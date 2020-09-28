@@ -1,0 +1,6 @@
+[submodule "external/singularity-eos"]
+	path = external/singularity-eos
+	url = git@gitlab.lanl.gov:singularity/singularity-eos.git
+[submodule "external/parthenon"]
+	path = external/parthenon
+	url = https://github.com/lanl/parthenon.git
