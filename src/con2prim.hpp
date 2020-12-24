@@ -22,18 +22,21 @@ namespace con2prim {
 
 enum class ConToPrimStatus {success, failure};
 
+template <typename T>
 class VarAccessor {
  public:
   KOKKOS_FUNCTION
-  VarAccessor(const VariablePack<Real> &var, const int k, const int j, const int i)
-              : var_(var), k_(k), j_(j), i_(i) {}
+  VarAccessor(const T &var, const int k, const int j, const int i)
+              : var_(var), b_(0), k_(k), j_(j), i_(i) {}
+  VarAccessor(const T &bar, const int b, const int k, const int j, const int i)
+              : var_(var), b_(b), k_(k), j_(j), i_(i) {}
   KOKKOS_FORCEINLINE_FUNCTION
   Real &operator()(const int n) const {
-    return var_(n,k_,j_,i_);
+    return var_(b, n, k_,j_,i_);
   }
  private:
-  const VariablePack<Real> &var_;
-  const int i_, j_, k_;
+  const T &var_;
+  const int b_, i_, j_, k_;
 };
 
 struct CellGeom {
