@@ -21,10 +21,10 @@ int main(int argc, char *argv[]) {
 
   // Redefine parthenon defaults
   pman.app_input->ProcessPackages = phoebus::ProcessPackages;
-  pman.app_input->ProcessProperties = phoebus::ProcessProperties;
+  // pman.app_input->ProcessProperties = phoebus::ProcessProperties;
   pman.app_input->ProblemGenerator = phoebus::ProblemGenerator;
-  //pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
-  pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
+  // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
+  // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
 
   // call ParthenonInit to initialize MPI and Kokkos, parse the input deck, and set up
   auto manager_status = pman.ParthenonInit(argc, argv);
