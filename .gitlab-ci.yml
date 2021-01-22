@@ -23,3 +23,4 @@ build:
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DCMAKE_CXX_COMPILER=mpic++ ..
     - make -j
+    - make test
