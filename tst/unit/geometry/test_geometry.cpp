@@ -46,14 +46,14 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
             if (alpha != 1.) update += 1;
 
             // shift
-            for (int l = 0; l < ND; ++l) {
+            for (int l = 1; l < NDFULL; ++l) {
               Real beta = system.ContravariantShift(l, CellLocation::Corn, 0, 0, 0);
               if (beta != 0.0) update += 1;
             }
 
             // metric
-            for (int l = 0; l < ND; l++) {
-              for (int m = 0; m < ND; m++) {
+            for (int l = 1; l < NDFULL; l++) {
+              for (int m = 1; m < NDFULL; m++) {
                 Real comp = system.Metric(l, m, CellLocation::Face1, 0, 0, 0);
                 if (l == m && comp != 1.)
                   update += 1;
@@ -102,7 +102,7 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
 
             // grad g
             for (int nu = 0; nu < NDFULL; ++nu) {
-              for (int l = 0; l < ND; ++l) {
+              for (int l = 1; l < NDFULL; ++l) {
                 for (int mu = 0; mu < NDFULL; ++mu) {
                   Real dg = system.MetricDerivative(mu,l,nu,0,0,0,0);
                   if (dg != 0.0) update += 1;
