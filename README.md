@@ -1,6 +1,8 @@
 phoebus
 ===
 
+[![pipeline status](https://gitlab.lanl.gov/rpm/phoebus/badges/master/pipeline.svg)](https://gitlab.lanl.gov/rpm/phoebus/-/commits/master)
+
 Phifty One Ergs Blows Up a Star
 
 # Attaining the Source Code
