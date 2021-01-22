@@ -44,6 +44,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 # TODO(JMM): Tests? Copy what's in riot? Hack something in?
 # TODO(JMM): Pgen?
+include(CTest)
+option(PHOEBUS_ENABLE_UNIT_TESTS "Enable unit tests" OFF)
+option(PHOEBUS_ENABLE_INTEGRATION_TESTS "Enable integration tests" OFF)
+option(PHOEBUS_ENABLE_REGRESSION_TESTS "Enable regression tests" OFF)
 option(PHOEBUS_ENABLE_CUDA "Enable cuda for riot and all dependencies" OFF)
 option(PHOEBUS_ENABLE_HDF5 "Enable HDF5 for riot and all dependencies" ON)
 option(PHOEBUS_ENABLE_MPI "Enable MPI for riot and all dependencies" ON)
@@ -113,11 +117,14 @@ endif()
 
 # parthenon
 # TODO(JMM): This should be renamed PARTHENON_BUILD_TESTING
+message("Configuring Parthenon")
+set(PARTHENON_LINT_DEFAULT OFF CACHE BOOL "" FORCE)
 set(PARTHENON_DISABLE_EXAMPLES ON CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/parthenon parthenon)
 
 # singularity eos
+message("Configuring singularity-eos")
 set(SINGULARITY_USE_KOKKOS ON CACHE BOOL "" FORCE)
 set(SINGULARITY_USE_FORTRAN OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_SUBMODULE_MODE ON CACHE BOOL "" FORCE)
@@ -126,7 +133,13 @@ set(SINGULARITY_BUILD_MIX OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/singularity-eos singularity-eos)
 
 # Phoebus src
+message("Configuring src")
 add_subdirectory(src)
 
 # TODO(JMM): Testing?
-# add testing subdirs, etc here
+if(PHOEBUS_ENABLE_UNIT_TESTS OR PHOEBUS_ENABLE_INTEGRATION_TESTS OR PHOEBUS_ENABLE_REGRESSION_TESTS)
+  message("Configuring tests")
+  add_subdirectory(external/catch2 Catch2)
+  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/external/catch2/contrib)
+  add_subdirectory(tst)
+endif()
