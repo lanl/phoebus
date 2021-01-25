@@ -28,7 +28,9 @@ namespace phoebus {
 // function.                                       *//
 // *************************************************//
 PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm)
-    : MultiStageBlockTaskDriver(pin, app_in, pm) {
+    : Driver(pin, app_in, pm) {
+  InitializeOutputs();
+
   // fail if these are not specified in the input file
   pin->CheckRequired("parthenon/mesh", "ix1_bc");
   pin->CheckRequired("parthenon/mesh", "ox1_bc");
@@ -40,8 +42,27 @@ PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh
   pin->CheckDesired("parthenon/mesh", "numlevel");
 }
 
-parthenon::TaskListStatus PhoebusDriver::Step() {
-  return parthenon::TaskListStatus::complete;
+// TODO(JMM): In the end we should probably use a different driver,
+// like evolution driver, and then this is handled for us.
+parthenon::DriverStatus PhoebusDriver::Execute() {
+  pouts->MakeOutputs(pmesh, pinput);
+
+  ConstructAndExecuteTaskLists<>(this);
+
+  return DriverStatus::complete;
+}
+
+template<typename T>
+TaskCollection PhoebusDriver::MakeTaskCollection(T &blocks) {
+  TaskCollection tc;
+
+  return tc;
+}
+
+parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
+  parthenon::Packages_t packages;
+
+  return packages;
 }
 
 } // namespace phoebus

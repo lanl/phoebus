@@ -22,16 +22,18 @@ using namespace parthenon::driver::prelude;
 
 namespace phoebus {
 
-class PhoebusDriver : public MultiStageDriver {
+// TODO(JMM): What kind of driver should this be?
+class PhoebusDriver : public Driver {
  public:
   PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm);
-  TaskListStatus Step();
+
+  template <typename T>
+  TaskCollection MakeTaskCollection(T &blocks);
+
+  DriverStatus Execute() override;
 };
 
-void UserWorkAfterLoop(Mesh *mesh, ParameterInput *pin, SimTime &tm);
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
-parthenon::Properties_t ProcessProperties(std::unique_ptr<ParamerterInput> &pin);
-void SetFillDerivedFunctions();
 
 } // namespace phoebus
 
