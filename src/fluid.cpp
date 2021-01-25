@@ -1,6 +1,9 @@
 #include "fluid.hpp"
+#include "con2prim.hpp"
+#include "reconstruction.hpp"
 
 #include <kokkos_abstraction.hpp>
+
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("Fluid");
@@ -20,12 +23,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField("p.energy", mprim_scalar);
   //physics->AddField("p.bfield", mprim_threev);
   physics->AddField("pressure", mprim_scalar);
+  physics->AddField("gamma1", mprim_scalar);
 
   // add the conserved variables
   physics->AddField("c.density", mcons_scalar);
   physics->AddField("c.momentum", mcons_threev);
   physics->AddField("c.energy", mcons_scalar);
   //physics->AddField("c.bfield", mcons_threev);
+
+  Metadata mrecon = Metadata({Metadata::Face, Metadata::OneCopy}, std::vector<int>(1, 7));
+  physics->AddField("ql", mrecon);
+  physics->AddField("qr", mrecon);
 
   return physics;
 }
@@ -35,7 +43,7 @@ TaskStatus PrimitiveToConserved(MeshData<Real> *rc) {
   auto *pmb = rc->GetParentPointer();
 
   std::vector<std::string> vars({"p.density", "c.density",
-                                 "p.velocity", "c.velocity",
+                                 "p.velocity", "c.momentum",
                                  "p.energy", "c.energy",
                                  "pressure"});
 
@@ -93,7 +101,7 @@ TaskStatus ConservedToPrimitive(MeshData<Real> *rc) {
   auto *pmb = rc->GetParentPointer();
 
   std::vector<std::string> vars({"p.density", "c.density",
-                                 "p.velocity", "c.velocity",
+                                 "p.velocity", "c.momentum",
                                  "p.energy", "c.energy",
                                  "pressure", "temperature"});
 
@@ -104,7 +112,7 @@ TaskStatus ConservedToPrimitive(MeshData<Real> *rc) {
   auto &geom = 
   ConToPrim invert(v, imap, eos, geom);
 
-  const int ifail
+  const int ifail;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -114,7 +122,27 @@ TaskStatus ConservedToPrimitive(MeshData<Real> *rc) {
   parthenon::par_reduce(DEFAULT_LOOP_PATTERN, "ConToPrim", DevExecSpace(),
     0, v.GetDim(5)-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &fail) {
-      invert(b, k, j, i);
+      auto status = invert(b, k, j, i);
+      if (status == ConToPrimStatus::failure) fail++;
     }, Kokkos::Sum<int>(fail_cnt));
+  return TaskStatus::complete;
+}
+
+//template <typename T>
+TaskStatus CalculateFluxes(MeshData<Real> *rc) {
+  auto *pmb = rc->GetParentPointer();
+
+  std::vector<std::string> vars({"p.density", "p.velocity", "p.energy", "pressure"});
+  std::vector<std::string> flxs({"c.density", "c.momentum", "c.energy"});
+
+  PackIndexMap imap;
+  auto &v = rc->PackVariablesAndFluxes(vars, flxs, imap);
+
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
+    0, v.GetDim(5)-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+    KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+
+    });
+
   return TaskStatus::complete;
 }

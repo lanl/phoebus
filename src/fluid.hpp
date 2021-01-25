@@ -17,7 +17,6 @@
 #include <memory>
 
 #include <parthenon/package.hpp>
-
 using namespace parthenon::package::prelude;
 
 namespace fluid {
