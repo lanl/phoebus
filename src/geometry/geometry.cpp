@@ -43,9 +43,28 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return geometry;
 }
 
+// These are overloaded, rather than templated because
+// the per-system logic probably needs to change between MeshData
+// and MeshBlockData.
 CoordinateSystem GetCoordinateSystem(MeshBlockData<Real> *rc) {
-  auto pmb = rc->GetBlockPointer();
+  auto pmb = rc->GetParentPointer();
   auto &geom = pmb->packages["geometry"];
+  auto tag = geom->Param<CoordSystemTag>("coordinate_system");
+
+  // some coordinate systems may require more inputs to
+  // constructor. Can be pulled out of params or the MeshBlockData
+  // object.
+  switch(tag) {
+  case CoordSystemTag::Minkowski:
+    return CoordinateSystem(Analytic<Minkowski>());
+  default:
+    PARTHENON_THROW("unknown coordinate system");
+  }
+}
+
+CoordinateSystem GetCoordinateSystem(MeshData<Real> *rc) {
+  auto pmesh = rc->GetParentPointer();
+  auto &geom = pmesh->packages["geometry"];
   auto tag = geom->Param<CoordSystemTag>("coordinate_system");
 
   // some coordinate systems may require more inputs to

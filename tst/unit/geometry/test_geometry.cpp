@@ -8,6 +8,7 @@
 // parthenon includes
 #include <coordinates/coordinates.hpp>
 #include <defs.hpp>
+#include <kokkos_abstraction.hpp>
 #include <parameter_input.hpp>
 
 // phoebus includes
@@ -17,6 +18,7 @@
 using namespace Geometry;
 using parthenon::Coordinates_t;
 using parthenon::ParameterInput;
+using parthenon::ParArray1D;
 using parthenon::Real;
 using parthenon::RegionSize;
 
@@ -40,15 +42,17 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
       Kokkos::parallel_reduce(
           "get n wrong", NTRIALS,
           KOKKOS_LAMBDA(const int i, int &update) {
-
             // lapse
             Real alpha = system.Lapse(0, 0, 0, 0);
-            if (alpha != 1.) update += 1;
+            if (alpha != 1.)
+              update += 1;
 
             // shift
             for (int l = 1; l < NDFULL; ++l) {
-              Real beta = system.ContravariantShift(l, CellLocation::Corn, 0, 0, 0);
-              if (beta != 0.0) update += 1;
+              Real beta =
+                  system.ContravariantShift(l, CellLocation::Corn, 0, 0, 0);
+              if (beta != 0.0)
+                update += 1;
             }
 
             // metric
@@ -62,7 +66,7 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
               }
             }
 
-            // inverse metric 
+            // inverse metric
             Real gamma[ND][ND];
             system.MetricInverse(0, 0, 0, 0, gamma);
             for (int l = 0; l < ND; l++) {
@@ -74,17 +78,16 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
               }
             }
 
-            
             // metric determinants
             for (int k = 0; k < NX; ++k) {
               for (int j = 0; j < NX; ++j) {
                 for (int ii = 0; ii < NX; ++ii) {
-                  Real dgamma =
-                      system.DetGamma(CellLocation::Face2, k, j, ii);
+                  Real dgamma = system.DetGamma(CellLocation::Face2, k, j, ii);
                   if (dgamma != 1.0)
                     update += 1;
                   Real dg = system.DetG(CellLocation::Face3, k, j, ii);
-                  if (dg != 1.0) update += 1;
+                  if (dg != 1.0)
+                    update += 1;
                 }
               }
             }
@@ -101,11 +104,13 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
             }
 
             // grad g
+            // g_{nu l, mu}
             for (int nu = 0; nu < NDFULL; ++nu) {
               for (int l = 1; l < NDFULL; ++l) {
                 for (int mu = 0; mu < NDFULL; ++mu) {
-                  Real dg = system.MetricDerivative(mu,l,nu,0,0,0,0);
-                  if (dg != 0.0) update += 1;
+                  Real dg = system.MetricDerivative(mu, l, nu, 0, 0, 0, 0);
+                  if (dg != 0.0)
+                    update += 1;
                 }
               }
             }
@@ -114,11 +119,75 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
             Real grada[NDFULL];
             system.GradLnAlpha(CellLocation::Corn, 0, 0, 0, grada);
             for (int mu = 0; mu < NDFULL; ++mu) {
-              if (grada[mu] != 0.0) update += 1;
+              if (grada[mu] != 0.0)
+                update += 1;
             }
           },
           n_wrong);
       REQUIRE(n_wrong == 0);
+    }
+  }
+  GIVEN("A ParArray1D of Coordinates_ts") {
+    ParArray1D<Coordinates_t> coords("coords view", NTRIALS);
+    auto coords_h = Kokkos::create_mirror_view(coords);
+    for (int i = 0; i < NTRIALS; ++i) {
+      coords_h(i) = Coordinates_t(); // or something more complicated
+    }
+    Kokkos::deep_copy(coords, coords_h);
+    THEN("We can create a Minkowski coordinate system using this") {
+      // time = 3.0
+      CoordinateSystem system = Analytic<Minkowski>(3.0, coords);
+      AND_THEN("The coordinate system can be called on device") {
+        int n_wrong = 100; // > 0
+        Kokkos::parallel_reduce(
+            "get n wrong", NTRIALS,
+            KOKKOS_LAMBDA(const int b, int &update) {
+              // shift
+              for (int l = 1; l < NDFULL; ++l) {
+                Real beta = system.ContravariantShift(l, CellLocation::Corn, b,
+                                                      0, 0, 0);
+                if (beta != 0.0)
+                  update += 1;
+              }
+
+              // metric
+              for (int l = 1; l < NDFULL; l++) {
+                for (int m = 1; m < NDFULL; m++) {
+                  Real comp =
+                      system.Metric(l, m, CellLocation::Face1, b, 0, 0, 0);
+                  if (l == m && comp != 1.)
+                    update += 1;
+                  if (l != m && comp != 0.)
+                    update += 1;
+                }
+              }
+
+              // metric determinants
+              for (int k = 0; k < NX; ++k) {
+                for (int j = 0; j < NX; ++j) {
+                  for (int ii = 0; ii < NX; ++ii) {
+                    Real dgamma =
+                        system.DetGamma(CellLocation::Face2, b, k, j, ii);
+                    if (dgamma != 1.0)
+                      update += 1;
+                    Real dg = system.DetG(CellLocation::Face3, b, k, j, ii);
+                    if (dg != 1.0)
+                      update += 1;
+                  }
+                }
+              }
+
+              // grad ln(alpha)
+              Real grada[NDFULL];
+              system.GradLnAlpha(CellLocation::Corn, b, 0, 0, 0, grada);
+              for (int mu = 0; mu < NDFULL; ++mu) {
+                if (grada[mu] != 0.0)
+                  update += 1;
+              }
+            },
+            n_wrong);
+        REQUIRE(n_wrong == 0);
+      }
     }
   }
 }

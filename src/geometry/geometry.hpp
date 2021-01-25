@@ -22,6 +22,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 void SetGeometry(MeshBlockData<Real> *rc);
 
 CoordinateSystem GetCoordinateSystem(MeshBlockData<Real> *rc);
+CoordinateSystem GetCoordinateSystem(MeshData<Real> *rc);
 
 } // namespace Geometry
 

@@ -16,6 +16,7 @@
 #include "phoebus_utils/cell_locations.hpp"
 
 using namespace parthenon::package::prelude;
+using parthenon::ParArray1D;
 
 namespace Geometry {
 
@@ -41,16 +42,30 @@ static constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
   - C2(X0, X1, X2, X3)
   - C3(X0, X1, X2, X3)
  */
+// TODO(JMM): We use a horrible run-time indirection here, where the
+// code will throw if you use the MeshData calls after initializing
+// for a meshblock or use the MeshBlockData calls after initializing
+// for a MeshData object. This COULD be done at compile time with
+// metaprogramming. But I went with this version for now.
 template <typename System> class Analytic {
 public:
   Analytic() = default;
   template <typename... Args>
   Analytic(const Coordinates_t &coordinates, Args... args)
-      : X0_(0), coordinates_(coordinates),
+      : multiple_coords_(false), X0_(0), coordinates_single_(coordinates),
         system_(std::forward<Args>(args)...) {}
   template <typename... Args>
   Analytic(const Real X0, const Coordinates_t &coordinates, Args... args)
-      : X0_(X0), coordinates_(coordinates),
+      : multiple_coords_(false), X0_(X0), coordinates_single_(coordinates),
+        system_(std::forward<Args>(args)...) {}
+  template <typename... Args>
+  Analytic(const ParArray1D<Coordinates_t> &coordinates, Args... args)
+      : multiple_coords_(true), X0_(0), coordinates_multi_(coordinates),
+        system_(std::forward<Args>(args)...) {}
+  template <typename... Args>
+  Analytic(const Real X0, const ParArray1D<Coordinates_t> &coordinates,
+           Args... args)
+      : multiple_coords_(true), X0_(X0), coordinates_multi_(coordinates),
         system_(std::forward<Args>(args)...) {}
 
   KOKKOS_INLINE_FUNCTION
@@ -61,6 +76,12 @@ public:
   Real Lapse(CellLocation loc, int k, int j, int i) const {
     Real X1, X2, X3;
     GetX(loc, k, j, i, X1, X2, X3);
+    return Lapse(X0_, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real Lapse(CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
     return Lapse(X0_, X1, X2, X3);
   }
 
@@ -74,6 +95,12 @@ public:
     GetX(loc, k, j, i, X1, X2, X3);
     return ContravariantShift(l, X0_, X1, X2, X3);
   }
+  KOKKOS_INLINE_FUNCTION
+  Real ContravariantShift(int l, CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return ContravariantShift(l, X0_, X1, X2, X3);
+  }
 
   KOKKOS_INLINE_FUNCTION
   Real Metric(int l, int m, Real X0, Real X1, Real X2, Real X3) const {
@@ -83,6 +110,12 @@ public:
   Real Metric(int l, int m, CellLocation loc, int k, int j, int i) const {
     Real X1, X2, X3;
     GetX(loc, k, j, i, X1, X2, X3);
+    return Metric(l, m, X0_, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real Metric(int l, int m, CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
     return Metric(l, m, X0_, X1, X2, X3);
   }
 
@@ -97,6 +130,13 @@ public:
     GetX(loc, k, j, i, X1, X2, X3);
     return MetricInverse(l, m, X0_, X1, X2, X3);
   }
+  KOKKOS_INLINE_FUNCTION
+  Real MetricInverse(int l, int m, CellLocation loc, int b, int k, int j,
+                     int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return MetricInverse(l, m, X0_, X1, X2, X3);
+  }
 
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
@@ -108,6 +148,12 @@ public:
     GetX(loc, k, j, i, X1, X2, X3);
     return DetGamma(X0_, X1, X2, X3);
   }
+  KOKKOS_INLINE_FUNCTION
+  Real DetGamma(CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return DetGamma(X0_, X1, X2, X3);
+  }
 
   KOKKOS_INLINE_FUNCTION
   Real DetG(Real X0, Real X1, Real X2, Real X3) const {
@@ -117,6 +163,12 @@ public:
   Real DetG(CellLocation loc, int k, int j, int i) const {
     Real X1, X2, X3;
     GetX(loc, k, j, i, X1, X2, X3);
+    return DetG(X0_, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real DetG(CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
     return DetG(X0_, X1, X2, X3);
   }
 
@@ -132,6 +184,13 @@ public:
     GetX(loc, k, j, i, X1, X2, X3);
     return ConnectionCoefficient(mu, nu, sigma, X0_, X1, X2, X3);
   }
+  KOKKOS_INLINE_FUNCTION
+  Real ConnectionCoefficient(int mu, int nu, int sigma, CellLocation loc, int b, int k,
+                             int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return ConnectionCoefficient(mu, nu, sigma, X0_, X1, X2, X3);
+  }
 
   KOKKOS_INLINE_FUNCTION
   Real MetricDerivative(int mu, int l, int nu, Real X0, Real X1, Real X2,
@@ -145,6 +204,13 @@ public:
     GetX(loc, k, j, i, X1, X2, X3);
     return MetricDerivative(mu, l, nu, X0_, X1, X2, X3);
   }
+  KOKKOS_INLINE_FUNCTION
+  Real MetricDerivative(int mu, int l, int nu, CellLocation loc, int b, int k, int j,
+                        int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return MetricDerivative(mu, l, nu, X0_, X1, X2, X3);
+  }
 
   KOKKOS_INLINE_FUNCTION
   Real GradLnAlpha(int mu, Real X0, Real X1, Real X2, Real X3) const {
@@ -154,6 +220,12 @@ public:
   Real GradLnAlpha(int mu, CellLocation loc, int k, int j, int i) const {
     Real X1, X2, X3;
     GetX(loc, k, j, i, X1, X2, X3);
+    return GradLnAlpha(mu, X0_, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real GradLnAlpha(int mu, CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
     return GradLnAlpha(mu, X0_, X1, X2, X3);
   }
 
@@ -197,30 +269,56 @@ public:
     GetX(loc, k, j, i, X1, X2, X3);
     return C3(X0_, X1, X2, X3);
   }
+  KOKKOS_INLINE_FUNCTION
+  Real C0(CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return C0(X0_, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real C1(CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return C1(X0_, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real C2(CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, k, j, i, X1, X2, X3);
+    return C2(X0_, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real C3(CellLocation loc, int b, int k, int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return C3(X0_, X1, X2, X3);
+  }
 
 private:
   KOKKOS_INLINE_FUNCTION
-  void GetX(CellLocation loc, int k, int j, int i, Real &X1, Real &X2,
+  void GetX(CellLocation loc, int b, int k, int j, int i, Real &X1, Real &X2,
             Real &X3) const {
+    PARTHENON_REQUIRE(multiple_coords_,
+                      "One Coordinates_t per meshblock is required");
     // defaults
-    X1 = coordinates_.x1v(i);
-    X2 = coordinates_.x2v(j);
-    X3 = coordinates_.x3v(k);
+    X1 = coordinates_multi_(b).x1v(i);
+    X2 = coordinates_multi_(b).x2v(j);
+    X3 = coordinates_multi_(b).x3v(k);
     // overwrite
     switch (loc) {
     case CellLocation::Face1:
-      X1 = coordinates_.x1f(i);
+      X1 = coordinates_multi_(b).x1f(i);
       break;
     case CellLocation::Face2:
-      X2 = coordinates_.x2f(j);
+      X2 = coordinates_multi_(b).x2f(j);
       break;
     case CellLocation::Face3:
-      X3 = coordinates_.x3f(k);
+      X3 = coordinates_multi_(b).x3f(k);
       break;
     case CellLocation::Corn:
-      X1 = coordinates_.x1f(i);
-      X2 = coordinates_.x2f(j);
-      X3 = coordinates_.x3f(k);
+      X1 = coordinates_multi_(b).x1f(i);
+      X2 = coordinates_multi_(b).x2f(j);
+      X3 = coordinates_multi_(b).x3f(k);
       break;
     default: // CellLocation::Cent:
       break;
@@ -228,7 +326,41 @@ private:
     return;
   }
 
-  Coordinates_t coordinates_;
+  KOKKOS_INLINE_FUNCTION
+  void GetX(CellLocation loc, int k, int j, int i, Real &X1, Real &X2,
+            Real &X3) const {
+    PARTHENON_REQUIRE(
+        !multiple_coords_,
+        "Must have set only one Coordinates_t object to resolve ambiguities");
+    // defaults
+    X1 = coordinates_single_.x1v(i);
+    X2 = coordinates_single_.x2v(j);
+    X3 = coordinates_single_.x3v(k);
+    // overwrite
+    switch (loc) {
+    case CellLocation::Face1:
+      X1 = coordinates_single_.x1f(i);
+      break;
+    case CellLocation::Face2:
+      X2 = coordinates_single_.x2f(j);
+      break;
+    case CellLocation::Face3:
+      X3 = coordinates_single_.x3f(k);
+      break;
+    case CellLocation::Corn:
+      X1 = coordinates_single_.x1f(i);
+      X2 = coordinates_single_.x2f(j);
+      X3 = coordinates_single_.x3f(k);
+      break;
+    default: // CellLocation::Cent:
+      break;
+    }
+    return;
+  }
+
+  bool multiple_coords_;
+  Coordinates_t coordinates_single_;
+  ParArray1D<Coordinates_t> coordinates_multi_;
   System system_;
   Real X0_;
 };
