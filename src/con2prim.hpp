@@ -18,8 +18,6 @@
 #include <parthenon/package.hpp>
 using namespace parthenon::package::prelude;
 
-#include "eos_stub.hpp"
-
 namespace con2prim {
 
 enum class ConToPrimStatus {success, failure};
