@@ -4,6 +4,8 @@
 
 #include <kokkos_abstraction.hpp>
 
+#include <eos/eos.hpp>
+
 namespace fluid {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
@@ -48,7 +50,7 @@ TaskStatus PrimitiveToConserved(T *rc) {
                                  "p.energy", "c.energy",
                                  "pressure"});
 
-  PackIndexMap imap
+  PackIndexMap imap;
   auto &v = rc->PackVariables(vars, imap);
 
   const int prho = imap["p.density"].first;
@@ -86,7 +88,7 @@ TaskStatus PrimitiveToConserved(T *rc) {
 
       Real rhoh = v(b, prho, k, j, i) + v(b, peng, k, j, i) + v(b, prs, k, j, i);
       for (int m = 0; m < 3; m++) {
-        vcov = 0.0;
+        Real vcov = 0.0;
         for (int n = 0; n < 3; n++) {
           vcov += gcov[m][n]*v(b, pvel_lo+n, k, j, i);
         }

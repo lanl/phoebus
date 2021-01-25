@@ -14,9 +14,13 @@
 #ifndef CON2PRIM_HPP_
 #define CON2PRIM_HPP_
 
+// parthenon provided headers
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 using namespace parthenon::package::prelude;
+
+// singulaarity
+#include <eos/eos.hpp>
 
 #include "geometry/coordinate_systems.hpp"
 #include "phoebus_utils/cell_locations.hpp"

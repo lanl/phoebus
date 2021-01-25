@@ -72,6 +72,16 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
+# If this is a debug build, set kokkos debug on
+if (${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+  message(STATUS "Enabling Kokkos debug mode")
+  set(Kokkos_ENABLE_DEBUG ON CACHE BOOL "Most general debug settings")
+  set(Kokkos_ENABLE_DEBUG_BOUNDS_CHECK ON CACHE BOOL
+     "Bounds checking on Kokkos views")
+  set(Kokkos_ENABLE_DEBUG_DUALVIEW_MODIFY_CHECK ON CACHE BOOL
+      "Sanity checks on Kokkos DualView")
+endif()
+
 # append to CMAKE_MODULE_PATH
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 

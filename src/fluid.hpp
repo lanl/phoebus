@@ -19,7 +19,7 @@
 #include <parthenon/package.hpp>
 using namespace parthenon::package::prelude;
 
-#include "geometry/coordinate_systems.hpp"
+#include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 
 namespace fluid {
@@ -33,3 +33,5 @@ template <typename T>
 TaskStatus ConservedToPrimitive(T *rc);
 
 } // namespace fluid
+
+#endif // FLUID_HPP_
