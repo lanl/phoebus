@@ -16,8 +16,14 @@ add_executable(phoebus
 
   # alphabetical
 
+  geometry/geometry.hpp
+  geometry/geometry.cpp
+
   initial_conditions.hpp
   initial_conditions.cpp
+
+  microphysics/eos/eos.hpp
+  microphysics/eos/eos.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp
