@@ -30,8 +30,8 @@ add_executable(phoebus
   initial_conditions.hpp
   initial_conditions.cpp
 
-  microphysics/eos/eos.hpp
-  microphysics/eos/eos.cpp
+  microphysics/eos_phoebus/eos_phoebus.hpp
+  microphysics/eos_phoebus/eos_phoebus.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp

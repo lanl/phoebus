@@ -11,7 +11,7 @@
 #include <eos/eos_builder.hpp>
 
 // phoebus includes
-#include "microphysics/eos/eos.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 
 namespace Microphysics {
 namespace EOS {
