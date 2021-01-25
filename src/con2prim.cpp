@@ -87,6 +87,7 @@ ConToPrimStatus ConToPrim::Solve(const VarAccessor &v, const CellGeom &g) const 
 
   if(!converged) return ConToPrimStatus::failure;
 
+  v(tmp) = T_guess;
   v(prho) = rho_guess;
   v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess);
   v(peng) = rho_guess*eos.InternalEnergyFromDensityTemperature(rho_guess, T_guess);

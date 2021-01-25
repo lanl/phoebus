@@ -30,7 +30,7 @@ class VarAccessor {
   KOKKOS_FUNCTION
   VarAccessor(const T &var, const int k, const int j, const int i)
               : var_(var), b_(0), k_(k), j_(j), i_(i) {}
-  VarAccessor(const T &bar, const int b, const int k, const int j, const int i)
+  VarAccessor(const T &var, const int b, const int k, const int j, const int i)
               : var_(var), b_(b), k_(k), j_(j), i_(i) {}
   KOKKOS_FORCEINLINE_FUNCTION
   Real &operator()(const int n) const {
@@ -44,9 +44,15 @@ class VarAccessor {
 struct CellGeom {
   CellGeom(const Geometry::CoordinateSystem &geom,
                const int k, const int j, const int i)
-               : gdet(geom.MetricDeterminant(loc,k,j,i)) {
-    geom.Metric(CellLocation::Center, k, j, i, gcov);
-    geom.MetricInverse(CellLocation::Center, k, j, i, gcon);
+               : gdet(DetGamma(CellLocation::Cent,k,j,i)) {
+    geom.Metric(CellLocation::Cent, k, j, i, gcov);
+    geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+  }
+  CellGeom(const Geometry::CoordinateSystem &geom,
+           const int b, const int k, const int j, const int i)
+           : gdet(geom.DetGamma(CellLocation::Cent,b,k,j,i)) {
+    geom.Metric(CellLocation::Cent, b, k, j, i, gcov);
+    geom.MetricInverse(CellLocation::Cent, b, k, j, i, gcon);
   }
   Real gcov[3][3];
   Real gcon[3][3];
@@ -77,11 +83,6 @@ class ConToPrim {
     VarAccessor v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
     return Solve(v, g);
-  }
-
-  KOKKOS_FUNCTION
-  ConToPrimStatus operator()(const int b, const int k, const int j, const int i) const {
-    VarAccessor v()
   }
 
   KOKKOS_FUNCTION

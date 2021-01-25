@@ -19,9 +19,16 @@
 #include <parthenon/package.hpp>
 using namespace parthenon::package::prelude;
 
+#include "phoebus_utils/cell_locations.hpp"
+
 namespace fluid {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-TaskStatus PrimitiveToConserved(MeshData<Real> *rc);
+
+template <typename T>
+TaskStatus PrimitiveToConserved(T *rc);
+
+template <typename T>
+TaskStatus ConservedToPrimitive(T *rc);
 
 } // namespace fluid
