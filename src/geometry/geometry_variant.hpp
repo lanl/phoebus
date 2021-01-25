@@ -73,10 +73,18 @@ public:
         [&](const auto &system) { return system.Lapse(X0, X1, X2, X3); },
         system_);
   }
+  // mesh version
   KOKKOS_INLINE_FUNCTION
   Real Lapse(CellLocation loc, int k, int j, int i) const {
     return mpark::visit(
         [&](const auto &system) { return system.Lapse(loc, k, j, i); },
+        system_);
+  }
+  // meshblock version
+  KOKKOS_INLINE_FUNCTION
+  Real Lapse(CellLocation loc, int b, int k, int j, int i) const {
+    return mpark::visit(
+        [&](const auto &system) { return system.Lapse(loc, b, k, j, i); },
         system_);
   }
 
@@ -115,6 +123,24 @@ public:
       beta[l] = ContravariantShift(l + 1, loc, k, j, i);
     }
   }
+  KOKKOS_INLINE_FUNCTION
+  Real ContravariantShift(int l, CellLocation loc, int b, int k, int j,
+                          int i) const {
+    PARTHENON_DEBUG_REQUIRE(1 <= l && l <= NDSPACE,
+                            "Indices must be spacelike");
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.ContravariantShift(l, loc, b, k, j, i);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void ContravariantShift(CellLocation loc, int b, int k, int j, int i,
+                          Real beta[NDSPACE]) const {
+    for (int l = 0; l < NDSPACE; ++l) {
+      beta[l] = ContravariantShift(l + 1, loc, b, k, j, i);
+    }
+  }
 
   // gamma_{ij}
   KOKKOS_INLINE_FUNCTION Real Metric(int l, int m, Real X0, Real X1, Real X2,
@@ -149,6 +175,26 @@ public:
     for (int l = 0; l < NDSPACE; ++l) {
       for (int m = 0; m < NDSPACE; ++m) {
         gamma[l][m] = Metric(l + 1, m + 1, loc, k, j, i);
+      }
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real Metric(int l, int m, CellLocation loc, int b, int k, int j,
+              int i) const {
+    PARTHENON_DEBUG_REQUIRE(1 <= l && l <= NDSPACE && 1 <= m && m <= NDSPACE,
+                            "Indices must be spacelike");
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.Metric(l, m, loc, b, k, j, i);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void Metric(CellLocation loc, int b, int k, int j, int i,
+              Real gamma[NDSPACE][NDSPACE]) const {
+    for (int l = 0; l < NDSPACE; ++l) {
+      for (int m = 0; m < NDSPACE; ++m) {
+        gamma[l][m] = Metric(l + 1, m + 1, loc, b, k, j, i);
       }
     }
   }
@@ -195,6 +241,27 @@ public:
       }
     }
   }
+  KOKKOS_INLINE_FUNCTION
+  Real MetricInverse(int l, int m, CellLocation loc, int b, int k, int j,
+                     int i) const {
+    PARTHENON_DEBUG_REQUIRE(1 <= l && l <= NDSPACE && 1 <= m && m <= NDSPACE,
+                            "Indices must be spacelike");
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.MetricInverse(l, m, loc, b, k, j, i);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void MetricInverse(CellLocation loc, int b, int k, int j, int i,
+                     Real gamma[NDSPACE][NDSPACE]) const {
+    for (int m = 0; m < NDSPACE; ++m) {
+      for (int l = m; l < NDSPACE; ++l) {
+        gamma[l][m] = MetricInverse(l + 1, m + 1, loc, b, k, j, i);
+        gamma[m][l] = gamma[l][m];
+      }
+    }
+  }
   // ======================================================================
 
   // Metric determinants
@@ -204,6 +271,12 @@ public:
   Real DetGamma(CellLocation loc, int k, int j, int i) const {
     return mpark::visit(
         [&](const auto &system) { return system.DetGamma(loc, k, j, i); },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real DetGamma(CellLocation loc, int b, int k, int j, int i) const {
+    return mpark::visit(
+        [&](const auto &system) { return system.DetGamma(loc, b, k, j, i); },
         system_);
   }
   KOKKOS_INLINE_FUNCTION
@@ -218,6 +291,12 @@ public:
   Real DetG(CellLocation loc, int k, int j, int i) const {
     return mpark::visit(
         [&](const auto &system) { return system.DetG(loc, k, j, i); }, system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real DetG(CellLocation loc, int b, int k, int j, int i) const {
+    return mpark::visit(
+        [&](const auto &system) { return system.DetG(loc, b, k, j, i); },
+        system_);
   }
   KOKKOS_INLINE_FUNCTION
   Real DetG(Real X0, Real X1, Real X2, Real X3) const {
@@ -284,6 +363,33 @@ public:
     }
   }
 
+  KOKKOS_INLINE_FUNCTION
+  Real ConnectionCoefficient(int mu, int nu, int sigma, CellLocation loc, int b,
+                             int k, int j, int i) const {
+    PARTHENON_DEBUG_REQUIRE(0 <= mu && mu <= NDFULL && 0 <= nu &&
+                                nu <= NDFULL && 0 <= sigma && sigma <= NDFULL,
+                            "Indices must be spacetime");
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.ConnectionCoefficient(mu, nu, sigma, loc, b, k, j, i);
+        },
+        system_);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void ConnectionCoefficient(CellLocation loc, int b, int k, int j, int i,
+                             Real Gamma[NDSPACE][NDSPACE][NDSPACE]) const {
+    for (int mu = 0; mu < NDSPACE; ++mu) {
+      for (int nu = 0; nu < NDSPACE; ++nu) {
+        for (int sigma = nu; sigma < NDSPACE; ++sigma) {
+          Gamma[mu][nu][sigma] =
+              ConnectionCoefficient(mu, nu, sigma, loc, b, k, j, i);
+          Gamma[mu][sigma][nu] = Gamma[mu][nu][sigma];
+        }
+      }
+    }
+  }
+
   // g_{nu l, mu}
   KOKKOS_INLINE_FUNCTION
   Real MetricDerivative(int mu, int l, int nu, Real X0, Real X1, Real X2,
@@ -331,6 +437,29 @@ public:
       }
     }
   }
+  KOKKOS_INLINE_FUNCTION
+  Real MetricDerivative(int mu, int l, int nu, CellLocation loc, int b, int k,
+                        int j, int i) const {
+    PARTHENON_DEBUG_REQUIRE(0 <= mu && mu <= NDFULL && 0 <= nu &&
+                                nu <= NDFULL && 1 <= l && l <= NDSPACE,
+                            "Indices must be correct");
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.MetricDerivative(mu, l, nu, loc, b, k, j, i);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void MetricDerivative(CellLocation loc, int b, int k, int j, int i,
+                        Real dg[NDFULL][NDSPACE][NDFULL]) const {
+    for (int mu = 0; mu < NDFULL; ++mu) {
+      for (int l = 0; l < NDSPACE; ++l) {
+        for (int nu = 0; nu < NDFULL; ++nu) {
+          dg[mu][l][nu] = MetricDerivative(mu, l + 1, nu, loc, b, k, j, i);
+        }
+      }
+    }
+  }
 
   // (ln alpha)_{, mu}
   KOKKOS_INLINE_FUNCTION
@@ -364,6 +493,23 @@ public:
                    Real da[NDFULL]) const {
     for (int mu = 0; mu < NDFULL; ++mu) {
       da[mu] = GradLnAlpha(mu, loc, k, j, i);
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real GradLnAlpha(int mu, CellLocation loc, int b, int k, int j, int i) const {
+    PARTHENON_DEBUG_REQUIRE(0 <= mu && mu <= NDFULL,
+                            "Indices must be spacetime");
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.GradLnAlpha(mu, loc, b, k, j, i);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void GradLnAlpha(CellLocation loc, int b, int k, int j, int i,
+                   Real da[NDFULL]) const {
+    for (int mu = 0; mu < NDFULL; ++mu) {
+      da[mu] = GradLnAlpha(mu, loc, b, k, j, i);
     }
   }
   // ======================================================================
@@ -424,6 +570,39 @@ public:
     C[1] = C1(loc, k, j, i);
     C[2] = C2(loc, k, j, i);
     C[3] = C3(loc, k, j, i);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real C0(CellLocation loc, int b, int k, int j, int i) const {
+    return mpark::visit(
+        [&](const auto &system) { return system.C0(loc, b, k, j, i); },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real C1(CellLocation loc, int b, int k, int j, int i) const {
+    return mpark::visit(
+        [&](const auto &system) { return system.C1(loc, b, k, j, i); },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real C2(CellLocation loc, int b, int k, int j, int i) const {
+    return mpark::visit(
+        [&](const auto &system) { return system.C2(loc, b, k, j, i); },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real C3(CellLocation loc, int b, int k, int j, int i) const {
+    return mpark::visit(
+        [&](const auto &system) { return system.C3(loc, b, k, j, i); },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void Coords(CellLocation loc, int b, int k, int j, int i,
+              Real C[NDFULL]) const {
+    C[0] = C0(loc, b, k, j, i);
+    C[1] = C1(loc, b, k, j, i);
+    C[2] = C2(loc, b, k, j, i);
+    C[3] = C3(loc, b, k, j, i);
   }
 
 private:
