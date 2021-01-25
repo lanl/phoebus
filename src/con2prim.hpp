@@ -18,6 +18,9 @@
 #include <parthenon/package.hpp>
 using namespace parthenon::package::prelude;
 
+#include "geometry/coordinate_systems.hpp"
+#include "phoebus_utils/cell_locations.hpp"
+
 namespace con2prim {
 
 enum class ConToPrimStatus {success, failure};
@@ -42,7 +45,7 @@ class VarAccessor {
 struct CellGeom {
   CellGeom(const Geometry::CoordinateSystem &geom,
                const int k, const int j, const int i)
-               : gdet(DetGamma(CellLocation::Cent,k,j,i)) {
+               : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)) {
     geom.Metric(CellLocation::Cent, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
   }
@@ -78,17 +81,17 @@ class ConToPrim {
   template <class... Args>
   KOKKOS_FUNCTION
   ConToPrimStatus operator()(Args &&... args) const {
-    VarAccessor v(var, std::forward<Args>(args)...);
+    VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
     return Solve(v, g);
   }
 
   KOKKOS_FUNCTION
-  ConToPrimStatus Solve(const VarAccessor &v, const CellGeom &g) const;
+  ConToPrimStatus Solve(const VarAccessor<T> &v, const CellGeom &g) const;
 
  private:
   const T var;
-  const singularity::EOS eos;
+  const singularity::EOS &eos;
   const Geometry::CoordinateSystem geom;
   const int prho, crho;
   const int pvel_lo, pvel_hi;

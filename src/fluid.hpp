@@ -19,6 +19,7 @@
 #include <parthenon/package.hpp>
 using namespace parthenon::package::prelude;
 
+#include "geometry/coordinate_systems.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 
 namespace fluid {
