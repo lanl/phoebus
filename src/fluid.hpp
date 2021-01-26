@@ -35,101 +35,97 @@ template <typename T>
 TaskStatus ConservedToPrimitive(T *rc);
 
 */
-template <typename T>
-TaskStatus PrimitiveToConserved(T *rc) {
-  auto *pmb = rc->GetParentPointer();
+#define DELTA(i,j) (i==j ? 1 : 0)
 
-  std::vector<std::string> vars({"p.density", "c.density",
-                                 "p.velocity", "c.momentum",
-                                 "p.energy", "c.energy",
-                                 "pressure"});
+KOKKOS_FUNCTION
+void prim_to_flux(const int b, const int d, const int k, const int j, const int i,
+                  const Geometry::CoordinateSystem &geom, const ParArrayND<Real> &q,
+                  Real &cs, Real *U, Real *F) {
+  const int dir = d-1;
+  const Real &rho = q(b,dir,0,k,j,i);
+  const Real vcon[] = {q(b,dir,1,k,j,i), q(b,dir,2,k,j,i), q(b,dir,3,k,j,i)};
+  const Real &v = vcon[dir];
+  const Real &u = q(b,dir,4,k,j,i);
+  const Real &P = q(b,dir,5,k,j,i);
+  const Real &gm1 = q(b,dir,6,k,j,i);
+  cs = sqrt(gm1*P/rho);
 
-  PackIndexMap imap;
-  auto &v = rc->PackVariables(vars, imap);
+  CellLocation loc = DirectionToFaceID(d);
 
-  const int prho = imap["p.density"].first;
-  const int crho = imap["c.density"].first;
-  const int pvel_lo = imap["p.velocity"].first;
-  const int pvel_hi = imap["p.velocity"].second;
-  const int cmom_lo = imap["c.momentum"].first;
-  const int cmom_hi = imap["c.momentum"].second;
-  const int peng = imap["p.energy"].first;
-  const int ceng = imap["c.energy"].first;
-  const int prs = imap["pressure"].first;
+  Real vcov[3];
+  for (int m = 1; m <= 3; m++) {
+    vcov[m-1] = 0.0;
+    for (int n = 1; n <= 3; n++) {
+      vcov[m-1] += geom.Metric(m,n,loc,k,j,i)*vcon[n-1];
+    }
+  }
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  // get Lorentz factor
+  Real vsq = 0.0;
+  for (int m = 0; m < 3; m++) {
+    for (int n = 0; n < 3; n++) {
+      vsq += vcon[m]*vcov[n];
+    }
+  }
+  const Real W = 1.0/sqrt(1.0 - vsq);
 
-  auto geom = Geometry::GetCoordinateSystem(rc);
+  // conserved density
+  U[0] = rho*W;
 
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(),
-    0, v.GetDim(5)-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-    KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-      //todo(jcd): make these real
-      Real gcov[3][3];
-      geom.Metric(CellLocation::Cent, b, k, j, i, gcov);
-      Real gdet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
-      Real vsq = 0.0;
-      for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-          vsq += gcov[m][n] * v(b,pvel_lo+m, k, j, i) * v(b, pvel_lo+n, k, j, i);
-        }
-      }
-      Real W = 1.0/sqrt(1.0 - vsq);
-      // conserved density D = \sqrt{\gamma} \rho W
-      v(b, crho, k, j, i) = gdet * v(b, prho, k, j, i) * W;
+  // conserved momentum
+  Real H = rho + u + P;
+  for (int m = 1; m <= 3; m++) {
+    U[m] = H*W*W*vcov[m-1];
+  }
 
-      Real rhoh = v(b, prho, k, j, i) + v(b, peng, k, j, i) + v(b, prs, k, j, i);
-      for (int m = 0; m < 3; m++) {
-        Real vcov = 0.0;
-        for (int n = 0; n < 3; n++) {
-          vcov += gcov[m][n]*v(b, pvel_lo+n, k, j, i);
-        }
-        v(b, cmom_lo+m, k, j, i) = gdet*rhoh*W*W*vcov;
-      }
+  // conserved energy
+  U[4] = H*W*W - P - U[0];
 
-      v(b, ceng, k, j, i) = gdet*(rhoh*W*W - v(b, prs, k, j, i)) - v(b, crho, k, j, i);
-    });
+  // Get fluxes
+  const Real alpha = geom.Lapse(d, k, j, i);
+  for (int m = 1; m <= 3; m++) {
+    const Real vtil = vcon[m] - geom.ContravariantShift(m, loc, k, j, i)/alpha;
 
-  return TaskStatus::complete;
+    // mass flux
+    F[0] = U[0]*vtil;
+
+    // momentum flux
+    for (int n = 1; n <= 3; n++) {
+      F[n] = U[n]*vtil + P*DELTA(d,n);
+    }
+
+    // energy flux
+    F[4] = U[4]*vtil + P*v;
+  }
+
+  return;
 }
 
+#undef DELTA
+
+
+
 template <typename T>
-TaskStatus ConservedToPrimitive(T *rc) {
-  using namespace con2prim;
-  auto *pmb = rc->GetParentPointer();
+KOKKOS_INLINE_FUNCTION
+void llf(const int b, const int d, const int k, const int j, const int i,
+         const Geometry::CoordinateSystem &geom, const ParArrayND<Real> &ql,
+         const ParArrayND<Real> &qr, T &v) {
 
-  std::vector<std::string> vars({"p.density", "c.density",
-                                 "p.velocity", "c.momentum",
-                                 "p.energy", "c.energy",
-                                 "pressure", "temperature"});
+  Real Ul[5], Ur[5];
+  Real Fl[5], Fr[5];
+  Real cl, cr;
 
-  using namespace singularity;
-  auto &eos_pkg = pmb->packages.Get("EOS");
-  auto &eos = eos_pkg->Param<EOS>("d.EOS");
+  prim_to_flux(b, d, k, j, i, geom, ql, cl, Ul, Fl);
+  prim_to_flux(b, d, k, j, i, geom, qr, cr, Ur, Fr);
 
-  PackIndexMap imap;
-  auto &v = rc->PackVariables(vars, imap);
-  auto geom = Geometry::GetCoordinateSystem(rc);
-  ConToPrim invert(v, imap, eos, geom);
+  const Real cmax = (cl > cr ? cl : cr);
 
-  const int ifail;
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-
-  int fail_cnt;
-  parthenon::par_reduce(DEFAULT_LOOP_PATTERN, "ConToPrim", DevExecSpace(),
-    0, v.GetDim(5)-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-    KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &fail) {
-      auto status = invert(b, k, j, i);
-      if (status == ConToPrimStatus::failure) fail++;
-    }, Kokkos::Sum<int>(fail_cnt));
-  return TaskStatus::complete;
+  CellLocation loc = DirectionToFaceID(d);
+  const Real gdet = geom.DetGamma(loc, k, j, i);
+  for (int m = 0; m < 5; m++) {
+    v.flux(d,m,k,j,i) = 0.5*(Fl[m] + Fr[m] - cmax*(Ur[m] - Ul[m])) * gdet;
+  }
 }
-
 
 
 

@@ -5,7 +5,7 @@
 #include <defs.hpp>
 
 enum class CellLocation{
-  Face1, Face2, Face3, Cent, Corn
+  Cent, Face1, Face2, Face3, Corn
 };
 
 KOKKOS_FORCEINLINE_FUNCTION

@@ -17,7 +17,7 @@
 
 // Local Includes
 #include "geometry/geometry.hpp"
-#include "microphysics/eos/eos.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_driver.hpp"
 
 using namespace parthenon::driver::prelude;

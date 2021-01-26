@@ -39,7 +39,7 @@ class VarAccessor {
               : var_(var), b_(b), k_(k), j_(j), i_(i) {}
   KOKKOS_FORCEINLINE_FUNCTION
   Real &operator()(const int n) const {
-    return var_(b_, n, k_,j_,i_);
+    return var_(b_, n, k_, j_, i_);
   }
  private:
   const T &var_;
