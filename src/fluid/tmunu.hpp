@@ -44,7 +44,7 @@ public:
   // signature needs to change.
   // TODO(JMM): Should I use enable_if or static asserts or anything?
   template <typename... Args>
-  void operator()(Args... args, , Real T[ND][ND]) const {
+  void operator()(Args... args, Real T[ND][ND]) const {
     static_assert(sizeof...(Args) >= 3, "Must at least have k, j, i");
     static_assert(sizeof...(Args) <= 4, "Must have no more than b, k, j, i");
     Real u[ND], gamma[ND][ND];
@@ -110,6 +110,13 @@ private:
 
 using TmunuMesh = StressEnergyTensorCon<MeshBlockPack<VariablePack<Real>>>;
 using TmunuMeshBlock = StressEnergyTensorCon<VariablePack<Real>>;
+
+TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) {
+  return TmunuMesh(rc);
+}
+TmunuMeshBlock BuildStressEenergyTensor(MeshBlockData<Real> *rc) {
+  return TmunuMeshBlock(rc);
+}
 
 } // namespace fluid
 
