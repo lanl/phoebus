@@ -32,9 +32,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField("c.energy", mcons_scalar);
   //physics->AddField("c.bfield", mcons_threev);
 
-  Metadata mrecon = Metadata({Metadata::Face, Metadata::OneCopy}, std::vector<int>(1, 7));
-  physics->AddField("ql", mrecon);
-  physics->AddField("qr", mrecon);
+  //Metadata mrecon = Metadata({Metadata::Face, Metadata::OneCopy}, std::vector<int>(1, 7));
+  //physics->AddField("ql", mrecon);
+  //physics->AddField("qr", mrecon);
+
+  physics->FillDerivedBlock = ConservedToPrimitive;
 
   return physics;
 }
@@ -127,6 +129,9 @@ TaskStatus ConservedToPrimitive(MeshBlockData<Real> *rc) {
       auto status = invert(b, k, j, i);
       if (status == ConToPrimStatus::failure) fail++;
     }, Kokkos::Sum<int>(fail_cnt));
+
+  PARTHENON_REQUIRE(fail_cnt==0, "Con2Prim Failed!");
+
   return TaskStatus::complete;
 }
 
@@ -143,9 +148,9 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  auto ql = ParArrayND<Real>("ql", v.GetDim(5), pmb->pmy_mesh->ndim, recon_size+1,
+  auto ql = ParArrayND<Real>("ql", pmb->pmy_mesh->ndim, recon_size+1,
                         v.GetDim(3), v.GetDim(2), v.GetDim(1));
-  auto qr = ParArrayND<Real>("qr", v.GetDim(5), pmb->pmy_mesh->ndim, recon_size+1,
+  auto qr = ParArrayND<Real>("qr", pmb->pmy_mesh->ndim, recon_size+1,
                         v.GetDim(3), v.GetDim(2), v.GetDim(1));
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -155,17 +160,17 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   const int dk = (pmb->pmy_mesh->ndim == 3 ? 1 : 0);
   const int dj = (pmb->pmy_mesh->ndim >  1 ? 1 : 0);
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
-    0, v.GetDim(5)-1, X1DIR, pmb->pmy_mesh->ndim,
+    X1DIR, pmb->pmy_mesh->ndim,
     kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
-    KOKKOS_LAMBDA(const int b, const int d, const int k, const int j, const int i) {
-      PhoebusReconstruction::PiecewiseLinear(b, d, 0, recon_size, k, j, i, v, ql, qr);
+    KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
+      PhoebusReconstruction::PiecewiseLinear(d, 0, recon_size, k, j, i, v, ql, qr);
     });
 
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
-    0, v.GetDim(5)-1, X1DIR, pmb->pmy_mesh->ndim,
+    X1DIR, pmb->pmy_mesh->ndim,
     kb.s, kb.e+dk, jb.s, jb.e+dj, ib.s, ib.e+1,
-    KOKKOS_LAMBDA(const int b, const int d, const int k, const int j, const int i) {
-      llf(b, d, k, j, i, geom, ql, qr, v);
+    KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
+      llf(d, k, j, i, geom, ql, qr, v);
     });
 
   return TaskStatus::complete;

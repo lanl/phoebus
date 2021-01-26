@@ -94,7 +94,7 @@ Real phifunc(const Real mind, const Real maxd, const Real gx, const Real gy, con
 
 template <typename T>
 KOKKOS_INLINE_FUNCTION
-void PiecewiseLinear(const int b, const int d, const int nlo, const int nhi,
+void PiecewiseLinear(const int d, const int nlo, const int nhi,
                      const int k, const int j, const int i,
                      const T &v, const ParArrayND<Real> &ql, const ParArrayND<Real> &qr) {
   const int dir = d-1;
@@ -102,11 +102,11 @@ void PiecewiseLinear(const int b, const int d, const int nlo, const int nhi,
   int dj = (d == X2DIR ? 1 : 0);
   int dk = (d == X3DIR ? 1 : 0);
   for (int n=nlo; n<=nhi; n++) {
-    Real dql = v(b,n,k,j,i) - v(b,n,k-dk,j-dj,i-di);
-    Real dqr = v(b,n,k+dk,j+dj,i+di) - v(b,n,k,j,i);
+    Real dql = v(n,k,j,i) - v(n,k-dk,j-dj,i-di);
+    Real dqr = v(n,k+dk,j+dj,i+di) - v(n,k,j,i);
     Real dq = mc(dql,dqr)*dqr;
-    ql(b,dir,n,k+dk,j+dj,i+di) = v(b,n,k,j,i) + 0.5*dq;
-    qr(b,dir,n,k,j,i) = v(b,n,k,j,i) - 0.5*dq;
+    ql(dir,n,k+dk,j+dj,i+di) = v(n,k,j,i) + 0.5*dq;
+    qr(dir,n,k,j,i) = v(n,k,j,i) - 0.5*dq;
   }
 }
 
