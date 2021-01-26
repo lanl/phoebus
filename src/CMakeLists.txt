@@ -16,11 +16,10 @@ add_executable(phoebus
 
   # alphabetical
 
-  con2prim.cpp
-  con2prim.hpp
-
-  fluid.cpp
-  fluid.hpp
+  fluid/con2prim.cpp
+  fluid/con2prim.hpp
+  fluid/fluid.cpp
+  fluid/fluid.hpp
 
   geometry/coordinate_systems.hpp
   geometry/geometry_variant.hpp
