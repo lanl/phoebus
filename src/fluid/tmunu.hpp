@@ -66,7 +66,7 @@ public:
 private:
   KOKKOS_INLINE_FUNCTION
   Real GetVar_(int v, int b, int k, int j, int i) const {
-    return pack_(v, b, k, j, i);
+    return pack_(b, v, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
   Real GetVar_(int v, int k, int j, int i) const { return pack_(v, k, j, i); }
