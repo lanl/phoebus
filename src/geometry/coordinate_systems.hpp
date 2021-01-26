@@ -21,7 +21,7 @@ using parthenon::ParArray1D;
 namespace Geometry {
 
 using parthenon::Coordinates_t;
-static constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
+constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
 
 // Boiler plate for analytic coordinate systems so you only need to
 // define the functions of X0,X1,X2,X3, not all the functions of indices.
