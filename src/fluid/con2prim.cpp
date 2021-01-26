@@ -32,22 +32,24 @@ ConToPrimStatus ConToPrim<T>::Solve(const VarAccessor<T> &v, const CellGeom &g) 
   Real rho_guess = D/W;
   Real T_guess = v(tmp);
 
-  auto sfunc = [&](const Real z, const Real W) {
+  auto sfunc = [&](const Real z, const Real Wp) {
     const Real zBsq = z + Bsq;
-    return zBsq*zBsq*(W*W-1.0)/W - (2.0*z + Bsq)*BdotSsq/(z*z) - Ssq;
+    return zBsq*zBsq*(Wp*Wp-1.0)/Wp - (2.0*z + Bsq)*BdotSsq/(z*z) - Ssq;
   };
 
-  auto taufunc = [&](const Real z, const Real W, const Real p) {
-    return z + Bsq - p - Bsq/(2.0*W*W) - BdotSsq/(2.0*z*z) - v(crho) - v(ceng);
+  auto taufunc = [&](const Real z, const Real Wp, const Real p) {
+    //std::cout << "taufunc: " << z << " " << p << " " << D << " " << tau << std::endl;
+    return z + Bsq - p - Bsq/(2.0*Wp*Wp) - BdotSsq/(2.0*z*z) - D - tau;
   };
 
   auto Rfunc = [&](const Real rho, const Real Temp, Real res[2]) {
     const Real p = eos.PressureFromDensityTemperature(rho, Temp);
     const Real sie = eos.InternalEnergyFromDensityTemperature(rho, Temp);
-    const Real W = D/rho;
-    const Real z = (rho*(1.0 + sie) * p)*W*W;
-    res[0] = sfunc(z, W);
-    res[1] = taufunc(z, W, p);
+    const Real Wp = D/rho;
+    const Real z = (rho*(1.0 + sie) + p)*Wp*Wp;
+    //std::cout << "Rfunc: " << tau << " " << rho*sie << " " << p << " " << taufunc(z, Wp, p) << std::endl;
+    res[0] = sfunc(z, Wp);
+    res[1] = taufunc(z, Wp, p);
   };
 
   int iter = 0;
@@ -87,9 +89,21 @@ ConToPrimStatus ConToPrim<T>::Solve(const VarAccessor<T> &v, const CellGeom &g) 
     T_guess += delta_T;
     iter++;
 
+    //std::cout << "iter " << iter << ": "
+    //          << rho_guess << " " << T_guess << " "
+    //          << delta_rho << " " << delta_T << std::endl;
+
   } while(converged != true && iter < max_iter);
 
-  if(!converged) return ConToPrimStatus::failure;
+  if(!converged) {
+    std::cout << "ConToPrim Failed state:" << rho_guess << " " << T_guess << " "
+                                           << v(crho) << " " 
+                                           << v(cmom_lo) << " "
+                                           << v(cmom_lo+1) << " "
+                                           << v(cmom_lo+2) << " " 
+                                           << v(ceng) << std::endl;
+    return ConToPrimStatus::failure;
+  }
 
   v(tmp) = T_guess;
   v(prho) = rho_guess;
@@ -102,10 +116,6 @@ ConToPrimStatus ConToPrim<T>::Solve(const VarAccessor<T> &v, const CellGeom &g) 
   W = D/rho_guess;
   const Real z = (rho_guess + v(peng) + v(prs))*W*W;
   for (int i = 0; i < 3; i++) {
-  Real scon[3];
-  for (int i = 0; i < 3; i++) {
-    
-  }
     Real sconi = 0.0;
     for (int j = 0; j < 3; j++) {
       sconi += g.gcon[i][j]*v(cmom_lo+j);
@@ -114,6 +124,7 @@ ConToPrimStatus ConToPrim<T>::Solve(const VarAccessor<T> &v, const CellGeom &g) 
     v(pvel_lo+i) = sconi/(z + Bsq) + BdotS*0.0/(z*(z + Bsq)); // this 0.0 should be B^i
   }
 
+  std::cout << "Converged: " << v(prho) << " " << rho_guess << " " << T_guess << std::endl;
   return ConToPrimStatus::success;
 }
 

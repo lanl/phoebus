@@ -82,7 +82,14 @@ class ConToPrim {
               prs(imap["pressure"].first),
               tmp(imap["temperature"].first),
               cs(imap["cs"].first),
-              gm1(imap["gm1"].first) { }
+              gm1(imap["gamma1"].first) {
+                std::cout << "ConToPrim: " << prho << " " << crho << " "
+                          << pvel_lo << " " << pvel_hi << " "
+                          << cmom_lo << " " << cmom_hi << " " 
+                          << peng << " " << ceng << " "
+                          << prs << " " << tmp << " " << cs << " " << gm1 << std::endl;
+
+              }
 
   template <class... Args>
   KOKKOS_FUNCTION

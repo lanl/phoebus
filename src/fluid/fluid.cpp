@@ -27,6 +27,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField("p.energy", mprim_scalar);
   //physics->AddField("p.bfield", mprim_threev);
   physics->AddField("pressure", mprim_scalar);
+  physics->AddField("temperature", mprim_scalar);
   physics->AddField("gamma1", mprim_scalar);
   physics->AddField("cs", mprim_scalar);
 
@@ -41,6 +42,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   //physics->AddField("qr", mrecon);
 
   physics->FillDerivedBlock = ConservedToPrimitive;
+  physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
 }
@@ -67,6 +69,11 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   const int ceng = imap["c.energy"].first;
   const int prs = imap["pressure"].first;
 
+  std::cout << "p2c indices: " << prho << " " << crho << " "
+            << pvel_lo << " " << pvel_hi << " "
+            << cmom_lo << " " << cmom_hi
+            << " " << peng << " " << ceng << " " << prs << std::endl;
+
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -78,8 +85,8 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
       //todo(jcd): make these real
       Real gcov[3][3];
-      geom.Metric(CellLocation::Cent, b, k, j, i, gcov);
-      Real gdet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+      geom.Metric(CellLocation::Cent, k, j, i, gcov);
+      Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
       Real vsq = 0.0;
       for (int m = 0; m < 3; m++) {
         for (int n = 0; n < 3; n++) {
@@ -90,6 +97,7 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
       // conserved density D = \sqrt{\gamma} \rho W
       v(b, crho, k, j, i) = gdet * v(b, prho, k, j, i) * W;
 
+      // enthalpy
       Real rhoh = v(b, prho, k, j, i) + v(b, peng, k, j, i) + v(b, prs, k, j, i);
       for (int m = 0; m < 3; m++) {
         Real vcov = 0.0;
@@ -114,9 +122,9 @@ TaskStatus ConservedToPrimitive(MeshBlockData<Real> *rc) {
                                  "p.velocity", "c.momentum",
                                  "p.energy", "c.energy",
                                  "pressure", "temperature",
-                                 "cs", "gm1"});
+                                 "cs", "gamma1"});
 
-  const auto &eos = pmb->packages.Get("EOS")->Param<singularity::EOS>("d.EOS");
+  const auto &eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -131,10 +139,11 @@ TaskStatus ConservedToPrimitive(MeshBlockData<Real> *rc) {
   parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "ConToPrim", DevExecSpace(),
     0, v.GetDim(5)-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &fail) {
-      auto status = invert(b, k, j, i);
+      auto status = invert(k, j, i);
       if (status == ConToPrimStatus::failure) fail++;
     }, Kokkos::Sum<int>(fail_cnt));
 
+  std::cout << "fail_cnt = " << fail_cnt << std::endl;
   PARTHENON_REQUIRE(fail_cnt==0, "Con2Prim Failed!");
 
   return TaskStatus::complete;
@@ -158,9 +167,9 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto qr = ParArrayND<Real>("qr", pmb->pmy_mesh->ndim, recon_size+1,
                         v.GetDim(3), v.GetDim(2), v.GetDim(1));
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   const int dk = (pmb->pmy_mesh->ndim == 3 ? 1 : 0);
   const int dj = (pmb->pmy_mesh->ndim >  1 ? 1 : 0);
@@ -206,12 +215,5 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   const auto& cfl = phys->Param<Real>("cfl");
   return cfl*min_dt;
 }
-
-/*TaskStatus PrimitiveToConserved<MeshData<Real>>(MeshData<Real> *);
-TaskStatus PrimitiveToConserved<MeshBlockData<Real>>(MeshBlockData<Real> *);
-TaskStatus ConservedToPrimitive<MeshData<Real>>;
-TaskStatus ConservedToPrimitive<MeshBlockData<Real>>;
-TaskStatus CalculateFluxes<MeshData<Real>>;
-TaskStatus CalculateFluxes<MeshBlockData<Real>>;*/
 
 } // namespace fluid

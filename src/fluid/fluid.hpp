@@ -31,6 +31,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
 TaskStatus ConservedToPrimitive(MeshBlockData<Real> *rc);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
 /*
 KOKKOS_FUNCTION
@@ -88,20 +89,18 @@ void prim_to_flux(const int d, const int k, const int j, const int i,
 
   // Get fluxes
   const Real alpha = geom.Lapse(d, k, j, i);
-  for (int m = 1; m <= 3; m++) {
-    const Real vtil = vcon[m] - geom.ContravariantShift(m, loc, k, j, i)/alpha;
+  const Real vtil = vcon[dir] - geom.ContravariantShift(d, loc, k, j, i)/alpha;
 
-    // mass flux
-    F[0] = U[0]*vtil;
+  // mass flux
+  F[0] = U[0]*vtil;
 
-    // momentum flux
-    for (int n = 1; n <= 3; n++) {
-      F[n] = U[n]*vtil + P*DELTA(d,n);
-    }
-
-    // energy flux
-    F[4] = U[4]*vtil + P*v;
+  // momentum flux
+  for (int n = 1; n <= 3; n++) {
+    F[n] = U[n]*vtil + P*DELTA(d,n);
   }
+
+  // energy flux
+  F[4] = U[4]*vtil + P*v;
 
   return;
 }

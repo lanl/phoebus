@@ -21,7 +21,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto pkg = std::make_shared<StateDescriptor>("eos");
   Params& params = pkg->AllParams();
 
-  const std::string block_name = "EOS";
+  const std::string block_name = "eos";
   auto FillRealParams = [&](ParameterInput *pin,
                             EOSBuilder::params_t &params,
                             const names_t &param_names) {
