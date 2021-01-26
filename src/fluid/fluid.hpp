@@ -45,11 +45,11 @@ void llf(const int d, const int k, const int j, const int i,
 KOKKOS_INLINE_FUNCTION
 void prim_to_flux(const int d, const int k, const int j, const int i,
                   const Geometry::CoordinateSystem &geom, const ParArrayND<Real> &q,
-                  Real &cs, Real *U, Real *F) {
+                  Real &v, Real &cs, Real *U, Real *F) {
   const int dir = d-1;
   const Real &rho = q(dir,0,k,j,i);
   const Real vcon[] = {q(dir,1,k,j,i), q(dir,2,k,j,i), q(dir,3,k,j,i)};
-  const Real &v = vcon[dir];
+  v = vcon[dir];
   const Real &u = q(dir,4,k,j,i);
   const Real &P = q(dir,5,k,j,i);
   const Real &gm1 = q(dir,6,k,j,i);
@@ -116,12 +116,13 @@ void llf(const int d, const int k, const int j, const int i,
 
   Real Ul[5], Ur[5];
   Real Fl[5], Fr[5];
-  Real cl, cr;
+  Real vl, cl, vr, cr;
 
-  prim_to_flux(d, k, j, i, geom, ql, cl, Ul, Fl);
-  prim_to_flux(d, k, j, i, geom, qr, cr, Ur, Fr);
+  prim_to_flux(d, k, j, i, geom, ql, vl, cl, Ul, Fl);
+  prim_to_flux(d, k, j, i, geom, qr, vr, cr, Ur, Fr);
 
-  const Real cmax = (cl > cr ? cl : cr);
+  Real cmax = (cl > cr ? cl : cr);
+  cmax += std::max(std::abs(vl), std::abs(vr));
 
   CellLocation loc = DirectionToFaceID(d);
   const Real gdet = geom.DetGamma(loc, k, j, i);

@@ -80,7 +80,9 @@ class ConToPrim {
               peng(imap["p.energy"].first),
               ceng(imap["c.energy"].first),
               prs(imap["pressure"].first),
-              tmp(imap["temperature"].first) { }
+              tmp(imap["temperature"].first),
+              cs(imap["cs"].first),
+              gm1(imap["gm1"].first) { }
 
   template <class... Args>
   KOKKOS_FUNCTION
@@ -101,7 +103,7 @@ class ConToPrim {
   const int pvel_lo, pvel_hi;
   const int cmom_lo, cmom_hi;
   const int peng, ceng;
-  const int prs, tmp;
+  const int prs, tmp, cs, gm1;
 };
 
 } // namespace con2prim

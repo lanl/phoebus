@@ -7,10 +7,13 @@
 namespace fluid {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
-  auto physics = std::make_shared<StateDescriptor>("Fluid");
+  auto physics = std::make_shared<StateDescriptor>("fluid");
+  Params &params = physics->AllParams();
+
+  Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
+  params.Add("cfl", cfl);
 
   Metadata m;
-
   std::vector<int> three_vec(1,3);
 
   Metadata mprim_threev = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector, Metadata::Derived, Metadata::OneCopy}, three_vec);
@@ -25,6 +28,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   //physics->AddField("p.bfield", mprim_threev);
   physics->AddField("pressure", mprim_scalar);
   physics->AddField("gamma1", mprim_scalar);
+  physics->AddField("cs", mprim_scalar);
 
   // add the conserved variables
   physics->AddField("c.density", mcons_scalar);
@@ -109,7 +113,8 @@ TaskStatus ConservedToPrimitive(MeshBlockData<Real> *rc) {
   std::vector<std::string> vars({"p.density", "c.density",
                                  "p.velocity", "c.momentum",
                                  "p.energy", "c.energy",
-                                 "pressure", "temperature"});
+                                 "pressure", "temperature",
+                                 "cs", "gm1"});
 
   const auto &eos = pmb->packages.Get("EOS")->Param<singularity::EOS>("d.EOS");
 
@@ -176,6 +181,31 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+  auto pmb = rc->GetBlockPointer();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  auto &cs = rc->Get("cs").data;
+  auto &v   = rc->Get("p.velocity").data;
+
+  auto &coords = pmb->coords;
+  const int ndim = pmb->pmy_mesh->ndim;
+
+  auto &phys = pmb->packages.Get("fluid");
+  Real min_dt;
+  pmb->par_reduce("Hydro::EstimateTimestep::0",
+    kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+    KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
+      const auto &c = cs(k,j,i);
+      lmin_dt = std::min(lmin_dt,1.0/( (std::abs(v(0,k,j,i))+c)/coords.Dx(X1DIR,k,j,i)
+                         + (ndim>1)*(std::abs(v(1,k,j,i))+c)/coords.Dx(X2DIR,k,j,i)
+                         + (ndim>2)*(std::abs(v(2,k,j,i))+c)/coords.Dx(X3DIR,k,j,i)));
+    }, Kokkos::Min<Real>(min_dt));
+  const auto& cfl = phys->Param<Real>("cfl");
+  return cfl*min_dt;
+}
 
 /*TaskStatus PrimitiveToConserved<MeshData<Real>>(MeshData<Real> *);
 TaskStatus PrimitiveToConserved<MeshBlockData<Real>>(MeshBlockData<Real> *);
