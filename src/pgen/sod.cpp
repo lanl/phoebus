@@ -43,10 +43,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real cv  = pin->GetReal("eos", "Cv");
 
-  const Real rhol = 1.0;
-  const Real Pl = 1.0;
-  const Real rhor = 0.125;
-  const Real Pr = 0.1;
+  const Real rhol = 10.0;
+  const Real Pl = 40.0/3.0;
+  const Real rhor = 1.0;
+  const Real Pr = 2.0e-6/3.0;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);

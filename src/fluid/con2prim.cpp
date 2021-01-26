@@ -124,7 +124,7 @@ ConToPrimStatus ConToPrim<T>::Solve(const VarAccessor<T> &v, const CellGeom &g) 
     v(pvel_lo+i) = sconi/(z + Bsq) + BdotS*0.0/(z*(z + Bsq)); // this 0.0 should be B^i
   }
 
-  std::cout << "Converged: " << v(prho) << " " << rho_guess << " " << T_guess << std::endl;
+  //std::cout << "Converged: " << v(prho) << " " << rho_guess << " " << T_guess << std::endl;
   return ConToPrimStatus::success;
 }
 
