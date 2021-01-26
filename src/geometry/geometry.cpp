@@ -25,7 +25,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (coord_system == "minkowski") {
     // more pinputs could go here
     // and should be added to params as needed.
-    tag = CoordSystemTag::Cartesian;
+    tag = CoordSystemTag::Minkowski;
   } else { // default
     PARTHENON_THROW("unknown coordinate system");
   }
@@ -48,7 +48,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 // and MeshBlockData.
 CoordinateSystem GetCoordinateSystem(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetParentPointer();
-  auto &geom = pmb->packages["geometry"];
+  auto &geom = pmb->packages.Get("geometry");
   auto tag = geom->Param<CoordSystemTag>("coordinate_system");
 
   // some coordinate systems may require more inputs to
@@ -64,7 +64,7 @@ CoordinateSystem GetCoordinateSystem(MeshBlockData<Real> *rc) {
 
 CoordinateSystem GetCoordinateSystem(MeshData<Real> *rc) {
   auto pmesh = rc->GetParentPointer();
-  auto &geom = pmesh->packages["geometry"];
+  auto &geom = pmesh->packages.Get("geometry");
   auto tag = geom->Param<CoordSystemTag>("coordinate_system");
 
   // some coordinate systems may require more inputs to

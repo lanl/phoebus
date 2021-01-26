@@ -14,11 +14,16 @@
 #ifndef CON2PRIM_HPP_
 #define CON2PRIM_HPP_
 
+// parthenon provided headers
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 using namespace parthenon::package::prelude;
 
-#include "eos_stub.hpp"
+// singulaarity
+#include <eos/eos.hpp>
+
+#include "geometry/coordinate_systems.hpp"
+#include "phoebus_utils/cell_locations.hpp"
 
 namespace con2prim {
 
@@ -34,7 +39,7 @@ class VarAccessor {
               : var_(var), b_(b), k_(k), j_(j), i_(i) {}
   KOKKOS_FORCEINLINE_FUNCTION
   Real &operator()(const int n) const {
-    return var_(b_, n, k_,j_,i_);
+    return var_(b_, n, k_, j_, i_);
   }
  private:
   const T &var_;
@@ -44,7 +49,7 @@ class VarAccessor {
 struct CellGeom {
   CellGeom(const Geometry::CoordinateSystem &geom,
                const int k, const int j, const int i)
-               : gdet(DetGamma(CellLocation::Cent,k,j,i)) {
+               : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)) {
     geom.Metric(CellLocation::Cent, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
   }
@@ -80,17 +85,17 @@ class ConToPrim {
   template <class... Args>
   KOKKOS_FUNCTION
   ConToPrimStatus operator()(Args &&... args) const {
-    VarAccessor v(var, std::forward<Args>(args)...);
+    VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
     return Solve(v, g);
   }
 
   KOKKOS_FUNCTION
-  ConToPrimStatus Solve(const VarAccessor &v, const CellGeom &g) const;
+  ConToPrimStatus Solve(const VarAccessor<T> &v, const CellGeom &g) const;
 
  private:
   const T var;
-  const singularity::EOS eos;
+  const singularity::EOS &eos;
   const Geometry::CoordinateSystem geom;
   const int prho, crho;
   const int pvel_lo, pvel_hi;

@@ -16,6 +16,8 @@
 #include <vector>
 
 // Local Includes
+#include "geometry/geometry.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_driver.hpp"
 
 using namespace parthenon::driver::prelude;
@@ -61,6 +63,9 @@ TaskCollection PhoebusDriver::MakeTaskCollection(T &blocks) {
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   parthenon::Packages_t packages;
+
+  packages.Add(Microphysics::EOS::Initialize(pin.get()));
+  packages.Add(Geometry::Initialize(pin.get()));
 
   return packages;
 }

@@ -2,7 +2,11 @@
 
 namespace con2prim {
 
-ConToPrimStatus ConToPrim::Solve(const VarAccessor &v, const CellGeom &g) const {
+const Real rel_tolerance = 1.e-8;
+const int max_iter =  20;
+
+template <typename T>
+ConToPrimStatus ConToPrim<T>::Solve(const VarAccessor<T> &v, const CellGeom &g) const {
   // converge on rho and T
   // constraints: rho <= D, T > 0
 
@@ -37,14 +41,14 @@ ConToPrimStatus ConToPrim::Solve(const VarAccessor &v, const CellGeom &g) const 
     return z + Bsq - p - Bsq/(2.0*W*W) - BdotSsq/(2.0*z*z) - v(crho) - v(ceng);
   };
 
-  auto Rfunc = [&](const Real rho, const Real T, Real res[2]) {
-    const Real p = eos.PressureFromDensityTemperature(rho, T);
-    const Real sie = eos.InternalEnergyFromDensityTemperature(rho, T);
-    const W = D/rho;
+  auto Rfunc = [&](const Real rho, const Real Temp, Real res[2]) {
+    const Real p = eos.PressureFromDensityTemperature(rho, Temp);
+    const Real sie = eos.InternalEnergyFromDensityTemperature(rho, Temp);
+    const Real W = D/rho;
     const Real z = (rho*(1.0 + sie) * p)*W*W;
     res[0] = sfunc(z, W);
     res[1] = taufunc(z, W, p);
-  }
+  };
 
   int iter = 0;
   bool converged = false;
@@ -56,7 +60,7 @@ ConToPrimStatus ConToPrim::Solve(const VarAccessor &v, const CellGeom &g) const 
     Rfunc(rho_guess + drho, T_guess, resp);
     jac[0][0] = (resp[0] - res[0])/drho;
     jac[1][0] = (resp[1] - res[1])/drho;
-    Real dT = 1.0e-8*T;
+    Real dT = 1.0e-8*T_guess;
     Rfunc(rho_guess, T_guess+dT, resp);
     jac[0][1] = (resp[0] - res[0])/dT;
     jac[1][1] = (resp[1] - res[1])/dT;
@@ -109,5 +113,7 @@ ConToPrimStatus ConToPrim::Solve(const VarAccessor &v, const CellGeom &g) const 
 
   return ConToPrimStatus::success;
 }
+
+template class ConToPrim<VariablePack<Real>>;
 
 } // namespace con2prim

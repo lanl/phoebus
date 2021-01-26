@@ -16,11 +16,28 @@ add_executable(phoebus
 
   # alphabetical
 
+  fluid/con2prim.cpp
+  fluid/con2prim.hpp
+  fluid/fluid.cpp
+  fluid/fluid.hpp
+
+  geometry/coordinate_systems.hpp
+  geometry/geometry_variant.hpp
+  geometry/geometry.cpp
+  geometry/geometry.hpp
+
   initial_conditions.hpp
   initial_conditions.cpp
 
+  microphysics/eos_phoebus/eos_phoebus.hpp
+  microphysics/eos_phoebus/eos_phoebus.cpp
+
   phoebus_driver.cpp
   phoebus_driver.hpp
+
+  phoebus_utils/cell_locations.hpp
+
+  reconstruction.hpp
 )
 
 target_include_directories(phoebus PRIVATE
