@@ -44,15 +44,15 @@ public:
   // signature needs to change.
   // TODO(JMM): Should I use enable_if or static asserts or anything?
   template <typename... Args>
-  void operator()(Args... args, Real T[ND][ND]) const {
+  KOKKOS_INLINE_FUNCTION void operator()(Args... args, Real T[ND][ND]) const {
     static_assert(sizeof...(Args) >= 3, "Must at least have k, j, i");
     static_assert(sizeof...(Args) <= 4, "Must have no more than b, k, j, i");
     Real u[ND], gamma[ND][ND];
     system_.MetricInverse(loc, std::forward<Args>(args)..., gamma);
-    GetFourVelocity(std::forward<Args>(args)..., u);
-    Real rho = rho_(std::forward<Args>(args)...);
-    Real uu = u_(std::forward<Args>(args)...);
-    Real P = P_(std::forward<Args>(args)...);
+    GetFourVelocity_(std::forward<Args>(args)..., u);
+    Real rho = GetVar_(ir_, std::forward<Args>(args)...);
+    Real uu = GetVar_(iu_, std::forward<Args>(args)...);
+    Real P = GetVar_(ip_, std::forward<Args>(args)...);
     // TODO(JMM): Add B-fields in here
     Real A = rho + uu + P; // + b^2
     Real B = P;            // + b^2/2
@@ -64,21 +64,21 @@ public:
   }
 
 private:
-  Real v_(int l, int b, int k, int j, int i) const {
-    return pack_(b, iv_ + l, k, j, i);
+  KOKKOS_INLINE_FUNCTION
+  Real GetVar_(int v, int b, int k, int j, int i) const {
+    return pack_(v, b, k, j, i);
   }
-  Real v_(int l, int k, int j, int i) const { return pack_(iv_ + l, k, j, i); }
-  Real rho_(int b, int k, int j, int i) const { return pack_(b, ir_, k, j, i); }
-  Real rho_(int k, int j, int i) const { return pack_(ir_, k, j, i); }
-  Real u_(int l, int b, int k, int j, int i) const {
-    return pack_(b, iu_, k, j, i);
+  KOKKOS_INLINE_FUNCTION
+  Real GetVar(int v, int k, int j, int i) const { return pack_(v, k, j, i); }
+
+  template <typename... Args>
+  KOKKOS_INLINE_FUNCTION Real v_(int l, Args... args) const {
+    return GetVar_(iv_ + l, std::forward<Args>(args)...);
   }
-  Real u_(int l, int k, int j, int i) const { return pack_(iu_, k, j, i); }
-  Real P_(int b, int k, int j, int i) const { return pack_(b, ip_, k, j, i); }
-  Real P_(int k, int j, int i) const { return pack_(ip_, k, j, i); }
 
   // TODO(JMM): Should these be available elsewhere/more publicly?
-  template <typename... Args> Real GetLorentzFactor_(Args... args) const {
+  template <typename... Args>
+  KOKKOS_INLINE_FUNCTION Real GetLorentzFactor_(Args... args) const {
     Real W = 1;
     for (int l = 1; l < ND; ++l) {
       for (int m = 1; m < ND; ++m) {
@@ -92,7 +92,8 @@ private:
     return W;
   }
 
-  template <typename... Args> void GetFourVelocity(Args..., Real u[ND]) const {
+  template <typename... Args>
+  KOKKOS_INLINE_FUNCTION void GetFourVelocity_(Args..., Real u[ND]) const {
     Real beta[ND - 1];
     Real W = GetLorentzFactor_(std::forward<Args>(args)...);
     Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
@@ -111,9 +112,7 @@ private:
 using TmunuMesh = StressEnergyTensorCon<MeshBlockPack<VariablePack<Real>>>;
 using TmunuMeshBlock = StressEnergyTensorCon<VariablePack<Real>>;
 
-TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) {
-  return TmunuMesh(rc);
-}
+TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) { return TmunuMesh(rc); }
 TmunuMeshBlock BuildStressEenergyTensor(MeshBlockData<Real> *rc) {
   return TmunuMeshBlock(rc);
 }
