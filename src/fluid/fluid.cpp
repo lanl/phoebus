@@ -75,11 +75,6 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   const int ceng = imap["c.energy"].first;
   const int prs = imap["pressure"].first;
 
-  std::cout << "p2c indices: " << prho << " " << crho << " "
-            << pvel_lo << " " << pvel_hi << " "
-            << cmom_lo << " " << cmom_hi
-            << " " << peng << " " << ceng << " " << prs << std::endl;
-
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -138,7 +133,6 @@ TaskStatus ConservedToPrimitive(T *rc) {
       if (status == ConToPrimStatus::failure) fail++;
     }, Kokkos::Sum<int>(fail_cnt));
 
-  std::cout << "fail_cnt = " << fail_cnt << std::endl;
   PARTHENON_REQUIRE(fail_cnt==0, "Con2Prim Failed!");
 
   return TaskStatus::complete;
