@@ -77,9 +77,9 @@ CoordinateSystem GetCoordinateSystem(MeshData<Real> *rc) {
   ParArray1D<Coordinates_t> coords("GetCoordinateSystem::coords",nblocks);
   auto coords_h = Kokkos::create_mirror_view(coords);
   for (int i = 0; i < nblocks; ++i) {
-    coords_h(i) = rc->GetBlockData(i)->coords;
+    coords_h(i) = rc->GetBlockData(i)->GetBlockPointer()->coords;
   }
-  Kokkos::deep_copy(coords, coords_host);
+  Kokkos::deep_copy(coords, coords_h);
 
   // some coordinate systems may require more inputs to
   // constructor. Can be pulled out of params or the MeshBlockData
