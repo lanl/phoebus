@@ -358,7 +358,7 @@ private:
     return;
   }
 
-  bool multiple_coords_;
+  bool multiple_coords_ = false;
   Coordinates_t coordinates_single_;
   ParArray1D<Coordinates_t> coordinates_multi_;
   System system_;
