@@ -98,6 +98,7 @@ Python3.
 NO source code is included for any dependencies. Both static and
 dynamic linking are supported.
 
+- Phoebus relies on the "Mpark Variant" backport of the C++17 feature to C++14 and GPUs (https://github.com/mpark/variant).
 - Phoebus optionally supports the HDF5 file format
   (https://www.hdfgroup.org/solutions/hdf5/) for file input/output.
 - Phoebus optionally supports Catch2
@@ -112,7 +113,7 @@ dynamic linking are supported.
   (https://github.com/lanl/parthenon) for mesh refinement
 - Phoebus requires the singularity-eos and singularity-opac libraries
   to support tabulated microphysics data. These libraries will be
-  disclosed in a separate EIDR.
+  disclosed in separate EIDRs.
 - Phoebus optionally supports nuclear reaction networks such as SkyNet
   (https://doi.org/10.3847/1538-4365/aa94cb) to model r-process
   nucleosynthesis and heating rates.
