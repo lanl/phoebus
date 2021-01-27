@@ -29,7 +29,8 @@ namespace fluid {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
-TaskStatus ConservedToPrimitive(MeshBlockData<Real> *rc);
+template <typename T>
+TaskStatus ConservedToPrimitive(T *rc);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 

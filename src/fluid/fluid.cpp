@@ -13,6 +13,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
   params.Add("cfl", cfl);
 
+  Real c2p_tol = pin->GetOrAddReal("fluid", "c2p_tol", 1.e-8);
+  params.Add("c2p_tol", c2p_tol);
+
+  int c2p_max_iter = pin->GetOrAddInteger("fluid", "c2p_max_iter", 20);
+  params.Add("c2p_max_iter", c2p_max_iter);
+
   Metadata m;
   std::vector<int> three_vec(1,3);
 
@@ -41,7 +47,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   //physics->AddField("ql", mrecon);
   //physics->AddField("qr", mrecon);
 
-  physics->FillDerivedBlock = ConservedToPrimitive;
+  physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
@@ -113,23 +119,12 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-//template <typename T>
-TaskStatus ConservedToPrimitive(MeshBlockData<Real> *rc) {
+template <typename T>
+TaskStatus ConservedToPrimitive(T *rc) {
   using namespace con2prim;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({"p.density", "c.density",
-                                 "p.velocity", "c.momentum",
-                                 "p.energy", "c.energy",
-                                 "pressure", "temperature",
-                                 "cs", "gamma1"});
-
-  const auto &eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
-
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-  auto geom = Geometry::GetCoordinateSystem(rc);
-  ConToPrim<decltype(v)> invert(v, imap, eos, geom);
+  auto invert = con2prim::ConToPrimSetup(rc);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -137,7 +132,7 @@ TaskStatus ConservedToPrimitive(MeshBlockData<Real> *rc) {
 
   int fail_cnt;
   parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "ConToPrim", DevExecSpace(),
-    0, v.GetDim(5)-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+    0, invert.NumBlocks()-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &fail) {
       auto status = invert(k, j, i);
       if (status == ConToPrimStatus::failure) fail++;

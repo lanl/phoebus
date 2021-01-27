@@ -5,8 +5,11 @@ namespace con2prim {
 const Real rel_tolerance = 1.e-8;
 const int max_iter =  20;
 
-template <typename T>
-ConToPrimStatus ConToPrim<T>::Solve(const VarAccessor<T> &v, const CellGeom &g) const {
+//static int calls = 0;
+//static Real avg_iters = 0.0;
+
+template <typename Data_t,typename T>
+ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGeom &g) const {
   // converge on rho and T
   // constraints: rho <= D, T > 0
 
@@ -105,6 +108,10 @@ ConToPrimStatus ConToPrim<T>::Solve(const VarAccessor<T> &v, const CellGeom &g) 
     return ConToPrimStatus::failure;
   }
 
+  //calls++;
+  //avg_iters += (iter - avg_iters)/calls;
+  //std::cout << "avg iter = " << avg_iters << std::endl;
+
   v(tmp) = T_guess;
   v(prho) = rho_guess;
   v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess);
@@ -128,6 +135,7 @@ ConToPrimStatus ConToPrim<T>::Solve(const VarAccessor<T> &v, const CellGeom &g) 
   return ConToPrimStatus::success;
 }
 
-template class ConToPrim<VariablePack<Real>>;
+template class ConToPrim<MeshBlockData<Real>,VariablePack<Real>>;
+//template class ConToPrim<MeshData<Real>,MeshBlockPack<Real>>;
 
 } // namespace con2prim

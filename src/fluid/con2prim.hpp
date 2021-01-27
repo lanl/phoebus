@@ -22,7 +22,7 @@ using namespace parthenon::package::prelude;
 // singulaarity
 #include <eos/eos.hpp>
 
-#include "geometry/coordinate_systems.hpp"
+#include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 
 namespace con2prim {
@@ -64,32 +64,40 @@ struct CellGeom {
   const Real gdet;
 };
 
-template <typename T>
+template <typename Data_t, typename T>
 class ConToPrim {
  public:
-  ConToPrim(const T &pack, PackIndexMap &imap,
-            const singularity::EOS &eos_obj,
-            const Geometry::CoordinateSystem &geom_obj)
-            : var(pack), eos(eos_obj), geom(geom_obj),
-              prho(imap["p.density"].first),
-              crho(imap["c.density"].first),
-              pvel_lo(imap["p.velocity"].first),
-              pvel_hi(imap["p.velocity"].second),
-              cmom_lo(imap["c.momentum"].first),
-              cmom_hi(imap["c.momentum"].second),
-              peng(imap["p.energy"].first),
-              ceng(imap["c.energy"].first),
-              prs(imap["pressure"].first),
-              tmp(imap["temperature"].first),
-              cs(imap["cs"].first),
-              gm1(imap["gamma1"].first) {
-                std::cout << "ConToPrim: " << prho << " " << crho << " "
-                          << pvel_lo << " " << pvel_hi << " "
-                          << cmom_lo << " " << cmom_hi << " " 
-                          << peng << " " << ceng << " "
-                          << prs << " " << tmp << " " << cs << " " << gm1 << std::endl;
+  ConToPrim(Data_t *rc)
+    : var(rc->PackVariables(Vars(), imap)),
+      eos(SetEOS(rc)),
+      geom(Geometry::GetCoordinateSystem(rc)),
+      prho(imap["p.density"].first),
+      crho(imap["c.density"].first),
+      pvel_lo(imap["p.velocity"].first),
+      pvel_hi(imap["p.velocity"].second),
+      cmom_lo(imap["c.momentum"].first),
+      cmom_hi(imap["c.momentum"].second),
+      peng(imap["p.energy"].first),
+      ceng(imap["c.energy"].first),
+      prs(imap["pressure"].first),
+      tmp(imap["temperature"].first),
+      cs(imap["cs"].first),
+      gm1(imap["gamma1"].first) {}
 
-              }
+  const singularity::EOS& SetEOS(MeshBlockData<Real> *rc) {
+    return rc->GetBlockPointer()->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  }
+  const singularity::EOS& SetEOS(MeshData<Real> *rc) {
+    return rc->GetMeshPointer()->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  }
+
+  std::vector<std::string> Vars() {
+    return std::vector<std::string>({"p.density", "c.density",
+                                    "p.velocity", "c.momentum",
+                                    "p.energy", "c.energy",
+                                    "pressure", "temperature",
+                                    "cs", "gamma1"});
+  }
 
   template <class... Args>
   KOKKOS_FUNCTION
@@ -102,16 +110,33 @@ class ConToPrim {
   KOKKOS_FUNCTION
   ConToPrimStatus Solve(const VarAccessor<T> &v, const CellGeom &g) const;
 
+  int NumBlocks() {
+    return var.GetDim(5);
+  }
+
  private:
-  const T var;
+  PackIndexMap imap;
+  const T &var;
   const singularity::EOS &eos;
-  const Geometry::CoordinateSystem geom;
+  const Geometry::CoordinateSystem &geom;
   const int prho, crho;
   const int pvel_lo, pvel_hi;
   const int cmom_lo, cmom_hi;
   const int peng, ceng;
   const int prs, tmp, cs, gm1;
 };
+
+
+
+using C2P_Block_t = ConToPrim<MeshBlockData<Real>,VariablePack<Real>>;
+using C2P_Mesh_t = ConToPrim<MeshData<Real>,MeshBlockPack<Real>>;
+
+inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc) {
+  return C2P_Block_t(rc);
+}
+/*inline C2P_Mesh_t ConToPrimSetup(MeshData<Real> *rc) {
+  return C2P_Mesh_t(rc);
+}*/
 
 } // namespace con2prim
 

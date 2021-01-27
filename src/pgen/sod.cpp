@@ -36,10 +36,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int igam = imap["gamma1"].first;
   const int ics  = imap["cs"].first;
 
-  std::cout << "indices: " << irho << " " << ivlo << " " << ivhi
-            << " " << ieng << " " << iprs << " " << itmp << " "
-            << igam << " " << ics << std::endl;
-
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real cv  = pin->GetReal("eos", "Cv");
 
