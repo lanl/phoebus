@@ -43,6 +43,27 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField("c.energy", mcons_scalar);
   //physics->AddField("c.bfield", mcons_threev);
 
+  int ndim = 1;
+  if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
+  else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
+
+  auto recon_vars = ReconVars();
+  int nrecon = 0;
+  for (const auto &v : recon_vars) {
+    auto &m = physics->FieldMetadata(v);
+    auto &shape = m.Shape();
+    int size = 1;
+    for (const auto &s : shape) {
+      size *= s;
+    }
+    nrecon += size;
+  }
+
+  std::vector<int> recon_shape({nrecon,ndim});
+  Metadata mrecon = Metadata({Metadata::Cell, Metadata::OneCopy}, recon_shape);
+  physics->AddField("ql", mrecon);
+  physics->AddField("qr", mrecon);
+
   //Metadata mrecon = Metadata({Metadata::Face, Metadata::OneCopy}, std::vector<int>(1, 7));
   //physics->AddField("ql", mrecon);
   //physics->AddField("qr", mrecon);
@@ -142,17 +163,13 @@ TaskStatus ConservedToPrimitive(T *rc) {
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({"p.density", "p.velocity", "p.energy", "pressure", "gamma1"});
-  std::vector<std::string> flxs({"c.density", "c.momentum", "c.energy"});
-
   PackIndexMap imap;
-  auto v = rc->PackVariablesAndFluxes(vars, flxs, imap);
+  auto v = rc->PackVariablesAndFluxes(ReconVars(), FluxVars(), imap);
   const int recon_size = imap["gamma1"].first;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  auto ql = ParArrayND<Real>("ql", pmb->pmy_mesh->ndim, recon_size+1,
-                        v.GetDim(3), v.GetDim(2), v.GetDim(1));
+  auto &ql = rc->Get("ql").data;
   auto qr = ParArrayND<Real>("qr", pmb->pmy_mesh->ndim, recon_size+1,
                         v.GetDim(3), v.GetDim(2), v.GetDim(1));
 

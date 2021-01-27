@@ -34,6 +34,14 @@ TaskStatus ConservedToPrimitive(T *rc);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
+inline std::vector<std::string> ReconVars() {
+  return std::vector<std::string>({"p.density", "p.velocity", "p.energy", "pressure", "gamma1"});
+}
+
+inline std::vector<std::string> FluxVars() {
+  return std::vector<std::string>({"c.density", "c.momentum", "c.energy"});
+}
+
 /*
 KOKKOS_FUNCTION
 void llf(const int d, const int k, const int j, const int i,
