@@ -64,10 +64,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField("ql", mrecon);
   physics->AddField("qr", mrecon);
 
-  //Metadata mrecon = Metadata({Metadata::Face, Metadata::OneCopy}, std::vector<int>(1, 7));
-  //physics->AddField("ql", mrecon);
-  //physics->AddField("qr", mrecon);
-
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
@@ -146,6 +142,7 @@ TaskStatus ConservedToPrimitive(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
+  //TODO(JCD): need to tag failed cells and get rid of this reduction
   int fail_cnt;
   parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "ConToPrim", DevExecSpace(),
     0, invert.NumBlocks()-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -169,9 +166,8 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  auto &ql = rc->Get("ql").data;
-  auto qr = ParArrayND<Real>("qr", pmb->pmy_mesh->ndim, recon_size+1,
-                        v.GetDim(3), v.GetDim(2), v.GetDim(1));
+  const auto &ql = rc->Get("ql").data;
+  const auto &qr = rc->Get("qr").data;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
