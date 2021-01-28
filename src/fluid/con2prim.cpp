@@ -2,9 +2,6 @@
 
 namespace con2prim {
 
-const Real rel_tolerance = 1.e-8;
-const int max_iter =  20;
-
 //static int calls = 0;
 //static Real avg_iters = 0.0;
 

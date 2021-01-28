@@ -67,7 +67,7 @@ struct CellGeom {
 template <typename Data_t, typename T>
 class ConToPrim {
  public:
-  ConToPrim(Data_t *rc)
+  ConToPrim(Data_t *rc, const Real tol, const int max_iterations)
     : var(rc->PackVariables(Vars(), imap)),
       eos(SetEOS(rc)),
       geom(Geometry::GetCoordinateSystem(rc)),
@@ -82,7 +82,9 @@ class ConToPrim {
       prs(imap["pressure"].first),
       tmp(imap["temperature"].first),
       cs(imap["cs"].first),
-      gm1(imap["gamma1"].first) {}
+      gm1(imap["gamma1"].first),
+      rel_tolerance(tol),
+      max_iter(max_iterations) {}
 
   const singularity::EOS& SetEOS(MeshBlockData<Real> *rc) {
     return rc->GetBlockPointer()->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
@@ -124,6 +126,8 @@ class ConToPrim {
   const int cmom_lo, cmom_hi;
   const int peng, ceng;
   const int prs, tmp, cs, gm1;
+  const Real rel_tolerance;
+  const int max_iter;
 };
 
 

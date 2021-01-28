@@ -136,7 +136,10 @@ TaskStatus ConservedToPrimitive(T *rc) {
   using namespace con2prim;
   auto *pmb = rc->GetParentPointer().get();
 
-  auto invert = con2prim::ConToPrimSetup(rc);
+  auto &pkg = pmb->packages.Get("fluid");
+  const Real c2p_tol = pkg->Param<Real>("c2p_tol");
+  const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
+  auto invert = con2prim::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
