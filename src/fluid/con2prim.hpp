@@ -135,8 +135,8 @@ class ConToPrim {
 using C2P_Block_t = ConToPrim<MeshBlockData<Real>,VariablePack<Real>>;
 using C2P_Mesh_t = ConToPrim<MeshData<Real>,MeshBlockPack<Real>>;
 
-inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc) {
-  return C2P_Block_t(rc);
+inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, const Real tol, const int max_iter) {
+  return C2P_Block_t(rc, tol, max_iter);
 }
 /*inline C2P_Mesh_t ConToPrimSetup(MeshData<Real> *rc) {
   return C2P_Mesh_t(rc);
