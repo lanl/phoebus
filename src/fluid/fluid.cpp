@@ -7,6 +7,8 @@
 namespace fluid {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+  namespace p = primitive_variables;
+  namespace c = conserved_variables;
   auto physics = std::make_shared<StateDescriptor>("fluid");
   Params &params = physics->AllParams();
 
@@ -28,26 +30,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata mcons_threev = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive, Metadata::Conserved, Metadata::Vector, Metadata::FillGhost}, three_vec);
 
   // add the primitive variables
-  physics->AddField("p.density", mprim_scalar);
-  physics->AddField("p.velocity", mprim_threev);
-  physics->AddField("p.energy", mprim_scalar);
+  physics->AddField(p::density, mprim_scalar);
+  physics->AddField(p::velocity, mprim_threev);
+  physics->AddField(p::energy, mprim_scalar);
   //physics->AddField("p.bfield", mprim_threev);
-  physics->AddField("pressure", mprim_scalar);
-  physics->AddField("temperature", mprim_scalar);
-  physics->AddField("gamma1", mprim_scalar);
-  physics->AddField("cs", mprim_scalar);
+  physics->AddField(p::pressure, mprim_scalar);
+  physics->AddField(p::temperature, mprim_scalar);
+  physics->AddField(p::gamma1, mprim_scalar);
+  physics->AddField(p::cs, mprim_scalar);
 
   // add the conserved variables
-  physics->AddField("c.density", mcons_scalar);
-  physics->AddField("c.momentum", mcons_threev);
-  physics->AddField("c.energy", mcons_scalar);
+  physics->AddField(c::density, mcons_scalar);
+  physics->AddField(c::momentum, mcons_threev);
+  physics->AddField(c::energy, mcons_scalar);
   //physics->AddField("c.bfield", mcons_threev);
 
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
   else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
 
-  auto recon_vars = ReconVars();
+  auto recon_vars = FluxState::ReconVars();
   int nrecon = 0;
   for (const auto &v : recon_vars) {
     auto &m = physics->FieldMetadata(v);
@@ -163,14 +165,7 @@ TaskStatus ConservedToPrimitive(T *rc) {
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
 
-  PackIndexMap imap;
-  auto v = rc->PackVariablesAndFluxes(ReconVars(), FluxVars(), imap);
-  const int recon_size = imap["gamma1"].first;
-
-  auto geom = Geometry::GetCoordinateSystem(rc);
-
-  const auto &ql = rc->Get("ql").data;
-  const auto &qr = rc->Get("qr").data;
+  auto flux = FluxState(rc);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -178,18 +173,19 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 
   const int dk = (pmb->pmy_mesh->ndim == 3 ? 1 : 0);
   const int dj = (pmb->pmy_mesh->ndim >  1 ? 1 : 0);
+  const int nrecon = flux.ql.GetDim(4)-1;
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
     X1DIR, pmb->pmy_mesh->ndim,
     kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
     KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-      PhoebusReconstruction::PiecewiseLinear(d, 0, recon_size, k, j, i, v, ql, qr);
+      PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
     });
 
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
     X1DIR, pmb->pmy_mesh->ndim,
     kb.s, kb.e+dk, jb.s, jb.e+dj, ib.s, ib.e+1,
     KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-      llf(d, k, j, i, geom, ql, qr, v);
+      flux.Solve(d, k, j, i);
     });
 
   return TaskStatus::complete;

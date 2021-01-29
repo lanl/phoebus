@@ -36,6 +36,7 @@ add_executable(phoebus
   phoebus_driver.hpp
 
   phoebus_utils/cell_locations.hpp
+  phoebus_utils/variables.hpp
 
   reconstruction.hpp
 )

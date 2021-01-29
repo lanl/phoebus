@@ -33,8 +33,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ieng = imap["p.energy"].first;
   const int iprs = imap["pressure"].first;
   const int itmp = imap["temperature"].first;
-  const int igam = imap["gamma1"].first;
-  const int ics  = imap["cs"].first;
 
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real cv  = pin->GetReal("eos", "Cv");
@@ -42,7 +40,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real rhol = 10.0;
   const Real Pl = 40.0/3.0;
   const Real rhor = 1.0;
-  const Real Pr = 2.0e-6/3.0;
+  const Real Pr = 1.e-3;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -58,10 +56,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real P = x < 0.5 ? Pl : Pr;
       v(irho, k, j, i) = rho;
       v(iprs, k, j, i) = P;
-      v(igam, k, j, i) = gam;
       v(ieng, k, j, i) = P/(gam - 1.0);
-      v(itmp, k, j, i) = v(ieng, k, j, i)/rho * cv;
-      v(ics, k, j, i) = sqrt(gam*P/rho);
+      v(itmp, k, j, i) = v(ieng, k, j, i)/rho * cv; // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
     });
 

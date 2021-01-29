@@ -45,6 +45,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   auto Rfunc = [&](const Real rho, const Real Temp, Real res[2]) {
     const Real p = eos.PressureFromDensityTemperature(rho, Temp);
     const Real sie = eos.InternalEnergyFromDensityTemperature(rho, Temp);
+    //std::cout << "Rfunc: " << rho << " " << Temp << " " << p << " " << sie << std::endl;
     const Real Wp = D/rho;
     const Real z = (rho*(1.0 + sie) + p)*Wp*Wp;
     //std::cout << "Rfunc: " << tau << " " << rho*sie << " " << p << " " << taufunc(z, Wp, p) << std::endl;
@@ -56,18 +57,28 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   bool converged = false;
   Real res[2], resp[2];
   Real jac[2][2];
+  const Real delta_fact_min = 1.e-8;
+  Real delta_fact = 1.e-8;
+  const Real delta_adj = 1.2;
   do {
     Rfunc(rho_guess, T_guess, res);
-    Real drho = 1.0e-8*rho_guess;
+    Real drho = delta_fact*rho_guess;
     Rfunc(rho_guess + drho, T_guess, resp);
     jac[0][0] = (resp[0] - res[0])/drho;
     jac[1][0] = (resp[1] - res[1])/drho;
-    Real dT = 1.0e-8*T_guess;
+    Real dT = delta_fact*T_guess;
     Rfunc(rho_guess, T_guess+dT, resp);
     jac[0][1] = (resp[0] - res[0])/dT;
     jac[1][1] = (resp[1] - res[1])/dT;
 
     const Real det = (jac[0][0]*jac[1][1] - jac[0][1]*jac[1][0]);
+    if (std::abs(det) < 1.e-16) {
+      delta_fact *= delta_adj;
+      iter++;
+      continue;
+      //std::cerr << "Jacobian is singular in con2prim.  Aborting." << std::endl;
+      //break;
+    }
     Real delta_rho = -(res[0]*jac[1][1] - jac[0][1]*res[1])/det;
     Real delta_T = -(jac[0][0]*res[1] - jac[1][0]*res[0])/det;
 
@@ -77,17 +88,19 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
     }
 
     if (rho_guess + delta_rho < 0.0) {
-      delta_rho = -0.8*rho_guess;
+      delta_rho = -0.1*rho_guess;
     }
     if (rho_guess + delta_rho > D) {
       delta_rho = 0.99*(D-rho_guess);
     }
     if (T_guess + delta_T < 0.0) {
-      delta_T = -0.8*T_guess;
+      delta_T = -0.1*T_guess;
     }
     rho_guess += delta_rho;
     T_guess += delta_T;
     iter++;
+
+    if (delta_fact > delta_fact_min) delta_fact /= delta_adj;
 
     //std::cout << "iter " << iter << ": "
     //          << rho_guess << " " << T_guess << " "
