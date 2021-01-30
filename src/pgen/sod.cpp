@@ -54,6 +54,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto v = rc->PackVariables({"p.density",
                               "p.velocity",
                               "p.energy",
+                              "p.ye",
                               "pressure",
                               "temperature",
                               "gamma1",
@@ -64,6 +65,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap["p.velocity"].first;
   const int ivhi = imap["p.velocity"].second;
   const int ieng = imap["p.energy"].first;
+  const int iye  = imap["p.ye"].second;
   const int iprs = imap["pressure"].first;
   const int itmp = imap["temperature"].first;
 
@@ -97,6 +99,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
       v(ivlo, k, j, i) = vel;
+      if (iye > 0) v(iye, k, j, i) = sin(2.0*M_PI*x);
     });
 
   fluid::PrimitiveToConserved(rc.get());

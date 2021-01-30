@@ -13,6 +13,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
 
   const Real D = v(crho)/g.gdet;
   const Real tau = v(ceng)/g.gdet;
+  if(pye > 0) v(pye) = v(cye)/v(crho);
 
   // todo(jcd): really compute these when there are B fields
   Real BdotS = 0.0;

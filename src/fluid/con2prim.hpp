@@ -79,6 +79,8 @@ class ConToPrim {
       cmom_hi(imap["c.momentum"].second),
       peng(imap["p.energy"].first),
       ceng(imap["c.energy"].first),
+      pye(imap["p.ye"].second),
+      cye(imap["c.ye"].second),
       prs(imap["pressure"].first),
       tmp(imap["temperature"].first),
       cs(imap["cs"].first),
@@ -97,6 +99,7 @@ class ConToPrim {
     return std::vector<std::string>({"p.density", "c.density",
                                     "p.velocity", "c.momentum",
                                     "p.energy", "c.energy",
+                                    "p.ye", "c.ye",
                                     "pressure", "temperature",
                                     "cs", "gamma1"});
   }
@@ -125,6 +128,7 @@ class ConToPrim {
   const int pvel_lo, pvel_hi;
   const int cmom_lo, cmom_hi;
   const int peng, ceng;
+  const int pye, cye;
   const int prs, tmp, cs, gm1;
   const Real rel_tolerance;
   const int max_iter;

@@ -27,6 +27,8 @@ using namespace parthenon::package::prelude;
 
 namespace fluid {
 
+enum class RiemannSolver {LLF, HLL};
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
@@ -41,20 +43,40 @@ class FluxState {
 
   KOKKOS_INLINE_FUNCTION
   void Solve(const int d, const int k, const int j, const int i) const {
-    llf(d, k, j ,i);
+    switch(solver){
+      case RiemannSolver::LLF:
+        llf(d,k,j,i);
+        break;
+      case RiemannSolver::HLL:
+        hll(d, k, j ,i);
+        break;
+      default:
+        PARTHENON_FAIL("Invalid Riemann Solver");
+    }
+  }
+
+  static void ReconVars(std::vector<std::string> &vars) {
+    for (const auto &v : vars) {
+      recon_vars.push_back(v);
+    }
+  }
+  static void ReconVars(const std::string &var) {
+    recon_vars.push_back(var);
+  }
+  static void FluxVars(std::vector<std::string> &vars) {
+    for (const auto &v : vars) {
+      flux_vars.push_back(v);
+    }
+  }
+  static void FluxVars(const std::string &var) {
+    flux_vars.push_back(var);
   }
 
   static std::vector<std::string> ReconVars() {
-    return std::vector<std::string>({primitive_variables::density,
-                                     primitive_variables::velocity,
-                                     primitive_variables::energy,
-                                     primitive_variables::pressure,
-                                     primitive_variables::gamma1});
+    return recon_vars;
   }
   static std::vector<std::string> FluxVars() {
-    return std::vector<std::string>({conserved_variables::density,
-                                     conserved_variables::momentum,
-                                     conserved_variables::energy});
+    return flux_vars;
   }
 
   const VariableFluxPack<Real> v;
@@ -62,20 +84,28 @@ class FluxState {
   const ParArrayND<Real> &qr;
  private:
   const Geometry::CoordinateSystem geom;
-  const int prho, pvel_lo, pvel_hi, peng, prs, gm1, crho, cmom_lo, cmom_hi, ceng, ncons;
+  const RiemannSolver &solver;
+  const int prho, pvel_lo, pvel_hi, peng, pye, prs, gm1, crho, cmom_lo, cmom_hi, ceng, cye, ncons;
+  static std::vector<std::string> recon_vars, flux_vars;
   FluxState(MeshBlockData<Real> *rc, PackIndexMap imap)
     : v(rc->PackVariablesAndFluxes(ReconVars(), FluxVars(), imap)),
       ql(rc->Get("ql").data),
       qr(rc->Get("qr").data),
       geom(Geometry::GetCoordinateSystem(rc)),
+      solver(rc->GetBlockPointer()->packages.Get("fluid")->Param<RiemannSolver>("RiemannSolver")),
       prho(imap[primitive_variables::density].first),
       pvel_lo(imap[primitive_variables::velocity].first),
       pvel_hi(imap[primitive_variables::velocity].second),
       peng(imap[primitive_variables::energy].first),
+      pye(imap[primitive_variables::ye].second),
       prs(imap[primitive_variables::pressure].first),
       gm1(imap[primitive_variables::gamma1].first),
-      crho(prho), cmom_lo(pvel_lo), cmom_hi(pvel_hi), ceng(peng),
-      ncons(ceng+1) {}
+      crho(imap[conserved_variables::density].first),
+      cmom_lo(imap[conserved_variables::momentum].first),
+      cmom_hi(imap[conserved_variables::momentum].second),
+      ceng(imap[conserved_variables::energy].first),
+      cye(imap[conserved_variables::ye].first),
+      ncons(5+(cye>0)) {}
 
 
 
@@ -117,6 +147,7 @@ class FluxState {
 
     // conserved density
     U[crho] = rho*W;
+    if (cye>0) U[cye] = U[crho]*q(dir,pye,k,j,i);
 
     // conserved momentum
     const Real rhohWsq = (rho + u + P)*W*W;
@@ -133,6 +164,7 @@ class FluxState {
 
     // mass flux
     F[crho] = U[crho]*vtil;
+    if (cye>0) F[cye] = U[cye]*vtil;
 
     // momentum flux
     for (int n = 0; n < 3; n++) {
@@ -161,6 +193,28 @@ class FluxState {
     const Real gdet = geom.DetGamma(loc, k, j, i);
     for (int m = 0; m < ncons; m++) {
       v.flux(d,m,k,j,i) = 0.5*(Fl[m] + Fr[m] - cmax*(Ur[m] - Ul[m])) * gdet;
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void hll(const int d, const int k, const int j, const int i) const {
+    Real Ul[ncons], Ur[ncons];
+    Real Fl[ncons], Fr[ncons];
+    Real vl, cl, vr, cr;
+
+    prim_to_flux(d, k, j, i, ql, vl, cl, Ul, Fl);
+    prim_to_flux(d, k, j, i, qr, vr, cr, Ur, Fr);
+
+    cr = std::max(vr + cr,0.0);
+    cl = std::min(vl - cl,0.0);
+
+    Real cmax = (cl > cr ? cl : cr);
+    cmax += std::max(std::abs(vl), std::abs(vr));
+
+    CellLocation loc = DirectionToFaceID(d);
+    const Real gdet = geom.DetGamma(loc, k, j, i);
+    for (int m = 0; m < ncons; m++) {
+      v.flux(d,m,k,j,i) = (cr*Fl[m] - cl*Fr[m] + cr*cl*(Ur[m] - Ul[m]))/(cr - cl) * gdet;
     }
   }
 };

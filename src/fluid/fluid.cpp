@@ -6,6 +6,9 @@
 
 namespace fluid {
 
+std::vector<std::string> FluxState::recon_vars;
+std::vector<std::string> FluxState::flux_vars;
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   namespace p = primitive_variables;
   namespace c = conserved_variables;
@@ -20,6 +23,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   int c2p_max_iter = pin->GetOrAddInteger("fluid", "c2p_max_iter", 20);
   params.Add("c2p_max_iter", c2p_max_iter);
+
+  std::string solver = pin->GetOrAddString("fluid", "riemann", "hll");
+  RiemannSolver rs = RiemannSolver::HLL;
+  if (solver == "llf") {
+    rs = RiemannSolver::LLF;
+  }
+  params.Add("RiemannSolver", rs);
+
+  bool ye = pin->GetOrAddBoolean("fluid", "Ye", false);
+  params.Add("Ye", ye);
 
   Metadata m;
   std::vector<int> three_vec(1,3);
@@ -38,13 +51,38 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::temperature, mprim_scalar);
   physics->AddField(p::gamma1, mprim_scalar);
   physics->AddField(p::cs, mprim_scalar);
+  if (ye) {
+    physics->AddField(p::ye, mprim_scalar);
+  }
 
   // add the conserved variables
   physics->AddField(c::density, mcons_scalar);
   physics->AddField(c::momentum, mcons_threev);
   physics->AddField(c::energy, mcons_scalar);
   //physics->AddField("c.bfield", mcons_threev);
+  if (ye) {
+    physics->AddField(c::ye, mcons_scalar);
+  }
 
+  // add the base state for reconstruction/fluxes
+  std::vector<std::string> rvars({p::density,
+                                  p::velocity,
+                                  p::energy});
+  FluxState::ReconVars(rvars);
+  if (ye) FluxState::ReconVars(p::ye);
+
+  std::vector<std::string> fvars({c::density,
+                                  c::momentum,
+                                  c::energy});
+  FluxState::FluxVars(fvars);
+  if (ye) FluxState::FluxVars(c::ye);
+
+  // add some extra fields for reconstruction
+  rvars = std::vector<std::string>({p::pressure,
+                                    p::gamma1});
+  FluxState::ReconVars(rvars);
+
+  // set up the arrays for left and right states
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
   else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
@@ -74,25 +112,30 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 //template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
+  namespace p = primitive_variables;
+  namespace c = conserved_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({"p.density", "c.density",
-                                 "p.velocity", "c.momentum",
-                                 "p.energy", "c.energy",
-                                 "pressure"});
+  std::vector<std::string> vars({p::density, c::density,
+                                 p::velocity, c::momentum,
+                                 p::energy, c::energy,
+                                 p::ye, c::ye,
+                                 p::pressure});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
-  const int prho = imap["p.density"].first;
-  const int crho = imap["c.density"].first;
-  const int pvel_lo = imap["p.velocity"].first;
-  const int pvel_hi = imap["p.velocity"].second;
-  const int cmom_lo = imap["c.momentum"].first;
-  const int cmom_hi = imap["c.momentum"].second;
-  const int peng = imap["p.energy"].first;
-  const int ceng = imap["c.energy"].first;
-  const int prs = imap["pressure"].first;
+  const int prho = imap[p::density].first;
+  const int crho = imap[c::density].first;
+  const int pvel_lo = imap[p::velocity].first;
+  const int pvel_hi = imap[p::velocity].second;
+  const int cmom_lo = imap[c::momentum].first;
+  const int cmom_hi = imap[c::momentum].second;
+  const int peng = imap[p::energy].first;
+  const int ceng = imap[c::energy].first;
+  const int prs = imap[p::pressure].first;
+  int pye = imap[p::ye].second; // -1 if not present
+  int cye = imap[c::ye].second;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -128,6 +171,9 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
       }
 
       v(b, ceng, k, j, i) = gdet*(rhohWsq - v(b, prs, k, j, i)) - v(b, crho, k, j, i);
+      if (pye > 0) {
+        v(b, cye, k, j, i) = v(b, crho, k, j, i) * v(b, pye, k, j, i);
+      }
     });
 
   return TaskStatus::complete;
