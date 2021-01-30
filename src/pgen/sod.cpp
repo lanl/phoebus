@@ -43,7 +43,6 @@ Real energy(const singularity::EOS &eos, const Real rho, const Real P) {
       Pguessr = Pmid;
     }
   }
-  std::cout << Pguessl << " " << P << " " << Pguessr << std::endl;
   return 0.5*rho*(eguessl + eguessr);
 }
 

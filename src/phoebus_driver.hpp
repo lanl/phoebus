@@ -31,6 +31,7 @@ class PhoebusDriver : public EvolutionDriver {
   TaskListStatus Step();
  private:
   std::unique_ptr<StagedIntegrator> integrator;
+  Real dt_init, dt_init_fact;
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);

@@ -36,23 +36,17 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
     Real zBsq = z + Bsq;
     zBsq *= zBsq;
     return (zBsq - Ssq - (2*z + Bsq)*BdotSsq/(z*z))*Wp*Wp - zBsq;
-    //return zBsq*zBsq*(Wp*Wp-1.0)/Wp - (2.0*z + Bsq)*BdotSsq/(z*z) - z*z - Ssq;
-    //return 
   };
 
   auto taufunc = [&](const Real z, const Real Wp, const Real p) {
-    //std::cout << "taufunc: " << z << " " << p << " " << D << " " << tau << std::endl;
-    //return z + Bsq - p - Bsq/(2.0*Wp*Wp) - BdotSsq/(2.0*z*z) - D - tau;
     return (tau + D - z- Bsq + BdotSsq/(2.0*z*z) + p)*Wp*Wp - 0.5*Bsq;
   };
 
   auto Rfunc = [&](const Real rho, const Real Temp, Real res[2]) {
     const Real p = eos.PressureFromDensityTemperature(rho, Temp);
     const Real sie = eos.InternalEnergyFromDensityTemperature(rho, Temp);
-    //std::cout << "Rfunc: " << rho << " " << Temp << " " << p << " " << sie << std::endl;
     const Real Wp = D/rho;
     const Real z = (rho*(1.0 + sie) + p)*Wp*Wp;
-    //std::cout << "Rfunc: " << tau << " " << rho*sie << " " << p << " " << taufunc(z, Wp, p) << std::endl;
     res[0] = sfunc(z, Wp);
     res[1] = taufunc(z, Wp, p);
   };
@@ -108,6 +102,8 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
     Real alpha = 1.0;
     int cnt = 0;
     while (res1 >= res0 && cnt < 5) {
+           //(std::abs(alpha*delta_rho/rho_guess) > delta_fact*rho_guess ||
+           //std::abs(alpha*delta_T/T_guess) > delta_fact*T_guess)) {
       alpha *= 0.5;
       Rfunc(rho_guess + alpha*delta_rho, T_guess + alpha*delta_T, res);
       res1 = res[0]*res[0] + res[1]*res[1];

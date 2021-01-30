@@ -46,11 +46,20 @@ PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh
   // warn if these fields aren't specified in the input file
   pin->CheckDesired("parthenon/mesh", "refinement");
   pin->CheckDesired("parthenon/mesh", "numlevel");
+
+  dt_init = pin->GetOrAddReal("parthenon/time", "dt_init", 1.e300);
+  dt_init_fact = pin->GetOrAddReal("parthenon/time", "dt_init_fact", 1.0);
 }
 
 TaskListStatus PhoebusDriver::Step() {
+  static bool first_call = true;
   TaskListStatus status;
-  integrator->dt = tm.dt;
+  Real dt_trial = tm.dt;
+  if (first_call) dt_trial = std::min(dt_trial, dt_init);
+  dt_trial *= dt_init_fact;
+  dt_init_fact = 1.0;
+  tm.dt = dt_trial;
+  integrator->dt = dt_trial;
 
   for (int stage = 1; stage <= integrator->nstages; stage++) {
     TaskCollection tc = RungeKuttaStage(stage);
