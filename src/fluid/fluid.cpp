@@ -118,16 +118,16 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
       v(b, crho, k, j, i) = gdet * v(b, prho, k, j, i) * W;
 
       // enthalpy
-      Real rhoh = v(b, prho, k, j, i) + v(b, peng, k, j, i) + v(b, prs, k, j, i);
+      Real rhohWsq = (v(b, prho, k, j, i) + v(b, peng, k, j, i) + v(b, prs, k, j, i))*W*W;
       for (int m = 0; m < 3; m++) {
         Real vcov = 0.0;
         for (int n = 0; n < 3; n++) {
           vcov += gcov[m][n]*v(b, pvel_lo+n, k, j, i);
         }
-        v(b, cmom_lo+m, k, j, i) = gdet*rhoh*W*W*vcov;
+        v(b, cmom_lo+m, k, j, i) = gdet*rhohWsq*vcov;
       }
 
-      v(b, ceng, k, j, i) = gdet*(rhoh*W*W - v(b, prs, k, j, i)) - v(b, crho, k, j, i);
+      v(b, ceng, k, j, i) = gdet*(rhohWsq - v(b, prs, k, j, i)) - v(b, crho, k, j, i);
     });
 
   return TaskStatus::complete;

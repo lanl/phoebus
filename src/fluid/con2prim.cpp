@@ -6,7 +6,7 @@ namespace con2prim {
 //static Real avg_iters = 0.0;
 
 template <typename Data_t,typename T>
-ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGeom &g) const {
+ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGeom &g, const bool print) const {
   // converge on rho and T
   // constraints: rho <= D, T > 0
 
@@ -33,13 +33,17 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   Real T_guess = v(tmp);
 
   auto sfunc = [&](const Real z, const Real Wp) {
-    const Real zBsq = z + Bsq;
-    return zBsq*zBsq*(Wp*Wp-1.0)/Wp - (2.0*z + Bsq)*BdotSsq/(z*z) - Ssq;
+    Real zBsq = z + Bsq;
+    zBsq *= zBsq;
+    return (zBsq - Ssq - (2*z + Bsq)*BdotSsq/(z*z))*Wp*Wp - zBsq;
+    //return zBsq*zBsq*(Wp*Wp-1.0)/Wp - (2.0*z + Bsq)*BdotSsq/(z*z) - z*z - Ssq;
+    //return 
   };
 
   auto taufunc = [&](const Real z, const Real Wp, const Real p) {
     //std::cout << "taufunc: " << z << " " << p << " " << D << " " << tau << std::endl;
-    return z + Bsq - p - Bsq/(2.0*Wp*Wp) - BdotSsq/(2.0*z*z) - D - tau;
+    //return z + Bsq - p - Bsq/(2.0*Wp*Wp) - BdotSsq/(2.0*z*z) - D - tau;
+    return (tau + D - z- Bsq + BdotSsq/(2.0*z*z) + p)*Wp*Wp - 0.5*Bsq;
   };
 
   auto Rfunc = [&](const Real rho, const Real Temp, Real res[2]) {
@@ -58,10 +62,10 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   Real res[2], resp[2];
   Real jac[2][2];
   const Real delta_fact_min = 1.e-8;
-  Real delta_fact = 1.e-8;
+  Real delta_fact = 1.e-6;
   const Real delta_adj = 1.2;
+  Rfunc(rho_guess, T_guess, res);
   do {
-    Rfunc(rho_guess, T_guess, res);
     Real drho = delta_fact*rho_guess;
     Rfunc(rho_guess + drho, T_guess, resp);
     jac[0][0] = (resp[0] - res[0])/drho;
@@ -76,8 +80,6 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
       delta_fact *= delta_adj;
       iter++;
       continue;
-      //std::cerr << "Jacobian is singular in con2prim.  Aborting." << std::endl;
-      //break;
     }
     Real delta_rho = -(res[0]*jac[1][1] - jac[0][1]*res[1])/det;
     Real delta_T = -(jac[0][0]*res[1] - jac[1][0]*res[0])/det;
@@ -86,25 +88,37 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
         std::abs(delta_T)/T_guess < rel_tolerance) {
           converged = true;
     }
+    if (print) {
+      std::cout << iter << " " << rho_guess << " " << T_guess << " " << delta_rho << " " << delta_T << std::endl;
+    }
 
     if (rho_guess + delta_rho < 0.0) {
       delta_rho = -0.1*rho_guess;
     }
     if (rho_guess + delta_rho > D) {
-      delta_rho = 0.99*(D-rho_guess);
+      delta_rho = D-rho_guess;
     }
     if (T_guess + delta_T < 0.0) {
       delta_T = -0.1*T_guess;
     }
-    rho_guess += delta_rho;
-    T_guess += delta_T;
+
+    const Real res0 = res[0]*res[0] + res[1]*res[1];
+    Rfunc(rho_guess + delta_rho, T_guess + delta_T, res);
+    Real res1 = res[0]*res[0] + res[1]*res[1];
+    Real alpha = 1.0;
+    int cnt = 0;
+    while (res1 >= res0 && cnt < 5) {
+      alpha *= 0.5;
+      Rfunc(rho_guess + alpha*delta_rho, T_guess + alpha*delta_T, res);
+      res1 = res[0]*res[0] + res[1]*res[1];
+      cnt++;
+    }
+
+    rho_guess += alpha*delta_rho;
+    T_guess += alpha*delta_T;
     iter++;
 
     if (delta_fact > delta_fact_min) delta_fact /= delta_adj;
-
-    //std::cout << "iter " << iter << ": "
-    //          << rho_guess << " " << T_guess << " "
-    //          << delta_rho << " " << delta_T << std::endl;
 
   } while(converged != true && iter < max_iter);
 
@@ -115,12 +129,9 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
                                            << v(cmom_lo+1) << " "
                                            << v(cmom_lo+2) << " " 
                                            << v(ceng) << std::endl;
+    if (!print) Solve(v,g,true);
     return ConToPrimStatus::failure;
   }
-
-  //calls++;
-  //avg_iters += (iter - avg_iters)/calls;
-  //std::cout << "avg iter = " << avg_iters << std::endl;
 
   v(tmp) = T_guess;
   v(prho) = rho_guess;
@@ -141,7 +152,6 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
     v(pvel_lo+i) = sconi/(z + Bsq) + BdotS*0.0/(z*(z + Bsq)); // this 0.0 should be B^i
   }
 
-  //std::cout << "Converged: " << v(prho) << " " << rho_guess << " " << T_guess << std::endl;
   return ConToPrimStatus::success;
 }
 

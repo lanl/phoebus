@@ -110,7 +110,7 @@ class ConToPrim {
   }
 
   KOKKOS_FUNCTION
-  ConToPrimStatus Solve(const VarAccessor<T> &v, const CellGeom &g) const;
+  ConToPrimStatus Solve(const VarAccessor<T> &v, const CellGeom &g, const bool print=false) const;
 
   int NumBlocks() {
     return var.GetDim(5);

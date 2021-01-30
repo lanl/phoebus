@@ -119,13 +119,13 @@ class FluxState {
     U[crho] = rho*W;
 
     // conserved momentum
-    Real H = rho + u + P;
+    const Real rhohWsq = (rho + u + P)*W*W;
     for (int m = 0; m < 3; m++) {
-      U[cmom_lo+m] = H*W*W*vcov[m];
+      U[cmom_lo+m] = rhohWsq*vcov[m];
     }
 
     // conserved energy
-    U[ceng] = H*W*W - P - U[crho];
+    U[ceng] = rhohWsq - P - U[crho];
 
     // Get fluxes
     const Real alpha = geom.Lapse(d, k, j, i);
