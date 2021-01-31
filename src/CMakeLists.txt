@@ -30,6 +30,7 @@ add_executable(phoebus
   microphysics/eos_phoebus/eos_phoebus.cpp
 
   pgen/pgen.hpp
+  pgen/hydro_modes.cpp
   pgen/sod.cpp
 
   phoebus_driver.cpp
