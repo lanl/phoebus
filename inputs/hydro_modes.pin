@@ -71,6 +71,7 @@ cfl = 0.4
 #riemann = hllc
 riemann = llf
 c2p_max_iter = 100
+recon = weno5
 
 <hydro_modes>
 mode = sound
