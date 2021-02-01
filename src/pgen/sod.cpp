@@ -69,9 +69,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iprs = imap["pressure"].first;
   const int itmp = imap["temperature"].first;
 
-  const Real gam = pin->GetReal("eos", "Gamma");
-  const Real cv  = pin->GetReal("eos", "Cv");
-
   const Real rhol = pin->GetOrAddReal("shocktube", "rhol", 1.0);
   const Real Pl = pin->GetOrAddReal("shocktube", "Pl", 1.0);
   const Real vl = pin->GetOrAddReal("shocktube", "vl", 0.0);
