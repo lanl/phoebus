@@ -9,6 +9,10 @@ namespace phoebus {
 // The problem generator for Riot.
 extern void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin);
 
+void YuckyOldWornOutProblemGenerator(MeshBlock *pmb, ParameterInput *pin);
+
+std::function<void(MeshBlock*, ParameterInput*)> GetProblemGenerator();
+
 } // namespace Riot
 
 #endif

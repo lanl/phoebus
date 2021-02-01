@@ -69,7 +69,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int itmp = imap["temperature"].first;
 
   const Real gam = pin->GetReal("eos", "Gamma");
-  const Real cv  = pin->GetReal("eos", "Cv");
+  //const Real cv  = pin->GetReal("eos", "Cv");
 
   const std::string mode = pin->GetOrAddString("hydro_modes", "mode", "entropy");
   const Real amp = pin->GetReal("hydro_modes", "amplitude");
@@ -83,16 +83,22 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   complex<double> omega, drho, dug, du1;
   double u10 = 0.;
   if (mode == "entropy") {
-    omega = 2.*M_PI;
+    omega = complex<double>(0, 2.*M_PI/10.);
     drho = 1.;
     dug = 0.;
     du1 = 0.;
-    u10 = 0.1;
+    u10 = 0.1; // Uniform advection
+  } else if (mode == "sound") {
+    omega = complex<double>(0., 0.6568547144496073);
+    drho = 0.9944432913027026;
+    dug = 0.0165740548550451;
+    du1 = -0.10396076706483988;
   } else {
     std::stringstream msg;
     msg << "Mode " << mode << " not supported!" << std::endl;
     PARTHENON_FAIL(msg);
   }
+  pin->SetReal("parthenon/time", "tlim", 2.*M_PI/omega.imag()); // Set final time to be one period
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
