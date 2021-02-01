@@ -84,6 +84,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double u10 = 0.;
   if (mode == "entropy") {
     omega = complex<double>(0, 2.*M_PI/10.);
+    //omega = complex<double>(0, 2.*M_PI/1.);
     drho = 1.;
     dug = 0.;
     du1 = 0.;
