@@ -24,10 +24,25 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   int c2p_max_iter = pin->GetOrAddInteger("fluid", "c2p_max_iter", 20);
   params.Add("c2p_max_iter", c2p_max_iter);
 
+  std::string recon = pin->GetOrAddString("fluid", "recon", "linear");
+  PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;
+  if (recon == "weno5") {
+    rt = PhoebusReconstruction::ReconType::weno5;
+  } else if (recon == "linear") {
+    rt = PhoebusReconstruction::ReconType::linear;
+  } else {
+    PARTHENON_THROW("Invalid Reconstruction option.  Choose from [linear,weno5]");
+  }
+  params.Add("Recon", rt);
+
   std::string solver = pin->GetOrAddString("fluid", "riemann", "hll");
   RiemannSolver rs = RiemannSolver::HLL;
   if (solver == "llf") {
     rs = RiemannSolver::LLF;
+  } else if (solver == "hll") {
+    rs = RiemannSolver::HLL;
+  } else {
+    PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
   }
   params.Add("RiemannSolver", rs);
 
@@ -220,12 +235,28 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   const int dk = (pmb->pmy_mesh->ndim == 3 ? 1 : 0);
   const int dj = (pmb->pmy_mesh->ndim >  1 ? 1 : 0);
   const int nrecon = flux.ql.GetDim(4)-1;
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
-    X1DIR, pmb->pmy_mesh->ndim,
-    kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
-    KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-      PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-    });
+  auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>("Recon");
+  switch (rt) {
+    case PhoebusReconstruction::ReconType::weno5:
+      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
+      X1DIR, pmb->pmy_mesh->ndim,
+      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
+        //PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
+        PhoebusReconstruction::WENO5(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
+        });
+      break;
+    case PhoebusReconstruction::ReconType::linear:
+      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
+      X1DIR, pmb->pmy_mesh->ndim,
+      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
+        PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
+        });
+      break;
+    default:
+      PARTHENON_THROW("Invalid recon option.");
+  }
 
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
     X1DIR, pmb->pmy_mesh->ndim,

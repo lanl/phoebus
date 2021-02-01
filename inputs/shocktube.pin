@@ -10,7 +10,8 @@ variables = p.density,  &
             p.velocity, &
             p.energy,   &
 	    pressure,	&
-	    cs
+	    cs, &
+	    p.ye
 
 file_type   = hdf5      # Tabular data dump
 dt          = 0.01      # time increment between outputs
@@ -19,7 +20,8 @@ dt          = 0.01      # time increment between outputs
 nlim        = -1        # cycle limit
 tlim        = 0.4       # time limit
 integrator  = rk2       # time integration algorithm
-ncycle_out  = 10        # interval for stdout summary info
+ncycle_out  = 1        # interval for stdout summary info
+dt_init_fact = 1.e-6
 
 <parthenon/mesh>
 #refinement = adaptive
@@ -67,14 +69,16 @@ rad = false
 
 <fluid>
 xorder = 2
-cfl = 0.1
-riemann = hllc
+cfl = 0.9
+riemann = hll
+recon = weno5
 c2p_max_iter = 100
+Ye = true
 
 <shocktube>
 rhol = 10.0
 Pl = 13.3333333333333333333333
 vl = 0.0
 rhor = 1.0
-Pr = 0.01
+Pr = 1.e-6
 vr = 0.0
