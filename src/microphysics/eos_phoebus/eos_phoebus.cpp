@@ -11,7 +11,7 @@
 #include <eos/eos_builder.hpp>
 
 // phoebus includes
-#include "microphysics/eos/eos.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 
 namespace Microphysics {
 namespace EOS {
@@ -21,7 +21,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto pkg = std::make_shared<StateDescriptor>("eos");
   Params &params = pkg->AllParams();
 
-  const std::string block_name = "EOS";
+  const std::string block_name = "eos";
   auto FillRealParams = [&](ParameterInput *pin, EOSBuilder::params_t &params,
                             const names_t &param_names) {
     for (auto &name : param_names) {

@@ -17,20 +17,21 @@
 #include <memory>
 
 #include <parthenon/driver.hpp>
-
 using namespace parthenon::driver::prelude;
 
 namespace phoebus {
 
 // TODO(JMM): What kind of driver should this be?
-class PhoebusDriver : public Driver {
+class PhoebusDriver : public EvolutionDriver {
  public:
   PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm);
 
-  template <typename T>
-  TaskCollection MakeTaskCollection(T &blocks);
+  TaskCollection RungeKuttaStage(const int stage);
 
-  DriverStatus Execute() override;
+  TaskListStatus Step();
+ private:
+  std::unique_ptr<StagedIntegrator> integrator;
+  Real dt_init, dt_init_fact;
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
