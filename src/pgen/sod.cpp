@@ -11,7 +11,7 @@
 // As descriged in the Athena test suite
 // https://www.astro.princeton.edu/~jstone/Athena/tests/blast/blast.html
 // and in
-// Zachary, Malagoli, A., & Colella,P., SIAM J. Sci. Comp., 15, 263 (1994); Balsara, D., & Spicer, D., JCP 149, 270 (1999); Londrillo, P. & Del Zanna, L., ApJ 530, 508 (2000). 
+// Zachary, Malagoli, A., & Colella,P., SIAM J. Sci. Comp., 15, 263 (1994); Balsara, D., & Spicer, D., JCP 149, 270 (1999); Londrillo, P. & Del Zanna, L., ApJ 530, 508 (2000).
 
 namespace phoebus {
 
@@ -46,7 +46,7 @@ Real energy(const singularity::EOS &eos, const Real rho, const Real P) {
   return 0.5*rho*(eguessl + eguessr);
 }
 
-void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+void YuckyOldWornOutProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &rc = pmb->meshblock_data.Get();
 

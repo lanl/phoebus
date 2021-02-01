@@ -1,4 +1,5 @@
 #include <complex>
+#include <sstream>
 
 #include <eos/eos.hpp>
 #include <utils/error_checking.hpp>
@@ -10,6 +11,8 @@
 #include "fluid/fluid.hpp"
 
 // Relativistic hydro linear modes.
+
+using std::complex;
 
 namespace phoebus {
 
@@ -68,20 +71,25 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real cv  = pin->GetReal("eos", "Cv");
 
-  const std::string mode = pin->GetString("hydro_modes", "mode", "entropy");
+  const std::string mode = pin->GetOrAddString("hydro_modes", "mode", "entropy");
+  const Real amp = pin->GetReal("hydro_modes", "amplitude");
 
-  const Real rho0 = pin->GetReal("hydro_modes", "rho0", 1.0);
-  const Real ug0 = pin->GetReal("hydro_modes", "ug0", 1.e-2);
+  double rho0 = 1.0;
+  double ug0 = 1.e-2;
 
   // Wavevector
   double k1 = 2.*M_PI;
 
-  //complex omega;
-  double omega;
+  complex<double> omega, drho, dug, du1;
+  double u10 = 0.;
   if (mode == "entropy") {
     omega = 2.*M_PI;
+    drho = 1.;
+    dug = 0.;
+    du1 = 0.;
+    u10 = 0.1;
   } else {
-    std::sstream msg;
+    std::stringstream msg;
     msg << "Mode " << mode << " not supported!" << std::endl;
     PARTHENON_FAIL(msg);
   }
@@ -96,17 +104,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
     "Phoebus::ProblemGenerator::Hydro_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      /*const Real x = coords.x1v(i);
-      const Real rho = x < 0.5 ? rhol : rhor;
-      const Real P = x < 0.5 ? Pl : Pr;
-      const Real vel = x < 0.5 ? vl : vr;
+      const Real x = coords.x1v(i);
+
+      double mode = amp*cos(k1*x);
+
+      double rho = rho0 + (drho*mode).real();
       v(irho, k, j, i) = rho;
-      v(iprs, k, j, i) = P;
-      v(ieng, k, j, i) = energy(eos, rho, P);
+      double ug = ug0 + (dug*mode).real();
+      double Pg = (gam - 1.)*ug;
+      v(iprs, k, j, i) = Pg;
+      v(ieng, k, j, i) = ug;
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
-      v(ivlo, k, j, i) = vel;
-      if (iye > 0) v(iye, k, j, i) = sin(2.0*M_PI*x);*/
+      v(ivlo, k, j, i) = u10 + (du1*mode).real();
     });
 
   fluid::PrimitiveToConserved(rc.get());
