@@ -1,50 +1,14 @@
-#include <eos/eos.hpp>
-#include <utils/error_checking.hpp>
-
-#include "eos/eos.hpp"
-
 #include "pgen/pgen.hpp"
-
-#include "fluid/fluid.hpp"
 
 // Single-material blast wave.
 // As descriged in the Athena test suite
 // https://www.astro.princeton.edu/~jstone/Athena/tests/blast/blast.html
 // and in
-// Zachary, Malagoli, A., & Colella,P., SIAM J. Sci. Comp., 15, 263 (1994); Balsara, D., & Spicer, D., JCP 149, 270 (1999); Londrillo, P. & Del Zanna, L., ApJ 530, 508 (2000). 
+// Zachary, Malagoli, A., & Colella,P., SIAM J. Sci. Comp., 15, 263 (1994); Balsara, D., & Spicer, D., JCP 149, 270 (1999); Londrillo, P. & Del Zanna, L., ApJ 530, 508 (2000).
 
-namespace phoebus {
+//namespace phoebus {
 
-KOKKOS_INLINE_FUNCTION
-Real energy(const singularity::EOS &eos, const Real rho, const Real P) {
-  Real eguessl = P/rho;
-  Real Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl);
-  Real eguessr = eguessl;
-  Real Pguessr = Pguessl;
-  while (Pguessl > P) {
-    eguessl /= 2.0;
-    Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl);
-  }
-  while (Pguessr < P) {
-    eguessr *= 2.0;
-    Pguessr = eos.PressureFromDensityInternalEnergy(rho, eguessr);
-  }
-
-  PARTHENON_REQUIRE_THROWS(Pguessr>P && Pguessl<P, "Pressure not bracketed");
-
-  while (Pguessr - Pguessl > 1.e-10*P) {
-    Real emid = 0.5*(eguessl + eguessr);
-    Real Pmid = eos.PressureFromDensityInternalEnergy(rho, emid);
-    if (Pmid < P) {
-      eguessl = emid;
-      Pguessl = Pmid;
-    } else {
-      eguessr = emid;
-      Pguessr = Pmid;
-    }
-  }
-  return 0.5*rho*(eguessl + eguessr);
-}
+namespace shock_tube {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -92,7 +56,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real vel = x < 0.5 ? vl : vr;
       v(irho, k, j, i) = rho;
       v(iprs, k, j, i) = P;
-      v(ieng, k, j, i) = energy(eos, rho, P);
+      v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho, P);
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
       v(ivlo, k, j, i) = vel;
@@ -102,4 +66,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   fluid::PrimitiveToConserved(rc.get());
 }
 
-} // namespace Riot
+}
+
+//} // namespace phoebus

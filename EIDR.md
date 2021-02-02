@@ -1,26 +1,33 @@
 Phoebus Request for Open-Sourcing Description
 ===
 
-# Description
+# Abstract or synopsis of the invention.
 
-Phoebus is a performance portable code for simulating compact object
+Phoebus is a performance portable code for simulating relativistic astrophysical phenomena. Phoebus includes the following physics: 1) general relativity, including both stationary and dynamical spacetimes, 2) magnetohydrodynamics closed by a general equation of state, 3) neutrino transport and weak interactions that couple neutrinos and matter, and 4) nuclear reactions.  Capabilities for these physical ingredients are developed atop the open source Parthenon framework for performance portable, block-structured adaptive mesh refinement.
+
+
+[//]: # (compact object
 astrophysics. This includes core-collapse supernovae, the in-spiral
 and merger of neutron stars and black holes, and the accretion disks
 formed in the aftermath of these cataclysmic events. In general, this
 problem requires: General relativity and gravitational waves, neutrino
 and weak physics, relativistic magnetohydrodynamics, and the ability
 to use open-sourced tabulated equations of state and neutrino
-opacities such as those provided by stellarcollapse.org.
+opacities such as those provided by stellarcollapse.org.)
 
+# Background of Problem of Need.
 
-## Details
- 
-The astrophysics methods and models implemented in Phoebus are
+Phoebus is being developed in support of the Next Generation Platforms
+effort under the ASC program.  This application will facilitate collaborations with external partners to help us understand and improve how complex multiphysics codes leverage high performance computing platforms.
+
+# Solution to Problem or Need.
+
+The numerical methods and models implemented in Phoebus are
 available in the open literature:
 
 - Finite volumes are used to model the general relativistic
   magnetohydrodynamics. For a review of the equations used and
-  thethods used to solve them, see Font. Living Rev. Relativ. 11, 7
+  the methods used to solve them, see Font. Living Rev. Relativ. 11, 7
   (2008). (https://doi.org/10.12942/lrr-2008-7)
 - Monte Carlo Neutrino transport and Neutrino fluid coupling as
   described in Miller, Ryan and Dolence. ApJS, 241:2
@@ -65,8 +72,6 @@ Phoebus is being developed at LANL.
 
 ## Mission or Purpose for which the Software Was Developed
 
-Phoebus is being developed in support of the Next Generation Platforms
-effort under the ASC progrem.
 
 ## Funding
 
