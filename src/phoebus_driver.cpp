@@ -58,6 +58,7 @@ TaskListStatus PhoebusDriver::Step() {
   if (first_call) dt_trial = std::min(dt_trial, dt_init);
   dt_trial *= dt_init_fact;
   dt_init_fact = 1.0;
+  if (tm.time + dt_trial > tm.tlim) dt_trial = tm.tlim-tm.time;
   tm.dt = dt_trial;
   integrator->dt = dt_trial;
 

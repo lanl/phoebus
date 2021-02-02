@@ -30,7 +30,9 @@ add_executable(phoebus
   microphysics/eos_phoebus/eos_phoebus.cpp
 
   pgen/pgen.hpp
-  pgen/sod.cpp
+  pgen/pgen.cpp
+  pgen/linear_modes.cpp
+  pgen/shock_tube.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp

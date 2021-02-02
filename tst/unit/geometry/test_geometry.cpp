@@ -25,7 +25,7 @@ using parthenon::RegionSize;
 constexpr int NTRIALS = 100;
 constexpr int ND = CoordinateSystem::NDSPACE;
 constexpr int NDFULL = CoordinateSystem::NDFULL;
-constexpr int NG = NGHOST;
+constexpr int NG = 2;
 constexpr int NX = 128 + 2 * NG;
 // constexpr Real EPS = 1e-5;
 
