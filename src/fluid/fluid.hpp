@@ -23,111 +23,201 @@ using namespace parthenon::package::prelude;
 #include "con2prim.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/variables.hpp"
 
 namespace fluid {
 
+enum class RiemannSolver {LLF, HLL};
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
-/*template <typename T>
-TaskStatus PrimitiveToConserved(T *rc);
-
+TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc);
+TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
-*/
-#define DELTA(i,j) (i==j ? 1 : 0)
+class FluxState {
+ public:
+  FluxState(MeshBlockData<Real> *rc) : FluxState(rc, PackIndexMap()) {}
 
-KOKKOS_FUNCTION
-void prim_to_flux(const int b, const int d, const int k, const int j, const int i,
-                  const Geometry::CoordinateSystem &geom, const ParArrayND<Real> &q,
-                  Real &cs, Real *U, Real *F) {
-  const int dir = d-1;
-  const Real &rho = q(b,dir,0,k,j,i);
-  const Real vcon[] = {q(b,dir,1,k,j,i), q(b,dir,2,k,j,i), q(b,dir,3,k,j,i)};
-  const Real &v = vcon[dir];
-  const Real &u = q(b,dir,4,k,j,i);
-  const Real &P = q(b,dir,5,k,j,i);
-  const Real &gm1 = q(b,dir,6,k,j,i);
-  cs = sqrt(gm1*P/rho);
-
-  CellLocation loc = DirectionToFaceID(d);
-
-  Real vcov[3];
-  for (int m = 1; m <= 3; m++) {
-    vcov[m-1] = 0.0;
-    for (int n = 1; n <= 3; n++) {
-      vcov[m-1] += geom.Metric(m,n,loc,k,j,i)*vcon[n-1];
+  KOKKOS_INLINE_FUNCTION
+  void Solve(const int d, const int k, const int j, const int i) const {
+    switch(solver){
+      case RiemannSolver::LLF:
+        llf(d,k,j,i);
+        break;
+      case RiemannSolver::HLL:
+        hll(d, k, j ,i);
+        break;
+      default:
+        PARTHENON_FAIL("Invalid Riemann Solver");
     }
   }
 
-  // get Lorentz factor
-  Real vsq = 0.0;
-  for (int m = 0; m < 3; m++) {
-    for (int n = 0; n < 3; n++) {
-      vsq += vcon[m]*vcov[n];
+  static void ReconVars(std::vector<std::string> &vars) {
+    for (const auto &v : vars) {
+      recon_vars.push_back(v);
     }
   }
-  const Real W = 1.0/sqrt(1.0 - vsq);
-
-  // conserved density
-  U[0] = rho*W;
-
-  // conserved momentum
-  Real H = rho + u + P;
-  for (int m = 1; m <= 3; m++) {
-    U[m] = H*W*W*vcov[m-1];
+  static void ReconVars(const std::string &var) {
+    recon_vars.push_back(var);
+  }
+  static void FluxVars(std::vector<std::string> &vars) {
+    for (const auto &v : vars) {
+      flux_vars.push_back(v);
+    }
+  }
+  static void FluxVars(const std::string &var) {
+    flux_vars.push_back(var);
   }
 
-  // conserved energy
-  U[4] = H*W*W - P - U[0];
+  static std::vector<std::string> ReconVars() {
+    return recon_vars;
+  }
+  static std::vector<std::string> FluxVars() {
+    return flux_vars;
+  }
 
-  // Get fluxes
-  const Real alpha = geom.Lapse(d, k, j, i);
-  for (int m = 1; m <= 3; m++) {
-    const Real vtil = vcon[m] - geom.ContravariantShift(m, loc, k, j, i)/alpha;
+  const VariableFluxPack<Real> v;
+  const ParArrayND<Real> &ql;
+  const ParArrayND<Real> &qr;
+ private:
+  const Geometry::CoordinateSystem geom;
+  const RiemannSolver &solver;
+  const int prho, pvel_lo, pvel_hi, peng, pye, prs, gm1, crho, cmom_lo, cmom_hi, ceng, cye, ncons;
+  static std::vector<std::string> recon_vars, flux_vars;
+  FluxState(MeshBlockData<Real> *rc, PackIndexMap imap)
+    : v(rc->PackVariablesAndFluxes(ReconVars(), FluxVars(), imap)),
+      ql(rc->Get("ql").data),
+      qr(rc->Get("qr").data),
+      geom(Geometry::GetCoordinateSystem(rc)),
+      solver(rc->GetBlockPointer()->packages.Get("fluid")->Param<RiemannSolver>("RiemannSolver")),
+      prho(imap[primitive_variables::density].first),
+      pvel_lo(imap[primitive_variables::velocity].first),
+      pvel_hi(imap[primitive_variables::velocity].second),
+      peng(imap[primitive_variables::energy].first),
+      pye(imap[primitive_variables::ye].second),
+      prs(imap[primitive_variables::pressure].first),
+      gm1(imap[primitive_variables::gamma1].first),
+      crho(imap[conserved_variables::density].first),
+      cmom_lo(imap[conserved_variables::momentum].first),
+      cmom_hi(imap[conserved_variables::momentum].second),
+      ceng(imap[conserved_variables::energy].first),
+      cye(imap[conserved_variables::ye].first),
+      ncons(5+(cye>0)) {}
+
+
+
+  KOKKOS_FORCEINLINE_FUNCTION
+  int Delta(const int i, const int j) const {
+    return i==j;
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void prim_to_flux(const int d, const int k, const int j, const int i,
+                    const ParArrayND<Real> &q, Real &vel, Real &cs, Real *U, Real *F) const {
+    const int dir = d-1;
+    const Real &rho = q(dir,prho,k,j,i);
+    const Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_hi,k,j,i)};
+    vel = vcon[dir];
+    const Real &u = q(dir,peng,k,j,i);
+    const Real &P = q(dir,prs,k,j,i);
+    const Real &gamma1 = q(dir,gm1,k,j,i);
+    cs = sqrt(gamma1*P/rho);
+
+    CellLocation loc = DirectionToFaceID(d);
+
+    Real vcov[3];
+    for (int m = 1; m <= 3; m++) {
+      vcov[m-1] = 0.0;
+      for (int n = 1; n <= 3; n++) {
+        vcov[m-1] += geom.Metric(m,n,loc,k,j,i)*vcon[n-1];
+      }
+    }
+
+    // get Lorentz factor
+    Real vsq = 0.0;
+    for (int m = 0; m < 3; m++) {
+      for (int n = 0; n < 3; n++) {
+        vsq += vcon[m]*vcov[n];
+      }
+    }
+    const Real W = 1.0/sqrt(1.0 - vsq);
+
+    // conserved density
+    U[crho] = rho*W;
+    if (cye>0) U[cye] = U[crho]*q(dir,pye,k,j,i);
+
+    // conserved momentum
+    const Real rhohWsq = (rho + u + P)*W*W;
+    for (int m = 0; m < 3; m++) {
+      U[cmom_lo+m] = rhohWsq*vcov[m];
+    }
+
+    // conserved energy
+    U[ceng] = rhohWsq - P - U[crho];
+
+    // Get fluxes
+    const Real alpha = geom.Lapse(d, k, j, i);
+    const Real vtil = vcon[dir] - geom.ContravariantShift(d, loc, k, j, i)/alpha;
 
     // mass flux
-    F[0] = U[0]*vtil;
+    F[crho] = U[crho]*vtil;
+    if (cye>0) F[cye] = U[cye]*vtil;
 
     // momentum flux
-    for (int n = 1; n <= 3; n++) {
-      F[n] = U[n]*vtil + P*DELTA(d,n);
+    for (int n = 0; n < 3; n++) {
+      F[cmom_lo+n] = U[cmom_lo+n]*vtil + P*Delta(dir,n);
     }
 
     // energy flux
-    F[4] = U[4]*vtil + P*v;
+    F[ceng] = U[ceng]*vtil + P*vel;
+
+    return;
   }
 
-  return;
-}
+  KOKKOS_INLINE_FUNCTION
+  void llf(const int d, const int k, const int j, const int i) const {
+    Real Ul[ncons], Ur[ncons];
+    Real Fl[ncons], Fr[ncons];
+    Real vl, cl, vr, cr;
 
-#undef DELTA
+    prim_to_flux(d, k, j, i, ql, vl, cl, Ul, Fl);
+    prim_to_flux(d, k, j, i, qr, vr, cr, Ur, Fr);
 
+    Real cmax = (cl > cr ? cl : cr);
+    cmax += std::max(std::abs(vl), std::abs(vr));
 
-
-template <typename T>
-KOKKOS_INLINE_FUNCTION
-void llf(const int b, const int d, const int k, const int j, const int i,
-         const Geometry::CoordinateSystem &geom, const ParArrayND<Real> &ql,
-         const ParArrayND<Real> &qr, T &v) {
-
-  Real Ul[5], Ur[5];
-  Real Fl[5], Fr[5];
-  Real cl, cr;
-
-  prim_to_flux(b, d, k, j, i, geom, ql, cl, Ul, Fl);
-  prim_to_flux(b, d, k, j, i, geom, qr, cr, Ur, Fr);
-
-  const Real cmax = (cl > cr ? cl : cr);
-
-  CellLocation loc = DirectionToFaceID(d);
-  const Real gdet = geom.DetGamma(loc, k, j, i);
-  for (int m = 0; m < 5; m++) {
-    v.flux(d,m,k,j,i) = 0.5*(Fl[m] + Fr[m] - cmax*(Ur[m] - Ul[m])) * gdet;
+    CellLocation loc = DirectionToFaceID(d);
+    const Real gdet = geom.DetGamma(loc, k, j, i);
+    for (int m = 0; m < ncons; m++) {
+      v.flux(d,m,k,j,i) = 0.5*(Fl[m] + Fr[m] - cmax*(Ur[m] - Ul[m])) * gdet;
+    }
   }
-}
 
+  KOKKOS_INLINE_FUNCTION
+  void hll(const int d, const int k, const int j, const int i) const {
+    Real Ul[ncons], Ur[ncons];
+    Real Fl[ncons], Fr[ncons];
+    Real vl, cl, vr, cr;
 
+    prim_to_flux(d, k, j, i, ql, vl, cl, Ul, Fl);
+    prim_to_flux(d, k, j, i, qr, vr, cr, Ur, Fr);
+
+    cr = std::max(vr + cr,0.0);
+    cl = std::min(vl - cl,0.0);
+
+    Real cmax = (cl > cr ? cl : cr);
+    cmax += std::max(std::abs(vl), std::abs(vr));
+
+    CellLocation loc = DirectionToFaceID(d);
+    const Real gdet = geom.DetGamma(loc, k, j, i);
+    for (int m = 0; m < ncons; m++) {
+      v.flux(d,m,k,j,i) = (cr*Fl[m] - cl*Fr[m] + cr*cl*(Ur[m] - Ul[m]))/(cr - cl) * gdet;
+    }
+  }
+};
 
 } // namespace fluid
 

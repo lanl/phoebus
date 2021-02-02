@@ -27,16 +27,17 @@ add_executable(phoebus
   geometry/geometry.cpp
   geometry/geometry.hpp
 
-  initial_conditions.hpp
-  initial_conditions.cpp
-
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
+
+  pgen/pgen.hpp
+  pgen/sod.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp
 
   phoebus_utils/cell_locations.hpp
+  phoebus_utils/variables.hpp
 
   reconstruction.hpp
 )

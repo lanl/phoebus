@@ -19,11 +19,10 @@ using names_t = std::vector<std::string>;
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   using namespace singularity;
   auto pkg = std::make_shared<StateDescriptor>("eos");
-  Params& params = pkg->AllParams();
+  Params &params = pkg->AllParams();
 
-  const std::string block_name = "EOS";
-  auto FillRealParams = [&](ParameterInput *pin,
-                            EOSBuilder::params_t &params,
+  const std::string block_name = "eos";
+  auto FillRealParams = [&](ParameterInput *pin, EOSBuilder::params_t &params,
                             const names_t &param_names) {
     for (auto &name : param_names) {
       params[name].emplace<Real>(pin->GetReal(block_name, name));
@@ -34,14 +33,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   names_t names;
   EOSBuilder::EOSType type;
   EOSBuilder::modifiers_t modifiers;
-  EOSBuilder::params_t base_params, shifted_params, scaled_params;
+  EOSBuilder::params_t base_params;
+  EOSBuilder::params_t relativity_params;
+  // EOSBuilder::params_t shifted_params, scaled_params;
 
+  const std::vector<std::string> valid_eos_names = {
+      IdealGas::EosType(), SpinerEOSDependsRhoT::EosType(),
+      SpinerEOSDependsRhoSie::EosType()};
   std::string eos_type = pin->GetString(block_name, std::string("type"));
   if (eos_type.compare(IdealGas::EosType()) == 0) {
     type = EOSBuilder::EOSType::IdealGas;
     names = {"Cv"};
     base_params["gm1"].emplace<Real>(
         pin->GetReal(block_name, std::string("Gamma")) - 1.0);
+    /*
+      // TODO(JMM): Disabling these for now
   } else if (eos_type.compare(Gruneisen::EosType()) == 0) {
     type = EOSBuilder::EOSType::Gruneisen;
     names = {"C0", "s1", "s2", "s3", "G0", "b", "rho0", "T0", "P0", "Cv"};
@@ -55,6 +61,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     type = EOSBuilder::EOSType::DavisReactants;
     names = {"rho0", "e0", "P0", "T0",    "A",  "B",
              "C",    "G0", "Z",  "alpha", "Cv0"};
+    */
 #ifdef SPINER_USE_HDF
   } else if (eos_type.compare(SpinerEOSDependsRhoT::EosType()) == 0) {
     type = EOSBuilder::EOSType::SpinerEOSDependsRhoT;
@@ -77,13 +84,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 #endif
   } else {
     std::stringstream error_mesg;
-    error_mesg << __func__ << ": " << eos_type << " is an invalid EOS selection"
-               << std::endl;
+    error_mesg << __func__ << ": " << eos_type
+               << " is an invalid EOS selection."
+               << " Valid EOS names are:\n";
+    for (const auto &name : valid_eos_names) {
+      error_mesg << "\t" << name << "\n";
+    }
+    error_mesg << std::endl;
     PARTHENON_THROW(error_mesg);
   }
   FillRealParams(pin, base_params, names);
 
   // modifiers
+  /*
+  // TODO(JMM): Disabling this for now
   Real shift = pin->GetOrAddReal(block_name, "shift", 0.0);
   Real scale = pin->GetOrAddReal(block_name, "scale", 1.0);
   if (shift != 0.0) {
@@ -94,8 +108,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     scaled_params["scale"].emplace<Real>(scale);
     modifiers[EOSBuilder::EOSModifier::Scaled] = scaled_params;
   }
-  
-  singularity::EOS eos_host = EOSBuilder::buildEOS(type, base_params, modifiers);
+  */
+
+  // TODO(JMM): Maybe get this automatically from a unit system when
+  // we're dealing with unit systems?
+  Real cl = pin->GetOrAddReal(block_name, "speed_of_light", 1.0);
+  relativity_params["cl"].emplace<Real>(cl);
+  modifiers[EOSBuilder::EOSModifier::Relativistic] = relativity_params;
+
+  // Build the EOS
+  singularity::EOS eos_host =
+      EOSBuilder::buildEOS(type, base_params, modifiers);
   singularity::EOS eos_device = eos_host.GetOnDevice();
   params.Add("d.EOS", eos_device);
   params.Add("h.EOS", eos_host);
