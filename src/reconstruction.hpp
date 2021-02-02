@@ -22,15 +22,21 @@ namespace PhoebusReconstruction {
 
 enum class ReconType {linear, weno5};
 
+
+KOKKOS_FORCEINLINE_FUNCTION
+Real koren(const Real dm, const Real dp) {
+  const Real r = (std::abs(dp) > 0. ? dm/dp : 0.0);
+  return std::max(0.0, std::min(2.0*r, std::min((1.0 + 2.0*r)/3.0, 2.0)));
+}
+
 KOKKOS_FORCEINLINE_FUNCTION
 Real mc(const Real dm, const Real dp) {
   const Real r = (std::abs(dp) > 0. ? dm/dp : 0.0);
-  return std::max(0.0, std::min(2.0,std::min(2*r,0.5*(1+r))));
+  return std::max(0.0, std::min(2.0,std::min(2.0*r,0.5*(1+r))));
 }
 KOKKOS_FORCEINLINE_FUNCTION
 Real minmod(const Real dm, const Real dp) {
   const Real r = (std::abs(dp) > 0. ? dm/dp : 0.0);
-  //return std::max(0.0, std::min(2.0,std::min(2*r,0.5*(1+r))));
   const Real t = 1.5;
   return std::max(0.0, std::min(t, std::min(t*r,0.5*(1.0+r))));
 }
@@ -106,7 +112,7 @@ void PiecewiseLinear(const int d, const int nlo, const int nhi,
   for (int n=nlo; n<=nhi; n++) {
     Real dql = v(n,k,j,i) - v(n,k-dk,j-dj,i-di);
     Real dqr = v(n,k+dk,j+dj,i+di) - v(n,k,j,i);
-    Real dq = mc(dql,dqr)*dqr;
+    Real dq = minmod(dql,dqr)*dqr;
     ql(dir,n,k+dk,j+dj,i+di) = v(n,k,j,i) + 0.5*dq;
     qr(dir,n,k,j,i) = v(n,k,j,i) - 0.5*dq;
   }
