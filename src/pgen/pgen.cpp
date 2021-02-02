@@ -5,15 +5,15 @@ namespace phoebus {
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   std::string name = pin->GetString("phoebus", "problem");
 
-  if (name == "phoebus" || prob.count(name) == 0) {
+  if (name == "phoebus" || pgen_dict.count(name) == 0) {
     std::stringstream s;
     s << "Invalid problem name in input file.  Valid options include:" << std::endl;
-    for (const auto &p : prob) {
+    for (const auto &p : pgen_dict) {
       if (p.first != "phoebus") s << "   " << p.first << std::endl;
     }
     PARTHENON_THROW(s);
   }
-  auto f = prob[name];
+  auto f = pgen_dict[name];
   f(pmb, pin);
 }
 

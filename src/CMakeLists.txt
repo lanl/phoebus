@@ -31,8 +31,8 @@ add_executable(phoebus
 
   pgen/pgen.hpp
   pgen/pgen.cpp
-  pgen/hydro_modes.cpp
-  pgen/sod.cpp
+  pgen/linear_modes.cpp
+  pgen/shock_tube.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp

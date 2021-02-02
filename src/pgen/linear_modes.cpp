@@ -7,7 +7,7 @@
 
 using std::complex;
 
-namespace LinearModes {
+namespace linear_modes {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -91,4 +91,4 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   fluid::PrimitiveToConserved(rc.get());
 }
 
-} // namespace LinearModes
+} // namespace linear_modes

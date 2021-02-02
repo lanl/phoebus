@@ -1,5 +1,5 @@
 <phoebus>
-problem = LinearModes
+problem = linear_modes
 
 <parthenon/job>
 problem_id  = hydro_modes       # problem ID: basename of output filenames

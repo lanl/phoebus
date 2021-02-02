@@ -8,7 +8,7 @@
 
 //namespace phoebus {
 
-namespace ShockTube {
+namespace shock_tube {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 

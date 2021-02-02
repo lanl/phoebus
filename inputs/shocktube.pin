@@ -1,5 +1,5 @@
 <phoebus>
-problem = ShockTube
+problem = shock_tube
 
 <parthenon/job>
 problem_id  = sod       # problem ID: basename of output filenames
