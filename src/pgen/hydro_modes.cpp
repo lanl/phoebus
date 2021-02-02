@@ -1,51 +1,13 @@
 #include <complex>
 #include <sstream>
 
-#include <eos/eos.hpp>
-#include <utils/error_checking.hpp>
-
-#include "eos/eos.hpp"
-
 #include "pgen/pgen.hpp"
-
-#include "fluid/fluid.hpp"
 
 // Relativistic hydro linear modes.
 
 using std::complex;
 
-namespace phoebus {
-
-/*KOKKOS_INLINE_FUNCTION
-Real energy(const singularity::EOS &eos, const Real rho, const Real P) {
-  Real eguessl = P/rho;
-  Real Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl);
-  Real eguessr = eguessl;
-  Real Pguessr = Pguessl;
-  while (Pguessl > P) {
-    eguessl /= 2.0;
-    Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl);
-  }
-  while (Pguessr < P) {
-    eguessr *= 2.0;
-    Pguessr = eos.PressureFromDensityInternalEnergy(rho, eguessr);
-  }
-
-  PARTHENON_REQUIRE_THROWS(Pguessr>P && Pguessl<P, "Pressure not bracketed");
-
-  while (Pguessr - Pguessl > 1.e-10*P) {
-    Real emid = 0.5*(eguessl + eguessr);
-    Real Pmid = eos.PressureFromDensityInternalEnergy(rho, emid);
-    if (Pmid < P) {
-      eguessl = emid;
-      Pguessl = Pmid;
-    } else {
-      eguessr = emid;
-      Pguessr = Pmid;
-    }
-  }
-  return 0.5*rho*(eguessl + eguessr);
-}*/
+namespace LinearModes {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -129,4 +91,4 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   fluid::PrimitiveToConserved(rc.get());
 }
 
-} // namespace Riot
+} // namespace LinearModes

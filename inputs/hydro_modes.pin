@@ -1,5 +1,5 @@
-<comment>
-problem   = Hydro modes
+<phoebus>
+problem = LinearModes
 
 <parthenon/job>
 problem_id  = hydro_modes       # problem ID: basename of output filenames
@@ -20,6 +20,7 @@ nlim        = -1        # cycle limit
 tlim        = 0.4       # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 10        # interval for stdout summary info
+dt_init_fact = 0.1
 
 <parthenon/mesh>
 #refinement = adaptive
@@ -68,8 +69,7 @@ rad = false
 <fluid>
 xorder = 2
 cfl = 0.4
-#riemann = hllc
-riemann = llf
+riemann = hll
 c2p_max_iter = 100
 #recon = weno5
 recon = linear
