@@ -43,6 +43,10 @@ add_executable(phoebus
   reconstruction.hpp
 )
 
+set(MAX_NUMBER_CONSERVED_VARS 5 CACHE INTEGER "Maximum number of conserved variables")
+
+configure_file(compile_constants.hpp.in generated/compile_constants.hpp @ONLY)
+
 target_include_directories(phoebus PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>

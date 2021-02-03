@@ -1,5 +1,7 @@
 #include "con2prim.hpp"
 
+#include <cstdio>
+
 namespace con2prim {
 
 //static int calls = 0;
@@ -84,7 +86,8 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
           converged = true;
     }
     if (print) {
-      std::cout << iter << " " << rho_guess << " " << T_guess << " " << delta_rho << " " << delta_T << std::endl;
+      printf("%d %g %g %g %g\n",
+             iter, rho_guess, T_guess, delta_rho, delta_T);
     }
 
     if (rho_guess + delta_rho < 0.0) {
@@ -120,12 +123,10 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   } while(converged != true && iter < max_iter);
 
   if(!converged) {
-    std::cout << "ConToPrim Failed state:" << rho_guess << " " << T_guess << " "
-                                           << v(crho) << " " 
-                                           << v(cmom_lo) << " "
-                                           << v(cmom_lo+1) << " "
-                                           << v(cmom_lo+2) << " " 
-                                           << v(ceng) << std::endl;
+    printf("ConToPrim failed state: %g %g %g %g %g %g %g\n",
+           rho_guess, T_guess, v(crho),
+           v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),
+           v(ceng));
     if (!print) Solve(v,g,true);
     return ConToPrimStatus::failure;
   }

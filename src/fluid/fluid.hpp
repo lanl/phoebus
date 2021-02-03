@@ -17,8 +17,10 @@
 #include <memory>
 
 #include <parthenon/package.hpp>
+#include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
+#include "compile_constants.hpp"
 #include <eos/eos.hpp>
 #include "con2prim.hpp"
 #include "geometry/geometry.hpp"
@@ -80,11 +82,11 @@ class FluxState {
   }
 
   const VariableFluxPack<Real> v;
-  const ParArrayND<Real> &ql;
-  const ParArrayND<Real> &qr;
+  const ParArrayND<Real> ql;
+  const ParArrayND<Real> qr;
  private:
   const Geometry::CoordinateSystem geom;
-  const RiemannSolver &solver;
+  const RiemannSolver solver;
   const int prho, pvel_lo, pvel_hi, peng, pye, prs, gm1, crho, cmom_lo, cmom_hi, ceng, cye, ncons;
   static std::vector<std::string> recon_vars, flux_vars;
   FluxState(MeshBlockData<Real> *rc, PackIndexMap imap)
@@ -105,7 +107,9 @@ class FluxState {
       cmom_hi(imap[conserved_variables::momentum].second),
       ceng(imap[conserved_variables::energy].first),
       cye(imap[conserved_variables::ye].first),
-      ncons(5+(cye>0)) {}
+      ncons(5+(cye>0)) {
+    PARTHENON_REQUIRE_THROWS(ncons <= NCONS_MAX, "ncons exceeds NCONS_MAX.  Reconfigure to increase NCONS_MAX.");
+  }
 
 
 
@@ -179,8 +183,8 @@ class FluxState {
 
   KOKKOS_INLINE_FUNCTION
   void llf(const int d, const int k, const int j, const int i) const {
-    Real Ul[ncons], Ur[ncons];
-    Real Fl[ncons], Fr[ncons];
+    Real Ul[NCONS_MAX], Ur[NCONS_MAX];
+    Real Fl[NCONS_MAX], Fr[NCONS_MAX];
     Real vl, cl, vr, cr;
 
     prim_to_flux(d, k, j, i, ql, vl, cl, Ul, Fl);
@@ -198,8 +202,8 @@ class FluxState {
 
   KOKKOS_INLINE_FUNCTION
   void hll(const int d, const int k, const int j, const int i) const {
-    Real Ul[ncons], Ur[ncons];
-    Real Fl[ncons], Fr[ncons];
+    Real Ul[NCONS_MAX], Ur[NCONS_MAX];
+    Real Fl[NCONS_MAX], Fr[NCONS_MAX];
     Real vl, cl, vr, cr;
 
     prim_to_flux(d, k, j, i, ql, vl, cl, Ul, Fl);
