@@ -351,10 +351,10 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int k, int j, int i,
-                             Real Gamma[NDSPACE][NDSPACE][NDSPACE]) const {
-    for (int mu = 0; mu < NDSPACE; ++mu) {
-      for (int nu = 0; nu < NDSPACE; ++nu) {
-        for (int sigma = nu; sigma < NDSPACE; ++sigma) {
+                             Real Gamma[NDFULL][NDFULL][NDFULL]) const {
+    for (int mu = 0; mu < NDFULL; ++mu) {
+      for (int nu = 0; nu < NDFULL; ++nu) {
+        for (int sigma = nu; sigma < NDFULL; ++sigma) {
           Gamma[mu][nu][sigma] =
               ConnectionCoefficient(mu, nu, sigma, loc, k, j, i);
           Gamma[mu][sigma][nu] = Gamma[mu][nu][sigma];
@@ -378,10 +378,10 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int b, int k, int j, int i,
-                             Real Gamma[NDSPACE][NDSPACE][NDSPACE]) const {
-    for (int mu = 0; mu < NDSPACE; ++mu) {
-      for (int nu = 0; nu < NDSPACE; ++nu) {
-        for (int sigma = nu; sigma < NDSPACE; ++sigma) {
+                             Real Gamma[NDFULL][NDFULL][NDFULL]) const {
+    for (int mu = 0; mu < NDFULL; ++mu) {
+      for (int nu = 0; nu < NDFULL; ++nu) {
+        for (int sigma = nu; sigma < NDFULL; ++sigma) {
           Gamma[mu][nu][sigma] =
               ConnectionCoefficient(mu, nu, sigma, loc, b, k, j, i);
           Gamma[mu][sigma][nu] = Gamma[mu][nu][sigma];
