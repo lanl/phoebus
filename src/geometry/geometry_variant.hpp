@@ -262,6 +262,62 @@ public:
       }
     }
   }
+
+  // g_{mu nu}
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetric(int mu, int nu, Real X0, Real X1, Real X2,
+                       Real X3) const {
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.SpacetimeMetric(mu, nu, X0, X1, X2, X3);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
+                       Real g[NDFULL][NDFULL]) const {
+    for (int nu = 0; nu < NDFULL; ++nu) {
+      for (int mu = nu; mu < NDFULL; ++mu) {
+        g[mu][nu] = SpacetimeMetric(mu, nu, X0, X1, X2, X3);
+      }
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetric(int mu, int nu, CellLocation loc, int k, int j,
+                       int i) const {
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.SpacetimeMetric(mu, nu, loc, k, j, i);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetric(CellLocation loc, int k, int j, int i,
+                       Real g[NDFULL][NDFULL]) const {
+    for (int nu = 0; nu < NDFULL; ++nu) {
+      for (int mu = nu; mu < NDFULL; ++mu) {
+        g[mu][nu] = SpacetimeMetric(mu, nu, loc, k, j, i);
+      }
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetric(int mu, int nu, CellLocation loc, int b, int k, int j,
+                       int i) const {
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.SpacetimeMetric(mu, nu, loc, b, k, j, i);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetric(CellLocation loc, int b, int k, int j, int i,
+                       Real g[NDFULL][NDFULL]) const {
+    for (int nu = 0; nu < NDFULL; ++nu) {
+      for (int mu = nu; mu < NDFULL; ++mu) {
+        g[mu][nu] = SpacetimeMetric(mu, nu, loc, b, k, j, i);
+      }
+    }
+  }
   // ======================================================================
 
   // Metric determinants

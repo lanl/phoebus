@@ -25,7 +25,7 @@ using parthenon::RegionSize;
 constexpr int NTRIALS = 100;
 constexpr int ND = CoordinateSystem::NDSPACE;
 constexpr int NDFULL = CoordinateSystem::NDFULL;
-constexpr int NG = NGHOST;
+constexpr int NG = 2;
 constexpr int NX = 128 + 2 * NG;
 // constexpr Real EPS = 1e-5;
 
@@ -158,6 +158,19 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
                   if (l == m && comp != 1.)
                     update += 1;
                   if (l != m && comp != 0.)
+                    update += 1;
+                }
+              }
+
+              for (int mu = 0; mu < NDFULL; ++mu) {
+                for (int nu = 0; nu < NDFULL; ++nu) {
+                  Real comp = system.SpacetimeMetric(mu, nu, CellLocation::Face1,
+                                                     b, 0, 0, 0);
+                  if (mu == nu && mu == 0 && comp != -1.)
+                    update += 1;
+                  if (mu == nu && mu != 0 && comp != 1.)
+                    update += 1;
+                  if (mu != nu && comp != 0.)
                     update += 1;
                 }
               }

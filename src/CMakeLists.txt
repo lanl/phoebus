@@ -31,7 +31,9 @@ add_executable(phoebus
   microphysics/eos_phoebus/eos_phoebus.cpp
 
   pgen/pgen.hpp
-  pgen/sod.cpp
+  pgen/pgen.cpp
+  pgen/linear_modes.cpp
+  pgen/shock_tube.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp
@@ -41,6 +43,10 @@ add_executable(phoebus
 
   reconstruction.hpp
 )
+
+set(MAX_NUMBER_CONSERVED_VARS 5 CACHE INTEGER "Maximum number of conserved variables")
+
+configure_file(compile_constants.hpp.in generated/compile_constants.hpp @ONLY)
 
 target_include_directories(phoebus PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
