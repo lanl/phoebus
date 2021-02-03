@@ -82,6 +82,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
 
+  std::vector<std::string> src_names({conserved_variables::momentum, conserved_variables::energy});
+
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
 
@@ -93,8 +95,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &base = pmb->meshblock_data.Get();
     if (stage == 1) {
       pmb->meshblock_data.Add("dUdt", base);
-      for (int i = 1; i < integrator->nstages; i++)
+      for (int i = 1; i < integrator->nstages; i++) {
         pmb->meshblock_data.Add(stage_name[i], base);
+      }
+      pmb->meshblock_data.Add("geometric source terms", base, src_names);
     }
 
     // pull out the container we'll use to get fluxes and/or compute RHSs
@@ -105,11 +109,14 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // pull out the container that will hold the updated state
     // effectively, sc1 = sc0 + dudt*dt
     auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
+    // pull out a container for the geometric source terms
+    auto &gsrc = pmb->meshblock_data.Get("geometric source terms");
 
     auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving,
                                  sc1.get(), BoundaryCommSubset::all);
 
     auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
+    auto geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
 
     auto send_flux =
         tl.AddTask(hydro_flux, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
@@ -121,7 +128,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto flux_div =
         tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>, sc0.get(), dudt.get());
 
-    auto avg_container = tl.AddTask(flux_div, AverageIndependentData<MeshBlockData<Real>>,
+    auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,
+                              src_names, dudt.get(), gsrc.get(), dudt.get());
+
+    auto avg_container = tl.AddTask(add_rhs, AverageIndependentData<MeshBlockData<Real>>,
                                     sc0.get(), base.get(), beta);
     // apply du/dt to all independent fields in the container
     auto update_container = tl.AddTask(avg_container, UpdateIndependentData<MeshBlockData<Real>>,

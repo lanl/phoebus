@@ -245,30 +245,47 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
   const int cmom_hi = imap[conserved_variables::momentum].second;
   const int ceng = imap[conserved_variables::energy].first;
 
-  auto tmunu = StressEnergyTensorCon(rc);
+  auto tmunu = TmunuMeshBlock(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(),
     kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      Real Tmunu[ND][ND], dg[ND][NS][ND], da[ND], gam[ND][ND][ND];
+      Real Tmunu[ND][ND], dg[ND][NS][ND], da[ND], gam[ND][ND][ND], gcov[ND][ND];
       tmunu(k, j, i, Tmunu);
       geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
       geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
       geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
+      geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+      const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
 
-      for (int l = 0; l < 3; l++) {
+      // momentum source terms
+      for (int l = 0; l < NS; l++) {
         src(cmom_lo+l,k,j,i) = 0.0;
         for (int m = 0; m < ND; m++) {
           for (int n = 0; n < ND; n++) {
-            Real 
-            src(l,k,j,i) += Tmunu[m][n]*(dg[m][l][n]] - )
+            Real Gamj = 0.0;
+            for (int d = 0; d < ND; d++) {
+              Gamj += gam[d][m][n]*gcov[l][d];
+            }
+            src(l,k,j,i) += Tmunu[m][n]*(dg[m][l][n] - Gamj);
           }
         }
       }
 
-    });
+      // energy source term
+      Real TGam = 0.0;
+      Real Ta = 0.0;
+      for (int m = 0; m < ND; m++) {
+        Ta += Tmunu[m][0]*da[m];
+        for (int n = 0; n < ND; n++) {
+          TGam += Tmunu[m][n]*gam[0][m][n];
+        }
+      }
+      src(ceng, k, j, i) = alpha*(Ta - TGam);
 
+    });
+  return TaskStatus::complete;
 }
 
 //template <typename T>

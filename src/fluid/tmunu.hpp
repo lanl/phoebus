@@ -43,8 +43,8 @@ public:
   // TODO(JMM): Assumes cell centers. If that needs to change, this
   // signature needs to change.
   // TODO(JMM): Should I use enable_if or static asserts or anything?
-  template <typename... Args>
-  KOKKOS_INLINE_FUNCTION void operator()(Args... args, Real T[ND][ND]) const {
+  template <class... Args>
+  KOKKOS_INLINE_FUNCTION void operator()(Args &&... args, Real T[ND][ND]) const {
     static_assert(sizeof...(Args) >= 3, "Must at least have k, j, i");
     static_assert(sizeof...(Args) <= 4, "Must have no more than b, k, j, i");
     Real u[ND], gamma[ND][ND];
@@ -65,20 +65,20 @@ public:
 
 private:
   KOKKOS_INLINE_FUNCTION
-  Real GetVar_(int v, int b, int k, int j, int i) const {
+  Real GetVar_(int v, const int b, const int k, const int j, const int i) const {
     return pack_(b, v, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
-  Real GetVar_(int v, int k, int j, int i) const { return pack_(v, k, j, i); }
+  Real GetVar_(int v, const int k, const int j, const int i) const { return pack_(v, k, j, i); }
 
   template <typename... Args>
-  KOKKOS_INLINE_FUNCTION Real v_(int l, Args... args) const {
+  KOKKOS_INLINE_FUNCTION Real v_(int l, Args &&... args) const {
     return GetVar_(iv_ + l, std::forward<Args>(args)...);
   }
 
   // TODO(JMM): Should these be available elsewhere/more publicly?
   template <typename... Args>
-  KOKKOS_INLINE_FUNCTION Real GetLorentzFactor_(Args... args) const {
+  KOKKOS_INLINE_FUNCTION Real GetLorentzFactor_(Args &&... args) const {
     Real W = 1;
     for (int l = 1; l < ND; ++l) {
       for (int m = 1; m < ND; ++m) {
@@ -93,7 +93,7 @@ private:
   }
 
   template <typename... Args>
-  KOKKOS_INLINE_FUNCTION void GetFourVelocity_(Args..., Real u[ND]) const {
+  KOKKOS_INLINE_FUNCTION void GetFourVelocity_(Args &&... args, Real u[ND]) const {
     Real beta[ND - 1];
     Real W = GetLorentzFactor_(std::forward<Args>(args)...);
     Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
@@ -109,10 +109,10 @@ private:
   int ir_, iv_, iu_, ip_;
 };
 
-using TmunuMesh = StressEnergyTensorCon<MeshBlockPack<VariablePack<Real>>>;
+//using TmunuMesh = StressEnergyTensorCon<MeshBlockPack<VariablePack<Real>>>;
 using TmunuMeshBlock = StressEnergyTensorCon<VariablePack<Real>>;
 
-TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) { return TmunuMesh(rc); }
+//TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) { return TmunuMesh(rc); }
 TmunuMeshBlock BuildStressEenergyTensor(MeshBlockData<Real> *rc) {
   return TmunuMeshBlock(rc);
 }
