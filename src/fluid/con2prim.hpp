@@ -122,7 +122,7 @@ class ConToPrim {
  private:
   PackIndexMap imap;
   const T var;
-  const singularity::EOS &eos;
+  const singularity::EOS eos;
   const Geometry::CoordinateSystem geom;
   const int prho, crho;
   const int pvel_lo, pvel_hi;
