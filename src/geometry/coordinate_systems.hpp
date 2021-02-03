@@ -96,7 +96,8 @@ public:
     return ContravariantShift(l, X0_, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
-  Real ContravariantShift(int l, CellLocation loc, int b, int k, int j, int i) const {
+  Real ContravariantShift(int l, CellLocation loc, int b, int k, int j,
+                          int i) const {
     Real X1, X2, X3;
     GetX(loc, b, k, j, i, X1, X2, X3);
     return ContravariantShift(l, X0_, X1, X2, X3);
@@ -113,7 +114,8 @@ public:
     return Metric(l, m, X0_, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
-  Real Metric(int l, int m, CellLocation loc, int b, int k, int j, int i) const {
+  Real Metric(int l, int m, CellLocation loc, int b, int k, int j,
+              int i) const {
     Real X1, X2, X3;
     GetX(loc, b, k, j, i, X1, X2, X3);
     return Metric(l, m, X0_, X1, X2, X3);
@@ -136,6 +138,25 @@ public:
     Real X1, X2, X3;
     GetX(loc, b, k, j, i, X1, X2, X3);
     return MetricInverse(l, m, X0_, X1, X2, X3);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetric(int l, int m, Real X0, Real X1, Real X2, Real X3) const {
+    return system_.SpacetimeMetric(l, m, X0, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetric(int l, int m, CellLocation loc, int k, int j,
+                       int i) const {
+    Real X1, X2, X3;
+    GetX(loc, k, j, i, X1, X2, X3);
+    return SpacetimeMetric(l, m, X0_, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetric(int l, int m, CellLocation loc, int b, int k, int j,
+                       int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return SpacetimeMetric(l, m, X0_, X1, X2, X3);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -185,8 +206,8 @@ public:
     return ConnectionCoefficient(mu, nu, sigma, X0_, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
-  Real ConnectionCoefficient(int mu, int nu, int sigma, CellLocation loc, int b, int k,
-                             int j, int i) const {
+  Real ConnectionCoefficient(int mu, int nu, int sigma, CellLocation loc, int b,
+                             int k, int j, int i) const {
     Real X1, X2, X3;
     GetX(loc, b, k, j, i, X1, X2, X3);
     return ConnectionCoefficient(mu, nu, sigma, X0_, X1, X2, X3);
@@ -205,8 +226,8 @@ public:
     return MetricDerivative(mu, l, nu, X0_, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
-  Real MetricDerivative(int mu, int l, int nu, CellLocation loc, int b, int k, int j,
-                        int i) const {
+  Real MetricDerivative(int mu, int l, int nu, CellLocation loc, int b, int k,
+                        int j, int i) const {
     Real X1, X2, X3;
     GetX(loc, b, k, j, i, X1, X2, X3);
     return MetricDerivative(mu, l, nu, X0_, X1, X2, X3);
@@ -374,8 +395,12 @@ public:
     return 0.;
   }
   KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetric(int mu, int nu, Real X0, Real X1, Real X2, Real X3) const {
+    return (mu == nu) ? (mu == 0 ? -1. : 1) : 0.;
+  }
+  KOKKOS_INLINE_FUNCTION
   Real Metric(int l, int m, Real X0, Real X1, Real X2, Real X3) const {
-    return (l == m) ? 1. : 0.;
+    return SpacetimeMetric(l, m, X0, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
   Real MetricInverse(int l, int m, Real X0, Real X1, Real X2, Real X3) const {
