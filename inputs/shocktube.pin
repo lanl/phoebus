@@ -24,6 +24,7 @@ ncycle_out  = 1        # interval for stdout summary info
 dt_init_fact = 1.e-6
 
 <parthenon/mesh>
+nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
@@ -47,9 +48,10 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-#<parthenon/meshblock>
-#nx1 = 32
-3nx2 = 32
+<parthenon/meshblock>
+nx1 = 512
+nx2 = 1
+nx3 = 1
 
 <parthenon/refinement0>
 field = c.c.bulk.rho

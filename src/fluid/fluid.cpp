@@ -2,7 +2,9 @@
 #include "reconstruction.hpp"
 #include "tmunu.hpp"
 
+#include <globals.hpp>
 #include <kokkos_abstraction.hpp>
+#include <utils/error_checking.hpp>
 
 
 namespace fluid {
@@ -28,6 +30,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string recon = pin->GetOrAddString("fluid", "recon", "linear");
   PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;
   if (recon == "weno5") {
+    PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                             "weno5 requires 4+ ghost cells");
     rt = PhoebusReconstruction::ReconType::weno5;
   } else if (recon == "linear") {
     rt = PhoebusReconstruction::ReconType::linear;

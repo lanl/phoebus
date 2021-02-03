@@ -162,6 +162,19 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
                 }
               }
 
+              for (int mu = 0; mu < NDFULL; ++mu) {
+                for (int nu = 0; nu < NDFULL; ++nu) {
+                  Real comp = system.SpacetimeMetric(mu, nu, CellLocation::Face1,
+                                                     b, 0, 0, 0);
+                  if (mu == nu && mu == 0 && comp != -1.)
+                    update += 1;
+                  if (mu == nu && mu != 0 && comp != 1.)
+                    update += 1;
+                  if (mu != nu && comp != 0.)
+                    update += 1;
+                }
+              }
+
               // metric determinants
               for (int k = 0; k < NX; ++k) {
                 for (int j = 0; j < NX; ++j) {

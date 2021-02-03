@@ -1,11 +1,12 @@
-#include <complex>
+// #include <complex>
+#include <Kokkos_Complex.hpp>
 #include <sstream>
 
 #include "pgen/pgen.hpp"
 
 // Relativistic hydro linear modes.
 
-using std::complex;
+using Kokkos::complex;
 
 namespace linear_modes {
 
@@ -29,9 +30,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ieng = imap["p.energy"].first;
   const int iprs = imap["pressure"].first;
   const int itmp = imap["temperature"].first;
+  const int nv = ivhi - ivlo + 1;
 
   const Real gam = pin->GetReal("eos", "Gamma");
   //const Real cv  = pin->GetReal("eos", "Cv");
+
+  PARTHENON_REQUIRE_THROWS(nv == 3, "3 have 3 velocities");
 
   const std::string mode = pin->GetOrAddString("hydro_modes", "mode", "entropy");
   const Real amp = pin->GetReal("hydro_modes", "amplitude");
@@ -75,7 +79,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
       const Real x = coords.x1v(i);
 
-      double mode = amp*cos(k1*x);
+      const double mode = amp*cos(k1*x);
 
       double rho = rho0 + (drho*mode).real();
       v(irho, k, j, i) = rho;
@@ -84,7 +88,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(iprs, k, j, i) = Pg;
       v(ieng, k, j, i) = ug;
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
-      for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
+      for (int d = 0; d < nv; d++) v(ivlo+d, k, j, i) = 0.0;
       v(ivlo, k, j, i) = u10 + (du1*mode).real();
     });
 
