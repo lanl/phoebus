@@ -160,6 +160,26 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetricInverse(int l, int m, Real X0, Real X1, Real X2,
+                              Real X3) const {
+    return system_.SpacetimeMetricInverse(l, m, X0, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetricInverse(int l, int m, CellLocation loc, int k, int j,
+                              int i) const {
+    Real X1, X2, X3;
+    GetX(loc, k, j, i, X1, X2, X3);
+    return SpacetimeMetricInverse(l, m, X0_, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetricInverse(int l, int m, CellLocation loc, int b, int k,
+                              int j, int i) const {
+    Real X1, X2, X3;
+    GetX(loc, b, k, j, i, X1, X2, X3);
+    return SpacetimeMetricInverse(l, m, X0_, X1, X2, X3);
+  }
+
+  KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
     return system_.DetGamma(X0, X1, X2, X3);
   }
@@ -395,7 +415,13 @@ public:
     return 0.;
   }
   KOKKOS_INLINE_FUNCTION
-  Real SpacetimeMetric(int mu, int nu, Real X0, Real X1, Real X2, Real X3) const {
+  Real SpacetimeMetric(int mu, int nu, Real X0, Real X1, Real X2,
+                       Real X3) const {
+    return (mu == nu) ? (mu == 0 ? -1. : 1) : 0.;
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetricInverse(int mu, int nu, Real X0, Real X1, Real X2,
+                              Real X3) const {
     return (mu == nu) ? (mu == 0 ? -1. : 1) : 0.;
   }
   KOKKOS_INLINE_FUNCTION

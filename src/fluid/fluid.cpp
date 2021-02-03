@@ -252,7 +252,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
     kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
       Real Tmunu[ND][ND], dg[ND][NS][ND], da[ND], gam[ND][ND][ND], gcov[ND][ND];
-      tmunu(k, j, i, Tmunu);
+      tmunu(Tmunu, k, j, i);
       geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
       geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
       geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);

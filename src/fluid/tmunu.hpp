@@ -44,12 +44,12 @@ public:
   // signature needs to change.
   // TODO(JMM): Should I use enable_if or static asserts or anything?
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void operator()(Args &&... args, Real T[ND][ND]) const {
+  KOKKOS_INLINE_FUNCTION void operator()(Real T[ND][ND], Args &&... args) const {
     static_assert(sizeof...(Args) >= 3, "Must at least have k, j, i");
     static_assert(sizeof...(Args) <= 4, "Must have no more than b, k, j, i");
-    Real u[ND], gamma[ND][ND];
-    system_.MetricInverse(loc, std::forward<Args>(args)..., gamma);
-    GetFourVelocity_(std::forward<Args>(args)..., u);
+    Real u[ND], g[ND][ND];
+    system_.SpacetimeMetricInverse(loc, std::forward<Args>(args)..., g);
+    GetFourVelocity_(u, std::forward<Args>(args)...);
     Real rho = GetVar_(ir_, std::forward<Args>(args)...);
     Real uu = GetVar_(iu_, std::forward<Args>(args)...);
     Real P = GetVar_(ip_, std::forward<Args>(args)...);
@@ -58,7 +58,7 @@ public:
     Real B = P;            // + b^2/2
     for (int mu = 0; mu < ND; ++mu) {
       for (int nu = 0; nu < ND; ++nu) {
-        T[mu][nu] = A * u[mu] * u[nu] + B * gamma[mu][nu];
+        T[mu][nu] = A * u[mu] * u[nu] + B * g[mu][nu];
       }
     }
   }
@@ -83,8 +83,8 @@ private:
     for (int l = 1; l < ND; ++l) {
       for (int m = 1; m < ND; ++m) {
         Real gamma = system_.Metric(l, m, loc, std::forward<Args>(args)...);
-        Real vl = v_(l, std::forward<args>(args)...);
-        Real vm = v_(m, std::forward<args>(args)...);
+        Real vl = v_(l, std::forward<Args>(args)...);
+        Real vm = v_(m, std::forward<Args>(args)...);
         W -= vl * vm * gamma;
       }
     }
@@ -93,11 +93,11 @@ private:
   }
 
   template <typename... Args>
-  KOKKOS_INLINE_FUNCTION void GetFourVelocity_(Args &&... args, Real u[ND]) const {
+  KOKKOS_INLINE_FUNCTION void GetFourVelocity_(Real u[ND], Args &&... args) const {
     Real beta[ND - 1];
     Real W = GetLorentzFactor_(std::forward<Args>(args)...);
     Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
-    system_.ContravariantShift(loc, std::forward<Args>(args)...);
+    system_.ContravariantShift(loc, std::forward<Args>(args)..., beta);
     u[0] = W / (std::abs(alpha) + SMALL);
     for (int l = 1; l < ND; ++l) {
       u[l] = W * v_(l - 1, std::forward<Args>(args)...) - u[0] * beta[l];
