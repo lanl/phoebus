@@ -245,7 +245,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
   const int cmom_hi = imap[conserved_variables::momentum].second;
   const int ceng = imap[conserved_variables::energy].first;
 
-  auto tmunu = TmunuMeshBlock(rc);
+  auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(),

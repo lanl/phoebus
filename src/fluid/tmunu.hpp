@@ -100,7 +100,7 @@ private:
     system_.ContravariantShift(loc, std::forward<Args>(args)..., beta);
     u[0] = W / (std::abs(alpha) + SMALL);
     for (int l = 1; l < ND; ++l) {
-      u[l] = W * v_(l - 1, std::forward<Args>(args)...) - u[0] * beta[l];
+      u[l] = W * v_(l - 1, std::forward<Args>(args)...) - u[0] * beta[l-1];
     }
   }
 
@@ -113,7 +113,7 @@ private:
 using TmunuMeshBlock = StressEnergyTensorCon<VariablePack<Real>>;
 
 //TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) { return TmunuMesh(rc); }
-TmunuMeshBlock BuildStressEenergyTensor(MeshBlockData<Real> *rc) {
+TmunuMeshBlock BuildStressEnergyTensor(MeshBlockData<Real> *rc) {
   return TmunuMeshBlock(rc);
 }
 
