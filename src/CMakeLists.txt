@@ -20,6 +20,7 @@ add_executable(phoebus
   fluid/con2prim.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
+  fluid/tmunu.hpp
 
   geometry/coordinate_systems.hpp
   geometry/geometry_variant.hpp
