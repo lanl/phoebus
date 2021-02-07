@@ -229,8 +229,8 @@ TaskStatus ConservedToPrimitive(T *rc) {
 
 //template <typename T>
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real> *rc_src) {
-  static constexpr int ND = Geometry::CoordinateSystem::NDFULL;
-  static constexpr int NS = Geometry::CoordinateSystem::NDSPACE;
+  constexpr int ND = Geometry::CoordinateSystem::NDFULL;
+  constexpr int NS = Geometry::CoordinateSystem::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -268,7 +268,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
             for (int d = 0; d < ND; d++) {
               Gamj += gam[d][m][n]*gcov[l][d];
             }
-            src(l,k,j,i) += Tmunu[m][n]*(dg[m][l][n] - Gamj);
+            src(cmom_lo+l,k,j,i) += Tmunu[m][n]*(dg[m][l][n] - Gamj);
           }
         }
       }
