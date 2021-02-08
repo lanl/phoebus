@@ -54,6 +54,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool ye = pin->GetOrAddBoolean("fluid", "Ye", false);
   params.Add("Ye", ye);
 
+  bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
+  params.Add("mhd", mhd);
+
   Metadata m;
   std::vector<int> three_vec(1,3);
 
@@ -66,7 +69,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::density, mprim_scalar);
   physics->AddField(p::velocity, mprim_threev);
   physics->AddField(p::energy, mprim_scalar);
-  //physics->AddField("p.bfield", mprim_threev);
+  if (mhd) {
+    physics->AddField(p::bfield, mprim_threev);
+  }
   physics->AddField(p::pressure, mprim_scalar);
   physics->AddField(p::temperature, mprim_scalar);
   physics->AddField(p::gamma1, mprim_scalar);
@@ -79,7 +84,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(c::density, mcons_scalar);
   physics->AddField(c::momentum, mcons_threev);
   physics->AddField(c::energy, mcons_scalar);
-  //physics->AddField("c.bfield", mcons_threev);
+  if (mhd) {
+    physics->AddField(c::bfield, mcons_threev);
+  }
   if (ye) {
     physics->AddField(c::ye, mcons_scalar);
   }
@@ -89,12 +96,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                                   p::velocity,
                                   p::energy});
   FluxState::ReconVars(rvars);
+  if (mhd) FluxState::ReconVars(p::bfield);
   if (ye) FluxState::ReconVars(p::ye);
 
   std::vector<std::string> fvars({c::density,
                                   c::momentum,
                                   c::energy});
   FluxState::FluxVars(fvars);
+  if (mhd) FluxState::FluxVars(c::bfield);
   if (ye) FluxState::FluxVars(c::ye);
 
   // add some extra fields for reconstruction
@@ -139,6 +148,7 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   std::vector<std::string> vars({p::density, c::density,
                                  p::velocity, c::momentum,
                                  p::energy, c::energy,
+                                 p::bfield, c::bfield,
                                  p::ye, c::ye,
                                  p::pressure});
 
@@ -154,6 +164,10 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   const int peng = imap[p::energy].first;
   const int ceng = imap[c::energy].first;
   const int prs = imap[p::pressure].first;
+  const int pb_lo = imap[p::bfield].first;
+  const int pb_hi = imap[p::bfield].second;
+  const int cb_lo = imap[c::bfield].first;
+  const int cb_hi = imap[c::bfield].second;
   int pye = imap[p::ye].second; // -1 if not present
   int cye = imap[c::ye].second;
 
@@ -169,28 +183,67 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
       //todo(jcd): make these real
       Real gcov[3][3];
       geom.Metric(CellLocation::Cent, k, j, i, gcov);
+      Real gcov4[4][4];
+      geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
       Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+      Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+      Real shift[3];
+      geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
       Real vsq = 0.0;
+      Real Bdotv = 0.0;
+      Real BdotB = 0.0;
       for (int m = 0; m < 3; m++) {
         for (int n = 0; n < 3; n++) {
           vsq += gcov[m][n] * v(b,pvel_lo+m, k, j, i) * v(b, pvel_lo+n, k, j, i);
         }
+        for (int n = pb_lo; n <= pb_hi; n++) {
+          Bdotv += gcov[m][n-pb_lo] * v(b,pvel_lo+m, k, j, i) * v(b, n, k , j, i);
+          BdotB += gcov[m][n-pb_lo] * v(b, pb_lo+m, k, j, i) * v(b, n, k, j, i);
+        }
       }
-      Real W = 1.0/sqrt(1.0 - vsq);
+      
+      // Lorentz factor
+      const Real W = 1.0/sqrt(1.0 - vsq);
+
+      // get the magnetic field 4-vector
+      Real bcon[] = {W*Bdotv/lapse, 0.0, 0.0, 0.0};
+      for (int m = pb_lo; m <= pb_hi; m++) {
+        bcon[m-pb_lo+1] = v(b, m, k, j, i)/W + lapse*
+        bcon[0]*(v(b, m-pb_lo+pvel_lo, k, j, i) - shift[m-pb_lo]/lapse);
+      }
+      const Real bsq = (BdotB + lapse*lapse*bcon[0]*bcon[0])/(W*W);
+      Real bcov[3] = {0.0, 0.0, 0.0};
+      if (pb_hi > 0) {
+        for (int m = 0; m < 3; m++) {
+          for (int n = 0; n < 4; n++) {
+            bcov[m] += gcov4[m+1][n] * bcon[n];
+          }
+        }
+      }
+
       // conserved density D = \sqrt{\gamma} \rho W
       v(b, crho, k, j, i) = gdet * v(b, prho, k, j, i) * W;
 
       // enthalpy
-      Real rhohWsq = (v(b, prho, k, j, i) + v(b, peng, k, j, i) + v(b, prs, k, j, i))*W*W;
+      Real rhohWsq = (v(b, prho, k, j, i) + v(b, peng, k, j, i) + v(b, prs, k, j, i) + bsq)*W*W;
+
+      // momentum
       for (int m = 0; m < 3; m++) {
         Real vcov = 0.0;
         for (int n = 0; n < 3; n++) {
           vcov += gcov[m][n]*v(b, pvel_lo+n, k, j, i);
         }
-        v(b, cmom_lo+m, k, j, i) = gdet*rhohWsq*vcov;
+        v(b, cmom_lo+m, k, j, i) = gdet*rhohWsq*vcov - lapse*bcon[0]*bcov[m];
       }
 
-      v(b, ceng, k, j, i) = gdet*(rhohWsq - v(b, prs, k, j, i)) - v(b, crho, k, j, i);
+      // energy
+      v(b, ceng, k, j, i) = gdet*(rhohWsq - (v(b, prs, k, j, i) + 0.5*bsq) -
+                                  lapse*lapse*bcon[0]*bcon[0]) - v(b, crho, k, j, i);
+
+      for (int m = cb_lo; m <= cb_hi; m++) {
+        v(b, m, k, j, i) = gdet*v(b, m-cb_lo+pb_lo, k, j, i);
+      }
+      // conserved lepton density
       if (pye > 0) {
         v(b, cye, k, j, i) = v(b, crho, k, j, i) * v(b, pye, k, j, i);
       }

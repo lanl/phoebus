@@ -12,14 +12,30 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   // converge on rho and T
   // constraints: rho <= D, T > 0
 
-
   const Real D = v(crho)/g.gdet;
   const Real tau = v(ceng)/g.gdet;
+
+  // electron fraction
   if(pye > 0) v(pye) = v(cye)/v(crho);
 
-  // todo(jcd): really compute these when there are B fields
   Real BdotS = 0.0;
   Real Bsq = 0.0;
+  // bfield
+  if (pb_hi > 0) {
+    // set primitive fields
+    for (int i = 0; i < 3; i++) {
+      v(pb_lo+i) = v(cb_lo+i)/g.gdet;
+    }
+    // take some dot products
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        Bsq += g.gcov[i][j] * v(pb_lo+i)*v(pb_lo+j);
+      }
+      BdotS += v(pb_lo+i)*v(cmom_lo+i);
+    }
+    // don't forget S_j has a \sqrt{gamma} in it...get rid of it here
+    BdotS /= g.gdet;
+  }
   const Real BdotSsq = BdotS*BdotS;
 
   Real Ssq = 0.0;
@@ -27,7 +43,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {
       Ssq += g.gcon[i][j] * v(cmom_lo+i)*v(cmom_lo+j);
-      W += g.gcov[i][j] * v(pvel_lo+i)*v(pvel_hi+j);
+      W += g.gcov[i][j] * v(pvel_lo+i)*v(pvel_lo+j);
     }
   }
   Ssq /= (g.gdet*g.gdet);
@@ -42,7 +58,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   };
 
   auto taufunc = [&](const Real z, const Real Wp, const Real p) {
-    return (tau + D - z- Bsq + BdotSsq/(2.0*z*z) + p)*Wp*Wp - 0.5*Bsq;
+    return (tau + D - z - Bsq + BdotSsq/(2.0*z*z) + p)*Wp*Wp + 0.5*Bsq;
   };
 
   auto Rfunc = [&](const Real rho, const Real Temp, Real res[2]) {
@@ -86,8 +102,8 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
           converged = true;
     }
     if (print) {
-      printf("%d %g %g %g %g\n",
-             iter, rho_guess, T_guess, delta_rho, delta_T);
+      printf("%d %g %g %g %g %g %g\n",
+             iter, rho_guess, T_guess, delta_rho, delta_T, res[0], res[1]);
     }
 
     if (rho_guess + delta_rho < 0.0) {
@@ -147,7 +163,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
       sconi += g.gcon[i][j]*v(cmom_lo+j);
     }
     sconi /= g.gdet;
-    v(pvel_lo+i) = sconi/(z + Bsq) + BdotS*0.0/(z*(z + Bsq)); // this 0.0 should be B^i
+    v(pvel_lo+i) = sconi/(z + Bsq) + BdotS*v(pb_lo+i)/(z*(z + Bsq));
   }
 
   return ConToPrimStatus::success;
