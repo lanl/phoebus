@@ -32,7 +32,7 @@ public:
   KOKKOS_FUNCTION Variant(Choice &&choice)
       : system_(std::forward<Choice>(choice)) {}
 
-  Variant() noexcept = default;
+  Variant() = default;
 
   template <
       typename Choice,
@@ -318,6 +318,61 @@ public:
       }
     }
   }
+  // g^{mu nu}
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetricInverse(int mu, int nu, Real X0, Real X1, Real X2,
+                              Real X3) const {
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.SpacetimeMetricInverse(mu, nu, X0, X1, X2, X3);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
+                              Real g[NDFULL][NDFULL]) const {
+    for (int nu = 0; nu < NDFULL; ++nu) {
+      for (int mu = nu; mu < NDFULL; ++mu) {
+        g[mu][nu] = SpacetimeMetricInverse(mu, nu, X0, X1, X2, X3);
+      }
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetricInverse(int mu, int nu, CellLocation loc, int k, int j,
+                              int i) const {
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.SpacetimeMetricInverse(mu, nu, loc, k, j, i);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetricInverse(CellLocation loc, int k, int j, int i,
+                              Real g[NDFULL][NDFULL]) const {
+    for (int nu = 0; nu < NDFULL; ++nu) {
+      for (int mu = nu; mu < NDFULL; ++mu) {
+        g[mu][nu] = SpacetimeMetricInverse(mu, nu, loc, k, j, i);
+      }
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real SpacetimeMetricInverse(int mu, int nu, CellLocation loc, int b, int k,
+                              int j, int i) const {
+    return mpark::visit(
+        [&](const auto &system) {
+          return system.SpacetimeMetricInverse(mu, nu, loc, b, k, j, i);
+        },
+        system_);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetricInverse(CellLocation loc, int b, int k, int j, int i,
+                              Real g[NDFULL][NDFULL]) const {
+    for (int nu = 0; nu < NDFULL; ++nu) {
+      for (int mu = nu; mu < NDFULL; ++mu) {
+        g[mu][nu] = SpacetimeMetricInverse(mu, nu, loc, b, k, j, i);
+      }
+    }
+  }
   // ======================================================================
 
   // Metric determinants
@@ -407,10 +462,10 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int k, int j, int i,
-                             Real Gamma[NDSPACE][NDSPACE][NDSPACE]) const {
-    for (int mu = 0; mu < NDSPACE; ++mu) {
-      for (int nu = 0; nu < NDSPACE; ++nu) {
-        for (int sigma = nu; sigma < NDSPACE; ++sigma) {
+                             Real Gamma[NDFULL][NDFULL][NDFULL]) const {
+    for (int mu = 0; mu < NDFULL; ++mu) {
+      for (int nu = 0; nu < NDFULL; ++nu) {
+        for (int sigma = nu; sigma < NDFULL; ++sigma) {
           Gamma[mu][nu][sigma] =
               ConnectionCoefficient(mu, nu, sigma, loc, k, j, i);
           Gamma[mu][sigma][nu] = Gamma[mu][nu][sigma];
@@ -434,10 +489,10 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int b, int k, int j, int i,
-                             Real Gamma[NDSPACE][NDSPACE][NDSPACE]) const {
-    for (int mu = 0; mu < NDSPACE; ++mu) {
-      for (int nu = 0; nu < NDSPACE; ++nu) {
-        for (int sigma = nu; sigma < NDSPACE; ++sigma) {
+                             Real Gamma[NDFULL][NDFULL][NDFULL]) const {
+    for (int mu = 0; mu < NDFULL; ++mu) {
+      for (int nu = 0; nu < NDFULL; ++nu) {
+        for (int sigma = nu; sigma < NDFULL; ++sigma) {
           Gamma[mu][nu][sigma] =
               ConnectionCoefficient(mu, nu, sigma, loc, b, k, j, i);
           Gamma[mu][sigma][nu] = Gamma[mu][nu][sigma];
