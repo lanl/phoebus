@@ -11,32 +11,22 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
-#ifndef PHOEBUS_DRIVER_HPP_
-#define PHOEBUS_DRIVER_HPP_
+#ifndef RADIATION_HPP_
+#define RADIATION_HPP_
 
-#include <memory>
+#include <parthenon/package.hpp>
+#include <utils/error_checking.hpp>
+using namespace parthenon::package::prelude;
 
-#include <parthenon/driver.hpp>
-using namespace parthenon::driver::prelude;
+#include "compile_constants.hpp"
+#include "utils/constants.hpp"
 
-namespace phoebus {
+namespace radiation {
 
-// TODO(JMM): What kind of driver should this be?
-class PhoebusDriver : public EvolutionDriver {
- public:
-  PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm);
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
-  TaskCollection RungeKuttaStage(const int stage);
-  TaskCollection RadiationStep();
+TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt);
 
-  TaskListStatus Step();
- private:
-  std::unique_ptr<StagedIntegrator> integrator;
-  Real dt_init, dt_init_fact;
-};
+} // namespace radiation
 
-parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
-
-} // namespace phoebus
-
-#endif // PHOEBUS_DRIVER_HPP_
+#endif // RADIATION_HPP_

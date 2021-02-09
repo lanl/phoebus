@@ -34,12 +34,18 @@ add_executable(phoebus
   pgen/pgen.cpp
   pgen/linear_modes.cpp
   pgen/shock_tube.cpp
+  pgen/thin_cooling.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp
 
   phoebus_utils/cell_locations.hpp
+  phoebus_utils/unit_conversions.cpp
+  phoebus_utils/unit_conversions.hpp
   phoebus_utils/variables.hpp
+
+  radiation/radiation.hpp
+  radiation/radiation.cpp
 
   reconstruction.hpp
 )

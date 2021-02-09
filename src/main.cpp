@@ -15,6 +15,7 @@
 
 #include "phoebus_driver.hpp"
 #include "initial_conditions.hpp"
+#include "phoebus_utils/unit_conversions.hpp"
 
 int main(int argc, char *argv[]) {
   parthenon::ParthenonManager pman;
@@ -25,6 +26,10 @@ int main(int argc, char *argv[]) {
   pman.app_input->ProblemGenerator = phoebus::ProblemGenerator;
   // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
+
+  phoebus::unit_conv.reset(new phoebus::UnitConversions(pman.pinput.get()));
+  printf("mass: %e\n", phoebus::unit_conv->GetMass());
+  exit(-1);
 
   // call ParthenonInit to initialize MPI and Kokkos, parse the input deck, and set up
   auto manager_status = pman.ParthenonInit(argc, argv);

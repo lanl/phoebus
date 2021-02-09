@@ -23,6 +23,7 @@
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_driver.hpp"
+#include "radiation/radiation.hpp"
 
 using namespace parthenon::driver::prelude;
 
@@ -66,6 +67,11 @@ TaskListStatus PhoebusDriver::Step() {
     TaskCollection tc = RungeKuttaStage(stage);
     status = tc.Execute();
     if (status != TaskListStatus::complete) break;
+  }
+
+  {
+    TaskCollection tc = RadiationStep();
+    status = tc.Execute();
   }
 
   return status;
@@ -136,7 +142,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // apply du/dt to all independent fields in the container
     auto update_container = tl.AddTask(avg_container, UpdateIndependentData<MeshBlockData<Real>>,
                                        sc0.get(), dudt.get(), beta*dt, sc1.get());
-    
+
     // update ghost cells
     auto send = tl.AddTask(update_container,
                            &MeshBlockData<Real>::SendBoundaryBuffers, sc1.get());
@@ -175,12 +181,39 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   return tc;
 }
 
+TaskCollection PhoebusDriver::RadiationStep() {
+  //using namespace ::parthenon::Update;
+  TaskCollection tc;
+  TaskID none(0);
+
+  BlockList_t &blocks = pmesh->block_list;
+
+  const Real dt = integrator->dt;
+  const auto &stage_name = integrator->stage_name;
+
+  auto num_independent_task_lists = blocks.size();
+  TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
+
+  for (int ib = 0; ib < num_independent_task_lists; ib++) {
+    auto pmb = blocks[ib].get();
+    auto &tl = async_region[ib];
+    auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+
+    //auto sc = pmb->swarm_data.Get();
+
+    auto calculate_four_force = tl.AddTask(none, radiation::CalculateRadiationForce, sc0.get(), dt);
+  }
+
+  return tc;
+}
+
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   parthenon::Packages_t packages;
 
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
   packages.Add(Geometry::Initialize(pin.get()));
   packages.Add(fluid::Initialize(pin.get()));
+  packages.Add(radiation::Initialize(pin.get()));
 
   return packages;
 }
