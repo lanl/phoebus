@@ -59,6 +59,11 @@ public:
     for (int mu = 0; mu < ND; ++mu) {
       for (int nu = 0; nu < ND; ++nu) {
         T[mu][nu] = A * u[mu] * u[nu] + B * g[mu][nu];
+        // THIS IS NOT JUST A DEBUGGING STATEMENT
+        // It prevents the compiler from incorrectly optimizing away
+        // this routine and introducing NaNs.
+        // Do not remove.
+        PARTHENON_REQUIRE(!std::isnan(T[mu][nu]),"Tmunu is NaN");
       }
     }
   }
