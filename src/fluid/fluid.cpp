@@ -33,6 +33,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
                              "weno5 requires 4+ ghost cells");
     rt = PhoebusReconstruction::ReconType::weno5;
+  } else if (recon == "mp5") {
+    PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                             "mp5 requires 4+ ghost cells");
+    rt = PhoebusReconstruction::ReconType::mp5;
   } else if (recon == "linear") {
     rt = PhoebusReconstruction::ReconType::linear;
   } else {
@@ -365,6 +369,15 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
         PhoebusReconstruction::WENO5(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
         });
       break;
+    case PhoebusReconstruction::ReconType::mp5:
+      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
+      X1DIR, pmb->pmy_mesh->ndim,
+      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
+        //PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
+        PhoebusReconstruction::MP5(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
+        });
+      break;
     case PhoebusReconstruction::ReconType::linear:
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
       X1DIR, pmb->pmy_mesh->ndim,
@@ -386,6 +399,21 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 
   return TaskStatus::complete;
 }
+
+/*
+TaskStatus FluxCT(MeshBlockData<Real> *rc) {
+  auto *pmb = rc->GetBlockPointer();
+
+  std::vector<std::string> bvar({conserved_variables::bfield});
+  auto v = rc->PackVariablesAndFluxes(bvar);
+
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "flux_ct", DevExecSpace(),
+    X1DIR, pmb->pmy_mesh->ndim,
+    kb.s, kb.e+)
+
+  return TaskStatus::complete;
+}
+*/
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetBlockPointer();

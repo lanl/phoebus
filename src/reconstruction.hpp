@@ -20,7 +20,7 @@
 
 namespace PhoebusReconstruction {
 
-enum class ReconType {linear, weno5};
+enum class ReconType {linear, weno5, mp5};
 
 
 KOKKOS_FORCEINLINE_FUNCTION
@@ -176,6 +176,85 @@ void WENO5(const int d, const int nlo, const int nhi, const int k, const int j, 
 
     ql(dir,n,k+dk,j+dj,i+di) = wl[0]*tl[0] + wl[1]*tl[1] + wl[2]*tl[2];
     qr(dir,n,k,j,i) = wr[0]*tr[0] + wr[1]*tr[1] + wr[2]*tr[2];
+  }
+}
+
+// MP5, lifted shamelessly from nubhlight, which was lifted shamelessly from PLUTO
+#define MINMOD(a, b) ((a) * (b) > 0.0 ? (fabs(a) < fabs(b) ? (a) : (b)) : 0.0)
+KOKKOS_INLINE_FUNCTION
+double Median(double a, double b, double c) {
+  return (a + MINMOD(b - a, c - a));
+}
+KOKKOS_INLINE_FUNCTION
+double mp5_subcalc(
+    double Fjm2, double Fjm1, double Fj, double Fjp1, double Fjp2) {
+  double        f, d2, d2p, d2m;
+  double        dMMm, dMMp;
+  double        scrh1, scrh2, Fmin, Fmax;
+  double        fAV, fMD, fLC, fUL, fMP;
+  constexpr double alpha = 4.0, epsm = 1.e-12;
+
+  f = 2.0 * Fjm2 - 13.0 * Fjm1 + 47.0 * Fj + 27.0 * Fjp1 - 3.0 * Fjp2;
+  f /= 60.0;
+
+  fMP = Fj + MINMOD(Fjp1 - Fj, alpha * (Fj - Fjm1));
+
+  if ((f - Fj) * (f - fMP) <= epsm)
+    return f;
+
+  d2m = Fjm2 + Fj - 2.0 * Fjm1; // Eqn. 2.19
+  d2  = Fjm1 + Fjp1 - 2.0 * Fj;
+  d2p = Fj + Fjp2 - 2.0 * Fjp1; // Eqn. 2.19
+
+  scrh1 = MINMOD(4.0 * d2 - d2p, 4.0 * d2p - d2);
+  scrh2 = MINMOD(d2, d2p);
+  dMMp  = MINMOD(scrh1, scrh2); // Eqn. 2.27
+  scrh1 = MINMOD(4.0 * d2m - d2, 4.0 * d2 - d2m);
+  scrh2 = MINMOD(d2, d2m);
+  dMMm  = MINMOD(scrh1, scrh2); // Eqn. 2.27
+
+  fUL = Fj + alpha * (Fj - Fjm1);                   // Eqn. 2.8
+  fAV = 0.5 * (Fj + Fjp1);                          // Eqn. 2.16
+  fMD = fAV - 0.5 * dMMp;                           // Eqn. 2.28
+  fLC = 0.5 * (3.0 * Fj - Fjm1) + 4.0 / 3.0 * dMMm; // Eqn. 2.29
+
+  scrh1 = fmin(Fj, Fjp1);
+  scrh1 = fmin(scrh1, fMD);
+  scrh2 = fmin(Fj, fUL);
+  scrh2 = fmin(scrh2, fLC);
+  Fmin  = fmax(scrh1, scrh2); // Eqn. (2.24a)
+
+  scrh1 = fmax(Fj, Fjp1);
+  scrh1 = fmax(scrh1, fMD);
+  scrh2 = fmax(Fj, fUL);
+  scrh2 = fmax(scrh2, fLC);
+  Fmax  = fmin(scrh1, scrh2); // Eqn. 2.24b
+
+  f = Median(f, Fmin, Fmax); // Eqn. 2.26
+  return f;
+}
+#undef MINMOD
+
+template <typename T>
+KOKKOS_INLINE_FUNCTION
+void MP5(const int d, const int nlo, const int nhi,
+                     const int k, const int j, const int i,
+                     const T &v, const ParArrayND<Real> &ql, const ParArrayND<Real> &qr) {
+  const int dir = d-1;
+  const int di = (d == X1DIR ? 1 : 0);
+  const int dj = (d == X2DIR ? 1 : 0);
+  const int dk = (d == X3DIR ? 1 : 0);
+  for (int n=nlo; n<=nhi; n++) {
+    ql(dir,n,k+dk,j+dj,i+di) = mp5_subcalc(v(n,k-2*dk,j-2*dj,i-2*di),
+                                           v(n,k-dk,j-dj,i-di),
+                                           v(n,k,j,i),
+                                           v(n,k+dk,j+dj,i+di),
+                                           v(n,k+2*dk,j+2*dj,i+2*di));
+    qr(dir,n,k,j,i) = mp5_subcalc(v(n,k+2*dk,j+2*dj,i+2*di),
+                                  v(n,k+dk,j+dj,i+di),
+                                  v(n,k,j,i),
+                                  v(n,k-dk,j-dj,i-di),
+                                  v(n,k-2*dk,j-2*dj,i-2*di));
   }
 }
 
