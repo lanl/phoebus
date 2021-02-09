@@ -127,6 +127,11 @@ void WENO5(const int d, const int nlo, const int nhi, const int k, const int j, 
                                   {-1.0/8.0, 0.75, 3.0/8.0},
                                   {3.0/8.0, 0.75, -1.0/8.0}};
   constexpr Real w5gamma[3] = {1.0/16.0, 5.0/8.0, 5.0/16.0};
+  constexpr Real eps = 1e-26; // value to compare beta gainst
+  // for WENO-Z type weights. The higher the number, the more diffusive
+  // and the more aggressively the method approaches ENO in discontinuous regions
+  constexpr Real p = 13; 
+
 
   const int dir = d-1;
   const int di = (d == X1DIR ? 1 : 0);
@@ -143,6 +148,7 @@ void WENO5(const int d, const int nlo, const int nhi, const int k, const int j, 
       q[l] = v(n,k+(l-2)*dk,j+(l-2)*dj,i+(l-2)*di);
     }
 
+    // ENO polynomials
     tl[0] = w5alpha[0][0]*q[0] + w5alpha[0][1]*q[1] + w5alpha[0][2]*q[2];
     tl[1] = w5alpha[1][0]*q[1] + w5alpha[1][1]*q[2] + w5alpha[1][2]*q[3];
     tl[2] = w5alpha[2][0]*q[2] + w5alpha[2][1]*q[3] + w5alpha[2][2]*q[4];
@@ -151,22 +157,50 @@ void WENO5(const int d, const int nlo, const int nhi, const int k, const int j, 
     tr[1] = w5alpha[1][0]*q[3] + w5alpha[1][1]*q[2] + w5alpha[1][2]*q[1];
     tr[2] = w5alpha[2][0]*q[2] + w5alpha[2][1]*q[1] + w5alpha[2][2]*q[0];
 
+    // Smoothness indicators from Tchekhovskoy et al. 2007
     beta[0] = (13. / 12.) * std::pow(q[0] - 2. * q[1] + q[2], 2) +
               0.25 * std::pow(q[0] - 4. * q[1] + 3. * q[2], 2);
     beta[1] = (13. / 12.) * std::pow(q[1] - 2. * q[2] + q[3], 2) +
               0.25 * std::pow(q[3] - q[1], 2);
     beta[2] = (13. / 12.) * std::pow(q[2] - 2. * q[3] + q[4], 2) +
               0.25 * std::pow(q[4] - 4. * q[3] + 3. * q[2], 2);
+    // Smoothness indicators from Shu 2011
+    /*
+    beta[0] = (1./3.)*(4*q[0]*q[0] - 19*q[0]*q[1]
+                       + 25*q[1]*q[1] + 11*q[0]*q[2]
+                       - 31*q[1]*q[2] + 10*q[2]*q[2]);
+    beta[1] = (1./3.)*(4*q[1]*q[1] - 13*q[1]*q[2] + 13*q[2]*q[2]
+                       + 5*q[1]*q[3] - 13*q[2]*q[3] + 4*q[3]*q[3]);
+    beta[2] = (1./3.)*(10.*q[2]*q[2] - 31.*q[2]*q[3] + 25*q[3]*q[3]
+                       + 11.*q[2]*q[4] - 19.*q[3]*q[4] + 4*q[4]*q[4]);
+    */
+
+    // Nonlinearity/shock detectors for WENO-A
+    Real phi = std::sqrt(std::abs(beta[0] - 2*beta[1] + beta[2]));
+    Real PHI = std::min(1.0,phi);
+    Real tau5 = std::fabs(beta[2] - beta[0]);
+
+    // Normalizations
     Real wsuml = 0.0;
     Real wsumr = 0.0;
+    /*
+    // Original WENO scheme
     for (int l = 0; l < 3; l++) {
-      beta[l] = beta[l] + 1.e-26;
+      beta[l] = beta[l] + eps;
       beta[l] *= beta[l];
     }
     for (int l = 0; l < 3; l++) {
       wl[l] = w5gamma[l]/beta[l];
       wsuml += wl[l];
       wr[l] = w5gamma[l]/beta[2-l];
+      wsumr += wr[l];
+    }
+    */
+    // WENO-A scheme introduced in Wang, Wang, and Don, 2019.
+    for (int l = 0; l < 3; l++) {
+      wl[l] = w5gamma[l]*std::max(1., PHI*std::pow(tau5/(beta[l] + eps),p));
+      wr[l] = w5gamma[l]*std::max(1., PHI*std::pow(tau5/(beta[2-l] + eps),p));
+      wsuml += wl[l];
       wsumr += wr[l];
     }
     for (int l = 0; l < 3; l++) {
