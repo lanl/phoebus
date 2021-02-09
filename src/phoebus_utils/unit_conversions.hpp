@@ -9,9 +9,10 @@ using namespace parthenon::package::prelude;
 
 namespace phoebus {
 
+// Object for converting between cgs and code units, based on relativistic mass
 class UnitConversions {
   public:
-    UnitConversions(ParameterInput *pinput);// {}// : mass_(mass) {}
+    UnitConversions(ParameterInput *pin);// {}// : mass_(mass) {}
 
   public:
     Real GetMass() const { return mass_; }
@@ -19,6 +20,8 @@ class UnitConversions {
   private:
     Real mass_;
 };
+
+extern Real solar_mass; // g
 
 extern std::unique_ptr<UnitConversions> unit_conv;
 

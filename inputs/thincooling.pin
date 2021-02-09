@@ -69,12 +69,15 @@ type = IdealGas
 Gamma = 1.6666666666666666667
 Cv = 1.238160e+08
 
+<units>
+#mass_g = 1.
+mass_msun = 1.
+
 <physics>
 hydro = false
 he = false
 3t = false
 rad = true
-unit_mass_g = 1.
 
 <fluid>
 xorder = 2
