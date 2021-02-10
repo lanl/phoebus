@@ -1,5 +1,6 @@
 #include "pgen/pgen.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
+#include "radiation/radiation.hpp"
 #include "utils/constants.hpp"
 
 // Optically thin cooling.
@@ -67,7 +68,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double P_code_eos = eos.PressureFromDensityInternalEnergy(rho_code, sie_code_eos);
   printf(" cv: %e EOS sie: %e P: %e\n", cv_code, sie_code_eos, P_code_eos);
 
-  exit(-1);
+  //exit(-1);
 
   const Real ne0 = pin->GetOrAddReal("thincooling", "ne0", 5.858732e+07);
   const Real rho0 = ne0*pc.mp*unit_conv.GetMassDensityCGSToCode();
@@ -83,6 +84,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double P0 = ne0*pc.kb*T0*unit_conv.GetTemperatureCodeToCGS();
   printf("P0: %e\n", P0);
 
+  const Real RHO = unit_conv.GetMassDensityCodeToCGS();
   const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
   const Real DENSITY = unit_conv.GetNumberDensityCodeToCGS();
 
@@ -98,6 +100,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(itmp,k,j,i));
 
       printf("P: %e\n", v(iprs, k, j, i)*ENERGY*DENSITY);
+
+      Real rho_cgs = rho0*RHO;
+      Real ne_cgs = radiation::GetNumberDensity(rho_cgs);
+      printf("ne_cgs: %e\n", ne_cgs);
 
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
     });

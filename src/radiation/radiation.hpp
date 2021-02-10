@@ -24,9 +24,14 @@ using namespace parthenon::package::prelude;
 
 namespace radiation {
 
+extern parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt);
+
+KOKKOS_INLINE_FUNCTION
+Real GetNumberDensity(const Real rho_cgs) { return rho_cgs/pc.mp; }
 
 } // namespace radiation
 

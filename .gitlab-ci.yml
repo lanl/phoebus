@@ -1,26 +1,93 @@
-image: ubuntu:20.04
+#image: ubuntu:20.04
+#
+#variables:
+#  GIT_SUBMODULE_STRATEGY: recursive
+#
+#build:
+#  before_script:
+#    # Install packages
+#    - export DEBIAN_FRONTEND=noninteractive
+#    - apt-get update -qq
+#    - apt-get install -qq --no-install-recommends tzdata
+#    - apt-get install -qq git
+#    - apt-get install -qq make cmake g++
+#    - apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
+#    - apt-get install -qq openssh-client
+#    - apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
+#    - apt-get install -qq lua5.3 liblua5.3-dev
+#    - apt-get upgrade -qq
+#    - apt-get -f install -qq
+#
+#  script:
+#    # build the code
+#    - mkdir build && cd build
+#    - cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DCMAKE_CXX_COMPILER=mpic++ ..
+#    - make -j
+#    - make test
 
 variables:
+  PROJECT: Phoebus
   GIT_SUBMODULE_STRATEGY: recursive
 
-build:
+stages:
+#  - fasttest
+  - test
+#  - slowtest
+#  - optional
+
+# Darwin machine settings
+.darwin:
+  tags:
+    - darwin-slurm-shared
+  variables:
+    http_proxy: "http://proxyout.lanl.gov:8080"
+    https_proxy: "http://proxyout.lanl.gov:8080"
+    JAYENNE_SOURCE_DIR: ${CI_PROJECT_DIR}
+    JAYENNE_BINARY_DIR: ${CI_PROJECT_DIR}/build/j
+    DRACO_BINARY_DIR: ${CI_PROJECT_DIR}/build/d
+    DRACO_SOURCE_DIR: ${CI_PROJECT_DIR}/draco
+    SITE_ID: darwin
+    DEPLOY: "FALSE"
+    SP_x86_64: "--nodes=1 --partition=general --qos=debug --constraint='cpu_family:broadwell|cpu_family:haswell'"
+    SP_power9: "--nodes=1 --partition=power9 --qos=debug"
+    SP_arm: "--nodes=1 --partition=arm --qos=debug"
+
+.darwin_merge:
+  extends: .darwin
+  variables:
+    CTEST_MODE: Experimental
+#  script:
+#    - /bin/bash -l -c ${CI_PROJECT_DIR}/.gitlab/ci/gitlab-ci-run-tests.sh
+#  only:
+#    - merge_requests
   before_script:
     # Install packages
     - export DEBIAN_FRONTEND=noninteractive
-    - apt-get update -qq 
+    - apt-get update -qq
     - apt-get install -qq --no-install-recommends tzdata
     - apt-get install -qq git
     - apt-get install -qq make cmake g++
     - apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
-    - apt-get install -qq openssh-client 
+    - apt-get install -qq openssh-client
     - apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
     - apt-get install -qq lua5.3 liblua5.3-dev
     - apt-get upgrade -qq
     - apt-get -f install -qq
-  
+
   script:
     # build the code
     - mkdir build && cd build
     - cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DCMAKE_CXX_COMPILER=mpic++ ..
     - make -j
     - make test
+
+p9_rel_gcc_7.3.0_mr:
+  stage: test
+  extends: .darwin_merge
+  variables:
+    CMAKE_BUILD_TYPE: Release
+    DRACO_ENV: power9-gcc730
+    ARCH: power9
+    CTEST_NPROC: 10
+    MAXLOAD: 40
+    SCHEDULER_PARAMETERS: ${SP_power9}
