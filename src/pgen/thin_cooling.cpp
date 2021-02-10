@@ -99,7 +99,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       printf("[%i] rho: %e ug: %e Pg: %e T0: %e\n", i, rho0, v(ieng,k,j,i), v(iprs,k,j,i),
         v(itmp,k,j,i));
 
-      printf("new T: %e\n", eos.TemperatureFromDensityInternalEnergy(rho0, v(ieng, k, j, i)));
+      //printf("new T: %e\n", eos.TemperatureFromDensityInternalEnergy(rho0, v(ieng, k, j, i)));
 
       printf("P: %e\n", v(iprs, k, j, i)*ENERGY*DENSITY);
 
@@ -112,7 +112,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   fluid::PrimitiveToConserved(rc.get());
 
-  fluid::ConservedToPrimitive(rc.get());
+  /*fluid::ConservedToPrimitive(rc.get());
   printf("NAEIWUHDAISUHDS\n");
   pmb->par_for(
     "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -127,7 +127,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real rho_cgs = rho0*RHO;
       Real ne_cgs = radiation::GetNumberDensity(rho_cgs);
       printf("ne_cgs: %e\n", ne_cgs);
-    });
+    });*/
 
 }
 
