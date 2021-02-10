@@ -133,8 +133,6 @@ ubuntu_x86:
 
 style:
   stage: fasttest
-  tags:
-    - ubuntu-docker
   before_script:
     # Install packages
     - export DEBIAN_FRONTEND=noninteractive
