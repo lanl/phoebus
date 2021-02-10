@@ -42,10 +42,10 @@ stages:
   variables:
     http_proxy: "http://proxyout.lanl.gov:8080"
     https_proxy: "http://proxyout.lanl.gov:8080"
-    JAYENNE_SOURCE_DIR: ${CI_PROJECT_DIR}
-    JAYENNE_BINARY_DIR: ${CI_PROJECT_DIR}/build/j
-    DRACO_BINARY_DIR: ${CI_PROJECT_DIR}/build/d
-    DRACO_SOURCE_DIR: ${CI_PROJECT_DIR}/draco
+    #JAYENNE_SOURCE_DIR: ${CI_PROJECT_DIR}
+    #JAYENNE_BINARY_DIR: ${CI_PROJECT_DIR}/build/j
+    #DRACO_BINARY_DIR: ${CI_PROJECT_DIR}/build/d
+    #DRACO_SOURCE_DIR: ${CI_PROJECT_DIR}/draco
     SITE_ID: darwin
     DEPLOY: "FALSE"
     SP_x86_64: "--nodes=1 --partition=general --qos=debug --constraint='cpu_family:broadwell|cpu_family:haswell'"
@@ -62,17 +62,19 @@ stages:
 #    - merge_requests
   before_script:
     # Install packages
-    - export DEBIAN_FRONTEND=noninteractive
-    - apt-get update -qq
-    - apt-get install -qq --no-install-recommends tzdata
-    - apt-get install -qq git
-    - apt-get install -qq make cmake g++
-    - apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
-    - apt-get install -qq openssh-client
-    - apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
-    - apt-get install -qq lua5.3 liblua5.3-dev
-    - apt-get upgrade -qq
-    - apt-get -f install -qq
+    DRACO_ARCH=$(/usr/projects/draco/vendors/bin/target_arch)
+    run "module use --append /projects/draco/Modules"
+#    - export DEBIAN_FRONTEND=noninteractive
+#    - apt-get update -qq
+#    - apt-get install -qq --no-install-recommends tzdata
+#    - apt-get install -qq git
+#    - apt-get install -qq make cmake g++
+#    - apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
+#    - apt-get install -qq openssh-client
+#    - apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
+#    - apt-get install -qq lua5.3 liblua5.3-dev
+#    - apt-get upgrade -qq
+#    - apt-get -f install -qq
 
   script:
     # build the code
