@@ -39,8 +39,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // EOSBuilder::params_t shifted_params, scaled_params;
 
   const std::vector<std::string> valid_eos_names = {
-      IdealGas::EosType(), SpinerEOSDependsRhoT::EosType(),
-      SpinerEOSDependsRhoSie::EosType()};
+      IdealGas::EosType()
+#ifdef SPINER_USE_HDF
+      , SpinerEOSDependsRhoT::EosType()
+      , SpinerEOSDependsRhoSie::EosType()
+#endif // SPINER_USE_HDF
+      };
   std::string eos_type = pin->GetString(block_name, std::string("type"));
   if (eos_type.compare(IdealGas::EosType()) == 0) {
     type = EOSBuilder::EOSType::IdealGas;
