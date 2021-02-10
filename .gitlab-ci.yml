@@ -62,8 +62,8 @@ stages:
 #    - merge_requests
   before_script:
     # Install packages
-    DRACO_ARCH=$(/usr/projects/draco/vendors/bin/target_arch)
-    module use --append /projects/draco/Modules
+    - DRACO_ARCH=$(/usr/projects/draco/vendors/bin/target_arch)
+    - module use --append /projects/draco/Modules
 #    - export DEBIAN_FRONTEND=noninteractive
 #    - apt-get update -qq
 #    - apt-get install -qq --no-install-recommends tzdata
