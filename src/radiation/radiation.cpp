@@ -73,17 +73,21 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
   double rho = ne*pc.mp;
   printf("ne: %e rho: %e\n", ne, rho);
 
+  const Real TEMP = unit_conv.GetTemperatureCodeToCGS();
+
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateRadiationForce", DevExecSpace(),
     kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      double ndens = v(prho, k, j, i)*RHO/pc.mp;
+      double ndens = GetNumberDensity(v(prho, k, j, i)*RHO);
       double Lambda = 4.*M_PI*pc.kb*pow(ndens,2)*N/pc.h*pow(v(ptemp, k, j, i), 1./2.);
       //printf("gm1: %e\n", gam);
       double cv = pc.kb/(pc.mp*(gam - 1.));
       //printf("cv: %e\n", cv);
-      printf("[%i] T: %e E: %e\n", i, v(ptemp, k, j, i), v(ceng, k, j, i));
+      printf("[%i] T: %e (%e) E: %e\n", i, v(ptemp, k, j, i), v(ptemp, k, j, i)*TEMP, v(ceng, k, j, i));
       v(ceng, k, j, i) -= v(ceng, k, j, i)*dt;
     });
+
+  exit(-1);
 
   return TaskStatus::complete;
 }
