@@ -87,7 +87,7 @@ stages:
   script:
     # build the code
     - mkdir build && cd build
-    - cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DCMAKE_CXX_COMPILER=mpic++ ..
+    - cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DPARTHENON_DISABLE_HDF5=ON -DCMAKE_CXX_COMPILER=mpic++ ..
     - make -j
     - make test
 
