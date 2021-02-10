@@ -41,7 +41,7 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
   namespace c = conserved_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({p::density, p::temperature, c::energy, p::gamma1});
+  std::vector<std::string> vars({p::density, p::temperature, c::energy});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
@@ -54,14 +54,29 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
+  StateDescriptor *eos = pmb->packages.Get("eos").get();
+  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   const Real gam = rad->Param<Real>("Gamma");
 
+  double L = unit_conv.GetLengthCodeToCGS();
+  double RHO = unit_conv.GetMassDensityCodeToCGS();
+  printf("M: %e L: %e T: %e\n", unit_conv.GetMassCodeToCGS(), L, unit_conv.GetTimeCodeToCGS());
+  printf("rho: %e\n", RHO);
+  printf("E: %e T: %e\n", unit_conv.GetEnergyCodeToCGS(), unit_conv.GetTemperatureCodeToCGS());
+
   constexpr double N = 5.4e-39; // cgs
+
+  double tf = 1.e8;
+  double T0 = 1.e8;
+  double ne = pc.h*sqrt(T0)/((gam - 1.)*M_PI*N*tf);
+  double rho = ne*pc.mp;
+  printf("ne: %e rho: %e\n", ne, rho);
+
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateRadiationForce", DevExecSpace(),
     kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      double ndens = v(prho, k, j, i)/pc.mp;
+      double ndens = v(prho, k, j, i)*RHO/pc.mp;
       double Lambda = 4.*M_PI*pc.kb*pow(ndens,2)*N/pc.h*pow(v(ptemp, k, j, i), 1./2.);
       //printf("gm1: %e\n", gam);
       double cv = pc.kb/(pc.mp*(gam - 1.));

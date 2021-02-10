@@ -40,10 +40,6 @@ int main(int argc, char *argv[]) {
   // Now that ParthenonInit has been called and setup succeeded, the code can now
   // make use of MPI and Kokkos
 
-  phoebus::unit_conv.reset(new phoebus::UnitConversions(pman.pinput.get()));
-  printf("mass: %e\n", phoebus::unit_conv->GetMass());
-  exit(-1);
-
   // Initialize the driver
   phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(),
                                 pman.pmesh.get());

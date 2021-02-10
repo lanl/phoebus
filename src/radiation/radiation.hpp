@@ -20,6 +20,7 @@ using namespace parthenon::package::prelude;
 
 #include "compile_constants.hpp"
 #include "utils/constants.hpp"
+#include "phoebus_utils/unit_conversions.hpp"
 
 namespace radiation {
 

@@ -67,11 +67,15 @@ nx3 = 1
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
-Cv = 1.238160e+08
+#Cv = 1.
+#Cv = 2.476320e+08 # cgs
+Cv = 1.793591e+24 # code
 
 <units>
-#mass_g = 1.
-mass_msun = 1.
+geom_length_cm = 1.e8
+#geom_mass_g = 1.
+#geom_mass_msun = 1.
+fluid_mass_g = 1.
 
 <physics>
 hydro = false
@@ -91,5 +95,5 @@ Ye = false
 method = cooling_function
 
 <thincooling>
-rho0 = 1.0
-T = 1e6
+ne0 = 5.858732e+07
+T0 = 1e8
