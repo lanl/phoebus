@@ -35,6 +35,31 @@ stages:
 #  - slowtest
 #  - optional
 
+.ubuntu:
+  tags:
+    - ubuntu-docker
+#  variables:
+  before_script:
+    # Install packages
+    - export DEBIAN_FRONTEND=noninteractive
+    - apt-get update -qq
+    - apt-get install -qq --no-install-recommends tzdata
+    - apt-get install -qq git
+    - apt-get install -qq make cmake g++
+    - apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
+    - apt-get install -qq openssh-client
+    - apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
+    - apt-get install -qq lua5.3 liblua5.3-dev
+    - apt-get upgrade -qq
+    - apt-get -f install -qq
+
+  script:
+    # build the code
+    - mkdir build && cd build
+    - cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DCMAKE_CXX_COMPILER=mpic++ ..
+    - make -j
+    - make test
+
 # Darwin machine settings
 .darwin:
   tags:
@@ -101,3 +126,7 @@ darwin_volta:
     CTEST_NPROC: 10
     MAXLOAD: 40
     SCHEDULER_PARAMETERS: ${SP_x86_volta}
+
+ubuntu_x86:
+  stage: test
+  extends: .ubuntu
