@@ -70,6 +70,7 @@ stages:
     - module load openmpi/2.1.3-gcc_6_4_0
     - module load python/3.5.1
     - module load lua/5.3.4
+    - module load cuda
 #    - export DEBIAN_FRONTEND=noninteractive
 #    - apt-get update -qq
 #    - apt-get install -qq --no-install-recommends tzdata
