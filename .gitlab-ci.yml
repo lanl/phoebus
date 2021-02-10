@@ -36,8 +36,8 @@ stages:
 #  - optional
 
 .ubuntu:
-  tags:
-    - ubuntu-docker
+#  tags:
+#    - ubuntu-docker
 #  variables:
   before_script:
     # Install packages
