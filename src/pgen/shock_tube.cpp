@@ -61,7 +61,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
       v(ivlo, k, j, i) = vel;
       if (iye > 0) v(iye, k, j, i) = sin(2.0*M_PI*x);
+      double rho1 = 3.0;
+      double T1 = 2.5;
+      double P1 = eos.PressureFromDensityTemperature(rho1, T1);
+      double ug1 = phoebus::energy_from_rho_P(eos, rho1, P1);
+      double sie1 = eos.InternalEnergyFromDensityTemperature(rho1, T1);
+      printf("ug1 = %e rho1*sie1 = %e\n", ug1, rho1*sie1);
     });
+  exit(-1);
 
   fluid::PrimitiveToConserved(rc.get());
 }

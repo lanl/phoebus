@@ -31,8 +31,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin)
   params.Add("method", method);
 
   return physics;
-
-
 }
 
 constexpr double mu = 0.5;
