@@ -56,6 +56,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double P_cgs_eos = eos.PressureFromDensityInternalEnergy(rho_cgs, sie_cgs_eos);
   printf(" cv: %e EOS sie: %e P: %e\n", cv_cgs, sie_cgs_eos, P_cgs_eos);
 
+  const Real RHO = unit_conv.GetMassDensityCodeToCGS();
+  const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
+  const Real DENSITY = unit_conv.GetNumberDensityCodeToCGS();
+  const Real TEMP = unit_conv.GetTemperatureCodeToCGS();
 
   const Real ne_code = ne_cgs*unit_conv.GetNumberDensityCGSToCode();
   const Real rho_code = rho_cgs*unit_conv.GetMassDensityCGSToCode();
@@ -66,7 +70,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real cv_code = cv_cgs*unit_conv.GetEnergyCGSToCode()/(unit_conv.GetMassCGSToCode()*unit_conv.GetTemperatureCGSToCode());
   double sie_code_eos = eos.InternalEnergyFromDensityTemperature(rho_code, T_code);
   double P_code_eos = eos.PressureFromDensityInternalEnergy(rho_code, sie_code_eos);
-  printf(" cv: %e EOS sie: %e P: %e\n", cv_code, sie_code_eos, P_code_eos);
+  double T_code_eos = eos.TemperatureFromDensityInternalEnergy(rho_code, sie_code_eos);
+  printf(" cv: %e EOS sie: %e P: %e T: %e(%e)\n", cv_code, sie_code_eos, P_code_eos, T_code_eos,
+    T_code_eos*TEMP);
 
   //exit(-1);
 
@@ -84,35 +90,56 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double P0 = ne0*pc.kb*T0*unit_conv.GetTemperatureCodeToCGS();
   printf("P0: %e\n", P0);
 
-  const Real RHO = unit_conv.GetMassDensityCodeToCGS();
-  const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
-  const Real DENSITY = unit_conv.GetNumberDensityCodeToCGS();
+  printf("Why is T != sie/Cv?\n");
+//  exit(-1);
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
       const Real x = coords.x1v(i);
       v(irho, k, j, i) = rho0;
-      v(ieng, k, j, i) = eos.InternalEnergyFromDensityTemperature(rho0, T0);
-      v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho0, v(ieng, k, j, i));
+      v(iprs, k, j, i) = eos.PressureFromDensityTemperature(rho0, T0);
+      v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho0, v(iprs, k, j, i));
+//Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P) {
+      //v(ieng, k, j, i) = eos.InternalEnergyFromDensityTemperature(rho0, T0);
+
+      //v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho0, v(ieng, k, j, i));
+//Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P) {
+//Real IdealGas::PressureFromDensityTemperature(const Real rho, const Real temp,
       v(itmp, k, j, i) = T0;
+
+      double rho1 = 3.0;
+      double T1 = 2.5;
+      double P1 = eos.PressureFromDensityTemperature(rho1, T1);
+      double ug1 = phoebus::energy_from_rho_P(eos, rho1, P1);
+      double sie1 = eos.InternalEnergyFromDensityTemperature(rho1, T1);
+      printf("ug1 = %e rho1*sie1 = %e\n", ug1, rho1*sie1);
+
+
       printf("[%i] rho: %e ug: %e Pg: %e T0: %e\n", i, rho0, v(ieng,k,j,i), v(iprs,k,j,i),
         v(itmp,k,j,i));
+      double sie = eos.InternalEnergyFromDensityTemperature(rho0, T0);
+      printf("     u: %e rho*sie: %e\n", v(ieng,k,j,i), rho0*sie);
 
-      //printf("new T: %e\n", eos.TemperatureFromDensityInternalEnergy(rho0, v(ieng, k, j, i)));
+      /*Real lambda, rho1, sie1;
+      eos.DensityEnergyFromPressureTemperature(v(iprs,k,j,i), v(itmp,k,j,i), &lambda, rho1, sie1);
+      printf("rho1: %e sie1: %e\n", rho1, sie1);
+
+      printf("new T: %e\n", eos.TemperatureFromDensityInternalEnergy(rho0, v(ieng, k, j, i)));
 
       printf("P: %e\n", v(iprs, k, j, i)*ENERGY*DENSITY);
 
       Real rho_cgs = rho0*RHO;
       Real ne_cgs = radiation::GetNumberDensity(rho_cgs);
-      printf("ne_cgs: %e\n", ne_cgs);
+      printf("ne_cgs: %e\n", ne_cgs);*/
 
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
     });
+//  exit(-1);
 
   fluid::PrimitiveToConserved(rc.get());
 
-  /*fluid::ConservedToPrimitive(rc.get());
+  fluid::ConservedToPrimitive(rc.get());
   printf("NAEIWUHDAISUHDS\n");
   pmb->par_for(
     "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -127,7 +154,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real rho_cgs = rho0*RHO;
       Real ne_cgs = radiation::GetNumberDensity(rho_cgs);
       printf("ne_cgs: %e\n", ne_cgs);
-    });*/
+    });
 
 }
 

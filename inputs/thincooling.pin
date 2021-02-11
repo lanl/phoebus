@@ -69,7 +69,9 @@ type = IdealGas
 Gamma = 1.6666666666666666667
 #Cv = 1.
 #Cv = 2.476320e+08 # cgs
-Cv = 1.793591e+24 # code
+#Cv = 1.793591e+24 # code
+#Cv = 1.995640e+03
+Cv = 2.;
 
 <units>
 geom_length_cm = 1.e8

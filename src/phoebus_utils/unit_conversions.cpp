@@ -38,7 +38,8 @@ UnitConversions::UnitConversions(ParameterInput *pin) {
 
   mass_density_ = mass_*number_density_;
 
-  temperature_ = energy_/pc.kb;
+  //temperature_ = energy_/pc.kb;
+  temperature_ = 1./pc.kb;
 }
 
 Real solar_mass = 1.989e33; // g
