@@ -16,16 +16,22 @@ class UnitConversions {
 
     Real GetMassCodeToCGS() const { return mass_; }
     Real GetMassCGSToCode() const { return 1./mass_; }
+
     Real GetLengthCodeToCGS() const { return length_; }
     Real GetLengthCGSToCode() const { return 1./length_; }
+
     Real GetTimeCodeToCGS() const { return time_; }
     Real GetTimeCGSToCode() const { return 1./time_; }
+
     Real GetEnergyCodeToCGS() const { return energy_; }
     Real GetEnergyCGSToCode() const { return 1./energy_; }
+
     Real GetNumberDensityCodeToCGS() const { return number_density_; }
     Real GetNumberDensityCGSToCode() const { return 1./number_density_; }
+
     Real GetMassDensityCodeToCGS() const { return mass_density_; }
     Real GetMassDensityCGSToCode() const { return 1./mass_density_; }
+
     Real GetTemperatureCodeToCGS() const { return temperature_; }
     Real GetTemperatureCGSToCode() const { return 1./temperature_; }
 

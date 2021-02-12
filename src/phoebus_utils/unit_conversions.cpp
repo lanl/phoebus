@@ -40,6 +40,8 @@ UnitConversions::UnitConversions(ParameterInput *pin) {
 
   //temperature_ = energy_/pc.kb;
   temperature_ = 1./pc.kb;
+
+  printf("Mass: %e Time: %e Length: %e\n", mass_, length_, time_);
 }
 
 Real solar_mass = 1.989e33; // g

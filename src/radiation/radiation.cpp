@@ -91,7 +91,7 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
       //printf("gm1: %e\n", gam);
 
       printf("T: %e\n", T_cgs);
-      double cv = pc.kb/(pc.mp*(gam - 1.));
+      //double cv = pc.kb/(pc.mp*(gam - 1.));
 
       v(ceng, k, j, i) -= Lambda_code*dt;
       //printf("cv: %e\n", cv);
