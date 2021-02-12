@@ -42,12 +42,11 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   };
 
   auto taufunc = [&](const Real z, const Real Wp, const Real p) {
-    printf("tau: %e D: %e z: %e p: %e Wp: %e res: %e\n",
-      tau, D, z, p, Wp, tau + D - z + p);
-    printf("BdotSsq = %e Bsq = %e\n", BdotSsq, Bsq);
-    printf("tau + D - z = %e\n", tau + D - z);
+    //printf("tau: %e D: %e z: %e p: %e Wp: %e res: %e\n",
+    //  tau, D, z, p, Wp, tau + D - z + p);
+    //printf("BdotSsq = %e Bsq = %e\n", BdotSsq, Bsq);
+    //printf("tau + D - z = %e\n", tau + D - z);
 
-    exit(-1);
     return (tau + D - z- Bsq + BdotSsq/(2.0*z*z) + p)*Wp*Wp - 0.5*Bsq;
   };
 
@@ -56,10 +55,11 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
     const Real sie = eos.InternalEnergyFromDensityTemperature(rho, Temp);
     const Real Wp = D/rho;
     const Real z = (rho*(1.0 + sie) + p)*Wp*Wp;
-    printf("rho: %e T: %e p: %e sie: %e u: %e\n", rho, Temp, p, sie, rho*sie);
+    //printf("rho: %e T: %e p: %e sie: %e u: %e\n", rho, Temp, p, sie, rho*sie);
     res[0] = sfunc(z, Wp);
     res[1] = taufunc(z, Wp, p);
-    printf("res: %e %e\n", res[0], res[1]);
+    //printf("res: %e %e\n", res[0], res[1]);
+    //exit(-1);
   };
 
   int iter = 0;
@@ -81,7 +81,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
     jac[1][1] = (resp[1] - res[1])/dT;
 
     const Real det = (jac[0][0]*jac[1][1] - jac[0][1]*jac[1][0]);
-    printf("det: %e\n", det);
+    //printf("det: %e\n", det);
     if (std::abs(det) < 1.e-16) {
       delta_fact *= delta_adj;
       iter++;
@@ -125,7 +125,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
 
     rho_guess += alpha*delta_rho;
     T_guess += alpha*delta_T;
-    printf("[%i] T_guess = %e\n", iter, T_guess);
+    //printf("[%i] T_guess = %e\n", iter, T_guess);
     iter++;
 
     if (delta_fact > delta_fact_min) delta_fact /= delta_adj;

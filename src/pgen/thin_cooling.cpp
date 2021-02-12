@@ -12,8 +12,6 @@ namespace thin_cooling {
 parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
-  exit(-1);
-
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
@@ -91,8 +89,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double P0 = ne0*pc.kb*T0*unit_conv.GetTemperatureCodeToCGS();
   printf("P0: %e\n", P0);
 
-  printf("Why is T != sie/Cv?\n");
-//  exit(-1);
+  printf("T_unit: %e\n", unit_conv.GetTimeCodeToCGS());
+  printf("Temp_unit: %e\n", unit_conv.GetTemperatureCodeToCGS());
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
