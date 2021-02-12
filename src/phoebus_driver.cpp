@@ -69,6 +69,7 @@ TaskListStatus PhoebusDriver::Step() {
     if (status != TaskListStatus::complete) break;
   }
 
+  // TODO(BRR): don't do this if radiation is disabled
   {
     TaskCollection tc = RadiationStep();
     status = tc.Execute();

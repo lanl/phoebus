@@ -12,6 +12,7 @@ namespace thin_cooling {
 parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  exit(-1);
 
   auto &rc = pmb->meshblock_data.Get();
 
