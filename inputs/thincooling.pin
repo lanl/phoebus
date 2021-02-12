@@ -12,7 +12,7 @@ variables = p.density,  &
             temperature
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1.e6      # time increment between outputs
+dt          = 1.e3      # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
@@ -68,11 +68,10 @@ Gamma = 1.6666666666666666667
 #Cv = 1.
 #Cv = 2.476320e+08 # cgs
 #Cv = 1.793591e+24 # code
-#Cv = 1.995640e+03
-Cv = 2.;
+Cv = 1.995640e+03
 
 <units>
-geom_length_cm = 1.e8
+geom_length_cm = 1.e12
 #geom_mass_g = 1.
 #geom_mass_msun = 1.
 fluid_mass_g = 1.

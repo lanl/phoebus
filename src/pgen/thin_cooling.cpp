@@ -107,7 +107,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //Real IdealGas::PressureFromDensityTemperature(const Real rho, const Real temp,
       v(itmp, k, j, i) = T0;
 
-      double rho1 = 3.0;
+      /*double rho1 = 3.0;
       double T1 = 2.5;
       double P1 = eos.PressureFromDensityTemperature(rho1, T1);
       double ug1 = phoebus::energy_from_rho_P(eos, rho1, P1);
@@ -118,7 +118,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       printf("[%i] rho: %e ug: %e Pg: %e T0: %e\n", i, rho0, v(ieng,k,j,i), v(iprs,k,j,i),
         v(itmp,k,j,i));
       double sie = eos.InternalEnergyFromDensityTemperature(rho0, T0);
-      printf("     u: %e rho*sie: %e\n", v(ieng,k,j,i), rho0*sie);
+      printf("     u: %e rho*sie: %e\n", v(ieng,k,j,i), rho0*sie);*/
 
       /*Real lambda, rho1, sie1;
       eos.DensityEnergyFromPressureTemperature(v(iprs,k,j,i), v(itmp,k,j,i), &lambda, rho1, sie1);
@@ -137,7 +137,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 //  exit(-1);
 
   fluid::PrimitiveToConserved(rc.get());
-
+/*
   fluid::ConservedToPrimitive(rc.get());
   printf("NAEIWUHDAISUHDS\n");
   pmb->par_for(
@@ -154,7 +154,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real ne_cgs = radiation::GetNumberDensity(rho_cgs);
       printf("ne_cgs: %e\n", ne_cgs);
     });
-
+*/
 }
 
 }

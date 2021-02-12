@@ -47,7 +47,6 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
   const int ptemp = imap[p::temperature].first;
   const int peng = imap[p::energy].first;
   const int ceng = imap[c::energy].first;
-//  const int gm1 = imap[p::gamma1].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -58,20 +57,9 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   const Real gam = rad->Param<Real>("Gamma");
 
-  double L = unit_conv.GetLengthCodeToCGS();
-  double RHO = unit_conv.GetMassDensityCodeToCGS();
-  //printf("M: %e L: %e T: %e\n", unit_conv.GetMassCodeToCGS(), L, unit_conv.GetTimeCodeToCGS());
-  //printf("rho: %e\n", RHO);
-  //printf("E: %e T: %e\n", unit_conv.GetEnergyCodeToCGS(), unit_conv.GetTemperatureCodeToCGS());
-
   constexpr double N = 5.4e-39; // cgs
 
-  //double tf = 1.e8;
-  //double T0 = 1.e8;
-  //double ne = pc.h*sqrt(T0)/((gam - 1.)*M_PI*N*tf);
-  //double rho = ne*pc.mp;
-  //printf("ne: %e rho: %e\n", ne, rho);
-
+  const Real RHO = unit_conv.GetMassDensityCodeToCGS();
   const Real TEMP = unit_conv.GetTemperatureCodeToCGS();
 
   const Real CENERGY = unit_conv.GetEnergyCGSToCode();
@@ -86,21 +74,11 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
       double ne_cgs = GetNumberDensity(v(prho, k, j, i)*RHO);
       double Lambda_cgs = 4.*M_PI*pc.kb*pow(ne_cgs,2)*N/pc.h*pow(T_cgs, 1./2.);
       double Lambda_code = Lambda_cgs*CPOWERDENS;
-      //printf("CGS T: %e ne: %e Lambda: %e\n", T_cgs, ne_cgs, Lambda_cgs);
-      //printf("CODE u: %e Lambda: %e dt: %e\n", v(peng, k, j, i), Lambda_code, dt);
-      //printf("gm1: %e\n", gam);
 
       printf("T: %e\n", T_cgs);
-      //double cv = pc.kb/(pc.mp*(gam - 1.));
 
       v(ceng, k, j, i) -= Lambda_code*dt;
-      //printf("cv: %e\n", cv);
-      //printf("[%i] T: %e (%e) E: %e ndens: %e\n", i, v(ptemp, k, j, i), v(ptemp, k, j, i)*TEMP, v(ceng, k, j, i), ne_cgs);
     });
-
-  //fluid::PrimitiveToConserved(rc.get());
-
-//  exit(-1);
 
   return TaskStatus::complete;
 }
