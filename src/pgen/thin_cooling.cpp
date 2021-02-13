@@ -31,8 +31,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(
-      {"p.density", "p.velocity", "p.energy", "pressure", "temperature"}, imap);
+  auto v =
+      rc->PackVariables({"p.density", "p.velocity", "p.energy", "pressure", "temperature"}, imap);
 
   const int irho = imap["p.density"].first;
   const int ivlo = imap["p.velocity"].first;
@@ -52,17 +52,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const Real ne0 = pin->GetOrAddReal("thincooling", "ne0", 5.858732e+07);
   const Real rho0 = ne0 * pc.mp * unit_conv.GetMassDensityCGSToCode();
-  const Real T0 = pin->GetOrAddReal("thincooling", "T0", 1.e8) *
-                  unit_conv.GetTemperatureCGSToCode();
+  const Real T0 =
+      pin->GetOrAddReal("thincooling", "T0", 1.e8) * unit_conv.GetTemperatureCGSToCode();
 
   pmb->par_for(
-      "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s,
-      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const Real x = coords.x1v(i);
         v(irho, k, j, i) = rho0;
         v(iprs, k, j, i) = eos.PressureFromDensityTemperature(rho0, T0);
-        v(ieng, k, j, i) =
-            phoebus::energy_from_rho_P(eos, rho0, v(iprs, k, j, i));
+        v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho0, v(iprs, k, j, i));
         v(itmp, k, j, i) = T0;
 
         for (int d = 0; d < 3; d++)

@@ -23,15 +23,12 @@ parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 // geometry and a mass scale for the fluid. Assume kb = 1 in code units.
 UnitConversions::UnitConversions(ParameterInput *pin) {
   int geom_mass_g_exists = pin->DoesParameterExist("units", "geom_mass_g");
-  int geom_mass_msun_exists =
-      pin->DoesParameterExist("units", "geom_mass_msun");
-  int geom_length_cm_exists =
-      pin->DoesParameterExist("units", "geom_length_cm");
+  int geom_mass_msun_exists = pin->DoesParameterExist("units", "geom_mass_msun");
+  int geom_length_cm_exists = pin->DoesParameterExist("units", "geom_length_cm");
 
-  PARTHENON_REQUIRE(
-      geom_mass_g_exists + geom_mass_msun_exists + geom_length_cm_exists == 1,
-      "Must provide exactly one of geom_mass_g, geom_mass_msun, "
-      "geom_length_cm!");
+  PARTHENON_REQUIRE(geom_mass_g_exists + geom_mass_msun_exists + geom_length_cm_exists == 1,
+                    "Must provide exactly one of geom_mass_g, geom_mass_msun, "
+                    "geom_length_cm!");
 
   if (geom_mass_g_exists) {
     Real geom_mass_ = pin->GetReal("units", "geom_mass_g");
