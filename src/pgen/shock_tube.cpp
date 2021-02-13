@@ -1,7 +1,7 @@
 #include "pgen/pgen.hpp"
 
 // Single-material blast wave.
-// As descriged in the Athena test suite
+// As described in the Athena test suite
 // https://www.astro.princeton.edu/~jstone/Athena/tests/blast/blast.html
 // and in
 // Zachary, Malagoli, A., & Colella,P., SIAM J. Sci. Comp., 15, 263 (1994); Balsara, D., & Spicer, D., JCP 149, 270 (1999); Londrillo, P. & Del Zanna, L., ApJ 530, 508 (2000).
