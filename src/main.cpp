@@ -15,7 +15,6 @@
 
 #include "phoebus_driver.hpp"
 #include "initial_conditions.hpp"
-#include "phoebus_utils/unit_conversions.hpp"
 
 int main(int argc, char *argv[]) {
   parthenon::ParthenonManager pman;

@@ -191,7 +191,6 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
       }
 
       v(b, ceng, k, j, i) = gdet*(rhohWsq - v(b, prs, k, j, i)) - v(b, crho, k, j, i);
-      printf("CENG: %e\n rhohWsq: %e prs: %e crho:%e peng: %e\n", v(b,ceng,k,j,i), rhohWsq, v(b,prs,k,j,i), v(b,crho,k,j,i), v(b,peng,k,j,i));
       if (pye > 0) {
         v(b, cye, k, j, i) = v(b, crho, k, j, i) * v(b, pye, k, j, i);
       }

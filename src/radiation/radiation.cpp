@@ -74,6 +74,7 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
       double Lambda_code = Lambda_cgs*CPOWERDENS;
 
       v(ceng, k, j, i) -= Lambda_code*dt;
+      printf("%e -> %e\n", v(ceng, k, j, i), v(ceng, k, j, i) - Lambda_code*dt);
     });
 
   return TaskStatus::complete;
