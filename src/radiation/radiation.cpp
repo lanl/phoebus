@@ -33,19 +33,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin)
   return physics;
 }
 
-constexpr double mu = 0.5;
 TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = primitive_variables;
   namespace c = conserved_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({p::density, p::temperature, p::energy, c::energy});
+  std::vector<std::string> vars({p::density, p::temperature, p::energy});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
   const int prho = imap[p::density].first;
   const int ptemp = imap[p::temperature].first;
-  const int peng = imap[p::energy].first;
   const int ceng = imap[c::energy].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -74,8 +72,6 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
       double ne_cgs = GetNumberDensity(v(prho, k, j, i)*RHO);
       double Lambda_cgs = 4.*M_PI*pc.kb*pow(ne_cgs,2)*N/pc.h*pow(T_cgs, 1./2.);
       double Lambda_code = Lambda_cgs*CPOWERDENS;
-
-      printf("T: %e\n", T_cgs);
 
       v(ceng, k, j, i) -= Lambda_code*dt;
     });

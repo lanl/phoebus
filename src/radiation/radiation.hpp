@@ -30,6 +30,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt);
 
+// TODO(BRR) mean molecular weight/multimat/whatever duh
 KOKKOS_INLINE_FUNCTION
 Real GetNumberDensity(const Real rho_cgs) { return rho_cgs/pc.mp; }
 
