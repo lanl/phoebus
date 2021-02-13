@@ -62,7 +62,6 @@ max_level = 3
 type = IdealGas
 Gamma = 1.6666666666666666667
 Cv = 1.0
-#Cv = 2.0
 
 <physics>
 hydro = true
