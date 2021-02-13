@@ -22,21 +22,36 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin)
 {
   auto physics = std::make_shared<StateDescriptor>("radiation");
 
-  Params &params = physics->AllParams();
+  /*Params &params = physics->AllParams();
+
+  const bool active = pin->GetBoolean("physics", "rad");
+  params.Add("active", active);
+
+  if (!active) {
+    return physics;
+  }
 
   const Real Gamma = pin->GetReal("eos", "Gamma");
   params.Add("Gamma", Gamma);
 
   std::string method = pin->GetString("radiation", "method");
-  params.Add("method", method);
+  params.Add("method", method);*/
 
   return physics;
 }
 
 TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
-  namespace p = primitive_variables;
+/*
+namespace p = primitive_variables;
   namespace c = conserved_variables;
   auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  auto rad_active = rad->Param<bool>("active");
+  if (!rad_active) {
+    printf("aposkd\n");
+    return TaskStatus::complete;
+  }
+    printf("aposkd -- sdifuhsdf\n");
 
   std::vector<std::string> vars({p::density, p::temperature, p::energy});
   PackIndexMap imap;
@@ -52,7 +67,6 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
 
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  StateDescriptor *rad = pmb->packages.Get("radiation").get();
   const Real gam = rad->Param<Real>("Gamma");
 
   constexpr double N = 5.4e-39; // cgs
@@ -76,7 +90,7 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
       v(ceng, k, j, i) -= Lambda_code*dt;
       printf("%e -> %e\n", v(ceng, k, j, i), v(ceng, k, j, i) - Lambda_code*dt);
     });
-
+*/
   return TaskStatus::complete;
 }
 
