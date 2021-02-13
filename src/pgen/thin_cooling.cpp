@@ -31,8 +31,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v =
-      rc->PackVariables({"p.density", "p.velocity", "p.energy", "pressure", "temperature"}, imap);
+  auto v = rc->PackVariables(
+      {"p.density", "p.velocity", "p.energy", "pressure", "temperature"}, imap);
 
   const int irho = imap["p.density"].first;
   const int ivlo = imap["p.velocity"].first;

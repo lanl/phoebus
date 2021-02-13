@@ -78,11 +78,12 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
   const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CalculateRadiationForce", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
-      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "CalculateRadiationForce", DevExecSpace(), kb.s, kb.e, jb.s,
+      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         double T_cgs = v(ptemp, k, j, i) * TEMP;
         double ne_cgs = GetNumberDensity(v(prho, k, j, i) * RHO);
-        double Lambda_cgs = 4. * M_PI * pc.kb * pow(ne_cgs, 2) * N / pc.h * pow(T_cgs, 1. / 2.);
+        double Lambda_cgs =
+            4. * M_PI * pc.kb * pow(ne_cgs, 2) * N / pc.h * pow(T_cgs, 1. / 2.);
         double Lambda_code = Lambda_cgs * CPOWERDENS;
 
         v(ceng, k, j, i) -= Lambda_code * dt;
