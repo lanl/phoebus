@@ -68,7 +68,7 @@ rad = true
 xorder = 2
 cfl = 0.9
 riemann = hll
-recon = weno5
+recon = linear
 c2p_max_iter = 100
 Ye = false
 

@@ -22,7 +22,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin)
 {
   auto physics = std::make_shared<StateDescriptor>("radiation");
 
-  /*Params &params = physics->AllParams();
+  Params &params = physics->AllParams();
 
   const bool active = pin->GetBoolean("physics", "rad");
   params.Add("active", active);
@@ -35,25 +35,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin)
   params.Add("Gamma", Gamma);
 
   std::string method = pin->GetString("radiation", "method");
-  params.Add("method", method);*/
+  params.Add("method", method);
 
   return physics;
 }
 
 TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
-/*
-namespace p = primitive_variables;
+  namespace p = primitive_variables;
   namespace c = conserved_variables;
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   auto rad_active = rad->Param<bool>("active");
   if (!rad_active) {
-    printf("aposkd\n");
     return TaskStatus::complete;
   }
-    printf("aposkd -- sdifuhsdf\n");
 
-  std::vector<std::string> vars({p::density, p::temperature, p::energy});
+  std::vector<std::string> vars({p::density, p::temperature, c::energy});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
@@ -88,9 +85,8 @@ namespace p = primitive_variables;
       double Lambda_code = Lambda_cgs*CPOWERDENS;
 
       v(ceng, k, j, i) -= Lambda_code*dt;
-      printf("%e -> %e\n", v(ceng, k, j, i), v(ceng, k, j, i) - Lambda_code*dt);
     });
-*/
+
   return TaskStatus::complete;
 }
 
