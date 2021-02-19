@@ -29,10 +29,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   std::string recon = pin->GetOrAddString("fluid", "recon", "linear");
   PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;
-  if (recon == "weno5") {
+  if (recon == "weno5" || recon == "weno5z") {
     PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
                              "weno5 requires 4+ ghost cells");
-    rt = PhoebusReconstruction::ReconType::weno5;
+    rt = PhoebusReconstruction::ReconType::weno5z;
+  } else if (recon == "weno5a") {
+    PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                             "weno5 requires 4+ ghost cells");
+    rt = PhoebusReconstruction::ReconType::weno5a;
   } else if (recon == "mp5") {
     PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
                              "mp5 requires 4+ ghost cells");
@@ -360,13 +364,22 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   const int nrecon = flux.ql.GetDim(4)-1;
   auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>("Recon");
   switch (rt) {
-    case PhoebusReconstruction::ReconType::weno5:
+    case PhoebusReconstruction::ReconType::weno5z:
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
       X1DIR, pmb->pmy_mesh->ndim,
       kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
       KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
         //PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        PhoebusReconstruction::WENO5(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
+        PhoebusReconstruction::WENO5Z(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
+        });
+      break;
+    case PhoebusReconstruction::ReconType::weno5a:
+      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
+      X1DIR, pmb->pmy_mesh->ndim,
+      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
+        //PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
+        PhoebusReconstruction::WENO5A(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
         });
       break;
     case PhoebusReconstruction::ReconType::mp5:

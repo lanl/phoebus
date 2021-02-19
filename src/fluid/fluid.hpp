@@ -223,7 +223,7 @@ class FluxState {
     }
  
     const Real vasq = bsq*W*W/rhohWsq;
-    const Real cssq = gamma1*P/rho;
+    const Real cssq = gamma1*P*W*W/rhohWsq;
     Real cmsq = cssq + vasq - cssq*vasq;
     cmsq = (cmsq > 0.0 ? cmsq : 1.e-16); // TODO(JCD): what should this 1.e-16 be?
     cmsq = (cmsq > 1.0 ? 1.0 : cmsq);

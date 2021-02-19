@@ -110,12 +110,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
   */
 
-  // TODO(JMM): Maybe get this automatically from a unit system when
-  // we're dealing with unit systems?
-  Real cl = pin->GetOrAddReal(block_name, "speed_of_light", 1.0);
-  relativity_params["cl"].emplace<Real>(cl);
-  modifiers[EOSBuilder::EOSModifier::Relativistic] = relativity_params;
-
   // Build the EOS
   singularity::EOS eos_host =
       EOSBuilder::buildEOS(type, base_params, modifiers);
