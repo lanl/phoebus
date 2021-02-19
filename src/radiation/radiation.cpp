@@ -32,9 +32,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return physics;
   }
 
-  const Real Gamma = pin->GetReal("eos", "Gamma");
-  params.Add("Gamma", Gamma);
-
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
@@ -65,7 +62,6 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
 
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  const Real gam = rad->Param<Real>("Gamma");
 
   constexpr double N = 5.4e-39; // cgs
 
