@@ -49,7 +49,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Wavevector
   double k1 = 2.*M_PI;
 
-  complex<double> omega, drho, dug, du1;
+  complex<double> omega = 0.;
+  complex<double> drho = 0.;
+  complex<double> dug = 0.;
+  complex<double> du1 = 0.;
+  complex<double> du2 = 0.;
   double u10 = 0.;
   if (mode == "entropy") {
     omega = complex<double>(0, 2.*M_PI/10.);
@@ -78,9 +82,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
 
   pmb->par_for(
-    "Phoebus::ProblemGenerator::Hydro_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+    "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      printf("ISUDHF\n");
       const Real x = coords.x1v(i);
 
       const double mode = amp*cos(k1*x);
@@ -93,7 +96,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(ieng, k, j, i) = ug;
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < nv; d++) v(ivlo+d, k, j, i) = 0.0;
-      for (int d = 0; d < nv; d++) v(ib_lo + d, k, j, i) = 0.0;
+      if (ib_hi > 0) {
+        for (int d = 0; d < nv; d++) v(ib_lo + d, k, j, i) = 0.0;
+      }
       /*v(ivlo, k, j, i) = u10 + (du1*mode).real();
       printf("%s:%i\n", __FILE__, __LINE__);
       v(ib_lo, k, j, i) = 0.;
