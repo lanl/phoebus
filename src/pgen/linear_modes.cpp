@@ -18,6 +18,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto v = rc->PackVariables({"p.density",
                               "p.velocity",
                               "p.energy",
+                              primitive_variables::bfield,
                               "pressure",
                               "temperature",
                               "gamma1",
@@ -28,6 +29,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap["p.velocity"].first;
   const int ivhi = imap["p.velocity"].second;
   const int ieng = imap["p.energy"].first;
+  const int ib_lo = imap[primitive_variables::bfield].first;
+  const int ib_hi = imap[primitive_variables::bfield].second;
   const int iprs = imap["pressure"].first;
   const int itmp = imap["temperature"].first;
   const int nv = ivhi - ivlo + 1;
@@ -77,6 +80,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
     "Phoebus::ProblemGenerator::Hydro_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      printf("ISUDHF\n");
       const Real x = coords.x1v(i);
 
       const double mode = amp*cos(k1*x);
@@ -89,8 +93,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(ieng, k, j, i) = ug;
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < nv; d++) v(ivlo+d, k, j, i) = 0.0;
-      v(ivlo, k, j, i) = u10 + (du1*mode).real();
+      for (int d = 0; d < nv; d++) v(ib_lo + d, k, j, i) = 0.0;
+      /*v(ivlo, k, j, i) = u10 + (du1*mode).real();
+      printf("%s:%i\n", __FILE__, __LINE__);
+      v(ib_lo, k, j, i) = 0.;
+      printf("%s:%i\n", __FILE__, __LINE__);
+      v(ib_lo + 1, k, j, i) = 0.;
+      printf("%s:%i\n", __FILE__, __LINE__);
+      v(ib_hi, k, j, i) = 0.;
+      printf("%i %i %i\n", k, j, i);*/
     });
+  printf("HERE\n");
 
   fluid::PrimitiveToConserved(rc.get());
 }
