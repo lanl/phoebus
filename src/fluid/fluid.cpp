@@ -9,9 +9,6 @@
 
 namespace fluid {
 
-std::vector<std::string> FluxState::recon_vars;
-std::vector<std::string> FluxState::flux_vars;
-
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   namespace p = primitive_variables;
   namespace c = conserved_variables;
@@ -40,6 +37,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   } else if (recon == "mp5") {
     PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
                              "mp5 requires 4+ ghost cells");
+    if (cfl > 0.4) {
+      PARTHENON_WARN("mp5 often requires smaller cfl numbers for stability");
+    }
     rt = PhoebusReconstruction::ReconType::mp5;
   } else if (recon == "linear") {
     rt = PhoebusReconstruction::ReconType::linear;
@@ -49,11 +49,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("Recon", rt);
 
   std::string solver = pin->GetOrAddString("fluid", "riemann", "hll");
-  RiemannSolver rs = RiemannSolver::HLL;
+  riemann::solver rs = riemann::solver::HLL;
   if (solver == "llf") {
-    rs = RiemannSolver::LLF;
+    rs = riemann::solver::LLF;
   } else if (solver == "hll") {
-    rs = RiemannSolver::HLL;
+    rs = riemann::solver::HLL;
   } else {
     PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
   }
@@ -103,28 +103,28 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::vector<std::string> rvars({p::density,
                                   p::velocity,
                                   p::energy});
-  FluxState::ReconVars(rvars);
-  if (mhd) FluxState::ReconVars(p::bfield);
-  if (ye) FluxState::ReconVars(p::ye);
+  riemann::FluxState::ReconVars(rvars);
+  if (mhd) riemann::FluxState::ReconVars(p::bfield);
+  if (ye) riemann::FluxState::ReconVars(p::ye);
 
   std::vector<std::string> fvars({c::density,
                                   c::momentum,
                                   c::energy});
-  FluxState::FluxVars(fvars);
-  if (mhd) FluxState::FluxVars(c::bfield);
-  if (ye) FluxState::FluxVars(c::ye);
+  riemann::FluxState::FluxVars(fvars);
+  if (mhd) riemann::FluxState::FluxVars(c::bfield);
+  if (ye) riemann::FluxState::FluxVars(c::ye);
 
   // add some extra fields for reconstruction
   rvars = std::vector<std::string>({p::pressure,
                                     p::gamma1});
-  FluxState::ReconVars(rvars);
+  riemann::FluxState::ReconVars(rvars);
 
   // set up the arrays for left and right states
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
   else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
 
-  auto recon_vars = FluxState::ReconVars();
+  auto recon_vars = riemann::FluxState::ReconVars();
   int nrecon = 0;
   for (const auto &v : recon_vars) {
     auto &m = physics->FieldMetadata(v);
@@ -188,7 +188,6 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(),
     0, v.GetDim(5)-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-      //todo(jcd): make these real
       Real gcov[3][3];
       geom.Metric(CellLocation::Cent, k, j, i, gcov);
       Real gcov4[4][4];
@@ -353,7 +352,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
 
-  auto flux = FluxState(rc);
+  auto flux = riemann::FluxState(rc);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -363,52 +362,50 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   const int dj = (pmb->pmy_mesh->ndim >  1 ? 1 : 0);
   const int nrecon = flux.ql.GetDim(4)-1;
   auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>("Recon");
+  auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
+
+  #define RECON(method) \
+    parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(), \
+      X1DIR, pmb->pmy_mesh->ndim,                                           \
+      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,                   \
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {   \
+        method(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);            \
+      });
   switch (rt) {
     case PhoebusReconstruction::ReconType::weno5z:
-      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
-      X1DIR, pmb->pmy_mesh->ndim,
-      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
-      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-        //PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        PhoebusReconstruction::WENO5Z(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        });
+      RECON(PhoebusReconstruction::WENO5Z);
       break;
     case PhoebusReconstruction::ReconType::weno5a:
-      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
-      X1DIR, pmb->pmy_mesh->ndim,
-      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
-      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-        //PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        PhoebusReconstruction::WENO5A(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        });
+      RECON(PhoebusReconstruction::WENO5A);
       break;
     case PhoebusReconstruction::ReconType::mp5:
-      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
-      X1DIR, pmb->pmy_mesh->ndim,
-      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
-      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-        //PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        PhoebusReconstruction::MP5(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        });
+      RECON(PhoebusReconstruction::MP5);
       break;
     case PhoebusReconstruction::ReconType::linear:
-      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
-      X1DIR, pmb->pmy_mesh->ndim,
-      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
-      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-        PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        });
+      RECON(PhoebusReconstruction::PiecewiseLinear);
       break;
     default:
       PARTHENON_THROW("Invalid recon option.");
   }
+  #undef RECON
 
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
-    X1DIR, pmb->pmy_mesh->ndim,
-    kb.s, kb.e+dk, jb.s, jb.e+dj, ib.s, ib.e+1,
-    KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-      flux.Solve(d, k, j, i);
-    });
+  #define FLUX(method) \
+    parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(), \
+      X1DIR, pmb->pmy_mesh->ndim,                                               \
+      kb.s, kb.e+dk, jb.s, jb.e+dj, ib.s, ib.e+1,                               \
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {       \
+        method(flux, d, k, j, i);                                               \
+      });
+  switch (st) {
+    case riemann::solver::LLF:
+      FLUX(riemann::llf);
+      break;
+    case riemann::solver::HLL:
+      FLUX(riemann::hll);
+      break;
+    default:
+      PARTHENON_THROW("Invalid riemann solver option.");
+  }
 
   return TaskStatus::complete;
 }
