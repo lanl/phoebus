@@ -154,6 +154,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   const Real H = rho_guess + v(peng) + v(prs);
   v(cs) = eos.BulkModulusFromDensityTemperature(rho_guess, T_guess)/H;
   v(gm1) = v(cs)*H/v(prs);
+  //v(cs) = 0.0;
   v(cs) = sqrt(v(cs));
 
   W = D/rho_guess;

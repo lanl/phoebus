@@ -141,6 +141,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField("ql", mrecon);
   physics->AddField("qr", mrecon);
 
+  std::vector<int> signal_shape(1,ndim);
+  Metadata msignal = Metadata({Metadata::Cell, Metadata::OneCopy}, signal_shape);
+  physics->AddField("signal_speed", msignal);
+
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
@@ -273,6 +277,9 @@ TaskStatus ConservedToPrimitive(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
+  auto v = rc->Get(primitive_variables::velocity);
+  auto cs = rc->Get(primitive_variables::cs);
+
   //TODO(JCD): need to tag failed cells and get rid of this reduction
   int fail_cnt;
   parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "ConToPrim", DevExecSpace(),
@@ -353,6 +360,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
 
   auto flux = riemann::FluxState(rc);
+  auto sig = rc->Get("signal_speed").data;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -394,7 +402,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
       X1DIR, pmb->pmy_mesh->ndim,                                               \
       kb.s, kb.e+dk, jb.s, jb.e+dj, ib.s, ib.e+1,                               \
       KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {       \
-        method(flux, d, k, j, i);                                               \
+        sig(d-1,k,j,i) = method(flux, d, k, j, i);                              \
       });
   switch (st) {
     case riemann::solver::LLF:
@@ -406,6 +414,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     default:
       PARTHENON_THROW("Invalid riemann solver option.");
   }
+  #undef FLUX
 
   return TaskStatus::complete;
 }
@@ -431,23 +440,37 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  auto &cs = rc->Get("cs").data;
-  auto &v   = rc->Get("p.velocity").data;
-
   auto &coords = pmb->coords;
   const int ndim = pmb->pmy_mesh->ndim;
 
-  auto &phys = pmb->packages.Get("fluid");
+  auto &pars = pmb->packages.Get("fluid")->AllParams();
   Real min_dt;
-  pmb->par_reduce("Hydro::EstimateTimestep::0",
-    kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-    KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
-      const auto &c = cs(k,j,i);
-      lmin_dt = std::min(lmin_dt,1.0/( (std::abs(v(0,k,j,i))+c)/coords.Dx(X1DIR,k,j,i)
-                         + (ndim>1)*(std::abs(v(1,k,j,i))+c)/coords.Dx(X2DIR,k,j,i)
-                         + (ndim>2)*(std::abs(v(2,k,j,i))+c)/coords.Dx(X3DIR,k,j,i)));
-    }, Kokkos::Min<Real>(min_dt));
-  const auto& cfl = phys->Param<Real>("cfl");
+  if (pars.hasKey("has_face_speeds")) {
+    auto sig = rc->Get("signal_speed").data;
+    pmb->par_reduce("Hydro::EstimateTimestep::1",
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
+        const auto &s = sig(k,j,i);
+        lmin_dt = std::min(lmin_dt, 
+                                 1.0/(std::max(sig(0,k,j,i),sig(0,k,j,i+1))/coords.Dx(X1DIR,k,j,i)
+                           + (ndim>1)*std::max(sig(1,k,j,i),sig(1,k,j+1,i))/coords.Dx(X2DIR,k,j,i)
+                           + (ndim>2)*std::max(sig(2,k,j,i),sig(2,k+1,j,i))/coords.Dx(X3DIR,k,j,i)));
+      }, Kokkos::Min<Real>(min_dt));
+  } else {
+    auto cs  = rc->Get(primitive_variables::cs).data;
+    auto vel = rc->Get(primitive_variables::velocity).data;
+    pmb->par_reduce("Hydro::EstimateTimestep::0",
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
+        const auto &s = cs(k,j,i);
+        lmin_dt = std::min(lmin_dt,
+                                 1.0/((std::fabs(vel(0,k,j,i))+s)/coords.Dx(X1DIR,k,j,i)
+                           + (ndim>1)*(std::fabs(vel(1,k,j,i))+s)/coords.Dx(X2DIR,k,j,i)
+                           + (ndim>2)*(std::fabs(vel(2,k,j,i))+s)/coords.Dx(X3DIR,k,j,i)));
+      }, Kokkos::Min<Real>(min_dt));
+    pars.Add("has_face_speeds", true);
+  }
+  const auto& cfl = pars.Get<Real>("cfl");
   return cfl*min_dt;
 }
 

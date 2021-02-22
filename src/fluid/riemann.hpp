@@ -94,9 +94,9 @@ class FluxState {
 };
 
 KOKKOS_FUNCTION
-void llf(const FluxState &fs, const int d, const int k, const int j, const int i);
+Real llf(const FluxState &fs, const int d, const int k, const int j, const int i);
 KOKKOS_FUNCTION
-void hll(const FluxState &fs, const int d, const int k, const int j, const int i);
+Real hll(const FluxState &fs, const int d, const int k, const int j, const int i);
 
 } // namespace riemann
 

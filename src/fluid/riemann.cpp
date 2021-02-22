@@ -125,7 +125,7 @@ void FluxState::prim_to_flux(const int d, const int k, const int j, const int i,
 }
 
 KOKKOS_FUNCTION
-void llf(const FluxState &fs, const int d, const int k, const int j, const int i) {
+Real llf(const FluxState &fs, const int d, const int k, const int j, const int i) {
   Real Ul[NCONS_MAX], Ur[NCONS_MAX];
   Real Fl[NCONS_MAX], Fr[NCONS_MAX];
   Real vml, vpl, vmr, vpr;
@@ -140,10 +140,11 @@ void llf(const FluxState &fs, const int d, const int k, const int j, const int i
   for (int m = 0; m < fs.NumConserved(); m++) {
     fs.v.flux(d,m,k,j,i) = 0.5*(Fl[m] + Fr[m] - cmax*(Ur[m] - Ul[m])) * gdet;
   }
+  return cmax;
 }
 
 KOKKOS_FUNCTION
-void hll(const FluxState &fs, const int d, const int k, const int j, const int i) {
+Real hll(const FluxState &fs, const int d, const int k, const int j, const int i) {
   Real Ul[NCONS_MAX], Ur[NCONS_MAX];
   Real Fl[NCONS_MAX], Fr[NCONS_MAX];
   Real vml, vpl, vmr, vpr;
@@ -159,6 +160,7 @@ void hll(const FluxState &fs, const int d, const int k, const int j, const int i
   for (int m = 0; m < fs.NumConserved(); m++) {
     fs.v.flux(d,m,k,j,i) = (cr*Fl[m] - cl*Fr[m] + cr*cl*(Ur[m] - Ul[m]))/(cr - cl) * gdet;
   }
+  return std::max(-cl,cr);
 }
 
 } // namespace riemann
