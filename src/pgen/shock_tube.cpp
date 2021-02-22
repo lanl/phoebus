@@ -21,9 +21,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                               primitive_variables::bfield,
                               primitive_variables::ye,
                               primitive_variables::pressure,
-                              primitive_variables::temperature,
-                              primitive_variables::gamma1,
-                              primitive_variables::cs},
+                              primitive_variables::temperature},
                               imap);
 
   const int irho = imap[primitive_variables::density].first;

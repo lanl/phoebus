@@ -83,7 +83,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::pressure, mprim_scalar);
   physics->AddField(p::temperature, mprim_scalar);
   physics->AddField(p::gamma1, mprim_scalar);
-  physics->AddField(p::cs, mprim_scalar);
+  physics->AddField("cell_signal_speed", mprim_threev);
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
@@ -143,7 +143,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   std::vector<int> signal_shape(1,ndim);
   Metadata msignal = Metadata({Metadata::Cell, Metadata::OneCopy}, signal_shape);
-  physics->AddField("signal_speed", msignal);
+  physics->AddField("face_signal_speed", msignal);
 
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
@@ -277,9 +277,6 @@ TaskStatus ConservedToPrimitive(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  auto v = rc->Get(primitive_variables::velocity);
-  auto cs = rc->Get(primitive_variables::cs);
-
   //TODO(JCD): need to tag failed cells and get rid of this reduction
   int fail_cnt;
   parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "ConToPrim", DevExecSpace(),
@@ -360,7 +357,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
 
   auto flux = riemann::FluxState(rc);
-  auto sig = rc->Get("signal_speed").data;
+  auto sig = rc->Get("face_signal_speed").data;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -446,27 +443,31 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   auto &pars = pmb->packages.Get("fluid")->AllParams();
   Real min_dt;
   if (pars.hasKey("has_face_speeds")) {
-    auto sig = rc->Get("signal_speed").data;
+    auto fsig = rc->Get("face_signal_speed").data;
+    auto csig = rc->Get("cell_signal_speed").data;
     pmb->par_reduce("Hydro::EstimateTimestep::1",
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
-        const auto &s = sig(k,j,i);
-        lmin_dt = std::min(lmin_dt, 
-                                 1.0/(std::max(sig(0,k,j,i),sig(0,k,j,i+1))/coords.Dx(X1DIR,k,j,i)
-                           + (ndim>1)*std::max(sig(1,k,j,i),sig(1,k,j+1,i))/coords.Dx(X2DIR,k,j,i)
-                           + (ndim>2)*std::max(sig(2,k,j,i),sig(2,k+1,j,i))/coords.Dx(X3DIR,k,j,i)));
+        Real ldt = 0.0;
+        for (int d = 0; d < ndim; d++) {
+          const int di = (d==0);
+          const int dj = (d==1);
+          const int dk = (d==2);
+          const Real max_s = std::max(csig(d,k,j,i),std::max(fsig(d,k,j,i),fsig(d,k+dk,j+dj,i+di)));
+          ldt += max_s/coords.Dx(X1DIR+d,k,j,i);
+        }
+        lmin_dt = std::min(lmin_dt, 1.0/ldt);
       }, Kokkos::Min<Real>(min_dt));
   } else {
-    auto cs  = rc->Get(primitive_variables::cs).data;
-    auto vel = rc->Get(primitive_variables::velocity).data;
+    auto csig = rc->Get("cell_signal_speed").data;
     pmb->par_reduce("Hydro::EstimateTimestep::0",
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
-        const auto &s = cs(k,j,i);
-        lmin_dt = std::min(lmin_dt,
-                                 1.0/((std::fabs(vel(0,k,j,i))+s)/coords.Dx(X1DIR,k,j,i)
-                           + (ndim>1)*(std::fabs(vel(1,k,j,i))+s)/coords.Dx(X2DIR,k,j,i)
-                           + (ndim>2)*(std::fabs(vel(2,k,j,i))+s)/coords.Dx(X3DIR,k,j,i)));
+        Real ldt = 0.0;
+        for (int d = 0; d < ndim; d++) {
+          ldt += csig(d,k,j,i)/coords.Dx(X1DIR+d,k,j,i);
+        }
+        lmin_dt = std::min(lmin_dt, 1.0/ldt);
       }, Kokkos::Min<Real>(min_dt));
     pars.Add("has_face_speeds", true);
   }

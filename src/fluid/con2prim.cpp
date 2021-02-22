@@ -152,10 +152,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess);
   v(peng) = rho_guess*eos.InternalEnergyFromDensityTemperature(rho_guess, T_guess);
   const Real H = rho_guess + v(peng) + v(prs);
-  v(cs) = eos.BulkModulusFromDensityTemperature(rho_guess, T_guess)/H;
-  v(gm1) = v(cs)*H/v(prs);
-  //v(cs) = 0.0;
-  v(cs) = sqrt(v(cs));
+  v(gm1) = eos.BulkModulusFromDensityTemperature(rho_guess, T_guess)/v(prs);
 
   W = D/rho_guess;
   const Real z = (rho_guess + v(peng) + v(prs))*W*W;
@@ -166,6 +163,21 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
     }
     sconi /= g.gdet;
     v(pvel_lo+i) = sconi/(z + Bsq) + BdotS*v(pb_lo+i)/(z*(z + Bsq));
+  }
+
+  // cell-centered signal speeds
+  Real vasq = BdotS/(H*W); // this is just bcon[0]*lapse
+  vasq = (Bsq + vasq*vasq); // this is now b^2 * W^2
+  vasq /= (H+vasq); // now this is the alven speed squared
+  Real cssq = v(gm1)*v(prs)/H;
+  cssq += vasq - cssq*vasq; // estimate of fast magneto-sonic speed
+  const Real vsq = 1.0 - 1.0/(W*W);
+  const Real vcoff = g.lapse/(1.0 - vsq*cssq);
+  for (int i = 0; i < 3; i++) {
+    const Real vpm = sqrt(cssq*(1.0 - vsq)*(g.gcon[i][i]*(1.0 - vsq*cssq) - v(pvel_lo+i)*v(pvel_lo+i)*(1.0 - cssq)));
+    Real vp = vcoff*(v(pvel_lo+i)*(1.0 - cssq) + vpm) - g.beta[i];
+    Real vm = vcoff*(v(pvel_lo+i)*(1.0 - cssq) - vpm) - g.beta[i];
+    v(sig_lo+i) = std::max(std::fabs(vp), std::fabs(vm));
   }
 
   return ConToPrimStatus::success;

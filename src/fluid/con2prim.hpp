@@ -50,19 +50,25 @@ class VarAccessor {
 struct CellGeom {
   CellGeom(const Geometry::CoordinateSystem &geom,
                const int k, const int j, const int i)
-               : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)) {
+               : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)),
+                 lapse(geom.Lapse(CellLocation::Cent,k,j,i)) {
     geom.Metric(CellLocation::Cent, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+    geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
   }
   CellGeom(const Geometry::CoordinateSystem &geom,
            const int b, const int k, const int j, const int i)
-           : gdet(geom.DetGamma(CellLocation::Cent,b,k,j,i)) {
+           : gdet(geom.DetGamma(CellLocation::Cent,b,k,j,i)),
+             lapse(geom.Lapse(CellLocation::Cent,b,k,j,i)) {
     geom.Metric(CellLocation::Cent, b, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, b, k, j, i, gcon);
+    geom.ContravariantShift(CellLocation::Cent, b, k, j, i, beta);
   }
   Real gcov[3][3];
   Real gcon[3][3];
+  Real beta[3];
   const Real gdet;
+  const Real lapse;
 };
 
 template <typename Data_t, typename T>
@@ -88,7 +94,7 @@ class ConToPrim {
       cye(imap[conserved_variables::ye].second),
       prs(imap[primitive_variables::pressure].first),
       tmp(imap[primitive_variables::temperature].first),
-      cs(imap[primitive_variables::cs].first),
+      sig_lo(imap["cell_signal_speed"].first),
       gm1(imap[primitive_variables::gamma1].first),
       rel_tolerance(tol),
       max_iter(max_iterations) {}
@@ -107,7 +113,7 @@ class ConToPrim {
                                     primitive_variables::bfield, conserved_variables::bfield,
                                     primitive_variables::ye, conserved_variables::ye,
                                     primitive_variables::pressure, primitive_variables::temperature,
-                                    primitive_variables::cs, primitive_variables::gamma1});
+                                    "cell_signal_speed", primitive_variables::gamma1});
   }
 
   template <class... Args>
@@ -137,7 +143,7 @@ class ConToPrim {
   const int pb_lo, pb_hi;
   const int cb_lo, cb_hi;
   const int pye, cye;
-  const int prs, tmp, cs, gm1;
+  const int prs, tmp, sig_lo, gm1;
   const Real rel_tolerance;
   const int max_iter;
 };
