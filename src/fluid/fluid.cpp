@@ -9,9 +9,6 @@
 
 namespace fluid {
 
-std::vector<std::string> FluxState::recon_vars;
-std::vector<std::string> FluxState::flux_vars;
-
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   namespace p = primitive_variables;
   namespace c = conserved_variables;
@@ -29,10 +26,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   std::string recon = pin->GetOrAddString("fluid", "recon", "linear");
   PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;
-  if (recon == "weno5") {
+  if (recon == "weno5" || recon == "weno5z") {
     PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
                              "weno5 requires 4+ ghost cells");
-    rt = PhoebusReconstruction::ReconType::weno5;
+    rt = PhoebusReconstruction::ReconType::weno5z;
+  } else if (recon == "weno5a") {
+    PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                             "weno5 requires 4+ ghost cells");
+    rt = PhoebusReconstruction::ReconType::weno5a;
+  } else if (recon == "mp5") {
+    PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                             "mp5 requires 4+ ghost cells");
+    if (cfl > 0.4) {
+      PARTHENON_WARN("mp5 often requires smaller cfl numbers for stability");
+    }
+    rt = PhoebusReconstruction::ReconType::mp5;
   } else if (recon == "linear") {
     rt = PhoebusReconstruction::ReconType::linear;
   } else {
@@ -41,11 +49,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("Recon", rt);
 
   std::string solver = pin->GetOrAddString("fluid", "riemann", "hll");
-  RiemannSolver rs = RiemannSolver::HLL;
+  riemann::solver rs = riemann::solver::HLL;
   if (solver == "llf") {
-    rs = RiemannSolver::LLF;
+    rs = riemann::solver::LLF;
   } else if (solver == "hll") {
-    rs = RiemannSolver::HLL;
+    rs = riemann::solver::HLL;
   } else {
     PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
   }
@@ -53,6 +61,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   bool ye = pin->GetOrAddBoolean("fluid", "Ye", false);
   params.Add("Ye", ye);
+
+  bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
+  params.Add("mhd", mhd);
 
   Metadata m;
   std::vector<int> three_vec(1,3);
@@ -66,11 +77,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::density, mprim_scalar);
   physics->AddField(p::velocity, mprim_threev);
   physics->AddField(p::energy, mprim_scalar);
-  //physics->AddField("p.bfield", mprim_threev);
+  if (mhd) {
+    physics->AddField(p::bfield, mprim_threev);
+  }
   physics->AddField(p::pressure, mprim_scalar);
   physics->AddField(p::temperature, mprim_scalar);
   physics->AddField(p::gamma1, mprim_scalar);
-  physics->AddField(p::cs, mprim_scalar);
+  physics->AddField("cell_signal_speed", mprim_threev);
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
@@ -79,7 +92,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(c::density, mcons_scalar);
   physics->AddField(c::momentum, mcons_threev);
   physics->AddField(c::energy, mcons_scalar);
-  //physics->AddField("c.bfield", mcons_threev);
+  if (mhd) {
+    physics->AddField(c::bfield, mcons_threev);
+  }
   if (ye) {
     physics->AddField(c::ye, mcons_scalar);
   }
@@ -88,26 +103,28 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::vector<std::string> rvars({p::density,
                                   p::velocity,
                                   p::energy});
-  FluxState::ReconVars(rvars);
-  if (ye) FluxState::ReconVars(p::ye);
+  riemann::FluxState::ReconVars(rvars);
+  if (mhd) riemann::FluxState::ReconVars(p::bfield);
+  if (ye) riemann::FluxState::ReconVars(p::ye);
 
   std::vector<std::string> fvars({c::density,
                                   c::momentum,
                                   c::energy});
-  FluxState::FluxVars(fvars);
-  if (ye) FluxState::FluxVars(c::ye);
+  riemann::FluxState::FluxVars(fvars);
+  if (mhd) riemann::FluxState::FluxVars(c::bfield);
+  if (ye) riemann::FluxState::FluxVars(c::ye);
 
   // add some extra fields for reconstruction
   rvars = std::vector<std::string>({p::pressure,
                                     p::gamma1});
-  FluxState::ReconVars(rvars);
+  riemann::FluxState::ReconVars(rvars);
 
   // set up the arrays for left and right states
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
   else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
 
-  auto recon_vars = FluxState::ReconVars();
+  auto recon_vars = riemann::FluxState::ReconVars();
   int nrecon = 0;
   for (const auto &v : recon_vars) {
     auto &m = physics->FieldMetadata(v);
@@ -124,6 +141,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField("ql", mrecon);
   physics->AddField("qr", mrecon);
 
+  std::vector<int> signal_shape(1,ndim);
+  Metadata msignal = Metadata({Metadata::Cell, Metadata::OneCopy}, signal_shape);
+  physics->AddField("face_signal_speed", msignal);
+
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
@@ -139,6 +160,7 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   std::vector<std::string> vars({p::density, c::density,
                                  p::velocity, c::momentum,
                                  p::energy, c::energy,
+                                 p::bfield, c::bfield,
                                  p::ye, c::ye,
                                  p::pressure});
 
@@ -154,6 +176,10 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   const int peng = imap[p::energy].first;
   const int ceng = imap[c::energy].first;
   const int prs = imap[p::pressure].first;
+  const int pb_lo = imap[p::bfield].first;
+  const int pb_hi = imap[p::bfield].second;
+  const int cb_lo = imap[c::bfield].first;
+  const int cb_hi = imap[c::bfield].second;
   int pye = imap[p::ye].second; // -1 if not present
   int cye = imap[c::ye].second;
 
@@ -166,31 +192,69 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(),
     0, v.GetDim(5)-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-      //todo(jcd): make these real
       Real gcov[3][3];
       geom.Metric(CellLocation::Cent, k, j, i, gcov);
+      Real gcov4[4][4];
+      geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
       Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+      Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+      Real shift[3];
+      geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
       Real vsq = 0.0;
+      Real Bdotv = 0.0;
+      Real BdotB = 0.0;
       for (int m = 0; m < 3; m++) {
         for (int n = 0; n < 3; n++) {
           vsq += gcov[m][n] * v(b,pvel_lo+m, k, j, i) * v(b, pvel_lo+n, k, j, i);
         }
+        for (int n = pb_lo; n <= pb_hi; n++) {
+          Bdotv += gcov[m][n-pb_lo] * v(b,pvel_lo+m, k, j, i) * v(b, n, k , j, i);
+          BdotB += gcov[m][n-pb_lo] * v(b, pb_lo+m, k, j, i) * v(b, n, k, j, i);
+        }
       }
-      Real W = 1.0/sqrt(1.0 - vsq);
+      
+      // Lorentz factor
+      const Real W = 1.0/sqrt(1.0 - vsq);
+
+      // get the magnetic field 4-vector
+      Real bcon[] = {W*Bdotv/lapse, 0.0, 0.0, 0.0};
+      for (int m = pb_lo; m <= pb_hi; m++) {
+        bcon[m-pb_lo+1] = v(b, m, k, j, i)/W + lapse*
+        bcon[0]*(v(b, m-pb_lo+pvel_lo, k, j, i) - shift[m-pb_lo]/lapse);
+      }
+      const Real bsq = (BdotB + lapse*lapse*bcon[0]*bcon[0])/(W*W);
+      Real bcov[3] = {0.0, 0.0, 0.0};
+      if (pb_hi > 0) {
+        for (int m = 0; m < 3; m++) {
+          for (int n = 0; n < 4; n++) {
+            bcov[m] += gcov4[m+1][n] * bcon[n];
+          }
+        }
+      }
+
       // conserved density D = \sqrt{\gamma} \rho W
       v(b, crho, k, j, i) = gdet * v(b, prho, k, j, i) * W;
 
       // enthalpy
-      Real rhohWsq = (v(b, prho, k, j, i) + v(b, peng, k, j, i) + v(b, prs, k, j, i))*W*W;
+      Real rhohWsq = (v(b, prho, k, j, i) + v(b, peng, k, j, i) + v(b, prs, k, j, i) + bsq)*W*W;
+
+      // momentum
       for (int m = 0; m < 3; m++) {
         Real vcov = 0.0;
         for (int n = 0; n < 3; n++) {
           vcov += gcov[m][n]*v(b, pvel_lo+n, k, j, i);
         }
-        v(b, cmom_lo+m, k, j, i) = gdet*rhohWsq*vcov;
+        v(b, cmom_lo+m, k, j, i) = gdet*rhohWsq*vcov - lapse*bcon[0]*bcov[m];
       }
 
-      v(b, ceng, k, j, i) = gdet*(rhohWsq - v(b, prs, k, j, i)) - v(b, crho, k, j, i);
+      // energy
+      v(b, ceng, k, j, i) = gdet*(rhohWsq - (v(b, prs, k, j, i) + 0.5*bsq) -
+                                  lapse*lapse*bcon[0]*bcon[0]) - v(b, crho, k, j, i);
+
+      for (int m = cb_lo; m <= cb_hi; m++) {
+        v(b, m, k, j, i) = gdet*v(b, m-cb_lo+pb_lo, k, j, i);
+      }
+      // conserved lepton density
       if (pye > 0) {
         v(b, cye, k, j, i) = v(b, crho, k, j, i) * v(b, pye, k, j, i);
       }
@@ -292,7 +356,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
 
-  auto flux = FluxState(rc);
+  auto flux = riemann::FluxState(rc);
+  auto sig = rc->Get("face_signal_speed").data;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -302,37 +367,69 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   const int dj = (pmb->pmy_mesh->ndim >  1 ? 1 : 0);
   const int nrecon = flux.ql.GetDim(4)-1;
   auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>("Recon");
+  auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
+
+  #define RECON(method) \
+    parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(), \
+      X1DIR, pmb->pmy_mesh->ndim,                                           \
+      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,                   \
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {   \
+        method(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);            \
+      });
   switch (rt) {
-    case PhoebusReconstruction::ReconType::weno5:
-      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
-      X1DIR, pmb->pmy_mesh->ndim,
-      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
-      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-        //PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        PhoebusReconstruction::WENO5(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        });
+    case PhoebusReconstruction::ReconType::weno5z:
+      RECON(PhoebusReconstruction::WENO5Z);
+      break;
+    case PhoebusReconstruction::ReconType::weno5a:
+      RECON(PhoebusReconstruction::WENO5A);
+      break;
+    case PhoebusReconstruction::ReconType::mp5:
+      RECON(PhoebusReconstruction::MP5);
       break;
     case PhoebusReconstruction::ReconType::linear:
-      parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
-      X1DIR, pmb->pmy_mesh->ndim,
-      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,
-      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-        PhoebusReconstruction::PiecewiseLinear(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);
-        });
+      RECON(PhoebusReconstruction::PiecewiseLinear);
       break;
     default:
       PARTHENON_THROW("Invalid recon option.");
   }
+  #undef RECON
 
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
-    X1DIR, pmb->pmy_mesh->ndim,
-    kb.s, kb.e+dk, jb.s, jb.e+dj, ib.s, ib.e+1,
-    KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-      flux.Solve(d, k, j, i);
-    });
+  #define FLUX(method) \
+    parthenon::par_for(DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(), \
+      X1DIR, pmb->pmy_mesh->ndim,                                               \
+      kb.s, kb.e+dk, jb.s, jb.e+dj, ib.s, ib.e+1,                               \
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {       \
+        sig(d-1,k,j,i) = method(flux, d, k, j, i);                              \
+      });
+  switch (st) {
+    case riemann::solver::LLF:
+      FLUX(riemann::llf);
+      break;
+    case riemann::solver::HLL:
+      FLUX(riemann::hll);
+      break;
+    default:
+      PARTHENON_THROW("Invalid riemann solver option.");
+  }
+  #undef FLUX
 
   return TaskStatus::complete;
 }
+
+/*
+TaskStatus FluxCT(MeshBlockData<Real> *rc) {
+  auto *pmb = rc->GetBlockPointer();
+
+  std::vector<std::string> bvar({conserved_variables::bfield});
+  auto v = rc->PackVariablesAndFluxes(bvar);
+
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "flux_ct", DevExecSpace(),
+    X1DIR, pmb->pmy_mesh->ndim,
+    kb.s, kb.e+)
+
+  return TaskStatus::complete;
+}
+*/
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetBlockPointer();
@@ -340,23 +437,41 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  auto &cs = rc->Get("cs").data;
-  auto &v   = rc->Get("p.velocity").data;
-
   auto &coords = pmb->coords;
   const int ndim = pmb->pmy_mesh->ndim;
 
-  auto &phys = pmb->packages.Get("fluid");
+  auto &pars = pmb->packages.Get("fluid")->AllParams();
   Real min_dt;
-  pmb->par_reduce("Hydro::EstimateTimestep::0",
-    kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-    KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
-      const auto &c = cs(k,j,i);
-      lmin_dt = std::min(lmin_dt,1.0/( (std::abs(v(0,k,j,i))+c)/coords.Dx(X1DIR,k,j,i)
-                         + (ndim>1)*(std::abs(v(1,k,j,i))+c)/coords.Dx(X2DIR,k,j,i)
-                         + (ndim>2)*(std::abs(v(2,k,j,i))+c)/coords.Dx(X3DIR,k,j,i)));
-    }, Kokkos::Min<Real>(min_dt));
-  const auto& cfl = phys->Param<Real>("cfl");
+  if (pars.hasKey("has_face_speeds")) {
+    auto fsig = rc->Get("face_signal_speed").data;
+    auto csig = rc->Get("cell_signal_speed").data;
+    pmb->par_reduce("Hydro::EstimateTimestep::1",
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
+        Real ldt = 0.0;
+        for (int d = 0; d < ndim; d++) {
+          const int di = (d==0);
+          const int dj = (d==1);
+          const int dk = (d==2);
+          const Real max_s = std::max(csig(d,k,j,i),std::max(fsig(d,k,j,i),fsig(d,k+dk,j+dj,i+di)));
+          ldt += max_s/coords.Dx(X1DIR+d,k,j,i);
+        }
+        lmin_dt = std::min(lmin_dt, 1.0/ldt);
+      }, Kokkos::Min<Real>(min_dt));
+  } else {
+    auto csig = rc->Get("cell_signal_speed").data;
+    pmb->par_reduce("Hydro::EstimateTimestep::0",
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
+        Real ldt = 0.0;
+        for (int d = 0; d < ndim; d++) {
+          ldt += csig(d,k,j,i)/coords.Dx(X1DIR+d,k,j,i);
+        }
+        lmin_dt = std::min(lmin_dt, 1.0/ldt);
+      }, Kokkos::Min<Real>(min_dt));
+    pars.Add("has_face_speeds", true);
+  }
+  const auto& cfl = pars.Get<Real>("cfl");
   return cfl*min_dt;
 }
 

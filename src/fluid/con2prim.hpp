@@ -24,6 +24,7 @@ using namespace parthenon::package::prelude;
 
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/variables.hpp"
 
 namespace con2prim {
 
@@ -49,19 +50,25 @@ class VarAccessor {
 struct CellGeom {
   CellGeom(const Geometry::CoordinateSystem &geom,
                const int k, const int j, const int i)
-               : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)) {
+               : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)),
+                 lapse(geom.Lapse(CellLocation::Cent,k,j,i)) {
     geom.Metric(CellLocation::Cent, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+    geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
   }
   CellGeom(const Geometry::CoordinateSystem &geom,
            const int b, const int k, const int j, const int i)
-           : gdet(geom.DetGamma(CellLocation::Cent,b,k,j,i)) {
+           : gdet(geom.DetGamma(CellLocation::Cent,b,k,j,i)),
+             lapse(geom.Lapse(CellLocation::Cent,b,k,j,i)) {
     geom.Metric(CellLocation::Cent, b, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, b, k, j, i, gcon);
+    geom.ContravariantShift(CellLocation::Cent, b, k, j, i, beta);
   }
   Real gcov[3][3];
   Real gcon[3][3];
+  Real beta[3];
   const Real gdet;
+  const Real lapse;
 };
 
 template <typename Data_t, typename T>
@@ -71,20 +78,24 @@ class ConToPrim {
     : var(rc->PackVariables(Vars(), imap)),
       eos(SetEOS(rc)),
       geom(Geometry::GetCoordinateSystem(rc)),
-      prho(imap["p.density"].first),
-      crho(imap["c.density"].first),
-      pvel_lo(imap["p.velocity"].first),
-      pvel_hi(imap["p.velocity"].second),
-      cmom_lo(imap["c.momentum"].first),
-      cmom_hi(imap["c.momentum"].second),
-      peng(imap["p.energy"].first),
-      ceng(imap["c.energy"].first),
-      pye(imap["p.ye"].second),
-      cye(imap["c.ye"].second),
-      prs(imap["pressure"].first),
-      tmp(imap["temperature"].first),
-      cs(imap["cs"].first),
-      gm1(imap["gamma1"].first),
+      prho(imap[primitive_variables::density].first),
+      crho(imap[conserved_variables::density].first),
+      pvel_lo(imap[primitive_variables::velocity].first),
+      pvel_hi(imap[primitive_variables::velocity].second),
+      cmom_lo(imap[conserved_variables::momentum].first),
+      cmom_hi(imap[conserved_variables::momentum].second),
+      peng(imap[primitive_variables::energy].first),
+      ceng(imap[conserved_variables::energy].first),
+      pb_lo(imap[primitive_variables::bfield].first),
+      pb_hi(imap[primitive_variables::bfield].second),
+      cb_lo(imap[conserved_variables::bfield].first),
+      cb_hi(imap[conserved_variables::bfield].second),
+      pye(imap[primitive_variables::ye].second),
+      cye(imap[conserved_variables::ye].second),
+      prs(imap[primitive_variables::pressure].first),
+      tmp(imap[primitive_variables::temperature].first),
+      sig_lo(imap["cell_signal_speed"].first),
+      gm1(imap[primitive_variables::gamma1].first),
       rel_tolerance(tol),
       max_iter(max_iterations) {}
 
@@ -96,12 +107,13 @@ class ConToPrim {
   }
 
   std::vector<std::string> Vars() {
-    return std::vector<std::string>({"p.density", "c.density",
-                                    "p.velocity", "c.momentum",
-                                    "p.energy", "c.energy",
-                                    "p.ye", "c.ye",
-                                    "pressure", "temperature",
-                                    "cs", "gamma1"});
+    return std::vector<std::string>({primitive_variables::density, conserved_variables::density,
+                                    primitive_variables::velocity, conserved_variables::momentum,
+                                    primitive_variables::energy, conserved_variables::energy,
+                                    primitive_variables::bfield, conserved_variables::bfield,
+                                    primitive_variables::ye, conserved_variables::ye,
+                                    primitive_variables::pressure, primitive_variables::temperature,
+                                    "cell_signal_speed", primitive_variables::gamma1});
   }
 
   template <class... Args>
@@ -128,8 +140,10 @@ class ConToPrim {
   const int pvel_lo, pvel_hi;
   const int cmom_lo, cmom_hi;
   const int peng, ceng;
+  const int pb_lo, pb_hi;
+  const int cb_lo, cb_hi;
   const int pye, cye;
-  const int prs, tmp, cs, gm1;
+  const int prs, tmp, sig_lo, gm1;
   const Real rel_tolerance;
   const int max_iter;
 };
