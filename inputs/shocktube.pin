@@ -71,7 +71,7 @@ rad = false
 
 <fluid>
 xorder = 2
-cfl = 0.9
+cfl = 0.8
 riemann = hll
 recon = weno5
 c2p_max_iter = 100
