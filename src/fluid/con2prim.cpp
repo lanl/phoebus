@@ -12,8 +12,9 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   // converge on rho and T
   // constraints: rho <= D, T > 0
 
-  const Real D = v(crho)/g.gdet;
-  const Real tau = v(ceng)/g.gdet;
+  const Real igdet = 1./g.gdet;
+  const Real D = v(crho)*igdet;
+  const Real tau = v(ceng)*igdet;
 
   // electron fraction
   if(pye > 0) v(pye) = v(cye)/v(crho);
@@ -24,7 +25,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   if (pb_hi > 0) {
     // set primitive fields
     for (int i = 0; i < 3; i++) {
-      v(pb_lo+i) = v(cb_lo+i)/g.gdet;
+      v(pb_lo+i) = v(cb_lo+i)*igdet;
     }
     // take some dot products
     for (int i = 0; i < 3; i++) {
@@ -34,7 +35,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
       BdotS += v(pb_lo+i)*v(cmom_lo+i);
     }
     // don't forget S_j has a \sqrt{gamma} in it...get rid of it here
-    BdotS /= g.gdet;
+    BdotS *= igdet;
   }
   const Real BdotSsq = BdotS*BdotS;
 
@@ -46,56 +47,43 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
       W += g.gcov[i][j] * v(pvel_lo+i)*v(pvel_lo+j);
     }
   }
-  Ssq /= (g.gdet*g.gdet);
+  Ssq *= igdet*igdet;
   W = sqrt(1.0/(1.0 - W));
   Real rho_guess = D/W;
   Real T_guess = v(tmp);
 
-  auto sfunc = [&](const Real z, const Real Wp) {
-    Real zBsq = z + Bsq;
-    zBsq *= zBsq;
-    return (zBsq - Ssq - (2*z + Bsq)*BdotSsq/(z*z))*Wp*Wp - zBsq;
-  };
-
-  auto taufunc = [&](const Real z, const Real Wp, const Real p) {
-    return (tau + D - z - Bsq + BdotSsq/(2.0*z*z) + p)*Wp*Wp + 0.5*Bsq;
-  };
-
-  auto Rfunc = [&](const Real rho, const Real Temp, Real res[2]) {
-    const Real p = eos.PressureFromDensityTemperature(rho, Temp);
-    const Real sie = eos.InternalEnergyFromDensityTemperature(rho, Temp);
-    const Real Wp = D/rho;
-    const Real z = (rho*(1.0 + sie) + p)*Wp*Wp;
-    res[0] = sfunc(z, Wp);
-    res[1] = taufunc(z, Wp, p);
-  };
+  Residual Rfunc(D, tau, Bsq, Ssq, BdotSsq, eos);
 
   int iter = 0;
   bool converged = false;
   Real res[2], resp[2];
   Real jac[2][2];
-  const Real delta_fact_min = 1.e-8;
+  constexpr Real delta_fact_min = 1.e-8;
   Real delta_fact = 1.e-6;
-  const Real delta_adj = 1.2;
+  constexpr Real delta_adj = 1.2;
+  constexpr Real idelta_adj = 1./delta_adj;
   Rfunc(rho_guess, T_guess, res);
   do {
     Real drho = delta_fact*rho_guess;
+    Real idrho = 1./drho;
     Rfunc(rho_guess + drho, T_guess, resp);
-    jac[0][0] = (resp[0] - res[0])/drho;
-    jac[1][0] = (resp[1] - res[1])/drho;
+    jac[0][0] = (resp[0] - res[0])*idrho;
+    jac[1][0] = (resp[1] - res[1])*idrho;
     Real dT = delta_fact*T_guess;
+    Real idT = 1./dT;
     Rfunc(rho_guess, T_guess+dT, resp);
-    jac[0][1] = (resp[0] - res[0])/dT;
-    jac[1][1] = (resp[1] - res[1])/dT;
+    jac[0][1] = (resp[0] - res[0])*idT;
+    jac[1][1] = (resp[1] - res[1])*idT;
 
     const Real det = (jac[0][0]*jac[1][1] - jac[0][1]*jac[1][0]);
+    const Real idet = 1./det;
     if (std::abs(det) < 1.e-16) {
       delta_fact *= delta_adj;
       iter++;
       continue;
     }
-    Real delta_rho = -(res[0]*jac[1][1] - jac[0][1]*res[1])/det;
-    Real delta_T = -(jac[0][0]*res[1] - jac[1][0]*res[0])/det;
+    Real delta_rho = -(res[0]*jac[1][1] - jac[0][1]*res[1])*idet;
+    Real delta_T = -(jac[0][0]*res[1] - jac[1][0]*res[0])*idet;
 
     if (std::abs(delta_rho)/rho_guess < rel_tolerance &&
         std::abs(delta_T)/T_guess < rel_tolerance) {
@@ -134,7 +122,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
     T_guess += alpha*delta_T;
     iter++;
 
-    if (delta_fact > delta_fact_min) delta_fact /= delta_adj;
+    if (delta_fact > delta_fact_min) delta_fact *= idelta_adj;
 
   } while(converged != true && iter < max_iter);
 
@@ -155,14 +143,16 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   v(gm1) = eos.BulkModulusFromDensityTemperature(rho_guess, T_guess)/v(prs);
 
   W = D/rho_guess;
-  const Real z = (rho_guess + v(peng) + v(prs))*W*W;
+  Real W2 = W*W;
+  const Real z = (rho_guess + v(peng) + v(prs))*W2;
+  const Real izbsq = 1./(z + Bsq);
   for (int i = 0; i < 3; i++) {
     Real sconi = 0.0;
     for (int j = 0; j < 3; j++) {
       sconi += g.gcon[i][j]*v(cmom_lo+j);
     }
-    sconi /= g.gdet;
-    v(pvel_lo+i) = sconi/(z + Bsq) + BdotS*v(pb_lo+i)/(z*(z + Bsq));
+    sconi *= igdet;
+    v(pvel_lo+i) = izbsq*(sconi + BdotS*v(pb_lo+i)/z);
   }
 
   // cell-centered signal speeds
@@ -171,7 +161,7 @@ ConToPrimStatus ConToPrim<Data_t,T>::Solve(const VarAccessor<T> &v, const CellGe
   vasq /= (H+vasq); // now this is the alven speed squared
   Real cssq = v(gm1)*v(prs)/H;
   cssq += vasq - cssq*vasq; // estimate of fast magneto-sonic speed
-  const Real vsq = 1.0 - 1.0/(W*W);
+  const Real vsq = 1.0 - 1.0/(W2);
   const Real vcoff = g.lapse/(1.0 - vsq*cssq);
   for (int i = 0; i < 3; i++) {
     const Real vpm = sqrt(cssq*(1.0 - vsq)*(g.gcon[i][i]*(1.0 - vsq*cssq) - v(pvel_lo+i)*v(pvel_lo+i)*(1.0 - cssq)));
