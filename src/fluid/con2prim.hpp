@@ -71,6 +71,37 @@ struct CellGeom {
   const Real lapse;
 };
 
+class Residual {
+public:
+  KOKKOS_FUNCTION
+  Residual(const Real D, const Real tau,
+           const Real Bsq, const Real Ssq, const Real BdotSsq,
+           const singularity::EOS &eos)
+    : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotSsq), eos_(eos) { }
+  KOKKOS_FORCEINLINE_FUNCTION
+  Real sfunc(const Real z, const Real Wp) const {
+    Real zBsq = (z + Bsq_);
+    zBsq *= zBsq;
+    return (zBsq - Ssq_ - (2*z + Bsq_)*BdotSsq_/(z*z))*Wp*Wp - zBsq;
+  }
+  KOKKOS_FORCEINLINE_FUNCTION
+  Real taufunc(const Real z, const Real Wp, const Real p) {
+    return (tau_ + D_ - z - Bsq_ + BdotSsq_/(2.0*z*z) + p)*Wp*Wp + 0.5*Bsq_;
+  }
+  KOKKOS_FORCEINLINE_FUNCTION
+  void operator()(const Real rho, const Real Temp, Real res[2]) {
+    const Real p = eos_.PressureFromDensityTemperature(rho, Temp);
+    const Real sie = eos_.InternalEnergyFromDensityTemperature(rho, Temp);
+    const Real Wp = D_/rho;
+    const Real z = (rho*(1.0 + sie) + p)*Wp*Wp;
+    res[0] = sfunc(z, Wp);
+    res[1] = taufunc(z, Wp, p);
+  }
+private:
+  const singularity::EOS &eos_;
+  const Real D_, tau_, Bsq_, Ssq_, BdotSsq_;
+};
+
 template <typename Data_t, typename T>
 class ConToPrim {
  public:
