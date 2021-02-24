@@ -22,7 +22,6 @@ public:
   static constexpr Real SMALL = Geometry::SMALL;
   static constexpr CellLocation loc = CellLocation::Cent;
 
-  KOKKOS_INLINE_FUNCTION
   StressEnergyTensorCon() = default;
 
   template <typename Data> StressEnergyTensorCon(Data *rc) {
