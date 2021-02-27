@@ -79,5 +79,6 @@ recon = linear
 c2p_tol = 1.e-12
 
 <hydro_modes>
-mode = sound
+physics = mhd
+mode = alfven
 amplitude = 1.e-5

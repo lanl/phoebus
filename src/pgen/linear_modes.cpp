@@ -41,10 +41,18 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(nv == 3, "3 have 3 velocities");
 
   const std::string mode = pin->GetOrAddString("hydro_modes", "mode", "entropy");
+  const std::string physics = pin->GetOrAddString("hydro_modes", "physics", "mhd");
   const Real amp = pin->GetReal("hydro_modes", "amplitude");
 
+  // Parameters
   double rho0 = 1.0;
   double ug0 = 1.e-2;
+  double u10 = 0.;
+  double u20 = 0.;
+  double u30 = 0.;
+  double B10 = 8.164966e-02;
+  double B20 = 8.164966e-02;
+  double B30 = 0.;
 
   // Wavevector
   double k1 = 2.*M_PI;
@@ -54,22 +62,45 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   complex<double> dug = 0.;
   complex<double> du1 = 0.;
   complex<double> du2 = 0.;
-  double u10 = 0.;
-  if (mode == "entropy") {
-    omega = complex<double>(0, 2.*M_PI/10.);
-    //omega = complex<double>(0, 2.*M_PI/1.);
-    drho = 1.;
-    dug = 0.;
-    du1 = 0.;
-    u10 = 0.1; // Uniform advection
-  } else if (mode == "sound") {
-    omega = complex<double>(0., 0.6568547144496073);
-    drho = 0.9944432913027026;
-    dug = 0.0165740548550451;
-    du1 = -0.10396076706483988;
+  complex<double> du3 = 0.;
+  complex<double> dB1 = 0.;
+  complex<double> dB2 = 0.;
+  complex<double> dB3 = 0.;
+
+  if (physics == "hydro") {
+    if (mode == "entropy") {
+      omega = complex<double>(0, 2.*M_PI/10.);
+      //omega = complex<double>(0, 2.*M_PI/1.);
+      drho = 1.;
+      dug = 0.;
+      du1 = 0.;
+      u10 = 0.1; // Uniform advection
+    } else if (mode == "sound") {
+      omega = complex<double>(0., 0.6568547144496073);
+      drho = 0.9944432913027026;
+      dug = 0.0165740548550451;
+      du1 = -0.10396076706483988;
+    } else {
+      std::stringstream msg;
+      msg << "Mode \"" << mode << "\" not recognized!";
+      PARTHENON_FAIL(msg);
+    }
+  } else if (physics == "mhd") {
+    if (mode == "alfven") {
+      omega = complex<double>(0., 0.8957108706097654);
+      drho = 0.9809599020287527;
+      dug = 0.016349331700479263;
+      du1 = 0.13984251695957056;
+      du2 = -0.06463830154694966;
+      dB2 = 0.11711673829229265;
+    } else {
+      std::stringstream msg;
+      msg << "Mode \"" << mode << "\" not recognized!";
+      PARTHENON_FAIL(msg);
+    }
   } else {
     std::stringstream msg;
-    msg << "Mode " << mode << " not supported!" << std::endl;
+    msg << "Physics option \"" << physics << "\" not recognized!";
     PARTHENON_FAIL(msg);
   }
   pin->SetReal("parthenon/time", "tlim", 2.*M_PI/omega.imag()); // Set final time to be one period
@@ -95,20 +126,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(iprs, k, j, i) = Pg;
       v(ieng, k, j, i) = ug;
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
-      for (int d = 0; d < nv; d++) v(ivlo+d, k, j, i) = 0.0;
-      if (ib_hi > 0) {
-        for (int d = 0; d < nv; d++) v(ib_lo + d, k, j, i) = 0.0;
+      if (ivhi > 0) {
+        v(ivlo, k, j, i) = u10 + (du1*mode).real();
       }
-      /*v(ivlo, k, j, i) = u10 + (du1*mode).real();
-      printf("%s:%i\n", __FILE__, __LINE__);
-      v(ib_lo, k, j, i) = 0.;
-      printf("%s:%i\n", __FILE__, __LINE__);
-      v(ib_lo + 1, k, j, i) = 0.;
-      printf("%s:%i\n", __FILE__, __LINE__);
-      v(ib_hi, k, j, i) = 0.;
-      printf("%i %i %i\n", k, j, i);*/
+      if (ivhi >= 2) {
+        v(ivlo + 1, k, j, i) = u20 + (du2*mode).real();
+      }
+      //for (int d = 0; d < nv; d++) v(ivlo+d, k, j, i) = 0.0;
+      if (ib_hi >= 1) {
+        v(ib_lo, k, j, i) = B10 + (dB1*mode).real();
+      }
+      if (ib_hi >= 2) {
+        v(ib_lo + 1, k, j, i) = B20 + (dB2*mode).real();
+      }
     });
-  printf("HERE\n");
 
   fluid::PrimitiveToConserved(rc.get());
 }
