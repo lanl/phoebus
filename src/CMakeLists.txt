@@ -34,6 +34,7 @@ add_executable(phoebus
 
   pgen/pgen.hpp
   pgen/pgen.cpp
+  pgen/kh.cpp
   pgen/linear_modes.cpp
   pgen/shock_tube.cpp
 

@@ -35,8 +35,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc);
+template <typename T>
+TaskStatus ConservedToPrimitive2(T *rc);
+template <typename T>
+TaskStatus ConservedToPrimitive3(T *rc);
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real> *rc_src);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
+TaskStatus FluxCT(MeshBlockData<Real> *rc);
+TaskStatus CalculateDivB(MeshBlockData<Real> *rc);
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
 

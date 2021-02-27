@@ -77,13 +77,13 @@ void FluxState::prim_to_flux(const int d, const int k, const int j, const int i,
   if (cye>0) U[cye] = U[crho]*q(dir,pye,k,j,i);
 
   // conserved momentum
-  const Real rhohWsq = (rho + u + P + bsq)*W*W;
+  const Real rhohWsq = (rho + u + P)*W*W;
   for (int m = 0; m < 3; m++) {
-    U[cmom_lo+m] = rhohWsq*vcov[m] - alpha*b[0]*bcov[m];
+    U[cmom_lo+m] = (rhohWsq+bsq)*vcov[m] - alpha*b[0]*bcov[m];
   }
 
   // conserved energy
-  U[ceng] = rhohWsq - (P + 0.5*bsq) - alpha*alpha*b[0]*b[0] - U[crho];
+  U[ceng] = (rhohWsq+bsq) - (P + 0.5*bsq) - alpha*alpha*b[0]*b[0] - U[crho];
 
   // magnetic fields
   for (int m = cb_lo; m <= cb_hi; m++) {
@@ -107,7 +107,7 @@ void FluxState::prim_to_flux(const int d, const int k, const int j, const int i,
     F[n] = U[n]*vtil - Bcon[dir]*vt[n-cb_lo];
   }
  
-  const Real vasq = bsq*W*W/rhohWsq;
+  const Real vasq = bsq*W*W/(rhohWsq+bsq);
   const Real cssq = gamma1*P*W*W/rhohWsq;
   Real cmsq = cssq + vasq - cssq*vasq;
   cmsq = (cmsq > 0.0 ? cmsq : 1.e-16); // TODO(JCD): what should this 1.e-16 be?
