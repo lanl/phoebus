@@ -16,8 +16,9 @@ using namespace parthenon::package::prelude;
 // add the name of a namespace that contains your new ProblemGenerator
 #define FOREACH_PROBLEM                                                                  \
   PROBLEM(phoebus)                                                                       \
-  PROBLEM(shock_tube)                                                                     \
-  PROBLEM(linear_modes)
+  PROBLEM(shock_tube)                                                                    \
+  PROBLEM(linear_modes)                                                                  \
+  PROBLEM(kelvin_helmholtz)
 
 /*
 // DO NOT TOUCH THE MACROS BELOW
