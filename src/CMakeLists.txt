@@ -16,7 +16,6 @@ add_executable(phoebus
 
   # alphabetical
 
-  fluid/con2prim.cpp
   fluid/con2prim.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
