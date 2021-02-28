@@ -29,7 +29,6 @@ using namespace parthenon::package::prelude;
 
 namespace fluid {
 
-
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);

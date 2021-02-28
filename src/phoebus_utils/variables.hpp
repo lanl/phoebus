@@ -27,6 +27,7 @@ namespace internal_variables {
   constexpr char c2p_scratch[] = "c2p_scratch";
   constexpr char ql[] = "ql";
   constexpr char qr[] = "qr";
+  constexpr char fail[] = "fail";
 }
 
 namespace diagnostic_variables {

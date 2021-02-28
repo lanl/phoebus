@@ -99,6 +99,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
+  // this fail flag should really be an enum or something
+  // but parthenon doesn't yet support that kind of thing
+  physics->AddField(impl::fail, mprim_scalar);
 
   // add the conserved variables
   physics->AddField(c::density, mcons_scalar);
@@ -290,6 +293,8 @@ TaskStatus ConservedToPrimitive(T *rc) {
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
 
+  auto fail = rc->Get(internal_variables::fail).data;
+
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -301,13 +306,20 @@ TaskStatus ConservedToPrimitive(T *rc) {
     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
       invert.Setup(geom,k,j,i);
     });
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(),
+    0, invert.NumBlocks()-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+    KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+      auto status = invert(eos,k, j, i);
+      fail(k,j,i) = (status == ConToPrimStatus::success
+                             ? FailFlags::success
+                             : FailFlags::fail);
+    });
+  // this is where we might stick fixup
   int fail_cnt;
-  //TODO(JCD): need to tag failed cells and get rid of this reduction
   parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve", DevExecSpace(),
     0, invert.NumBlocks()-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-    KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &fail) {
-      auto status = invert(eos,k, j, i);
-      if (status == ConToPrimStatus::failure) fail++;
+    KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &f) {
+      f += (fail(k,j,i) == FailFlags::success ? 0 : 1);
     }, Kokkos::Sum<int>(fail_cnt));
   PARTHENON_REQUIRE(fail_cnt==0, "Con2Prim Failed!");
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "ConToPrim::Finalize", DevExecSpace(),

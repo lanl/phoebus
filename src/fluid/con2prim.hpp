@@ -29,6 +29,10 @@ using namespace parthenon::package::prelude;
 namespace con2prim {
 
 enum class ConToPrimStatus {success, failure};
+struct FailFlags {
+  static constexpr Real success = 0.0;
+  static constexpr Real fail = 1.0;
+};
 
 class Residual {
 public:
