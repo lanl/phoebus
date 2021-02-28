@@ -279,6 +279,7 @@ public:
     for (int nu = 0; nu < NDFULL; ++nu) {
       for (int mu = nu; mu < NDFULL; ++mu) {
         g[mu][nu] = SpacetimeMetric(mu, nu, X0, X1, X2, X3);
+        g[nu][mu] = g[mu][nu];
       }
     }
   }
@@ -297,6 +298,7 @@ public:
     for (int nu = 0; nu < NDFULL; ++nu) {
       for (int mu = nu; mu < NDFULL; ++mu) {
         g[mu][nu] = SpacetimeMetric(mu, nu, loc, k, j, i);
+        g[nu][mu] = g[mu][nu];
       }
     }
   }
@@ -315,6 +317,7 @@ public:
     for (int nu = 0; nu < NDFULL; ++nu) {
       for (int mu = nu; mu < NDFULL; ++mu) {
         g[mu][nu] = SpacetimeMetric(mu, nu, loc, b, k, j, i);
+        g[nu][mu] = g[mu][nu];
       }
     }
   }

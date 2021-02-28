@@ -30,6 +30,37 @@ namespace con2prim {
 
 enum class ConToPrimStatus {success, failure};
 
+class Residual {
+public:
+  KOKKOS_FUNCTION
+  Residual(const Real D, const Real tau,
+           const Real Bsq, const Real Ssq, const Real BdotS,
+           const singularity::EOS &eos)
+    : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS*BdotS), eos_(eos) { }
+  KOKKOS_FORCEINLINE_FUNCTION
+  Real sfunc(const Real z, const Real Wp) const {
+    Real zBsq = (z + Bsq_);
+    zBsq *= zBsq;
+    return (zBsq - Ssq_ - (2*z + Bsq_)*BdotSsq_/(z*z))*Wp*Wp - zBsq;
+  }
+  KOKKOS_FORCEINLINE_FUNCTION
+  Real taufunc(const Real z, const Real Wp, const Real p) {
+    return (tau_ + D_ - z - Bsq_ + BdotSsq_/(2.0*z*z) + p)*Wp*Wp + 0.5*Bsq_;
+  }
+  KOKKOS_FORCEINLINE_FUNCTION
+  void operator()(const Real rho, const Real Temp, Real res[2]) {
+    const Real p = eos_.PressureFromDensityTemperature(rho, Temp);
+    const Real sie = eos_.InternalEnergyFromDensityTemperature(rho, Temp);
+    const Real Wp = D_/rho;
+    const Real z = (rho*(1.0 + sie) + p)*Wp*Wp;
+    res[0] = sfunc(z, Wp);
+    res[1] = taufunc(z, Wp, p);
+  }
+private:
+  const singularity::EOS &eos_;
+  const Real D_, tau_, Bsq_, Ssq_, BdotSsq_;
+};
+
 template <typename T>
 class VarAccessor {
  public:
@@ -48,30 +79,36 @@ class VarAccessor {
 };
 
 struct CellGeom {
+  KOKKOS_FUNCTION
   CellGeom(const Geometry::CoordinateSystem &geom,
                const int k, const int j, const int i)
-               : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)) {
+               : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)),
+                 lapse(geom.Lapse(CellLocation::Cent,k,j,i)) {
     geom.Metric(CellLocation::Cent, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+    geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
   }
   CellGeom(const Geometry::CoordinateSystem &geom,
            const int b, const int k, const int j, const int i)
-           : gdet(geom.DetGamma(CellLocation::Cent,b,k,j,i)) {
+           : gdet(geom.DetGamma(CellLocation::Cent,b,k,j,i)),
+             lapse(geom.Lapse(CellLocation::Cent,b,k,j,i)) {
     geom.Metric(CellLocation::Cent, b, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, b, k, j, i, gcon);
+    geom.ContravariantShift(CellLocation::Cent, b, k, j, i, beta);
   }
   Real gcov[3][3];
   Real gcon[3][3];
+  Real beta[3];
   const Real gdet;
+  const Real lapse;
 };
+
 
 template <typename Data_t, typename T>
 class ConToPrim {
  public:
   ConToPrim(Data_t *rc, const Real tol, const int max_iterations)
     : var(rc->PackVariables(Vars(), imap)),
-      eos(SetEOS(rc)),
-      geom(Geometry::GetCoordinateSystem(rc)),
       prho(imap[primitive_variables::density].first),
       crho(imap[conserved_variables::density].first),
       pvel_lo(imap[primitive_variables::velocity].first),
@@ -88,17 +125,11 @@ class ConToPrim {
       cye(imap[conserved_variables::ye].second),
       prs(imap[primitive_variables::pressure].first),
       tmp(imap[primitive_variables::temperature].first),
-      cs(imap[primitive_variables::cs].first),
+      sig_lo(imap[internal_variables::cell_signal_speed].first),
       gm1(imap[primitive_variables::gamma1].first),
+      scr_lo(imap[internal_variables::c2p_scratch].first),
       rel_tolerance(tol),
       max_iter(max_iterations) {}
-
-  const singularity::EOS& SetEOS(MeshBlockData<Real> *rc) {
-    return rc->GetBlockPointer()->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
-  }
-  const singularity::EOS& SetEOS(MeshData<Real> *rc) {
-    return rc->GetMeshPointer()->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
-  }
 
   std::vector<std::string> Vars() {
     return std::vector<std::string>({primitive_variables::density, conserved_variables::density,
@@ -107,19 +138,32 @@ class ConToPrim {
                                     primitive_variables::bfield, conserved_variables::bfield,
                                     primitive_variables::ye, conserved_variables::ye,
                                     primitive_variables::pressure, primitive_variables::temperature,
-                                    primitive_variables::cs, primitive_variables::gamma1});
+                                    internal_variables::cell_signal_speed, primitive_variables::gamma1,
+                                    internal_variables::c2p_scratch});
   }
 
   template <class... Args>
-  KOKKOS_FUNCTION
-  ConToPrimStatus operator()(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION
+  void Setup(const Geometry::CoordinateSystem &geom, Args &&... args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
-    return Solve(v, g);
+    setup(v,g);
   }
 
-  KOKKOS_FUNCTION
-  ConToPrimStatus Solve(const VarAccessor<T> &v, const CellGeom &g, const bool print=false) const;
+  template <class... Args>
+  KOKKOS_INLINE_FUNCTION
+  ConToPrimStatus operator()(const singularity::EOS &eos, Args &&... args) const {
+    VarAccessor<T> v(var, std::forward<Args>(args)...);
+    return solve(v,eos);
+  }
+
+  template <class... Args>
+  KOKKOS_INLINE_FUNCTION
+  void Finalize(const singularity::EOS &eos, const Geometry::CoordinateSystem &geom, Args &&... args) const {
+    VarAccessor<T> v(var, std::forward<Args>(args)...);
+    CellGeom g(geom, std::forward<Args>(args)...);
+    finalize(v,g,eos);
+  }
 
   int NumBlocks() {
     return var.GetDim(5);
@@ -128,8 +172,6 @@ class ConToPrim {
  private:
   PackIndexMap imap;
   const T var;
-  const singularity::EOS eos;
-  const Geometry::CoordinateSystem geom;
   const int prho, crho;
   const int pvel_lo, pvel_hi;
   const int cmom_lo, cmom_hi;
@@ -137,12 +179,199 @@ class ConToPrim {
   const int pb_lo, pb_hi;
   const int cb_lo, cb_hi;
   const int pye, cye;
-  const int prs, tmp, cs, gm1;
+  const int prs, tmp, sig_lo, gm1, scr_lo;
   const Real rel_tolerance;
   const int max_iter;
+  constexpr static int iD = 0;
+  constexpr static int itau = 1;
+  constexpr static int iBsq = 2;
+  constexpr static int iSsq = 3;
+  constexpr static int iBdotS = 4;
+
+  KOKKOS_INLINE_FUNCTION
+  void finalize(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos) const {
+    const Real igdet = 1.0/g.gdet;
+    const Real &D = v(scr_lo+iD);
+    const Real &Bsq = v(scr_lo+iBsq);
+    const Real &BdotS = v(scr_lo+iBdotS);
+    Real &rho_guess = v(prho);
+    Real &T_guess = v(tmp);
+    v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess);
+    v(peng) = rho_guess*eos.InternalEnergyFromDensityTemperature(rho_guess, T_guess);
+    const Real H = rho_guess + v(peng) + v(prs);
+    v(gm1) = eos.BulkModulusFromDensityTemperature(rho_guess, T_guess)/v(prs);
+
+    const Real W = D/rho_guess;
+    const Real W2 = W*W;
+    const Real z = (rho_guess + v(peng) + v(prs))*W2;
+    const Real izbsq = 1./(z + Bsq);
+    for (int i = 0; i < 3; i++) {
+      Real sconi = 0.0;
+      for (int j = 0; j < 3; j++) {
+        sconi += g.gcon[i][j]*v(cmom_lo+j);
+      }
+      sconi *= igdet;
+      v(pvel_lo+i) = izbsq*(sconi + BdotS*v(pb_lo+i)/z);
+    }
+
+    // cell-centered signal speeds
+    Real vasq = BdotS/(H*W); // this is just bcon[0]*lapse
+    vasq = (Bsq + vasq*vasq); // this is now b^2 * W^2
+    vasq /= (H+vasq); // now this is the alven speed squared
+    Real cssq = v(gm1)*v(prs)/H;
+    cssq += vasq - cssq*vasq; // estimate of fast magneto-sonic speed
+    const Real vsq = 1.0 - 1.0/(W2);
+    const Real vcoff = g.lapse/(1.0 - vsq*cssq);
+    for (int i = 0; i < 3; i++) {
+      const Real vpm = sqrt(cssq*(1.0 - vsq)*(g.gcon[i][i]*(1.0 - vsq*cssq) - v(pvel_lo+i)*v(pvel_lo+i)*(1.0 - cssq)));
+      Real vp = vcoff*(v(pvel_lo+i)*(1.0 - cssq) + vpm) - g.beta[i];
+      Real vm = vcoff*(v(pvel_lo+i)*(1.0 - cssq) - vpm) - g.beta[i];
+      v(sig_lo+i) = std::max(std::fabs(vp), std::fabs(vm));
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  ConToPrimStatus solve(const VarAccessor<T> &v, const singularity::EOS &eos, bool print=false) const {
+    Real &D = v(scr_lo+iD);
+    Real &tau = v(scr_lo+itau);
+    Real &Bsq = v(scr_lo+iBsq);
+    Real &Ssq = v(scr_lo+iSsq);
+    Real &BdotS = v(scr_lo+iBdotS);
+    Residual Rfunc(D, tau, Bsq, Ssq, BdotS, eos);
+    Real &rho_guess = v(prho);
+    Real &T_guess = v(tmp);
+
+    int iter = 0;
+    bool converged = false;
+    Real res[2], resp[2];
+    Real jac[2][2];
+    constexpr Real delta_fact_min = 1.e-6;
+    Real delta_fact = delta_fact_min;
+    constexpr Real delta_adj = 1.2;
+    constexpr Real idelta_adj = 1./delta_adj;
+    Rfunc(rho_guess, T_guess, res);
+    do {
+      Real drho = delta_fact*rho_guess;
+      Real idrho = 1./drho;
+      Rfunc(rho_guess + drho, T_guess, resp);
+      jac[0][0] = (resp[0] - res[0])*idrho;
+      jac[1][0] = (resp[1] - res[1])*idrho;
+      Real dT = delta_fact*T_guess;
+      Real idT = 1./dT;
+      Rfunc(rho_guess, T_guess+dT, resp);
+      jac[0][1] = (resp[0] - res[0])*idT;
+      jac[1][1] = (resp[1] - res[1])*idT;
+
+      const Real det = (jac[0][0]*jac[1][1] - jac[0][1]*jac[1][0]);
+      const Real idet = 1./det;
+      if (std::abs(det) < 1.e-16) {
+        delta_fact *= delta_adj;
+        iter++;
+        continue;
+      }
+      Real delta_rho = -(res[0]*jac[1][1] - jac[0][1]*res[1])*idet;
+      Real delta_T = -(jac[0][0]*res[1] - jac[1][0]*res[0])*idet;
+
+      if (std::abs(delta_rho)/rho_guess < rel_tolerance &&
+          std::abs(delta_T)/T_guess < rel_tolerance) {
+            converged = true;
+      }
+      #ifndef NDEBUG
+      if (print) {
+        printf("%d %g %g %g %g %g %g\n",
+               iter, rho_guess, T_guess, delta_rho, delta_T, res[0], res[1]);
+      }
+      #endif
+
+      Real alpha = 1.0;
+      if (rho_guess+delta_rho < 0.0) {
+        alpha = -0.1*rho_guess/delta_rho;
+      } else if(rho_guess+delta_rho > D) {
+        alpha = (D-rho_guess)/delta_rho;
+      }
+      delta_rho = alpha*delta_rho;
+      delta_T = (T_guess + delta_T < 0.0 ? -0.1*T_guess : delta_T);
+
+      const Real res0 = res[0]*res[0] + res[1]*res[1];
+      Rfunc(rho_guess + delta_rho, T_guess + delta_T, res);
+      Real res1 = res[0]*res[0] + res[1]*res[1];
+      alpha = 1.0;
+      int cnt = 0;
+      while (res1 >= res0 && cnt < 5) {
+        alpha *= 0.5;
+        Rfunc(rho_guess + alpha*delta_rho, T_guess + alpha*delta_T, res);
+        res1 = res[0]*res[0] + res[1]*res[1];
+        cnt++;
+      }
+
+      rho_guess += alpha*delta_rho;
+      T_guess += alpha*delta_T;
+      iter++;
+
+      delta_fact *= (delta_fact > delta_fact_min ? idelta_adj : 1.0);
+
+    } while(converged != true && iter < max_iter);
+
+    if(!converged) {
+      #ifndef NDEBUG
+      printf("ConToPrim failed state: %g %g %g %g %g %g %g\n",
+             rho_guess, T_guess, v(crho),
+             v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),
+             v(ceng));
+      if (!print) solve(v,eos,true);
+      #endif
+      return ConToPrimStatus::failure;
+    }
+    return ConToPrimStatus::success;
+  }
+
+  template <class... Args>
+  KOKKOS_INLINE_FUNCTION
+  void setup(const VarAccessor<T> &v, const CellGeom &g) const {
+    Real &D = v(scr_lo+iD);
+    Real &tau = v(scr_lo+itau);
+    Real &Bsq = v(scr_lo+iBsq);
+    Real &Ssq = v(scr_lo+iSsq);
+    Real &BdotS = v(scr_lo+iBdotS);
+    const Real igdet = 1./g.gdet;
+    D = v(crho)*igdet;
+    tau = v(ceng)*igdet;
+
+    // electron fraction
+    if(pye > 0) v(pye) = v(cye)/v(crho);
+
+    BdotS = 0.0;
+    Bsq = 0.0;
+    // bfield
+    if (pb_hi > 0) {
+      // set primitive fields
+      for (int i = 0; i < 3; i++) {
+        v(pb_lo+i) = v(cb_lo+i)*igdet;
+      }
+      // take some dot products
+      for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+          Bsq += g.gcov[i][j] * v(pb_lo+i)*v(pb_lo+j);
+        }
+        BdotS += v(pb_lo+i)*v(cmom_lo+i);
+      }
+      // don't forget S_j has a \sqrt{gamma} in it...get rid of it here
+      BdotS *= igdet;
+    }
+
+    Ssq = 0.0;
+    Real W = 0.0;
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        Ssq += g.gcon[i][j] * v(cmom_lo+i)*v(cmom_lo+j);
+        W += g.gcov[i][j] * v(pvel_lo+i)*v(pvel_lo+j);
+      }
+    }
+    Ssq *= igdet*igdet;
+    W = sqrt(1.0/(1.0 - W));
+    v(prho) = D/W; // initial guess for density
+  }
 };
-
-
 
 using C2P_Block_t = ConToPrim<MeshBlockData<Real>,VariablePack<Real>>;
 using C2P_Mesh_t = ConToPrim<MeshData<Real>,MeshBlockPack<Real>>;
