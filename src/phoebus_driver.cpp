@@ -69,7 +69,6 @@ TaskListStatus PhoebusDriver::Step() {
     if (status != TaskListStatus::complete) break;
   }
 
-  // TODO(BRR): don't do this if radiation is disabled
   {
     TaskCollection tc = RadiationStep();
     status = tc.Execute();
@@ -197,12 +196,18 @@ TaskCollection PhoebusDriver::RadiationStep() {
 
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
-    auto &tl = async_region[ib];
-    auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+    StateDescriptor *rad = pmb->packages.Get("radiation").get();
+    auto rad_active = rad->Param<bool>("active");
+    if (rad_active) {
+      auto &tl = async_region[ib];
+      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
 
-    //auto sc = pmb->swarm_data.Get();
+      //auto sc = pmb->swarm_data.Get();
 
-    auto calculate_four_force = tl.AddTask(none, radiation::CalculateRadiationForce, sc0.get(), dt);
+      auto calculate_four_force = tl.AddTask(none, radiation::CalculateRadiationFourForce, sc0.get(), dt);
+
+      auto apply_four_force = tl.AddTask(calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
+    }
   }
 
   return tc;

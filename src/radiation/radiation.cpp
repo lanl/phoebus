@@ -32,29 +32,59 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return physics;
   }
 
+  std::vector<int> four_vec(1,4);
+  Metadata mfourforce = Metadata({Metadata::Cell, Metadata::OneCopy}, four_vec);
+  physics->AddField("Gcov", mfourforce);
+
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
   return physics;
 }
 
-TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
+TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
+  namespace c = conserved_variables;
+  auto *pmb = rc->GetParentPointer().get();
+
+  std::vector<std::string> vars({c::energy, c::momentum, "Gcov"});
+  PackIndexMap imap;
+  auto v = rc->PackVariables(vars, imap);
+  const int ceng    = imap[c::energy].first;
+  const int cmom_lo = imap[c::density].first;
+  const int cmom_hi = imap[c::density].second;
+  const int Gcov_lo = imap["Gcov"].first;
+  const int Gcov_hi = imap["Gcov"].second;
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
+      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        v(ceng, k, j, i) -= v(Gcov_lo, k, j, i)*dt;
+        v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i);
+        v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i);
+        v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i);
+      });
+
+  return TaskStatus::complete;
+}
+
+TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = primitive_variables;
   namespace c = conserved_variables;
   auto *pmb = rc->GetParentPointer().get();
-  StateDescriptor *rad = pmb->packages.Get("radiation").get();
-  auto rad_active = rad->Param<bool>("active");
-  if (!rad_active) {
-    return TaskStatus::complete;
-  }
 
-  std::vector<std::string> vars({p::density, p::temperature, c::energy});
+  std::vector<std::string> vars({p::density, p::temperature, c::energy, "Gcov"});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
   const int prho = imap[p::density].first;
   const int ptemp = imap[p::temperature].first;
   const int ceng = imap[c::energy].first;
+  const int Gcov_lo = imap["Gcov"].first;
+  const int Gcov_hi = imap["Gcov"].second;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -82,7 +112,10 @@ TaskStatus CalculateRadiationForce(MeshBlockData<Real> *rc, const double dt) {
             4. * M_PI * pc.kb * pow(ne_cgs, 2) * N / pc.h * pow(T_cgs, 1. / 2.);
         double Lambda_code = Lambda_cgs * CPOWERDENS;
 
-        v(ceng, k, j, i) -= Lambda_code * dt;
+        v(Gcov_lo, k, j, i) = Lambda_code;
+        for (int mu = Gcov_lo + 1; mu <= Gcov_lo + 3; mu++) {
+          v(mu, k, j, i) = 0.;
+        }
       });
 
   return TaskStatus::complete;
