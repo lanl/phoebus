@@ -76,24 +76,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       du1 = 0.;
       u10 = 0.1; // Uniform advection
     } else if (mode == "sound") {
-      omega = complex<double>(0., 0.6568547144496073);
-      drho = 0.9944432913027026;
-      dug = 0.0165740548550451;
-      du1 = -0.10396076706483988;
+      omega = complex<double>(0., 2.7422068833892093);
+      drho = 0.5804294924639215;
+      dug = 0.7739059899518946;
+      du1 = -0.2533201985524494;
     } else {
       std::stringstream msg;
       msg << "Mode \"" << mode << "\" not recognized!";
       PARTHENON_FAIL(msg);
     }
   } else if (physics == "mhd") {
-    if (mode == "alfven") {
-      omega = complex<double>(0., 0.8957108706097654);
-      drho = 0.9809599020287527;
-      dug = 0.016349331700479263;
-      du1 = 0.13984251695957056;
-      du2 = -0.06463830154694966;
-      dB2 = 0.11711673829229265;
-    } else if (mode == "slow") {
+    if (mode == "slow") {
       omega = complex<double>(0., 2.41024185339);
       drho = 0.558104461559;
       dug = 0.744139282078;
