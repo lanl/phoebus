@@ -334,8 +334,8 @@ TaskStatus ConservedToPrimitive(T *rc) {
 
 //template <typename T>
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real> *rc_src) {
-  constexpr int ND = Geometry::CoordinateSystem::NDFULL;
-  constexpr int NS = Geometry::CoordinateSystem::NDSPACE;
+  constexpr int ND = Geometry::NDFULL;
+  constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -356,12 +356,13 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(),
     kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      Real Tmunu[ND][ND], dg[ND][NS][ND], da[ND], gam[ND][ND][ND], gcov[ND][ND];
+      Real Tmunu[ND][ND], dg[ND][ND][ND], da[ND], gam[ND][ND][ND], gcov[ND][ND], gcon[ND][ND];
       tmunu(Tmunu, k, j, i);
       geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
       geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
       geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
       geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+      geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon);
       const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
 
       // momentum source terms
@@ -369,11 +370,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
         src(cmom_lo+l,k,j,i) = 0.0;
         for (int m = 0; m < ND; m++) {
           for (int n = 0; n < ND; n++) {
-            Real Gamj = 0.0;
-            for (int d = 0; d < ND; d++) {
-              Gamj += gam[d][m][n]*gcov[l][d];
-            }
-            src(cmom_lo+l,k,j,i) += Tmunu[m][n]*(dg[m][l][n] - Gamj);
+            // gam is ALL INDICES DOWN
+            src(cmom_lo+l,k,j,i) += Tmunu[m][n]*(dg[m][l][n] - gam[l][m][n]);
           }
         }
       }
@@ -384,7 +382,11 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
       for (int m = 0; m < ND; m++) {
         Ta += Tmunu[m][0]*da[m];
         for (int n = 0; n < ND; n++) {
-          TGam += Tmunu[m][n]*gam[0][m][n];
+          Real gam0 = 0;
+          for (int r = 0; r < ND; r++) {
+            gam0 += gcon[0][r]*gam[r][m][n];
+          }
+          TGam += Tmunu[m][n]*gam0;
         }
       }
       src(ceng, k, j, i) = alpha*(Ta - TGam);

@@ -59,9 +59,11 @@ CoordinateSystem GetCoordinateSystem(MeshBlockData<Real> *rc) {
   // some coordinate systems may require more inputs to
   // constructor. Can be pulled out of params or the MeshBlockData
   // object.
-  switch(tag) {
-  case CoordSystemTag::Minkowski:
-    return CoordinateSystem(Analytic<Minkowski>(coords));
+  switch (tag) {
+  case CoordSystemTag::Minkowski: {
+    IndexerMeshBlock indexer(coords);
+    return CoordinateSystem(Analytic<Minkowski, IndexerMeshBlock>(indexer));
+  }
   default:
     PARTHENON_THROW("unknown coordinate system");
   }
@@ -74,7 +76,7 @@ CoordinateSystem GetCoordinateSystem(MeshData<Real> *rc) {
 
   // TODO(JMM): Cache this somehow?
   int nblocks = rc->NumBlocks();
-  ParArray1D<Coordinates_t> coords("GetCoordinateSystem::coords",nblocks);
+  ParArray1D<Coordinates_t> coords("GetCoordinateSystem::coords", nblocks);
   auto coords_h = Kokkos::create_mirror_view(coords);
   for (int i = 0; i < nblocks; ++i) {
     coords_h(i) = rc->GetBlockData(i)->GetBlockPointer()->coords;
@@ -84,9 +86,11 @@ CoordinateSystem GetCoordinateSystem(MeshData<Real> *rc) {
   // some coordinate systems may require more inputs to
   // constructor. Can be pulled out of params or the MeshBlockData
   // object.
-  switch(tag) {
-  case CoordSystemTag::Minkowski:
-    return CoordinateSystem(Analytic<Minkowski>(coords));
+  switch (tag) {
+  case CoordSystemTag::Minkowski: {
+    IndexerMesh indexer(coords);
+    return CoordinateSystem(Analytic<Minkowski, IndexerMesh>(indexer));
+  }
   default:
     PARTHENON_THROW("unknown coordinate system");
   }
