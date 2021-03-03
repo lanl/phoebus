@@ -7,6 +7,8 @@
 
 #include "geometry/coordinate_systems.hpp"
 
+#include "geometry/tetrads.hpp"
+
 using namespace parthenon::package::prelude;
 
 namespace Geometry {

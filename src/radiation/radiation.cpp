@@ -14,6 +14,7 @@
 //========================================================================================
 
 #include "radiation.hpp"
+#include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
 namespace radiation {
@@ -103,9 +104,19 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
   const Real CTIME = unit_conv.GetTimeCGSToCode();
   const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
 
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CalculateRadiationForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+
+        Real Gcov[4][4];
+        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
+        Real Ucon[4] = {-1, 0, 0, 0};
+        Real Trial[4] = {0, 1, 0, 0};
+        Geometry::Tetrad tetrad(Ucon, Trial, Gcov);
+        exit(-1);
+
         double T_cgs = v(ptemp, k, j, i) * TEMP;
         double ne_cgs = GetNumberDensity(v(prho, k, j, i) * RHO);
         double Lambda_cgs =
