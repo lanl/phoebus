@@ -1,3 +1,7 @@
+#include <parthenon/package.hpp>
+
+#include "geometry/coordinate_systems.hpp"
+
 #ifndef GEOMETRY_TETRADS_HPP_
 #define GEOMETRY_TETRADS_HPP_
 
@@ -7,15 +11,12 @@ namespace Geometry {
 #define NULOOP for (int nu = 0; nu < NDFULL; nu++)
 #define NDFULL (4)
 
-class Tetrad {
+class Tetrads {
 public:
   KOKKOS_FUNCTION
-  Tetrad(const double ucon[NDFULL], const double trial[NDFULL],
+  Tetrads(const double ucon[NDFULL], const double trial[NDFULL],
          const double Gcov[NDFULL][NDFULL]) {
 
-    MULOOP { printf("ucon[%i] = %e\n", mu, ucon[mu]); }
-    MULOOP { printf("trial[%i] = %e\n", mu, trial[mu]); }
-    MULOOP NULOOP { printf("Gcov[%i][%i] = %e\n", mu, nu, Gcov[mu][nu]); }
     Real X1ness = 0.;
     Real X2ness = 0.;
     Real X3ness = 0.;
@@ -70,11 +71,49 @@ public:
     // Make covariant version
     MULOOP { Lower_(Econ_[mu], Gcov, Ecov_[mu]); }
     MULOOP { Ecov_[0][mu] *= -1.; }
-
-    MULOOP NULOOP { printf("Ecov[%i][%i] = %e\n", mu, nu, Ecov_[mu][nu]); }
-    printf("\n");
-    MULOOP NULOOP { printf("Econ[%i][%i] = %e\n", mu, nu, Econ_[mu][nu]); }
   }
+
+  KOKKOS_INLINE_FUNCTION
+  void CoordToTetradCon(const Real VCoord[NDFULL], Real VTetrad[NDFULL]) {
+    MULOOP {
+      VTetrad[mu] = 0.;
+      NULOOP {
+        VTetrad[mu] += Ecov_[mu][nu]*VCoord[nu];
+      }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void CoordToTetradCov(const Real VCoord[NDFULL], Real VTetrad[NDFULL]) {
+    MULOOP {
+      VTetrad[mu] = 0.;
+      NULOOP {
+        VTetrad[mu] += Econ_[mu][nu]*VCoord[nu];
+      }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void TetradToCoordCon(const Real VTetrad[NDFULL], Real VCoord[NDFULL]) {
+    MULOOP {
+      VCoord[mu] = 0.;
+      NULOOP {
+        VCoord[mu] += Econ_[nu][mu]*VTetrad[nu];
+      }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void TetradToCoordCov(const Real VTetrad[NDFULL], Real VCoord[NDFULL]) {
+    MULOOP {
+      VCoord[mu] = 0.;
+      NULOOP {
+        VCoord[mu] += Ecov_[nu][mu]*VTetrad[nu];
+      }
+    }
+  }
+
+private:
 
   KOKKOS_INLINE_FUNCTION
   void Normalize_(double Vcon[NDFULL], const double Gcov[NDFULL][NDFULL]) {
@@ -132,7 +171,6 @@ public:
     }
   }
 
-private:
   Real Econ_[NDFULL][NDFULL];
   Real Ecov_[NDFULL][NDFULL];
 };
