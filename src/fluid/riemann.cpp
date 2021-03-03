@@ -50,13 +50,18 @@ void FluxState::prim_to_flux(const int d, const int k, const int j, const int i,
   const Real W = 1.0/sqrt(1.0 - vsq);
 
   const Real alpha = geom.Lapse(d, k, j, i);
-  const Real beta[] = {geom.ContravariantShift(1, loc, k, j, i),
-                       geom.ContravariantShift(2, loc, k, j, i),
-                       geom.ContravariantShift(3, loc, k, j, i)};
+  Real beta[Geometry::NDSPACE];
+  geom.ContravariantShift(loc, k, j, i, beta);
   const Real vt[3] = {vcon[0] - beta[0]/alpha,
                       vcon[1] - beta[1]/alpha,
                       vcon[2] - beta[2]/alpha};
   const Real &vtil = vt[dir];
+
+  Real gcov4[Geometry::NDFULL][Geometry::NDFULL];
+  geom.SpacetimeMetric(loc, k, j, i, gcov4);
+
+  Real gcon[Geometry::NDSPACE][Geometry::NDSPACE];
+  geom.MetricInverse(loc, k, j, i, gcon);
 
   Real b[4] = {W*Bdotv/alpha, 0.0, 0.0, 0.0};
   for (int m = pb_lo; m <= pb_hi; m++) {
@@ -67,7 +72,7 @@ void FluxState::prim_to_flux(const int d, const int k, const int j, const int i,
   if (pb_hi > 0) {
     for (int m = 0; m < 3; m++) {
       for (int n = 0; n < 4; n++) {
-        bcov[m] += geom.SpacetimeMetric(m+1, n, loc, k, j, i) * b[n];
+        bcov[m] += gcov4[m+1][n] * b[n];
       }
     }
   }
@@ -113,7 +118,7 @@ void FluxState::prim_to_flux(const int d, const int k, const int j, const int i,
   cmsq = (cmsq > 0.0 ? cmsq : 1.e-16); // TODO(JCD): what should this 1.e-16 be?
   cmsq = (cmsq > 1.0 ? 1.0 : cmsq);
 
-  const Real gdd = geom.MetricInverse(d,d,loc,k,j,i);
+  const Real gdd = gcon[d][d];
   const Real vcoff = alpha/(1. - vsq*cmsq);
   const Real v0 = vcon[dir]*(1.0 - cmsq);
   const Real vpm = sqrt(cmsq*(1.0  - vsq)*(gdd*(1.0 - vsq*cmsq) - vel*vel*(1.0 - cmsq)));
