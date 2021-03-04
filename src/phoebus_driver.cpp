@@ -122,13 +122,14 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                  sc1.get(), BoundaryCommSubset::all);
 
     auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
+    auto flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
     auto geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
 
     auto send_flux =
-        tl.AddTask(hydro_flux, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
+        tl.AddTask(flux_ct, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
 
     auto recv_flux = tl.AddTask(
-        hydro_flux, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
+        flux_ct, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
 
     // compute the divergence of fluxes of conserved variables
     auto flux_div =
@@ -168,6 +169,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (stage == integrator->nstages) {
       auto new_dt = tl.AddTask(
           fill_derived, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
+
+      auto divb = tl.AddTask(set_bc, fluid::CalculateDivB, sc1.get());
 
       // Update refinement
       if (pmesh->adaptive) {

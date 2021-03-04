@@ -1,5 +1,5 @@
 <phoebus>
-problem = shock_tube
+problem   = shock_tube
 
 <parthenon/job>
 problem_id  = sod       # problem ID: basename of output filenames
@@ -11,7 +11,8 @@ variables = p.density,  &
             p.energy,   &
 	    pressure,	&
 	    cs, &
-	    p.ye
+	    p.ye, &
+            p.bfield
 
 file_type   = hdf5      # Tabular data dump
 dt          = 0.01      # time increment between outputs
@@ -24,11 +25,11 @@ ncycle_out  = 1        # interval for stdout summary info
 dt_init_fact = 1.e-6
 
 <parthenon/mesh>
-nghost = 4
 #refinement = adaptive
 #numlevel = 3
+nghost = 4
 
-nx1         = 512       # Number of zones in X1-direction
+nx1         = 256       # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1         # maximum value of X1
 ix1_bc      = outflow  # Inner-X1 boundary condition flag
@@ -48,10 +49,9 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-<parthenon/meshblock>
-nx1 = 512
-nx2 = 1
-nx3 = 1
+#<parthenon/meshblock>
+#nx1 = 32
+#nx2 = 32
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -61,7 +61,7 @@ max_level = 3
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
-Cv = 1.0
+Cv = 1.0 
 
 <physics>
 hydro = true
@@ -69,23 +69,24 @@ he = false
 3t = false
 rad = false
 
-<units>
-scale_free = true
-geom_length_cm = 1.
-fluid_mass_g = 1.
-
 <fluid>
 xorder = 2
-cfl = 0.8
+cfl = 0.9
 riemann = hll
 recon = weno5
 c2p_max_iter = 100
-Ye = true
+Ye = false
+mhd = true
 
 <shocktube>
-rhol = 10.0
-Pl = 13.3333333333333333333333
+rhol = 1.0
+Pl = 1.0
 vl = 0.0
-rhor = 1.0
-Pr = 1.e-6
+Bxl = 0.5
+Byl = 1.0
+rhor = 0.125
+Pr = 0.1
 vr = 0.0
+Bxr = 0.5
+Byr = -1.0
+

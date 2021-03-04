@@ -1,17 +1,21 @@
 PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
-res = [16, 32, 64, 128, 256]
-#res = [128, 256, 512, 1024]
+res = [8, 16, 32]
+colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
+          'tab:brown', 'tab:pink', 'tab:gray']
 
 rho0 = 1
+ug0 = 1.
+B10 = 1.
+B20 = 0.
+B30 = 0.
 amp = 1.e-5
-mode = 'entropy'
+physics = 'mhd'
+mode_name = 'alfven'
 recon = 'weno5'
-plot_each_wave = False
-
-# Sound
+plot_each_wave = True
+plot_initial = False
 
 import numpy as np
-#import h5py
 import sys
 import matplotlib.pyplot as plt
 import shutil
@@ -20,16 +24,63 @@ from subprocess import call, DEVNULL
 import glob
 sys.path.append(PHDF_PATH)
 import phdf
+import time
 
-if mode == "entropy":
-  omega = 0 + (2.*np.pi/10.)*1j
-  #omega = 0 + (2.*np.pi/1.)*1j
-  drho_mode = 1.
-  u1 = 0.1
-elif mode == "sound":
-  omega = 0 + 0.6568547144496073j
-  drho_mode = 0.9944432913027026
-  u1 = 0
+def clean_dump_files():
+  # Clean up dump files
+  for dump in glob.glob('hydro_modes*.phdf*'):
+    os.remove(dump)
+
+mode = {}
+mode['k1'] = 2.*np.pi
+mode['k2'] = 2.*np.pi
+
+u1 = 0 # Boosted mode (for entropy)
+if physics == "hydro":
+  mode['dim'] = 1
+  if mode_name == "entropy":
+    mode['omega'] = 0 + (2.*np.pi/10.)*1j
+    mode['vars'] = ['rho']
+    mode['rho'] = 1.
+    mode['ug'] = 0.
+    u1 = 0.1
+  elif mode_name == "sound":
+    mode['omega'] = 0 + 2.7422068833892093j
+    mode['vars'] = ['rho', 'ug', 'u1']
+    mode['rho'] = 0.5804294924639215
+    mode['ug'] = 0.7739059899518946
+    mode['u1'] = -0.2533201985524494
+  else:
+    print("mode_name \"" + mode_name + "\" not understood")
+elif physics == "mhd":
+  mode['dim'] = 2
+  if mode_name == "alfven":
+    mode['omega'] = 0 + 3.44144232573j
+    mode['vars'] = ['u3', 'B3']
+    mode['u3'] = 0.480384461415
+    mode['B3'] = 0.877058019307
+  elif mode_name == "slow":
+    mode['omega'] = 0 + 2.41024185339j
+    mode['vars'] = ['rho', 'ug', 'u1', 'u2', 'B1', 'B2']
+    mode['rho'] = 0.558104461559
+    mode['ug'] = 0.744139282078
+    mode['u1'] = -0.277124827421
+    mode['u2'] = 0.063034892770
+    mode['B1'] = -0.164323721928
+    mode['B2'] = 0.164323721928
+  elif mode_name == "fast":
+    mode['omega'] = 0 + 5.53726217331j
+    mode['vars'] = ['rho', 'ug', 'u1', 'u2', 'B1', 'B2']
+    mode['rho'] = 0.476395427447
+    mode['ug'] = 0.635193903263
+    mode['u1'] = -0.102965815319
+    mode['u2'] = -0.316873207561
+    mode['B1'] = 0.359559114174
+    mode['B2'] = -0.359559114174
+  else:
+    print("mode_name \"" + mode_name + "\" not understood")
+else:
+  print("physics \"" + physics + "\" not understood")
 
 if len(sys.argv) != 3:
   print("ERROR: format is")
@@ -40,17 +91,27 @@ EXECUTABLE = sys.argv[1]
 TMPINPUTFILE = 'tmplinmode.pin'
 shutil.copyfile(sys.argv[2], TMPINPUTFILE)
 
-k = 2.*np.pi
-def rho_mode(x, t):
-  #print(amp)
-  #print(drho_mode)
-  #print(np.exp(1j*k*x - omega*t))
-  return (amp*drho_mode*np.exp(1j*k*(x - u1*t) - omega*t)).real
+def get_mode(x, y, t, var):
+  k1 = mode['k1']
+  k2 = mode['k2']
+  omega = mode['omega']
+  dvar = mode[var]
+  if mode['dim'] == 1:
+    ans = np.zeros(x.size)
+    for i in range(x.size):
+      ans[i] = (amp*dvar*np.exp(1j*(k1*(x[i] - u1*t)) - omega*t)).real
+  elif mode['dim'] == 2:
+    ans = np.zeros([x.size, y.size])
+    for i in range(x.size):
+      for j in range(y.size):
+        ans[j,i] = (amp*dvar*np.exp(1j*(k1*(x[i] - u1*t) + k2*y[j]) - omega*t)).real
+  return ans
 
 res = np.array(res)
-data = {}
 
-L1 = np.zeros(res.size)
+L1 = {}
+for var in mode['vars']:
+  L1[var] = np.zeros(res.size)
 
 for n, N in enumerate(res):
   # Process input file
@@ -59,74 +120,123 @@ for n, N in enumerate(res):
     for i, line in enumerate(lines):
       if (line.startswith("nx1")):
         lines[i] = "nx1 = %i" % N + "\n"
+      if mode['dim'] == 1:
+        if (line.startswith("nx2")):
+          lines[i] = "nx2 = 1\n"
+      elif mode['dim'] == 2:
+
+#      if physics == 'mhd':
+        if (line.startswith("nx2")):
+          lines[i] = "nx2 = %i" % N + "\n"
         #break
+      if (line.startswith("physics")):
+        lines[i] = "physics = " + physics + "\n"
       if (line.startswith("mode")):
-        lines[i] = "mode = " + mode + "\n"
+        lines[i] = "mode = " + mode_name + "\n"
       if (line.startswith("amplitude")):
         lines[i] = "amplitude = %e" % amp + "\n"
       if (line.startswith("recon")):
         lines[i] = "recon = " + recon + "\n"
+
+      if physics == "hydro":
+        if (line.startswith("mhd")):
+          lines[i] = "mhd = false\n"
+      elif physics == "mhd":
+        if (line.startswith("mhd")):
+          lines[i] = "mhd = true\n"
   with open(TMPINPUTFILE, 'w') as outfile:
     outfile.writelines(lines)
 
   # Run simulation
-  print('Running problem at %i zones... ' % N, end='')
+  start = time.time()
+  print('Running problem at %i zones... ' % N, end='', flush=True)
   call([EXECUTABLE, '-i', TMPINPUTFILE], stdout=DEVNULL, stderr=DEVNULL)
-  print('done')
+  stop = time.time()
+  print('done in %g seconds' % (stop - start))
 
   dumps = np.sort(glob.glob('hydro_modes*.phdf'))
 
   dump = phdf.phdf(dumps[-1])
-  tf_soln = 2.*np.pi/omega.imag
+  tf_soln = 2.*np.pi/mode['omega'].imag
   t = dump.Time
   if (np.fabs(t - tf_soln)/tf_soln) > 0.05:
     print("Mismatch in expected solution times!")
     print("  Code: ", t)
     print("  Soln: ", tf_soln)
     sys.exit()
+  if plot_initial:
+    dump = phdf.phdf(dumps[0])
+    t = 0
   x = dump.x[0,:]
-  drho = dump.Get('p.density') - rho0
+  y = dump.y[0,:]
+  parth = {}
+  parth['drho'] = dump.Get('p.density', flatten=False)[0,0,:,:] - rho0
+  parth['dug'] = dump.Get('p.energy', flatten=False)[0,0,:,:] - ug0
+  parth['du1'] = dump.Get('p.velocity', flatten=False)[0,0,:,:,0]
+  parth['du2'] = dump.Get('p.velocity', flatten=False)[0,0,:,:,1]
+  parth['du3'] = dump.Get('p.velocity', flatten=False)[0,0,:,:,2]
+  if physics == 'mhd':
+    parth['dB1'] = dump.Get('p.bfield', flatten=False)[0,0,:,:,0] - B10
+    parth['dB2'] = dump.Get('p.bfield', flatten=False)[0,0,:,:,1] - B20
+    parth['dB3'] = dump.Get('p.bfield', flatten=False)[0,0,:,:,2] - B30
+  if mode['dim'] == 1:
+    for key in parth.keys():
+      parth[key] = parth[key][0,:]
 
-
-  drho_soln = rho_mode(x, t)
-
-  L1[n] = np.fabs(drho - drho_soln).sum()/(N*amp)
-  data[N] = (x, drho, L1)
+  for var in mode['vars']:
+    mode[var + '_soln'] = get_mode(x, y, t, var)
+    L1[var][n] =  np.fabs(parth['d' + var] - mode[var + '_soln']).sum()/(N*N*amp)
 
   if plot_each_wave:
-    plt.figure()
-    ax = plt.gca()
-    plt.plot(x, drho, color='r', label='drho')
-    plt.plot(x, drho_soln, color='k', label='drho solution', linestyle='--')
-    plt.xlim([0, 1])
-    plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
-    plt.legend(loc=1)
-    plt.xlabel('x')
-    plt.show()
+    if mode['dim'] == 1:
+      fig, axes = plt.subplots(len(mode['vars']))
+      for n, var in enumerate(mode['vars']):
+        if len(mode['vars']) == 1:
+          ax = axes
+        else:
+          ax = axes[n]
+        ax.plot(x, parth['d' + var], color='tab:blue')
+        ax.plot(x, mode[var + '_soln'], color='k', linestyle='--')
+        ax.set_ylabel(var)
+      plt.show()
+    elif mode['dim'] == 2:
+      fig, axes = plt.subplots(len(mode['vars']), 2)
+      for n, var in enumerate(mode['vars']):
+        ax0 = axes[n,0]
+        ax1 = axes[n,1]
+        ax0.pcolormesh(mode[var + '_soln'])
+        ax0.set_ylabel(var)
+        ax1.pcolormesh(parth['d' + var])
+        if n == 0:
+          ax0.set_title('Solution')
+          ax1.set_title('phoebus')
+      plt.show()
 
-  # Clean up dump files
-  for dump in glob.glob('hydro_modes*.phdf*'):
-    os.remove(dump)
+  clean_dump_files()
 
 # Get fit to see convergence rate
-fit = np.polyfit(np.log(res), np.log(L1), deg=1)
-fitx = res
-fity = np.exp(fit[0]*np.log(fitx) + fit[1])
+for var in mode['vars']:
+  fit = np.polyfit(np.log(res), np.log(L1[var]), deg=1)
+  mode[var + '_fit_slope'] = fit[0]
+  mode[var + '_fitx'] = res
+  mode[var + '_fity'] = np.exp(fit[0]*np.log(mode[var + '_fitx']) + fit[1])
 
 plt.figure()
 ax = plt.gca()
-plt.plot(res, L1, color='r', label='$\\delta \\rho$', linestyle='', marker='s')
-plt.plot(fitx, fity, color='k', linestyle='--', label='$N^{%g}$' % fit[0])
+for n, var in enumerate(mode['vars']):
+  plt.plot(res, L1[var], color=colors[n], label='$\\delta$' + var, linestyle='', marker='s')
+  plt.plot(mode[var + '_fitx'], mode[var + '_fity'], color=colors[n], linestyle='--', label='$N^{%g}$' % mode[var + '_fit_slope'])
 plt.legend(loc=1)
 plt.xlabel('N')
 plt.ylabel('L1')
 plt.xscale('log')
 plt.yscale('log')
+plt.title(physics + ' ' + mode_name)
 ax.set_xticks(res)
 ticks = []
 for N in res:
   ticks.append(str(N))
-ax.set_xticklabels(ticks)
+ax.set_xticklabels(ticks, minor=False)
+ax.xaxis.set_tick_params(which='minor', bottom=False)
+plt.minorticks_off()
 plt.show()
-
-#os.remove(TMPINPUTFILE)
