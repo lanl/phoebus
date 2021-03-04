@@ -41,8 +41,6 @@ bool SoftEquiv(const Real &val, const Real &ref, const Real tol = 1.e-8,
 
 TEST_CASE("Tetrads", "[geometry][tetrads]") {
   GIVEN("A timelike observer Ucon") {
-    // auto geom = Geometry::GetCoordinateSystem(rc);
-
     CoordinateSystem system = Analytic<Minkowski, IndexerMeshBlock>();
     THEN("We can boost into the frame of a timelike observer Ucon") {
 
@@ -54,14 +52,10 @@ TEST_CASE("Tetrads", "[geometry][tetrads]") {
             Real v = sqrt(1. - 1. / (lorentz * lorentz));
             Real theta = 2. / 3. * M_PI;
             Real phi = 1. / 4. * M_PI;
-            //lorentz = 1.;
-            //theta = M_PI/2.;
-            //phi = 0.;
             Real TetradFrame[NDFULL] = {lorentz, lorentz * v * sin(theta) * cos(phi),
                                         lorentz * v * sin(theta) * sin(phi),
                                         lorentz * v * cos(theta)};
 
-            // Real Ucon[NDFULL] = {-lorentz, sqrt(-1. + lorentz * lorentz), 0, 0};
             Real Trial[NDFULL] = {0, 1, 0, 0};
 
             Real VConCoord[NDFULL] = {1, 0, 0, 0};
@@ -84,18 +78,6 @@ TEST_CASE("Tetrads", "[geometry][tetrads]") {
             Tetrads.CoordToTetradCon(VConCoord, VConTetrad);
             Tetrads.TetradToCoordCon(VConTetrad, VConCoordCompare);
 
-            printf("TetradFrame\n");
-            printf("%e %e %e %e\n", TetradFrame[0], TetradFrame[1], TetradFrame[2], TetradFrame[3]);
-            printf("VConCoord\n");
-            printf("%e %e %e %e\n", VConCoord[0], VConCoord[1], VConCoord[2],
-                   VConCoord[3]);
-            printf("VConTetrad\n");
-            printf("%28.18e %28.18e %28.18e %28.18e\n", VConTetrad[0], VConTetrad[1],
-                   VConTetrad[2], VConTetrad[3]);
-            printf("VConCoordCompare\n");
-            printf("%e %e %e %e\n", VConCoordCompare[0], VConCoordCompare[1],
-                   VConCoordCompare[2], VConCoordCompare[3]);
-
             for (int mu = 0; mu < NDFULL; mu++) {
               if (!SoftEquiv(VConCoordCompare[mu], VConCoord[mu])) {
                 wrong++;
@@ -107,8 +89,6 @@ TEST_CASE("Tetrads", "[geometry][tetrads]") {
 
             Tetrads.CoordToTetradCov(VCovCoord, VCovTetrad);
             Tetrads.TetradToCoordCov(VCovTetrad, VCovCoordCompare);
-            printf("%28.18e %28.18e %28.18e %28.18e\n", VCovTetrad[0], VCovTetrad[1],
-                   VCovTetrad[2], VCovTetrad[3]);
 
             for (int mu = 0; mu < NDFULL; mu++) {
               if (!SoftEquiv(VCovCoordCompare[mu], VCovCoord[mu])) {
