@@ -28,6 +28,7 @@ add_executable(phoebus
   geometry/geometry.hpp
   geometry/geometry_utils.hpp
   geometry/geometry_variant.hpp
+  geometry/tetrads.hpp
 
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp

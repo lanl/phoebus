@@ -14,6 +14,7 @@
 //========================================================================================
 
 #include "radiation.hpp"
+#include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
 namespace radiation {
@@ -32,7 +33,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return physics;
   }
 
-  std::vector<int> four_vec(1,4);
+  std::vector<int> four_vec(1, 4);
   Metadata mfourforce = Metadata({Metadata::Cell, Metadata::OneCopy}, four_vec);
   physics->AddField("Gcov", mfourforce);
 
@@ -49,7 +50,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   std::vector<std::string> vars({c::energy, c::momentum, "Gcov"});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int ceng    = imap[c::energy].first;
+  const int ceng = imap[c::energy].first;
   const int cmom_lo = imap[c::density].first;
   const int cmom_hi = imap[c::density].second;
   const int Gcov_lo = imap["Gcov"].first;
@@ -62,10 +63,13 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        v(ceng, k, j, i) -= v(Gcov_lo, k, j, i)*dt;
-        v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i);
-        v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i);
-        v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i);
+        printf("Applying four force %e %e %e %e\n", v(Gcov_lo, k, j, i),
+               v(Gcov_lo + 1, k, j, i), v(Gcov_lo + 2, k, j, i), v(Gcov_lo + 3, k, j, i));
+        exit(-1);
+        v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
+        v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
+        v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
+        v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
       });
 
   return TaskStatus::complete;
@@ -103,18 +107,30 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
   const Real CTIME = unit_conv.GetTimeCGSToCode();
   const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
 
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CalculateRadiationForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        double T_cgs = v(ptemp, k, j, i) * TEMP;
-        double ne_cgs = GetNumberDensity(v(prho, k, j, i) * RHO);
-        double Lambda_cgs =
-            4. * M_PI * pc.kb * pow(ne_cgs, 2) * N / pc.h * pow(T_cgs, 1. / 2.);
-        double Lambda_code = Lambda_cgs * CPOWERDENS;
+        Real Gcov[4][4];
+        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
+        Real lorentz = 2;
+        Real Ucon[4] = {-lorentz, sqrt(-1. + lorentz * lorentz), 0, 0};
+        Real Trial[4] = {0, 1, 0, 0};
+        Geometry::Tetrads Tetrads(Ucon, Trial, Gcov);
 
-        v(Gcov_lo, k, j, i) = Lambda_code;
-        for (int mu = Gcov_lo + 1; mu <= Gcov_lo + 3; mu++) {
-          v(mu, k, j, i) = 0.;
+        Real T_cgs = v(ptemp, k, j, i) * TEMP;
+        Real ne_cgs = GetNumberDensity(v(prho, k, j, i) * RHO);
+        Real Lambda_cgs =
+            4. * M_PI * pc.kb * pow(ne_cgs, 2) * N / pc.h * pow(T_cgs, 1. / 2.);
+        Real Lambda_code = Lambda_cgs * CPOWERDENS;
+
+        Real Gcov_tetrad[4] = {Lambda_code, 0, 0, 0};
+        Real Gcov_coord[4];
+        Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
+
+        for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
+          v(mu, k, j, i) = Gcov_coord[mu - Gcov_lo];
         }
       });
 
