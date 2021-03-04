@@ -120,7 +120,9 @@ private:
   void ProjectOut_(double Vcona[NDFULL], double Vconb[NDFULL],
                    const double Gcov[NDFULL][NDFULL]) {
     double Vconb_sq = 0.;
-    SPACETIMELOOP(mu) SPACETIMELOOP(nu) { Vconb_sq += Vconb[mu] * Vconb[nu] * Gcov[mu][nu]; }
+    SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
+      Vconb_sq += Vconb[mu] * Vconb[nu] * Gcov[mu][nu];
+    }
 
     double adotb = 0.;
     SPACETIMELOOP(mu) SPACETIMELOOP(nu) { adotb += Vcona[mu] * Vconb[nu] * Gcov[mu][nu]; }

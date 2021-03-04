@@ -58,43 +58,43 @@ TEST_CASE("Tetrads", "[geometry][tetrads]") {
 
             Real Trial[NDFULL] = {0, 1, 0, 0};
 
-            Real VConCoord[NDFULL] = {1, 0, 0, 0};
-            Real VCovCoord[NDFULL] = {-1, 0, 0, 0};
-            Real VConTetrad[NDFULL];
-            Real VCovTetrad[NDFULL];
-            Real VConTetradReference[NDFULL] = {
+            Real VconCoord[NDFULL] = {1, 0, 0, 0};
+            Real VcovCoord[NDFULL] = {-1, 0, 0, 0};
+            Real VconTetrad[NDFULL];
+            Real VcovTetrad[NDFULL];
+            Real VconTetradReference[NDFULL] = {
                 1.999999999999999112, -1.455213750217997370e+00,
                 -8.072073527955754280e-01, 4.803844614152611436e-01};
-            Real VCovTetradReference[NDFULL] = {
+            Real VcovTetradReference[NDFULL] = {
                 -1.999999999999999112e+00, -1.455213750217997370e+00,
                 -8.072073527955754280e-01, 4.803844614152611436e-01};
-            Real VConCoordCompare[NDFULL];
-            Real VCovCoordCompare[NDFULL];
+            Real VconCoordCompare[NDFULL];
+            Real VcovCoordCompare[NDFULL];
 
             Real Gcov[NDFULL][NDFULL];
             system.SpacetimeMetric(CellLocation::Cent, 0, 0, 0, Gcov);
 
             Geometry::Tetrads Tetrads(TetradFrame, Trial, Gcov);
-            Tetrads.CoordToTetradCon(VConCoord, VConTetrad);
-            Tetrads.TetradToCoordCon(VConTetrad, VConCoordCompare);
+            Tetrads.CoordToTetradCon(VconCoord, VconTetrad);
+            Tetrads.TetradToCoordCon(VconTetrad, VconCoordCompare);
 
             for (int mu = 0; mu < NDFULL; mu++) {
-              if (!SoftEquiv(VConCoordCompare[mu], VConCoord[mu])) {
+              if (!SoftEquiv(VconCoordCompare[mu], VconCoord[mu])) {
                 wrong++;
               }
-              if (!SoftEquiv(VConTetrad[mu], VConTetradReference[mu])) {
+              if (!SoftEquiv(VconTetrad[mu], VconTetradReference[mu])) {
                 wrong++;
               }
             }
 
-            Tetrads.CoordToTetradCov(VCovCoord, VCovTetrad);
-            Tetrads.TetradToCoordCov(VCovTetrad, VCovCoordCompare);
+            Tetrads.CoordToTetradCov(VcovCoord, VcovTetrad);
+            Tetrads.TetradToCoordCov(VcovTetrad, VcovCoordCompare);
 
             for (int mu = 0; mu < NDFULL; mu++) {
-              if (!SoftEquiv(VCovCoordCompare[mu], VCovCoord[mu])) {
+              if (!SoftEquiv(VcovCoordCompare[mu], VcovCoord[mu])) {
                 wrong++;
               }
-              if (!SoftEquiv(VCovTetrad[mu], VCovTetradReference[mu])) {
+              if (!SoftEquiv(VcovTetrad[mu], VcovTetradReference[mu])) {
                 wrong++;
               }
             }
