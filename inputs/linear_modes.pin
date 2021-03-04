@@ -6,11 +6,12 @@ problem_id  = hydro_modes       # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = p.density,  &
-	    c.density,  &
+	          c.density,  &
             p.velocity, &
             p.energy,   &
-	    pressure,	&
-	    cs
+            p.bfield,   &
+	          pressure,	  &
+	          cs
 
 file_type   = hdf5      # Tabular data dump
 dt          = 0.5      # time increment between outputs
@@ -23,6 +24,7 @@ ncycle_out  = 10        # interval for stdout summary info
 dt_init_fact = 0.1
 
 <parthenon/mesh>
+nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
@@ -32,7 +34,7 @@ x1max       = 1         # maximum value of X1
 ix1_bc      = periodic  # Inner-X1 boundary condition flag
 ox1_bc      = periodic  # Outer-X1 boundary condition flag
 
-nx2         = 1       # Number of zones in X2-direction
+nx2         = 512       # Number of zones in X2-direction
 x2min       = -1        # minimum value of X2
 x2max       = 1         # maximum value of X2
 ix2_bc      = periodic  # Inner-X2 boundary condition flag
@@ -46,9 +48,10 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-#<parthenon/meshblock>
-#nx1 = 32
-3nx2 = 32
+<parthenon/meshblock>
+nx1 = 512
+nx2 = 512
+nx3 = 1
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -57,7 +60,7 @@ max_level = 3
 
 <eos>
 type = IdealGas
-Gamma = 1.6666666666666666667
+Gamma = 1.333333333333333333
 Cv = 1.0
 
 <physics>
@@ -67,6 +70,7 @@ he = false
 rad = false
 
 <fluid>
+mhd = true
 xorder = 2
 cfl = 0.4
 riemann = hll
@@ -76,5 +80,6 @@ recon = linear
 c2p_tol = 1.e-12
 
 <hydro_modes>
-mode = sound
+physics = mhd
+mode = alfven
 amplitude = 1.e-5

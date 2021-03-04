@@ -16,10 +16,11 @@ add_executable(phoebus
 
   # alphabetical
 
-  fluid/con2prim.cpp
   fluid/con2prim.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
+  fluid/riemann.cpp
+  fluid/riemann.hpp
   fluid/tmunu.hpp
 
   geometry/coordinate_systems.hpp
@@ -33,6 +34,7 @@ add_executable(phoebus
 
   pgen/pgen.hpp
   pgen/pgen.cpp
+  pgen/kh.cpp
   pgen/linear_modes.cpp
   pgen/shock_tube.cpp
   pgen/thin_cooling.cpp

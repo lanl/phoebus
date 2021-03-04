@@ -18,11 +18,10 @@ const std::vector<std::string> TMUNU_VARS = {"p.density", "p.velocity",
 template <typename Pack> class StressEnergyTensorCon {
 public:
   // TODO(JMM): Should these be moved out of Geometry?
-  static constexpr int ND = Geometry::CoordinateSystem::NDFULL;
+  static constexpr int ND = Geometry::NDFULL;
   static constexpr Real SMALL = Geometry::SMALL;
   static constexpr CellLocation loc = CellLocation::Cent;
 
-  KOKKOS_INLINE_FUNCTION
   StressEnergyTensorCon() = default;
 
   template <typename Data> StressEnergyTensorCon(Data *rc) {
@@ -85,12 +84,13 @@ private:
   template <typename... Args>
   KOKKOS_INLINE_FUNCTION Real GetLorentzFactor_(Args &&... args) const {
     Real W = 1;
+    Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
+    system_.Metric(loc, std::forward<Args>(args)..., gamma);
     for (int l = 1; l < ND; ++l) {
       for (int m = 1; m < ND; ++m) {
-        Real gamma = system_.Metric(l, m, loc, std::forward<Args>(args)...);
         Real vl = v_(l, std::forward<Args>(args)...);
         Real vm = v_(m, std::forward<Args>(args)...);
-        W -= vl * vm * gamma;
+        W -= vl * vm * gamma[l-1][m-1];
       }
     }
     W = 1. / std::sqrt(std::abs(W) + SMALL);
