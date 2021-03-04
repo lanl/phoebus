@@ -1,4 +1,4 @@
-add_library(geometry_unit_tests OBJECT test_geometry.cpp)
+add_library(geometry_unit_tests OBJECT test_geometry.cpp test_tetrads.cpp)
 
 target_link_libraries(geometry_unit_tests
   PRIVATE
