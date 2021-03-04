@@ -9,14 +9,12 @@
 // TODO(JMM): Fix this include
 #include "../../external/singularity-eos/utils/variant/include/mpark/variant.hpp"
 
+#include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 
 using namespace parthenon::package::prelude;
 
 namespace Geometry {
-
-static constexpr int NDSPACE = 3;
-static constexpr int NDFULL = NDSPACE + 1;
 
 // replace this with std::variant when the time comes
 template <typename... Ts> using geo_variant = mpark::variant<Ts...>;

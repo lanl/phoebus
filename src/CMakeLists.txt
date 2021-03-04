@@ -24,9 +24,10 @@ add_executable(phoebus
   fluid/tmunu.hpp
 
   geometry/coordinate_systems.hpp
-  geometry/geometry_variant.hpp
   geometry/geometry.cpp
   geometry/geometry.hpp
+  geometry/geometry_utils.hpp
+  geometry/geometry_variant.hpp
   geometry/tetrads.hpp
 
   microphysics/eos_phoebus/eos_phoebus.hpp

@@ -12,6 +12,7 @@
 #include <utils/error_checking.hpp>
 
 // phoebus includes
+#include "geometry/geometry_utils.hpp"
 #include "geometry/geometry_variant.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 
@@ -21,7 +22,6 @@ using parthenon::ParArray1D;
 namespace Geometry {
 
 using parthenon::Coordinates_t;
-constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
 
 // Boiler plate for analytic coordinate systems so you only need to
 // define the functions of X0,X1,X2,X3, not all the functions of indices.
