@@ -7,11 +7,6 @@
 
 namespace Geometry {
 
-//#define MULOOP for (int mu = 0; mu < NDFULL; mu++)
-//#define SPACETIMELOOP(nu) for (int nu = 0; nu < NDFULL; nu++)
-
-#define SPACETIMELOOP(mu) for (int mu = 0; mu < NDFULL; mu++)
-
 class Tetrads {
 public:
   KOKKOS_FUNCTION
@@ -168,10 +163,6 @@ private:
   Real Econ_[NDFULL][NDFULL];
   Real Ecov_[NDFULL][NDFULL];
 };
-
-#undef SPACETIMELOOP
-//#undef MULOOP
-//#undef SPACETIMELOOP(nu)
 
 } // namespace Geometry
 
