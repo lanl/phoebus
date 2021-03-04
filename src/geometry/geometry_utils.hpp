@@ -107,7 +107,7 @@ void Raise(const double Vcov[NDFULL], const double Gcon[NDFULL][NDFULL],
 }
 
 KOKKOS_INLINE_FUNCTION
-int Delta(const int a, const int b) {
+int KroneckerDelta(const int a, const int b) {
   if (a == b) {
     return 1;
   } else {

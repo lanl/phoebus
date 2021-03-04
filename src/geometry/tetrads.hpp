@@ -34,9 +34,9 @@ public:
 
     // Use X1, X2, X3. Then, whichever is closest to Trial, overwrite.
     SPACETIMELOOP(mu) {
-      Econ_[1][mu] = Geometry::Utils::Delta(mu, 1);
-      Econ_[2][mu] = Geometry::Utils::Delta(mu, 2);
-      Econ_[3][mu] = Geometry::Utils::Delta(mu, 3);
+      Econ_[1][mu] = Geometry::Utils::KroneckerDelta(mu, 1);
+      Econ_[2][mu] = Geometry::Utils::KroneckerDelta(mu, 2);
+      Econ_[3][mu] = Geometry::Utils::KroneckerDelta(mu, 3);
     }
 
     if (norm > SMALL) {
