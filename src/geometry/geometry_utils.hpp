@@ -88,4 +88,7 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
 } // namespace Utils
 } // namespace Geometry
 
+#define SPACELOOP(i) for (int i = 0; i < Geometry::NDSPACE; i++)
+#define SPACETIMELOOP(mu) for (int mu = 0; mu < Geometry::NDFULL; mu++)
+
 #endif // GEOMETRY_GEOMETRY_UTILS_HPP_
