@@ -113,13 +113,25 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   return TaskStatus::complete;
 }
 
+// Temporary cooling problem functions etc.
+  enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
+  KOKKOS_INLINE_FUNCTION Real Getyf(Real Ye, NeutrinoSpecies s) {
+    if (s == NeutrinoSpecies::Electron) {
+      return 2.*Ye;
+    } else if (s == NeutrinoSpecies::ElectronAnti) {
+      return 1. - 2.*Ye;
+    } else {
+      return 0.;
+    }
+  }
+
 TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = primitive_variables;
   namespace c = conserved_variables;
   auto *pmb = rc->GetParentPointer().get();
 
   std::vector<std::string> vars(
-      {p::density, p::velocity, p::temperature, c::energy, "Gcov", "Gye"});
+      {p::density, p::velocity, p::temperature, p::ye, c::energy, "Gcov", "Gye"});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
@@ -127,6 +139,7 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
   const int pvlo = imap[p::velocity].first;
   const int pvhi = imap[p::velocity].second;
   const int ptemp = imap[p::temperature].first;
+  const int pye = imap[p::ye].first;
   const int ceng = imap[c::energy].first;
   const int Gcov_lo = imap["Gcov"].first;
   const int Gcov_hi = imap["Gcov"].second;
@@ -151,6 +164,12 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
+  // Temporary cooling problem parameters
+  Real C = 1.;
+  Real numax = 1.e17;
+  Real numin = 1.e7;
+  NeutrinoSpecies s = NeutrinoSpecies::Electron;
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CalculateRadiationForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -165,7 +184,20 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
         Real ne_cgs = GetNumberDensity(v(prho, k, j, i) * RHO);
         Real Lambda_cgs =
             4. * M_PI * pc.kb * pow(ne_cgs, 2) * N / pc.h * pow(T_cgs, 1. / 2.);
+            printf("4.*M_PI*pc.kb*pow*ne_cgs, 2) *N/pc.h = %e\n",
+              4.*M_PI*pc.kb*pow(ne_cgs, 2) *N/pc.h);
         Real Lambda_code = Lambda_cgs * CPOWERDENS;
+
+        Real Ac = pc.mp/(pc.h*v(prho, k, j, i) * RHO)*C*log(numax/numin);
+        printf("rho = %e\n", v(prho, k, j, i) * RHO);
+        Real Bc = C*(numax - numin);
+        printf("Ac: %e Bc: %e\n", Ac, Bc);
+
+        printf("Lambda_code = %e\n", Lambda_code);
+        Real J = C*Getyf(v(pye, k, j, i), s)*(numax - numin);
+        printf("C: %e yf: %e dnu: %e\n", C, Getyf(v(pye, k, j, i), s), numax-numin);
+        printf("J = %e\n", J);
+        exit(-1);
 
         Real Gcov_tetrad[4] = {Lambda_code, 0, 0, 0};
         Real Gcov_coord[4];

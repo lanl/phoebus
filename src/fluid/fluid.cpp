@@ -228,7 +228,7 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
           BdotB += gcov[m][n-pb_lo] * v(b, pb_lo+m, k, j, i) * v(b, n, k, j, i);
         }
       }
-      
+
       // Lorentz factor
       const Real W = 1.0/sqrt(1.0 - vsq);
 
@@ -327,7 +327,7 @@ TaskStatus ConservedToPrimitive(T *rc) {
     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
       invert.Finalize(eos,geom,k,j,i);
     });
-  
+
 
   return TaskStatus::complete;
 }
