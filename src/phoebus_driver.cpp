@@ -192,6 +192,7 @@ TaskCollection PhoebusDriver::RadiationStep() {
   BlockList_t &blocks = pmesh->block_list;
 
   const Real dt = integrator->dt;
+  printf("idt: %e\n", integrator->dt);
   const auto &stage_name = integrator->stage_name;
 
   auto num_independent_task_lists = blocks.size();
@@ -207,9 +208,11 @@ TaskCollection PhoebusDriver::RadiationStep() {
 
       //auto sc = pmb->swarm_data.Get();
 
-      auto calculate_four_force = tl.AddTask(none, radiation::CalculateRadiationFourForce, sc0.get(), dt);
+      auto calculate_four_force = tl.AddTask(none, radiation::CalculateRadiationFourForce,
+       sc0.get(), dt);
 
-      auto apply_four_force = tl.AddTask(calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
+      auto apply_four_force = tl.AddTask(calculate_four_force,
+       radiation::ApplyRadiationFourForce, sc0.get(), dt);
     }
   }
 

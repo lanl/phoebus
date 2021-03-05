@@ -1,4 +1,5 @@
 PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
+DUMP_NAMES = '/home/brryan/builds/phoebus/cooling.out1.*.phdf'
 
 import numpy as np
 import sys
@@ -60,7 +61,20 @@ t = np.logspace(0, 2, 128)
 Ye = get_Ye(t)
 u = get_u(t)
 
-fig, axes = plt.subplots(2, 1)
+T_unit = 1./2.997925e-04
+
+dfnams = np.sort(glob.glob(DUMP_NAMES))
+t_code = np.zeros(dfnams.size)
+Ye_code = np.zeros(dfnams.size)
+for n, dfnam in enumerate(dfnams):
+  dfile = phdf.phdf(dfnam)
+  t_code[n] = dfile.Time*T_unit
+  Ye_code[n] = dfile.Get("p.ye").mean()
+
+print(t_code)
+print(Ye_code)
+
+fig, axes = plt.subplots(2, 1, figsize=(8,6))
 ax = axes[0]
 #plt.xlabel('N')
 #plt.ylabel('L1')
@@ -68,8 +82,11 @@ ax = axes[0]
 ax.set_yscale('log')
 ax.set_xticklabels([])
 #plt.title(physics + ' ' + mode_name)
-ax.plot(t, Ye)
+ax.plot(t_code, Ye_code, color='r', label='phoebus')
+ax.plot(t, Ye, color='k', linestyle='--', label='Analytic')
+ax.set_xlim([0, t[-1]])
 ax.set_ylabel('Ye')
+ax.legend(loc=1)
 
 ax = axes[1]
 ax.plot(t, u)
