@@ -21,6 +21,38 @@ namespace radiation {
 
 parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
+// TODO(BRR) Utilities that should be moved
+#define SMALL (1.e-200)
+KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(Real v[4],
+                                             const Geometry::CoordinateSystem &system,
+                                             CellLocation loc, const int k, const int j,
+                                             const int i) {
+  Real W = 1;
+  Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
+  system.Metric(loc, k, j, i, gamma);
+  for (int l = 1; l < Geometry::NDFULL; ++l) {
+    for (int m = 1; m < Geometry::NDFULL; ++m) {
+      W -= v[l] * v[m] * gamma[l - 1][m - 1];
+    }
+  }
+  W = 1. / std::sqrt(std::abs(W) + SMALL);
+  return W;
+}
+
+KOKKOS_INLINE_FUNCTION void GetFourVelocity(Real v[4],
+                                            const Geometry::CoordinateSystem &system,
+                                            CellLocation loc, const int k, const int j,
+                                            const int i, Real u[Geometry::NDFULL]) {
+  Real beta[Geometry::NDSPACE];
+  Real W = GetLorentzFactor(v, system, loc, k, j, i);
+  Real alpha = system.Lapse(loc, k, j, i);
+  system.ContravariantShift(loc, k, j, i, beta);
+  u[0] = W / (std::abs(alpha) + SMALL);
+  for (int l = 1; l < Geometry::NDFULL; ++l) {
+    u[l] = W * v[l - 1] - u[0] * beta[l - 1];
+  }
+}
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("radiation");
 
@@ -37,6 +69,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata mfourforce = Metadata({Metadata::Cell, Metadata::OneCopy}, four_vec);
   physics->AddField("Gcov", mfourforce);
 
+  Metadata mscalar = Metadata({Metadata::Cell, Metadata::OneCopy});
+  physics->AddField("Gye", mscalar);
+
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
@@ -47,14 +82,16 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace c = conserved_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({c::energy, c::momentum, "Gcov"});
+  std::vector<std::string> vars({c::energy, c::momentum, c::ye, "Gcov", "Gye"});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int ceng = imap[c::energy].first;
   const int cmom_lo = imap[c::density].first;
   const int cmom_hi = imap[c::density].second;
+  const int cye = imap[c::ye].first;
   const int Gcov_lo = imap["Gcov"].first;
   const int Gcov_hi = imap["Gcov"].second;
+  const int Gye = imap["Gye"].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -70,6 +107,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
+        v(cye, k, j, i) += v(Gye, k, j, i) * dt;
       });
 
   return TaskStatus::complete;
@@ -80,15 +118,19 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
   namespace c = conserved_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({p::density, p::temperature, c::energy, "Gcov"});
+  std::vector<std::string> vars(
+      {p::density, p::velocity, p::temperature, c::energy, "Gcov", "Gye"});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
   const int prho = imap[p::density].first;
+  const int pvlo = imap[p::velocity].first;
+  const int pvhi = imap[p::velocity].second;
   const int ptemp = imap[p::temperature].first;
   const int ceng = imap[c::energy].first;
   const int Gcov_lo = imap["Gcov"].first;
   const int Gcov_hi = imap["Gcov"].second;
+  const int Gye = imap["Gye"].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -114,10 +156,10 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real Gcov[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
-        Real lorentz = 2;
-        Real Ucon[4] = {-lorentz, sqrt(-1. + lorentz * lorentz), 0, 0};
-        Real Trial[4] = {0, 1, 0, 0};
-        Geometry::Tetrads Tetrads(Ucon, Trial, Gcov);
+        Real Ucon[4];
+        Real vel[4] = {0, v(pvlo, k, j, i), v(pvlo + 1, k, j, i), v(pvlo + 2, k, j, i)};
+        GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
+        Geometry::Tetrads Tetrads(Ucon, Gcov);
 
         Real T_cgs = v(ptemp, k, j, i) * TEMP;
         Real ne_cgs = GetNumberDensity(v(prho, k, j, i) * RHO);
@@ -128,10 +170,12 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
         Real Gcov_tetrad[4] = {Lambda_code, 0, 0, 0};
         Real Gcov_coord[4];
         Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
+        Real detG = geom.DetG(CellLocation::Cent, k, j, i);
 
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-          v(mu, k, j, i) = Gcov_coord[mu - Gcov_lo];
+          v(mu, k, j, i) = detG * Gcov_coord[mu - Gcov_lo];
         }
+        v(Gye, k, j, i) = detG * 0. / dt;
       });
 
   return TaskStatus::complete;

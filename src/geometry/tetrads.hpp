@@ -12,6 +12,51 @@ public:
   KOKKOS_FUNCTION
   Tetrads(const double Ucon[NDFULL], const double Trial[NDFULL],
           const double Gcov[NDFULL][NDFULL]) {
+    ConstructTetrads_(Ucon, Trial, Gcov);
+  }
+
+  KOKKOS_FUNCTION
+  Tetrads(const double Ucon[NDFULL], const double Gcov[NDFULL][NDFULL]) {
+    Real Trial[NDFULL] = {0, 1, 0, 0};
+    ConstructTetrads_(Ucon, Trial, Gcov);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void CoordToTetradCon(const Real VCoord[NDFULL], Real VTetrad[NDFULL]) {
+    SPACETIMELOOP(mu) {
+      VTetrad[mu] = 0.;
+      SPACETIMELOOP(nu) { VTetrad[mu] += Ecov_[mu][nu] * VCoord[nu]; }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void CoordToTetradCov(const Real VCoord[NDFULL], Real VTetrad[NDFULL]) {
+    SPACETIMELOOP(mu) {
+      VTetrad[mu] = 0.;
+      SPACETIMELOOP(nu) { VTetrad[mu] += Econ_[mu][nu] * VCoord[nu]; }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void TetradToCoordCon(const Real VTetrad[NDFULL], Real VCoord[NDFULL]) {
+    SPACETIMELOOP(mu) {
+      VCoord[mu] = 0.;
+      SPACETIMELOOP(nu) { VCoord[mu] += Econ_[nu][mu] * VTetrad[nu]; }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void TetradToCoordCov(const Real VTetrad[NDFULL], Real VCoord[NDFULL]) {
+    SPACETIMELOOP(mu) {
+      VCoord[mu] = 0.;
+      SPACETIMELOOP(nu) { VCoord[mu] += Ecov_[nu][mu] * VTetrad[nu]; }
+    }
+  }
+
+private:
+  KOKKOS_FUNCTION
+  void ConstructTetrads_(const double Ucon[NDFULL], const double Trial[NDFULL],
+                         const double Gcov[NDFULL][NDFULL]) {
 
     Real X1ness = 0.;
     Real X2ness = 0.;
@@ -68,40 +113,6 @@ public:
     SPACETIMELOOP(mu) { Geometry::Utils::Lower(Econ_[mu], Gcov, Ecov_[mu]); }
     SPACETIMELOOP(mu) { Ecov_[0][mu] *= -1.; }
   }
-
-  KOKKOS_INLINE_FUNCTION
-  void CoordToTetradCon(const Real VCoord[NDFULL], Real VTetrad[NDFULL]) {
-    SPACETIMELOOP(mu) {
-      VTetrad[mu] = 0.;
-      SPACETIMELOOP(nu) { VTetrad[mu] += Ecov_[mu][nu] * VCoord[nu]; }
-    }
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void CoordToTetradCov(const Real VCoord[NDFULL], Real VTetrad[NDFULL]) {
-    SPACETIMELOOP(mu) {
-      VTetrad[mu] = 0.;
-      SPACETIMELOOP(nu) { VTetrad[mu] += Econ_[mu][nu] * VCoord[nu]; }
-    }
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void TetradToCoordCon(const Real VTetrad[NDFULL], Real VCoord[NDFULL]) {
-    SPACETIMELOOP(mu) {
-      VCoord[mu] = 0.;
-      SPACETIMELOOP(nu) { VCoord[mu] += Econ_[nu][mu] * VTetrad[nu]; }
-    }
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void TetradToCoordCov(const Real VTetrad[NDFULL], Real VCoord[NDFULL]) {
-    SPACETIMELOOP(mu) {
-      VCoord[mu] = 0.;
-      SPACETIMELOOP(nu) { VCoord[mu] += Ecov_[nu][mu] * VTetrad[nu]; }
-    }
-  }
-
-private:
   KOKKOS_INLINE_FUNCTION
   void Normalize_(double Vcon[NDFULL], const double Gcov[NDFULL][NDFULL]) {
     double norm = 0.;
