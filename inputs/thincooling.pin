@@ -12,11 +12,13 @@ variables = p.density,  &
             temperature
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1.e3      # time increment between outputs
+#dt          = 1.e3      # time increment between outputs
+dt = 1.e-5
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 2.5e4       # time limit
+#tlim        = 2.5e4       # time limit
+tlim = 2.997925e-04
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1        # interval for stdout summary info
 dt_init_fact = 1.e-6

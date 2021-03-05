@@ -100,9 +100,11 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        printf("Applying four force %e %e %e %e\n", v(Gcov_lo, k, j, i),
-               v(Gcov_lo + 1, k, j, i), v(Gcov_lo + 2, k, j, i), v(Gcov_lo + 3, k, j, i));
-        exit(-1);
+        printf("Applying four force %e %e %e %e - %e Deltat = %e\n", v(Gcov_lo, k, j, i),
+               v(Gcov_lo + 1, k, j, i), v(Gcov_lo + 2, k, j, i), v(Gcov_lo + 3, k, j, i),
+               v(Gye, k, j, i), dt);
+        printf("to u = %e ye = %e\n", v(ceng, k, j, i), v(cye, k, j, i));
+        //exit(-1);
         v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
@@ -156,11 +158,15 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
 
   const Real RHO = unit_conv.GetMassDensityCodeToCGS();
   const Real TEMP = unit_conv.GetTemperatureCodeToCGS();
+  const Real MASS = unit_conv.GetMassCodeToCGS();
 
+  const Real CMASS = unit_conv.GetMassCGSToCode();
   const Real CENERGY = unit_conv.GetEnergyCGSToCode();
   const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
   const Real CTIME = unit_conv.GetTimeCGSToCode();
   const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
+
+  printf("CDENSITY: %e CTIME: %e\n", CDENSITY, CTIME);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -197,9 +203,9 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
         Real J = C*Getyf(v(pye, k, j, i), s)*(numax - numin);
         printf("C: %e yf: %e dnu: %e\n", C, Getyf(v(pye, k, j, i), s), numax-numin);
         printf("J = %e\n", J);
-        exit(-1);
 
-        Real Gcov_tetrad[4] = {Lambda_code, 0, 0, 0};
+        //Real Gcov_tetrad[4] = {Lambda_code, 0, 0, 0};
+        Real Gcov_tetrad[4] = {Bc*Getyf(v(pye, k, j, i), s)*CPOWERDENS, 0, 0, 0};
         Real Gcov_coord[4];
         Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
         Real detG = geom.DetG(CellLocation::Cent, k, j, i);
@@ -207,7 +213,8 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
           v(mu, k, j, i) = detG * Gcov_coord[mu - Gcov_lo];
         }
-        v(Gye, k, j, i) = detG * 0. / dt;
+        //v(Gye, k, j, i) = detG * 0. / dt;
+        v(Gye, k, j, i) = -detG*v(prho, k, j, i) * RHO*Ac*Getyf(v(pye, k, j, i), s)*CMASS*CDENSITY/CTIME;
       });
 
   return TaskStatus::complete;
