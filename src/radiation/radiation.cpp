@@ -54,6 +54,7 @@ KOKKOS_INLINE_FUNCTION void GetFourVelocity(Real v[4],
 }
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+  namespace iv = internal_variables;
   auto physics = std::make_shared<StateDescriptor>("radiation");
 
   Params &params = physics->AllParams();
@@ -67,10 +68,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   std::vector<int> four_vec(1, 4);
   Metadata mfourforce = Metadata({Metadata::Cell, Metadata::OneCopy}, four_vec);
-  physics->AddField("Gcov", mfourforce);
+  physics->AddField(iv::Gcov, mfourforce);
 
   Metadata mscalar = Metadata({Metadata::Cell, Metadata::OneCopy});
-  physics->AddField("Gye", mscalar);
+  physics->AddField(iv::Gye, mscalar);
 
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
