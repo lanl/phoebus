@@ -71,8 +71,6 @@ rad = false
 
 <units>
 scale_free = true
-geom_length_cm = 1.
-fluid_mass_g = 1.
 
 <fluid>
 xorder = 2

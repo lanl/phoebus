@@ -34,10 +34,6 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
 
 TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
 
-// TODO(BRR) mean molecular weight/multimat/whatever duh
-KOKKOS_INLINE_FUNCTION
-Real GetNumberDensity(const Real rho_cgs) { return rho_cgs / pc.mp; }
-
 } // namespace radiation
 
 #endif // RADIATION_HPP_
