@@ -62,17 +62,21 @@ Ye = get_Ye(t)
 u = get_u(t)
 
 T_unit = 1./2.997925e-04
+U_unit = 8.987552e-22
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 t_code = np.zeros(dfnams.size)
 Ye_code = np.zeros(dfnams.size)
+u_code = np.zeros(dfnams.size)
 for n, dfnam in enumerate(dfnams):
   dfile = phdf.phdf(dfnam)
   t_code[n] = dfile.Time*T_unit
   Ye_code[n] = dfile.Get("p.ye").mean()
+  u_code[n] = dfile.Get("p.energy").mean()*U_unit
 
-print(t_code)
-print(Ye_code)
+#print(t_code)
+#print(Ye_code)
+#print(u_code)
 
 fig, axes = plt.subplots(2, 1, figsize=(8,6))
 ax = axes[0]
@@ -82,14 +86,16 @@ ax = axes[0]
 ax.set_yscale('log')
 ax.set_xticklabels([])
 #plt.title(physics + ' ' + mode_name)
-ax.plot(t_code, Ye_code, color='r', label='phoebus')
+ax.plot(t_code, Ye_code, color='r', label='phoebus')#, marker='.')
 ax.plot(t, Ye, color='k', linestyle='--', label='Analytic')
 ax.set_xlim([0, t[-1]])
 ax.set_ylabel('Ye')
 ax.legend(loc=1)
 
 ax = axes[1]
-ax.plot(t, u)
+ax.plot(t_code, u_code, color='r')
+ax.plot(t, u, color='k', linestyle='--')
+ax.set_xlim([0, t[-1]])
 ax.set_xlabel('t')
 ax.set_ylabel('u')
 

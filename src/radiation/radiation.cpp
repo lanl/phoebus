@@ -100,12 +100,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        printf("Applying four force %e %e %e %e - %e Deltat = %e\n", v(Gcov_lo, k, j, i),
-               v(Gcov_lo + 1, k, j, i), v(Gcov_lo + 2, k, j, i), v(Gcov_lo + 3, k, j, i),
-               v(Gye, k, j, i), dt);
-        printf("to u = %e ye = %e\n", v(ceng, k, j, i), v(cye, k, j, i));
-        //exit(-1);
-        v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
+        v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
@@ -116,16 +111,16 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
 }
 
 // Temporary cooling problem functions etc.
-  enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
-  KOKKOS_INLINE_FUNCTION Real Getyf(Real Ye, NeutrinoSpecies s) {
-    if (s == NeutrinoSpecies::Electron) {
-      return 2.*Ye;
-    } else if (s == NeutrinoSpecies::ElectronAnti) {
-      return 1. - 2.*Ye;
-    } else {
-      return 0.;
-    }
+enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
+KOKKOS_INLINE_FUNCTION Real Getyf(Real Ye, NeutrinoSpecies s) {
+  if (s == NeutrinoSpecies::Electron) {
+    return 2. * Ye;
+  } else if (s == NeutrinoSpecies::ElectronAnti) {
+    return 1. - 2. * Ye;
+  } else {
+    return 0.;
   }
+}
 
 TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = primitive_variables;
@@ -160,6 +155,9 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
   const Real TEMP = unit_conv.GetTemperatureCodeToCGS();
   const Real MASS = unit_conv.GetMassCodeToCGS();
 
+  const Real EDENS = unit_conv.GetEnergyCodeToCGS()*unit_conv.GetNumberDensityCodeToCGS();
+  printf("EDENS: %e\n", EDENS);
+
   const Real CMASS = unit_conv.GetMassCGSToCode();
   const Real CENERGY = unit_conv.GetEnergyCGSToCode();
   const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
@@ -186,26 +184,10 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
         GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
         Geometry::Tetrads Tetrads(Ucon, Gcov);
 
-        Real T_cgs = v(ptemp, k, j, i) * TEMP;
-        Real ne_cgs = GetNumberDensity(v(prho, k, j, i) * RHO);
-        Real Lambda_cgs =
-            4. * M_PI * pc.kb * pow(ne_cgs, 2) * N / pc.h * pow(T_cgs, 1. / 2.);
-            printf("4.*M_PI*pc.kb*pow*ne_cgs, 2) *N/pc.h = %e\n",
-              4.*M_PI*pc.kb*pow(ne_cgs, 2) *N/pc.h);
-        Real Lambda_code = Lambda_cgs * CPOWERDENS;
+        Real Ac = pc.mp / (pc.h * v(prho, k, j, i) * RHO) * C * log(numax / numin);
+        Real Bc = C * (numax - numin);
 
-        Real Ac = pc.mp/(pc.h*v(prho, k, j, i) * RHO)*C*log(numax/numin);
-        printf("rho = %e\n", v(prho, k, j, i) * RHO);
-        Real Bc = C*(numax - numin);
-        printf("Ac: %e Bc: %e\n", Ac, Bc);
-
-        printf("Lambda_code = %e\n", Lambda_code);
-        Real J = C*Getyf(v(pye, k, j, i), s)*(numax - numin);
-        printf("C: %e yf: %e dnu: %e\n", C, Getyf(v(pye, k, j, i), s), numax-numin);
-        printf("J = %e\n", J);
-
-        //Real Gcov_tetrad[4] = {Lambda_code, 0, 0, 0};
-        Real Gcov_tetrad[4] = {Bc*Getyf(v(pye, k, j, i), s)*CPOWERDENS, 0, 0, 0};
+        Real Gcov_tetrad[4] = {-Bc * Getyf(v(pye, k, j, i), s) * CPOWERDENS, 0, 0, 0};
         Real Gcov_coord[4];
         Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
         Real detG = geom.DetG(CellLocation::Cent, k, j, i);
@@ -213,8 +195,8 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
           v(mu, k, j, i) = detG * Gcov_coord[mu - Gcov_lo];
         }
-        //v(Gye, k, j, i) = detG * 0. / dt;
-        v(Gye, k, j, i) = -detG*v(prho, k, j, i) * RHO*Ac*Getyf(v(pye, k, j, i), s)*CMASS*CDENSITY/CTIME;
+        v(Gye, k, j, i) = -detG * v(prho, k, j, i) * (Ac/CTIME) *
+                          Getyf(v(pye, k, j, i), s);
       });
 
   return TaskStatus::complete;
