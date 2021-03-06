@@ -18,10 +18,10 @@
 #include "radiation/radiation.hpp"
 #include "utils/constants.hpp"
 
-// Optically thin cooling.
-// As described in the bhlight test suite
-// Ryan, B. R., Dolence, J. C., & Gammie, C. F. 2015, ApJ, 807, 31.
-// doi:10.1088/0004-637X/807/1/31
+// Optically thin neutrino cooling.
+// As described in the nubhlight test suite
+// Miller, J. M., Ryan, B. R., & Dolence, J. C. 2019, ApJS, 241, 30
+// doi:10.3847/1538-4365/ab09fc
 
 namespace thin_cooling {
 
@@ -53,11 +53,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto eos = eospkg->Param<singularity::EOS>("d.EOS");
   auto &unit_conv = eospkg.get()->Param<phoebus::UnitConversions>("unit_conv");
 
-  //const Real ne0 = pin->GetOrAddReal("thincooling", "ne0", 5.858732e+07);
-  //const Real rho0 = ne0 * pc.mp * unit_conv.GetMassDensityCGSToCode();
-  //const Real T0 =
-  //    pin->GetOrAddReal("thincooling", "T0", 1.e8) * unit_conv.GetTemperatureCGSToCode();
-
   const Real rho0 = 1.e6 * unit_conv.GetMassDensityCGSToCode();
   const Real u0 = 1.e20*unit_conv.GetEnergyCGSToCode()*unit_conv.GetNumberDensityCGSToCode();
 
@@ -69,9 +64,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ieng, k, j, i) = u0;
         v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho0, u0/rho0);
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho0, u0/rho0);
-        //v(iprs, k, j, i) = eos.PressureFromDensityTemperature(rho0, T0);
-        //v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho0, v(iprs, k, j, i));
-        //v(itmp, k, j, i) = T0;
         v(iye, k, j, i) = 0.5; // TODO(BRR) change depending on species
 
         for (int d = 0; d < 3; d++)
@@ -82,5 +74,3 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 }
 
 } // namespace thin_cooling
-
-//} // namespace phoebus

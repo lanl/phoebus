@@ -80,18 +80,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace c = conserved_variables;
+  namespace iv = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({c::energy, c::momentum, c::ye, "Gcov", "Gye"});
+  std::vector<std::string> vars({c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int ceng = imap[c::energy].first;
   const int cmom_lo = imap[c::density].first;
   const int cmom_hi = imap[c::density].second;
   const int cye = imap[c::ye].first;
-  const int Gcov_lo = imap["Gcov"].first;
-  const int Gcov_hi = imap["Gcov"].second;
-  const int Gye = imap["Gye"].first;
+  const int Gcov_lo = imap[iv::Gcov].first;
+  const int Gcov_hi = imap[iv::Gcov].second;
+  const int Gye = imap[iv::Gye].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -110,6 +111,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   return TaskStatus::complete;
 }
 
+// TODO(BRR) move this somewhere else
 // Temporary cooling problem functions etc.
 enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
 KOKKOS_INLINE_FUNCTION Real Getyf(Real Ye, NeutrinoSpecies s) {
@@ -125,22 +127,22 @@ KOKKOS_INLINE_FUNCTION Real Getyf(Real Ye, NeutrinoSpecies s) {
 TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = primitive_variables;
   namespace c = conserved_variables;
+  namespace iv = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
 
   std::vector<std::string> vars(
-      {p::density, p::velocity, p::temperature, p::ye, c::energy, "Gcov", "Gye"});
+      {p::density, p::velocity, p::temperature, p::ye, c::energy, iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
   const int prho = imap[p::density].first;
   const int pvlo = imap[p::velocity].first;
   const int pvhi = imap[p::velocity].second;
-  const int ptemp = imap[p::temperature].first;
   const int pye = imap[p::ye].first;
   const int ceng = imap[c::energy].first;
-  const int Gcov_lo = imap["Gcov"].first;
-  const int Gcov_hi = imap["Gcov"].second;
-  const int Gye = imap["Gye"].first;
+  const int Gcov_lo = imap[iv::Gcov].first;
+  const int Gcov_hi = imap[iv::Gcov].second;
+  const int Gye = imap[iv::Gye].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -149,22 +151,11 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
 
-  constexpr double N = 5.4e-39; // cgs
-
   const Real RHO = unit_conv.GetMassDensityCodeToCGS();
-  const Real TEMP = unit_conv.GetTemperatureCodeToCGS();
-  const Real MASS = unit_conv.GetMassCodeToCGS();
-
-  const Real EDENS = unit_conv.GetEnergyCodeToCGS()*unit_conv.GetNumberDensityCodeToCGS();
-  printf("EDENS: %e\n", EDENS);
-
-  const Real CMASS = unit_conv.GetMassCGSToCode();
   const Real CENERGY = unit_conv.GetEnergyCGSToCode();
   const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
   const Real CTIME = unit_conv.GetTimeCGSToCode();
   const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
-
-  printf("CDENSITY: %e CTIME: %e\n", CDENSITY, CTIME);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -195,8 +186,8 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
           v(mu, k, j, i) = detG * Gcov_coord[mu - Gcov_lo];
         }
-        v(Gye, k, j, i) = -detG * v(prho, k, j, i) * (Ac/CTIME) *
-                          Getyf(v(pye, k, j, i), s);
+        v(Gye, k, j, i) =
+            -detG * v(prho, k, j, i) * (Ac / CTIME) * Getyf(v(pye, k, j, i), s);
       });
 
   return TaskStatus::complete;

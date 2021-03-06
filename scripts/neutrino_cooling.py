@@ -13,7 +13,7 @@ import phdf
 import time
 from enum import Enum
 
-NeutrinoSpecies = Enum('electron', 'electron anti')
+NeutrinoSpecies = Enum('NeutrinoSpecies', 'electron electronanti')
 
 s = NeutrinoSpecies.electron
 mp = 1.672621777e-24
@@ -24,21 +24,20 @@ C = 1.
 rho = 1.e6
 u0 = 1.e20
 
-
 Ac = mp/(h*rho)*C*np.log(numax/numin)
 Bc = C*(numax - numin)
 
 def get_yf(Ye):
   if s == NeutrinoSpecies.electron:
     return 2.*Ye
-  elif s == NeutrinoSpecies.electron:
+  elif s == NeutrinoSpecies.electronanti:
     return 1. - 2.*Ye
   else:
     return 0.
 def get_Ye0():
   if s == NeutrinoSpecies.electron:
     return 0.5
-  elif s == NeutrinoSpecies.electron:
+  elif s == NeutrinoSpecies.electronanti:
     return 0.
   else:
     return None
@@ -46,21 +45,18 @@ def get_Ye(t):
   Ye0 = get_Ye0()
   if s == NeutrinoSpecies.electron:
     return np.exp(-2.*Ac*t)*Ye0
-  elif s == NeutrinoSpecies.electron:
+  elif s == NeutrinoSpecies.electronanti:
     return 0.5 + np.exp(-2.*Ac*t)*(Ye0 - 0.5)
   else:
     return None
 def get_u(t):
   return u0 + Bc/(2.*Ac)*(np.exp(-2.*Ac*t) - 1.)
 
-
-print("Ac = %e" % Ac)
-print("BC = %e" % Bc)
-
 t = np.logspace(0, 2, 128)
 Ye = get_Ye(t)
 u = get_u(t)
 
+# TODO(BRR) get these from dump files
 T_unit = 1./2.997925e-04
 U_unit = 8.987552e-22
 
@@ -74,19 +70,11 @@ for n, dfnam in enumerate(dfnams):
   Ye_code[n] = dfile.Get("p.ye").mean()
   u_code[n] = dfile.Get("p.energy").mean()*U_unit
 
-#print(t_code)
-#print(Ye_code)
-#print(u_code)
-
 fig, axes = plt.subplots(2, 1, figsize=(8,6))
 ax = axes[0]
-#plt.xlabel('N')
-#plt.ylabel('L1')
-#ax.set_xscale('log')
 ax.set_yscale('log')
 ax.set_xticklabels([])
-#plt.title(physics + ' ' + mode_name)
-ax.plot(t_code, Ye_code, color='r', label='phoebus')#, marker='.')
+ax.plot(t_code, Ye_code, color='r', label='phoebus')
 ax.plot(t, Ye, color='k', linestyle='--', label='Analytic')
 ax.set_xlim([0, t[-1]])
 ax.set_ylabel('Ye')
@@ -100,5 +88,3 @@ ax.set_xlabel('t')
 ax.set_ylabel('u')
 
 plt.show()
-
-

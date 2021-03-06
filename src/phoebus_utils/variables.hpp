@@ -28,6 +28,8 @@ namespace internal_variables {
   constexpr char ql[] = "ql";
   constexpr char qr[] = "qr";
   constexpr char fail[] = "fail";
+  constexpr char Gcov[] = "Gcov";
+  constexpr char Gye[] = "Gye";
 }
 
 namespace diagnostic_variables {

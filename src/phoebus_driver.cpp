@@ -185,14 +185,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 }
 
 TaskCollection PhoebusDriver::RadiationStep() {
-  //using namespace ::parthenon::Update;
   TaskCollection tc;
   TaskID none(0);
 
   BlockList_t &blocks = pmesh->block_list;
 
   const Real dt = integrator->dt;
-  printf("idt: %e\n", integrator->dt);
   const auto &stage_name = integrator->stage_name;
 
   auto num_independent_task_lists = blocks.size();
@@ -206,6 +204,7 @@ TaskCollection PhoebusDriver::RadiationStep() {
       auto &tl = async_region[ib];
       auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
 
+      // TODO(BRR) use particles
       //auto sc = pmb->swarm_data.Get();
 
       auto calculate_four_force = tl.AddTask(none, radiation::CalculateRadiationFourForce,
