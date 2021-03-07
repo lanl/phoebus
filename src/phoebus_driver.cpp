@@ -184,6 +184,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   return tc;
 }
 
+TaskStatus DefaultTask() { return TaskStatus::complete; }
+
 TaskCollection PhoebusDriver::RadiationStep() {
   TaskCollection tc;
   TaskID none(0);
@@ -200,8 +202,8 @@ TaskCollection PhoebusDriver::RadiationStep() {
     auto pmb = blocks[ib].get();
     StateDescriptor *rad = pmb->packages.Get("radiation").get();
     auto rad_active = rad->Param<bool>("active");
+    auto &tl = async_region[ib];
     if (rad_active) {
-      auto &tl = async_region[ib];
       auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
 
       // TODO(BRR) use particles
@@ -212,6 +214,8 @@ TaskCollection PhoebusDriver::RadiationStep() {
 
       auto apply_four_force = tl.AddTask(calculate_four_force,
        radiation::ApplyRadiationFourForce, sc0.get(), dt);
+    } else {
+      auto default_task = tl.AddTask(none, DefaultTask);
     }
   }
 
@@ -223,12 +227,8 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
 
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
   packages.Add(Geometry::Initialize(pin.get()));
-  if (pin->GetBoolean("physics", "hydro") == true) {
-    packages.Add(fluid::Initialize(pin.get()));
-  }
-  if (pin->GetBoolean("physics", "rad") == true) {
-    packages.Add(radiation::Initialize(pin.get()));
-  }
+  packages.Add(fluid::Initialize(pin.get()));
+  packages.Add(radiation::Initialize(pin.get()));
 
   return packages;
 }
