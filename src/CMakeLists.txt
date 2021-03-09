@@ -19,7 +19,6 @@ add_executable(phoebus
   fluid/con2prim.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
-  fluid/riemann.cpp
   fluid/riemann.hpp
   fluid/tmunu.hpp
 

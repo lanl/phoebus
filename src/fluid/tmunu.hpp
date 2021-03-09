@@ -13,7 +13,8 @@ namespace fluid {
 
 // TODO(JMM): Add B-fields
 const std::vector<std::string> TMUNU_VARS = {"p.density", "p.velocity",
-                                             "p.energy", "pressure"};
+                                             "p.energy", "pressure",
+                                             "p.bfield"};
 // Indices are upstairs
 template <typename Pack> class StressEnergyTensorCon {
 public:
@@ -29,14 +30,11 @@ public:
     pack_ = rc->PackVariables(TMUNU_VARS, imap);
     system_ = Geometry::GetCoordinateSystem(rc);
 
-    // TODO(JMM): Perhaps this should be a macro
-    for (auto &name : TMUNU_VARS) {
-      PARTHENON_REQUIRE_THROWS(imap[name].second >= 0, name + " found");
-    }
     ir_ = imap["p.density"].first;
     iv_ = imap["p.velocity"].first;
     iu_ = imap["p.energy"].first;
     ip_ = imap["pressure"].first;
+    ib_ = imap["p.field"].first;
   }
 
   // TODO(JMM): Assumes cell centers. If that needs to change, this
@@ -46,72 +44,79 @@ public:
   KOKKOS_INLINE_FUNCTION void operator()(Real T[ND][ND], Args &&... args) const {
     static_assert(sizeof...(Args) >= 3, "Must at least have k, j, i");
     static_assert(sizeof...(Args) <= 4, "Must have no more than b, k, j, i");
-    Real u[ND], g[ND][ND];
+    Real u[ND], b[ND], g[ND][ND], bsq;
+    GetTmunuTerms_(u, b, bsq, g, std::forward<Args>(args)...);
     system_.SpacetimeMetricInverse(loc, std::forward<Args>(args)..., g);
-    GetFourVelocity_(u, std::forward<Args>(args)...);
     Real rho = GetVar_(ir_, std::forward<Args>(args)...);
     Real uu = GetVar_(iu_, std::forward<Args>(args)...);
     Real P = GetVar_(ip_, std::forward<Args>(args)...);
     // TODO(JMM): Add B-fields in here
-    Real A = rho + uu + P; // + b^2
-    Real B = P;            // + b^2/2
+    Real A = rho + uu + P + bsq;
+    Real B = P + 0.5*bsq;
     for (int mu = 0; mu < ND; ++mu) {
       for (int nu = 0; nu < ND; ++nu) {
-        T[mu][nu] = A * u[mu] * u[nu] + B * g[mu][nu];
-        // THIS IS NOT JUST A DEBUGGING STATEMENT
-        // It prevents the compiler from incorrectly optimizing away
-        // this routine and introducing NaNs.
-        // Do not remove.
-        PARTHENON_REQUIRE(!std::isnan(T[mu][nu]),"Tmunu is NaN");
+        T[mu][nu] = A * u[mu] * u[nu] + B * g[mu][nu] - b[mu]*b[nu];
       }
     }
   }
 
 private:
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   Real GetVar_(int v, const int b, const int k, const int j, const int i) const {
     return pack_(b, v, k, j, i);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   Real GetVar_(int v, const int k, const int j, const int i) const { return pack_(v, k, j, i); }
 
   template <typename... Args>
-  KOKKOS_INLINE_FUNCTION Real v_(int l, Args &&... args) const {
-    return GetVar_(iv_ + l, std::forward<Args>(args)...);
+  KOKKOS_FORCEINLINE_FUNCTION Real v_(int l, Args &&... args) const {
+    return GetVar_(iv_ + l - 1, std::forward<Args>(args)...);
   }
 
-  // TODO(JMM): Should these be available elsewhere/more publicly?
   template <typename... Args>
-  KOKKOS_INLINE_FUNCTION Real GetLorentzFactor_(Args &&... args) const {
-    Real W = 1;
-    Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
-    system_.Metric(loc, std::forward<Args>(args)..., gamma);
+  KOKKOS_FORCEINLINE_FUNCTION Real b_(int l, Args &&... args) const {
+    return (ib_ > 0 ? GetVar_(ib_ + l - 1, std::forward<Args>(args)...) : 0.0);
+  }
+
+  template <typename... Args>
+  KOKKOS_INLINE_FUNCTION void GetTmunuTerms_(Real u[ND], Real b[ND], Real &bsq, Real gscratch[4][4], Args &&... args) const {
+    Real beta[ND - 1];
+    Real W = 1.0;
+    Real Bdotv = 0.0;
+    Real Bsq = 0.0;
+    auto gcov = reinterpret_cast<Real (*)[3]>(gscratch);
+    system_.Metric(loc,std::forward<Args>(args)..., gcov);
     for (int l = 1; l < ND; ++l) {
       for (int m = 1; m < ND; ++m) {
-        Real vl = v_(l, std::forward<Args>(args)...);
-        Real vm = v_(m, std::forward<Args>(args)...);
-        W -= vl * vm * gamma[l-1][m-1];
+        const Real gamma = gcov[l-1][m-1];
+        const Real &vl = v_(l, std::forward<Args>(args)...);
+        const Real &vm = v_(m, std::forward<Args>(args)...);
+        W -= vl * vm * gamma;
+        const Real &bl = b_(l, std::forward<Args>(args)...);
+        const Real &bm = b_(m, std::forward<Args>(args)...);
+        Bdotv += bl * vm * gamma;
+        Bsq += bl * bm * gamma;
       }
     }
-    W = 1. / std::sqrt(std::abs(W) + SMALL);
-    return W;
-  }
+    const Real iW = std::sqrt(std::abs(W));
+    W = 1. / (iW + SMALL);
 
-  template <typename... Args>
-  KOKKOS_INLINE_FUNCTION void GetFourVelocity_(Real u[ND], Args &&... args) const {
-    Real beta[ND - 1];
-    Real W = GetLorentzFactor_(std::forward<Args>(args)...);
     Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
     system_.ContravariantShift(loc, std::forward<Args>(args)..., beta);
     u[0] = W / (std::abs(alpha) + SMALL);
+    b[0] = u[0]*Bdotv;
     for (int l = 1; l < ND; ++l) {
-      u[l] = W * v_(l - 1, std::forward<Args>(args)...) - u[0] * beta[l-1];
+      u[l] = W * v_(l, std::forward<Args>(args)...) - u[0] * beta[l-1];
+      b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha*b[0]*u[l]);
     }
+
+    b[0] *= alpha;
+    bsq = (Bsq + b[0]*b[0])*iW*iW;
   }
 
   Pack pack_;
   Geometry::CoordinateSystem system_;
-  int ir_, iv_, iu_, ip_;
+  int ir_, iv_, iu_, ip_, ib_;
 };
 
 //using TmunuMesh = StressEnergyTensorCon<MeshBlockPack<VariablePack<Real>>>;

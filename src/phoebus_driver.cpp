@@ -82,7 +82,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
 
-  std::vector<std::string> src_names({conserved_variables::momentum, conserved_variables::energy});
+  std::vector<std::string> src_names({fluid_cons::momentum, fluid_cons::energy});
 
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
@@ -132,10 +132,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,
                               src_names, dudt.get(), gsrc.get(), dudt.get());
 
-    auto avg_container = tl.AddTask(add_rhs, AverageIndependentData<MeshBlockData<Real>>,
+    auto avg_container = tl.AddTask(hydro_flux|geom_src, AverageIndependentData<MeshBlockData<Real>>,
                                     sc0.get(), base.get(), beta);
     // apply du/dt to all independent fields in the container
-    auto update_container = tl.AddTask(avg_container, UpdateIndependentData<MeshBlockData<Real>>,
+    auto update_container = tl.AddTask(avg_container|add_rhs, UpdateIndependentData<MeshBlockData<Real>>,
                                        sc0.get(), dudt.get(), beta*dt, sc1.get());
     
     // update ghost cells
