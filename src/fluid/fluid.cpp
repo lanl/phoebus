@@ -6,12 +6,14 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
+// statically defined vars from riemann.hpp
+std::vector<std::string> riemann::FluxState::recon_vars, riemann::FluxState::flux_vars;
 
 namespace fluid {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
-  namespace p = primitive_variables;
-  namespace c = conserved_variables;
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
   namespace impl = internal_variables;
   namespace diag = diagnostic_variables;
   auto physics = std::make_shared<StateDescriptor>("fluid");
@@ -95,7 +97,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::pressure, mprim_scalar);
   physics->AddField(p::temperature, mprim_scalar);
   physics->AddField(p::gamma1, mprim_scalar);
-  physics->AddField(impl::cell_signal_speed, mprim_threev);
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
@@ -156,6 +157,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::vector<int> signal_shape(1,ndim);
   Metadata msignal = Metadata({Metadata::Cell, Metadata::OneCopy}, signal_shape);
   physics->AddField(impl::face_signal_speed, msignal);
+  physics->AddField(impl::cell_signal_speed, msignal);
 
   std::vector<int> c2p_scratch_size(1,5);
   Metadata c2p_meta = Metadata({Metadata::Cell, Metadata::OneCopy}, c2p_scratch_size);
@@ -169,8 +171,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 //template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
-  namespace p = primitive_variables;
-  namespace c = conserved_variables;
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
   auto *pmb = rc->GetParentPointer().get();
 
   std::vector<std::string> vars({p::density, c::density,
@@ -342,13 +344,13 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> vars({conserved_variables::momentum,
-                                 conserved_variables::energy});
+  std::vector<std::string> vars({fluid_cons::momentum,
+                                 fluid_cons::energy});
   PackIndexMap imap;
   auto src = rc_src->PackVariables(vars, imap);
-  const int cmom_lo = imap[conserved_variables::momentum].first;
-  const int cmom_hi = imap[conserved_variables::momentum].second;
-  const int ceng = imap[conserved_variables::energy].first;
+  const int cmom_lo = imap[fluid_cons::momentum].first;
+  const int cmom_hi = imap[fluid_cons::momentum].second;
+  const int ceng = imap[fluid_cons::energy].first;
 
   auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -356,31 +358,27 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(),
     kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      Real Tmunu[ND][ND], dg[ND][ND][ND], da[ND], gam[ND][ND][ND], gcov[ND][ND], gcon[ND][ND];
+      Real Tmunu[ND][ND], gam[ND][ND][ND];
       tmunu(Tmunu, k, j, i);
-      geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
-      geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
       geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
-      geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-      geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon);
-      const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
 
       // momentum source terms
       for (int l = 0; l < NS; l++) {
-        src(cmom_lo+l,k,j,i) = 0.0;
+        Real src_mom = 0.0;
         for (int m = 0; m < ND; m++) {
           for (int n = 0; n < ND; n++) {
             // gam is ALL INDICES DOWN
-            src(cmom_lo+l,k,j,i) += Tmunu[m][n]*(dg[m][l][n] - gam[l][m][n]);
+            src_mom -= Tmunu[m][n]*gam[l][m][n];
           }
         }
+        src(cmom_lo+l,k,j,i) = src_mom;
       }
 
-      // energy source term
+      { // energy source term
+      Real gcon[4][4];
+      geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon);
       Real TGam = 0.0;
-      Real Ta = 0.0;
       for (int m = 0; m < ND; m++) {
-        Ta += Tmunu[m][0]*da[m];
         for (int n = 0; n < ND; n++) {
           Real gam0 = 0;
           for (int r = 0; r < ND; r++) {
@@ -389,8 +387,27 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real
           TGam += Tmunu[m][n]*gam0;
         }
       }
+      Real Ta = 0.0;
+      Real *da = &gam[1][0][0];
+      geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
+      for (int m = 0; m < ND; m++) {
+        Ta += Tmunu[m][0]*da[m];
+      }
+      const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
       src(ceng, k, j, i) = alpha*(Ta - TGam);
+      }
 
+      // re-use gam for metric derivative
+      geom.MetricDerivative(CellLocation::Cent, k, j, i, gam);
+      for (int l = 0; l < NS; l++) {
+        Real src_mom = 0.0;
+        for (int m = 0; m < ND; m++) {
+          for (int n = 0; n < ND; n++) {
+            src_mom += Tmunu[m][n]*gam[m][l][n];
+          }
+        }
+        src(cmom_lo+l,k,j,i) += src_mom;
+      }
     });
   return TaskStatus::complete;
 }
@@ -413,11 +430,11 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
   #define RECON(method) \
-    parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(), \
-      X1DIR, pmb->pmy_mesh->ndim,                                           \
-      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,                   \
-      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {   \
-        method(d, 0, nrecon, k, j, i, flux.v, flux.ql, flux.qr);            \
+    parthenon::par_for(DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(),             \
+      X1DIR, pmb->pmy_mesh->ndim, 0, nrecon,                                            \
+      kb.s-dk, kb.e+dk, jb.s-dj, jb.e+dj, ib.s-1, ib.e+1,                               \
+      KOKKOS_LAMBDA(const int d, const int n, const int k, const int j, const int i) {  \
+        method(d, n, k, j, i, flux.v, flux.ql, flux.qr);                                \
       });
   switch (rt) {
     case PhoebusReconstruction::ReconType::weno5z:
@@ -465,13 +482,14 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
   if (!pmb->packages.Get("fluid")->Param<bool>("mhd")) return TaskStatus::complete;
 
   const int ndim = pmb->pmy_mesh->ndim;
+  if (ndim == 1) return TaskStatus::complete;
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  auto f1 = rc->Get(conserved_variables::bfield).flux[X1DIR];
-  auto f2 = rc->Get(conserved_variables::bfield).flux[X2DIR];
-  auto f3 = rc->Get(conserved_variables::bfield).flux[X3DIR];
+  auto f1 = rc->Get(fluid_cons::bfield).flux[X1DIR];
+  auto f2 = rc->Get(fluid_cons::bfield).flux[X2DIR];
+  auto f3 = rc->Get(fluid_cons::bfield).flux[X3DIR];
   auto emf = rc->Get(internal_variables::emf).data;
 
   if (ndim == 2) {
@@ -528,7 +546,7 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   auto &coords = pmb->coords;
-  auto b = rc->Get(conserved_variables::bfield).data;
+  auto b = rc->Get(fluid_cons::bfield).data;
   auto divb = rc->Get(diagnostic_variables::divb).data;
   if (ndim == 2) {
     // todo(jcd): these are supposed to be node centered, and this misses the high boundaries

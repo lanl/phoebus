@@ -1,7 +1,7 @@
 #ifndef PHOEBUS_UTILS_VARIABLES_HPP_
 #define PHOEBUS_UTILS_VARIABLES_HPP_
 
-namespace primitive_variables {
+namespace fluid_prim {
   constexpr char density[] = "p.density";
   constexpr char velocity[] = "p.velocity";
   constexpr char energy[] = "p.energy";
@@ -12,7 +12,7 @@ namespace primitive_variables {
   constexpr char gamma1[] = "gamma1";
 }
 
-namespace conserved_variables {
+namespace fluid_cons {
   constexpr char density[] = "c.density";
   constexpr char momentum[] = "c.momentum";
   constexpr char energy[] = "c.energy";

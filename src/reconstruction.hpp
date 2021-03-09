@@ -102,113 +102,89 @@ Real phifunc(const Real mind, const Real maxd, const Real gx, const Real gy, con
 
 template <typename T>
 KOKKOS_INLINE_FUNCTION
-void PiecewiseLinear(const int d, const int nlo, const int nhi,
+void PiecewiseLinear(const int d, const int n,
                      const int k, const int j, const int i,
                      const T &v, const ParArrayND<Real> &ql, const ParArrayND<Real> &qr) {
   const int dir = d-1;
   const int di = (d == X1DIR ? 1 : 0);
   const int dj = (d == X2DIR ? 1 : 0);
   const int dk = (d == X3DIR ? 1 : 0);
-  for (int n=nlo; n<=nhi; n++) {
-    Real dql = v(n,k,j,i) - v(n,k-dk,j-dj,i-di);
-    Real dqr = v(n,k+dk,j+dj,i+di) - v(n,k,j,i);
-    Real dq = minmod(dql, dqr)*dqr;
-    ql(dir,n,k+dk,j+dj,i+di) = v(n,k,j,i) + 0.5*dq;
-    qr(dir,n,k,j,i) = v(n,k,j,i) - 0.5*dq;
-  }
-}
-
-KOKKOS_FORCEINLINE_FUNCTION
-Real weno_map(const Real x) {
-  constexpr Real xb = 1.0/3.0;
-  return x * (xb * (1.0 + xb - 3.0*x) + x*x)/(xb*xb + x * (1.0 - 2.0*xb));
+  Real dq = v(n,k+dk,j+dj,i+di) - v(n,k,j,i);
+  dq = minmod(v(n,k,j,i)-v(n,k-dk,j-dj,i-di), dq)*dq;
+  ql(dir,n,k+dk,j+dj,i+di) = v(n,k,j,i) + 0.5*dq;
+  qr(dir,n,k,j,i) = v(n,k,j,i) - 0.5*dq;
 }
 
 template <typename T>
 KOKKOS_INLINE_FUNCTION
-void WENO5Z(const int d, const int nlo, const int nhi, const int k, const int j, const int i,
-            const T &v, const ParArrayND<Real> &ql, const ParArrayND<Real> &qr) {
-
+void WENO5Z(const int d, const int n, const int k, const int j, const int i,
+            const T &v, const ParArrayND<Real> &q_l, const ParArrayND<Real> &q_r) {
   constexpr Real w5alpha[3][3] = {{1.0/3.0, -7.0/6.0, 11.0/6.0},
                                   {-1.0/6.0, 5.0/6.0, 1.0/3.0},
                                   {1.0/3.0, 5.0/6.0, -1.0/6.0}};
   constexpr Real w5gamma[3] = {0.1, 0.6, 0.3};
-  constexpr Real eps = 1e-100; // value to compare beta gainst
- 
-  const int dir = d-1;
-  const int di = (d == X1DIR ? 1 : 0);
-  const int dj = (d == X2DIR ? 1 : 0);
-  const int dk = (d == X3DIR ? 1 : 0);
-  Real q[5];
-  Real tl[3];
-  Real tr[3];
-  Real beta[3];
-  Real wl[3];
-  Real wr[3];
-  for (int n = nlo; n <= nhi; n++) {
-    for (int l = 0; l < 5; l++) {
-      q[l] = v(n,k+(l-2)*dk,j+(l-2)*dj,i+(l-2)*di);
-    }
+  constexpr Real eps = 1e-100;
+  constexpr Real thirteen_thirds = 13.0/3.0;
 
-    Real dm = q[2]-q[1];
-    Real dp = q[3]-q[2];
-    Real ql_lin, qr_lin;
-    if (dm*dp < 0) {
-      ql_lin = q[2];
-      qr_lin = q[2];
-    } else {
-      Real dq = mc(dm, dp)*dp;
-      ql_lin = q[2] + 0.5*dq;
-      qr_lin = q[2] - 0.5*dq;
-    }
+  const int di = d == X1DIR;
+  const int dj = d == X2DIR;
+  const int dk = d == X3DIR;
 
-    // ENO polynomials
-    tl[0] = w5alpha[0][0]*q[0] + w5alpha[0][1]*q[1] + w5alpha[0][2]*q[2];
-    tl[1] = w5alpha[1][0]*q[1] + w5alpha[1][1]*q[2] + w5alpha[1][2]*q[3];
-    tl[2] = w5alpha[2][0]*q[2] + w5alpha[2][1]*q[3] + w5alpha[2][2]*q[4];
+  const Real q0 = v(n,k-2*dk,j-2*dj,i-2*di);
+  const Real q1 = v(n,k-dk,j-dj,i-di);
+  const Real q2 = v(n,k,j,i);
+  const Real q3 = v(n,k+dk,j+dj,i+di);
+  const Real q4 = v(n,k+2*dk,j+2*dj,i+2*di);
 
-    tr[0] = w5alpha[0][0]*q[4] + w5alpha[0][1]*q[3] + w5alpha[0][2]*q[2];
-    tr[1] = w5alpha[1][0]*q[3] + w5alpha[1][1]*q[2] + w5alpha[1][2]*q[1];
-    tr[2] = w5alpha[2][0]*q[2] + w5alpha[2][1]*q[1] + w5alpha[2][2]*q[0];
+  Real a = q0 - 2*q1 + q2;
+  Real b = q0 - 4.0*q1 + 3.0*q2;
+  Real beta0 = thirteen_thirds * a*a + b*b  + eps;
+  a = q1 - 2.0*q2 + q3;
+  b = q3 - q1;
+  Real beta1 = thirteen_thirds * a*a + b*b + eps;
+  a = q2 - 2.0*q3 + q4;
+  b = q4 - 4.0*q3 + 3.0*q2;
+  Real beta2 = thirteen_thirds * a*a + b*b + eps;
+  const Real tau5 = std::fabs(beta2 - beta0);
+
+  beta0 = (beta0 + tau5)/beta0;
+  beta1 = (beta1 + tau5)/beta1;
+  beta2 = (beta2 + tau5)/beta2;
+  Real w0 = w5gamma[0]*beta0;
+  Real w1 = w5gamma[1]*beta1;
+  Real w2 = w5gamma[2]*beta2;
+  Real wsum = 1.0/(w0 + w1 + w2);
+  Real ql = wsum * 
+           (w0 * (w5alpha[0][0]*q0 + w5alpha[0][1]*q1 + w5alpha[0][2]*q2)
+          + w1 * (w5alpha[1][0]*q1 + w5alpha[1][1]*q2 + w5alpha[1][2]*q3)
+          + w2 * (w5alpha[2][0]*q2 + w5alpha[2][1]*q3 + w5alpha[2][2]*q4));
   
-    beta[0] = (13. / 12.) * std::pow(q[0] - 2. * q[1] + q[2], 2) +
-              0.25 * std::pow(q[0] - 4. * q[1] + 3. * q[2], 2);
-    beta[1] = (13. / 12.) * std::pow(q[1] - 2. * q[2] + q[3], 2) +
-              0.25 * std::pow(q[3] - q[1], 2);
-    beta[2] = (13. / 12.) * std::pow(q[2] - 2. * q[3] + q[4], 2) +
-              0.25 * std::pow(q[4] - 4. * q[3] + 3. * q[2], 2);
-    Real tau5 = std::fabs(beta[2] - beta[0]);
+  const Real alpha_l = 3.0*wsum/(w5gamma[0]/(w0+eps) + w5gamma[1]/(w1+eps) + w5gamma[2]/(w2+eps));
 
-    for (int l = 0; l < 3; l++) {
-      beta[l] = beta[l] + eps;
-      beta[l] = beta[l]/(beta[l] + tau5);
-    }
-    Real wlsum = 0.0;
-    Real wrsum = 0.0;
-    for (int l = 0; l < 3; l++) {
-      wl[l] = w5gamma[l]/beta[l];
-      wr[l] = w5gamma[l]/beta[2-l];
-      wlsum += wl[l];
-      wrsum += wr[l];
-    }
-    Real alpha_lin = 1.0;;
-    for (int l = 0; l < 3; l++) {
-      wl[l] /= wlsum;
-      alpha_lin = std::min(alpha_lin, wl[l]/w5gamma[l]);
-      wr[l] /= wrsum;
-      alpha_lin = std::min(alpha_lin, wr[l]/w5gamma[l]);
-    }
-    alpha_lin = std::sqrt(alpha_lin);
+  w0 = w5gamma[0]*beta2;
+  w1 = w5gamma[1]*beta1;
+  w2 = w5gamma[2]*beta0;
+  wsum = 1.0/(w0 + w1 + w2);
+  Real qr = wsum *
+           (w0 * (w5alpha[0][0]*q4 + w5alpha[0][1]*q3 + w5alpha[0][2]*q2)
+          + w1 * (w5alpha[1][0]*q3 + w5alpha[1][1]*q2 + w5alpha[1][2]*q1)
+          + w2 * (w5alpha[2][0]*q2 + w5alpha[2][1]*q1 + w5alpha[2][2]*q0));
+  const Real alpha_r = 3.0*wsum/(w5gamma[0]/(w0+eps) + w5gamma[1]/(w1+eps) + w5gamma[2]/(w2+eps));
 
-    ql(dir,n,k+dk,j+dj,i+di) = alpha_lin*(wl[0]*tl[0] + wl[1]*tl[1] + wl[2]*tl[2]) + (1.0-alpha_lin)*ql_lin;
-    qr(dir,n,k,j,i) = alpha_lin*(wr[0]*tr[0] + wr[1]*tr[1] + wr[2]*tr[2]) + (1.0-alpha_lin)*qr_lin;
-  }
+  Real dq = q3-q2;
+  dq = mc(q2-q1, dq)*dq;
+
+  const Real alpha_lin = 2.0/(1.0/(alpha_l+eps) + 1.0/(alpha_r+eps));
+  ql = alpha_lin*ql + (1.0 - alpha_lin) * (q2 + 0.5*dq);
+  qr = alpha_lin*qr + (1.0 - alpha_lin) * (q2 - 0.5*dq);
+
+  q_l(d-1,n,k+dk,j+dj,i+di) = ql;
+  q_r(d-1,n,k,j,i) = qr;
 }
-
 
 template <typename T>
 KOKKOS_INLINE_FUNCTION
-void WENO5A(const int d, const int nlo, const int nhi, const int k, const int j, const int i,
+void WENO5A(const int d, const int n, const int k, const int j, const int i,
            const T &v, const ParArrayND<Real> &ql, const ParArrayND<Real> &qr) {
 
   constexpr Real w5alpha[3][3] = {{1.0/3.0, -7.0/6.0, 11.0/6.0},
@@ -230,52 +206,50 @@ void WENO5A(const int d, const int nlo, const int nhi, const int k, const int j,
   Real beta[3];
   Real wl[3];
   Real wr[3];
-  for (int n = nlo; n <= nhi; n++) {
-    for (int l = 0; l < 5; l++) {
-      q[l] = v(n,k+(l-2)*dk,j+(l-2)*dj,i+(l-2)*di);
-    }
-
-    // ENO polynomials
-    tl[0] = w5alpha[0][0]*q[0] + w5alpha[0][1]*q[1] + w5alpha[0][2]*q[2];
-    tl[1] = w5alpha[1][0]*q[1] + w5alpha[1][1]*q[2] + w5alpha[1][2]*q[3];
-    tl[2] = w5alpha[2][0]*q[2] + w5alpha[2][1]*q[3] + w5alpha[2][2]*q[4];
-
-    tr[0] = w5alpha[0][0]*q[4] + w5alpha[0][1]*q[3] + w5alpha[0][2]*q[2];
-    tr[1] = w5alpha[1][0]*q[3] + w5alpha[1][1]*q[2] + w5alpha[1][2]*q[1];
-    tr[2] = w5alpha[2][0]*q[2] + w5alpha[2][1]*q[1] + w5alpha[2][2]*q[0];
-
-    // Smoothness indicators from Tchekhovskoy et al. 2007
-    beta[0] = (13. / 12.) * std::pow(q[0] - 2. * q[1] + q[2], 2) +
-              0.25 * std::pow(q[0] - 4. * q[1] + 3. * q[2], 2);
-    beta[1] = (13. / 12.) * std::pow(q[1] - 2. * q[2] + q[3], 2) +
-              0.25 * std::pow(q[3] - q[1], 2);
-    beta[2] = (13. / 12.) * std::pow(q[2] - 2. * q[3] + q[4], 2) +
-              0.25 * std::pow(q[4] - 4. * q[3] + 3. * q[2], 2);
-
-    // Nonlinearity/shock detectors for WENO-A
-    Real phi = std::sqrt(std::abs(beta[0] - 2*beta[1] + beta[2]));
-    Real PHI = std::min(1.0,phi);
-    Real tau5 = std::fabs(beta[2] - beta[0]);
-
-    // Normalizations
-    Real wsuml = 0.0;
-    Real wsumr = 0.0;
-    
-    // WENO-A scheme introduced in Wang, Wang, and Don, 2019.
-    for (int l = 0; l < 3; l++) {
-      wl[l] = w5gamma[l]*std::max(1., PHI*std::pow(tau5/beta[l],p));
-      wr[l] = w5gamma[l]*std::max(1., PHI*std::pow(tau5/beta[2-l],p));
-      wsuml += wl[l];
-      wsumr += wr[l];
-    }
-    for (int l = 0; l < 3; l++) {
-      wl[l] /= wsuml;
-      wr[l] /= wsumr;
-    }
-
-    ql(dir,n,k+dk,j+dj,i+di) = wl[0]*tl[0] + wl[1]*tl[1] + wl[2]*tl[2];
-    qr(dir,n,k,j,i) = wr[0]*tr[0] + wr[1]*tr[1] + wr[2]*tr[2];
+  for (int l = 0; l < 5; l++) {
+    q[l] = v(n,k+(l-2)*dk,j+(l-2)*dj,i+(l-2)*di);
   }
+
+  // ENO polynomials
+  tl[0] = w5alpha[0][0]*q[0] + w5alpha[0][1]*q[1] + w5alpha[0][2]*q[2];
+  tl[1] = w5alpha[1][0]*q[1] + w5alpha[1][1]*q[2] + w5alpha[1][2]*q[3];
+  tl[2] = w5alpha[2][0]*q[2] + w5alpha[2][1]*q[3] + w5alpha[2][2]*q[4];
+
+  tr[0] = w5alpha[0][0]*q[4] + w5alpha[0][1]*q[3] + w5alpha[0][2]*q[2];
+  tr[1] = w5alpha[1][0]*q[3] + w5alpha[1][1]*q[2] + w5alpha[1][2]*q[1];
+  tr[2] = w5alpha[2][0]*q[2] + w5alpha[2][1]*q[1] + w5alpha[2][2]*q[0];
+
+  // Smoothness indicators from Tchekhovskoy et al. 2007
+  beta[0] = (13. / 12.) * std::pow(q[0] - 2. * q[1] + q[2], 2) +
+            0.25 * std::pow(q[0] - 4. * q[1] + 3. * q[2], 2);
+  beta[1] = (13. / 12.) * std::pow(q[1] - 2. * q[2] + q[3], 2) +
+            0.25 * std::pow(q[3] - q[1], 2);
+  beta[2] = (13. / 12.) * std::pow(q[2] - 2. * q[3] + q[4], 2) +
+            0.25 * std::pow(q[4] - 4. * q[3] + 3. * q[2], 2);
+
+  // Nonlinearity/shock detectors for WENO-A
+  Real phi = std::sqrt(std::abs(beta[0] - 2*beta[1] + beta[2]));
+  Real PHI = std::min(1.0,phi);
+  Real tau5 = std::fabs(beta[2] - beta[0]);
+
+  // Normalizations
+  Real wsuml = 0.0;
+  Real wsumr = 0.0;
+    
+  // WENO-A scheme introduced in Wang, Wang, and Don, 2019.
+  for (int l = 0; l < 3; l++) {
+    wl[l] = w5gamma[l]*std::max(1., PHI*std::pow(tau5/beta[l],p));
+    wr[l] = w5gamma[l]*std::max(1., PHI*std::pow(tau5/beta[2-l],p));
+    wsuml += wl[l];
+    wsumr += wr[l];
+  }
+  for (int l = 0; l < 3; l++) {
+    wl[l] /= wsuml;
+    wr[l] /= wsumr;
+  }
+
+  ql(dir,n,k+dk,j+dj,i+di) = wl[0]*tl[0] + wl[1]*tl[1] + wl[2]*tl[2];
+  qr(dir,n,k,j,i) = wr[0]*tr[0] + wr[1]*tr[1] + wr[2]*tr[2];
 }
 
 // MP5, lifted shamelessly from nubhlight, which was lifted shamelessly from PLUTO
@@ -336,25 +310,23 @@ double mp5_subcalc(
 
 template <typename T>
 KOKKOS_INLINE_FUNCTION
-void MP5(const int d, const int nlo, const int nhi,
-                     const int k, const int j, const int i,
-                     const T &v, const ParArrayND<Real> &ql, const ParArrayND<Real> &qr) {
+void MP5(const int d, const int n,
+         const int k, const int j, const int i,
+         const T &v, const ParArrayND<Real> &ql, const ParArrayND<Real> &qr) {
   const int dir = d-1;
   const int di = (d == X1DIR ? 1 : 0);
   const int dj = (d == X2DIR ? 1 : 0);
   const int dk = (d == X3DIR ? 1 : 0);
-  for (int n=nlo; n<=nhi; n++) {
-    ql(dir,n,k+dk,j+dj,i+di) = mp5_subcalc(v(n,k-2*dk,j-2*dj,i-2*di),
-                                           v(n,k-dk,j-dj,i-di),
-                                           v(n,k,j,i),
-                                           v(n,k+dk,j+dj,i+di),
-                                           v(n,k+2*dk,j+2*dj,i+2*di));
-    qr(dir,n,k,j,i) = mp5_subcalc(v(n,k+2*dk,j+2*dj,i+2*di),
-                                  v(n,k+dk,j+dj,i+di),
-                                  v(n,k,j,i),
-                                  v(n,k-dk,j-dj,i-di),
-                                  v(n,k-2*dk,j-2*dj,i-2*di));
-  }
+  ql(dir,n,k+dk,j+dj,i+di) = mp5_subcalc(v(n,k-2*dk,j-2*dj,i-2*di),
+                                         v(n,k-dk,j-dj,i-di),
+                                         v(n,k,j,i),
+                                         v(n,k+dk,j+dj,i+di),
+                                         v(n,k+2*dk,j+2*dj,i+2*di));
+  qr(dir,n,k,j,i) = mp5_subcalc(v(n,k+2*dk,j+2*dj,i+2*di),
+                                v(n,k+dk,j+dj,i+di),
+                                v(n,k,j,i),
+                                v(n,k-dk,j-dj,i-di),
+                                v(n,k-2*dk,j-2*dj,i-2*di));
 }
 
 } // PhoebusReconstruction
