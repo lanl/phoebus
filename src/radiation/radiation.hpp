@@ -16,6 +16,8 @@
 #ifndef RADIATION_HPP_
 #define RADIATION_HPP_
 
+#include "Kokkos_Random.hpp"
+
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
@@ -25,6 +27,8 @@ using namespace parthenon::package::prelude;
 #include "utils/constants.hpp"
 
 namespace radiation {
+
+typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 extern parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 

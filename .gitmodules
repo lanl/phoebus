@@ -4,6 +4,7 @@
 [submodule "external/parthenon"]
 	path = external/parthenon
 	url = https://github.com/lanl/parthenon.git
+  branch = brryan/particles_bounds
 [submodule "external/catch2"]
 	path = external/catch2
 	url = https://github.com/catchorg/Catch2.git

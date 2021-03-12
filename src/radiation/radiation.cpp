@@ -76,8 +76,50 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
+  if (method == "monte_carlo" || method == "mocmc") {
+    // Initialize random number generator pool
+    int rng_seed = pin->GetOrAddInteger("Particles", "rng_seed", 238947);
+    physics->AddParam<>("rng_seed", rng_seed);
+    RNGPool rng_pool(rng_seed);
+    physics->AddParam<>("rng_pool", rng_pool);
+
+    std::string swarm_name = "neutrinos";
+    Metadata swarm_metadata;
+    physics->AddSwarm(swarm_name, swarm_metadata);
+    Metadata real_swarmvalue_metadata({Metadata::Real});
+    physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("vx", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("vy", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("vz", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("weight", swarm_name, real_swarmvalue_metadata);
+  }
+
   return physics;
 }
+
+// TaskCollection radiation::Transport
+// TODO(BRR) nvm this needs to be a PhoebusDriver member function
+//TaskCollection Transport() {
+//  TaskCollection tc;
+//  TaskID none(0);
+//  const double t0 = tm.time;
+//}
+
+TaskStatus TransportMCParticles(MeshBlockData <Real> *rc, const double t0, const double dt) {
+  auto *pmb = rc->GetParentPointer().get();
+  auto swarm = pmb->swarm_data.Get()->Get("neutrinos");
+  int max_active_index = swarm->GetMaxActiveIndex();
+
+  auto &t = swarm->Get<Real>("t").Get();
+  auto &x = swarm->Get<Real>("x").Get();
+  auto &y = swarm->Get<Real>("y").Get();
+  auto &z = swarm->Get<Real>("z").Get();
+  const auto &vx = swarm->Get<Real>("vx").Get();
+  const auto &vy = swarm->Get<Real>("vy").Get();
+  const auto &vz = swarm->Get<Real>("vz").Get();
+}
+
+// TaskStatus ApplyRadiationFourForce
 
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace c = conserved_variables;
