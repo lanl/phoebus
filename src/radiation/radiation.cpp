@@ -117,6 +117,8 @@ TaskStatus TransportMCParticles(MeshBlockData <Real> *rc, const double t0, const
   const auto &vx = swarm->Get<Real>("vx").Get();
   const auto &vy = swarm->Get<Real>("vy").Get();
   const auto &vz = swarm->Get<Real>("vz").Get();
+
+  return TaskStatus::complete;
 }
 
 // TaskStatus ApplyRadiationFourForce

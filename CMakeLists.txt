@@ -142,6 +142,9 @@ set(SINGULARITY_USE_KOKKOSKERNELS OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_BUILD_MIX OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/singularity-eos singularity-eos)
 
+# Radiation
+include(cmake/Radiation.cmake)
+
 # Phoebus src
 message("Configuring src")
 add_subdirectory(src)

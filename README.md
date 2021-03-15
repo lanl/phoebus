@@ -5,7 +5,7 @@ phoebus
 
 Phifty One Ergs Blows Up a Star
 
-# Attaining the Source Code
+# Obtaining the Source Code
 
 `phoebus` uses submodules extensively. To make sure you get them all, clone it as
 ```bash
@@ -103,7 +103,7 @@ You can see all the Parthenon build options [here](https://github.com/lanl/parth
 
 If you are proficient with `cmake` You can optionally write a `cmake`
 file that sets the configure parameters that you like on a given
-machine. Both `phoebus` and `parthenon` can make use of it. You can point to the file with 
+machine. Both `phoebus` and `parthenon` can make use of it. You can point to the file with
 ```
 -DMACHINE_CFG=path/to/machine/file
 ```

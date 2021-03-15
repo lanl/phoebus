@@ -198,19 +198,26 @@ TaskCollection PhoebusDriver::RadiationStep() {
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
 
+  const auto rad_active = pmesh->packages.Get("radiation")->Param<bool>("active");
+
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
-    StateDescriptor *rad = pmb->packages.Get("radiation").get();
-    auto rad_active = rad->Param<bool>("active");
     auto &tl = async_region[ib];
     if (rad_active) {
       auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
 
-      // TODO(BRR) use particles
-      //auto sc = pmb->swarm_data.Get();
-
+#if RADIATION_METHOD == ThinCooling
       auto calculate_four_force = tl.AddTask(none, radiation::CalculateRadiationFourForce,
        sc0.get(), dt);
+#elif RADIATION_METHOD == Diffusion
+#elif RADIATION_METHOD == M1
+#elif RADIATION_METHOD == MonteCarlo
+      // TODO(BRR) use particles
+      //auto sc = pmb->swarm_data.Get();
+#elif RADIATION_METHOD == MOCMC
+      // TODO(BRR) use particles
+      //auto sc = pmb->swarm_data.Get();
+#endif // RADIATION_METHOD
 
       auto apply_four_force = tl.AddTask(calculate_four_force,
        radiation::ApplyRadiationFourForce, sc0.get(), dt);
