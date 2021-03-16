@@ -195,36 +195,40 @@ TaskCollection PhoebusDriver::RadiationStep() {
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
 
+  const auto rad_active = pmesh->packages.Get("radiation")->Param<bool>("active");
+  if (!rad_active) {
+    auto num_independent_task_lists = blocks.size();
+    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
+    for (int ib = 0; ib < num_independent_task_lists; ib++) {
+      auto pmb = blocks[ib].get();
+      auto &tl = async_region[ib];
+      auto default_task = tl.AddTask(none, DefaultTask);
+    }
+    return tc;
+  }
+
+#if RADIATION_METHOD == CoolingFunction
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
-
-  const auto rad_active = pmesh->packages.Get("radiation")->Param<bool>("active");
-
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region[ib];
-    if (rad_active) {
-      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
-
-#if RADIATION_METHOD == CoolingFunction
-      auto calculate_four_force = tl.AddTask(none, radiation::CalculateCoolingFunctionFourForce,
-        sc0.get(), dt);
-      auto apply_four_force = tl.AddTask(calculate_four_force,
-       radiation::ApplyRadiationFourForce, sc0.get(), dt);
+    auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+    auto calculate_four_force = tl.AddTask(none, radiation::CalculateCoolingFunctionFourForce,
+      sc0.get(), dt);
+    auto apply_four_force = tl.AddTask(calculate_four_force,
+     radiation::ApplyRadiationFourForce, sc0.get(), dt);
+  }
 #elif RADIATION_METHOD == Diffusion
 #elif RADIATION_METHOD == M1
 #elif RADIATION_METHOD == MonteCarlo
+  return MonteCarloStep();
       // TODO(BRR) use particles
       //auto sc = pmb->swarm_data.Get();
 #elif RADIATION_METHOD == MOCMC
       // TODO(BRR) use particles
       //auto sc = pmb->swarm_data.Get();
 #endif // RADIATION_METHOD
-
-    } else {
-      auto default_task = tl.AddTask(none, DefaultTask);
-    }
-  }
 
   return tc;
 }
@@ -238,6 +242,48 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(radiation::Initialize(pin.get()));
 
   return packages;
+}
+
+//TaskListStatus PhoebusDriver::MonteCarloStep() {
+TaskCollection PhoebusDriver::MonteCarloStep() {
+  //TaskListStatus status;
+    TaskCollection tc;
+  const double t0 = tm.time;
+  //integrator.dt = tm.dt;
+  TaskID none(0);
+
+  BlockList_t &blocks = pmesh->block_list;
+  auto num_task_lists_executed_independently = blocks.size();
+
+  // Create all particles sourced due to emission during timestep
+  {
+    TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
+    for (int i = 0; i < blocks.size(); i++) {
+      auto &pmb = blocks[i];
+      auto &tl = async_region0[i];
+      auto sample_particles = tl.AddTask(none, radiation::MonteCarloSourceParticles, pmb.get(), t0);
+    }
+    //status = tc.Execute();
+  }
+/*
+  // Loop over repeated MPI communication calls until every particle has reached
+  // the end of the timestep.
+  bool particles_update_done = false;
+  while (!particles_update_done) {
+    status = radiation::MonteCarloTransportTaskCollection().Execute();
+
+    particles_update_done = true;
+    for (auto &block : blocks) {
+      auto swarm = block->swarm_data.Get()->Get("monte_carlo");
+      if (!swarm->finished_transport {
+        particles_update_done = false;
+      }
+    }
+  }
+
+  status = radiation::MonteCarloFinalizationTaskCollection().Execute();
+*/
+  return tc;//status;
 }
 
 } // namespace phoebus

@@ -81,6 +81,10 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
 // Optically thin cooling function
 TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const double dt);
 
+// Monte Carlo transport
+TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, const double t0);
+
+
 enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
 
 // TODO(BRR) temporary opacity here
