@@ -206,9 +206,11 @@ TaskCollection PhoebusDriver::RadiationStep() {
     if (rad_active) {
       auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
 
-#if RADIATION_METHOD == ThinCooling
-      auto calculate_four_force = tl.AddTask(none, radiation::CalculateRadiationFourForce,
-       sc0.get(), dt);
+#if RADIATION_METHOD == CoolingFunction
+      auto calculate_four_force = tl.AddTask(none, radiation::CalculateCoolingFunctionFourForce,
+        sc0.get(), dt);
+      auto apply_four_force = tl.AddTask(calculate_four_force,
+       radiation::ApplyRadiationFourForce, sc0.get(), dt);
 #elif RADIATION_METHOD == Diffusion
 #elif RADIATION_METHOD == M1
 #elif RADIATION_METHOD == MonteCarlo
@@ -219,8 +221,6 @@ TaskCollection PhoebusDriver::RadiationStep() {
       //auto sc = pmb->swarm_data.Get();
 #endif // RADIATION_METHOD
 
-      auto apply_four_force = tl.AddTask(calculate_four_force,
-       radiation::ApplyRadiationFourForce, sc0.get(), dt);
     } else {
       auto default_task = tl.AddTask(none, DefaultTask);
     }

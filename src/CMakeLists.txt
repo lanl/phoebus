@@ -50,6 +50,8 @@ add_executable(phoebus
 
   radiation/radiation.hpp
   radiation/radiation.cpp
+  radiation/cooling_function.cpp
+  radiation/monte_carlo.cpp
 
   reconstruction.hpp
 )

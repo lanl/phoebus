@@ -1,7 +1,7 @@
 set(PHOEBUS_RADIATION_METHOD "MonteCarlo" CACHE STRING "Numerical method for radiation transport")
 
 set(PHOEBUS_RADIATION_METHODS
-    "OpticallyThinCooling"
+    "CoolingFunction"
     "Diffusion"
     "M1"
     "MonteCarlo"

@@ -21,38 +21,6 @@ namespace radiation {
 
 parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
-// TODO(BRR) Utilities that should be moved
-#define SMALL (1.e-200)
-KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(Real v[4],
-                                             const Geometry::CoordinateSystem &system,
-                                             CellLocation loc, const int k, const int j,
-                                             const int i) {
-  Real W = 1;
-  Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
-  system.Metric(loc, k, j, i, gamma);
-  for (int l = 1; l < Geometry::NDFULL; ++l) {
-    for (int m = 1; m < Geometry::NDFULL; ++m) {
-      W -= v[l] * v[m] * gamma[l - 1][m - 1];
-    }
-  }
-  W = 1. / std::sqrt(std::abs(W) + SMALL);
-  return W;
-}
-
-KOKKOS_INLINE_FUNCTION void GetFourVelocity(Real v[4],
-                                            const Geometry::CoordinateSystem &system,
-                                            CellLocation loc, const int k, const int j,
-                                            const int i, Real u[Geometry::NDFULL]) {
-  Real beta[Geometry::NDSPACE];
-  Real W = GetLorentzFactor(v, system, loc, k, j, i);
-  Real alpha = system.Lapse(loc, k, j, i);
-  system.ContravariantShift(loc, k, j, i, beta);
-  u[0] = W / (std::abs(alpha) + SMALL);
-  for (int l = 1; l < Geometry::NDFULL; ++l) {
-    u[l] = W * v[l - 1] - u[0] * beta[l - 1];
-  }
-}
-
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   namespace iv = internal_variables;
   auto physics = std::make_shared<StateDescriptor>("radiation");
@@ -158,18 +126,8 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
 
 // TODO(BRR) move this somewhere else
 // Temporary cooling problem functions etc.
-enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
-KOKKOS_INLINE_FUNCTION Real Getyf(Real Ye, NeutrinoSpecies s) {
-  if (s == NeutrinoSpecies::Electron) {
-    return 2. * Ye;
-  } else if (s == NeutrinoSpecies::ElectronAnti) {
-    return 1. - 2. * Ye;
-  } else {
-    return 0.;
-  }
-}
 
-TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
+/*TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = primitive_variables;
   namespace c = conserved_variables;
   namespace iv = internal_variables;
@@ -236,6 +194,6 @@ TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt)
       });
 
   return TaskStatus::complete;
-}
+}*/
 
 } // namespace radiation
