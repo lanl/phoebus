@@ -28,7 +28,8 @@ class PhoebusDriver : public EvolutionDriver {
 
   TaskCollection RungeKuttaStage(const int stage);
   TaskCollection RadiationStep();
-  TaskCollection MonteCarloStep();
+
+  TaskListStatus MonteCarloStep();
 
   TaskListStatus Step();
  private:

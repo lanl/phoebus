@@ -44,14 +44,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
-  if (method == "monte_carlo" || method == "mocmc") {
-    // Initialize random number generator pool
-    int rng_seed = pin->GetOrAddInteger("Particles", "rng_seed", 238947);
-    physics->AddParam<>("rng_seed", rng_seed);
-    RNGPool rng_pool(rng_seed);
-    physics->AddParam<>("rng_pool", rng_pool);
-
-    std::string swarm_name = "neutrinos";
+  if (method == "monte_carlo") {
+    std::string swarm_name = "monte_carlo";
     Metadata swarm_metadata;
     physics->AddSwarm(swarm_name, swarm_metadata);
     Metadata real_swarmvalue_metadata({Metadata::Real});
@@ -60,6 +54,24 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("vy", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("vz", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("weight", swarm_name, real_swarmvalue_metadata);
+  }
+
+  if (method == "monte_carlo" || method == "mocmc") {
+    // Initialize random number generator pool
+    int rng_seed = pin->GetOrAddInteger("Particles", "rng_seed", 238947);
+    physics->AddParam<>("rng_seed", rng_seed);
+    RNGPool rng_pool(rng_seed);
+    physics->AddParam<>("rng_pool", rng_pool);
+
+    /*std::string swarm_name = "neutrinos";
+    Metadata swarm_metadata;
+    physics->AddSwarm(swarm_name, swarm_metadata);
+    Metadata real_swarmvalue_metadata({Metadata::Real});
+    physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("vx", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("vy", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("vz", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("weight", swarm_name, real_swarmvalue_metadata);*/
   }
 
   return physics;

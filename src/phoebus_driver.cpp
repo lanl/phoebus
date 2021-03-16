@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-//TODO(JCD): this should be exported by parthenon
+// TODO(JCD): this should be exported by parthenon
 #include <refinement/refinement.hpp>
 
 // Local Includes
@@ -56,23 +56,28 @@ TaskListStatus PhoebusDriver::Step() {
   static bool first_call = true;
   TaskListStatus status;
   Real dt_trial = tm.dt;
-  if (first_call) dt_trial = std::min(dt_trial, dt_init);
+  if (first_call)
+    dt_trial = std::min(dt_trial, dt_init);
   dt_trial *= dt_init_fact;
   dt_init_fact = 1.0;
-  if (tm.time + dt_trial > tm.tlim) dt_trial = tm.tlim-tm.time;
+  if (tm.time + dt_trial > tm.tlim)
+    dt_trial = tm.tlim - tm.time;
   tm.dt = dt_trial;
   integrator->dt = dt_trial;
 
   for (int stage = 1; stage <= integrator->nstages; stage++) {
     TaskCollection tc = RungeKuttaStage(stage);
     status = tc.Execute();
-    if (status != TaskListStatus::complete) break;
+    if (status != TaskListStatus::complete)
+      break;
   }
 
-  {
+  /*{
     TaskCollection tc = RadiationStep();
     status = tc.Execute();
-  }
+  }*/
+
+  status = MonteCarloStep();
 
   return status;
 }
@@ -88,7 +93,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
 
-  std::vector<std::string> src_names({conserved_variables::momentum, conserved_variables::energy});
+  std::vector<std::string> src_names(
+      {conserved_variables::momentum, conserved_variables::energy});
 
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
@@ -118,37 +124,40 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // pull out a container for the geometric source terms
     auto &gsrc = pmb->meshblock_data.Get("geometric source terms");
 
-    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving,
-                                 sc1.get(), BoundaryCommSubset::all);
+    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc1.get(),
+                                 BoundaryCommSubset::all);
 
     auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
     auto flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
-    auto geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
+    auto geom_src =
+        tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
 
     auto send_flux =
         tl.AddTask(flux_ct, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
 
-    auto recv_flux = tl.AddTask(
-        flux_ct, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
+    auto recv_flux =
+        tl.AddTask(flux_ct, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
 
     // compute the divergence of fluxes of conserved variables
     auto flux_div =
-        tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>, sc0.get(), dudt.get());
+        tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>,
+                   sc0.get(), dudt.get());
 
-    auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,
-                              src_names, dudt.get(), gsrc.get(), dudt.get());
+    auto add_rhs =
+        tl.AddTask(flux_div | geom_src, SumData<std::string, MeshBlockData<Real>>,
+                   src_names, dudt.get(), gsrc.get(), dudt.get());
 
     auto avg_container = tl.AddTask(add_rhs, AverageIndependentData<MeshBlockData<Real>>,
                                     sc0.get(), base.get(), beta);
     // apply du/dt to all independent fields in the container
-    auto update_container = tl.AddTask(avg_container, UpdateIndependentData<MeshBlockData<Real>>,
-                                       sc0.get(), dudt.get(), beta*dt, sc1.get());
+    auto update_container =
+        tl.AddTask(avg_container, UpdateIndependentData<MeshBlockData<Real>>, sc0.get(),
+                   dudt.get(), beta * dt, sc1.get());
 
     // update ghost cells
-    auto send = tl.AddTask(update_container,
-                           &MeshBlockData<Real>::SendBoundaryBuffers, sc1.get());
-    auto recv =
-        tl.AddTask(send, &MeshBlockData<Real>::ReceiveBoundaryBuffers, sc1.get());
+    auto send = tl.AddTask(update_container, &MeshBlockData<Real>::SendBoundaryBuffers,
+                           sc1.get());
+    auto recv = tl.AddTask(send, &MeshBlockData<Real>::ReceiveBoundaryBuffers, sc1.get());
     auto fill_from_bufs =
         tl.AddTask(recv, &MeshBlockData<Real>::SetBoundaries, sc1.get());
     auto clear_comm_flags =
@@ -158,23 +167,23 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto prolongBound = tl.AddTask(fill_from_bufs, parthenon::ProlongateBoundaries, sc1);
 
     // set physical boundaries
-    auto set_bc =
-      tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc1);
+    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc1);
 
     // fill in derived fields
-    auto fill_derived =
-        tl.AddTask(set_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+    auto fill_derived = tl.AddTask(
+        set_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
 
     // estimate next time step
     if (stage == integrator->nstages) {
-      auto new_dt = tl.AddTask(
-          fill_derived, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
+      auto new_dt =
+          tl.AddTask(fill_derived,
+                     parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
 
       auto divb = tl.AddTask(set_bc, fluid::CalculateDivB, sc1.get());
 
       // Update refinement
       if (pmesh->adaptive) {
-        //using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
+        // using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
         auto tag_refine = tl.AddTask(
             fill_derived, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
       }
@@ -214,20 +223,20 @@ TaskCollection PhoebusDriver::RadiationStep() {
     auto pmb = blocks[ib].get();
     auto &tl = async_region[ib];
     auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
-    auto calculate_four_force = tl.AddTask(none, radiation::CalculateCoolingFunctionFourForce,
-      sc0.get(), dt);
+    auto calculate_four_force =
+        tl.AddTask(none, radiation::CalculateCoolingFunctionFourForce, sc0.get(), dt);
     auto apply_four_force = tl.AddTask(calculate_four_force,
-     radiation::ApplyRadiationFourForce, sc0.get(), dt);
+                                       radiation::ApplyRadiationFourForce, sc0.get(), dt);
   }
 #elif RADIATION_METHOD == Diffusion
 #elif RADIATION_METHOD == M1
 #elif RADIATION_METHOD == MonteCarlo
-  return MonteCarloStep();
-      // TODO(BRR) use particles
-      //auto sc = pmb->swarm_data.Get();
+  // return MonteCarloStep();
+  // TODO(BRR) use particles
+  // auto sc = pmb->swarm_data.Get();
 #elif RADIATION_METHOD == MOCMC
-      // TODO(BRR) use particles
-      //auto sc = pmb->swarm_data.Get();
+  // TODO(BRR) use particles
+  // auto sc = pmb->swarm_data.Get();
 #endif // RADIATION_METHOD
 
   return tc;
@@ -244,12 +253,13 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   return packages;
 }
 
-//TaskListStatus PhoebusDriver::MonteCarloStep() {
-TaskCollection PhoebusDriver::MonteCarloStep() {
-  //TaskListStatus status;
-    TaskCollection tc;
+TaskListStatus PhoebusDriver::MonteCarloStep() {
+  // TaskCollection PhoebusDriver::MonteCarloStep() {
+  TaskCollection tc;
+  TaskListStatus status; // tl;
   const double t0 = tm.time;
-  //integrator.dt = tm.dt;
+  const double dt = tm.dt;
+  // integrator.dt = tm.dt;
   TaskID none(0);
 
   BlockList_t &blocks = pmesh->block_list;
@@ -257,33 +267,74 @@ TaskCollection PhoebusDriver::MonteCarloStep() {
 
   // Create all particles sourced due to emission during timestep
   {
+    TaskCollection tc;
     TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
     for (int i = 0; i < blocks.size(); i++) {
       auto &pmb = blocks[i];
       auto &tl = async_region0[i];
-      auto sample_particles = tl.AddTask(none, radiation::MonteCarloSourceParticles, pmb.get(), t0);
+      auto sample_particles =
+          tl.AddTask(none, radiation::MonteCarloSourceParticles, pmb.get(), t0);
     }
-    //status = tc.Execute();
+    status = tc.Execute();
   }
-/*
+
   // Loop over repeated MPI communication calls until every particle has reached
   // the end of the timestep.
   bool particles_update_done = false;
   while (!particles_update_done) {
-    status = radiation::MonteCarloTransportTaskCollection().Execute();
+    TaskCollection tc;
+    TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
+    for (int i = 0; i < blocks.size(); i++) {
+      auto &pmb = blocks[i];
+      auto sc = pmb->swarm_data.Get();
+      auto &tl = async_region0[i];
+      auto transport_particles =
+          tl.AddTask(none, radiation::MonteCarloTransport, pmb.get(), dt, t0);
+      auto send = tl.AddTask(transport_particles, &SwarmContainer::Send, sc.get(),
+                             BoundaryCommSubset::all);
+      auto receive =
+          tl.AddTask(send, &SwarmContainer::Receive, sc.get(), BoundaryCommSubset::all);
+    }
+
+    TaskRegion &sync_region = tc.AddRegion(1);
+    {
+      auto &tl = sync_region[0];
+      auto stop_comm = tl.AddTask(none, radiation::MonteCarloStopCommunication, blocks);
+    }
+
+    status = tc.Execute();
 
     particles_update_done = true;
     for (auto &block : blocks) {
       auto swarm = block->swarm_data.Get()->Get("monte_carlo");
-      if (!swarm->finished_transport {
+      if (!swarm->finished_transport) {
         particles_update_done = false;
       }
     }
+
+    PARTHENON_FAIL("Haven't written any transport yet, this hangs!");
   }
 
-  status = radiation::MonteCarloFinalizationTaskCollection().Execute();
-*/
-  return tc;//status;
+  return status;
+  /*
+    // Loop over repeated MPI communication calls until every particle has reached
+    // the end of the timestep.
+    bool particles_update_done = false;
+    while (!particles_update_done) {
+      status = radiation::MonteCarloTransportTaskCollection().Execute();
+
+      particles_update_done = true;
+      for (auto &block : blocks) {
+        auto swarm = block->swarm_data.Get()->Get("monte_carlo");
+        if (!swarm->finished_transport {
+          particles_update_done = false;
+        }
+      }
+    }
+
+    status = radiation::MonteCarloFinalizationTaskCollection().Execute();
+  */
+  // return tc;//status;
 }
 
 } // namespace phoebus

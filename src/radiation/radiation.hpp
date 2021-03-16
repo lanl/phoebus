@@ -83,6 +83,8 @@ TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const doub
 
 // Monte Carlo transport
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, const double t0);
+TaskStatus MonteCarloTransport(MeshBlock *pmb, const double dt, const double t0);
+TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
 
 enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
