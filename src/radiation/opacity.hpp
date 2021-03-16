@@ -21,6 +21,24 @@ Real Getyf(Real Ye, NeutrinoSpecies s) {
 }
 
 KOKKOS_INLINE_FUNCTION
+Real Getjnu(const Real Ye, const NeutrinoSpecies s, const Real nu) {
+  if (nu > numin && nu < numax) {
+    return C*Getyf(Ye, s);
+  } else {
+    return 0.;
+  }
+}
+
+KOKKOS_INLINE_FUNCTION
+Real GetJnu(const Real Ye, const NeutrinoSpecies s, const Real nu) {
+  if (nu > numin && nu < numax) {
+    return 4.*M_PI*C*Getyf(Ye, s);
+  } else {
+    return 0.;
+  }
+}
+
+KOKKOS_INLINE_FUNCTION
 Real GetJ(const Real rho_cgs, const Real Ye, const NeutrinoSpecies s) {
   Real Bc = C * (numax - numin);
   Real J = Bc * Getyf(Ye, s);

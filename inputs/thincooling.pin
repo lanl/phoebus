@@ -76,8 +76,11 @@ c2p_max_iter = 100
 Ye = true
 
 <radiation>
-method = cooling_function
-#method = monte_carlo
+#method = cooling_function
+method = monte_carlo
+nu_min = 1.e5
+nu_max = 1.e22
+nu_bins = 100
 
 <thincooling>
 species = electron

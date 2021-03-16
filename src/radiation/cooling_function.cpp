@@ -1,20 +1,12 @@
-//#include <parthenon/package.hpp>
-//#include <utils/error_checking.hpp>
-//using namespace parthenon::package::prelude;
-
 #include "radiation.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
 #include "opacity.hpp"
 
-//#include "compile_constants.hpp"
-//#include "phoebus_utils/unit_conversions.hpp"
-//#include "utils/constants.hpp"
-
 namespace radiation {
 
-TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const double dt) {
+TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = primitive_variables;
   namespace c = conserved_variables;
   namespace iv = internal_variables;
@@ -34,6 +26,9 @@ TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const doub
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
 
+// TODO(BRR) Temporary cooling problem parameters
+NeutrinoSpecies s = NeutrinoSpecies::Electron;
+
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -49,14 +44,8 @@ TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const doub
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  // Temporary cooling problem parameters
-  //Real C = 1.;
-  //Real numax = 1.e17;
-  //Real numin = 1.e7;
-  NeutrinoSpecies s = NeutrinoSpecies::Electron;
-
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CalculateRadiationForce", DevExecSpace(), kb.s, kb.e, jb.s,
+      DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real Gcov[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
@@ -65,10 +54,6 @@ TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const doub
         GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
         Geometry::Tetrads Tetrads(Ucon, Gcov);
 
-        //Real Ac = pc.mp / (pc.h * v(prho, k, j, i) * RHO) * C * log(numax / numin);
-        //Real Bc = C * (numax - numin);
-
-        //Real Gcov_tetrad[4] = {-Bc * Getyf(v(pye, k, j, i), s) * CPOWERDENS, 0, 0, 0};
         double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
         double Jye = GetJye(v(prho, k, j, i), v(pye, k, j, i), s);
         Real Gcov_tetrad[4] = {-J*CPOWERDENS, 0., 0., 0.};
@@ -80,7 +65,6 @@ TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const doub
           v(mu, k, j, i) = detG * Gcov_coord[mu - Gcov_lo];
         }
         v(Gye, k, j, i) = -detG * Jye * CDENSITY / CTIME;
-//            -detG * v(prho, k, j, i) * (Ac / CTIME) * Getyf(v(pye, k, j, i), s);
       });
 
   return TaskStatus::complete;

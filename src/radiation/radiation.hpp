@@ -29,12 +29,6 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
-#define CoolingFunction (0)
-#define Diffusion (1)
-#define M1 (2)
-#define MonteCarlo (3)
-#define MOCMC (4)
-
 namespace radiation {
 
 // TODO(BRR) Utilities that should be moved
@@ -81,11 +75,12 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
 //TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
 
 // Optically thin cooling function
-TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const double dt);
+TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt);
 
 // Monte Carlo transport
-TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, const double t0);
-TaskStatus MonteCarloTransport(MeshBlock *pmb, const double dt, const double t0);
+//TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, const double t0);
+TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc, SwarmContainer *sc, const double t0, const double dt);
+TaskStatus MonteCarloTransport(MeshBlock *pmb, const double t0, const double dt);
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
 

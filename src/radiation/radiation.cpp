@@ -44,6 +44,25 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
+  Real nu_min = pin->GetReal("radiation", "nu_min");
+  params.Add("nu_min", nu_min);
+  Real nu_max = pin->GetReal("radiation", "nu_max");
+  params.Add("nu_max", nu_max);
+  int nu_bins = pin->GetInteger("radiation", "nu_bins");
+  params.Add("nu_bins", nu_bins);
+  Real dlnu = (log(nu_max) - log(nu_min))/(nu_bins + 1);
+  params.Add("dlnu", dlnu);
+  ParArray1D<Real> nusamp("Frequency grid", nu_bins+1);
+  auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
+  for (int n = 0; n < nu_bins+1; n++) {
+    nusamp_h(n) = exp(log(nu_min) + n*dlnu);
+  }
+  Kokkos::deep_copy(nusamp, nusamp_h);
+  params.Add("nusamp", nusamp);
+
+  int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
+  params.Add("num_species", num_species);
+
   std::vector<std::string> known_methods = {"cooling_function", "moment", "monte_carlo", "mocmc"};
   if (std::find(known_methods.begin(), known_methods.end(), method) == known_methods.end()) {
     std::stringstream msg;
@@ -61,6 +80,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("vy", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("vz", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("weight", swarm_name, real_swarmvalue_metadata);
+    Metadata int_swarmvalue_metadata({Metadata::Integer});
+    physics->AddSwarmValue("i", swarm_name, int_swarmvalue_metadata);
+    physics->AddSwarmValue("j", swarm_name, int_swarmvalue_metadata);
+    physics->AddSwarmValue("k", swarm_name, int_swarmvalue_metadata);
+
+    physics->AddField("dEdlnu_max", mscalar);
+
+    std::vector<int> dEdlnu_size(1, nu_bins+1);
+    Metadata mdEdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dEdlnu_size);
+    physics->AddField("dEdlnu", mdEdlnu);
+
+    Real tune_emiss = pin->GetOrAddReal("radiation", "tune_emiss", 1.);
+    params.Add("tune_emiss", tune_emiss);
   }
 
   if (method == "monte_carlo" || method == "mocmc") {

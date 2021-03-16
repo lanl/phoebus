@@ -223,20 +223,22 @@ TaskListStatus PhoebusDriver::RadiationStep() {
   }
 
 //#if RADIATION_METHOD == CoolingFunction
+  auto num_independent_task_lists = blocks.size();
+
   if (rad_method == "cooling_function") {
-    auto num_independent_task_lists = blocks.size();
     TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
     for (int ib = 0; ib < num_independent_task_lists; ib++) {
       auto pmb = blocks[ib].get();
       auto &tl = async_region[ib];
       auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
       auto calculate_four_force =
-          tl.AddTask(none, radiation::CalculateCoolingFunctionFourForce, sc0.get(), dt);
+          tl.AddTask(none, radiation::CoolingFunctionCalculateFourForce, sc0.get(), dt);
       auto apply_four_force = tl.AddTask(calculate_four_force,
                                          radiation::ApplyRadiationFourForce, sc0.get(), dt);
     }
   } else if (rad_method == "moment") {
   } else if (rad_method == "monte_carlo") {
+    return MonteCarloStep();
   } else if (rad_method == "mocmc") {
   }
 //#elif RADIATION_METHOD == Diffusion
@@ -272,6 +274,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
   const double dt = tm.dt;
   // integrator.dt = tm.dt;
   TaskID none(0);
+  const auto &stage_name = integrator->stage_name;
 
   BlockList_t &blocks = pmesh->block_list;
   auto num_task_lists_executed_independently = blocks.size();
@@ -283,8 +286,10 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
     for (int i = 0; i < blocks.size(); i++) {
       auto &pmb = blocks[i];
       auto &tl = async_region0[i];
+      auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
       auto sample_particles =
-          tl.AddTask(none, radiation::MonteCarloSourceParticles, pmb.get(), t0);
+          tl.AddTask(none, radiation::MonteCarloSourceParticles, pmb.get(), mbd0.get(), sc0.get(), t0, dt);
     }
     status = tc.Execute();
   }
@@ -300,7 +305,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       auto sc = pmb->swarm_data.Get();
       auto &tl = async_region0[i];
       auto transport_particles =
-          tl.AddTask(none, radiation::MonteCarloTransport, pmb.get(), dt, t0);
+          tl.AddTask(none, radiation::MonteCarloTransport, pmb.get(), t0, dt);
       auto send = tl.AddTask(transport_particles, &SwarmContainer::Send, sc.get(),
                              BoundaryCommSubset::all);
       auto receive =
