@@ -50,7 +50,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("nu_max", nu_max);
   int nu_bins = pin->GetInteger("radiation", "nu_bins");
   params.Add("nu_bins", nu_bins);
-  Real dlnu = (log(nu_max) - log(nu_min))/(nu_bins + 1);
+  Real dlnu = (log(nu_max) - log(nu_min))/nu_bins;
   params.Add("dlnu", dlnu);
   ParArray1D<Real> nusamp("Frequency grid", nu_bins+1);
   auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
@@ -79,17 +79,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("vx", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("vy", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("vz", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("energy", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("weight", swarm_name, real_swarmvalue_metadata);
     Metadata int_swarmvalue_metadata({Metadata::Integer});
     physics->AddSwarmValue("i", swarm_name, int_swarmvalue_metadata);
     physics->AddSwarmValue("j", swarm_name, int_swarmvalue_metadata);
     physics->AddSwarmValue("k", swarm_name, int_swarmvalue_metadata);
 
-    physics->AddField("dEdlnu_max", mscalar);
+    physics->AddField("dNdlnu_max", mscalar);
+    physics->AddField("dN", mscalar);
 
-    std::vector<int> dEdlnu_size(1, nu_bins+1);
-    Metadata mdEdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dEdlnu_size);
-    physics->AddField("dEdlnu", mdEdlnu);
+    std::vector<int> dNdlnu_size(1, nu_bins+1);
+    Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
+    physics->AddField("dNdlnu", mdNdlnu);
 
     Real tune_emiss = pin->GetOrAddReal("radiation", "tune_emiss", 1.);
     params.Add("tune_emiss", tune_emiss);

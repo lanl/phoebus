@@ -62,6 +62,17 @@ KOKKOS_INLINE_FUNCTION void GetFourVelocity(Real v[4],
     u[l] = W * v[l - 1] - u[0] * beta[l - 1];
   }
 }
+
+KOKKOS_INLINE_FUNCTION
+Real LinearInterpLog(Real x, int k, int j, int i, ParArrayND<Real> table, Real lx_min, Real dlx) {
+  Real lx = log(x);
+  Real dn = (lx - lx_min)/dlx;
+  int n = static_cast<int>(dn);
+  dn = dn - n;
+  return (1. - dn)*table(n,k,j,i) + dn*table(n+1,k,j,i);
+}
+
+// Choice of RNG
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 extern parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
