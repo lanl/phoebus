@@ -1,18 +1,18 @@
-set(PHOEBUS_RADIATION_METHOD "MonteCarlo" CACHE STRING "Numerical method for radiation transport")
-
-set(PHOEBUS_RADIATION_METHODS
-    "CoolingFunction"
-    "Diffusion"
-    "M1"
-    "MonteCarlo"
-    "MOCMC"
-   )
-
-if(PHOEBUS_RADIATION_METHOD IN_LIST PHOEBUS_RADIATION_METHODS)
-  set(RADIATION_METHOD "${PHOEBUS_RADIATION_METHOD}")
-else()
-  message(FATAL_ERROR "Unknown PHOEBUS_RADIATION_METHOD!")
-endif()
+#set(PHOEBUS_RADIATION_METHOD "MonteCarlo" CACHE STRING "Numerical method for radiation transport")
+#
+#set(PHOEBUS_RADIATION_METHODS
+#    "CoolingFunction"
+#    "Diffusion"
+#    "M1"
+#    "MonteCarlo"
+#    "MOCMC"
+#   )
+#
+#if(PHOEBUS_RADIATION_METHOD IN_LIST PHOEBUS_RADIATION_METHODS)
+#  set(RADIATION_METHOD "${PHOEBUS_RADIATION_METHOD}")
+#else()
+#  message(FATAL_ERROR "Unknown PHOEBUS_RADIATION_METHOD!")
+#endif()
 
 set(PHOEBUS_RADIATION_BOUND_IX1 "outflow" CACHE STRING "Lower X1 radiation boundary condition")
 set(PHOEBUS_RADIATION_BOUND_OX1 "outflow" CACHE STRING "Upper X1 radiation boundary condition")

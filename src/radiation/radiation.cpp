@@ -44,6 +44,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
+  std::vector<std::string> known_methods = {"cooling_function", "moment", "monte_carlo", "mocmc"};
+  if (std::find(known_methods.begin(), known_methods.end(), method) == known_methods.end()) {
+    std::stringstream msg;
+    msg << "Radiation method \"" << method << "\" not recognized!";
+    PARTHENON_FAIL(msg);
+  }
+
   if (method == "monte_carlo") {
     std::string swarm_name = "monte_carlo";
     Metadata swarm_metadata;

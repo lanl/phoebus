@@ -76,8 +76,10 @@ TaskListStatus PhoebusDriver::Step() {
     TaskCollection tc = RadiationStep();
     status = tc.Execute();
   }*/
+  status = RadiationStep();
 
-  status = MonteCarloStep();
+
+  //status = MonteCarloStep();
 
   return status;
 }
@@ -195,7 +197,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
 TaskStatus DefaultTask() { return TaskStatus::complete; }
 
-TaskCollection PhoebusDriver::RadiationStep() {
+//TaskCollection PhoebusDriver::RadiationStep() {
+TaskListStatus PhoebusDriver::RadiationStep() {
+  TaskListStatus status;
   TaskCollection tc;
   TaskID none(0);
 
@@ -204,7 +208,9 @@ TaskCollection PhoebusDriver::RadiationStep() {
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
 
-  const auto rad_active = pmesh->packages.Get("radiation")->Param<bool>("active");
+  auto rad = pmesh->packages.Get("radiation");
+  const auto rad_active = rad->Param<bool>("active");
+  const auto rad_method = rad->Param<std::string>("method");
   if (!rad_active) {
     auto num_independent_task_lists = blocks.size();
     TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
@@ -213,33 +219,38 @@ TaskCollection PhoebusDriver::RadiationStep() {
       auto &tl = async_region[ib];
       auto default_task = tl.AddTask(none, DefaultTask);
     }
-    return tc;
+    return tc.Execute();
   }
 
-#if RADIATION_METHOD == CoolingFunction
-  auto num_independent_task_lists = blocks.size();
-  TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
-  for (int ib = 0; ib < num_independent_task_lists; ib++) {
-    auto pmb = blocks[ib].get();
-    auto &tl = async_region[ib];
-    auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
-    auto calculate_four_force =
-        tl.AddTask(none, radiation::CalculateCoolingFunctionFourForce, sc0.get(), dt);
-    auto apply_four_force = tl.AddTask(calculate_four_force,
-                                       radiation::ApplyRadiationFourForce, sc0.get(), dt);
+//#if RADIATION_METHOD == CoolingFunction
+  if (rad_method == "cooling_function") {
+    auto num_independent_task_lists = blocks.size();
+    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
+    for (int ib = 0; ib < num_independent_task_lists; ib++) {
+      auto pmb = blocks[ib].get();
+      auto &tl = async_region[ib];
+      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      auto calculate_four_force =
+          tl.AddTask(none, radiation::CalculateCoolingFunctionFourForce, sc0.get(), dt);
+      auto apply_four_force = tl.AddTask(calculate_four_force,
+                                         radiation::ApplyRadiationFourForce, sc0.get(), dt);
+    }
+  } else if (rad_method == "moment") {
+  } else if (rad_method == "monte_carlo") {
+  } else if (rad_method == "mocmc") {
   }
-#elif RADIATION_METHOD == Diffusion
-#elif RADIATION_METHOD == M1
-#elif RADIATION_METHOD == MonteCarlo
+//#elif RADIATION_METHOD == Diffusion
+//#elif RADIATION_METHOD == M1
+//#elif RADIATION_METHOD == MonteCarlo
   // return MonteCarloStep();
   // TODO(BRR) use particles
   // auto sc = pmb->swarm_data.Get();
-#elif RADIATION_METHOD == MOCMC
+//#elif RADIATION_METHOD == MOCMC
   // TODO(BRR) use particles
   // auto sc = pmb->swarm_data.Get();
-#endif // RADIATION_METHOD
+//#endif // RADIATION_METHOD
 
-  return tc;
+  return tc.Execute();
 }
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {

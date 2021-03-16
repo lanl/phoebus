@@ -72,6 +72,8 @@ typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 extern parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
+enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
@@ -87,18 +89,6 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, const double dt, const double t0)
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
 
-enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
-
-// TODO(BRR) temporary opacity here
-KOKKOS_INLINE_FUNCTION Real Getyf(Real Ye, NeutrinoSpecies s) {
-  if (s == NeutrinoSpecies::Electron) {
-    return 2. * Ye;
-  } else if (s == NeutrinoSpecies::ElectronAnti) {
-    return 1. - 2. * Ye;
-  } else {
-    return 0.;
-  }
-}
 
 } // namespace radiation
 

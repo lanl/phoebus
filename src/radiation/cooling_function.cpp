@@ -6,6 +6,8 @@
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
+#include "opacity.hpp"
+
 //#include "compile_constants.hpp"
 //#include "phoebus_utils/unit_conversions.hpp"
 //#include "utils/constants.hpp"
@@ -48,9 +50,9 @@ TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const doub
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   // Temporary cooling problem parameters
-  Real C = 1.;
-  Real numax = 1.e17;
-  Real numin = 1.e7;
+  //Real C = 1.;
+  //Real numax = 1.e17;
+  //Real numin = 1.e7;
   NeutrinoSpecies s = NeutrinoSpecies::Electron;
 
   parthenon::par_for(
@@ -63,10 +65,13 @@ TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const doub
         GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
         Geometry::Tetrads Tetrads(Ucon, Gcov);
 
-        Real Ac = pc.mp / (pc.h * v(prho, k, j, i) * RHO) * C * log(numax / numin);
-        Real Bc = C * (numax - numin);
+        //Real Ac = pc.mp / (pc.h * v(prho, k, j, i) * RHO) * C * log(numax / numin);
+        //Real Bc = C * (numax - numin);
 
-        Real Gcov_tetrad[4] = {-Bc * Getyf(v(pye, k, j, i), s) * CPOWERDENS, 0, 0, 0};
+        //Real Gcov_tetrad[4] = {-Bc * Getyf(v(pye, k, j, i), s) * CPOWERDENS, 0, 0, 0};
+        double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
+        double Jye = GetJye(v(prho, k, j, i), v(pye, k, j, i), s);
+        Real Gcov_tetrad[4] = {-J*CPOWERDENS, 0., 0., 0.};
         Real Gcov_coord[4];
         Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
         Real detG = geom.DetG(CellLocation::Cent, k, j, i);
@@ -74,8 +79,8 @@ TaskStatus CalculateCoolingFunctionFourForce(MeshBlockData<Real> *rc, const doub
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
           v(mu, k, j, i) = detG * Gcov_coord[mu - Gcov_lo];
         }
-        v(Gye, k, j, i) =
-            -detG * v(prho, k, j, i) * (Ac / CTIME) * Getyf(v(pye, k, j, i), s);
+        v(Gye, k, j, i) = -detG * Jye * CDENSITY / CTIME;
+//            -detG * v(prho, k, j, i) * (Ac / CTIME) * Getyf(v(pye, k, j, i), s);
       });
 
   return TaskStatus::complete;
