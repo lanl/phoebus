@@ -59,7 +59,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   // TODO(BRR) can I do this with AMR?
   const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
   const Real dV_code = dx_i*dx_j*dx_k*dt;
-  printf("d3x: %e dt: %e\n", dx_i*dx_j*dx_k, dt);
 
   std::vector<std::string> vars({p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", iv::Gcov, iv::Gye});
   PackIndexMap imap;
@@ -112,7 +111,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         }
 
         v(idN, k, j, i) = static_cast<Real>(Ns);
-        printf("dN[%i %i %i] = %e\n", k, j, i, v(idN, k, j, i));
+        //printf("dN[%i %i %i] = %e\n", k, j, i, v(idN, k, j, i));
         v(idNdlnu_max, k, j, i) = dNdlnu_max;
         rng_pool.free_state(rng_gen);
       });
@@ -224,14 +223,14 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           }
           // TODO(BRR) lepton sign
           v(Gye, k, j, i) -= 1./dV_code*weight(m)*pc.mp/MASS;
-          printf("weight: %e dV: %e E: %e (%e)\n", weight(m), dV_code, E, E*ENERGY);
+          /*printf("weight: %e dV: %e E: %e (%e)\n", weight(m), dV_code, E, E*ENERGY);
           printf("dG: %e %e %e %e (%e)\n",
             1./dV_code*weight(m)*K_coord[0],
             1./dV_code*weight(m)*K_coord[1],
             1./dV_code*weight(m)*K_coord[2],
             1./dV_code*weight(m)*K_coord[3],
             1./dV_code*weight(m)*pc.mp/MASS);
-
+*/
           rng_pool.free_state(rng_gen);
 
           // TODO(BRR) Now throw away particles temporarily
