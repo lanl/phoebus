@@ -50,11 +50,16 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real MASS = unit_conv.GetMassCodeToCGS();
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
+  const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
   const Real CENERGY = unit_conv.GetEnergyCGSToCode();
+  const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
+  const Real CTIME = unit_conv.GetTimeCGSToCode();
+  const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
 
   // TODO(BRR) can I do this with AMR?
   const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
   const Real dV_code = dx_i*dx_j*dx_k*dt;
+  printf("d3x: %e dt: %e\n", dx_i*dx_j*dx_k, dt);
 
   std::vector<std::string> vars({p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", iv::Gcov, iv::Gye});
   PackIndexMap imap;
@@ -70,7 +75,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
-  const Real wgtC = 1.e48 * tune_emiss;
+  //const Real wgtC = 1.e44 * tune_emiss;
+  const Real wgtC = 1.e60 * tune_emiss;
 
   pmb->par_for(
       "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -79,26 +85,34 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
         Real dNdlnu_max = 0.;
         Real dN = 0.;
+        Real Jtot = 0.;
         for (int n = 0; n <= nu_bins; n++) {
           Real nu = nusamp(n);
           Real wgt = GetWeight(wgtC, nu);
-          Real dNdlnu = GetJnu(v(iye, k, j, i), s, nu) / wgt;
+          Real dNdlnu = nu*GetJnu(v(iye, k, j, i), s, nu) / wgt;
+          Jtot += GetJnu(v(iye, k, j, i), s, nu)*nu*dlnu;
           v(idNdlnu + n, k, j, i) = dNdlnu;
           if (dNdlnu > dNdlnu_max) {
             dNdlnu_max = dNdlnu;
           }
           // TODO(BRR) gdet
           dN += dNdlnu * dlnu * dV_cgs;
+          //printf("dN: %e\n", dN);
         }
+        //printf("Jtot: %e (%e)\n", Jtot, Jtot*CPOWERDENS);
+        //printf("getG: %e (%e)\n", GetJ(v(iye, k, j, i), s),
+        //  GetJ(v(iye, k, j, i), s)*CPOWERDENS);
 
         // Trapezoidal rule
-        dN -= 0.5 * (v(idNdlnu, k, j, i) + v(idNdlnu + nu_bins, k, j, i));
+        dN -= 0.5 * (v(idNdlnu, k, j, i) + v(idNdlnu + nu_bins, k, j, i))*dlnu *dV_cgs;
+        //printf("final dN: %e\n", dN);
         int Ns = static_cast<int>(dN);
         if (dN - Ns > rng_gen.drand()) {
           Ns++;
         }
 
         v(idN, k, j, i) = static_cast<Real>(Ns);
+        printf("dN[%i %i %i] = %e\n", k, j, i, v(idN, k, j, i));
         v(idNdlnu_max, k, j, i) = dNdlnu_max;
         rng_pool.free_state(rng_gen);
       });
@@ -210,13 +224,13 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           }
           // TODO(BRR) lepton sign
           v(Gye, k, j, i) -= 1./dV_code*weight(m)*pc.mp/MASS;
-/*          printf("weight: %e\n", weight(m));
+          printf("weight: %e dV: %e E: %e (%e)\n", weight(m), dV_code, E, E*ENERGY);
           printf("dG: %e %e %e %e (%e)\n",
             1./dV_code*weight(m)*K_coord[0],
             1./dV_code*weight(m)*K_coord[1],
             1./dV_code*weight(m)*K_coord[2],
             1./dV_code*weight(m)*K_coord[3],
-            1./dV_code*weight(m)*pc.mp/MASS);*/
+            1./dV_code*weight(m)*pc.mp/MASS);
 
           rng_pool.free_state(rng_gen);
 

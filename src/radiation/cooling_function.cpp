@@ -54,7 +54,8 @@ NeutrinoSpecies s = NeutrinoSpecies::Electron;
         GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
         Geometry::Tetrads Tetrads(Ucon, Gcov);
 
-        double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
+        //double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
+        double J = GetJ(v(pye, k, j, i), s);
         double Jye = GetJye(v(prho, k, j, i), v(pye, k, j, i), s);
         Real Gcov_tetrad[4] = {-J*CPOWERDENS, 0., 0., 0.};
         Real Gcov_coord[4];

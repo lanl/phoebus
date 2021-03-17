@@ -39,7 +39,7 @@ Real GetJnu(const Real Ye, const NeutrinoSpecies s, const Real nu) {
 }
 
 KOKKOS_INLINE_FUNCTION
-Real GetJ(const Real rho_cgs, const Real Ye, const NeutrinoSpecies s) {
+Real GetJ(const Real Ye, const NeutrinoSpecies s) {
   Real Bc = C * (numax - numin);
   Real J = Bc * Getyf(Ye, s);
   return J;
