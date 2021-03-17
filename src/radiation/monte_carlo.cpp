@@ -43,22 +43,30 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real &minx_i = pmb->coords.x1f(ib.s);
   const Real &minx_j = pmb->coords.x2f(jb.s);
   const Real &minx_k = pmb->coords.x3f(kb.s);
+  auto geom = Geometry::GetCoordinateSystem(rc);
 
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  const Real MASS = unit_conv.GetMassCodeToCGS();
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
+  const Real CENERGY = unit_conv.GetEnergyCGSToCode();
 
   // TODO(BRR) can I do this with AMR?
   const Real dV = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
 
-  std::vector<std::string> vars({p::ye, "dNdlnu_max", "dNdlnu", "dN"});
+  std::vector<std::string> vars({p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int iye = imap[p::ye].first;
+  const int pvlo = imap[p::velocity].first;
+  const int pvhi = imap[p::velocity].second;
   const int idNdlnu = imap["dNdlnu"].first;
   const int idNdlnu_max = imap["dNdlnu_max"].first;
   const int idN = imap["dN"].first;
+    const int Gcov_lo = imap[iv::Gcov].first;
+  const int Gcov_hi = imap[iv::Gcov].second;
+  const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
   const Real wgtC = 1.e44 * tune_emiss;
@@ -111,12 +119,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto &x = swarm->Get<Real>("x").Get();
   auto &y = swarm->Get<Real>("y").Get();
   auto &z = swarm->Get<Real>("z").Get();
-  auto &vx = swarm->Get<Real>("vx").Get();
-  auto &vy = swarm->Get<Real>("vy").Get();
-  auto &vz = swarm->Get<Real>("vz").Get();
-  auto &pi = swarm->Get<int>("i").Get();
-  auto &pj = swarm->Get<int>("j").Get();
-  auto &pk = swarm->Get<int>("k").Get();
+  auto &k0 = swarm->Get<Real>("k0").Get();
+  auto &k1 = swarm->Get<Real>("k1").Get();
+  auto &k2 = swarm->Get<Real>("k2").Get();
+  auto &k3 = swarm->Get<Real>("k3").Get();
   auto &weight = swarm->Get<Real>("weight").Get();
   auto swarm_d = swarm->GetDeviceContext();
 
@@ -144,25 +150,27 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   pmb->par_for(
       "MonteCarloSourceParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        // Create tetrad transformation once per zone
+        Real Gcov[4][4];
+        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
+        Real Ucon[4];
+        Real vel[4] = {0, v(pvlo, k, j, i), v(pvlo + 1, k, j, i), v(pvlo + 2, k, j, i)};
+        GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
+        Geometry::Tetrads Tetrads(Ucon, Gcov);
+        Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+
+        // Loop over particles to create in this zone
         for (int n = 0; n < static_cast<int>(dN(k, j, i)); n++) {
           const int m = new_indices(n);
           auto rng_gen = rng_pool.get_state();
-          printf("zone %i %i %i making a particle!\n", k, j, i);
 
           // Create particles at initial time
-          t(n) = t0;
+          t(m) = t0;
 
           // Create particles at zone centers
-          x(n) = minx_i + (i + 0.5) * dx_i;
-          y(n) = minx_j + (j + 0.5) * dx_j;
-          z(n) = minx_k + (k + 0.5) * dx_k;
-
-          // Randomly sample direction, v = c
-          Real theta = acos(2. * rng_gen.drand() - 1.);
-          Real phi = 2. * M_PI * rng_gen.drand();
-          vx(n) = sin(theta) * cos(phi);
-          vy(n) = sin(theta) * sin(phi);
-          vz(n) = cos(theta);
+          x(m) = minx_i + (i + 0.5) * dx_i;
+          y(m) = minx_j + (j + 0.5) * dx_j;
+          z(m) = minx_k + (k + 0.5) * dx_k;
 
           // Sample energy and set weight
           Real nu;
@@ -171,17 +179,48 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             nu = exp(rng_gen.drand()*(lnu_max - lnu_min) + lnu_min);
             counter++;
           } while (rng_gen.drand() > LinearInterpLog(nu, k, j, i, dNdlnu, lnu_min, dlnu)/dNdlnu_max(k, j, i));
-          printf("nu: %e\n", nu);
 
 
-          weight(n) = GetWeight(wgtC, nu);
+          weight(m) = GetWeight(wgtC, nu);
+
+          // Encode frequency and randomly sample direction
+          Real E = nu*pc.h*CENERGY;
+          Real theta = acos(2. * rng_gen.drand() - 1.);
+          Real phi = 2. * M_PI * rng_gen.drand();
+          Real K_tetrad[4] = {-E,
+                              E*cos(theta),
+                              E*cos(phi)*sin(theta),
+                              E*sin(phi)*sin(theta)};
+          Real K_coord[4];
+          Tetrads.TetradToCoordCov(K_tetrad, K_coord);
+
+          k0(m) = K_coord[0];
+          k1(m) = K_coord[1];
+          k2(m) = K_coord[2];
+          k3(m) = K_coord[3];
+
+          for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
+            // detG is on numerator and denominator
+            v(mu, k, j, i) -= 1./(dV)*weight(m)*K_coord[mu];
+          }
+          // TODO(BRR) lepton sign
+          v(Gye, k, j, i) -= 1./dV*weight(m)*pc.mp/MASS;
+          printf("dG: %e %e %e %e (%e)\n",
+            1./(dV)*weight(m)*K_coord[0],
+            1./(dV)*weight(m)*K_coord[1],
+            1./(dV)*weight(m)*K_coord[2],
+            1./(dV)*weight(m)*K_coord[3],
+            1./dV*weight(m)*pc.mp/MASS);
 
           rng_pool.free_state(rng_gen);
+
+          // TODO(BRR) Now throw away particles temporarily
+          swarm_d.MarkParticleForRemoval(m);
         }
       });
-  exit(-1);
+  //exit(-1);
 
-  pmb->par_for(
+  /*pmb->par_for(
       "MonteCarloSourceParticles", 0, new_indices.GetSize() - 1,
       KOKKOS_LAMBDA(const int n) {
         printf("%s:%i\n", __FILE__, __LINE__);
@@ -210,7 +249,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
         rng_pool.free_state(rng_gen);
       });
-  printf("%s:%i\n", __FILE__, __LINE__);
+  printf("%s:%i\n", __FILE__, __LINE__);*/
 
   return TaskStatus::complete;
 }

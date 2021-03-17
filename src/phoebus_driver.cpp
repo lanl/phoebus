@@ -296,7 +296,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
 
   // Loop over repeated MPI communication calls until every particle has reached
   // the end of the timestep.
-  bool particles_update_done = false;
+  /*bool particles_update_done = false;
   while (!particles_update_done) {
     TaskCollection tc;
     TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
@@ -328,7 +328,21 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       }
     }
 
-    PARTHENON_FAIL("Haven't written any transport yet, this hangs!");
+    //PARTHENON_FAIL("Haven't written any transport yet, this hangs!");
+  }*/
+
+  // Finalization calls
+  {
+    TaskCollection tc;
+    TaskRegion &async_region1 = tc.AddRegion(num_task_lists_executed_independently);
+    for (int ib = 0; ib < num_task_lists_executed_independently; ib++) {
+      auto pmb = blocks[ib].get();
+      auto &tl = async_region1[ib];
+      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      auto apply_four_force = tl.AddTask(none,
+                                         radiation::ApplyRadiationFourForce, sc0.get(), dt);
+    }
+    status = tc.Execute();
   }
 
   return status;

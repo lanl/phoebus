@@ -76,15 +76,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarm(swarm_name, swarm_metadata);
     Metadata real_swarmvalue_metadata({Metadata::Real});
     physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("vx", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("vy", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("vz", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("energy", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("k0", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("k1", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("k2", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("k3", swarm_name, real_swarmvalue_metadata);
+//    physics->AddSwarmValue("energy", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("weight", swarm_name, real_swarmvalue_metadata);
     Metadata int_swarmvalue_metadata({Metadata::Integer});
-    physics->AddSwarmValue("i", swarm_name, int_swarmvalue_metadata);
-    physics->AddSwarmValue("j", swarm_name, int_swarmvalue_metadata);
-    physics->AddSwarmValue("k", swarm_name, int_swarmvalue_metadata);
+    //physics->AddSwarmValue("i", swarm_name, int_swarmvalue_metadata);
+    //physics->AddSwarmValue("j", swarm_name, int_swarmvalue_metadata);
+    //physics->AddSwarmValue("k", swarm_name, int_swarmvalue_metadata);
 
     physics->AddField("dNdlnu_max", mscalar);
     physics->AddField("dN", mscalar);
@@ -167,12 +168,26 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        printf("cons: %e %e %e %e (%e)\n",
+          v(ceng, k, j, i),
+          v(cmom_lo, k, j, i),
+          v(cmom_lo + 1, k, j, i),
+          v(cmom_lo + 2, k, j, i),
+          v(cye, k, j, i));
+        printf("G: %e %e %e %e (%e)\n",
+          v(Gcov_lo, k, j, i) * dt,
+          v(Gcov_lo + 1, k, j, i) * dt,
+          v(Gcov_lo + 2, k, j, i) * dt,
+          v(Gcov_lo + 3, k, j, i) * dt,
+          v(Gye, k, j, i) * dt);
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
         v(cye, k, j, i) += v(Gye, k, j, i) * dt;
       });
+
+  exit(-1);
 
   return TaskStatus::complete;
 }
