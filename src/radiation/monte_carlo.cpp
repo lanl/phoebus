@@ -53,7 +53,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real CENERGY = unit_conv.GetEnergyCGSToCode();
 
   // TODO(BRR) can I do this with AMR?
-  const Real dV = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
+  const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
+  const Real dV_code = dx_i*dx_j*dx_k*dt;
 
   std::vector<std::string> vars({p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", iv::Gcov, iv::Gye});
   PackIndexMap imap;
@@ -69,7 +70,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
-  const Real wgtC = 1.e44 * tune_emiss;
+  const Real wgtC = 1.e48 * tune_emiss;
 
   pmb->par_for(
       "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -87,7 +88,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             dNdlnu_max = dNdlnu;
           }
           // TODO(BRR) gdet
-          dN += dNdlnu * dlnu * dV;
+          dN += dNdlnu * dlnu * dV_cgs;
         }
 
         // Trapezoidal rule
@@ -111,6 +112,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         dNtot += static_cast<int>(v(idN, k, j, i));
       },
       Kokkos::Sum<int>(dNtot));
+  printf("Creating %i particles!\n", dNtot);
+  if (dNtot <= 0) {
+    return TaskStatus::complete;
+  }
 
   ParArrayND<int> new_indices;
   const auto new_particles_mask = swarm->AddEmptyParticles(dNtot, new_indices);
@@ -201,16 +206,17 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
             // detG is on numerator and denominator
-            v(mu, k, j, i) -= 1./(dV)*weight(m)*K_coord[mu];
+            v(mu, k, j, i) -= 1./dV_code*weight(m)*K_coord[mu-Gcov_lo];
           }
           // TODO(BRR) lepton sign
-          v(Gye, k, j, i) -= 1./dV*weight(m)*pc.mp/MASS;
+          v(Gye, k, j, i) -= 1./dV_code*weight(m)*pc.mp/MASS;
+/*          printf("weight: %e\n", weight(m));
           printf("dG: %e %e %e %e (%e)\n",
-            1./(dV)*weight(m)*K_coord[0],
-            1./(dV)*weight(m)*K_coord[1],
-            1./(dV)*weight(m)*K_coord[2],
-            1./(dV)*weight(m)*K_coord[3],
-            1./dV*weight(m)*pc.mp/MASS);
+            1./dV_code*weight(m)*K_coord[0],
+            1./dV_code*weight(m)*K_coord[1],
+            1./dV_code*weight(m)*K_coord[2],
+            1./dV_code*weight(m)*K_coord[3],
+            1./dV_code*weight(m)*pc.mp/MASS);*/
 
           rng_pool.free_state(rng_gen);
 

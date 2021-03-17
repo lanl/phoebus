@@ -154,8 +154,8 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int ceng = imap[c::energy].first;
-  const int cmom_lo = imap[c::density].first;
-  const int cmom_hi = imap[c::density].second;
+  const int cmom_lo = imap[c::momentum].first;
+  const int cmom_hi = imap[c::momentum].second;
   const int cye = imap[c::ye].first;
   const int Gcov_lo = imap[iv::Gcov].first;
   const int Gcov_hi = imap[iv::Gcov].second;
@@ -168,7 +168,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        printf("cons: %e %e %e %e (%e)\n",
+        /*printf("cons: %e %e %e %e (%e)\n",
           v(ceng, k, j, i),
           v(cmom_lo, k, j, i),
           v(cmom_lo + 1, k, j, i),
@@ -179,7 +179,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
           v(Gcov_lo + 1, k, j, i) * dt,
           v(Gcov_lo + 2, k, j, i) * dt,
           v(Gcov_lo + 3, k, j, i) * dt,
-          v(Gye, k, j, i) * dt);
+          v(Gye, k, j, i) * dt);*/
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
@@ -187,7 +187,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
         v(cye, k, j, i) += v(Gye, k, j, i) * dt;
       });
 
-  exit(-1);
+  //exit(-1);
 
   return TaskStatus::complete;
 }
