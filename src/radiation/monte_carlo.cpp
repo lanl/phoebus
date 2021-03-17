@@ -59,6 +59,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   // TODO(BRR) can I do this with AMR?
   const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
   const Real dV_code = dx_i*dx_j*dx_k*dt;
+  const Real d3x_cgs = dx_i*dx_j*dx_k*pow(LENGTH,3);
 
   std::vector<std::string> vars({p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", iv::Gcov, iv::Gye});
   PackIndexMap imap;
@@ -76,12 +77,21 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
   //const Real wgtC = 1.e44 * tune_emiss;
   //const Real wgtC = 1.e60 * tune_emiss;
-  const Real wgtC = 1.e76*tune_emiss;
+  const Real wgtC = 1.e68*tune_emiss;
+//  const Real wgtC = 1.e100*tune_emiss;
 
   pmb->par_for(
       "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         auto rng_gen = rng_pool.get_state();
+        Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+        Real ye = v(iye, k, j, i);
+
+        Real nufid = 1.e17;
+        Real En = pc.h*nufid*GetWeight(wgtC, nufid);
+        printf("J: %e DeltaE: %e En: %e\n",
+          GetJ(ye, s), GetJ(ye, s)*d3x_cgs*dt*TIME, En);
+        //exit(-1);
 
         Real dNdlnu_max = 0.;
         Real dN = 0.;
@@ -89,25 +99,51 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         for (int n = 0; n <= nu_bins; n++) {
           Real nu = nusamp(n);
           Real wgt = GetWeight(wgtC, nu);
+          Real Jnu = GetJnu(ye, s, nu);
+
+          //dN += Jnu*nu/(pc.h*nu*wgt)*dlnu;
+          Real deltadN = Jnu*nu/(pc.h*nu*wgt)*dlnu;
+          dN += deltadN;
+
+
+
           //Real dNdlnu = nu*GetJnu(v(iye, k, j, i), s, nu) / wgt;
-          printf("Multiply by dx3 etc. here!\n");
-          exit(-1);
-          Real dNdlnu = GetJnu(v(iye, k, j, i), s, nu) / (pc.h * wgt);
+          //printf("Multiply by dx3 etc. here!\n");
+          //exit(-1);
+          // Factors of nu in numerator and denominator cancel
+          Real dNdlnu = Jnu * d3x_cgs*detG / (pc.h * wgt);
+          printf("nu: %e Jnu: %e dEbin: %e dNbin: %e En: %e\n", nu, Jnu,
+            nu*Jnu*dlnu*d3x_cgs*dt*TIME, deltadN*d3x_cgs*detG*dt*TIME,
+            pc.h*nu*wgt);
+          //printf("ye: %e nu: %e Jnu: %e d3xcgs: %e detG: %e h: %e wgt: %e dNdlnu: %e\n",
+          //  v(iye,k,j,i), nu, GetJnu(v(iye, k, j, i), s, nu), d3x_cgs, detG, pc.h, wgt, dNdlnu);
           Jtot += GetJnu(v(iye, k, j, i), s, nu)*nu*dlnu;
           v(idNdlnu + n, k, j, i) = dNdlnu;
           if (dNdlnu > dNdlnu_max) {
             dNdlnu_max = dNdlnu;
           }
           // TODO(BRR) gdet
-          dN += dNdlnu * dlnu * dV_cgs;
+          //dN += dNdlnu * dlnu;// * dV_cgs;
+          //printf("dN: %e detG: %e\n", dN, detG);
           //printf("dN: %e\n", dN);
         }
         //printf("Jtot: %e (%e)\n", Jtot, Jtot*CPOWERDENS);
         //printf("getG: %e (%e)\n", GetJ(v(iye, k, j, i), s),
         //  GetJ(v(iye, k, j, i), s)*CPOWERDENS);
 
+        //dN -= 0.5*(GetJnu(ye, s, nusamp[0])*nusamp[0]/(pc.h*nusamp[0]*GetWeight(wgtC, nusamp[0]))
+        //         + GetJnu(ye, s, nusamp[nu_bins])*nusamp[nu_bins]/(pc.h*nusamp[nu_bins]*GetWeight(wgtC, nusamp[nu_bins])))*dlnu;
+        dN *= d3x_cgs*detG*dt*TIME;
+        Real dE = Jtot*d3x_cgs*detG*dt*TIME;
+        printf("J: %e DeltaE: %e En: %e\n",
+          GetJ(ye, s), GetJ(ye, s)*d3x_cgs*dt*TIME, En);
+        printf("Jtot: %e\n", Jtot);
+        printf("dE: %e\n", dE);
+        printf("dN: %e\n", dN);
+        exit(-1);
+
         // Trapezoidal rule
-        dN -= 0.5 * (v(idNdlnu, k, j, i) + v(idNdlnu + nu_bins, k, j, i))*dlnu *dV_cgs;
+        //dN -= 0.5 * (v(idNdlnu, k, j, i) + v(idNdlnu + nu_bins, k, j, i))*dlnu;// *dV_cgs;
         printf("final dN: %e\n", dN);
         int Ns = static_cast<int>(dN);
         if (dN - Ns > rng_gen.drand()) {

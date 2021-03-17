@@ -23,7 +23,7 @@ Real Getyf(Real Ye, NeutrinoSpecies s) {
 KOKKOS_INLINE_FUNCTION
 Real Getjnu(const Real Ye, const NeutrinoSpecies s, const Real nu) {
   if (nu > numin && nu < numax) {
-    return C*Getyf(Ye, s);
+    return C*Getyf(Ye, s)/(4.*M_PI);
   } else {
     return 0.;
   }
@@ -32,7 +32,8 @@ Real Getjnu(const Real Ye, const NeutrinoSpecies s, const Real nu) {
 KOKKOS_INLINE_FUNCTION
 Real GetJnu(const Real Ye, const NeutrinoSpecies s, const Real nu) {
   if (nu > numin && nu < numax) {
-    return 4.*M_PI*C*Getyf(Ye, s);
+    return C*Getyf(Ye, s);
+    //return 4.*M_PI*C*Getyf(Ye, s);
   } else {
     return 0.;
   }
