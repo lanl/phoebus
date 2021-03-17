@@ -58,10 +58,11 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   // TODO(BRR) can I do this with AMR?
   const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
-  const Real dV_code = dx_i*dx_j*dx_k*dt;
-  const Real d3x_cgs = dx_i*dx_j*dx_k*pow(LENGTH,3);
+  const Real dV_code = dx_i * dx_j * dx_k * dt;
+  const Real d3x_cgs = dx_i * dx_j * dx_k * pow(LENGTH, 3);
 
-  std::vector<std::string> vars({p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", iv::Gcov, iv::Gye});
+  std::vector<std::string> vars(
+      {p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int iye = imap[p::ye].first;
@@ -70,21 +71,20 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int idNdlnu = imap["dNdlnu"].first;
   const int idNdlnu_max = imap["dNdlnu_max"].first;
   const int idN = imap["dN"].first;
-    const int Gcov_lo = imap[iv::Gcov].first;
+  const int Gcov_lo = imap[iv::Gcov].first;
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
-  //const Real wgtC = 1.e44 * tune_emiss;
-  //const Real wgtC = 1.e60 * tune_emiss;
-  //const Real wgtC = 1.e68*tune_emiss;
-  const Real wgtC = 1.e72*tune_emiss;
-//  const Real wgtC = 1.e100*tune_emiss;
+  // const Real wgtC = 1.e44 * tune_emiss;
+  // const Real wgtC = 1.e60 * tune_emiss;
+  // const Real wgtC = 1.e68*tune_emiss;
+  const Real wgtC = 1.e72 * tune_emiss;
+  //  const Real wgtC = 1.e100*tune_emiss;
 
   pmb->par_for(
       "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-
         // Reset radiation four-force
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
           v(mu, k, j, i) = 0.;
@@ -96,10 +96,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         Real ye = v(iye, k, j, i);
 
         Real nufid = 1.e17;
-        Real En = pc.h*nufid*GetWeight(wgtC, nufid);
-        //printf("J: %e DeltaE: %e En: %e\n",
+        Real En = pc.h * nufid * GetWeight(wgtC, nufid);
+        // printf("J: %e DeltaE: %e En: %e\n",
         //  GetJ(ye, s), GetJ(ye, s)*d3x_cgs*dt*TIME, En);
-        //exit(-1);
+        // exit(-1);
 
         Real dNdlnu_max = 0.;
         Real dN = 0.;
@@ -109,49 +109,53 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real wgt = GetWeight(wgtC, nu);
           Real Jnu = GetJnu(ye, s, nu);
 
-          //dN += Jnu*nu/(pc.h*nu*wgt)*dlnu;
-          Real deltadN = Jnu*nu/(pc.h*nu*wgt)*dlnu;
+          // dN += Jnu*nu/(pc.h*nu*wgt)*dlnu;
+          Real deltadN = Jnu * nu / (pc.h * nu * wgt) * dlnu;
           dN += deltadN;
 
-
-
-          //Real dNdlnu = nu*GetJnu(v(iye, k, j, i), s, nu) / wgt;
-          //printf("Multiply by dx3 etc. here!\n");
-          //exit(-1);
+          // Real dNdlnu = nu*GetJnu(v(iye, k, j, i), s, nu) / wgt;
+          // printf("Multiply by dx3 etc. here!\n");
+          // exit(-1);
           // Factors of nu in numerator and denominator cancel
-          Real dNdlnu = Jnu * d3x_cgs*detG / (pc.h * wgt);
-          //printf("nu: %e Jnu: %e dEbin: %e dNbin: %e En: %e\n", nu, Jnu,
+          Real dNdlnu = Jnu * d3x_cgs * detG / (pc.h * wgt);
+          // printf("nu: %e Jnu: %e dEbin: %e dNbin: %e En: %e\n", nu, Jnu,
           //  nu*Jnu*dlnu*d3x_cgs*dt*TIME, deltadN*d3x_cgs*detG*dt*TIME,
           //  pc.h*nu*wgt);
-          //printf("ye: %e nu: %e Jnu: %e d3xcgs: %e detG: %e h: %e wgt: %e dNdlnu: %e\n",
-          //  v(iye,k,j,i), nu, GetJnu(v(iye, k, j, i), s, nu), d3x_cgs, detG, pc.h, wgt, dNdlnu);
-          Jtot += GetJnu(v(iye, k, j, i), s, nu)*nu*dlnu;
+          // printf("ye: %e nu: %e Jnu: %e d3xcgs: %e detG: %e h: %e wgt: %e dNdlnu:
+          // %e\n",
+          //  v(iye,k,j,i), nu, GetJnu(v(iye, k, j, i), s, nu), d3x_cgs, detG, pc.h, wgt,
+          //  dNdlnu);
+          Jtot += GetJnu(v(iye, k, j, i), s, nu) * nu * dlnu;
           v(idNdlnu + n, k, j, i) = dNdlnu;
           if (dNdlnu > dNdlnu_max) {
             dNdlnu_max = dNdlnu;
           }
           // TODO(BRR) gdet
-          //dN += dNdlnu * dlnu;// * dV_cgs;
-          //printf("dN: %e detG: %e\n", dN, detG);
-          //printf("dN: %e\n", dN);
+          // dN += dNdlnu * dlnu;// * dV_cgs;
+          // printf("dN: %e detG: %e\n", dN, detG);
+          // printf("dN: %e\n", dN);
         }
-        //printf("Jtot: %e (%e)\n", Jtot, Jtot*CPOWERDENS);
-        //printf("getG: %e (%e)\n", GetJ(v(iye, k, j, i), s),
+        // printf("Jtot: %e (%e)\n", Jtot, Jtot*CPOWERDENS);
+        // printf("getG: %e (%e)\n", GetJ(v(iye, k, j, i), s),
         //  GetJ(v(iye, k, j, i), s)*CPOWERDENS);
 
-        //dN -= 0.5*(GetJnu(ye, s, nusamp[0])*nusamp[0]/(pc.h*nusamp[0]*GetWeight(wgtC, nusamp[0]))
-        //         + GetJnu(ye, s, nusamp[nu_bins])*nusamp[nu_bins]/(pc.h*nusamp[nu_bins]*GetWeight(wgtC, nusamp[nu_bins])))*dlnu;
-        dN *= d3x_cgs*detG*dt*TIME;
-        Real dE = Jtot*d3x_cgs*detG*dt*TIME;
-        printf("J: %e DeltaE: %e En: %e\n",
-          GetJ(ye, s), GetJ(ye, s)*d3x_cgs*dt*TIME, En);
+        // dN -= 0.5*(GetJnu(ye, s, nusamp[0])*nusamp[0]/(pc.h*nusamp[0]*GetWeight(wgtC,
+        // nusamp[0]))
+        //         + GetJnu(ye, s,
+        //         nusamp[nu_bins])*nusamp[nu_bins]/(pc.h*nusamp[nu_bins]*GetWeight(wgtC,
+        //         nusamp[nu_bins])))*dlnu;
+        dN *= d3x_cgs * detG * dt * TIME;
+        Real dE = Jtot * d3x_cgs * detG * dt * TIME;
+        printf("J: %e DeltaE: %e En: %e\n", GetJ(ye, s),
+               GetJ(ye, s) * d3x_cgs * dt * TIME, En);
         printf("Jtot: %e\n", Jtot);
         printf("dE: %e\n", dE);
         printf("dN: %e\n", dN);
-        //exit(-1);
+        // exit(-1);
 
         // Trapezoidal rule
-        //dN -= 0.5 * (v(idNdlnu, k, j, i) + v(idNdlnu + nu_bins, k, j, i))*dlnu;// *dV_cgs;
+        // dN -= 0.5 * (v(idNdlnu, k, j, i) + v(idNdlnu + nu_bins, k, j, i))*dlnu;//
+        // *dV_cgs;
         printf("final dN: %e\n", dN);
         int Ns = static_cast<int>(dN);
         if (dN - Ns > rng_gen.drand()) {
@@ -159,7 +163,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         }
 
         v(idN, k, j, i) = static_cast<Real>(Ns);
-        //printf("dN[%i %i %i] = %e\n", k, j, i, v(idN, k, j, i));
+        // printf("dN[%i %i %i] = %e\n", k, j, i, v(idN, k, j, i));
         v(idNdlnu_max, k, j, i) = dNdlnu_max;
         rng_pool.free_state(rng_gen);
       });
@@ -173,7 +177,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         dNtot += static_cast<int>(v(idN, k, j, i));
       },
       Kokkos::Sum<int>(dNtot));
-  //printf("Creating %i particles!\n", dNtot);
+  // printf("Creating %i particles!\n", dNtot);
   if (dNtot <= 0) {
     return TaskStatus::complete;
   }
@@ -242,22 +246,20 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real nu;
           int counter = 0;
           do {
-            nu = exp(rng_gen.drand()*(lnu_max - lnu_min) + lnu_min);
+            nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
             counter++;
-          } while (rng_gen.drand() > LinearInterpLog(nu, k, j, i, dNdlnu, lnu_min, dlnu)/dNdlnu_max(k, j, i));
-
+          } while (rng_gen.drand() > LinearInterpLog(nu, k, j, i, dNdlnu, lnu_min, dlnu) /
+                                         dNdlnu_max(k, j, i));
 
           weight(m) = GetWeight(wgtC, nu);
-          //printf("nu: %e weight: %e En: %e\n", nu, weight(m), pc.h*nu*weight(m));
+          // printf("nu: %e weight: %e En: %e\n", nu, weight(m), pc.h*nu*weight(m));
 
           // Encode frequency and randomly sample direction
-          Real E = nu*pc.h*CENERGY;
+          Real E = nu * pc.h * CENERGY;
           Real theta = acos(2. * rng_gen.drand() - 1.);
           Real phi = 2. * M_PI * rng_gen.drand();
-          Real K_tetrad[4] = {-E,
-                              E*cos(theta),
-                              E*cos(phi)*sin(theta),
-                              E*sin(phi)*sin(theta)};
+          Real K_tetrad[4] = {-E, E * cos(theta), E * cos(phi) * sin(theta),
+                              E * sin(phi) * sin(theta)};
           Real K_coord[4];
           Tetrads.TetradToCoordCov(K_tetrad, K_coord);
 
@@ -268,10 +270,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
             // detG is on numerator and denominator
-            v(mu, k, j, i) += 1./dV_code*weight(m)*K_coord[mu-Gcov_lo];
+            v(mu, k, j, i) += 1. / dV_code * weight(m) * K_coord[mu - Gcov_lo];
           }
           // TODO(BRR) lepton sign
-          v(Gye, k, j, i) -= 1./dV_code*weight(m)*pc.mp/MASS;
+          v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc.mp / MASS;
           /*printf("weight: %e dV: %e E: %e (%e)\n", weight(m), dV_code, E, E*ENERGY);
           printf("dG: %e %e %e %e (%e)\n",
             1./dV_code*weight(m)*K_coord[0],
@@ -286,7 +288,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           swarm_d.MarkParticleForRemoval(m);
         }
       });
-  //exit(-1);
+  // exit(-1);
 
   /*pmb->par_for(
       "MonteCarloSourceParticles", 0, new_indices.GetSize() - 1,
