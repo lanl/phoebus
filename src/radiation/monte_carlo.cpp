@@ -75,7 +75,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
   //const Real wgtC = 1.e44 * tune_emiss;
-  const Real wgtC = 1.e60 * tune_emiss;
+  //const Real wgtC = 1.e60 * tune_emiss;
+  const Real wgtC = 1.e76*tune_emiss;
 
   pmb->par_for(
       "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -88,7 +89,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         for (int n = 0; n <= nu_bins; n++) {
           Real nu = nusamp(n);
           Real wgt = GetWeight(wgtC, nu);
-          Real dNdlnu = nu*GetJnu(v(iye, k, j, i), s, nu) / wgt;
+          //Real dNdlnu = nu*GetJnu(v(iye, k, j, i), s, nu) / wgt;
+          printf("Multiply by dx3 etc. here!\n");
+          exit(-1);
+          Real dNdlnu = GetJnu(v(iye, k, j, i), s, nu) / (pc.h * wgt);
           Jtot += GetJnu(v(iye, k, j, i), s, nu)*nu*dlnu;
           v(idNdlnu + n, k, j, i) = dNdlnu;
           if (dNdlnu > dNdlnu_max) {
@@ -104,7 +108,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
         // Trapezoidal rule
         dN -= 0.5 * (v(idNdlnu, k, j, i) + v(idNdlnu + nu_bins, k, j, i))*dlnu *dV_cgs;
-        //printf("final dN: %e\n", dN);
+        printf("final dN: %e\n", dN);
         int Ns = static_cast<int>(dN);
         if (dN - Ns > rng_gen.drand()) {
           Ns++;
@@ -125,7 +129,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         dNtot += static_cast<int>(v(idN, k, j, i));
       },
       Kokkos::Sum<int>(dNtot));
-  printf("Creating %i particles!\n", dNtot);
+  //printf("Creating %i particles!\n", dNtot);
   if (dNtot <= 0) {
     return TaskStatus::complete;
   }
