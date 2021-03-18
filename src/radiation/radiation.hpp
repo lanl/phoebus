@@ -1,5 +1,5 @@
 //========================================================================================
-// (C) (or copyright) 2020. Triad National Security, LLC. All rights reserved.
+// (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
 //
 // This program was produced under U.S. Government contract 89233218CNA000001
 // for Los Alamos National Laboratory (LANL), which is operated by Triad
@@ -64,12 +64,13 @@ KOKKOS_INLINE_FUNCTION void GetFourVelocity(Real v[4],
 }
 
 KOKKOS_INLINE_FUNCTION
-Real LinearInterpLog(Real x, int k, int j, int i, ParArrayND<Real> table, Real lx_min, Real dlx) {
+Real LinearInterpLog(Real x, int k, int j, int i, ParArrayND<Real> table, Real lx_min,
+                     Real dlx) {
   Real lx = log(x);
-  Real dn = (lx - lx_min)/dlx;
+  Real dn = (lx - lx_min) / dlx;
   int n = static_cast<int>(dn);
   dn = dn - n;
-  return (1. - dn)*table(n,k,j,i) + dn*table(n+1,k,j,i);
+  return (1. - dn) * table(n, k, j, i) + dn * table(n + 1, k, j, i);
 }
 
 // Choice of RNG
@@ -83,18 +84,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
 
-//TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
+// TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
 
 // Optically thin cooling function
 TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt);
 
 // Monte Carlo transport
-//TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, const double t0);
-TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc, SwarmContainer *sc, const double t0, const double dt);
+// TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, const double t0);
+TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
+                                     SwarmContainer *sc, const double t0,
+                                     const double dt);
 TaskStatus MonteCarloTransport(MeshBlock *pmb, const double t0, const double dt);
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
-
-
 
 } // namespace radiation
 

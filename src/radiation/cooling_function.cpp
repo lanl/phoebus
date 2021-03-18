@@ -1,6 +1,6 @@
-#include "radiation.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
+#include "radiation.hpp"
 
 #include "opacity.hpp"
 
@@ -26,8 +26,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
 
-// TODO(BRR) Temporary cooling problem parameters
-NeutrinoSpecies s = NeutrinoSpecies::Electron;
+  // TODO(BRR) Temporary cooling problem parameters
+  NeutrinoSpecies s = NeutrinoSpecies::Electron;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -45,8 +45,8 @@ NeutrinoSpecies s = NeutrinoSpecies::Electron;
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real Gcov[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
         Real Ucon[4];
@@ -54,10 +54,10 @@ NeutrinoSpecies s = NeutrinoSpecies::Electron;
         GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
         Geometry::Tetrads Tetrads(Ucon, Gcov);
 
-        //double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
+        // double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
         double J = GetJ(v(pye, k, j, i), s);
         double Jye = GetJye(v(prho, k, j, i), v(pye, k, j, i), s);
-        Real Gcov_tetrad[4] = {-J*CPOWERDENS, 0., 0., 0.};
+        Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
         Real Gcov_coord[4];
         Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
         Real detG = geom.DetG(CellLocation::Cent, k, j, i);

@@ -1,3 +1,18 @@
+//========================================================================================
+// (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
+//
+// This program was produced under U.S. Government contract 89233218CNA000001
+// for Los Alamos National Laboratory (LANL), which is operated by Triad
+// National Security, LLC for the U.S. Department of Energy/National Nuclear
+// Security Administration. All rights in the program are reserved by Triad
+// National Security, LLC, and the U.S. Department of Energy/National Nuclear
+// Security Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide license
+// in this material to reproduce, prepare derivative works, distribute copies to
+// the public, perform publicly and display publicly, and to permit others to do
+// so.
+//========================================================================================
+
 #include "radiation.hpp"
 
 #include "opacity.hpp"
@@ -14,7 +29,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   namespace c = conserved_variables;
   namespace iv = internal_variables;
   auto rad = pmb->packages.Get("radiation");
-  // auto swarm = pmb->swarm_data.Get()->Get("monte_carlo");
   auto swarm = sc->Get("monte_carlo");
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
   const auto tune_emiss = rad->Param<Real>("tune_emiss");
@@ -76,11 +90,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
-  // const Real wgtC = 1.e44 * tune_emiss;
-  // const Real wgtC = 1.e60 * tune_emiss;
-  // const Real wgtC = 1.e68*tune_emiss;
   const Real wgtC = 1.e72 * tune_emiss;
-  //  const Real wgtC = 1.e100*tune_emiss;
 
   pmb->par_for(
       "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -95,75 +105,37 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         Real detG = geom.DetG(CellLocation::Cent, k, j, i);
         Real ye = v(iye, k, j, i);
 
-        Real nufid = 1.e17;
-        Real En = pc.h * nufid * GetWeight(wgtC, nufid);
-        // printf("J: %e DeltaE: %e En: %e\n",
-        //  GetJ(ye, s), GetJ(ye, s)*d3x_cgs*dt*TIME, En);
-        // exit(-1);
-
         Real dNdlnu_max = 0.;
         Real dN = 0.;
-        Real Jtot = 0.;
         for (int n = 0; n <= nu_bins; n++) {
           Real nu = nusamp(n);
           Real wgt = GetWeight(wgtC, nu);
           Real Jnu = GetJnu(ye, s, nu);
 
-          // dN += Jnu*nu/(pc.h*nu*wgt)*dlnu;
-          Real deltadN = Jnu * nu / (pc.h * nu * wgt) * dlnu;
-          dN += deltadN;
+          dN += Jnu * nu / (pc.h * nu * wgt) * dlnu;
 
-          // Real dNdlnu = nu*GetJnu(v(iye, k, j, i), s, nu) / wgt;
-          // printf("Multiply by dx3 etc. here!\n");
-          // exit(-1);
           // Factors of nu in numerator and denominator cancel
           Real dNdlnu = Jnu * d3x_cgs * detG / (pc.h * wgt);
-          // printf("nu: %e Jnu: %e dEbin: %e dNbin: %e En: %e\n", nu, Jnu,
-          //  nu*Jnu*dlnu*d3x_cgs*dt*TIME, deltadN*d3x_cgs*detG*dt*TIME,
-          //  pc.h*nu*wgt);
-          // printf("ye: %e nu: %e Jnu: %e d3xcgs: %e detG: %e h: %e wgt: %e dNdlnu:
-          // %e\n",
-          //  v(iye,k,j,i), nu, GetJnu(v(iye, k, j, i), s, nu), d3x_cgs, detG, pc.h, wgt,
-          //  dNdlnu);
-          Jtot += GetJnu(v(iye, k, j, i), s, nu) * nu * dlnu;
           v(idNdlnu + n, k, j, i) = dNdlnu;
           if (dNdlnu > dNdlnu_max) {
             dNdlnu_max = dNdlnu;
           }
-          // TODO(BRR) gdet
-          // dN += dNdlnu * dlnu;// * dV_cgs;
-          // printf("dN: %e detG: %e\n", dN, detG);
-          // printf("dN: %e\n", dN);
         }
-        // printf("Jtot: %e (%e)\n", Jtot, Jtot*CPOWERDENS);
-        // printf("getG: %e (%e)\n", GetJ(v(iye, k, j, i), s),
-        //  GetJ(v(iye, k, j, i), s)*CPOWERDENS);
-
-        // dN -= 0.5*(GetJnu(ye, s, nusamp[0])*nusamp[0]/(pc.h*nusamp[0]*GetWeight(wgtC,
-        // nusamp[0]))
-        //         + GetJnu(ye, s,
-        //         nusamp[nu_bins])*nusamp[nu_bins]/(pc.h*nusamp[nu_bins]*GetWeight(wgtC,
-        //         nusamp[nu_bins])))*dlnu;
-        dN *= d3x_cgs * detG * dt * TIME;
-        Real dE = Jtot * d3x_cgs * detG * dt * TIME;
-        printf("J: %e DeltaE: %e En: %e\n", GetJ(ye, s),
-               GetJ(ye, s) * d3x_cgs * dt * TIME, En);
-        printf("Jtot: %e\n", Jtot);
-        printf("dE: %e\n", dE);
-        printf("dN: %e\n", dN);
-        // exit(-1);
 
         // Trapezoidal rule
-        // dN -= 0.5 * (v(idNdlnu, k, j, i) + v(idNdlnu + nu_bins, k, j, i))*dlnu;//
-        // *dV_cgs;
-        printf("final dN: %e\n", dN);
+        Real nu0 = nusamp[0];
+        Real nu1 = nusamp[nu_bins];
+        dN -= 0.5 * GetJnu(ye, s, nu0) * nu0 / (pc.h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
+        dN -= 0.5 * GetJnu(ye, s, nu1) * nu1 / (pc.h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
+        dN *= d3x_cgs * detG * dt * TIME;
+
         int Ns = static_cast<int>(dN);
         if (dN - Ns > rng_gen.drand()) {
           Ns++;
         }
 
+        // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
         v(idN, k, j, i) = static_cast<Real>(Ns);
-        // printf("dN[%i %i %i] = %e\n", k, j, i, v(idN, k, j, i));
         v(idNdlnu_max, k, j, i) = dNdlnu_max;
         rng_pool.free_state(rng_gen);
       });
@@ -206,7 +178,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
     for (int j = 0; j < nx_j; j++) {
       for (int i = 0; i < nx_i; i++) {
         starting_index_h(k, j, i) = index;
-        // index += dN_h(k+nghost, j+nghost, i+nghost);
         index += dN_h(k + kb.s, j + jb.s, i + ib.s);
       }
     }
@@ -252,7 +223,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                          dNdlnu_max(k, j, i));
 
           weight(m) = GetWeight(wgtC, nu);
-          // printf("nu: %e weight: %e En: %e\n", nu, weight(m), pc.h*nu*weight(m));
 
           // Encode frequency and randomly sample direction
           Real E = nu * pc.h * CENERGY;
@@ -269,57 +239,19 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           k3(m) = K_coord[3];
 
           for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-            // detG is on numerator and denominator
+            // detG is in both numerator and denominator
             v(mu, k, j, i) += 1. / dV_code * weight(m) * K_coord[mu - Gcov_lo];
           }
           // TODO(BRR) lepton sign
           v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc.mp / MASS;
-          /*printf("weight: %e dV: %e E: %e (%e)\n", weight(m), dV_code, E, E*ENERGY);
-          printf("dG: %e %e %e %e (%e)\n",
-            1./dV_code*weight(m)*K_coord[0],
-            1./dV_code*weight(m)*K_coord[1],
-            1./dV_code*weight(m)*K_coord[2],
-            1./dV_code*weight(m)*K_coord[3],
-            1./dV_code*weight(m)*pc.mp/MASS);
-*/
           rng_pool.free_state(rng_gen);
 
           // TODO(BRR) Now throw away particles temporarily
           swarm_d.MarkParticleForRemoval(m);
         }
       });
-  // exit(-1);
 
-  /*pmb->par_for(
-      "MonteCarloSourceParticles", 0, new_indices.GetSize() - 1,
-      KOKKOS_LAMBDA(const int n) {
-        printf("%s:%i\n", __FILE__, __LINE__);
-        const int m = new_indices(n);
-        auto rng_gen = rng_pool.get_state();
-        printf("%s:%i\n", __FILE__, __LINE__);
-
-        // Randomly sample in space in this meshblock
-        // Create particles at zone centers
-        // x(n) = minx_i + nx_i * dx_i * rng_gen.drand();
-        // y(n) = minx_j + nx_j * dx_j * rng_gen.drand();
-        // z(n) = minx_k + nx_k * dx_k * rng_gen.drand();
-
-        // Randomly sample direction, v = c
-        printf("%s:%i\n", __FILE__, __LINE__);
-        Real theta = acos(2. * rng_gen.drand() - 1.);
-        Real phi = 2. * M_PI * rng_gen.drand();
-        printf("%s:%i\n", __FILE__, __LINE__);
-        vx(n) = sin(theta) * cos(phi);
-        printf("%s:%i\n", __FILE__, __LINE__);
-        printf("n: %i val: %e\n", n, sin(theta) * sin(phi));
-        vy(n) = sin(theta) * sin(phi);
-        printf("%s:%i\n", __FILE__, __LINE__);
-        vz(n) = cos(theta);
-        printf("%s:%i\n", __FILE__, __LINE__);
-
-        rng_pool.free_state(rng_gen);
-      });
-  printf("%s:%i\n", __FILE__, __LINE__);*/
+  swarm->RemoveMarkedParticles();
 
   return TaskStatus::complete;
 }
