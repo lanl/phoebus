@@ -11,6 +11,7 @@
 
 #include "geometry/coordinate_systems.hpp"
 #include "geometry/geometry.hpp"
+#include "geometry/geometry_defaults.hpp"
 #include "phoebus_utils/variables.hpp"
 
 using namespace parthenon::package::prelude;
@@ -18,6 +19,40 @@ using parthenon::Coordinates_t;
 using parthenon::ParArray1D;
 
 namespace Geometry {
+
+template <typename System>
+void SetGeometryDefault(MeshBlockData<Real> *rc, const System &system) {
+  auto pmb = rc->GetParentPointer();
+  std::vector<std::string> coord_names = {geometric_variables::cell_coords,
+                                          geometric_variables::node_coords};
+  PackIndexMap imap;
+  auto pack = rc->PackVariables(coord_names, imap);
+  int icoord_c = imap["g.c.coord"].first;
+  int icoord_n = imap["g.n.coord"].first;
+
+  auto lamb =
+      KOKKOS_LAMBDA(const int k, const int j, const int i, CellLocation loc) {
+    Real C[NDFULL];
+    int icoord = (loc == CellLocation::Cent) ? icoord_c : icoord_n;
+    system.Coords(loc, k, j, i, C);
+    SPACETIMELOOP(mu) pack(icoord + mu, k, j, i) = C[mu];
+  };
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  pmb->par_for(
+      "SetGeometry::Set Cached data, Cent", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        lamb(k, j, i, CellLocation::Cent);
+      });
+  pmb->par_for(
+      "SetGeometry::Set Cached data, Corn", kb.s, kb.e + 1, jb.s, jb.e + 1,
+      ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        lamb(k, j, i, CellLocation::Corn);
+      });
+  pmb->exec_space.fence(); // do not let users interact with coords
+                           // unless meshblock data is set
+}
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
@@ -46,7 +81,9 @@ CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc) {
   return GetCoordinateSystem<CoordSysMesh>(rc);
 }
 void SetGeometry(MeshBlockData<Real> *rc) {
+  auto system = GetCoordinateSystem(rc);
   SetGeometry<CoordSysMeshBlock>(rc);
+  SetGeometryDefault(rc, system);
 }
 
 } // namespace Geometry
