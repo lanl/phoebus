@@ -18,7 +18,10 @@ using namespace parthenon::package::prelude;
   PROBLEM(phoebus)                                                                       \
   PROBLEM(shock_tube)                                                                    \
   PROBLEM(linear_modes)                                                                  \
-  PROBLEM(kelvin_helmholtz)
+  PROBLEM(kelvin_helmholtz)                                                              \
+  PROBLEM(rhs_tester)                                                                    \
+  PROBLEM(sedov)                                                                         \
+  PROBLEM(blandford_mckee)
 
 /*
 // DO NOT TOUCH THE MACROS BELOW

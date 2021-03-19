@@ -17,9 +17,9 @@ enum class solver {LLF, HLL};
 
 struct FaceGeom {
   KOKKOS_INLINE_FUNCTION
-  FaceGeom(const Geometry::CoordinateSystem &g, const CellLocation loc,
+  FaceGeom(const Geometry::CoordSysMeshBlock &g, const CellLocation loc,
            const int d, const int k, const int j, const int i)
-           : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetGamma(loc,k,j,i)) {
+           : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetG(loc,k,j,i)) {
     auto gcon = reinterpret_cast<Real (*)[3]>(&gcov[0][0]);
     g.MetricInverse(loc,k,j,i,gcon);
     gdd = gcon[d-1][d-1];
@@ -82,8 +82,6 @@ class FluxState {
       Bcon[m-pb_lo] = q(dir, m, k, j, i);
     }
 
-    CellLocation loc = DirectionToFaceID(d);
-
     Real BdotB = 0.0;
     Real Bdotv = 0.0;
     Real vsq = 0.0;
@@ -100,12 +98,12 @@ class FluxState {
 
     // density
     U[crho] = rho*W;
-    F[crho] = U[crho]*vtil;
+    F[crho] = U[crho]*vtil/g.alpha;
 
     // composition
     if (cye>0) {
       U[cye] = U[crho]*q(dir,pye,k,j,i);
-      F[cye] = U[cye]*vtil;
+      F[cye] = U[cye]*vtil/g.alpha;
     }
 
     Real b0 = W*Bdotv; // this is really b0*alpha
@@ -122,12 +120,12 @@ class FluxState {
         vcovm += g.gcov[m+1][n] * vcon[n-1];
       }
       U[cmom_lo+m] = (rhohWsq+bsqWsq)*vcovm - b0*bcovm;
-      F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
+      F[cmom_lo+m] = U[cmom_lo+m]*vtil/g.alpha + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
     }
 
     // energy
     U[ceng] = rhohWsq + bsqWsq - (P + 0.5*bsq) - b0*b0 - U[crho];
-    F[ceng] = U[ceng]*vtil + (P + 0.5*bsq)*vel - Bdotv*Bcon[dir];
+    F[ceng] = U[ceng]*vtil/g.alpha + (P + 0.5*bsq)*vel - Bdotv*Bcon[dir];
 
     // magnetic fields
     for (int m = cb_lo; m <= cb_hi; m++) {
@@ -151,7 +149,7 @@ class FluxState {
   const VariableFluxPack<Real> v;
   const ParArrayND<Real> ql;
   const ParArrayND<Real> qr;
-  const Geometry::CoordinateSystem geom;
+  const Geometry::CoordSysMeshBlock geom;
  private:
   const int prho, pvel_lo, peng, pb_lo, pb_hi, pye, prs, gm1;
   const int crho, cmom_lo, ceng, cb_lo, cb_hi, cye, ncons;

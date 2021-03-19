@@ -118,7 +118,8 @@ endif()
 if(PHOEBUS_ENABLE_OPENMP)
   find_package(OpenMP COMPONENTS CXX)
 else()
-  set(PARTHENON_DISABLE_OPENMP ON CACHE BOOL "" FORCE)
+  set(PARTHENON_DISABLE_OPENM
+  P ON CACHE BOOL "" FORCE)
 endif()
 
 # TODO(JMM): For some reason, order still maters for including
@@ -142,13 +143,24 @@ set(SINGULARITY_USE_KOKKOSKERNELS OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_BUILD_MIX OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/singularity-eos singularity-eos)
 
+# Geometry
+include(cmake/Geometry.cmake)
+
+# Print RHS
+option(PHOEBUS_PRINT_RHS "Print right hand sides" OFF)
+if (PHOEBUS_PRINT_RHS)
+   set(PRINT_RHS 1)
+else()
+   set(PRINT_RHS 0)
+endif()
+
 # Phoebus src
-message("Configuring src")
+message("\nConfiguring src")
 add_subdirectory(src)
 
 # TODO(JMM): Testing?
 if(PHOEBUS_ENABLE_UNIT_TESTS OR PHOEBUS_ENABLE_INTEGRATION_TESTS OR PHOEBUS_ENABLE_REGRESSION_TESTS)
-  message("Configuring tests")
+  message("\nConfiguring tests")
   add_subdirectory(external/catch2 Catch2)
   list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/external/catch2/contrib)
   add_subdirectory(tst)

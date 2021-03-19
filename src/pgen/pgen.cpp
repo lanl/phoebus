@@ -1,3 +1,5 @@
+#include "geometry/geometry.hpp"
+
 #include "pgen.hpp"
 
 namespace phoebus {
@@ -13,12 +15,18 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     }
     PARTHENON_THROW(s);
   }
+
+  auto &rc = pmb->meshblock_data.Get();
+  Geometry::SetGeometry(rc.get());
+
   auto f = pgen_dict[name];
   f(pmb, pin);
 }
 
 KOKKOS_FUNCTION
 Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P) {
+  PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
+
   Real eguessl = P/rho;
   Real Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl);
   Real eguessr = eguessl;

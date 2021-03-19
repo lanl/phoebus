@@ -30,6 +30,11 @@ namespace internal_variables {
   constexpr char fail[] = "fail";
 }
 
+namespace geometric_variables {
+  constexpr char cell_coords[] = "g.c.coord";
+  constexpr char node_coords[] = "g.n.coord";
+}
+
 namespace diagnostic_variables {
   constexpr char divb[] = "divb";
 }

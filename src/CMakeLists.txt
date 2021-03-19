@@ -22,25 +22,48 @@ add_executable(phoebus
   fluid/riemann.hpp
   fluid/tmunu.hpp
 
+  geometry/analytic_system.hpp
+  geometry/boyer_lindquist.hpp
+  geometry/boyer_lindquist.cpp
+  geometry/cached_system.hpp
   geometry/coordinate_systems.hpp
+  geometry/fmks.hpp
+  geometry/fmks.cpp
   geometry/geometry.cpp
   geometry/geometry.hpp
+  geometry/geometry_defaults.hpp
   geometry/geometry_utils.hpp
-  geometry/geometry_variant.hpp
-
+  geometry/mckinney_gammie_ryan.hpp
+  geometry/mckinney_gammie_ryan.cpp
+  geometry/modified_system.hpp
+  geometry/minkowski.hpp
+  geometry/minkowski.cpp
+  geometry/spherical_kerr_schild.hpp
+  geometry/spherical_kerr_schild.cpp
+  geometry/spherical_minkowski.hpp
+  geometry/spherical_minkowski.cpp
+  
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
 
   pgen/pgen.hpp
   pgen/pgen.cpp
+  pgen/blandford_mckee.cpp
   pgen/kh.cpp
   pgen/linear_modes.cpp
+  pgen/rhs_tester.cpp
   pgen/shock_tube.cpp
+  pgen/sedov.cpp
+
+  phoebus_boundaries/phoebus_boundaries.hpp
+  phoebus_boundaries/phoebus_boundaries.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp
 
   phoebus_utils/cell_locations.hpp
+  phoebus_utils/debug_utils.hpp
+  phoebus_utils/linear_algebra.hpp
   phoebus_utils/variables.hpp
 
   reconstruction.hpp
