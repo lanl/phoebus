@@ -83,19 +83,21 @@ class VarAccessor {
 };
 
 struct CellGeom {
+  template<typename CoordinateSystem>
   KOKKOS_FUNCTION
-  CellGeom(const Geometry::CoordinateSystem &geom,
-               const int k, const int j, const int i)
-               : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)),
-                 lapse(geom.Lapse(CellLocation::Cent,k,j,i)) {
+  CellGeom(const CoordinateSystem &geom,
+           const int k, const int j, const int i)
+    : gdet(geom.DetGamma(CellLocation::Cent,k,j,i)),
+      lapse(geom.Lapse(CellLocation::Cent,k,j,i)) {
     geom.Metric(CellLocation::Cent, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
     geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
   }
-  CellGeom(const Geometry::CoordinateSystem &geom,
+  template<typename CoordinateSystem>
+  CellGeom(const CoordinateSystem &geom,
            const int b, const int k, const int j, const int i)
-           : gdet(geom.DetGamma(CellLocation::Cent,b,k,j,i)),
-             lapse(geom.Lapse(CellLocation::Cent,b,k,j,i)) {
+    : gdet(geom.DetGamma(CellLocation::Cent,b,k,j,i)),
+      lapse(geom.Lapse(CellLocation::Cent,b,k,j,i)) {
     geom.Metric(CellLocation::Cent, b, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, b, k, j, i, gcon);
     geom.ContravariantShift(CellLocation::Cent, b, k, j, i, beta);
@@ -146,9 +148,9 @@ class ConToPrim {
                                     internal_variables::c2p_scratch});
   }
 
-  template <class... Args>
+  template <typename CoordinateSystem, class... Args>
   KOKKOS_INLINE_FUNCTION
-  void Setup(const Geometry::CoordinateSystem &geom, Args &&... args) const {
+  void Setup(const CoordinateSystem &geom, Args &&... args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
     setup(v,g);
@@ -161,9 +163,10 @@ class ConToPrim {
     return solve(v,eos);
   }
 
-  template <class... Args>
+  template <typename CoordinateSystem, class... Args>
   KOKKOS_INLINE_FUNCTION
-  void Finalize(const singularity::EOS &eos, const Geometry::CoordinateSystem &geom, Args &&... args) const {
+  void Finalize(const singularity::EOS &eos, const CoordinateSystem &geom,
+                Args &&... args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
     finalize(v,g,eos);

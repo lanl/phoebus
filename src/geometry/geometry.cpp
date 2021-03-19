@@ -1,3 +1,4 @@
+#include <array>
 #include <memory>
 #include <string>
 #include <utility>
@@ -10,6 +11,7 @@
 
 #include "geometry/coordinate_systems.hpp"
 #include "geometry/geometry.hpp"
+#include "phoebus_utils/variables.hpp"
 
 using namespace parthenon::package::prelude;
 using parthenon::Coordinates_t;
@@ -18,85 +20,33 @@ using parthenon::ParArray1D;
 namespace Geometry {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+
   auto geometry = std::make_shared<StateDescriptor>("geometry");
-  Params &params = geometry->AllParams();
+  Initialize<CoordSysMeshBlock>(pin, geometry.get());
 
-  // has to be a pointer, because inheritence
-  // TODO(JMM): Perhaps another reason to use variants here?
-  std::string coord_system =
-      pin->GetOrAddString("coordinates", "system", "minkowski");
-  CoordSystemTag tag;
-  if (coord_system == "minkowski") {
-    // more pinputs could go here
-    // and should be added to params as needed.
-    tag = CoordSystemTag::Minkowski;
-  } else { // default
-    PARTHENON_THROW("unknown coordinate system");
-  }
-  params.Add("coordinate_system", tag);
-
-  // Add fields here if needed
-  /*
-  std::string field_name;
-  std::vector<int> shape;
-  std::vector<MetadataFlag> flags;
-  Metadata m;
-  // ...
-  */
+  // Always add coodinates fields
+  Utils::MeshBlockShape dims(pin);
+  std::vector<int> cell_shape = {4};
+  Metadata gcoord_cell = Metadata(
+      {Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, cell_shape);
+  // TODO(JMM): Make this actual node-centered data when available
+  std::vector<int> node_shape = {dims.nx1 + 1, dims.nx2 + 1, dims.nx3 + 1, 4};
+  Metadata gcoord_node =
+      Metadata({Metadata::Derived, Metadata::OneCopy}, node_shape);
+  geometry->AddField(geometric_variables::cell_coords, gcoord_cell);
+  geometry->AddField(geometric_variables::node_coords, gcoord_node);
 
   return geometry;
 }
 
-// These are overloaded, rather than templated because
-// the per-system logic probably needs to change between MeshData
-// and MeshBlockData.
-CoordinateSystem GetCoordinateSystem(MeshBlockData<Real> *rc) {
-  auto pmb = rc->GetParentPointer();
-  auto &geom = pmb->packages.Get("geometry");
-  auto tag = geom->Param<CoordSystemTag>("coordinate_system");
-  auto &coords = pmb->coords;
-
-  // some coordinate systems may require more inputs to
-  // constructor. Can be pulled out of params or the MeshBlockData
-  // object.
-  switch (tag) {
-  case CoordSystemTag::Minkowski: {
-    IndexerMeshBlock indexer(coords);
-    return CoordinateSystem(Analytic<Minkowski, IndexerMeshBlock>(indexer));
-  }
-  default:
-    PARTHENON_THROW("unknown coordinate system");
-  }
+CoordSysMeshBlock GetCoordinateSystem(MeshBlockData<Real> *rc) {
+  return GetCoordinateSystem<CoordSysMeshBlock>(rc);
 }
-
-CoordinateSystem GetCoordinateSystem(MeshData<Real> *rc) {
-  auto pmesh = rc->GetParentPointer();
-  auto &geom = pmesh->packages.Get("geometry");
-  auto tag = geom->Param<CoordSystemTag>("coordinate_system");
-
-  // TODO(JMM): Cache this somehow?
-  int nblocks = rc->NumBlocks();
-  ParArray1D<Coordinates_t> coords("GetCoordinateSystem::coords", nblocks);
-  auto coords_h = Kokkos::create_mirror_view(coords);
-  for (int i = 0; i < nblocks; ++i) {
-    coords_h(i) = rc->GetBlockData(i)->GetBlockPointer()->coords;
-  }
-  Kokkos::deep_copy(coords, coords_h);
-
-  // some coordinate systems may require more inputs to
-  // constructor. Can be pulled out of params or the MeshBlockData
-  // object.
-  switch (tag) {
-  case CoordSystemTag::Minkowski: {
-    IndexerMesh indexer(coords);
-    return CoordinateSystem(Analytic<Minkowski, IndexerMesh>(indexer));
-  }
-  default:
-    PARTHENON_THROW("unknown coordinate system");
-  }
+CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc) {
+  return GetCoordinateSystem<CoordSysMesh>(rc);
 }
-
-// For now, a no-op.
-void SetGeometry(MeshBlockData<Real> *rc) {}
+void SetGeometry(MeshBlockData<Real> *rc) {
+  SetGeometry<CoordSysMeshBlock>(rc);
+}
 
 } // namespace Geometry
