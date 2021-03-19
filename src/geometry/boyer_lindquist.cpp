@@ -25,6 +25,10 @@ void Initialize<BoyerLindquistMeshBlock>(ParameterInput *pin,
   params.Add("a", a);
   params.Add("dxfd", dxfd);
 }
+
+template <>
+void SetGeometry<BoyerLindquistMeshBlock>(MeshBlockData<Real> *rc) {}
+
 template <>
 BoyerLindquistMeshBlock
 GetCoordinateSystem<BoyerLindquistMeshBlock>(MeshBlockData<Real> *rc) {

@@ -18,7 +18,6 @@ using namespace parthenon::package::prelude;
 
 namespace Geometry {
 
-// Don't need to overwrite SetGeometry
 template <>
 void Initialize<SphericalKSMeshBlock>(ParameterInput *pin,
                                       StateDescriptor *geometry) {
@@ -26,6 +25,9 @@ void Initialize<SphericalKSMeshBlock>(ParameterInput *pin,
   Real a = pin->GetOrAddReal("coordinates", "a", 0);
   params.Add("a", a);
 }
+template <>
+void SetGeometry<SphericalKSMeshBlock>(MeshBlockData<Real> *rc) {}
+
 template <>
 SphericalKSMeshBlock
 GetCoordinateSystem<SphericalKSMeshBlock>(MeshBlockData<Real> *rc) {

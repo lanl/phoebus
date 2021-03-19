@@ -18,14 +18,18 @@ using namespace parthenon::package::prelude;
 
 namespace Geometry {
 
-// We can utilize the default Initialize and SetGeometry because
-// Minkowski doesn't need anything
+template <>
+void Initialize<SphMinkowskiMeshBlock>(ParameterInput *pin,
+                                       StateDescriptor *geometry) {}
+
 template <>
 SphMinkowskiMeshBlock
 GetCoordinateSystem<SphMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
   auto indexer = GetIndexer(rc);
   return SphMinkowskiMeshBlock(indexer);
 }
+template <> void SetGeometry<SphMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {}
+
 template <>
 SphMinkowskiMesh GetCoordinateSystem<SphMinkowskiMesh>(MeshData<Real> *rc) {
   auto indexer = GetIndexer(rc);
