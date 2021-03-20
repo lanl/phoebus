@@ -17,6 +17,10 @@
 
 #include "opacity.hpp"
 
+#define ANALYTIC (0)
+#define NUMERICAL (1)
+#define SAMPLING_METHOD ANALYTIC
+
 namespace radiation {
 
 KOKKOS_INLINE_FUNCTION
@@ -74,6 +78,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
   const Real dV_code = dx_i * dx_j * dx_k * dt;
   const Real d3x_cgs = dx_i * dx_j * dx_k * pow(LENGTH, 3);
+  const Real d3x_code = dx_i*dx_j*dx_k;
 
   std::vector<std::string> vars(
       {p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", iv::Gcov, iv::Gye});
@@ -107,12 +112,21 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
         Real dNdlnu_max = 0.;
         Real dN = 0.;
+        Real G0 = 0.;
+        Real Gye = 0.;
         for (int n = 0; n <= nu_bins; n++) {
           Real nu = nusamp(n);
           Real wgt = GetWeight(wgtC, nu);
           Real Jnu = GetJnu(ye, s, nu);
 
           dN += Jnu * nu / (pc.h * nu * wgt) * dlnu;
+          printf("nu[%i] = %e Jnu: %e dN += %e\n", n, nu, Jnu, Jnu * nu / (pc.h * nu * wgt) * dlnu);
+          Real fac = 1.;
+          if (n == 0 || n == nu_bins) {
+            fac = 0.5;
+          }
+          G0 += fac*Jnu*nu*dlnu;
+          Gye += fac*Jnu*nu*dlnu/(pc.h*nu);
 
           // Factors of nu in numerator and denominator cancel
           Real dNdlnu = Jnu * d3x_cgs * detG / (pc.h * wgt);
@@ -122,17 +136,36 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           }
         }
 
+        for (int n = 0; n <= nu_bins; n++) {
+          v(idNdlnu + n, k, j, i) /= dNdlnu_max;
+        }
+
+
         // Trapezoidal rule
         Real nu0 = nusamp[0];
         Real nu1 = nusamp[nu_bins];
+        printf("dN before: %e\n", dN);
         dN -= 0.5 * GetJnu(ye, s, nu0) * nu0 / (pc.h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
         dN -= 0.5 * GetJnu(ye, s, nu1) * nu1 / (pc.h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
+        printf("dN after: %e\n", dN);
         dN *= d3x_cgs * detG * dt * TIME;
+
+        G0 *= CPOWERDENS;
+        Gye *= pc.mp/MASS*CDENSITY/CTIME;
+        #if SAMPLING_METHOD == ANALYTIC
+        //printf("dN before: %e\n", dN);
+        dN = GetJ(ye, s)*d3x_cgs*detG*dt*TIME/(pc.h*wgtC);
+        //printf("dN after: %e\n", dN);
+        //exit(-1);
+        #endif
+        printf("G0: %e Gye: %e\n", G0, Gye);
+        //exit(-1);
 
         int Ns = static_cast<int>(dN);
         if (dN - Ns > rng_gen.drand()) {
           Ns++;
         }
+        printf("Ns: %i\n", Ns);
 
         // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
         v(idN, k, j, i) = static_cast<Real>(Ns);
@@ -149,7 +182,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         dNtot += static_cast<int>(v(idN, k, j, i));
       },
       Kokkos::Sum<int>(dNtot));
-  // printf("Creating %i particles!\n", dNtot);
+  printf("Creating %i particles!\n", dNtot);
   if (dNtot <= 0) {
     return TaskStatus::complete;
   }
@@ -216,13 +249,27 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           // Sample energy and set weight
           Real nu;
           int counter = 0;
+#if SAMPLING_METHOD == NUMERICAL
           do {
             nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
             counter++;
-          } while (rng_gen.drand() > LinearInterpLog(nu, k, j, i, dNdlnu, lnu_min, dlnu) /
-                                         dNdlnu_max(k, j, i));
+          } while (rng_gen.drand() > LinearInterpLog(nu, k, j, i, dNdlnu, lnu_min, dlnu));
+          ///
+            //                             dNdlnu_max(k, j, i));
+#elif SAMPLING_METHOD == ANALYTIC
+          Real ye = v(iye, k, j, i);
+          Real dndlnu, dndlnu_max;
+          do {
+            nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
+            dndlnu = nu*GetJnu(ye, s, nu)/(pc.h*nu*wgtC/nu);
+            Real numax = exp(lnu_max);
+            dndlnu_max = numax*GetJnu(ye, s, numax)/(pc.h*numax*wgtC/numax);
+            counter++;
+          } while (rng_gen.drand() > dndlnu/dndlnu_max);
+#endif
 
           weight(m) = GetWeight(wgtC, nu);
+          //printf("nu = %e weight = %e\n", nu, weight(m));
 
           // Encode frequency and randomly sample direction
           Real E = nu * pc.h * CENERGY;
