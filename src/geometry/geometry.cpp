@@ -27,6 +27,12 @@ void SetGeometryDefault(MeshBlockData<Real> *rc, const System &system) {
                                           geometric_variables::node_coords};
   PackIndexMap imap;
   auto pack = rc->PackVariables(coord_names, imap);
+  PARTHENON_REQUIRE(imap["g.c.coord"].second >= 0, "g.c.coord exists");
+  PARTHENON_REQUIRE(imap["g.n.coord"].second >= 0, "g.n.coord exists");
+  PARTHENON_REQUIRE(imap["g.c.coord"].second - imap["g.c.coord"].first + 1 == 4,
+                    "g.c.coord has correct shape");
+  PARTHENON_REQUIRE(imap["g.n.coord"].second - imap["g.n.coord"].first + 1 == 4,
+                    "g.n.coord has correct shape");
   int icoord_c = imap["g.c.coord"].first;
   int icoord_n = imap["g.n.coord"].first;
 

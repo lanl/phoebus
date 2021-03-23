@@ -82,10 +82,22 @@ public:
     for (auto &loc : GEOMETRY_LOC_NAMES) {
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".alpha"].second >= 0,
                               "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".alpha"].second -
+                                      imap["g." + loc + ".alpha"].first ==
+                                  0,
+                              "variable shape correct");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second >= 0,
                               "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second -
+                                      imap["g." + loc + ".dalpha"].first + 1 ==
+                                  3,
+                              "variable shape correct");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second >= 0,
                               "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second -
+                                      imap["g." + loc + ".bcon"].first + 1 ==
+                                  3,
+                              "variable shape correct");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gcov"].second >= 0,
                               "variable exists");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gamcon"].second >= 0,
@@ -217,7 +229,8 @@ public:
     }
     SPACELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDSPACE);
-      g[mu + 1][nu + 1] = pack_(b, idx.gamcon + offst, k, j, i) - g[0][mu + 1] * g[0][nu + 1] * alpha2;
+      g[mu + 1][nu + 1] = pack_(b, idx.gamcon + offst, k, j, i);
+      g[mu + 1][nu + 1] -= g[0][mu + 1] * g[0][nu + 1] * alpha2;
     }
   }
   KOKKOS_INLINE_FUNCTION
@@ -483,7 +496,9 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
     int lin = 0;
     for (int mu = 0; mu < NDFULL; ++mu) {
       for (int nu = mu; nu < NDFULL; ++nu) {
-        pack(idx[loc].gcov + lin, k, j, i) = gcov[mu][nu];
+        int offst = idx[loc].gcov + lin;
+        //printf("offst = %d\n", offst);
+        pack(offst, k, j, i) = gcov[mu][nu];
         lin++;
       }
     }
@@ -491,7 +506,9 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
     lin = 0;
     for (int mu = 0; mu < NDSPACE; ++mu) {
       for (int nu = mu; nu < NDSPACE; ++nu) {
-        pack(idx[loc].gamcon + lin, k, j, i) = gamcon[mu][nu];
+        int offst = idx[loc].gamcon + lin;
+        //printf("offst = %d\n", offst);
+        pack(offst, k, j, i) = gamcon[mu][nu];
         lin++;
       }
     }
@@ -501,7 +518,9 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
     for (int sigma = 1; sigma < NDFULL; ++sigma) {
       for (int mu = 0; mu < NDFULL; ++mu) {
         for (int nu = mu; nu < NDFULL; ++nu) {
-          pack(idx[loc].dg + lin, k, j, i) = dg[mu][nu][sigma];
+          int offst = idx[loc].dg + lin;
+          //printf("offst = %d\n", offst);
+          pack(offst, k, j, i) = dg[mu][nu][sigma];
           lin++;
         }
       }
