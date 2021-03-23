@@ -16,7 +16,7 @@ using namespace parthenon::package::prelude;
 namespace Geometry {
 
 template <typename System>
-void Initialize(ParameterInput *pin, StateDescriptor *geometry) {}
+void Initialize(ParameterInput *pin, StateDescriptor *geometry) { }
 
 template <typename System> System GetCoordinateSystem(MeshBlockData<Real> *rc);// {
 //  PARTHENON_THROW("Unknown coordinate system");

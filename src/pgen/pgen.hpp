@@ -21,7 +21,8 @@ using namespace parthenon::package::prelude;
   PROBLEM(kelvin_helmholtz)                                                              \
   PROBLEM(rhs_tester)                                                                    \
   PROBLEM(sedov)                                                                         \
-  PROBLEM(blandford_mckee)
+  PROBLEM(blandford_mckee)                                                               \
+  PROBLEM(bondi)
 
 /*
 // DO NOT TOUCH THE MACROS BELOW

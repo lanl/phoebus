@@ -34,6 +34,9 @@ using FMKSMeshBlock = Analytic<FMKS, IndexerMeshBlock>;
 using CFMKSMesh = CachedOverMesh<Analytic<FMKS, IndexerMesh>>;
 using CFMKSMeshBlock = CachedOverMeshBlock<Analytic<FMKS, IndexerMeshBlock>>;
 
+template <>
+void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+
 } // namespace Geometry
 
 #endif // GEOMETRY_FMKS_HPP_

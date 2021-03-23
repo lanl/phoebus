@@ -60,6 +60,13 @@ public:
     res[0] = sfunc(z, Wp);
     res[1] = taufunc(z, Wp, p);
   }
+  #ifndef NDEBUG
+  KOKKOS_INLINE_FUNCTION
+  void print() {
+    printf("Residual Report: %16.14g %16.14g %16.14g %16.14g %16.14g\n",
+           D_, tau_, Bsq_, Ssq_, BdotSsq_);
+  }
+  #endif
 private:
   const singularity::EOS &eos_;
   const Real D_, tau_, Bsq_, Ssq_, BdotSsq_;
@@ -245,6 +252,11 @@ class ConToPrim {
     Real &Ssq = v(scr_lo+iSsq);
     Real &BdotS = v(scr_lo+iBdotS);
     Residual Rfunc(D, tau, Bsq, Ssq, BdotS, eos);
+    #ifndef NDEBUG
+    if (print) {
+      Rfunc.print();
+    }
+    #endif
     Real &rho_guess = v(prho);
     Real &T_guess = v(tmp);
 

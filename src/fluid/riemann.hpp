@@ -98,12 +98,12 @@ class FluxState {
 
     // density
     U[crho] = rho*W;
-    F[crho] = U[crho]*vtil/g.alpha;
+    F[crho] = U[crho]*vtil;
 
     // composition
     if (cye>0) {
       U[cye] = U[crho]*q(dir,pye,k,j,i);
-      F[cye] = U[cye]*vtil/g.alpha;
+      F[cye] = U[cye]*vtil;
     }
 
     Real b0 = W*Bdotv; // this is really b0*alpha
@@ -120,12 +120,12 @@ class FluxState {
         vcovm += g.gcov[m+1][n] * vcon[n-1];
       }
       U[cmom_lo+m] = (rhohWsq+bsqWsq)*vcovm - b0*bcovm;
-      F[cmom_lo+m] = U[cmom_lo+m]*vtil/g.alpha + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
+      F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
     }
 
     // energy
     U[ceng] = rhohWsq + bsqWsq - (P + 0.5*bsq) - b0*b0 - U[crho];
-    F[ceng] = U[ceng]*vtil/g.alpha + (P + 0.5*bsq)*vel - Bdotv*Bcon[dir];
+    F[ceng] = U[ceng]*vtil + (P + 0.5*bsq)*vel - Bdotv*Bcon[dir];
 
     // magnetic fields
     for (int m = cb_lo; m <= cb_hi; m++) {

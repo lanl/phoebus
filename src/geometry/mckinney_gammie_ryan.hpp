@@ -69,16 +69,65 @@ public:
 
     LinearAlgebra::SetZero(Jcov, NDSPACE, NDSPACE);
     LinearAlgebra::SetZero(Jcon, NDSPACE, NDSPACE);
-    // Jcov
+    // Jcon
     Jcov[0][0] = drdX1;  // r
     Jcov[1][0] = dthdX1; // th
     Jcov[1][1] = dthdX2;
     Jcov[2][2] = 1.;     // phi
-    // Jcon
+    // Jcov
     Jcon[0][0] = Utils::ratio(1., drdX1);               // r
     Jcon[1][0] = -Utils::ratio(dthdX1, drdX1 * dthdX2); // th
     Jcon[1][1] = Utils::ratio(1., dthdX2);
     Jcon[2][2] = 1.;                                    // phi
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real bl_radius(const Real x1) const { return r_(x1); }
+  KOKKOS_INLINE_FUNCTION
+  Real bl_theta(const Real x1, const Real x2) const {
+    Real y, th;
+    th_(x1, x2, y, th);
+    return th;
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void bl_to_ks(const Real x1, const Real a, Real *ucon_bl, Real *ucon_ks) const {
+    Real trans[NDFULL][NDFULL];
+    LinearAlgebra::SetZero(trans, NDFULL, NDFULL);
+    const Real r = r_(x1);
+    const Real idenom = 1.0/(r*r - 2.0*r + a*a);
+    trans[0][0] = 1.0;
+    trans[0][1] = 2.0*r*idenom;
+    trans[1][1] = 1.0;
+    trans[2][2] = 1.0;
+    trans[3][1] = a*idenom;
+    trans[3][3] = 1.0;
+    LinearAlgebra::SetZero(ucon_ks, NDFULL);
+    SPACETIMELOOP2(mu,nu) {
+      ucon_ks[mu] += trans[mu][nu]*ucon_bl[nu];
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void bl_to_fmks(const Real x1, const Real x2, const Real x3, const Real a,
+                  Real *ucon_bl, Real *ucon_fmks) const {
+    Real ucon_ks[NDFULL];
+    bl_to_ks(x1, a, ucon_bl, ucon_ks);
+
+    Real c[NDSPACE];
+    Real Jcov[NDSPACE][NDSPACE];
+    Real Jcon[NDSPACE][NDSPACE];
+    (*this)(x1, x2, x3, c, Jcov, Jcon);
+    Real trans[NDFULL][NDFULL];
+    LinearAlgebra::SetZero(trans, NDFULL, NDFULL);
+    trans[0][0] = 1.0;
+    SPACELOOP2(i,j) {
+      trans[i+1][j+1] = Jcon[i][j];
+    }
+    LinearAlgebra::SetZero(ucon_fmks, NDFULL);
+    SPACETIMELOOP2(mu,nu) {
+      ucon_fmks[mu] += trans[mu][nu]*ucon_ks[nu];
+    }
   }
 
 private:
@@ -122,6 +171,9 @@ private:
   Real smooth_ = 0.5;
   Real norm_;
 };
+
+template <>
+McKinneyGammieRyan GetTransformation<McKinneyGammieRyan>(StateDescriptor *pkg);
 
 } // namespace Geometry
 

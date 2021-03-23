@@ -227,6 +227,9 @@ using SphericalKSMesh = Analytic<SphericalKerrSchild, IndexerMesh>;
 using CSphericalKSMeshBlock = CachedOverMeshBlock<SphericalKSMeshBlock>;
 using CSphericalKSMesh = CachedOverMesh<SphericalKSMesh>;
 
+template <>
+void Initialize<SphericalKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+
 } // namespace Geometry
 
 #endif // GEOMETRY_SPHERICAL_KERR_SCHILD_HPP_
