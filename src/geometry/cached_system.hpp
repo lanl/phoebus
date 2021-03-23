@@ -74,8 +74,8 @@ template <typename Pack, typename System> class Cached {
 public:
   Cached() = default;
   template <typename Data>
-  Cached(Data *rc, const System &s, bool axisymmetric = false)
-      : s_(s), axisymmetric_(axisymmetric) {
+  Cached(Data *rc, const System &s, Real dx = 1e-8, bool axisymmetric = false)
+    : s_(s), dx_(dx), axisymmetric_(axisymmetric) {
     PackIndexMap imap;
     pack_ = rc->PackVariables(GEOMETRY_CACHED_VARS, imap);
     int i = 0;
@@ -330,6 +330,7 @@ private:
   int icoord_c_; // don't bother with face coords for now.
   int icoord_n_;
   Pack pack_;
+  Real dx_ = 1e-8;
   Impl::LocArray<Impl::GeomPackIndices> idx_;
   static constexpr Real X0_ = 0;
   static constexpr int b_ = 0;
@@ -351,6 +352,9 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin,
   Params &params = geometry->AllParams();
   bool axisymmetric = pin->GetOrAddBoolean("geometry", "axisymmetric", false);
   params.Add("axisymmetric", axisymmetric);
+
+  Real dxfd = pin->GetOrAddBoolean("geometry","finite_differences_dx", 1e-8);
+  params.Add("dxfd", dxfd);
 
   // Request fields for cache
   Utils::MeshBlockShape dims(pin);
@@ -407,12 +411,18 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin,
 template <typename System>
 CachedOverMeshBlock<System> GetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
   auto system = GetCoordinateSystem<System>(rc);
-  return CachedOverMeshBlock<System>(rc, system);
+  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  Real dxfd = pkg->Param<Real>("dxfd");
+  bool axisymmetric = pkg->Param<bool>("axisymmetric");
+  return CachedOverMeshBlock<System>(rc, system, dxfd, axisymmetric);
 }
 template <typename System>
 CachedOverMesh<System> GetCachedCoordinateSystem(MeshData<Real> *rc) {
   auto system = GetCoordinateSystem<System>(rc);
-  return CachedOverMesh<System>(rc, system);
+  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  Real dxfd = pkg->Param<Real>("dxfd");
+  bool axisymmetric = pkg->Param<bool>("axisymmetric");
+  return CachedOverMesh<System>(rc, system, dxfd, axisymmetric);
 }
 template <typename System>
 void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {

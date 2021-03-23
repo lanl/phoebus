@@ -20,8 +20,8 @@ template <>
 void Initialize<BoyerLindquistMeshBlock>(ParameterInput *pin,
                                          StateDescriptor *geometry) {
   Params &params = geometry->AllParams();
-  Real a = pin->GetOrAddReal("coordinates", "a", 0);
-  Real dxfd = pin->GetOrAddReal("coordinates", "finite_differences_dx", 1e-8);
+  Real a = pin->GetOrAddReal("geometry", "a", 0);
+  Real dxfd = pin->GetOrAddReal("geometry", "finite_differences_dx", 1e-8);
   params.Add("a", a);
   params.Add("dxfd", dxfd);
 }
