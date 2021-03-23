@@ -123,7 +123,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
 
-  const Real a = pin->GetReal("coordinates","a");
+  const Real a = pin->GetReal("geometry","a");
   auto bl = Geometry::BoyerLindquist(a);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
