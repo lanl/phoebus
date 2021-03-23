@@ -83,8 +83,10 @@ c2p_max_iter = 100
 c2p_tol = 1.e-8
 Ye = false
 
-<coordinates>
+<geometry>
 a = 0
+    
+<coordinates>
 derefine_poles = false
 
 <bondi>
