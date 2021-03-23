@@ -116,8 +116,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real C2 = std::pow(1. + (1. + n)*Tc,2)*(1. - 2./rs + std::pow(C1,2)/
        (std::pow(rs,4)*std::pow(Tc,2*n)));
 
-  fprintf(stderr,"C: %g %g %g\n", n, C1, C2);
-
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -125,7 +123,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
 
-  const Real a = pin->GetReal("coordinates","a");
+  const Real a = pin->GetReal("geometry","a");
   auto bl = Geometry::BoyerLindquist(a);
 
   auto geom = Geometry::GetCoordinateSystem(rc);

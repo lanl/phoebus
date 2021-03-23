@@ -395,10 +395,17 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
             for (int n = 0; n < ND; n++) {
               // gam is ALL INDICES DOWN
               src_mom -= Tmunu[m][n] * gam[l+1][n][m];
+              //fprintf(stderr,"%d %d %d %d %d %g\n", __LINE__, i, l, m, n, gam[l+1][n][m]);
             }
           }
 	        src(cmom_lo + l, k, j, i) = gdet*src_mom;
         }
+
+        /*Real beta[3];
+        geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+        for (int m = 0; m < 3; m++) {
+          fprintf(stderr,"%d %d %d %g\n", __LINE__, i, m, beta[m]);
+        }*/
 
         { // energy source term
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
@@ -410,8 +417,10 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
               Real gam0 = 0;
               for (int r = 0; r < ND; r++) {
                 gam0 += gcon[0][r] * gam[r][m][n];
+                //fprintf(stderr,"%d %d %d %d %d %g %g\n", __LINE__, i, m, n, r, gcon[0][r], gam[r][m][n]);
               }
               TGam += Tmunu[m][n] * gam0;
+              //fprintf(stderr,"%d %d %d %d %g\n", __LINE__, i, m, n, gam0);
             }
           }
           Real Ta = 0.0;
@@ -420,8 +429,10 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
           for (int m = 0; m < ND; m++) {
             Ta += Tmunu[m][0] * da[m];
+            //fprintf(stderr,"%d %d %d %g\n", __LINE__, i, m, da[m]);
           }
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          //fprintf(stderr,"%d %d %g\n", __LINE__, i, alpha);
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
         }
 
@@ -432,6 +443,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           for (int m = 0; m < ND; m++) {
             for (int n = 0; n < ND; n++) {
               src_mom += Tmunu[m][n] * gam[n][l+1][m];
+              //fprintf(stderr,"%d %d %d %d %d %g\n", __LINE__, i, l, m, n, gam[n][l+1][m]);
             }
           }
           src(cmom_lo + l, k, j, i) += gdet*src_mom;

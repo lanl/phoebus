@@ -95,8 +95,8 @@ public:
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dg"].second >= 0,
                               "variable exists");
       idx_[i].alpha = imap["g." + loc + ".alpha"].first;
-      idx_[i].dalpha = imap["g." + loc + ".bcon"].first;
-      idx_[i].bcon = imap["g." + loc + ".dalpha"].first;
+      idx_[i].dalpha = imap["g." + loc + ".dalpha"].first;
+      idx_[i].bcon = imap["g." + loc + ".bcon"].first;
       idx_[i].gcov = imap["g." + loc + ".gcov"].first;
       idx_[i].gamcon = imap["g." + loc + ".gamcon"].first;
       idx_[i].detgam = imap["g." + loc + ".detgam"].first;
@@ -217,8 +217,7 @@ public:
     }
     SPACELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDSPACE);
-      g[mu + 1][nu + 1] = pack_(b, idx.gamcon + offst, k, j, i);
-      g[mu + 1][nu + 1] -= Utils::ratio(g[0][mu + 1] * g[0][nu + 1], alpha2);
+      g[mu + 1][nu + 1] = pack_(b, idx.gamcon + offst, k, j, i) - g[0][mu + 1] * g[0][nu + 1] * alpha2;
     }
   }
   KOKKOS_INLINE_FUNCTION
