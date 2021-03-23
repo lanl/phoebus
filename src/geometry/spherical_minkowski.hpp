@@ -120,6 +120,10 @@ using SphMinkowskiMesh = Analytic<SphericalMinkowski, IndexerMesh>;
 using CSphMinkowskiMeshBlock = CachedOverMeshBlock<SphMinkowskiMeshBlock>;
 using CSphMinkowskiMesh = CachedOverMesh<SphMinkowskiMesh>;
 
+template <>
+void Initialize<CSphMinkowskiMeshBlock>(ParameterInput *pin,
+                                        StateDescriptor *geometry); 
+
 } // namespace Geometry
 
 #endif // GEOMETRY_SPHERICAL_MINKOWSKI_HPP_

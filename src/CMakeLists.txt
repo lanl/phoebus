@@ -84,12 +84,14 @@ target_include_directories(phoebus PRIVATE
 
 target_compile_features(phoebus PUBLIC cxx_std_14)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "XL")
-  target_compile_options(riot PUBLIC -std=c++1y -qxflag=disable__cplusplusOverride)
+  target_compile_options(phoebus PUBLIC -std=c++1y -qxflag=disable__cplusplusOverride)
 endif()
 
 if (Kokkos_ENABLE_CUDA)
   target_compile_options(phoebus PUBLIC --expt-relaxed-constexpr)
 endif()
+
+# target_compile_options(phoebus PUBLIC -G -lineinfo)
 
 target_link_libraries(phoebus PRIVATE parthenon
   singularity-eos::flags

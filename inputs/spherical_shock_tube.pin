@@ -27,7 +27,23 @@ variables = p.density,  &
       	    cs, &
       	    p.ye, &
       	    g.c.coord, &
-      	    g.n.coord
+      	    g.n.coord, &
+            g.c.alpha, &
+            g.c.bcon, &
+            g.c.gcov, &
+            g.c.gamcon, &
+            g.c.detgam, &
+            g.c.dg, &
+            g.f1.alpha, &
+            g.f1.gcov, &
+            g.f1.gamcon, &
+            g.f1.detgam, &
+            g.f1.dg, &
+            g.n.alpha, &
+            g.n.bcon, &
+            g.n.gamcon, &
+            g.n.detgam, &
+            g.n.dg
 
 file_type   = hdf5      # Tabular data dump
 dt          = 0.01      # time increment between outputs
@@ -73,6 +89,9 @@ nx3 = 1
 field = c.c.bulk.rho
 method = derivative_order_1
 max_level = 3
+
+<geometry>
+axisymmetry = false
 
 <eos>
 type = IdealGas

@@ -18,8 +18,8 @@ using namespace parthenon::package::prelude;
 
 namespace Geometry {
 
-// We can utilize the default Initialize and SetGeometry because
-// Minkowski doesn't need anything
+template <> void SetGeometry<MinkowskiMeshBlock>(MeshBlockData<Real> *rc) {}
+
 template <>
 MinkowskiMeshBlock
 GetCoordinateSystem<MinkowskiMeshBlock>(MeshBlockData<Real> *rc) {

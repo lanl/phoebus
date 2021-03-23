@@ -140,8 +140,11 @@ SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
 KOKKOS_INLINE_FUNCTION
 int Flatten2(int m, int n, int size) {
   PARTHENON_DEBUG_REQUIRE(0 <= m && 0 <= n && m < size && n < size, "bounds");
-  if (m > n)
-    return Flatten2(n, m, size);
+  if (m > n) { // remove recursion
+    int tmp = n;
+    n = m;
+    m = tmp;
+  }
   return n + size * m - m * (m - 1) / 2 - m;
 }
 KOKKOS_INLINE_FUNCTION

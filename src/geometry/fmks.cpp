@@ -42,6 +42,8 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   params.Add("x0", x0);
   params.Add("smooth", smooth);
 }
+template <> void SetGeometry<FMKSMeshBlock>(MeshBlockData<Real> *rc) {}
+
 template <>
 FMKSMeshBlock GetCoordinateSystem<FMKSMeshBlock>(MeshBlockData<Real> *rc) {
   auto &pkg = rc->GetParentPointer()->packages.Get("geometry");

@@ -279,6 +279,11 @@ using CBoyerLindquistMeshBlock =
 using CBoyerLindquistMesh =
     CachedOverMesh<Analytic<BoyerLindquist, IndexerMesh>>;
 
+template <>
+void Initialize<BoyerLindquistMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+template <>
+void Initialize<CBoyerLindquistMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+
 } // namespace Geometry
 
 #endif // GEOMETRY_BOYER_LINDQUIST_HPP_

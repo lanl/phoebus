@@ -229,6 +229,8 @@ using CSphericalKSMesh = CachedOverMesh<SphericalKSMesh>;
 
 template <>
 void Initialize<SphericalKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+template <>
+void Initialize<CSphericalKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 
 } // namespace Geometry
 
