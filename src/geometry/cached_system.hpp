@@ -550,8 +550,8 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
       ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         lamb(k, j, i, CellLocation::Corn);
       });
-  pmb->exec_space
-      .fence(); // don't let other kernels launch until geometry is set
+  // don't let other kernels launch until geometry is set
+  pmb->exec_space.fence();
 }
 
 } // namespace Geometry
