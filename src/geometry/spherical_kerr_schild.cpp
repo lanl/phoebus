@@ -21,7 +21,6 @@ namespace Geometry {
 template <>
 void Initialize<SphericalKSMeshBlock>(ParameterInput *pin,
                                       StateDescriptor *geometry) {
-  std::cout << "Initializing SphericalKSMeshBlock" << std::endl;
   Params &params = geometry->AllParams();
   Real a = pin->GetOrAddReal("coordinates", "a", 0);
   params.Add("a", a);

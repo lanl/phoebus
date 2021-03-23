@@ -69,12 +69,12 @@ public:
 
     LinearAlgebra::SetZero(Jcov, NDSPACE, NDSPACE);
     LinearAlgebra::SetZero(Jcon, NDSPACE, NDSPACE);
-    // Jcon
+    // Jcov
     Jcov[0][0] = drdX1;  // r
     Jcov[1][0] = dthdX1; // th
     Jcov[1][1] = dthdX2;
     Jcov[2][2] = 1.;     // phi
-    // Jcov
+    // Jcon
     Jcon[0][0] = Utils::ratio(1., drdX1);               // r
     Jcon[1][0] = -Utils::ratio(dthdX1, drdX1 * dthdX2); // th
     Jcon[1][1] = Utils::ratio(1., dthdX2);

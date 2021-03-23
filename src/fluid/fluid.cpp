@@ -217,7 +217,6 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto coords = pmb->coords;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(), 0, v.GetDim(5) - 1,
@@ -316,7 +315,6 @@ template <typename T> TaskStatus ConservedToPrimitive(T *rc) {
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto coords = pmb->coords;
 
   auto fail = rc->Get(internal_variables::fail).data;
 
@@ -348,9 +346,6 @@ template <typename T> TaskStatus ConservedToPrimitive(T *rc) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
                     int &f) {
         f += (fail(k, j, i) == FailFlags::success ? 0 : 1);
-        if (fail(k,j,i) != FailFlags::success) {
-          printf("Failed at r = %g\n", std::exp(coords.x1v(i)));
-        }
       },
       Kokkos::Sum<int>(fail_cnt));
   PARTHENON_REQUIRE(fail_cnt == 0, "Con2Prim Failed!");
@@ -588,7 +583,7 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  auto &coords = pmb->coords;
+  auto coords = pmb->coords;
   auto b = rc->Get(fluid_cons::bfield).data;
   auto divb = rc->Get(diagnostic_variables::divb).data;
   if (ndim == 2) {

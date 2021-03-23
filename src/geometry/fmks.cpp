@@ -23,7 +23,6 @@ namespace Geometry {
 
 template <>
 void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
-  std::cout << "Initialize<FMKSMeshBlock>" << std::endl;
   Initialize<SphericalKSMeshBlock>(pin, geometry);
   Params &params = geometry->AllParams();
   Real dxfd = pin->GetOrAddReal("coordinates", "finite_differences_dx", 1e-8);
