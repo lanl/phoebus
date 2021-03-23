@@ -34,10 +34,10 @@ const std::vector<std::string> GEOMETRY_CACHED_VARS = {
     "g.f1.alpha",  "g.f1.dalpha", "g.f1.bcon", "g.f1.gcov",
     "g.f1.gamcon", "g.f1.detgam", "g.f1.dg",
 
-    "g.f2.alpha",  "g.f1.dalpha", "g.f2.bcon", "g.f2.gcov",
+    "g.f2.alpha",  "g.f2.dalpha", "g.f2.bcon", "g.f2.gcov",
     "g.f2.gamcon", "g.f2.detgam", "g.f2.dg",
 
-    "g.f3.alpha",  "g.f1.dalpha", "g.f3.bcon", "g.f3.gcov",
+    "g.f3.alpha",  "g.f3.dalpha", "g.f3.bcon", "g.f3.gcov",
     "g.f3.gamcon", "g.f3.detgam", "g.f3.dg",
 
     "g.n.alpha",   "g.n.dalpha",  "g.n.bcon",  "g.n.gcov",
@@ -81,6 +81,18 @@ public:
     int i = 0;
     for (auto &loc : GEOMETRY_LOC_NAMES) {
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".alpha"].second >= 0,
+                              "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second >= 0,
+                              "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second >= 0,
+                              "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gcov"].second >= 0,
+                              "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gamcon"].second >= 0,
+                              "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".detgam"].second >= 0,
+                              "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dg"].second >= 0,
                               "variable exists");
       idx_[i].alpha = imap["g." + loc + ".alpha"].first;
       idx_[i].dalpha = imap["g." + loc + ".bcon"].first;
@@ -458,7 +470,7 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
 
   auto lamb = KOKKOS_LAMBDA(const int k, const int j, const int i,
                             const CellLocation loc) {
-    Real dalpha[NDFULL];
+    Real da[NDFULL];
     Real beta[NDSPACE];
     Real gcov[NDFULL][NDFULL];
     Real gamcon[NDSPACE][NDSPACE];
