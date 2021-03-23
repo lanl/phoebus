@@ -396,7 +396,6 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin,
       shape = {dims.nx1, dims.nx2, 1, var_sizes[i]};
       m = Metadata(flags_o, shape);
     } else {
-      std::cout << "this is my codepath" << std::endl;
       shape = {var_sizes[i]};
       m = Metadata(flags_c, shape);
     }
