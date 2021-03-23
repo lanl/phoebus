@@ -15,6 +15,8 @@ KOKKOS_FUNCTION
 Real get_bondi_temp(const Real r, const Real n, const Real C1, const Real C2, const Real Tc, const Real rc) {
   Real rtol = 1.e-12;
   Real ftol = 1.e-14;
+  // TODO(jcd): this hardcoded 0.8 is really only appropriate for gamma = 1.4.
+  //            for other gamma, this Tguess may not fall between the two roots
   Real Tguess = Tc * std::pow(rc/r,0.8);
   Real Tmin = (r < rc ? 0.1*Tguess : Tguess);
   Real Tmax = (r < rc ? Tguess : 10.*Tguess);
