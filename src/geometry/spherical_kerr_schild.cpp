@@ -22,7 +22,7 @@ template <>
 void Initialize<SphericalKSMeshBlock>(ParameterInput *pin,
                                       StateDescriptor *geometry) {
   Params &params = geometry->AllParams();
-  Real a = pin->GetOrAddReal("coordinates", "a", 0);
+  Real a = pin->GetOrAddReal("geometry", "a", 0);
   params.Add("a", a);
 }
 template <>
