@@ -107,7 +107,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
-  const Real Rhor = pin->GetOrAddReal("bondi", "Rhor", 2.5);
+  const Real Rhor = pin->GetOrAddReal("bondi", "Rhor", 2.0);
 
   // Solution constants
   const Real uc = std::sqrt(1.0/(2.*rs));
