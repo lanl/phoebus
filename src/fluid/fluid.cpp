@@ -401,6 +401,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
         }
 
         { // energy source term
+          // TODO(jcd): maybe use the lapse and shift here instead of gcon
           Real gcon[4][4];
           geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon);
           Real TGam = 0.0;
@@ -421,7 +422,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
             Ta += Tmunu[m][0] * da[m];
           }
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-          src(ceng, k, j, i) = gdet*alpha * (Ta - TGam);
+          src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
         }
 
         // re-use gam for metric derivative
@@ -582,7 +583,7 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  auto &coords = pmb->coords;
+  auto coords = pmb->coords;
   auto b = rc->Get(fluid_cons::bfield).data;
   auto divb = rc->Get(diagnostic_variables::divb).data;
   if (ndim == 2) {

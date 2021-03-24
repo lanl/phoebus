@@ -66,13 +66,14 @@ public:
     Real r2, r3, sth, cth, DD, mu;
     ComputeDeltaMu_(r, th, r2, r3, sth, cth, DD, mu);
     const Real r3dm = r3 * DD * mu;
+    const Real sth2 = sth*sth;
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
-    g[0][0] = ratio(2 * (a2_ + r2), r3dm);
-    g[0][0] = -(1 + g[0][0]);
-    g[0][3] = g[3][0] = -ratio(2 * a_, r3dm);
-    g[1][1] = ratio(DD, mu);
-    g[2][2] = ratio(1, r2 * mu);
-    g[3][3] = ratio((r * mu - 2) * sth * sth, r3dm);
+    g[0][0] = -(1.0 - ratio(2.0,r*mu));
+    g[0][3] = g[3][0] = -ratio(2.0 * a_ * sth2, r*mu);
+    g[1][1] = mu / DD;
+    g[2][2] = r2 * mu;
+    g[3][3] = r2 * sth2 * (1.0 + ratio(a2_,r2) + ratio(2.0*a2_*sth2,r3*mu));
+
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
@@ -240,6 +241,13 @@ public:
 
 private:
   KOKKOS_INLINE_FUNCTION
+  void ComputeInternals_(const Real r, const Real th, Real &bl_fact, Real &cth2, Real &sth2) const {
+    cth2 = std::cos(th);
+    cth2 *= cth2;
+    sth2 = 1.0 - cth2;
+    bl_fact = r*r + a2_*cth2;
+  }
+  KOKKOS_INLINE_FUNCTION
   void ComputeDeltaMu_(Real r, Real th, Real &r2, Real &r3, Real &sth,
                        Real &cth, Real &DD, Real &mu) const {
     using namespace Utils;
@@ -270,6 +278,11 @@ using CBoyerLindquistMeshBlock =
     CachedOverMeshBlock<Analytic<BoyerLindquist, IndexerMeshBlock>>;
 using CBoyerLindquistMesh =
     CachedOverMesh<Analytic<BoyerLindquist, IndexerMesh>>;
+
+template <>
+void Initialize<BoyerLindquistMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+template <>
+void Initialize<CBoyerLindquistMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 
 } // namespace Geometry
 

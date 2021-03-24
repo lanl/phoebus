@@ -60,8 +60,9 @@ public:
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     s_.ContravariantShift(X0, C[0], C[1], C[2], beta0);
+    LinearAlgebra::SetZero(beta, NDSPACE);
     SPACELOOP(i) {
-      SPACELOOP(j) { beta[i] = Jcon[i][j] * beta0[j]; }
+      SPACELOOP(j) { beta[i] += Jcon[i][j] * beta0[j]; }
     }
   }
 
@@ -123,7 +124,9 @@ public:
     SPACELOOP(i) {
       SPACELOOP(j) {
         SPACELOOP(k) {
-          SPACELOOP(l) { g[i][j] += g0[k][l] * Jcov[k][i] * Jcov[l][j]; }
+          SPACELOOP(l) { 
+            g[i][j] += g0[k][l] * Jcov[k][i] * Jcov[l][j]; 
+          }
         }
       }
     }
@@ -155,7 +158,7 @@ public:
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     Real detJ = LinearAlgebra::Determinant(Jcov);
-    return s_.DetGamma(X0, C[0], C[1], C[2]) * std::sqrt(detJ * detJ);
+    return s_.DetGamma(X0, C[0], C[1], C[2]) * std::abs(detJ);
   }
   KOKKOS_INLINE_FUNCTION
   Real DetG(Real X0, Real X1, Real X2, Real X3) const {
@@ -164,7 +167,7 @@ public:
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     Real detJ = LinearAlgebra::Determinant(Jcov);
-    return s_.DetG(X0, C[0], C[1], C[2]) * std::sqrt(detJ * detJ);
+    return s_.DetG(X0, C[0], C[1], C[2]) * std::abs(detJ);
   }
 
   KOKKOS_INLINE_FUNCTION

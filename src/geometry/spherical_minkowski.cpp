@@ -19,10 +19,6 @@ using namespace parthenon::package::prelude;
 namespace Geometry {
 
 template <>
-void Initialize<SphMinkowskiMeshBlock>(ParameterInput *pin,
-                                       StateDescriptor *geometry) {}
-
-template <>
 SphMinkowskiMeshBlock
 GetCoordinateSystem<SphMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
   auto indexer = GetIndexer(rc);

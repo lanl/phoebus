@@ -110,6 +110,10 @@ using MinkowskiMesh = Analytic<Minkowski, IndexerMesh>;
 using CMinkowskiMeshBlock = CachedOverMeshBlock<MinkowskiMeshBlock>;
 using CMinkowskiMesh = CachedOverMesh<MinkowskiMesh>;
 
+template <>
+void Initialize<CMinkowskiMeshBlock>(ParameterInput *pin,
+                                     StateDescriptor *geometry);
+
 } // namespace Geometry
 
 #endif // GEOMETRY_MINKOWSKI_HPP_

@@ -25,7 +25,8 @@ template <>
 void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Initialize<SphericalKSMeshBlock>(pin, geometry);
   Params &params = geometry->AllParams();
-  Real dxfd = pin->GetOrAddReal("coordinates", "finite_differences_dx", 1e-8);
+  Real dxfd_geom = pin->GetOrAddReal("geometry", "finite_differences_dx", 1e-8);
+  Real dxfd = pin->GetOrAddReal("coordinates", "finite_differences_dx", dxfd_geom);
   bool derefine_poles =
       pin->GetOrAddBoolean("coordinates", "derefine_poles", true);
   Real h = pin->GetOrAddReal("coordinates", "hslope", 0.3);
@@ -33,7 +34,9 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Real alpha = pin->GetOrAddReal("coordinates", "poly_alpha", 14);
   Real x0 = pin->GetReal("parthenon/mesh", "x1min");
   Real smooth = pin->GetOrAddReal("coordinates", "smooth", 0.5);
-  params.Add("dxfd", dxfd);
+  if (!params.hasKey("dxfd")) {
+    params.Add("dxfd", dxfd);
+  }
   params.Add("derefine_poles", derefine_poles);
   params.Add("h", h);
   params.Add("xt", xt);

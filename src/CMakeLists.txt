@@ -49,6 +49,7 @@ add_executable(phoebus
   pgen/pgen.hpp
   pgen/pgen.cpp
   pgen/blandford_mckee.cpp
+  pgen/bondi.cpp
   pgen/kh.cpp
   pgen/linear_modes.cpp
   pgen/rhs_tester.cpp

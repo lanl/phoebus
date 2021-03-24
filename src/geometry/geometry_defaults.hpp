@@ -15,11 +15,8 @@ using namespace parthenon::package::prelude;
 
 namespace Geometry {
 
-// DO NOT IMPLEMENT GENERIC VERSIONS OF THESE. If you do, the compiler
-// will rely on the generic and not refer to the specializations.
-
 template <typename System>
-void Initialize(ParameterInput *pin, StateDescriptor *geometry);
+void Initialize(ParameterInput *pin, StateDescriptor *geometry) { }
 
 template <typename System> System GetCoordinateSystem(MeshBlockData<Real> *rc);
 

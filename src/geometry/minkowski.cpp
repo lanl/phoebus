@@ -18,10 +18,6 @@ using namespace parthenon::package::prelude;
 
 namespace Geometry {
 
-template <>
-void Initialize<MinkowskiMeshBlock>(ParameterInput *pin,
-                                    StateDescriptor *geometry) {}
-
 template <> void SetGeometry<MinkowskiMeshBlock>(MeshBlockData<Real> *rc) {}
 
 template <>
