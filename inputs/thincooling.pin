@@ -80,11 +80,11 @@ Ye = true
 <radiation>
 #method = cooling_function
 method = monte_carlo
-nu_min = 1.e7
-nu_max = 0.9999e17
+nu_min = 1.e20
+nu_max = 0.9999e22
 nu_bins = 200
 #tune_emiss = 1.e-1
-tune_emiss = 1.e-5
+tune_emiss = 1.e-9
 
 <thincooling>
 species = electron

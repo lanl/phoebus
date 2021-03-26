@@ -220,10 +220,20 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto dNdlnu = rc->Get("dNdlnu").data;
   auto dNdlnu_max = rc->Get("dNdlnu_max").data;
 
+
+  int ng = parthenon::Globals::nghost;
+  ParArrayND<Real> dwdlnu("dwdlnu", nu_bins+1, 1, 1, 4+2*ng);
+
   // Loop over zones and generate appropriate number of particles in each zone
   pmb->par_for(
       "MonteCarloSourceParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+
+  // temporary
+  for (int n = 0; n <=nu_bins; n++) {
+    dwdlnu(n,k,j,i) = 0.;
+  }
+
         // Create tetrad transformation once per zone
         Real Gcov[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
@@ -269,6 +279,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 #endif
 
           weight(m) = GetWeight(wgtC, nu);
+          dwdlnu((log(nu) - lnu_min)/dlnu, k, j, i) += weight(m);
           //printf("nu = %e weight = %e\n", nu, weight(m));
 
           // Encode frequency and randomly sample direction
@@ -296,6 +307,13 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           // TODO(BRR) Now throw away particles temporarily
           swarm_d.MarkParticleForRemoval(m);
         }
+
+
+  for (int n = 0; n <=nu_bins; n++) {
+    //printf("dwdlnu(%i,%i,%i,%i) = %e\n", n,k,j,i,dwdlnu(n,k,j,i));
+    printf("%e, ", n,k,j,i,dwdlnu(n,k,j,i));
+  }
+  printf("\n");
       });
 
   swarm->RemoveMarkedParticles();
