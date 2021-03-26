@@ -79,7 +79,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
   const Real dV_code = dx_i * dx_j * dx_k * dt;
   const Real d3x_cgs = dx_i * dx_j * dx_k * pow(LENGTH, 3);
-  const Real d3x_code = dx_i*dx_j*dx_k;
+  const Real d3x_code = dx_i * dx_j * dx_k;
 
   std::vector<std::string> vars(
       {p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
@@ -97,8 +97,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
-  //const Real wgtC = 1.e72 * tune_emiss;
-  Real wgtC = 1.e50;
+  Real wgtC = 1.e50; // Typical-ish value
 
   pmb->par_for(
       "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -113,7 +112,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         Real detG = geom.DetG(CellLocation::Cent, k, j, i);
         Real ye = v(iye, k, j, i);
 
-        #if SAMPLING_METHOD == NUMERICAL
+#if SAMPLING_METHOD == NUMERICAL
         Real dN = 0.;
         Real dNdlnu_max = 0.;
         for (int n = 0; n <= nu_bins; n++) {
@@ -122,7 +121,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real Jnu = GetJnu(ye, s, nu);
 
           dN += Jnu * nu / (pc.h * nu * wgt) * dlnu;
-        //  printf("dN += %e\n", Jnu * nu / (pc.h * nu * wgt) * dlnu);
 
           // Factors of nu in numerator and denominator cancel
           Real dNdlnu = Jnu * d3x_cgs * detG / (pc.h * wgt);
@@ -136,21 +134,17 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           v(idNdlnu + n, k, j, i) /= dNdlnu_max;
         }
 
-
         // Trapezoidal rule
         Real nu0 = nusamp[0];
         Real nu1 = nusamp[nu_bins];
         dN -= 0.5 * GetJnu(ye, s, nu0) * nu0 / (pc.h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
         dN -= 0.5 * GetJnu(ye, s, nu1) * nu1 / (pc.h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
-        printf("dN dN: %e %e\n",
-          0.5 * GetJnu(ye, s, nu0) * nu0 / (pc.h * nu0 * GetWeight(wgtC, nu0)) * dlnu,
-          0.5 * GetJnu(ye, s, nu1) * nu1 / (pc.h * nu1 * GetWeight(wgtC, nu1)) * dlnu);
         dN *= d3x_cgs * detG * dt * TIME;
 
         v(idNdlnu_max, k, j, i) = dNdlnu_max;
-        #elif SAMPLING_METHOD == ANALYTIC
-        Real dN = GetJ(ye, s)*d3x_cgs*detG*dt*TIME/(pc.h*wgtC);
-        #endif
+#elif SAMPLING_METHOD == ANALYTIC
+        Real dN = GetJ(ye, s) * d3x_cgs * detG * dt * TIME / (pc.h * wgtC);
+#endif
 
         int Ns = static_cast<int>(dN);
         if (dN - Ns > rng_gen.drand()) {
@@ -172,21 +166,18 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         dNtot += v(idN, k, j, i);
       },
       Kokkos::Sum<Real>(dNtot));
-  printf("dNtot: %e\n", dNtot);
-  // TODO(BRR) Mpi reduction here.......
-  Real wgtCfac = static_cast<Real>(num_particles)/dNtot;
-  printf("wgtCfac: %e\n", wgtCfac);
+  // TODO(BRR) Mpi reduction here....... this really needs to be a separate task
+  Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
   pmb->par_for(
       "MonteCarlodiNsEval", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         auto rng_gen = rng_pool.get_state();
 
-        Real dN_upd = wgtCfac*v(idN, k, j, i);
+        Real dN_upd = wgtCfac * v(idN, k, j, i);
         int Ns = static_cast<int>(dN_upd);
         if (dN_upd - Ns > rng_gen.drand()) {
           Ns++;
         }
-        printf("dN_upd: %e Ns: %i\n", dN_upd, Ns);
 
         // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
         v(iNs, k, j, i) = static_cast<Real>(Ns);
@@ -200,12 +191,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         Nstot += static_cast<int>(v(iNs, k, j, i));
       },
       Kokkos::Sum<int>(Nstot));
-  printf("Nstot = %i\n", Nstot);
   if (dNtot <= 0) {
     return TaskStatus::complete;
   }
-  //exit(-1);
-
 
   ParArrayND<int> new_indices;
   const auto new_particles_mask = swarm->AddEmptyParticles(Nstot, new_indices);
@@ -240,20 +228,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto dNdlnu = rc->Get("dNdlnu").data;
   auto dNdlnu_max = rc->Get("dNdlnu_max").data;
 
-
-  int ng = parthenon::Globals::nghost;
-  ParArrayND<Real> dwdlnu("dwdlnu", nu_bins+1, 1, 1, 4+2*ng);
-
   // Loop over zones and generate appropriate number of particles in each zone
   pmb->par_for(
       "MonteCarloSourceParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-
-  // temporary
-  for (int n = 0; n <=nu_bins; n++) {
-    dwdlnu(n,k,j,i) = 0.;
-  }
-
         // Create tetrad transformation once per zone
         Real Gcov[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
@@ -265,7 +243,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         int dNs = v(iNs, k, j, i);
 
         // Loop over particles to create in this zone
-        //for (int n = 0; n < static_cast<int>(dNs(k, j, i)); n++) {
         for (int n = 0; n < static_cast<int>(dNs); n++) {
           const int m = new_indices(n);
           auto rng_gen = rng_pool.get_state();
@@ -291,16 +268,14 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real dndlnu, dndlnu_max;
           do {
             nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
-            dndlnu = nu*GetJnu(ye, s, nu)/(pc.h*nu*wgtC/nu);
+            dndlnu = nu * GetJnu(ye, s, nu) / (pc.h * nu * wgtC / nu);
             Real numax = exp(lnu_max);
-            dndlnu_max = numax*GetJnu(ye, s, numax)/(pc.h*numax*wgtC/numax);
+            dndlnu_max = numax * GetJnu(ye, s, numax) / (pc.h * numax * wgtC / numax);
             counter++;
-          } while (rng_gen.drand() > dndlnu/dndlnu_max);
+          } while (rng_gen.drand() > dndlnu / dndlnu_max);
 #endif
 
-          weight(m) = GetWeight(wgtC/wgtCfac, nu);
-          //printf("weight: %e\n", weight(m));
-          dwdlnu((log(nu) - lnu_min)/dlnu, k, j, i) += weight(m);
+          weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
           // Encode frequency and randomly sample direction
           Real E = nu * pc.h * CENERGY;
@@ -328,7 +303,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           swarm_d.MarkParticleForRemoval(m);
         }
       });
-//  exit(-1);
 
   swarm->RemoveMarkedParticles();
 

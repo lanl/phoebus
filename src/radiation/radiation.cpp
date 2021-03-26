@@ -158,10 +158,6 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
         v(cye, k, j, i) += v(Gye, k, j, i) * dt;
-        printf("u0: %e\n", v(ceng, k, j, i));
-        printf("G0:  %e\n", v(Gcov_lo, k, j, i));
-        printf("Gye: %e\n", v(Gye, k, j, i));
-        //exit(-1);
       });
 
   return TaskStatus::complete;
