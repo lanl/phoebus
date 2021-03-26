@@ -87,6 +87,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     physics->AddField("dNdlnu_max", mscalar);
     physics->AddField("dN", mscalar);
+    physics->AddField("Ns", mscalar);
 
     std::vector<int> dNdlnu_size(1, nu_bins + 1);
     Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
@@ -94,6 +95,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     Real tune_emiss = pin->GetOrAddReal("radiation", "tune_emiss", 1.);
     params.Add("tune_emiss", tune_emiss);
+
+    int num_particles = pin->GetOrAddInteger("radiation", "num_particles", 100);
+    params.Add("num_particles", num_particles);
   }
 
   if (method == "monte_carlo" || method == "mocmc") {

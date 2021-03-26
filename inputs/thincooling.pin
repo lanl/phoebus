@@ -85,6 +85,7 @@ nu_max = 0.9999e17
 nu_bins = 200
 #tune_emiss = 1.e-1
 tune_emiss = 1.e2
+num_particles = 1000
 
 <thincooling>
 species = electron
