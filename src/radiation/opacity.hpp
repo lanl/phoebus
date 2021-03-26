@@ -7,7 +7,7 @@ namespace radiation {
 
 #define C (1.)
 #define numax (1.e17)
-#define numin (1.e7)
+#define numin (1.e15)
 
 KOKKOS_INLINE_FUNCTION
 Real Getyf(Real Ye, NeutrinoSpecies s) {

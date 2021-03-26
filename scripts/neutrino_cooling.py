@@ -18,8 +18,8 @@ NeutrinoSpecies = Enum('NeutrinoSpecies', 'electron electronanti')
 s = NeutrinoSpecies.electron
 mp = 1.672621777e-24
 h = 6.62606957e-27
-numax = 1.e22
-numin = 1.e20
+numax = 1.e17
+numin = 1.e15
 C = 1.
 rho = 1.e6
 u0 = 1.e20
@@ -52,7 +52,7 @@ def get_Ye(t):
 def get_u(t):
   return u0 + Bc/(2.*Ac)*(np.exp(-2.*Ac*t) - 1.)
 
-t = np.logspace(0, 2, 128)
+t = np.logspace(0, 3, 128)
 Ye = get_Ye(t)
 u = get_u(t)
 

@@ -120,7 +120,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real Jnu = GetJnu(ye, s, nu);
 
           dN += Jnu * nu / (pc.h * nu * wgt) * dlnu;
-          printf("nu[%i] = %e Jnu: %e dN += %e\n", n, nu, Jnu, Jnu * nu / (pc.h * nu * wgt) * dlnu);
+         // printf("nu[%i] = %e Jnu: %e dN += %e\n", n, nu, Jnu, Jnu * nu / (pc.h * nu * wgt) * dlnu);
           Real fac = 1.;
           if (n == 0 || n == nu_bins) {
             fac = 0.5;
@@ -165,7 +165,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         if (dN - Ns > rng_gen.drand()) {
           Ns++;
         }
-        printf("Ns: %i\n", Ns);
+        printf("Ns: %i dN = %e\n", Ns, dN);
 
         // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
         v(idN, k, j, i) = static_cast<Real>(Ns);
@@ -309,11 +309,11 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         }
 
 
-  for (int n = 0; n <=nu_bins; n++) {
+  //for (int n = 0; n <=nu_bins; n++) {
     //printf("dwdlnu(%i,%i,%i,%i) = %e\n", n,k,j,i,dwdlnu(n,k,j,i));
-    printf("%e, ", n,k,j,i,dwdlnu(n,k,j,i));
-  }
-  printf("\n");
+  //  printf("%e, ", n,k,j,i,dwdlnu(n,k,j,i));
+  //}
+  //printf("\n");
       });
 
   swarm->RemoveMarkedParticles();
