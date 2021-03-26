@@ -13,8 +13,6 @@ using namespace parthenon::package::prelude;
 
 namespace Geometry {
 
-enum class CoordSystemTag { Minkowski };
-
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 // Set geometry data on grid, if needed.
@@ -23,8 +21,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 // a problem generator.
 void SetGeometry(MeshBlockData<Real> *rc);
 
-CoordinateSystem GetCoordinateSystem(MeshBlockData<Real> *rc);
-CoordinateSystem GetCoordinateSystem(MeshData<Real> *rc);
+CoordSysMeshBlock GetCoordinateSystem(MeshBlockData<Real> *rc);
+CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc);
 
 } // namespace Geometry
 

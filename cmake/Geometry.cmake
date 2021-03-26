@@ -1,0 +1,31 @@
+option(PHOEBUS_ANALYTIC_GEOMETRY "Use an analytic geometry" ON) # TODO(JMM): clean up later
+option(PHOEBUS_CACHE_GEOMETRY "Cache geometry. Only available for some geometries" OFF)
+
+# Default
+set(PHOEBUS_GEOMETRY "Minkowski" CACHE STRING "The metric used by Phoebus")
+
+set(PHOEBUS_ANALYTIC_GEOMETRIES
+    "Minkowski"
+    "SphericalMinkowski"
+    "BoyerLindquist"
+    "SphericalKerrSchild"
+    "FMKS"
+    )
+if(PHOEBUS_ANALYTIC_GEOMETRY)
+  if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_ANALYTIC_GEOMETRIES)
+    set(GEOMETRY_MESH "Analytic<${PHOEBUS_GEOMETRY}, IndexerMesh>")
+    set(GEOMETRY_MESH_BLOCK "Analytic<${PHOEBUS_GEOMETRY}, IndexerMeshBlock>")
+    if (PHOEBUS_CACHE_GEOMETRY)
+      set(GEOMETRY_MESH "CachedOverMesh<${GEOMETRY_MESH}>")
+      set(GEOMETRY_MESH_BLOCK "CachedOverMeshBlock<${GEOMETRY_MESH_BLOCK}>")
+    endif()
+  else()
+    message(FATAL_ERROR "Unkown geometry")  
+  endif()
+else()
+  message(FATAL_ERROR "Only analytic geometries currently supported")
+endif()
+
+message("\nGeometry set to ${PHOEBUS_GEOMETRY}")
+message(STATUS "On MeshBlocks:     ${GEOMETRY_MESH_BLOCK}")
+message(STATUS "On MeshBlockPacks: ${GEOMETRY_MESH}")

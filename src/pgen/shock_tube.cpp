@@ -15,24 +15,24 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({primitive_variables::density,
-                              primitive_variables::velocity,
-                              primitive_variables::energy,
-                              primitive_variables::bfield,
-                              primitive_variables::ye,
-                              primitive_variables::pressure,
-                              primitive_variables::temperature},
+  auto v = rc->PackVariables({fluid_prim::density,
+                              fluid_prim::velocity,
+                              fluid_prim::energy,
+                              fluid_prim::bfield,
+                              fluid_prim::ye,
+                              fluid_prim::pressure,
+                              fluid_prim::temperature},
                               imap);
 
-  const int irho = imap[primitive_variables::density].first;
-  const int ivlo = imap[primitive_variables::velocity].first;
-  const int ivhi = imap[primitive_variables::velocity].second;
-  const int ieng = imap[primitive_variables::energy].first;
-  const int ib_lo = imap[primitive_variables::bfield].first;
-  const int ib_hi = imap[primitive_variables::bfield].second;
-  const int iye  = imap[primitive_variables::ye].second;
-  const int iprs = imap[primitive_variables::pressure].first;
-  const int itmp = imap[primitive_variables::temperature].first;
+  const int irho = imap[fluid_prim::density].first;
+  const int ivlo = imap[fluid_prim::velocity].first;
+  const int ivhi = imap[fluid_prim::velocity].second;
+  const int ieng = imap[fluid_prim::energy].first;
+  const int ib_lo = imap[fluid_prim::bfield].first;
+  const int ib_hi = imap[fluid_prim::bfield].second;
+  const int iye  = imap[fluid_prim::ye].second;
+  const int iprs = imap[fluid_prim::pressure].first;
+  const int itmp = imap[fluid_prim::temperature].first;
 
   const Real rhol = pin->GetOrAddReal("shocktube", "rhol", 1.0);
   const Real Pl = pin->GetOrAddReal("shocktube", "Pl", 1.0);

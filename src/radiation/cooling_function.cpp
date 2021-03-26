@@ -7,8 +7,8 @@
 namespace radiation {
 
 TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt) {
-  namespace p = primitive_variables;
-  namespace c = conserved_variables;
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
   namespace iv = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
 

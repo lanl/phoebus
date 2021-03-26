@@ -28,8 +28,8 @@ namespace thin_cooling {
 parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
-  namespace p = primitive_variables;
-  namespace c = conserved_variables;
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;

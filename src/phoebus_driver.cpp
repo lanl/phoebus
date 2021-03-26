@@ -19,11 +19,13 @@
 #include <refinement/refinement.hpp>
 
 // Local Includes
+#include "compile_constants.hpp"
 #include "fluid/fluid.hpp"
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_driver.hpp"
 #include "radiation/radiation.hpp"
+#include "phoebus_utils/debug_utils.hpp"
 
 using namespace parthenon::driver::prelude;
 
@@ -95,8 +97,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
 
-  std::vector<std::string> src_names(
-      {conserved_variables::momentum, conserved_variables::energy});
+  std::vector<std::string> src_names({fluid_cons::momentum, fluid_cons::energy});
 
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
@@ -149,12 +150,18 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         tl.AddTask(flux_div | geom_src, SumData<std::string, MeshBlockData<Real>>,
                    src_names, dudt.get(), gsrc.get(), dudt.get());
 
-    auto avg_container = tl.AddTask(add_rhs, AverageIndependentData<MeshBlockData<Real>>,
+    #if PRINT_RHS
+    auto print_rhs = tl.AddTask(add_rhs, Debug::PrintRHS<MeshBlockData<Real>>, dudt.get());
+    auto next = print_rhs;
+    #else
+    auto next = add_rhs;
+    #endif
+
+    auto avg_container = tl.AddTask(hydro_flux|geom_src, AverageIndependentData<MeshBlockData<Real>>,
                                     sc0.get(), base.get(), beta);
     // apply du/dt to all independent fields in the container
-    auto update_container =
-        tl.AddTask(avg_container, UpdateIndependentData<MeshBlockData<Real>>, sc0.get(),
-                   dudt.get(), beta * dt, sc1.get());
+    auto update_container = tl.AddTask(avg_container|next, UpdateIndependentData<MeshBlockData<Real>>,
+                                       sc0.get(), dudt.get(), beta*dt, sc1.get());
 
     // update ghost cells
     auto send = tl.AddTask(update_container, &MeshBlockData<Real>::SendBoundaryBuffers,

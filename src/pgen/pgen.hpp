@@ -19,7 +19,11 @@ using namespace parthenon::package::prelude;
   PROBLEM(shock_tube)                                                                    \
   PROBLEM(linear_modes)                                                                  \
   PROBLEM(thin_cooling)                                                                  \
-  PROBLEM(kelvin_helmholtz)
+  PROBLEM(kelvin_helmholtz)                                                              \
+  PROBLEM(rhs_tester)                                                                    \
+  PROBLEM(sedov)                                                                         \
+  PROBLEM(blandford_mckee)                                                               \
+  PROBLEM(bondi)
 
 /*
 // DO NOT TOUCH THE MACROS BELOW

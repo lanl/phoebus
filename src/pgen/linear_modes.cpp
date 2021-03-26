@@ -18,7 +18,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto v = rc->PackVariables({"p.density",
                               "p.velocity",
                               "p.energy",
-                              primitive_variables::bfield,
+                              fluid_prim::bfield,
                               "pressure",
                               "temperature",
                               "gamma1",
@@ -29,8 +29,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap["p.velocity"].first;
   const int ivhi = imap["p.velocity"].second;
   const int ieng = imap["p.energy"].first;
-  const int ib_lo = imap[primitive_variables::bfield].first;
-  const int ib_hi = imap[primitive_variables::bfield].second;
+  const int ib_lo = imap[fluid_prim::bfield].first;
+  const int ib_hi = imap[fluid_prim::bfield].second;
   const int iprs = imap["pressure"].first;
   const int itmp = imap["temperature"].first;
   const int nv = ivhi - ivlo + 1;

@@ -34,7 +34,7 @@ namespace radiation {
 // TODO(BRR) Utilities that should be moved
 #define SMALL (1.e-200)
 KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(Real v[4],
-                                             const Geometry::CoordinateSystem &system,
+                                             const Geometry::CoordSysMeshBlock &system,
                                              CellLocation loc, const int k, const int j,
                                              const int i) {
   Real W = 1;
@@ -50,7 +50,7 @@ KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(Real v[4],
 }
 
 KOKKOS_INLINE_FUNCTION void GetFourVelocity(Real v[4],
-                                            const Geometry::CoordinateSystem &system,
+                                            const Geometry::CoordSysMeshBlock &system,
                                             CellLocation loc, const int k, const int j,
                                             const int i, Real u[Geometry::NDFULL]) {
   Real beta[Geometry::NDSPACE];

@@ -19,26 +19,48 @@ add_executable(phoebus
   fluid/con2prim.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
-  fluid/riemann.cpp
   fluid/riemann.hpp
   fluid/tmunu.hpp
 
+  geometry/analytic_system.hpp
+  geometry/boyer_lindquist.hpp
+  geometry/boyer_lindquist.cpp
+  geometry/cached_system.hpp
   geometry/coordinate_systems.hpp
+  geometry/fmks.hpp
+  geometry/fmks.cpp
   geometry/geometry.cpp
   geometry/geometry.hpp
+  geometry/geometry_defaults.hpp
   geometry/geometry_utils.hpp
-  geometry/geometry_variant.hpp
   geometry/tetrads.hpp
+
+  geometry/mckinney_gammie_ryan.hpp
+  geometry/mckinney_gammie_ryan.cpp
+  geometry/modified_system.hpp
+  geometry/minkowski.hpp
+  geometry/minkowski.cpp
+  geometry/spherical_kerr_schild.hpp
+  geometry/spherical_kerr_schild.cpp
+  geometry/spherical_minkowski.hpp
+  geometry/spherical_minkowski.cpp
 
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
 
   pgen/pgen.hpp
   pgen/pgen.cpp
+  pgen/blandford_mckee.cpp
+  pgen/bondi.cpp
   pgen/kh.cpp
   pgen/linear_modes.cpp
+  pgen/rhs_tester.cpp
   pgen/shock_tube.cpp
   pgen/thin_cooling.cpp
+  pgen/sedov.cpp
+
+  phoebus_boundaries/phoebus_boundaries.hpp
+  phoebus_boundaries/phoebus_boundaries.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp
@@ -46,6 +68,8 @@ add_executable(phoebus
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
+  phoebus_utils/debug_utils.hpp
+  phoebus_utils/linear_algebra.hpp
   phoebus_utils/variables.hpp
 
   radiation/radiation.hpp
@@ -70,12 +94,14 @@ target_include_directories(phoebus PRIVATE
 
 target_compile_features(phoebus PUBLIC cxx_std_14)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "XL")
-  target_compile_options(riot PUBLIC -std=c++1y -qxflag=disable__cplusplusOverride)
+  target_compile_options(phoebus PUBLIC -std=c++1y -qxflag=disable__cplusplusOverride)
 endif()
 
 if (Kokkos_ENABLE_CUDA)
   target_compile_options(phoebus PUBLIC --expt-relaxed-constexpr)
 endif()
+
+# target_compile_options(phoebus PUBLIC -G -lineinfo)
 
 target_link_libraries(phoebus PRIVATE parthenon
   singularity-eos::flags

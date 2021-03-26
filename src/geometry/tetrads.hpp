@@ -1,6 +1,6 @@
 #include <parthenon/package.hpp>
 
-#include "geometry/coordinate_systems.hpp"
+//#include "geometry/coordinate_systems.hpp"
 
 #ifndef GEOMETRY_TETRADS_HPP_
 #define GEOMETRY_TETRADS_HPP_

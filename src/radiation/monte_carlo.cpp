@@ -29,8 +29,8 @@ Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                      SwarmContainer *sc, const double t0,
                                      const double dt) {
-  namespace p = primitive_variables;
-  namespace c = conserved_variables;
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
   namespace iv = internal_variables;
   auto rad = pmb->packages.Get("radiation");
   auto swarm = sc->Get("monte_carlo");
