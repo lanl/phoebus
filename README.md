@@ -7,11 +7,11 @@ Phifty One Ergs Blows Up a Star
 
 `phoebus` uses submodules extensively. To make sure you get them all, clone it as
 ```bash
-git clone --recursive git@gitlab.lanl.gov:rpm/phoebus.git
+git clone --recursive git@github.com:lanl/phoebus.git
 ```
 or as
 ```bash
-git clone https://gitlab.lanl.gov/rpm/phoebus
+git clone git@github.com:lanl/phoebus.git
 cd phoebus
 git submodule update --init --recursive
 ```
