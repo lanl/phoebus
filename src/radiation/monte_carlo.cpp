@@ -21,6 +21,11 @@
 #define NUMERICAL (1)
 #define SAMPLING_METHOD NUMERICAL
 
+#define DESTROY_ALL_SOURCED_PARTICLES (0)
+
+using Geometry::NDFULL;
+using Geometry::CoordSysMeshBlock;
+
 namespace radiation {
 
 KOKKOS_INLINE_FUNCTION
@@ -220,8 +225,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   for (int k = 0; k < nx_k; k++) {
     for (int j = 0; j < nx_j; j++) {
       for (int i = 0; i < nx_i; i++) {
-        printf("[%i %i %i] index: %i dindex[%i %i %i]: %i\n", k, j, i, index,
-          k+kb.s, j+jb.s, i+ib.s, static_cast<int>(dN_h(k + kb.s, j + jb.s, i + ib.s)));
         starting_index_h(k, j, i) = index;
         index += static_cast<int>(dN_h(k + kb.s, j + jb.s, i + ib.s));
       }
@@ -245,13 +248,11 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         Geometry::Tetrads Tetrads(Ucon, Gcov);
         Real detG = geom.DetG(CellLocation::Cent, k, j, i);
         int dNs = v(iNs, k, j, i);
-        printf("[%i %i %i] dNs: %i\n", k, j, i, dNs);
 
         // Loop over particles to create in this zone
         for (int n = 0; n < static_cast<int>(dNs); n++) {
           //const int m = new_indices(n);
           const int m = new_indices(starting_index(k-kb.s, j-jb.s, i-ib.s) + n);
-          printf("[%i %i %i] n: %i m: %i\n", k, j, i, n, m);
           auto rng_gen = rng_pool.get_state();
 
           // Create particles at initial time
@@ -306,14 +307,58 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc.mp / MASS;
           rng_pool.free_state(rng_gen);
 
-          // TODO(BRR) Now throw away particles temporarily
+#if DESTROY_ALL_SOURCED_PARTICLES
           swarm_d.MarkParticleForRemoval(m);
+#endif // DESTROY_ALL_SOURCED_PARTICLES
         }
       });
 
   swarm->RemoveMarkedParticles();
 
   return TaskStatus::complete;
+}
+
+KOKKOS_INLINE_FUNCTION
+void GetXSource(Real &Kcon0, Real &Kcon1, Real &Kcon2, Real &Kcon3, Real src[NDFULL]) {
+  src[0] = 1.;
+  src[1] = Kcon1/Kcon0;
+  src[2] = Kcon2/Kcon0;
+  src[3] = Kcon3/Kcon0;
+}
+
+KOKKOS_INLINE_FUNCTION
+void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1, Real &Kcov2, Real &Kcov3,
+  Real &Kcon0, Real source[4]) {
+  SPACETIMELOOP(mu) {
+    source[mu] = 0.;
+  }
+}
+
+KOKKOS_INLINE_FUNCTION
+void PushParticle(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1, Real &Kcov2,
+                  Real &Kcov3, Real &dt, CoordSysMeshBlock &geom) {
+  Real c1[NDFULL], c2[NDFULL], d1[NDFULL], d2[NDFULL];
+  Real Xtmp[NDFULL], Kcontmp[NDFULL], Kcovtmp[NDFULL];
+  Real Kcov[NDFULL] = {Kcov0, Kcov1, Kcov2, Kcov3};
+  //Real Kcon[NDFULL];
+
+  // First stage
+  Real Gcon[NDFULL][NDFULL];
+  geom.SpacetimeMetricInverse(X0, X1, X2, X3, Gcon);
+  Geometry::Utils::Raise(Kcov, Gcon, Kcontmp);
+
+  GetXSource(Kcon[0], Kcon[1], Kcon[2], Kcon[3], c1);
+  GetKSource(X0, X1, X2, X3, Kcov0, Kcov1, Kcov2, Kcov3, Kcontmp[0], d1);
+
+  Xtmp[0] = X0 + dt*c1[0];
+  Xtmp[1] = X1 + dt*c1[1];
+  Xtmp[2] = X2 + dt*c1[2];
+  Xtmp[3] = X3 + dt*c1[3];
+
+  Kcovtmp[0] = Kcov0 + dt*d1[0];
+  Kcovtmp[1] = Kcov1 + dt*d1[1];
+  Kcovtmp[2] = Kcov2 + dt*d1[2];
+  Kcovtmp[3] = Kcov3 + dt*d1[3];
 }
 
 TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
@@ -334,9 +379,6 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto dlnu = rad->Param<Real>("dlnu");
   const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const auto num_particles = rad->Param<int>("num_particles");
-
-  // TODO(BRR) temporary
-  NeutrinoSpecies s = NeutrinoSpecies::Electron;
 
   // Meshblock geometry
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -369,7 +411,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(),
       KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
-  //        printf("%i active!\n", n);
+          printf("[%i] k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
         }
       });
 
