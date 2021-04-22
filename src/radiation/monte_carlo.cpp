@@ -23,8 +23,8 @@
 
 #define DESTROY_ALL_SOURCED_PARTICLES (0)
 
-using Geometry::NDFULL;
 using Geometry::CoordSysMeshBlock;
+using Geometry::NDFULL;
 
 namespace radiation {
 
@@ -251,8 +251,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
         // Loop over particles to create in this zone
         for (int n = 0; n < static_cast<int>(dNs); n++) {
-          //const int m = new_indices(n);
-          const int m = new_indices(starting_index(k-kb.s, j-jb.s, i-ib.s) + n);
+          // const int m = new_indices(n);
+          const int m = new_indices(starting_index(k - kb.s, j - jb.s, i - ib.s) + n);
           auto rng_gen = rng_pool.get_state();
 
           // Create particles at initial time
@@ -281,7 +281,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             dndlnu_max = numax * GetJnu(ye, s, numax) / (pc.h * numax * wgtC / numax);
             counter++;
           } while (rng_gen.drand() > dndlnu / dndlnu_max);
-#endif
+#endif // SAMPLING_METHOD
 
           weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
@@ -321,48 +321,64 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 KOKKOS_INLINE_FUNCTION
 void GetXSource(Real &Kcon0, Real &Kcon1, Real &Kcon2, Real &Kcon3, Real src[NDFULL]) {
   src[0] = 1.;
-  src[1] = Kcon1/Kcon0;
-  src[2] = Kcon2/Kcon0;
-  src[3] = Kcon3/Kcon0;
+  src[1] = Kcon1 / Kcon0;
+  src[2] = Kcon2 / Kcon0;
+  src[3] = Kcon3 / Kcon0;
 }
 
 KOKKOS_INLINE_FUNCTION
-void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1, Real &Kcov2, Real &Kcov3,
-  Real &Kcon0, Real source[4]) {
-  SPACETIMELOOP(mu) {
-    source[mu] = 0.;
-  }
+void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1,
+                Real &Kcov2, Real &Kcov3, Real &Kcon0, Real source[4]) {
+  SPACETIMELOOP(mu) { source[mu] = 0.; }
 }
 
 KOKKOS_INLINE_FUNCTION
-void PushParticle(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1, Real &Kcov2,
-                  Real &Kcov3, Real &dt, CoordSysMeshBlock &geom) {
+void PushParticle(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1,
+                  Real &Kcov2, Real &Kcov3, const Real &dt,
+                  const CoordSysMeshBlock &geom) {
   Real c1[NDFULL], c2[NDFULL], d1[NDFULL], d2[NDFULL];
   Real Xtmp[NDFULL], Kcontmp[NDFULL], Kcovtmp[NDFULL];
   Real Kcov[NDFULL] = {Kcov0, Kcov1, Kcov2, Kcov3};
-  //Real Kcon[NDFULL];
+  Real Gcon[NDFULL][NDFULL];
 
   // First stage
-  Real Gcon[NDFULL][NDFULL];
   geom.SpacetimeMetricInverse(X0, X1, X2, X3, Gcon);
   Geometry::Utils::Raise(Kcov, Gcon, Kcontmp);
 
-  GetXSource(Kcon[0], Kcon[1], Kcon[2], Kcon[3], c1);
+  GetXSource(Kcontmp[0], Kcontmp[1], Kcontmp[2], Kcontmp[3], c1);
   GetKSource(X0, X1, X2, X3, Kcov0, Kcov1, Kcov2, Kcov3, Kcontmp[0], d1);
 
-  Xtmp[0] = X0 + dt*c1[0];
-  Xtmp[1] = X1 + dt*c1[1];
-  Xtmp[2] = X2 + dt*c1[2];
-  Xtmp[3] = X3 + dt*c1[3];
+  Xtmp[0] = X0 + dt * c1[0];
+  Xtmp[1] = X1 + dt * c1[1];
+  Xtmp[2] = X2 + dt * c1[2];
+  Xtmp[3] = X3 + dt * c1[3];
 
-  Kcovtmp[0] = Kcov0 + dt*d1[0];
-  Kcovtmp[1] = Kcov1 + dt*d1[1];
-  Kcovtmp[2] = Kcov2 + dt*d1[2];
-  Kcovtmp[3] = Kcov3 + dt*d1[3];
+  Kcovtmp[0] = Kcov0 + dt * d1[0];
+  Kcovtmp[1] = Kcov1 + dt * d1[1];
+  Kcovtmp[2] = Kcov2 + dt * d1[2];
+  Kcovtmp[3] = Kcov3 + dt * d1[3];
+
+  // Second stage
+  geom.SpacetimeMetricInverse(Xtmp[0], Xtmp[1], Xtmp[2], Xtmp[3], Gcon);
+  Geometry::Utils::Raise(Kcovtmp, Gcon, Kcontmp);
+
+  GetXSource(Kcontmp[0], Kcontmp[1], Kcontmp[2], Kcontmp[3], c2);
+  GetKSource(X0, X1, X2, X3, Kcovtmp[0], Kcovtmp[1], Kcovtmp[2], Kcovtmp[3], Kcontmp[0],
+             d2);
+
+  X0 += 0.5 * dt * (c1[0] + c2[0]);
+  X1 += 0.5 * dt * (c1[1] + c2[1]);
+  X2 += 0.5 * dt * (c1[2] + c2[2]);
+  X3 += 0.5 * dt * (c1[3] + c2[3]);
+
+  Kcov0 += 0.5 * dt * (d1[0] + d2[0]);
+  Kcov1 += 0.5 * dt * (d1[1] + d2[1]);
+  Kcov2 += 0.5 * dt * (d1[2] + d2[2]);
+  Kcov3 += 0.5 * dt * (d1[3] + d2[3]);
 }
 
 TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
-                               SwarmContainer *sc, const double dt, const double t0) {
+                               SwarmContainer *sc, const double t0, const double dt) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -406,12 +422,21 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto swarm_d = swarm->GetDeviceContext();
 
   printf("num active: %i\n", swarm->GetNumActive());
+  printf("dt: %e\n", dt);
 
   pmb->par_for(
-      "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(),
-      KOKKOS_LAMBDA(const int n) {
+      "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
-          printf("[%i] k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
+          printf("[%i] before x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
+          printf("[%i] before k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
+
+          PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt, geom);
+
+          printf("[%i] after  x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
+          printf("[%i] after  k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
+
+          bool on_current_mesh_block = true;
+          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
         }
       });
 
@@ -421,6 +446,41 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   return TaskStatus::complete;
 }
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {
+  return TaskStatus::complete;
+}
+
+TaskStatus InitializeCommunicationMesh(const std::string swarmName, const BlockList_t &blocks) {
+  // Boundary transfers on same MPI proc are blocking
+  for (auto &block : blocks) {
+    auto swarm = block->swarm_data.Get()->Get(swarmName);
+    for (int n = 0; n < block->pbval->nneighbor; n++) {
+      auto &nb = block->pbval->neighbor[n];
+      swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
+    }
+  }
+
+  for (auto &block : blocks) {
+    auto &pmb = block;
+    auto sc = pmb->swarm_data.Get();
+    auto swarm = sc->Get(swarmName);
+
+    for (int n = 0; n < swarm->vbswarm->bd_var_.nbmax; n++) {
+      auto &nb = pmb->pbval->neighbor[n];
+      swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
+    }
+  }
+
+  // Reset boundary statuses
+  for (auto &block : blocks) {
+    auto &pmb = block;
+    auto sc = pmb->swarm_data.Get();
+    auto swarm = sc->Get(swarmName);
+    for (int n = 0; n < swarm->vbswarm->bd_var_.nbmax; n++) {
+      auto &nb = pmb->pbval->neighbor[n];
+      swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
+    }
+  }
+
   return TaskStatus::complete;
 }
 
