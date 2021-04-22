@@ -297,6 +297,8 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
       auto sample_particles =
           tl.AddTask(none, radiation::MonteCarloSourceParticles, pmb.get(), mbd0.get(), sc0.get(), t0, dt);
+      auto transport_particles =
+          tl.AddTask(sample_particles, radiation::MonteCarloTransport, pmb.get(), mbd0.get(), sc0.get(), t0, dt);
     }
     status = tc.Execute();
   }

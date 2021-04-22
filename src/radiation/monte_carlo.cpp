@@ -195,6 +195,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
     return TaskStatus::complete;
   }
 
+  printf("Creating %i particles!\n", Nstot);
+
   ParArrayND<int> new_indices;
   const auto new_particles_mask = swarm->AddEmptyParticles(Nstot, new_indices);
 
@@ -212,14 +214,16 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   // Calculate array of starting index for each zone to compute particles
   ParArrayND<int> starting_index("Starting index", nx_k, nx_j, nx_i);
   auto starting_index_h = starting_index.GetHostMirror();
-  auto dN = rc->Get("dN").data;
+  auto dN = rc->Get("Ns").data;
   auto dN_h = dN.GetHostMirrorAndCopy();
   int index = 0;
   for (int k = 0; k < nx_k; k++) {
     for (int j = 0; j < nx_j; j++) {
       for (int i = 0; i < nx_i; i++) {
+        printf("[%i %i %i] index: %i dindex[%i %i %i]: %i\n", k, j, i, index,
+          k+kb.s, j+jb.s, i+ib.s, static_cast<int>(dN_h(k + kb.s, j + jb.s, i + ib.s)));
         starting_index_h(k, j, i) = index;
-        index += dN_h(k + kb.s, j + jb.s, i + ib.s);
+        index += static_cast<int>(dN_h(k + kb.s, j + jb.s, i + ib.s));
       }
     }
   }
@@ -241,10 +245,13 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         Geometry::Tetrads Tetrads(Ucon, Gcov);
         Real detG = geom.DetG(CellLocation::Cent, k, j, i);
         int dNs = v(iNs, k, j, i);
+        printf("[%i %i %i] dNs: %i\n", k, j, i, dNs);
 
         // Loop over particles to create in this zone
         for (int n = 0; n < static_cast<int>(dNs); n++) {
-          const int m = new_indices(n);
+          //const int m = new_indices(n);
+          const int m = new_indices(starting_index(k-kb.s, j-jb.s, i-ib.s) + n);
+          printf("[%i %i %i] n: %i m: %i\n", k, j, i, n, m);
           auto rng_gen = rng_pool.get_state();
 
           // Create particles at initial time
@@ -309,7 +316,66 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   return TaskStatus::complete;
 }
 
-TaskStatus MonteCarloTransport(MeshBlock *pmb, const double dt, const double t0) {
+TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
+                               SwarmContainer *sc, const double dt, const double t0) {
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
+  namespace iv = internal_variables;
+  auto rad = pmb->packages.Get("radiation");
+  auto swarm = sc->Get("monte_carlo");
+  auto rng_pool = rad->Param<RNGPool>("rng_pool");
+  const auto tune_emiss = rad->Param<Real>("tune_emiss");
+
+  const auto nu_min = rad->Param<Real>("nu_min");
+  const auto nu_max = rad->Param<Real>("nu_max");
+  const Real lnu_min = log(nu_min);
+  const Real lnu_max = log(nu_max);
+  const auto nu_bins = rad->Param<int>("nu_bins");
+  const auto dlnu = rad->Param<Real>("dlnu");
+  const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  const auto num_particles = rad->Param<int>("num_particles");
+
+  // TODO(BRR) temporary
+  NeutrinoSpecies s = NeutrinoSpecies::Electron;
+
+  // Meshblock geometry
+  const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
+  const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
+  const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
+  const Real &dx_i = pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
+  const Real &dx_j = pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
+  const Real &dx_k = pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
+  const Real &minx_i = pmb->coords.x1f(ib.s);
+  const Real &minx_j = pmb->coords.x2f(jb.s);
+  const Real &minx_k = pmb->coords.x3f(kb.s);
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  auto &t = swarm->Get<Real>("t").Get();
+  auto &x = swarm->Get<Real>("x").Get();
+  auto &y = swarm->Get<Real>("y").Get();
+  auto &z = swarm->Get<Real>("z").Get();
+  auto &k0 = swarm->Get<Real>("k0").Get();
+  auto &k1 = swarm->Get<Real>("k1").Get();
+  auto &k2 = swarm->Get<Real>("k2").Get();
+  auto &k3 = swarm->Get<Real>("k3").Get();
+  auto &weight = swarm->Get<Real>("weight").Get();
+  auto swarm_d = swarm->GetDeviceContext();
+
+  printf("num active: %i\n", swarm->GetNumActive());
+
+  pmb->par_for(
+      "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(),
+      KOKKOS_LAMBDA(const int n) {
+        if (swarm_d.IsActive(n)) {
+  //        printf("%i active!\n", n);
+        }
+      });
+
+  printf("Monte carlo transport!\n");
+  exit(-1);
+
   return TaskStatus::complete;
 }
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {

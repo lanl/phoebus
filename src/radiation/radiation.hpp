@@ -94,7 +94,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                      SwarmContainer *sc, const double t0,
                                      const double dt);
-TaskStatus MonteCarloTransport(MeshBlock *pmb, const double t0, const double dt);
+TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc, SwarmContainer *sc, const double dt, const double t0);
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
 } // namespace radiation
