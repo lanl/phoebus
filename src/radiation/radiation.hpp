@@ -106,40 +106,8 @@ TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
 // Mark all MPI requests as NULL / initialize boundary flags.
 TaskStatus InitializeCommunicationMesh(const std::string swarmName, const BlockList_t &blocks);
-/*{
-  // Boundary transfers on same MPI proc are blocking
-  for (auto &block : blocks) {
-    auto swarm = block->swarm_data.Get()->Get(swarmName);
-    for (int n = 0; n < block->pbval->nneighbor; n++) {
-      auto &nb = block->pbval->neighbor[n];
-      swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
-    }
-  }
 
-  for (auto &block : blocks) {
-    auto &pmb = block;
-    auto sc = pmb->swarm_data.Get();
-    auto swarm = sc->Get(swarmName);
-
-    for (int n = 0; n < swarm->vbswarm->bd_var_.nbmax; n++) {
-      auto &nb = pmb->pbval->neighbor[n];
-      swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
-    }
-  }
-
-  // Reset boundary statuses
-  for (auto &block : blocks) {
-    auto &pmb = block;
-    auto sc = pmb->swarm_data.Get();
-    auto swarm = sc->Get(swarmName);
-    for (int n = 0; n < swarm->vbswarm->bd_var_.nbmax; n++) {
-      auto &nb = pmb->pbval->neighbor[n];
-      swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
-    }
-  }
-
-  return TaskStatus::complete;
-}*/
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
 } // namespace radiation
 

@@ -259,9 +259,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           t(m) = t0;
 
           // Create particles at zone centers
-          x(m) = minx_i + (i + 0.5) * dx_i;
-          y(m) = minx_j + (j + 0.5) * dx_j;
-          z(m) = minx_k + (k + 0.5) * dx_k;
+          x(m) = minx_i + (i - ib.s + 0.5) * dx_i;
+          y(m) = minx_j + (j - jb.s + 0.5) * dx_j;
+          z(m) = minx_k + (k - kb.s + 0.5) * dx_k;
 
           // Sample energy and set weight
           Real nu;
@@ -423,6 +423,9 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   printf("num active: %i\n", swarm->GetNumActive());
   printf("dt: %e\n", dt);
+  printf("min: %e %e %e\n", minx_i, minx_j, minx_k);
+  printf("dx: %e %e %e\n", dx_i, dx_j, dx_k);
+  printf("nx: %i %i %i\n", nx_i, nx_j, nx_k);
 
   pmb->par_for(
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
@@ -437,6 +440,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+          printf("[%i] current MB? %i\n", n, static_cast<int>(on_current_mesh_block));
         }
       });
 

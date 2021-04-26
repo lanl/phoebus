@@ -108,6 +108,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddParam<>("rng_pool", rng_pool);
   }
 
+  physics->EstimateTimestepBlock = EstimateTimestepBlock;
+
   return physics;
 }
 
@@ -166,6 +168,39 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
       });
 
   return TaskStatus::complete;
+}
+
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+  auto pmb = rc->GetBlockPointer();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  auto &coords = pmb->coords;
+  const int ndim = pmb->pmy_mesh->ndim;
+
+  // TODO(BRR) Can't just use dx^i/dx^0 = 1 for speed of light
+  auto &pars = pmb->packages.Get("fluid")->AllParams();
+  Real min_dt;
+  pmb->par_reduce(
+      "Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
+        Real ldt = 0.0;
+        Real csig = 1.0;
+        for (int d = 0; d < ndim; d++) {
+//          ldt += csig / coords.Dx(X1DIR + d, k, j, i);
+          lmin_dt = std::min(lmin_dt, 1.0 / ( csig / coords.Dx(X1DIR + d, k, j, i)));
+        printf("[%i %i %i] (%i) csig: %e dx: %e lmin_dt: %e\n", k, j, i, d, csig,
+          coords.Dx(X1DIR+d, k, j, i), lmin_dt);
+        }
+
+
+  //      lmin_dt = std::min(lmin_dt, 1.0 / ldt);
+      },
+      Kokkos::Min<Real>(min_dt));
+  const auto &cfl = pars.Get<Real>("cfl");
+  printf("RAD MIN DT: %e\n", cfl*min_dt);
+  return cfl * min_dt;
 }
 
 } // namespace radiation
