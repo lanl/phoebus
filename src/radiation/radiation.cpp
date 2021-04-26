@@ -108,7 +108,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddParam<>("rng_pool", rng_pool);
   }
 
-  physics->EstimateTimestepBlock = EstimateTimestepBlock;
+  if (method != "cooling_function") {
+    physics->EstimateTimestepBlock = EstimateTimestepBlock;
+  }
 
   return physics;
 }
@@ -156,9 +158,9 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
-        //v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
-        //v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
-        //v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
+        v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
+        v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
+        v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
         v(cye, k, j, i) += v(Gye, k, j, i) * dt;
         printf("u du %e %e ye dye %e %e\n", v(ceng, k, j, i), v(Gcov_lo, k, j, i)*dt,
           v(cye, k, j, i), v(Gye, k, j, i) * dt);
@@ -180,6 +182,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   const int ndim = pmb->pmy_mesh->ndim;
 
   // TODO(BRR) Can't just use dx^i/dx^0 = 1 for speed of light
+  // TODO(BRR) add a cfl-like fudge factor to radiation
   auto &pars = pmb->packages.Get("fluid")->AllParams();
   Real min_dt;
   pmb->par_reduce(
@@ -190,8 +193,8 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
         for (int d = 0; d < ndim; d++) {
 //          ldt += csig / coords.Dx(X1DIR + d, k, j, i);
           lmin_dt = std::min(lmin_dt, 1.0 / ( csig / coords.Dx(X1DIR + d, k, j, i)));
-        printf("[%i %i %i] (%i) csig: %e dx: %e lmin_dt: %e\n", k, j, i, d, csig,
-          coords.Dx(X1DIR+d, k, j, i), lmin_dt);
+//        printf("[%i %i %i] (%i) csig: %e dx: %e lmin_dt: %e\n", k, j, i, d, csig,
+//          coords.Dx(X1DIR+d, k, j, i), lmin_dt);
         }
 
 
@@ -199,7 +202,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
       },
       Kokkos::Min<Real>(min_dt));
   const auto &cfl = pars.Get<Real>("cfl");
-  printf("RAD MIN DT: %e\n", cfl*min_dt);
+ // printf("RAD MIN DT: %e\n", cfl*min_dt);
   return cfl * min_dt;
 }
 
