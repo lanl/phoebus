@@ -21,7 +21,7 @@
 #define NUMERICAL (1)
 #define SAMPLING_METHOD NUMERICAL
 
-#define DESTROY_ALL_SOURCED_PARTICLES (1)
+#define DESTROY_ALL_SOURCED_PARTICLES (0)
 
 using Geometry::CoordSysMeshBlock;
 using Geometry::NDFULL;
@@ -41,30 +41,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto swarm = sc->Get("monte_carlo");
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
   const auto tune_emiss = rad->Param<Real>("tune_emiss");
-
-  { // MOMENTUM CHECK
-    pmb->exec_space.fence();
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
 
   const auto nu_min = rad->Param<Real>("nu_min");
   const auto nu_max = rad->Param<Real>("nu_max");
@@ -339,30 +315,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   swarm->RemoveMarkedParticles();
 
-  { // MOMENTUM CHECK
-    pmb->exec_space.fence();
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
-
    /*printf("TEMPORARILY MAKING UP Gcov\n");
     parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
@@ -446,29 +398,6 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto swarm = sc->Get("monte_carlo");
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
   const auto tune_emiss = rad->Param<Real>("tune_emiss");
-
-  { // MOMENTUM CHECK
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
 
   const auto nu_min = rad->Param<Real>("nu_min");
   const auto nu_max = rad->Param<Real>("nu_max");

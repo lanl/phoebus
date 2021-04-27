@@ -20,6 +20,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("fluid");
   Params &params = physics->AllParams();
 
+  const bool hydro = pin->GetBoolean("physics", "hydro");
+  params.Add("hydro", hydro);
+
   Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
   params.Add("cfl", cfl);
 
@@ -195,29 +198,6 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
 
   const int prho = imap[p::density].first;
   const int crho = imap[c::density].first;
@@ -322,29 +302,6 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
           v(b, cye, k, j, i) = v(b, crho, k, j, i) * v(b, pye, k, j, i);
         }
       });
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
 
   return TaskStatus::complete;
 }
@@ -352,30 +309,6 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
 template <typename T> TaskStatus ConservedToPrimitive(T *rc) {
   using namespace con2prim;
   auto *pmb = rc->GetParentPointer().get();
-
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
 
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
@@ -426,30 +359,6 @@ template <typename T> TaskStatus ConservedToPrimitive(T *rc) {
         invert.Finalize(eos, geom, k, j, i);
       });
 
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
-
   return TaskStatus::complete;
 }
 
@@ -459,29 +368,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
+  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+    return TaskStatus::complete;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -554,59 +442,15 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
         }
       });
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
+
   return TaskStatus::complete;
 }
 
 // template <typename T>
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
-  return TaskStatus::complete;
   auto *pmb = rc->GetParentPointer().get();
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
+  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+    return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
   auto sig = rc->Get(internal_variables::face_signal_speed).data;
@@ -668,29 +512,6 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     PARTHENON_THROW("Invalid riemann solver option.");
   }
 #undef FLUX
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
 
   return TaskStatus::complete;
 }
@@ -823,29 +644,6 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
 
   auto &coords = pmb->coords;
   const int ndim = pmb->pmy_mesh->ndim;
@@ -886,29 +684,6 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
     pars.Add("has_face_speeds", true);
   }
   const auto &cfl = pars.Get<Real>("cfl");
-  { // MOMENTUM CHECK
-    namespace c = fluid_cons;
-    std::vector<std::string> vars({c::energy, c::momentum, c::ye});
-    PackIndexMap imap;
-    auto v = rc->PackVariables(vars, imap);
-    const int ceng = imap[c::energy].first;
-    const int cmom_lo = imap[c::momentum].first;
-    const int cmom_hi = imap[c::momentum].second;
-    IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-    printf("%s:%i CHECKING FOR MOMENTUM!\n", __FILE__, __LINE__);
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(cmom_lo, k, j, i)) > 1.) {
-          printf("[%i %i %i] T0mu = %e %e %e %e\n", k, j, i,
-            v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));
-          PARTHENON_FAIL("Momentum dep??\n");
-        }
-    });
-  } // MOMENTUM CHECK
   return cfl * min_dt;
 }
 

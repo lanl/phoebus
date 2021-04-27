@@ -64,7 +64,7 @@ Gamma = 1.6666666666666666667
 Cv = 1.0
 
 <physics>
-hydro = true
+hydro = false
 he = false
 3t = false
 rad = false
