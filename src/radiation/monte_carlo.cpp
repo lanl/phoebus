@@ -31,15 +31,9 @@ namespace radiation {
 KOKKOS_INLINE_FUNCTION
 Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
 
-static bool called_once = false;
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                      SwarmContainer *sc, const double t0,
                                      const double dt) {
-  if (called_once) {
-    return TaskStatus::complete;
-  }
-  called_once = true;
-
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -319,18 +313,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   swarm->RemoveMarkedParticles();
 
-   /*printf("TEMPORARILY MAKING UP Gcov\n");
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        v(Gcov_lo, k, j, i) = -8.e40;
-        v(Gcov_lo+1, k, j, i) = 0.;
-        v(Gcov_lo+2, k, j, i) = 0.;
-        v(Gcov_lo+3, k, j, i) = 0.;
-  //      v(Gye, k, j, i) = -1.e48;
-    });
-    return TaskStatus::complete;*/
-
   return TaskStatus::complete;
 }
 
@@ -437,33 +419,24 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto &weight = swarm->Get<Real>("weight").Get();
   auto swarm_d = swarm->GetDeviceContext();
 
+  printf("[%i] Number active particles: %i\n", pmb->gid, swarm->GetNumActive());
+
   pmb->par_for(
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
-          {
-            bool on_current_mesh_block = true;
-            swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
-            if (!on_current_mesh_block) {
-              printf("Particle starting push on wrong meshblock!\n");
-              printf("n = %i x y z = %e %e %e\n", n, x(n), y(n), z(n));
-              exit(-1);
-            }
-          }
-          printf("[%i] before x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
+          //printf("[%i] before x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
      //     printf("[%i] before k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
 
           PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt, geom);
 
-          printf("[%i] after  x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
+          //printf("[%i] after  x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
     //      printf("[%i] after  k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
 
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
-          printf("[%i] current MB? %i\n", n, static_cast<int>(on_current_mesh_block));
+          //printf("[%i] current MB? %i\n", n, static_cast<int>(on_current_mesh_block));
         }
       });
-
-//  printf("Monte carlo transport!\n");
 
   return TaskStatus::complete;
 }
