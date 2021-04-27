@@ -31,9 +31,15 @@ namespace radiation {
 KOKKOS_INLINE_FUNCTION
 Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
 
+static bool called_once = false;
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                      SwarmContainer *sc, const double t0,
                                      const double dt) {
+  if (called_once) {
+    return TaskStatus::complete;
+  }
+  called_once = true;
+
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -434,17 +440,26 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   pmb->par_for(
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
-     //     printf("[%i] before x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
+          {
+            bool on_current_mesh_block = true;
+            swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+            if (!on_current_mesh_block) {
+              printf("Particle starting push on wrong meshblock!\n");
+              printf("n = %i x y z = %e %e %e\n", n, x(n), y(n), z(n));
+              exit(-1);
+            }
+          }
+          printf("[%i] before x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
      //     printf("[%i] before k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
 
           PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt, geom);
 
-     //     printf("[%i] after  x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
+          printf("[%i] after  x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
     //      printf("[%i] after  k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
 
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
-  //        printf("[%i] current MB? %i\n", n, static_cast<int>(on_current_mesh_block));
+          printf("[%i] current MB? %i\n", n, static_cast<int>(on_current_mesh_block));
         }
       });
 
