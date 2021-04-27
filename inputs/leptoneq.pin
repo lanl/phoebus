@@ -14,11 +14,11 @@ variables = p.density,  &
 
 file_type   = hdf5      # Tabular data dump
 #dt         = 1.e3      # time increment between outputs
-dt = 1.e-2
+dt = 1.
 
 <parthenon/time>
 nlim         = -1        # cycle limit
-tlim         = 2.e-1
+tlim         = 10.
 integrator   = rk2      # time integration algorithm
 ncycle_out   = 1        # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -47,8 +47,8 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 10
-nx2 = 10
+nx1 = 20
+nx2 = 20
 nx3 = 1
 
 <eos>

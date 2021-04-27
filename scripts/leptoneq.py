@@ -4,6 +4,7 @@ DUMP_NAMES = '/home/brryan/builds/phoebus/leptoneq.out1.*.phdf'
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import shutil
 import os
 from subprocess import call, DEVNULL
@@ -63,18 +64,15 @@ U_unit = 8.987552e-22
 #U_unit = 8.987552e-10
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
-dfile = phdf.phdf(dfnams[0])
+dfile = phdf.phdf(dfnams[1])
 
 nblocks = dfile.NumBlocks
-print(nblocks)
 
 meshblocksize = dfile.MeshBlockSize
-print(meshblocksize)
 nx = meshblocksize[0]
 ny = meshblocksize[1]
 
 blockbounds = dfile.BlockBounds
-print(blockbounds)
 dx = (blockbounds[0][1] - blockbounds[0][0])/nx
 dy = (blockbounds[0][3] - blockbounds[0][2])/ny
 
@@ -89,34 +87,25 @@ for n in range(nblocks):
       xblock[n,i,j] = blockbounds[n][0] + i*dx
       yblock[n,i,j] = blockbounds[n][2] + j*dy
 
-
-# Get pcolormesh grid for each block
-xg = np.zeros([nx+1, ny+1])
-yg = np.zeros([nx+1, ny+1])
-for i in range(nx+1):
-  for j in range(ny+1):
-    xg[i,j] = blockbounds[0][0] + i*dx
-    yg[i,j] = blockbounds[0][2] + j*dy
-
-print(xg)
-print(yg)
-
-x = dfile.x
-y = dfile.y
-print(x)
-print(y)
-
 # Numblocks, nz, ny, nx
 Ye_code = dfile.Get("p.ye", flatten=False)
-print(Ye_code)
 
+vmin = 0.1
+vmax = 0.35
 fig, axes = plt.subplots(1, 1, figsize=(8,6))
 ax = axes
 for n in range(nblocks):
-  ax.pcolormesh(xblock[n,:,:], yblock[n,:,:], Ye_code[n,0])
+  im = ax.pcolormesh(xblock[n,:,:], yblock[n,:,:], Ye_code[n,0],
+    vmin=vmin, vmax=vmax)
+for n in range(nblocks):
+  rect = patches.Rectangle((blockbounds[n][0], blockbounds[n][2]),
+    blockbounds[n][1]-blockbounds[n][0], blockbounds[n][3]-blockbounds[n][2],
+    linewidth=1, edgecolor='k', facecolor='none')
+  ax.add_patch(rect)
 ax.set_aspect('equal')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
+plt.colorbar(im, label='Ye')
 plt.show()
 
 sys.exit()
