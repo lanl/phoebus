@@ -53,6 +53,7 @@ add_executable(phoebus
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
   pgen/kh.cpp
+  pgen/leptoneq.cpp
   pgen/linear_modes.cpp
   pgen/rhs_tester.cpp
   pgen/shock_tube.cpp

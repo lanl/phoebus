@@ -19,6 +19,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(shock_tube)                                                                    \
   PROBLEM(linear_modes)                                                                  \
   PROBLEM(thin_cooling)                                                                  \
+  PROBLEM(leptoneq)                                                                      \
   PROBLEM(kelvin_helmholtz)                                                              \
   PROBLEM(rhs_tester)                                                                    \
   PROBLEM(sedov)                                                                         \

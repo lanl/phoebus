@@ -200,8 +200,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
     return TaskStatus::complete;
   }
 
-  printf("Creating %i particles!\n", Nstot);
-
   ParArrayND<int> new_indices;
   const auto new_particles_mask = swarm->AddEmptyParticles(Nstot, new_indices);
 
@@ -432,8 +430,6 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto &k3 = swarm->Get<Real>("k3").Get();
   auto &weight = swarm->Get<Real>("weight").Get();
   auto swarm_d = swarm->GetDeviceContext();
-
-  printf("num active: %i\n", swarm->GetNumActive());
 
   pmb->par_for(
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
