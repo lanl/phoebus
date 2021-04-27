@@ -59,6 +59,8 @@ u = get_u(t)
 # TODO(BRR) get these from dump files
 T_unit = 1./2.997925e-04
 U_unit = 8.987552e-22
+#T_unit = 1./3.335641e-01
+#U_unit = 8.987552e-10
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 t_code = np.zeros(dfnams.size)

@@ -231,7 +231,6 @@ TaskListStatus PhoebusDriver::RadiationStep() {
     return tc.Execute();
   }
 
-  //#if RADIATION_METHOD == CoolingFunction
   auto num_independent_task_lists = blocks.size();
 
   if (rad_method == "cooling_function") {
@@ -246,20 +245,12 @@ TaskListStatus PhoebusDriver::RadiationStep() {
           calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
     }
   } else if (rad_method == "moment") {
+    PARTHENON_FAIL("Moment method not implemented!");
   } else if (rad_method == "monte_carlo") {
     return MonteCarloStep();
   } else if (rad_method == "mocmc") {
+    PARTHENON_FAIL("MOCMC not implemented!");
   }
-  //#elif RADIATION_METHOD == Diffusion
-  //#elif RADIATION_METHOD == M1
-  //#elif RADIATION_METHOD == MonteCarlo
-  // return MonteCarloStep();
-  // TODO(BRR) use particles
-  // auto sc = pmb->swarm_data.Get();
-  //#elif RADIATION_METHOD == MOCMC
-  // TODO(BRR) use particles
-  // auto sc = pmb->swarm_data.Get();
-  //#endif // RADIATION_METHOD
 
   return tc.Execute();
 }
@@ -290,12 +281,12 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
   // Create all particles sourced due to emission during timestep
   {
     TaskCollection tc;
-    TaskRegion &sync_region0 = tc.AddRegion(1);
+    /*TaskRegion &sync_region0 = tc.AddRegion(1);
     {
       auto &tl = sync_region0[0];
       auto initialize_comms =
           tl.AddTask(none, radiation::InitializeCommunicationMesh, "monte_carlo", blocks);
-    }
+    }*/
 
     TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
     for (int i = 0; i < blocks.size(); i++) {
@@ -305,7 +296,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
       auto sample_particles = tl.AddTask(none, radiation::MonteCarloSourceParticles,
                                          pmb.get(), mbd0.get(), sc0.get(), t0, dt);
-      auto transport_particles =
+      /*auto transport_particles =
           tl.AddTask(sample_particles, radiation::MonteCarloTransport, pmb.get(),
                      mbd0.get(), sc0.get(), t0, dt);
 
@@ -313,7 +304,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
                              BoundaryCommSubset::all);
 
       auto receive =
-          tl.AddTask(send, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
+          tl.AddTask(send, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);*/
     }
     status = tc.Execute();
   }

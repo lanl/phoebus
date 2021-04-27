@@ -55,6 +55,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const Real rho0 = 1.e6 * unit_conv.GetMassDensityCGSToCode();
   const Real u0 = 1.e20*unit_conv.GetEnergyCGSToCode()*unit_conv.GetNumberDensityCGSToCode();
+  printf("rho0: %e u0: %e\n", rho0, u0);
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,

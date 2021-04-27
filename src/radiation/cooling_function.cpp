@@ -56,7 +56,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
 
         // double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
         double J = GetJ(v(pye, k, j, i), s);
-        double Jye = GetJye(v(prho, k, j, i), v(pye, k, j, i), s);
+        //double Jye = GetJye(v(prho, k, j, i), v(pye, k, j, i), s);
+        double Jye = GetJye(v(prho, k, j, i)*RHO, v(pye, k, j, i), s);
         Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
         Real Gcov_coord[4];
         Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
@@ -66,6 +67,16 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
           v(mu, k, j, i) = detG * Gcov_coord[mu - Gcov_lo];
         }
         v(Gye, k, j, i) = -detG * Jye * CDENSITY / CTIME;
+        printf("ye: %e rho: %e\n", v(pye, k, j, i), v(prho, k, j, i)*RHO);
+        printf("G: %e %e %e %e (%e)\n", detG * Gcov_coord[0],
+          detG * Gcov_coord[1],
+          detG * Gcov_coord[2],
+          detG * Gcov_coord[3],
+          detG*Jye*CDENSITY/CTIME);
+
+//        printf("ceng/G0: %e ceng: %e G0: %e J: %e\n", v(ceng, k, j, i)/Gcov_coord[0],
+//          v(ceng, k, j, i), Gcov_coord[0], J);
+//        exit(-1);
       });
 
   return TaskStatus::complete;
