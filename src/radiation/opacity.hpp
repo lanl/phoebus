@@ -5,7 +5,8 @@
 
 namespace radiation {
 
-#define C (1.)
+//#define C (1.)
+#define C (1.e15)
 #define numax (1.e17)
 #define numin (1.e15)
 
