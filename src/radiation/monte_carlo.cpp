@@ -28,6 +28,9 @@ using Geometry::NDFULL;
 
 namespace radiation {
 
+// TODO(BRR) temporary
+NeutrinoSpecies s = NeutrinoSpecies::Electron;
+
 KOKKOS_INLINE_FUNCTION
 Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
 
@@ -50,9 +53,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto dlnu = rad->Param<Real>("dlnu");
   const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const auto num_particles = rad->Param<int>("num_particles");
-
-  // TODO(BRR) temporary
-  NeutrinoSpecies s = NeutrinoSpecies::Electron;
 
   // Meshblock geometry
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -419,6 +419,24 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto &weight = swarm->Get<Real>("weight").Get();
   auto swarm_d = swarm->GetDeviceContext();
 
+  StateDescriptor *eos = pmb->packages.Get("eos").get();
+  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
+  const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
+  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
+
+  std::vector<std::string> vars(
+      {p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});
+  PackIndexMap imap;
+  auto v = rc->PackVariables(vars, imap);
+  const int iye = imap[p::ye].first;
+  const int ivlo = imap[p::velocity].first;
+  const int ivhi = imap[p::velocity].second;
+  const int itemp = imap[p::temperature].first;
+  const int iGcov_lo = imap[iv::Gcov].first;
+  const int iGcov_hi = imap[iv::Gcov].second;
+  const int iGye = imap[iv::Gye].first;
+
   printf("[%i] Number active particles: %i\n", pmb->gid, swarm->GetNumActive());
 
   pmb->par_for(
@@ -435,6 +453,32 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
           //printf("[%i] current MB? %i\n", n, static_cast<int>(on_current_mesh_block));
+
+          // TODO(BRR) Get u^mu, evaluate -k.u
+          Real nu = -k0(n)*ENERGY/pc.h;
+
+          // TODO(BRR) Get K^0 via metric
+          Real Kcon0 = -k0(n);
+          Real dlam = dt/Kcon0;
+
+          int k, j, i;
+          swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+          Real T = v(itemp, k, j, i)*TEMPERATURE;
+          Real Ye = v(iye, k, j, i);
+          printf("xyz: %e %e %e kji: %i %i %i nu = %e T = %e Ye = %e\n", x(n), y(n), z(n),
+            k, j, i, nu, T, Ye);
+
+          Real alphanu = Getkappanu(Ye, T, nu, s);
+
+          printf("[%i] kappanu: %e\n", n, alphanu);
+
+          Real dtau = LENGTH*pc.h/ENERGY*dlam*(nu*alphanu);
+
+          printf("[%i] dtau: %e\n", dtau);
+
+          if (dtau > 1.e10) {
+          exit(-1);
+          }
         }
       });
 
