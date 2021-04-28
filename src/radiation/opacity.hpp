@@ -29,9 +29,7 @@ public:
               const Real nu) = 0;
 
   KOKKOS_INLINE_FUNCTION
-  virtual Real GetJ(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) {
-    PARTHENON_FAIL("ASIJDIOS");
-  };
+  virtual Real GetJ(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) = 0;
 
   KOKKOS_INLINE_FUNCTION
   virtual Real GetJye(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) = 0;
@@ -86,8 +84,8 @@ private:
 
 class TophatOpacity : public Opacity {
 public:
-  TophatOpacity(const Real C, const Real numax, const Real numin)
-      : C_(C), numax_(numax), numin_(numin) {}
+  TophatOpacity(const Real C, const Real numin, const Real numax)
+      : C_(C), numin_(numin), numax_(numax) {}
 
   KOKKOS_INLINE_FUNCTION
   Real Getjnu(const Real rho, const Real T, const Real Ye,
@@ -124,8 +122,8 @@ public:
 
 private:
   Real C_;
-  Real numax_;
   Real numin_;
+  Real numax_;
 
   KOKKOS_INLINE_FUNCTION
   Real Getyf(Real Ye, NeutrinoSpecies s) {
@@ -141,7 +139,7 @@ private:
 
 #define OPACITY_MODEL_TOPHAT (0)
 #define OPACITY_MODEL_GRAY (1)
-#define OPACITY_MODEL OPACITE_MODEL_GRAY
+#define OPACITY_MODEL OPACITY_MODEL_TOPHAT
 
 KOKKOS_INLINE_FUNCTION
 Real GetBnu(const Real T, const Real nu) {
@@ -158,7 +156,7 @@ Real GetB(const Real T) {
 
 #if OPACITY_MODEL == OPACITY_MODEL_TOPHAT
 
-#define C (1.e15)
+#define C (1.e0)
 #define numax (1.e17)
 #define numin (1.e15)
 

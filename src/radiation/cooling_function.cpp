@@ -61,20 +61,22 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
         GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
         Geometry::Tetrads Tetrads(Ucon, Gcov);
 
-        // double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
+        const Real rho_cgs = v(prho, k, j, i) * RHO;
+        const Real T_cgs = v(ptemp, k, j, i)*TEMPERATURE;
+        const Real Ye = v(pye, k, j, i);
+
+         //double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
         double J = GetJ(v(pye, k, j, i), s);
-        printf("about to get opacity\n");
-        printf("rho t ye s: %e %e %e %i\n",
-          v(prho, k, j, i) * RHO,
-          v(ptemp, k, j, i)*TEMPERATURE,
-          v(pye, k, j, i),
-          static_cast<int>(s));
-        double J2 = d_opacity->GetJ(v(prho, k, j, i) * RHO, v(ptemp, k, j, i)*TEMPERATURE,
-          v(pye, k, j, i), s);
-        printf("J = %e J2 = %e\n", J, J2);
-        exit(-1);
-        //double Jye = GetJye(v(prho, k, j, i), v(pye, k, j, i), s);
+        printf("ye: %e s: %i\n", v(pye,k,j,i), static_cast<int>(s));
+        //printf("about to get opacity\n");
+        //printf("rho t ye s: %e %e %e %i\n",
+        //  v(prho, k, j, i) * RHO,
+        //  v(ptemp, k, j, i)*TEMPERATURE,
+        //  v(pye, k, j, i),
+        //  static_cast<int>(s));
+        //double J = d_opacity->GetJ(rho_cgs, T_cgs, Ye, s);
         double Jye = GetJye(v(prho, k, j, i)*RHO, v(pye, k, j, i), s);
+        //double Jye = d_opacity->GetJye(rho_cgs, T_cgs, Ye, s);
         Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
         Real Gcov_coord[4];
         Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
@@ -84,6 +86,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
           v(mu, k, j, i) = detG * Gcov_coord[mu - Gcov_lo];
         }
         v(Gye, k, j, i) = -detG * Jye * CDENSITY / CTIME;
+        printf("J: %e Jcode: %e\n", J, J*CPOWERDENS);
         printf("ye: %e rho: %e\n", v(pye, k, j, i), v(prho, k, j, i)*RHO);
         printf("G: %e %e %e %e (%e)\n", detG * Gcov_coord[0],
           detG * Gcov_coord[1],

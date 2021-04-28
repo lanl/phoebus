@@ -99,7 +99,7 @@ num_particles = 16
 opacity_model = tophat
 
 <tophatopacity>
-C = 1.e15
+C = 1.e0
 numin = 1.e15
 numax = 1.e17
 
