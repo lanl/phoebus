@@ -84,6 +84,10 @@ nu_bins = 200
 #tune_emiss = 1.e-1
 tune_emiss = 1.e2
 num_particles = 200
+opacity_model = gray
+
+<grayopacity>
+kappa = 1.0
 
 <leptoneq>
 species = electron

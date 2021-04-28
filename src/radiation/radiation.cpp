@@ -16,6 +16,7 @@
 #include "radiation.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
+#include "opacity.hpp"
 
 namespace radiation {
 
@@ -44,6 +45,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
+  std::vector<std::string> known_methods = {"cooling_function", "moment", "monte_carlo",
+                                            "mocmc"};
+  if (std::find(known_methods.begin(), known_methods.end(), method) ==
+      known_methods.end()) {
+    std::stringstream msg;
+    msg << "Radiation method \"" << method << "\" not recognized!";
+    PARTHENON_FAIL(msg);
+  }
+
   Real nu_min = pin->GetReal("radiation", "nu_min");
   params.Add("nu_min", nu_min);
   Real nu_max = pin->GetReal("radiation", "nu_max");
@@ -63,14 +73,55 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
   params.Add("num_species", num_species);
 
-  std::vector<std::string> known_methods = {"cooling_function", "moment", "monte_carlo",
-                                            "mocmc"};
-  if (std::find(known_methods.begin(), known_methods.end(), method) ==
-      known_methods.end()) {
+  std::string opacity_model = pin->GetString("radiation", "opacity_model");
+  params.Add("opacity_model", opacity_model);
+
+  std::vector<std::string> known_opacity_models = {"tophat", "gray"};
+  if (std::find(known_opacity_models.begin(), known_opacity_models.end(), opacity_model) ==
+    known_opacity_models.end()) {
     std::stringstream msg;
-    msg << "Radiation method \"" << method << "\" not recognized!";
+    msg << "Opacity model \"" << opacity_model << "\" not recognized!";
     PARTHENON_FAIL(msg);
   }
+
+  Opacity *h_opacity, *d_opacity;
+
+  if (opacity_model == "tophat") {
+    Real C = pin->GetReal("tophatopacity", "C");
+    Real numin = pin->GetReal("tophatopacity", "numin");
+    Real numax = pin->GetReal("tophatopacity", "numax");
+    params.Add("opacity_tophat_C", C);
+    params.Add("opacity_tophat_numin", numin);
+    params.Add("opacity_tophat_numax", numax);
+
+    auto opacity = TophatOpacity(C, numin, numax);
+    h_opacity = &opacity;
+    static auto up_opacity = DeviceCopy<TophatOpacity>(opacity);
+    //d_opacity = DeviceCopy<TophatOpacity>(opacity).get();
+    d_opacity = up_opacity.get();
+    printf("J? %e\n", h_opacity->GetJ(0,0,0,NeutrinoSpecies::Electron));
+    printf("J? %e\n", d_opacity->GetJ(0,0,0,NeutrinoSpecies::Electron));
+    //h_opacity = new TophatOpacity(C, numin, numax);
+    //d_opacity = DeviceCopy<TophatOpacity>(static_cast<TophatOpacity>(*h_opacity)).get();
+  //params.Add("h_opacity", h_opacity);
+  //params.Add("d_opacity", d_opacity);
+  } else if (opacity_model == "gray") {
+    Real kappa = pin->GetReal("grayopacity", "kappa");
+
+    params.Add("opacity_gray_kappa", kappa);
+    auto opacity = GrayOpacity(kappa);
+    h_opacity = &opacity;//new GrayOpacity(kappa);
+    static auto up_opacity = DeviceCopy<GrayOpacity>(opacity);
+    d_opacity = up_opacity.get();
+    //d_opacity = DeviceCopy<GrayOpacity>(opacity).get();//static_cast<GrayOpacity>(*h_opacity)).get();
+//  params.Add("h_opacity", h_opacity);
+//  params.Add("d_opacity", d_opacity);
+  }
+
+  params.Add("h_opacity", h_opacity);
+  params.Add("d_opacity", d_opacity);
+
+  printf("d_opacity: %p\n", d_opacity);
 
   if (method == "monte_carlo") {
     std::string swarm_name = "monte_carlo";

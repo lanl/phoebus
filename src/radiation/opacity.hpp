@@ -19,19 +19,24 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   virtual Real Getjnu(const Real rho, const Real T, const Real Ye,
-                      const NeutrinoSpecies s, const Real nu) = 0;
+                      const NeutrinoSpecies s, const Real nu) {
+    // Stub to avoid warning
+    return 0.;
+  }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetJnu(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s,
+  virtual Real GetJnu(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s,
               const Real nu) = 0;
 
   KOKKOS_INLINE_FUNCTION
-  Real GetJ(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) = 0;
+  virtual Real GetJ(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) {
+    PARTHENON_FAIL("ASIJDIOS");
+  };
 
   KOKKOS_INLINE_FUNCTION
-  Real GetJye(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) = 0;
+  virtual Real GetJye(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) = 0;
 
-private:
+protected:
   KOKKOS_INLINE_FUNCTION
   Real GetBnu(const Real T, const Real nu) {
     Real x = pc.h * nu / (pc.kb * T);
@@ -41,7 +46,7 @@ private:
 
   KOKKOS_INLINE_FUNCTION
   Real GetB(const Real T) {
-    return 8. * pow(M_PI, 5) * pow(pc.kb, 4) * SCONST * pow(T, 4) * KAPPA /
+    return 8. * pow(M_PI, 5) * pow(pc.kb, 4) * SCONST * pow(T, 4) /
            (15. * pow(pc.c, 2) * pow(pc.h, 3));
   }
 };
@@ -51,33 +56,32 @@ public:
   GrayOpacity(const Real kappa) : kappa_(kappa) {}
 
   KOKKOS_INLINE_FUNCTION
-  virtual Real Getjnu(const Real rho, const Real T, const Real Ye,
-                      const NeutrinoSpecies s, const Real nu) {
+  Real Getjnu(const Real rho, const Real T, const Real Ye,
+                      const NeutrinoSpecies s, const Real nu) override {
     Real Bnu = GetBnu(T, nu);
-    return KAPPA * Bnu;
+    return kappa_ * Bnu;
   }
 
   KOKKOS_INLINE_FUNCTION
   Real GetJnu(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s,
-              const Real nu) {
-    return 4. * M_PI * Getjnu(T, Ye, s, nu);
+              const Real nu) override {
+    return 4. * M_PI * Getjnu(rho, T, Ye, s, nu);
   }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetJ(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) {
-    Real GetB(T);
-    return KAPPA * B;
+  Real GetJ(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) override {
+    return kappa_ * GetB(T);
   }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetJye(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) {
+  Real GetJye(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) override {
     const Real zeta3 = 1.20206;
-    return 12. * pow(pc.kb, 3) * pc.mp * M_PI * SCONST * pow(T, 3) * KAPPA * zeta3 /
+    return 12. * pow(pc.kb, 3) * pc.mp * M_PI * SCONST * pow(T, 3) * kappa_ * zeta3 /
            (pow(pc.c, 2) * pow(pc.h, 3));
   }
 
 private:
-  kappa_; // cgs value of absorption coefficient (cm^-1)
+  Real kappa_; // cgs value of absorption coefficient (cm^-1)
 };
 
 class TophatOpacity : public Opacity {
@@ -86,10 +90,10 @@ public:
       : C_(C), numax_(numax), numin_(numin) {}
 
   KOKKOS_INLINE_FUNCTION
-  virtual Real Getjnu(const Real rho, const Real T, const Real Ye,
-                      const NeutrinoSpecies s, const Real nu) {
-    if (nu > numin && nu < numax) {
-      return C * Getyf(Ye, s) / (4. * M_PI);
+  Real Getjnu(const Real rho, const Real T, const Real Ye,
+                      const NeutrinoSpecies s, const Real nu) override {
+    if (nu > numin_ && nu < numax_) {
+      return C_ * Getyf(Ye, s) / (4. * M_PI);
     } else {
       return 0.;
     }
@@ -97,26 +101,25 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   Real GetJnu(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s,
-              const Real nu) {
-    if (nu > numin && nu < numax) {
-      return C * Getyf(Ye, s);
-      // return 4.*M_PI*C*Getyf(Ye, s);
+              const Real nu) override {
+    if (nu > numin_ && nu < numax_) {
+      return C_ * Getyf(Ye, s);
     } else {
       return 0.;
     }
   }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetJ(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) {
-    Real Bc = C * (numax - numin);
+  Real GetJ(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) override {
+    Real Bc = C_ * (numax_ - numin_);
     Real J = Bc * Getyf(Ye, s);
     return J;
   }
 
   KOKKOS_INLINE_FUNCTION
-  Real GetJye(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) {
-    Real Ac = pc.mp / (pc.h * rho_cgs) * C * log(numax / numin);
-    return rho_cgs * Ac * Getyf(Ye, s);
+  Real GetJye(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) override {
+    Real Ac = pc.mp / (pc.h * rho) * C_ * log(numax_ / numin_);
+    return rho * Ac * Getyf(Ye, s);
   }
 
 private:
@@ -136,28 +139,21 @@ private:
   }
 };
 
-#define OPACITY_MODEL_TOPHAT
-#define OPACITY_MODEL_GRAY
+#define OPACITY_MODEL_TOPHAT (0)
+#define OPACITY_MODEL_GRAY (1)
 #define OPACITY_MODEL OPACITE_MODEL_GRAY
 
 KOKKOS_INLINE_FUNCTION
 Real GetBnu(const Real T, const Real nu) {
   Real x = pc.h * nu / (pc.kb * T);
-  Real Bnu = CONST * (2. * pc.h * nu * nu * nu / (pc.c * pc.c)) * 1. / (exp(x) + 1.);
+  Real Bnu = SCONST * (2. * pc.h * nu * nu * nu / (pc.c * pc.c)) * 1. / (exp(x) + 1.);
   return Bnu;
 }
 
 KOKKOS_INLINE_FUNCTION
 Real GetB(const Real T) {
-  return 8. * pow(M_PI, 5) * pow(pc.kb, 4) * SCONST * pow(T, 4) * KAPPA /
+  return 8. * pow(M_PI, 5) * pow(pc.kb, 4) * SCONST * pow(T, 4) /
          (15. * pow(pc.c, 2) * pow(pc.h, 3));
-}
-
-KOKKOS_INLINE_FUNCTION
-Real Getkappanu(const Real Ye, const Real T, const Real nu, const NeutrinoSpecies s) {
-  Real Bnu = GetBnu(T, nu);
-  Real jnu = Getjnu(Ye, s, nu);
-  return jnu / Bnu;
 }
 
 #if OPACITY_MODEL == OPACITY_MODEL_TOPHAT
@@ -241,7 +237,14 @@ Real GetJye(const Real T, const Real rho_cgs, const Real Ye, const NeutrinoSpeci
          (pow(pc.c, 2) * pow(pc.h, 3));
 }
 
-#endif
+#endif // OPACITY_MODEL
+
+KOKKOS_INLINE_FUNCTION
+Real Getkappanu(const Real Ye, const Real T, const Real nu, const NeutrinoSpecies s) {
+  Real Bnu = GetBnu(T, nu);
+  Real jnu = Getjnu(Ye, s, nu);
+  return jnu / Bnu;
+}
 
 } // namespace radiation
 

@@ -20,6 +20,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   const int prho = imap[p::density].first;
   const int pvlo = imap[p::velocity].first;
   const int pvhi = imap[p::velocity].second;
+  const int ptemp = imap[p::temperature].first;
   const int pye = imap[p::ye].first;
   const int ceng = imap[c::energy].first;
   const int Gcov_lo = imap[iv::Gcov].first;
@@ -35,8 +36,14 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
 
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  auto rad = pmb->packages.Get("radiation").get();
+
+  const auto d_opacity = rad->Param<Opacity*>("d_opacity");
+  printf("now d_opacity: %p\n", d_opacity);
+  printf("? %e\n", d_opacity->GetJ(0,0,0,NeutrinoSpecies::Electron));
 
   const Real RHO = unit_conv.GetMassDensityCodeToCGS();
+  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
   const Real CENERGY = unit_conv.GetEnergyCGSToCode();
   const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
   const Real CTIME = unit_conv.GetTimeCGSToCode();
@@ -56,6 +63,16 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
 
         // double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
         double J = GetJ(v(pye, k, j, i), s);
+        printf("about to get opacity\n");
+        printf("rho t ye s: %e %e %e %i\n",
+          v(prho, k, j, i) * RHO,
+          v(ptemp, k, j, i)*TEMPERATURE,
+          v(pye, k, j, i),
+          static_cast<int>(s));
+        double J2 = d_opacity->GetJ(v(prho, k, j, i) * RHO, v(ptemp, k, j, i)*TEMPERATURE,
+          v(pye, k, j, i), s);
+        printf("J = %e J2 = %e\n", J, J2);
+        exit(-1);
         //double Jye = GetJye(v(prho, k, j, i), v(pye, k, j, i), s);
         double Jye = GetJye(v(prho, k, j, i)*RHO, v(pye, k, j, i), s);
         Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};

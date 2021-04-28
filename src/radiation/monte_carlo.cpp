@@ -54,6 +54,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const auto num_particles = rad->Param<int>("num_particles");
 
+  const auto d_opacity = rad->Param<Opacity*>("d_opacity");
+
   // Meshblock geometry
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -393,6 +395,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto dlnu = rad->Param<Real>("dlnu");
   const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const auto num_particles = rad->Param<int>("num_particles");
+
+  const auto d_opacity = rad->Param<Opacity*>("d_opacity");
 
   // Meshblock geometry
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
