@@ -528,6 +528,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc.mp / MASS;
                 swarm_d.MarkParticleForRemoval(n);*/
               absorbed = true;
+              swarm_d.MarkParticleForRemoval(n);
             }
           }
 
