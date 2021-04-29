@@ -21,8 +21,6 @@
 #define NUMERICAL (1)
 #define SAMPLING_METHOD NUMERICAL
 
-#define DESTROY_ALL_SOURCED_PARTICLES (0)
-
 using Geometry::CoordSysMeshBlock;
 using Geometry::NDFULL;
 
@@ -53,6 +51,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto dlnu = rad->Param<Real>("dlnu");
   const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const auto num_particles = rad->Param<int>("num_particles");
+  const auto remove_emitted_particles = rad->Param<bool>("remove_emitted_particles");
 
   const auto d_opacity = rad->Param<Opacity*>("d_opacity");
 
@@ -77,6 +76,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
   const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
+  const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
+  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
   const Real CENERGY = unit_conv.GetEnergyCGSToCode();
   const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
   const Real CTIME = unit_conv.GetTimeCGSToCode();
@@ -89,10 +90,12 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real d3x_code = dx_i * dx_j * dx_k;
 
   std::vector<std::string> vars(
-      {p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
+      {p::density, p::temperature, p::ye, p::velocity, "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int iye = imap[p::ye].first;
+  const int pdens = imap[p::density].first;
+  const int ptemp = imap[p::temperature].first;
   const int pvlo = imap[p::velocity].first;
   const int pvhi = imap[p::velocity].second;
   const int idNdlnu = imap["dNdlnu"].first;
@@ -119,13 +122,17 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         Real detG = geom.DetG(CellLocation::Cent, k, j, i);
         Real ye = v(iye, k, j, i);
 
+        const Real rho_cgs = v(pdens, k, j, i)*DENSITY;
+        const Real T_cgs = v(ptemp, k, j, i)*TEMPERATURE;
+
 #if SAMPLING_METHOD == NUMERICAL
         Real dN = 0.;
         Real dNdlnu_max = 0.;
         for (int n = 0; n <= nu_bins; n++) {
           Real nu = nusamp(n);
           Real wgt = GetWeight(wgtC, nu);
-          Real Jnu = GetJnu(ye, s, nu);
+          Real Jnu = d_opacity->GetJnu(rho_cgs, T_cgs, ye, s, nu);
+          //Real Jnu = GetJnu(ye, s, nu);
 
           dN += Jnu * nu / (pc.h * nu * wgt) * dlnu;
 
@@ -144,13 +151,16 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         // Trapezoidal rule
         Real nu0 = nusamp[0];
         Real nu1 = nusamp[nu_bins];
-        dN -= 0.5 * GetJnu(ye, s, nu0) * nu0 / (pc.h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
-        dN -= 0.5 * GetJnu(ye, s, nu1) * nu1 / (pc.h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
+        //dN -= 0.5 * GetJnu(ye, s, nu0) * nu0 / (pc.h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
+        //dN -= 0.5 * GetJnu(ye, s, nu1) * nu1 / (pc.h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
+        dN -= 0.5 * d_opacity->GetJnu(rho_cgs, T_cgs, ye, s, nu0) * nu0 / (pc.h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
+        dN -= 0.5 * d_opacity->GetJnu(rho_cgs, T_cgs, ye, s, nu1) * nu1 / (pc.h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
         dN *= d3x_cgs * detG * dt * TIME;
 
         v(idNdlnu_max, k, j, i) = dNdlnu_max;
 #elif SAMPLING_METHOD == ANALYTIC
-        Real dN = GetJ(ye, s) * d3x_cgs * detG * dt * TIME / (pc.h * wgtC);
+        //Real dN = GetJ(ye, s) * d3x_cgs * detG * dt * TIME / (pc.h * wgtC);
+        Real dN = d_opacity->GetJ(rho_cgs, T_cgs, ye, s) * d3x_cgs * detG * dt * TIME / (pc.h * wgtC);
 #endif
 
         int Ns = static_cast<int>(dN);
@@ -274,9 +284,11 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 #elif SAMPLING_METHOD == ANALYTIC
           Real ye = v(iye, k, j, i);
           Real dndlnu, dndlnu_max;
+          PARTHENON_FAIL("Analytic sampling only supports tophat i.e. it is trash");
           do {
             nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
             dndlnu = nu * GetJnu(ye, s, nu) / (pc.h * nu * wgtC / nu);
+            // TODO(BRR) This is wrong except for tophat
             Real numax = exp(lnu_max);
             dndlnu_max = numax * GetJnu(ye, s, numax) / (pc.h * numax * wgtC / numax);
             counter++;
@@ -306,14 +318,22 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           // TODO(BRR) lepton sign
           v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc.mp / MASS;
           rng_pool.free_state(rng_gen);
-
-#if DESTROY_ALL_SOURCED_PARTICLES
-          swarm_d.MarkParticleForRemoval(m);
-#endif // DESTROY_ALL_SOURCED_PARTICLES
         }
       });
 
-  swarm->RemoveMarkedParticles();
+  if (remove_emitted_particles) {
+    pmb->par_for(
+      "MonteCarloRemoveEmittedParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        int dNs = v(iNs, k, j, i);
+        // Loop over particles to create in this zone
+        for (int n = 0; n < static_cast<int>(dNs); n++) {
+          const int m = new_indices(starting_index(k - kb.s, j - jb.s, i - ib.s) + n);
+          swarm_d.MarkParticleForRemoval(m);
+        }
+      });
+    swarm->RemoveMarkedParticles();
+  }
 
   return TaskStatus::complete;
 }
@@ -395,6 +415,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto dlnu = rad->Param<Real>("dlnu");
   const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const auto num_particles = rad->Param<int>("num_particles");
+  const auto absorption = rad->Param<bool>("absorption");
 
   const auto d_opacity = rad->Param<Opacity*>("d_opacity");
 
@@ -411,6 +432,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real &minx_i = pmb->coords.x1f(ib.s);
   const Real &minx_j = pmb->coords.x2f(jb.s);
   const Real &minx_k = pmb->coords.x3f(kb.s);
+  const Real dV_code = dx_i * dx_j * dx_k * dt;
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto &t = swarm->Get<Real>("t").Get();
   auto &x = swarm->Get<Real>("x").Get();
@@ -425,14 +447,17 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  const Real MASS = unit_conv.GetMassCodeToCGS();
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
   const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
+  const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
 
   std::vector<std::string> vars(
-      {p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});
+      {p::density, p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
+  const int prho = imap[p::density].first;
   const int iye = imap[p::ye].first;
   const int ivlo = imap[p::velocity].first;
   const int ivhi = imap[p::velocity].second;
@@ -446,16 +471,17 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   pmb->par_for(
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
+          auto rng_gen = rng_pool.get_state();
           //printf("[%i] before x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
      //     printf("[%i] before k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
 
-          PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt, geom);
+          //PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt, geom);
 
           //printf("[%i] after  x: %e %e %e %e\n", n, t(n), x(n), y(n), z(n));
     //      printf("[%i] after  k: %e %e %e %e\n", n, k0(n), k1(n), k2(n), k3(n));
 
-          bool on_current_mesh_block = true;
-          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+          //bool on_current_mesh_block = true;
+          //swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
           //printf("[%i] current MB? %i\n", n, static_cast<int>(on_current_mesh_block));
 
           // TODO(BRR) Get u^mu, evaluate -k.u
@@ -467,24 +493,58 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
-          Real T = v(itemp, k, j, i)*TEMPERATURE;
-          Real Ye = v(iye, k, j, i);
-          printf("xyz: %e %e %e kji: %i %i %i nu = %e T = %e Ye = %e\n", x(n), y(n), z(n),
-            k, j, i, nu, T, Ye);
+          const Real rho_cgs = v(prho, k, j, i) * DENSITY;
+          const Real T_cgs = v(itemp, k, j, i)*TEMPERATURE;
+          const Real Ye = v(iye, k, j, i);
+//          printf("xyz: %e %e %e kji: %i %i %i nu = %e T = %e Ye = %e\n", x(n), y(n), z(n),
+//            k, j, i, nu, T_cgs, Ye);
 
-          Real alphanu = Getkappanu(Ye, T, nu, s);
+          Real alphanu = d_opacity->Getalphanu(rho_cgs, T_cgs, Ye, nu, s);
+          //Real alphanu = Getkappanu(Ye, T_cgs, nu, s);
 
-          printf("[%i] kappanu: %e\n", n, alphanu);
+//          printf("[%i] kappanu: %e\n", n, alphanu);
 
-          Real dtau = LENGTH*pc.h/ENERGY*dlam*(nu*alphanu);
+          Real dtau_abs = LENGTH*pc.h/ENERGY*dlam*(nu*alphanu);
 
-          printf("[%i] dtau: %e\n", dtau);
+//          printf("[%i] dtau: %e\n", dtau);
+         bool absorbed = false;
 
-          if (dtau > 1.e10) {
-          exit(-1);
+          if (absorption) {
+            // Process absorption events
+            Real xabs = log(rng_gen.drand());
+            if (xabs <= dtau_abs) {
+              // Process absorption
+              Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)), -1./dV_code*weight(n)*k0(n));
+              Kokkos::atomic_add(&(v(iGcov_lo+1, k, j, i)), -1./dV_code*weight(n)*k1(n));
+              Kokkos::atomic_add(&(v(iGcov_lo+2, k, j, i)), -1./dV_code*weight(n)*k2(n));
+              Kokkos::atomic_add(&(v(iGcov_lo+3, k, j, i)), -1./dV_code*weight(n)*k3(n));
+              // TODO(BRR) Add Ucon[0] in the below
+              Kokkos::atomic_add(&(v(iGye, k, j, i)), 1./dV_code*weight(n)*pc.mp/MASS);
+              /*for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
+                // detG is in both numerator and denominator
+                v(mu, k, j, i) += 1. / dV_code * weight(m) * K_coord[mu - Gcov_lo];
+              }
+              // TODO(BRR) lepton sign
+              v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc.mp / MASS;
+                swarm_d.MarkParticleForRemoval(n);*/
+              absorbed = true;
+            }
           }
+
+          if (absorbed == false) {
+            PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt, geom);
+
+            bool on_current_mesh_block = true;
+            swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+          }
+
+          rng_pool.free_state(rng_gen);
         }
       });
+
+  if (absorption) {
+    swarm->RemoveMarkedParticles();
+  }
 
   return TaskStatus::complete;
 }

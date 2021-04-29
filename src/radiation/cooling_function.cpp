@@ -39,8 +39,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   auto rad = pmb->packages.Get("radiation").get();
 
   const auto d_opacity = rad->Param<Opacity*>("d_opacity");
-  printf("now d_opacity: %p\n", d_opacity);
-  printf("? %e\n", d_opacity->GetJ(0,0,0,NeutrinoSpecies::Electron));
 
   const Real RHO = unit_conv.GetMassDensityCodeToCGS();
   const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
@@ -66,17 +64,17 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
         const Real Ye = v(pye, k, j, i);
 
          //double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
-        double J = GetJ(v(pye, k, j, i), s);
-        printf("ye: %e s: %i\n", v(pye,k,j,i), static_cast<int>(s));
+        //double J = GetJ(v(pye, k, j, i), s);
+        //printf("ye: %e s: %i\n", v(pye,k,j,i), static_cast<int>(s));
         //printf("about to get opacity\n");
         //printf("rho t ye s: %e %e %e %i\n",
         //  v(prho, k, j, i) * RHO,
         //  v(ptemp, k, j, i)*TEMPERATURE,
         //  v(pye, k, j, i),
         //  static_cast<int>(s));
-        //double J = d_opacity->GetJ(rho_cgs, T_cgs, Ye, s);
-        double Jye = GetJye(v(prho, k, j, i)*RHO, v(pye, k, j, i), s);
-        //double Jye = d_opacity->GetJye(rho_cgs, T_cgs, Ye, s);
+        double J = d_opacity->GetJ(rho_cgs, T_cgs, Ye, s);
+        //double Jye = GetJye(v(prho, k, j, i)*RHO, v(pye, k, j, i), s);
+        double Jye = d_opacity->GetJye(rho_cgs, T_cgs, Ye, s);
         Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
         Real Gcov_coord[4];
         Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);

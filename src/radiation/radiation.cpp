@@ -73,6 +73,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
   params.Add("num_species", num_species);
 
+  bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
+  params.Add("absorption", absorption);
+
   std::string opacity_model = pin->GetString("radiation", "opacity_model");
   params.Add("opacity_model", opacity_model);
 
@@ -96,26 +99,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     auto opacity = TophatOpacity(C, numin, numax);
     h_opacity = &opacity;
-    static auto up_opacity = DeviceCopy<TophatOpacity>(opacity);
-    //d_opacity = DeviceCopy<TophatOpacity>(opacity).get();
-    d_opacity = up_opacity.get();
+    static auto p_opacity = RawDeviceCopy<TophatOpacity>(opacity);
+    d_opacity = p_opacity;//.get();
     printf("J? %e\n", h_opacity->GetJ(0,0,0,NeutrinoSpecies::Electron));
     printf("J? %e\n", d_opacity->GetJ(0,0,0,NeutrinoSpecies::Electron));
-    //h_opacity = new TophatOpacity(C, numin, numax);
-    //d_opacity = DeviceCopy<TophatOpacity>(static_cast<TophatOpacity>(*h_opacity)).get();
-  //params.Add("h_opacity", h_opacity);
-  //params.Add("d_opacity", d_opacity);
   } else if (opacity_model == "gray") {
     Real kappa = pin->GetReal("grayopacity", "kappa");
 
     params.Add("opacity_gray_kappa", kappa);
     auto opacity = GrayOpacity(kappa);
-    h_opacity = &opacity;//new GrayOpacity(kappa);
-    static auto up_opacity = DeviceCopy<GrayOpacity>(opacity);
-    d_opacity = up_opacity.get();
-    //d_opacity = DeviceCopy<GrayOpacity>(opacity).get();//static_cast<GrayOpacity>(*h_opacity)).get();
-//  params.Add("h_opacity", h_opacity);
-//  params.Add("d_opacity", d_opacity);
+    h_opacity = &opacity;
+    d_opacity = RawDeviceCopy<GrayOpacity>(opacity);
   }
 
   params.Add("h_opacity", h_opacity);
@@ -149,6 +143,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     int num_particles = pin->GetOrAddInteger("radiation", "num_particles", 100);
     params.Add("num_particles", num_particles);
+
+    bool remove_emitted_particles = pin->GetOrAddBoolean("monte_carlo", "remove_emitted_particles", false);
+    params.Add("remove_emitted_particles", remove_emitted_particles);
   }
 
   if (method == "monte_carlo" || method == "mocmc") {
@@ -208,8 +205,8 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        printf("u du %e %e ye dye %e %e\n", v(ceng, k, j, i), v(Gcov_lo, k, j, i)*dt,
-          v(cye, k, j, i), v(Gye, k, j, i) * dt);
+        //printf("u du %e %e ye dye %e %e\n", v(ceng, k, j, i), v(Gcov_lo, k, j, i)*dt,
+        //  v(cye, k, j, i), v(Gye, k, j, i) * dt);
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;

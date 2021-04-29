@@ -10,7 +10,7 @@ namespace radiation {
 class Opacity {
 public:
   KOKKOS_INLINE_FUNCTION
-  Real Getkappanu(const Real rho, const Real T, const Real Ye, const Real nu,
+  Real Getalphanu(const Real rho, const Real T, const Real Ye, const Real nu,
                   const NeutrinoSpecies s) {
     Real Bnu = GetBnu(T, nu);
     Real jnu = Getjnu(rho, T, Ye, s, nu);
@@ -19,10 +19,7 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   virtual Real Getjnu(const Real rho, const Real T, const Real Ye,
-                      const NeutrinoSpecies s, const Real nu) {
-    // Stub to avoid warning
-    return 0.;
-  }
+                      const NeutrinoSpecies s, const Real nu) = 0;
 
   KOKKOS_INLINE_FUNCTION
   virtual Real GetJnu(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s,
