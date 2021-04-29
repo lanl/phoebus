@@ -17,18 +17,18 @@ public:
     return jnu / Bnu;
   }
 
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FUNCTION
   virtual Real Getjnu(const Real rho, const Real T, const Real Ye,
                       const NeutrinoSpecies s, const Real nu) = 0;
 
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FUNCTION
   virtual Real GetJnu(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s,
               const Real nu) = 0;
 
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FUNCTION
   virtual Real GetJ(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) = 0;
 
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FUNCTION
   virtual Real GetJye(const Real rho, const Real T, const Real Ye, const NeutrinoSpecies s) = 0;
 
 protected:

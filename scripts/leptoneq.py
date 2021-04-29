@@ -64,7 +64,7 @@ U_unit = 8.987552e-22
 #U_unit = 8.987552e-10
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
-dfile = phdf.phdf(dfnams[1])
+dfile = phdf.phdf(dfnams[-1])
 
 nblocks = dfile.NumBlocks
 
