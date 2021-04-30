@@ -1,3 +1,18 @@
+//========================================================================================
+// (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
+//
+// This program was produced under U.S. Government contract 89233218CNA000001
+// for Los Alamos National Laboratory (LANL), which is operated by Triad
+// National Security, LLC for the U.S. Department of Energy/National Nuclear
+// Security Administration. All rights in the program are reserved by Triad
+// National Security, LLC, and the U.S. Department of Energy/National Nuclear
+// Security Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide license
+// in this material to reproduce, prepare derivative works, distribute copies to
+// the public, perform publicly and display publicly, and to permit others to do
+// so.
+//========================================================================================
+
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "radiation.hpp"
@@ -63,17 +78,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
         const Real T_cgs = v(ptemp, k, j, i)*TEMPERATURE;
         const Real Ye = v(pye, k, j, i);
 
-         //double J = GetJ(v(prho, k, j, i) * RHO, v(pye, k, j, i), s);
-        //double J = GetJ(v(pye, k, j, i), s);
-        //printf("ye: %e s: %i\n", v(pye,k,j,i), static_cast<int>(s));
-        //printf("about to get opacity\n");
-        //printf("rho t ye s: %e %e %e %i\n",
-        //  v(prho, k, j, i) * RHO,
-        //  v(ptemp, k, j, i)*TEMPERATURE,
-        //  v(pye, k, j, i),
-        //  static_cast<int>(s));
         double J = d_opacity->GetJ(rho_cgs, T_cgs, Ye, s);
-        //double Jye = GetJye(v(prho, k, j, i)*RHO, v(pye, k, j, i), s);
         double Jye = d_opacity->GetJye(rho_cgs, T_cgs, Ye, s);
         Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
         Real Gcov_coord[4];
@@ -84,17 +89,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
           v(mu, k, j, i) = detG * Gcov_coord[mu - Gcov_lo];
         }
         v(Gye, k, j, i) = -detG * Jye * CDENSITY / CTIME;
-        printf("J: %e Jcode: %e\n", J, J*CPOWERDENS);
-        printf("ye: %e rho: %e\n", v(pye, k, j, i), v(prho, k, j, i)*RHO);
-        printf("G: %e %e %e %e (%e)\n", detG * Gcov_coord[0],
-          detG * Gcov_coord[1],
-          detG * Gcov_coord[2],
-          detG * Gcov_coord[3],
-          detG*Jye*CDENSITY/CTIME);
-
-//        printf("ceng/G0: %e ceng: %e G0: %e J: %e\n", v(ceng, k, j, i)/Gcov_coord[0],
-//          v(ceng, k, j, i), Gcov_coord[0], J);
-//        exit(-1);
       });
 
   return TaskStatus::complete;

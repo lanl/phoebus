@@ -90,22 +90,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
 
-// TaskStatus CalculateRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
-
 // Optically thin cooling function
 TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt);
 
 // Monte Carlo transport
-// TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, const double t0);
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                      SwarmContainer *sc, const double t0,
                                      const double dt);
-TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc, SwarmContainer *sc,
-  const double t0, const double dt);
+TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
+                               SwarmContainer *sc, const double t0, const double dt);
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
 // Mark all MPI requests as NULL / initialize boundary flags.
-TaskStatus InitializeCommunicationMesh(const std::string swarmName, const BlockList_t &blocks);
+TaskStatus InitializeCommunicationMesh(const std::string swarmName,
+                                       const BlockList_t &blocks);
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 

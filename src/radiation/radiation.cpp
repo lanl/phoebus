@@ -15,8 +15,8 @@
 
 #include "radiation.hpp"
 #include "geometry/geometry.hpp"
-#include "phoebus_utils/variables.hpp"
 #include "opacity.hpp"
+#include "phoebus_utils/variables.hpp"
 
 namespace radiation {
 
@@ -80,8 +80,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("opacity_model", opacity_model);
 
   std::vector<std::string> known_opacity_models = {"tophat", "gray"};
-  if (std::find(known_opacity_models.begin(), known_opacity_models.end(), opacity_model) ==
-    known_opacity_models.end()) {
+  if (std::find(known_opacity_models.begin(), known_opacity_models.end(),
+                opacity_model) == known_opacity_models.end()) {
     std::stringstream msg;
     msg << "Opacity model \"" << opacity_model << "\" not recognized!";
     PARTHENON_FAIL(msg);
@@ -100,9 +100,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     auto opacity = TophatOpacity(C, numin, numax);
     h_opacity = &opacity;
     static auto p_opacity = RawDeviceCopy<TophatOpacity>(opacity);
-    d_opacity = p_opacity;//.get();
-    printf("J? %e\n", h_opacity->GetJ(0,0,0,NeutrinoSpecies::Electron));
-    printf("J? %e\n", d_opacity->GetJ(0,0,0,NeutrinoSpecies::Electron));
+    d_opacity = p_opacity; //.get();
+    printf("J? %e\n", h_opacity->GetJ(0, 0, 0, NeutrinoSpecies::Electron));
+    printf("J? %e\n", d_opacity->GetJ(0, 0, 0, NeutrinoSpecies::Electron));
   } else if (opacity_model == "gray") {
     Real kappa = pin->GetReal("grayopacity", "kappa");
 
@@ -144,7 +144,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     int num_particles = pin->GetOrAddInteger("radiation", "num_particles", 100);
     params.Add("num_particles", num_particles);
 
-    bool remove_emitted_particles = pin->GetOrAddBoolean("monte_carlo", "remove_emitted_particles", false);
+    bool remove_emitted_particles =
+        pin->GetOrAddBoolean("monte_carlo", "remove_emitted_particles", false);
     params.Add("remove_emitted_particles", remove_emitted_particles);
   }
 
@@ -205,19 +206,11 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        //printf("u du %e %e ye dye %e %e\n", v(ceng, k, j, i), v(Gcov_lo, k, j, i)*dt,
-        //  v(cye, k, j, i), v(Gye, k, j, i) * dt);
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
         v(cye, k, j, i) += v(Gye, k, j, i) * dt;
-/*        printf("%e %e %e %e %e\n",  v(Gcov_lo,k,j,i), v(Gcov_lo + 1, k, j, i) ,
-           v(Gcov_lo + 2, k, j, i) ,
-            v(Gcov_lo + 3, k, j, i) ,
-            v(Gye,k,j,i));
-        printf("T0mu = %e %e %e %e\n", v(ceng, k, j, i), v(cmom_lo, k, j, i), v(cmom_lo+1, k, j, i),
-          v(cmom_lo+2, k, j, i));*/
       });
 
   return TaskStatus::complete;
@@ -242,18 +235,11 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
         Real ldt = 0.0;
         Real csig = 1.0;
         for (int d = 0; d < ndim; d++) {
-//          ldt += csig / coords.Dx(X1DIR + d, k, j, i);
-          lmin_dt = std::min(lmin_dt, 1.0 / ( csig / coords.Dx(X1DIR + d, k, j, i)));
-//        printf("[%i %i %i] (%i) csig: %e dx: %e lmin_dt: %e\n", k, j, i, d, csig,
-//          coords.Dx(X1DIR+d, k, j, i), lmin_dt);
+          lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
         }
-
-
-  //      lmin_dt = std::min(lmin_dt, 1.0 / ldt);
       },
       Kokkos::Min<Real>(min_dt));
   const auto &cfl = pars.Get<Real>("cfl");
- // printf("RAD MIN DT: %e\n", cfl*min_dt);
   return cfl * min_dt;
 }
 

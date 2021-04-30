@@ -77,6 +77,7 @@ add_executable(phoebus
   radiation/radiation.cpp
   radiation/cooling_function.cpp
   radiation/monte_carlo.cpp
+  radiation/geodesics.hpp
 
   reconstruction.hpp
 )
