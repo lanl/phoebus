@@ -150,7 +150,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   if (method == "monte_carlo" || method == "mocmc") {
     // Initialize random number generator pool
-    int rng_seed = pin->GetOrAddInteger("Particles", "rng_seed", 238947);
+    int rng_seed = pin->GetOrAddInteger("radiation", "rng_seed", 238947);
     physics->AddParam<>("rng_seed", rng_seed);
     RNGPool rng_pool(rng_seed);
     physics->AddParam<>("rng_pool", rng_pool);

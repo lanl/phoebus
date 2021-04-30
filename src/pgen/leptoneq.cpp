@@ -65,7 +65,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const Real x = coords.x1v(i);
         const Real y = coords.x2v(j);
-        printf("x = %e y = %e\n", x, y);
         v(irho, k, j, i) = rho0;
         v(ieng, k, j, i) = u0;
         v(iprs, k, j, i) = P0;

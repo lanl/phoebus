@@ -493,6 +493,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+          // TODO(BRR) This suddenly started failing...
+          k = 0;
           const Real rho_cgs = v(prho, k, j, i) * DENSITY;
           const Real T_cgs = v(itemp, k, j, i)*TEMPERATURE;
           const Real Ye = v(iye, k, j, i);
@@ -511,7 +513,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           if (absorption) {
             // Process absorption events
-            Real xabs = log(rng_gen.drand());
+            Real xabs = -log(rng_gen.drand());
             if (xabs <= dtau_abs) {
               // Process absorption
               Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)), -1./dV_code*weight(n)*k0(n));
