@@ -30,8 +30,8 @@ void GetXSource(Real &Kcon0, Real &Kcon1, Real &Kcon2, Real &Kcon3, Real src[NDF
 
 KOKKOS_INLINE_FUNCTION
 void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1,
-                Real &Kcov2, Real &Kcov3, Real &Kcon0, const Geometry::CoordSysMeshBlock &geom,
-                Real source[4]) {
+                Real &Kcov2, Real &Kcov3, Real &Kcon0,
+                const Geometry::CoordSysMeshBlock &geom, Real source[4]) {
   SPACETIMELOOP(mu) { source[mu] = 0.; }
 }
 
@@ -80,6 +80,6 @@ void PushParticle(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kco
   Kcov3 += 0.5 * dt * (d1[3] + d2[3]);
 }
 
-}
+} // namespace radiation
 
 #endif // RADIATION_GEODESICS_HPP_
