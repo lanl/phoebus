@@ -121,28 +121,30 @@ template <typename Data_t, typename T>
 class ConToPrim {
  public:
   ConToPrim(Data_t *rc, const Real tol, const int max_iterations)
-    : var(rc->PackVariables(Vars(), imap)),
-      prho(imap[fluid_prim::density].first),
-      crho(imap[fluid_cons::density].first),
-      pvel_lo(imap[fluid_prim::velocity].first),
-      pvel_hi(imap[fluid_prim::velocity].second),
-      cmom_lo(imap[fluid_cons::momentum].first),
-      cmom_hi(imap[fluid_cons::momentum].second),
-      peng(imap[fluid_prim::energy].first),
-      ceng(imap[fluid_cons::energy].first),
-      pb_lo(imap[fluid_prim::bfield].first),
-      pb_hi(imap[fluid_prim::bfield].second),
-      cb_lo(imap[fluid_cons::bfield].first),
-      cb_hi(imap[fluid_cons::bfield].second),
-      pye(imap[fluid_prim::ye].second),
-      cye(imap[fluid_cons::ye].second),
-      prs(imap[fluid_prim::pressure].first),
-      tmp(imap[fluid_prim::temperature].first),
-      sig_lo(imap[internal_variables::cell_signal_speed].first),
-      gm1(imap[fluid_prim::gamma1].first),
-      scr_lo(imap[internal_variables::c2p_scratch].first),
-      rel_tolerance(tol),
-      max_iter(max_iterations) {}
+    : rel_tolerance(tol),
+      max_iter(max_iterations) {
+    PackIndexMap imap;
+    var = rc->PackVariables(Vars(), imap);
+    prho = imap[fluid_prim::density].first;
+    crho = imap[fluid_cons::density].first;
+    pvel_lo = imap[fluid_prim::velocity].first;
+    pvel_hi = imap[fluid_prim::velocity].second;
+    cmom_lo = imap[fluid_cons::momentum].first;
+    cmom_hi = imap[fluid_cons::momentum].second;
+    peng = imap[fluid_prim::energy].first;
+    ceng = imap[fluid_cons::energy].first;
+    pb_lo = imap[fluid_prim::bfield].first;
+    pb_hi = imap[fluid_prim::bfield].second;
+    cb_lo = imap[fluid_cons::bfield].first;
+    cb_hi = imap[fluid_cons::bfield].second;
+    pye = imap[fluid_prim::ye].second;
+    cye = imap[fluid_cons::ye].second;
+    prs = imap[fluid_prim::pressure].first;
+    tmp = imap[fluid_prim::temperature].first;
+    sig_lo = imap[internal_variables::cell_signal_speed].first;
+    gm1 = imap[fluid_prim::gamma1].first;
+    scr_lo = imap[internal_variables::c2p_scratch].first;
+  }
 
   std::vector<std::string> Vars() {
     return std::vector<std::string>({fluid_prim::density, fluid_cons::density,
@@ -184,16 +186,15 @@ class ConToPrim {
   }
 
  private:
-  PackIndexMap imap;
-  const T var;
-  const int prho, crho;
-  const int pvel_lo, pvel_hi;
-  const int cmom_lo, cmom_hi;
-  const int peng, ceng;
-  const int pb_lo, pb_hi;
-  const int cb_lo, cb_hi;
-  const int pye, cye;
-  const int prs, tmp, sig_lo, gm1, scr_lo;
+  T var;
+  int prho, crho;
+  int pvel_lo, pvel_hi;
+  int cmom_lo, cmom_hi;
+  int peng, ceng;
+  int pb_lo, pb_hi;
+  int cb_lo, cb_hi;
+  int pye, cye;
+  int prs, tmp, sig_lo, gm1, scr_lo;
   const Real rel_tolerance;
   const int max_iter;
   constexpr static int iD = 0;
