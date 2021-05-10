@@ -191,7 +191,7 @@ void WENO5A(const int d, const int n, const int k, const int j, const int i,
                                   {-1.0/6.0, 5.0/6.0, 1.0/3.0},
                                   {1.0/3.0, 5.0/6.0, -1.0/6.0}};
   constexpr Real w5gamma[3] = {0.1, 0.6, 0.3};
-  constexpr Real eps = 1e-26; // value to compare beta gainst
+  // constexpr Real eps = 1e-26; // value to compare beta gainst
   // for WENO-Z type weights. The higher the number, the more diffusive
   // and the more aggressively the method approaches ENO in discontinuous regions
   constexpr Real p = 13; 
