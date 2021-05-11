@@ -156,7 +156,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real x3 = coords.x3v(k,j,i);
 
       Real r = tr.bl_radius(x1);
-      //const Real r0 = r;
       while (r < Rhor) {
         x1 += coords.dx1v(i);
         r = tr.bl_radius(x1);

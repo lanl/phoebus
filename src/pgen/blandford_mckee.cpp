@@ -55,8 +55,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(rescale <= 1, "Rescale must shrink velocities");
 
   auto &coords = pmb->coords;
-  //auto pmesh = pmb->pmy_mesh;
-  //int ndim = pmesh->ndim;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
