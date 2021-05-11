@@ -104,4 +104,3 @@ rho_ambient = 1
 p_ambient = 1e-3
 explosion_energy = 1
 rinner = 0.05
-rescale = 1e-2

@@ -39,7 +39,7 @@ file_type   = hdf5      # Tabular data dump
 dt          = 0.005     # time increment between outputs
 
 <parthenon/time>
-nlim        = -1        # cycle limit
+nlim        = 1        # cycle limit
 tlim        = 0.5       # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
@@ -47,18 +47,18 @@ dt_init_fact = 1.e-6
 
 <parthenon/mesh>
 nghost = 4
-#refinement = adaptive
-#numlevel = 3
+refinement = adaptive
+numlevel = 3
 
-nx1         = 64          # Number of zones in X1-direction
-x1min       = -0.3        # minimum value of X1
-x1max       = 0.3         # maximum value of X1
+nx1         = 128         # Number of zones in X1-direction
+x1min       = -1          # minimum value of X1
+x1max       = 1           # maximum value of X1
 ix1_bc      = periodic    # Inner-X1 boundary condition flag
 ox1_bc      = periodic    # Outer-X1 boundary condition flag
 
-nx2         = 64            # Number of zones in X2-direction
-x2min       = -0.3          # minimum value of X2
-x2max       = 0.3           # maximum value of X2. Pi
+nx2         = 128           # Number of zones in X2-direction
+x2min       = -1            # minimum value of X2
+x2max       = 1             # maximum value of X2. Pi
 ix2_bc      = periodic      # Inner-X2 boundary condition flag
 ox2_bc      = periodic      # Outer-X2 boundary condition flag
 
@@ -71,12 +71,12 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 64
-nx2 = 64
+nx1 = 16
+nx2 = 16
 nx3 = 1
 
 <parthenon/refinement0>
-field = c.c.bulk.rho
+field = c.energy
 method = derivative_order_1
 max_level = 3
 
@@ -93,9 +93,9 @@ rad = false
 
 <fluid>
 xorder = 2
-cfl = 0.1
-riemann = hll
-recon = linear
+cfl = 1e-2
+riemann = llf
+recon = mp5
 c2p_max_iter = 100
 Ye = false
 
@@ -104,5 +104,4 @@ rho_ambient = 1
 p_ambient = 1e-4
 explosion_energy = 1
 rinner = 0.1
-rescale = 1e-3
 spherical_coords = false
