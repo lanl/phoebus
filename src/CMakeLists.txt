@@ -70,7 +70,7 @@ add_executable(phoebus
   reconstruction.hpp
 )
 
-set(MAX_NUMBER_CONSERVED_VARS 5 CACHE INTEGER "Maximum number of conserved variables")
+set(MAX_NUMBER_CONSERVED_VARS 9 CACHE INTEGER "Maximum number of conserved variables")
 
 configure_file(compile_constants.hpp.in generated/compile_constants.hpp @ONLY)
 

@@ -14,11 +14,7 @@
 #include "pgen/pgen.hpp"
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "geometry/boyer_lindquist.hpp"
-// Single-material blast wave.
-// As descriged in the Athena test suite
-// https://www.astro.princeton.edu/~jstone/Athena/tests/blast/blast.html
-// and in
-// Zachary, Malagoli, A., & Colella,P., SIAM J. Sci. Comp., 15, 263 (1994); Balsara, D., & Spicer, D., JCP 149, 270 (1999); Londrillo, P. & Del Zanna, L., ApJ 530, 508 (2000).
+#include "utils/error_checking.hpp"
 
 //namespace phoebus {
 
@@ -47,7 +43,7 @@ Real get_bondi_temp(const Real r, const Real n, const Real C1, const Real C2, co
 
   if (f0*f1 > 0.) {
     printf("Failed solving for T at r = %e C1 = %e C2 = %e\n", r, C1, C2);
-    exit(-1);
+    PARTHENON_FAIL("Bondi setup failed");
   }
 
   Th = 0.5*(T0 + T1);//(f1*T0 - f0*T1)/(f1 - f0);
@@ -160,7 +156,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real x3 = coords.x3v(k,j,i);
 
       Real r = tr.bl_radius(x1);
-      const Real r0 = r;
+      //const Real r0 = r;
       while (r < Rhor) {
         x1 += coords.dx1v(i);
         r = tr.bl_radius(x1);
