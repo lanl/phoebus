@@ -69,7 +69,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Wavevector
   double k1 = 2.*M_PI;
   double k2 = 2.*M_PI;
-  double k3 = 2.*M_PI;
+  //double k3 = 2.*M_PI;
 
   complex<double> omega = 0.;
   complex<double> drho = 0.;

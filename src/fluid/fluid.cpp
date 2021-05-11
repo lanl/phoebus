@@ -655,9 +655,9 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
   auto &pars = pmb->packages.Get("fluid")->AllParams();
   Real min_dt;
+  auto csig = rc->Get(internal_variables::cell_signal_speed).data;
   if (pars.hasKey("has_face_speeds")) {
     auto fsig = rc->Get(internal_variables::face_signal_speed).data;
-    auto csig = rc->Get(internal_variables::cell_signal_speed).data;
     pmb->par_reduce(
         "Hydro::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
@@ -675,7 +675,6 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
         },
         Kokkos::Min<Real>(min_dt));
   } else {
-    auto csig = rc->Get(internal_variables::cell_signal_speed).data;
     pmb->par_reduce(
         "Hydro::EstimateTimestep::0", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
