@@ -16,6 +16,8 @@
 #ifndef CON2PRIM_HPP_
 #define CON2PRIM_HPP_
 
+#include <limits>
+
 // parthenon provided headers
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
@@ -25,6 +27,7 @@ using namespace parthenon::package::prelude;
 #include <eos/eos.hpp>
 
 #include "geometry/geometry.hpp"
+#include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/variables.hpp"
 
@@ -247,6 +250,9 @@ private:
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const singularity::EOS &eos,
                         bool print = false) const {
+    using Geometry::Utils::sgn;
+    using Geometry::Utils::ratio;
+    constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
     Real &D = v(scr_lo + iD);
     Real &tau = v(scr_lo + itau);
     Real &Bsq = v(scr_lo + iBsq);
@@ -269,15 +275,22 @@ private:
     Real delta_fact = delta_fact_min;
     constexpr Real delta_adj = 1.2;
     constexpr Real idelta_adj = 1. / delta_adj;
+    const Real delta_min = std::max(rel_tolerance*delta_fact_min, SMALL);
     Rfunc(rho_guess, T_guess, res);
     do {
       Real drho = delta_fact * rho_guess;
-      Real idrho = 1. / drho;
+      if (std::abs(drho) < delta_min) { // deltas cannot be 0
+        drho = sgn(drho)*delta_min;
+      }
+      Real idrho = ratio(1., drho);
       Rfunc(rho_guess + drho, T_guess, resp);
       jac[0][0] = (resp[0] - res[0]) * idrho;
       jac[1][0] = (resp[1] - res[1]) * idrho;
       Real dT = delta_fact * T_guess;
-      Real idT = 1. / dT;
+      if (std::abs(dT) < delta_min) { // deltas cannot be 0
+        dT = sgn(dT)*delta_min;
+      }
+      Real idT = ratio(1., dT);
       Rfunc(rho_guess, T_guess + dT, resp);
       jac[0][1] = (resp[0] - res[0]) * idT;
       jac[1][1] = (resp[1] - res[1]) * idT;
