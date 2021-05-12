@@ -10,17 +10,13 @@
 # prepare derivative works, distribute copies to the public, perform
 # publicly and display publicly, and to permit others to do so.
 
-# Non-relativistic Sedov blast wave
-# As descriged in in the Castro test suite
-# https://amrex-astro.github.io/Castro/docs/Verification.html
-# To do a non-relativistic blast, set rescale = small number
-# To do a relativistic one, set rescale = 1
+# Advection of Ye
 
 <phoebus>
-problem = sedov
+problem = advection
 
 <parthenon/job>
-problem_id  = sedov       # problem ID: basename of output filenames
+problem_id  = advection       # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = p.density,  &
@@ -36,11 +32,11 @@ variables = p.density,  &
       	    g.n.coord
 
 file_type   = hdf5      # Tabular data dump
-dt          = 0.005     # time increment between outputs
+dt          = 0.05      # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 0.5       # time limit
+tlim        = 2         # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -51,20 +47,20 @@ refinement = adaptive
 numlevel = 3
 
 nx1         = 128         # Number of zones in X1-direction
-x1min       = -1          # minimum value of X1
-x1max       = 1           # maximum value of X1
+x1min       = -0.5        # minimum value of X1
+x1max       = 0.5         # maximum value of X1
 ix1_bc      = periodic    # Inner-X1 boundary condition flag
 ox1_bc      = periodic    # Outer-X1 boundary condition flag
 
 nx2         = 128           # Number of zones in X2-direction
-x2min       = -1            # minimum value of X2
-x2max       = 1             # maximum value of X2. Pi
+x2min       = -0.5          # minimum value of X2
+x2max       = 0.5           # maximum value of X2. Pi
 ix2_bc      = periodic      # Inner-X2 boundary condition flag
 ox2_bc      = periodic      # Outer-X2 boundary condition flag
 
 nx3         = 1             # Number of zones in X3-direction
-x3min       = 0             # minimum value of X3
-x3max       = 1             # maximum value of X3. 2*pi
+x3min       = -0.5          # minimum value of X3
+x3max       = 0.5           # maximum value of X3. 2*pi
 ix3_bc      = periodic      # Inner-X3 boundary condition flag
 ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 
@@ -76,7 +72,7 @@ nx2 = 32
 nx3 = 1
 
 <parthenon/refinement0>
-field = c.energy
+field = p.ye
 method = derivative_order_1
 max_level = 3
 
@@ -87,21 +83,20 @@ Cv = 1.0
 
 <physics>
 hydro = true
-he = false
-3t = false
-rad = false
 
 <fluid>
 xorder = 2
-cfl = 1e-2
-riemann = llf
+cfl = 0.8
+riemann = hll
 recon = mp5
 c2p_max_iter = 100
-Ye = false
+Ye = true
 
-<sedov>
-rho_ambient = 1
-p_ambient = 1e-3
-explosion_energy = 1e-2
-rinner = 0.1
-spherical_coords = false
+<advection>
+rho = 1
+u = 1
+vx = 0.5
+vy = 0.5
+vz = 0.5
+rin = 0.1
+shapedim = 2
