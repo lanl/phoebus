@@ -87,11 +87,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   std::vector<std::string> src_names({fluid_cons::momentum, fluid_cons::energy});
 
   auto num_independent_task_lists = blocks.size();
-  TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
-
+  TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
-    auto &tl = async_region[ib];
+    auto &tl = async_region_1[ib];
 
     // first make other useful containers
     auto &base = pmb->meshblock_data.Get();
@@ -146,19 +145,31 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // apply du/dt to all independent fields in the container
     auto update_container = tl.AddTask(avg_container|next, UpdateIndependentData<MeshBlockData<Real>>,
                                        sc0.get(), dudt.get(), beta*dt, sc1.get());
-    
-    // update ghost cells
-    auto send = tl.AddTask(update_container,
-                           &MeshBlockData<Real>::SendBoundaryBuffers, sc1.get());
-    auto recv =
-        tl.AddTask(send, &MeshBlockData<Real>::ReceiveBoundaryBuffers, sc1.get());
-    auto fill_from_bufs =
-        tl.AddTask(recv, &MeshBlockData<Real>::SetBoundaries, sc1.get());
-    auto clear_comm_flags =
-        tl.AddTask(fill_from_bufs, &MeshBlockData<Real>::ClearBoundary, sc1.get(),
-                   BoundaryCommSubset::all);
+  }
 
-    auto prolongBound = tl.AddTask(fill_from_bufs, parthenon::ProlongateBoundaries, sc1);
+  const int num_partitions = pmesh->DefaultNumPartitions();
+  TaskRegion &sync_region = tc.AddRegion(num_partitions);
+  for (int ib = 0; ib < num_partitions; ib++) {
+    auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
+    auto &tl = sync_region[ib];
+
+    // update ghost cells
+    auto send = tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
+    auto recv = tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
+    auto fill_from_bufs = tl.AddTask(recv, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
+  }
+
+  TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);
+  for (int ib = 0; ib < num_independent_task_lists; ib++) {
+    auto pmb = blocks[ib].get();
+    auto &tl = async_region_2[ib];
+    auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
+
+    auto clear_comm_flags =
+      tl.AddTask(none, &MeshBlockData<Real>::ClearBoundary, sc1.get(),
+                   BoundaryCommSubset::all);
+    
+    auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc1);
 
     // set physical boundaries
     auto set_bc =
