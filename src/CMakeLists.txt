@@ -48,6 +48,7 @@ add_executable(phoebus
 
   pgen/pgen.hpp
   pgen/pgen.cpp
+  pgen/advection.cpp
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
   pgen/kh.cpp
