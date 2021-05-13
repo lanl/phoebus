@@ -33,6 +33,6 @@ jobs:
           cmake -DCMAKE_INSTALL_PREFIX=${HOME}/install \
                 -DPHOEBUS_ENABLE_UNIT_TESTS=ON \
                 ..
-          make
+          make -j 4
           make install
           #make test
