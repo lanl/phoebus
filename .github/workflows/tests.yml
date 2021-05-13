@@ -20,7 +20,8 @@ jobs:
         run: export DEBIAN_FRONTEND=noninteractive
       - name: install dependencies
         run: |
-          sudo apt-get install -y --force-yes -qq build-essential gfortran \
+          sudo apt-get install -y --force-yes -qq  \
+            git make cmake g++ \
             libopenmpi-dev libhdf5-openmpi-dev lua5.3 liblua5.3-dev
           pip install numpy
           pip install h5py
