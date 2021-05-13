@@ -7,8 +7,15 @@ on:
     branches: [ main ]
 
 jobs:
+  formatting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: python tst/formatting.py
+
   tests:
     name: Unit and Regression Tests
+    needs: formatting
     runs-on: ubuntu-latest
 
     steps:
