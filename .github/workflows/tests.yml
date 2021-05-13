@@ -1,0 +1,36 @@
+name: Testing
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  tests:
+    name: Unit and Regression Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+        - name: Set system to non-interactive mode
+          run: export DEBIAN_FRONTEND=noninteractive
+        - name: install dependencies
+          run: |
+            sudo apt-get install -y --force-yes -qq build-essential gfortran libhdf5-serial-dev
+            pip install numpy
+            pip install h5py
+        - name: build and run tests
+          run: |
+            mkdir -p bin
+            cd bin
+            mkdir -p ${HOME}/install
+            cmake -DCMAKE_INSTALL_PREFIX=${HOME}/install \
+                  -DPHOEBUS_ENABLE_UNIT_TESTS=ON \
+                  ..
+            make -j
+            make install
+            make test
