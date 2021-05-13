@@ -139,22 +139,25 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     #else
     auto next = add_rhs;
     #endif
-
-    auto avg_container = tl.AddTask(hydro_flux|geom_src, AverageIndependentData<MeshBlockData<Real>>,
-                                    sc0.get(), base.get(), beta);
-    // apply du/dt to all independent fields in the container
-    auto update_container = tl.AddTask(avg_container|next, UpdateIndependentData<MeshBlockData<Real>>,
-                                       sc0.get(), dudt.get(), beta*dt, sc1.get());
   }
 
   const int num_partitions = pmesh->DefaultNumPartitions();
   TaskRegion &sync_region = tc.AddRegion(num_partitions);
   for (int ib = 0; ib < num_partitions; ib++) {
+    auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
+    auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
     auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
+    auto &dudt = pmesh->mesh_data.GetOrAdd("dUdt", ib);
     auto &tl = sync_region[ib];
 
+    // update step
+    auto avg_data = tl.AddTask(none, AverageIndependentData<MeshData<Real>>,
+                               sc0.get(), base.get(), beta);
+    auto update = tl.AddTask(avg_data, UpdateIndependentData<MeshData<Real>>, sc0.get(),
+                             dudt.get(), beta*dt, sc1.get());
+
     // update ghost cells
-    auto send = tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
+    auto send = tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
     auto recv = tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
     auto fill_from_bufs = tl.AddTask(recv, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
   }
