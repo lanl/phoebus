@@ -30,9 +30,11 @@ jobs:
           mkdir -p bin
           cd bin
           mkdir -p ${HOME}/install
-          cmake -DCMAKE_INSTALL_PREFIX=${HOME}/install \
+          cmake \
                 -DPHOEBUS_ENABLE_UNIT_TESTS=ON \
                 ..
           make -j 4
-          make install
-          #make test
+          #make install
+          make test
+#
+#-DCMAKE_INSTALL_PREFIX=${HOME}/install \
