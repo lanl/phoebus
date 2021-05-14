@@ -22,6 +22,7 @@ set(PHOEBUS_ANALYTIC_GEOMETRIES
     "BoyerLindquist"
     "SphericalKerrSchild"
     "FMKS"
+    "Snake"
     )
 if(PHOEBUS_ANALYTIC_GEOMETRY)
   if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_ANALYTIC_GEOMETRIES)
@@ -32,7 +33,7 @@ if(PHOEBUS_ANALYTIC_GEOMETRY)
       set(GEOMETRY_MESH_BLOCK "CachedOverMeshBlock<${GEOMETRY_MESH_BLOCK}>")
     endif()
   else()
-    message(FATAL_ERROR "Unkown geometry")  
+    message(FATAL_ERROR "Unkown geometry")
   endif()
 else()
   message(FATAL_ERROR "Only analytic geometries currently supported")

@@ -38,11 +38,13 @@ add_executable(phoebus
   geometry/modified_system.hpp
   geometry/minkowski.hpp
   geometry/minkowski.cpp
+  geometry/snake.hpp
+  geometry/snake.cpp
   geometry/spherical_kerr_schild.hpp
   geometry/spherical_kerr_schild.cpp
   geometry/spherical_minkowski.hpp
   geometry/spherical_minkowski.cpp
-  
+
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
 
