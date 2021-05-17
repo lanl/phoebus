@@ -79,7 +79,7 @@ public:
     g[1][1] = 1./(-d*d + sqrt(1. + d*d));
     g[1][2] = d/(-d*d + sqrt(1. + d*d));
     g[2][1] = d/(-d*d + sqrt(1. + d*d));
-    g[2][2] = 1./(1. - d*d/sqrt(1. - d*d));
+    g[2][2] = 1./(1. - d*d/sqrt(1. + d*d));
   }
   KOKKOS_INLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3,
@@ -106,7 +106,7 @@ public:
     gamma[0][0] = 1./(-d*d + sqrt(1. + d*d));
     gamma[0][1] = d/(-d*d + sqrt(1. + d*d));
     gamma[1][0] = d/(-d*d + sqrt(1. + d*d));
-    gamma[1][1] = 1./(1. - d*d/sqrt(1. - d*d));
+    gamma[1][1] = 1./(1. - d*d/sqrt(1. + d*d));
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
