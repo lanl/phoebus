@@ -22,6 +22,7 @@
 // TODO: Make this 3D instead of 2D.
 
 using Kokkos::complex;
+using Geometry::NDFULL;
 
 namespace linear_modes {
 
@@ -185,7 +186,35 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       if (ib_hi >= 3) {
         v(ib_lo + 2, k, j, i) = B30 + (dB3*mode).real();
       }
+
+      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+        PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
+        // Transform velocity
+        Real Gamma = 1./sqrt(1. - pow(v(ivlo, k, j, i),2) + pow(v(ivlo+1, k, j, i),2)
+          + pow(v(ivlo+2, k, j, i),2));
+        Real ucon[NDFULL] = {Gamma, // alpha = 1
+                             Gamma*v(ivlo, k, j, i),
+                             Gamma*v(ivlo+1, k, j, i),
+                             Gamma*v(ivlo+2, k, j, i)};
+        printf("Gamma: %e\n", Gamma);
+        Real J[NDFULL][NDFULL];
+        J[0][0] = 1.;
+        J[1][1] = 1.;
+        J[2][2] = 1.;
+        J[3][3] = 1.;
+        J[2][2] = -a_snake*sin(k_snake*x) + 1.;
+        Real ucon_snake[NDFULL] = {0, 0, 0, 0};
+        SPACETIMELOOP(mu) SPACETIMELOOP(nu){
+          ucon_snake[mu] += J[mu][nu]*ucon[nu];
+        }
+        Gamma = ucon_snake[0]; // alpha = 1
+        v(ivlo, k, j, i) = ucon_snake[1];
+        v(ivlo+1, k, j, i) = ucon_snake[2];
+        v(ivlo+2, k, j, i) = ucon_snake[3];
+      }
     });
+
+    //    exit(-1);
 
   fluid::PrimitiveToConserved(rc.get());
 }
