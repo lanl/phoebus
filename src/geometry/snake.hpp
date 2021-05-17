@@ -11,8 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef GEOMETRY_MINKOWSKI_HPP_
-#define GEOMETRY_MINKOWSKI_HPP_
+#ifndef GEOMETRY_SNAKE_HPP_
+#define GEOMETRY_SNAKE_HPP_
 
 #include <array>
 #include <cmath>
@@ -76,9 +76,9 @@ public:
       }
     }
     const Real d = GetDelta(X1);
-    g[1][1] = 1./(-d*d + sqrt(1. + d*d);
-    g[1][2] = delta_/(-d*d + sqrt(1. + d*d));
-    g[2][1] = delta_/(-d*d + sqrt(1. + d*d));
+    g[1][1] = 1./(-d*d + sqrt(1. + d*d));
+    g[1][2] = d/(-d*d + sqrt(1. + d*d));
+    g[2][1] = d/(-d*d + sqrt(1. + d*d));
     g[2][2] = 1./(1. - d*d/sqrt(1. - d*d));
   }
   KOKKOS_INLINE_FUNCTION
@@ -103,7 +103,7 @@ public:
       }
     }
     const Real d = GetDelta(X1);
-    gamma[0][0] = 1./(-d*d + sqrt(1. + d*d);
+    gamma[0][0] = 1./(-d*d + sqrt(1. + d*d));
     gamma[0][1] = d/(-d*d + sqrt(1. + d*d));
     gamma[1][0] = d/(-d*d + sqrt(1. + d*d));
     gamma[1][1] = 1./(1. - d*d/sqrt(1. - d*d));
@@ -111,7 +111,8 @@ public:
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
     const Real d = GetDelta(X1);
-    return sqrt(-d*d + sqrt(1. + d*d));
+    const Real alpha = 1.;
+    return alpha*sqrt(-d*d + sqrt(1. + d*d));
   }
   KOKKOS_INLINE_FUNCTION
   Real DetG(Real X0, Real X1, Real X2, Real X3) const {
@@ -129,6 +130,12 @@ public:
         }
       }
     }
+    const Real a2 = a_*a_;
+    const Real k2 = k_*k_;
+    const Real k3 = k_*k_*k_;
+
+    Gamma[1][1][1] = -sqrt(2)*a2*k3*sin(2*k_*X1)/(4*sqrt(a2*k2*cos(2*k_*X1) + a2*k2 + 2));
+    Gamma[2][1][1] = a_*k2*sin(k_*X1);
   }
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
@@ -140,6 +147,14 @@ public:
         }
       }
     }
+
+    const Real a2 = a_*a_;
+    const Real k2 = k_*k_;
+    const Real k3 = k_*k_*k_;
+
+    dg[1][1][1] = -sqrt(2)*a2*k3*sin(2*k_*X1)/(2*sqrt(a2*k2*cos(2*k_*X1) + a2*k2 + 2));
+    dg[2][1][1] = a_*k2*sin(k_*X1);
+    dg[1][2][1] = a_*k2*sin(k_*X1);
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
@@ -166,16 +181,16 @@ public:
   }
 };
 
-using MinkowskiMeshBlock = Analytic<Minkowski, IndexerMeshBlock>;
-using MinkowskiMesh = Analytic<Minkowski, IndexerMesh>;
+using SnakeMeshBlock = Analytic<Snake, IndexerMeshBlock>;
+using SnakeMesh = Analytic<Snake, IndexerMesh>;
 
-using CMinkowskiMeshBlock = CachedOverMeshBlock<MinkowskiMeshBlock>;
-using CMinkowskiMesh = CachedOverMesh<MinkowskiMesh>;
+using CSnakeMeshBlock = CachedOverMeshBlock<SnakeMeshBlock>;
+using CSnakeMesh = CachedOverMesh<SnakeMesh>;
 
 template <>
-void Initialize<CMinkowskiMeshBlock>(ParameterInput *pin,
+void Initialize<CSnakeMeshBlock>(ParameterInput *pin,
                                      StateDescriptor *geometry);
 
 } // namespace Geometry
 
-#endif // GEOMETRY_MINKOWSKI_HPP_
+#endif // GEOMETRY_SNAKE_HPP_
