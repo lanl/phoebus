@@ -27,22 +27,38 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 
-#include "geometry/minkowski.hpp"
+#include "geometry/snake.hpp"
 
 namespace Geometry {
+
+template <>
+void Initialize<SnakeMeshBlock>(ParameterInput *pin,
+                                      StateDescriptor *geometry) {
+  Params &params = geometry->AllParams();
+  Real a = pin->GetOrAddReal("geometry", "a", 0.3);
+  Real k = pin->GetOrAddReal("geometry", "k", M_PI/2.);
+  params.Add("a", a);
+  params.Add("k", k);
+}
 
 template <> void SetGeometry<SnakeMeshBlock>(MeshBlockData<Real> *rc) {}
 
 template <>
 SnakeMeshBlock
 GetCoordinateSystem<SnakeMeshBlock>(MeshBlockData<Real> *rc) {
+  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
-  return SnakeMeshBlock(indexer);
+  Real a = pkg->Param<Real>("a");
+  Real k = pkg->Param<Real>("k");
+  return SnakeMeshBlock(indexer, a, k);
 }
 template <>
 SnakeMesh GetCoordinateSystem<SnakeMesh>(MeshData<Real> *rc) {
+  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
-  return SnakeMesh(indexer);
+  Real a = pkg->Param<Real>("a");
+  Real k = pkg->Param<Real>("k");
+  return SnakeMesh(indexer, a, k);
 }
 
 template <>

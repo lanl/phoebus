@@ -14,6 +14,7 @@
 // #include <complex>
 #include <Kokkos_Complex.hpp>
 #include <sstream>
+#include <typeinfo>
 
 #include "pgen/pgen.hpp"
 
@@ -137,12 +138,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto gpkg = pmb->packages.Get("geometry");
+
+  Real a_snake, k_snake;
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+    a_snake = gpkg->Param<Real>("a");
+    k_snake = gpkg->Param<Real>("k");
+  }
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
       const Real x = coords.x1v(i);
-      const Real y = coords.x2v(j);
+      Real y = coords.x2v(j);
+
+      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+        y = y - a_snake*sin(k_snake*x);
+      }
 
       const double mode = amp*cos(k1*x + k2*y);
 
