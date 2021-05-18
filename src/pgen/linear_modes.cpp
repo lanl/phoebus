@@ -29,6 +29,7 @@ namespace linear_modes {
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &rc = pmb->meshblock_data.Get();
+  const int ndim = pmb->pmy_mesh->ndim;
 
   PackIndexMap imap;
   auto v = rc->PackVariables({"p.density",
@@ -91,10 +92,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       du1 = 0.;
       u10 = 0.1; // Uniform advection
     } else if (mode == "sound") {
-      omega = complex<double>(0., 2.7422068833892093);
-      drho = 0.5804294924639215;
-      dug = 0.7739059899518946;
-      du1 = -0.2533201985524494;
+      if (ndim == 1) {
+        omega = complex<double>(0., 2.7422068833892093);
+        drho = 0.5804294924639215;
+        dug = 0.7739059899518946;
+        du1 = -0.2533201985524494;
+      } else if (ndim == 2) {
+        omega = complex<double>(0., 3.8780661653218766);
+        drho = 0.5804294924639213;
+        dug = 0.7739059899518947;
+        du1 = 0.1791244302079596;
+        du2 = 0.1791244302079596;
+      } else {
+        PARTHENON_FAIL("ndim == 3 not supported!");
+      }
     } else {
       std::stringstream msg;
       msg << "Mode \"" << mode << "\" not recognized!";
