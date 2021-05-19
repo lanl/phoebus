@@ -16,6 +16,8 @@
 #include <sstream>
 #include <typeinfo>
 
+#include "geometry/geometry.hpp"
+
 #include "pgen/pgen.hpp"
 
 // Relativistic hydro linear modes.
@@ -151,6 +153,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
   auto gpkg = pmb->packages.Get("geometry");
+  auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   Real a_snake, k_snake;
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
@@ -203,6 +206,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // Transform velocity
         Real Gamma = 1./sqrt(1. - pow(v(ivlo, k, j, i),2) + pow(v(ivlo+1, k, j, i),2)
           + pow(v(ivlo+2, k, j, i),2));
+        /*Real vsq = 0.;
+        Real gcov[NDFULL][NDFULL];
+        Real vcon[3] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
+        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+        for (int m = 0; m < 3; m++) {
+          for (int n = 0; n < 3; n++) {
+            vsq += gcov[m+1][n+1]*vcon[m]*vcon[n];
+          }
+        }
+        Real Gamma = 1./sqrt(1. - vsq);*/
         Real ucon[NDFULL] = {Gamma, // alpha = 1
                              Gamma*v(ivlo, k, j, i),
                              Gamma*v(ivlo+1, k, j, i),
@@ -213,7 +226,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         J[1][1] = 1.;
         J[2][2] = 1.;
         J[3][3] = 1.;
-        J[2][2] = -a_snake*sin(k_snake*x) + 1.;
+        //J[2][2] = -a_snake*sin(k_snake*x) + 1.;
+        //J[2][1] = -a_snake*k_snake*cos(k_snake*x);
+        //J[2][1] = a_snake*k_snake*cos(k_snake*x);
         Real ucon_snake[NDFULL] = {0, 0, 0, 0};
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
           ucon_snake[mu] += J[mu][nu]*ucon[nu];
