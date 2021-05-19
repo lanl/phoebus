@@ -204,9 +204,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
-        Real Gamma = 1./sqrt(1. - pow(v(ivlo, k, j, i),2) + pow(v(ivlo+1, k, j, i),2)
-          + pow(v(ivlo+2, k, j, i),2));
-        /*Real vsq = 0.;
+        //Real Gamma = 1./sqrt(1. - pow(v(ivlo, k, j, i),2) + pow(v(ivlo+1, k, j, i),2)
+        //  + pow(v(ivlo+2, k, j, i),2));
+        Real vsq = 0.;
         Real gcov[NDFULL][NDFULL];
         Real vcon[3] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
@@ -215,12 +215,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             vsq += gcov[m+1][n+1]*vcon[m]*vcon[n];
           }
         }
-        Real Gamma = 1./sqrt(1. - vsq);*/
+        Real Gamma = 1./sqrt(1. - vsq);
         Real ucon[NDFULL] = {Gamma, // alpha = 1
                              Gamma*v(ivlo, k, j, i),
                              Gamma*v(ivlo+1, k, j, i),
                              Gamma*v(ivlo+2, k, j, i)};
-        printf("Gamma: %e\n", Gamma);
+        if (i == 64 && j == 64) {
+          printf("Gamma: %e\n", Gamma);
+        }
         Real J[NDFULL][NDFULL];
         J[0][0] = 1.;
         J[1][1] = 1.;
@@ -228,7 +230,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         J[3][3] = 1.;
         //J[2][2] = -a_snake*sin(k_snake*x) + 1.;
         //J[2][1] = -a_snake*k_snake*cos(k_snake*x);
-        //J[2][1] = a_snake*k_snake*cos(k_snake*x);
+        J[2][1] = a_snake*k_snake*cos(k_snake*x);
         Real ucon_snake[NDFULL] = {0, 0, 0, 0};
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
           ucon_snake[mu] += J[mu][nu]*ucon[nu];
@@ -237,6 +239,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo, k, j, i) = ucon_snake[1];
         v(ivlo+1, k, j, i) = ucon_snake[2];
         v(ivlo+2, k, j, i) = ucon_snake[3];
+        //printf("ivlo: %i ivhi: %i u: %e %e %e\n", ivlo, ivhi, ucon_snake[1], ucon_snake[2],
+        //  ucon_snake[3]);
 
 
         /*printf("Temporarily making constant value!\n");
