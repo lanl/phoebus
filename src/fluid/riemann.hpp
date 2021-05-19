@@ -138,6 +138,8 @@ class FluxState {
       }
       U[cmom_lo+m] = (rhohWsq+bsqWsq)*vcovm - b0*bcovm;
       F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
+      //printf("Fold[%i] = %e Fnew = %e\n", cmom_lo+m, F[cmom_lo+m],
+      //  rhohWsq*vcovm*(g.alpha*vcon[dir]-g.beta[dir]) + g.alpha*P*Delta(dir,m));
     }
 
     // energy
@@ -164,11 +166,11 @@ class FluxState {
     vp = vcoff*(v0 + vpm) - g.beta[dir];
     vm = vcoff*(v0 - vpm) - g.beta[dir];
 
-    if (j == 64 && i == 64) {
-    //{
+/*    if (j == 64 && i == 64) {
+//    {
       //printf("Diag cons and flux!\n");
-      printf("Original U: %e %e %e %e %e\n", U[crho], U[ceng], U[cmom_lo], U[cmom_lo+1], U[cmom_lo+2]);
-      printf("Original F: %e %e %e %e %e\n", F[crho], F[ceng], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2]);
+ //     printf("Original U: %e %e %e %e %e\n", U[crho], U[ceng], U[cmom_lo], U[cmom_lo+1], U[cmom_lo+2]);
+  //    printf("Original F: %e %e %e %e %e\n", F[crho], F[ceng], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2]);
       //printf("rho: %e u: %e v: %e %e %e\n", rho, u, vcon[0], vcon[1], vcon[2]);
       Real vcov[3] = {0, 0, 0};
       Real vsq = 0.0;
@@ -215,7 +217,7 @@ class FluxState {
       for (int m = 0; m < 3; m++) {
         for (int n = 0; n < 3; n++) {
           for (int kap = 0; kap < 3; kap++) {
-            Wij_UD[m][n] += g.gcov[m+1][kap+1]*Wij_UU[n][kap];
+            Wij_UD[n][m] += g.gcov[m+1][kap+1]*Wij_UU[n][kap];
           }
         }
       }
@@ -232,14 +234,13 @@ class FluxState {
       NewF[3] = Wij_UD[dir][1];
       NewF[4] = Wij_UD[dir][2];
 
-      F[cmom_lo+1] = NewF[3];
+//      F[cmom_lo+1] = NewF[3];
 
-      printf("New U:      %e %e %e %e %e\n", NewU[0], NewU[1], NewU[2], NewU[3], NewU[4]);
-      printf("New F:      %e %e %e %e %e\n", NewF[0], NewF[1], NewF[2], NewF[3], NewF[4]);
+//      printf("New U:      %e %e %e %e %e\n", NewU[0], NewU[1], NewU[2], NewU[3], NewU[4]);
+//      printf("New F:      %e %e %e %e %e\n", NewF[0], NewF[1], NewF[2], NewF[3], NewF[4]);
 
-
-      exit(-1);
-    }
+//      exit(-1);
+    }*/
   }
 
   const VariableFluxPack<Real> v;
