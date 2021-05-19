@@ -38,16 +38,12 @@ struct FaceGeom {
     gdd = gcon[d-1][d-1];
     g.SpacetimeMetric(loc,k,j,i,gcov);
     g.ContravariantShift(loc,k,j,i,beta);
-
-    // TEMP
-    g.MetricInverse(loc,k,j,i,gcon_);
   }
   const Real alpha;
   const Real gdet;
   Real gcov[4][4];
   Real beta[3];
   Real gdd;
-  Real gcon_[3][3];
 };
 
 class FluxState {
@@ -82,7 +78,7 @@ class FluxState {
   int NumConserved() const {
     return ncons;
   }
-
+  
   KOKKOS_INLINE_FUNCTION
   void prim_to_flux(const int d, const int k, const int j, const int i, const FaceGeom &g,
                     const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F) const {
@@ -138,14 +134,10 @@ class FluxState {
       }
       U[cmom_lo+m] = (rhohWsq+bsqWsq)*vcovm - b0*bcovm;
       F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
-      //printf("Fold[%i] = %e Fnew = %e\n", cmom_lo+m, F[cmom_lo+m],
-      //  rhohWsq*vcovm*(g.alpha*vcon[dir]-g.beta[dir]) + g.alpha*P*Delta(dir,m));
     }
 
     // energy
     U[ceng] = rhohWsq + bsqWsq - (P + 0.5*bsq) - b0*b0 - U[crho];
-    //if (i == 64 && j == 64)
-    //printf("Calcing ceng: %e + %e - %e - %e - %e = %e\n", rhohWsq, bsqWsq, P+0.5*bsq, b0*b0, U[crho], U[ceng]);
     F[ceng] = U[ceng]*vtil + (P + 0.5*bsq)*vel - Bdotv*Bcon[dir];
 
     // magnetic fields
@@ -165,82 +157,6 @@ class FluxState {
     const Real vpm = sqrt(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0));
     vp = vcoff*(v0 + vpm) - g.beta[dir];
     vm = vcoff*(v0 - vpm) - g.beta[dir];
-
-/*    if (j == 64 && i == 64) {
-//    {
-      //printf("Diag cons and flux!\n");
- //     printf("Original U: %e %e %e %e %e\n", U[crho], U[ceng], U[cmom_lo], U[cmom_lo+1], U[cmom_lo+2]);
-  //    printf("Original F: %e %e %e %e %e\n", F[crho], F[ceng], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2]);
-      //printf("rho: %e u: %e v: %e %e %e\n", rho, u, vcon[0], vcon[1], vcon[2]);
-      Real vcov[3] = {0, 0, 0};
-      Real vsq = 0.0;
-      for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-          vcov[m] += g.gcov[m+1][n+1]*vcon[n];
-          vsq += g.gcov[m+1][n+1]*vcon[m]*vcon[n];
-        }
-      }
-      //printf("vcov: %e %e %e\n", vcov[0], vcov[1], vcov[2]);
-      Real Gamma = 1./sqrt(1. - vsq);
-      //printf("Gamma: %e\n", Gamma);
-
-      //printf("dir: %i\n", dir);
-
-      Real vtil = vcon[dir];
-
-      Real NewU[5] = {0, 0, 0, 0, 0};
-      Real NewF[5] = {0, 0, 0, 0, 0};
-
-      NewU[0] = rho*Gamma;
-      NewF[0] = rho*vtil;
-
-      double h = 1 + u/rho + P/rho;
-      Real Scon[3], Scov[3];
-      for (int m = 0; m < 3; m++) {
-        Scon[m] = rho*h*Gamma*Gamma*vcon[m];
-        Scov[m] = rho*h*Gamma*Gamma*vcov[m];
-      }
-      Real Sconi = Scon[dir];//rho*h*Gamma*Gamma*vcon[dir];
-      Real Scovi = Scov[dir];//rho*h*Gamma*Gamma*vcov[dir];
-
-      //printf("old rhohWsq: %e new: %e\n", rhohWsq, rho*h*Gamma*Gamma);
-
-      Real Wij_UU[3][3];
-      Real Wij_UD[3][3] = {0};
-      //Real gcon[3][3];
-      //g.MetricInverse(loc_,k,j,i,gcon);
-      for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-          Wij_UU[m][n] = Scon[m]*vcon[n] + P*g.gcon_[m][n];
-        }
-      }
-      for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-          for (int kap = 0; kap < 3; kap++) {
-            Wij_UD[n][m] += g.gcov[m+1][kap+1]*Wij_UU[n][kap];
-          }
-        }
-      }
-
-
-      NewU[1] = rho*h*Gamma*Gamma - P - NewU[0];
-      NewF[1] = Sconi - vcon[dir]*NewU[0];
-
-      NewU[2] = Scov[0];
-      NewU[3] = Scov[1];
-      NewU[4] = Scov[2];
-
-      NewF[2] = Wij_UD[dir][0];
-      NewF[3] = Wij_UD[dir][1];
-      NewF[4] = Wij_UD[dir][2];
-
-//      F[cmom_lo+1] = NewF[3];
-
-//      printf("New U:      %e %e %e %e %e\n", NewU[0], NewU[1], NewU[2], NewU[3], NewU[4]);
-//      printf("New F:      %e %e %e %e %e\n", NewF[0], NewF[1], NewF[2], NewF[3], NewF[4]);
-
-//      exit(-1);
-    }*/
   }
 
   const VariableFluxPack<Real> v;
