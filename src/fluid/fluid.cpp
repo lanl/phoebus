@@ -449,6 +449,45 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
         }
+
+        /*if (i == 64 && j == 64){
+          printf("Tmunu:\n");
+          for (int n = 0; n < 4; n++) {
+            printf("%e %e %e %e\n", Tmunu[n][0], Tmunu[n][1], Tmunu[n][2], Tmunu[n][3]);
+          }
+          printf("\n");
+          printf("Sources:\n");
+          printf("%e %e %e %e %e\n",
+            0.,
+            src(ceng,k,j,i),
+            src(cmom_lo,k,j,i),
+            src(cmom_lo+1,k,j,i),
+            src(cmom_lo+2,k,j,i));
+
+          // Now try to calculate via Porth:
+          Real ncon[4] = {1, 0, 0, 0};
+          Real ncov[4] = {-1, 0, 0, 0};
+          Real delta[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
+          Real proj[4][4];
+          Real Wij[4][4];
+          SPACETIMELOOP2(mu, nu) {
+            Wij[mu][nu] = 0.;
+            proj[mu][nu] = delta[mu][nu] + ncon[mu]*ncov[nu];
+          }
+          SPACETIMELOOP(mu) SPACETIMELOOP(nu) SPACETIMELOOP(kap) SPACETIMELOOP(lam) {
+            Wij[mu][nu] += proj[mu][kap]*proj[nu][lam]*Tmunu[kap][lam];
+          }
+          Real ceng_src = 0.;
+          for (int ii = 1; ii < 4; ii++) {
+            for (int jj = 1; jj < 4; jj++) {
+              for (int kk = 1; kk < 4; kk++) {
+                ceng_src += 0.5*Wij[ii][kk]*gam[jj][ii][kk];
+              }
+            }
+          }
+          printf("ceng_src: %e\n", ceng_src);
+          exit(-1);
+        }*/
       });
   return TaskStatus::complete;
 }

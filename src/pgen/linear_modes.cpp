@@ -222,6 +222,22 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo, k, j, i) = ucon_snake[1];
         v(ivlo+1, k, j, i) = ucon_snake[2];
         v(ivlo+2, k, j, i) = ucon_snake[3];
+
+
+        /*printf("Temporarily making constant value!\n");
+        double rho = rho0;
+        v(irho, k, j, i) = rho;
+        double ug = ug0;
+        double Pg = (gam - 1.)*ug;
+        v(ieng, k, j, i) = ug;
+        v(iprs, k, j, i) = Pg;
+        v(ivlo, k, j, i) = 0.;
+        v(ivlo + 1, k, j, i) = 0.;
+        v(ivlo + 2, k, j, i) = 0.;
+        */
+        v(ib_lo, k, j, i) = 0.;
+        v(ib_lo + 1, k, j, i) = 0.;
+        v(ib_lo + 2, k, j, i) = 0.;
       }
     });
 
