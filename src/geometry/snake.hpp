@@ -205,6 +205,8 @@ using CSnakeMeshBlock = CachedOverMeshBlock<SnakeMeshBlock>;
 using CSnakeMesh = CachedOverMesh<SnakeMesh>;
 
 template <>
+void Initialize<SnakeMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+template <>
 void Initialize<CSnakeMeshBlock>(ParameterInput *pin,
                                      StateDescriptor *geometry);
 

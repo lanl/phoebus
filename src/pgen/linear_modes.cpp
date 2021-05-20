@@ -156,7 +156,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   Real a_snake, k_snake;
+  printf("a\n");
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+  printf("b\n");
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
   }
@@ -236,9 +238,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           ucon_snake[mu] += J[mu][nu]*ucon[nu];
         }
         Gamma = ucon_snake[0]; // alpha = 1
-        v(ivlo, k, j, i) = ucon_snake[1];
-        v(ivlo+1, k, j, i) = ucon_snake[2];
-        v(ivlo+2, k, j, i) = ucon_snake[3];
+        v(ivlo, k, j, i) = ucon_snake[1]/Gamma;
+        v(ivlo+1, k, j, i) = ucon_snake[2]/Gamma;
+        v(ivlo+2, k, j, i) = ucon_snake[3]/Gamma;
         //printf("ivlo: %i ivhi: %i u: %e %e %e\n", ivlo, ivhi, ucon_snake[1], ucon_snake[2],
         //  ucon_snake[3]);
 
