@@ -1,6 +1,6 @@
 [submodule "external/singularity-eos"]
 	path = external/singularity-eos
-	url = git@github.com:lanl/singularity-eos.git
+	url = https://github.com/lanl/singularity-eos.git
 [submodule "external/parthenon"]
 	path = external/parthenon
 	url = https://github.com/lanl/parthenon.git
