@@ -25,6 +25,7 @@
 
 using Kokkos::complex;
 using Geometry::NDFULL;
+using Geometry::NDSPACE;
 
 namespace linear_modes {
 
@@ -156,9 +157,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   Real a_snake, k_snake;
-  printf("a\n");
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
-  printf("b\n");
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
   }
@@ -206,32 +205,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
-        //Real Gamma = 1./sqrt(1. - pow(v(ivlo, k, j, i),2) + pow(v(ivlo+1, k, j, i),2)
-        //  + pow(v(ivlo+2, k, j, i),2));
         Real vsq = 0.;
-        Real gcov[NDFULL][NDFULL];
-        Real vcon[3] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
+        Real gcov[NDFULL][NDFULL] = {0};
+        Real vcon[NDSPACE] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-        for (int m = 0; m < 3; m++) {
-          for (int n = 0; n < 3; n++) {
-            vsq += gcov[m+1][n+1]*vcon[m]*vcon[n];
-          }
+        SPACELOOP2(m, n) {
+          vsq += gcov[m+1][n+1]*vcon[m]*vcon[n];
         }
         Real Gamma = 1./sqrt(1. - vsq);
         Real ucon[NDFULL] = {Gamma, // alpha = 1
                              Gamma*v(ivlo, k, j, i),
                              Gamma*v(ivlo+1, k, j, i),
                              Gamma*v(ivlo+2, k, j, i)};
-        if (i == 64 && j == 64) {
-          printf("Gamma: %e\n", Gamma);
-        }
-        Real J[NDFULL][NDFULL];
+        Real J[NDFULL][NDFULL] = {0};
         J[0][0] = 1.;
         J[1][1] = 1.;
         J[2][2] = 1.;
         J[3][3] = 1.;
-        //J[2][2] = -a_snake*sin(k_snake*x) + 1.;
-        //J[2][1] = -a_snake*k_snake*cos(k_snake*x);
         J[2][1] = a_snake*k_snake*cos(k_snake*x);
         Real ucon_snake[NDFULL] = {0, 0, 0, 0};
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
@@ -241,28 +231,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo, k, j, i) = ucon_snake[1]/Gamma;
         v(ivlo+1, k, j, i) = ucon_snake[2]/Gamma;
         v(ivlo+2, k, j, i) = ucon_snake[3]/Gamma;
-        //printf("ivlo: %i ivhi: %i u: %e %e %e\n", ivlo, ivhi, ucon_snake[1], ucon_snake[2],
-        //  ucon_snake[3]);
 
-
-        /*printf("Temporarily making constant value!\n");
-        double rho = rho0;
-        v(irho, k, j, i) = rho;
-        double ug = ug0;
-        double Pg = (gam - 1.)*ug;
-        v(ieng, k, j, i) = ug;
-        v(iprs, k, j, i) = Pg;
-        v(ivlo, k, j, i) = 0.;
-        v(ivlo + 1, k, j, i) = 0.;
-        v(ivlo + 2, k, j, i) = 0.;
-        */
+        // Enforce zero B fields for now
         v(ib_lo, k, j, i) = 0.;
         v(ib_lo + 1, k, j, i) = 0.;
         v(ib_lo + 2, k, j, i) = 0.;
       }
     });
-
-    //    exit(-1);
 
   fluid::PrimitiveToConserved(rc.get());
 }
