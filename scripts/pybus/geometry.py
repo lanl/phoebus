@@ -1,10 +1,16 @@
 from numpy import *
+from enum import Enum
 
-# Geometry
+class Location(Enum):
+  CENT = 0
+  FACE1 = 1
+  FACE2 = 2
+  CORN = 3
+
 class Geometry:
-  def gcon(self, loc, i, j):
-    X = getX(loc, i, j)
-    return self.gcon(X)
+  #def gcon(self, loc, i, j):
+  #  X = getX(loc, i, j)
+  #  return self.gcon(X)
 
   def gcon(self, X):
     gcov = self.gcov(X)
@@ -60,7 +66,7 @@ class Geometry:
 
   def Jinv(self, X):
     J = self.J(X)
-    return J.inv()
+    return linalg.inv(J)
 
 class Snake(Geometry):
   def __init__(self, a, k):
@@ -90,4 +96,6 @@ class Snake(Geometry):
     J = zeros([4, 4])
     for mu in range(4):
       J[mu,mu] = 1.
-    J[2,1] = self.a*self.k*cos(self.k*X[1])
+    J[2,1] = -self.a*self.k*cos(self.k*X[1])
+
+    return J

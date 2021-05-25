@@ -1,20 +1,11 @@
 from numpy import *
-from enum import Enum
 import os, sys
 sys.dont_write_bytecode = True
 
 # Pybus imports
 from geometry import *
-
-def FAIL(message):
-  print(message)
-  sys.exit()
-
-class Location(Enum):
-  CENT = 0
-  FACE1 = 1
-  FACE2 = 2
-  CORN = 3
+from state import *
+from util import *
 
 # Coordinates
 X1min = -1
@@ -28,8 +19,14 @@ dX1 = (X1max - X1min)/nX1
 dX2 = (X2max - X2min)/nX2
 nX1e = nX1 + 2*ng
 nX2e = nX2 + 2*ng
+NX1E = nX1e
+NX2E = nX2e
 X1 = zeros(nX1e)
 X2 = zeros(nX2e)
+X1p = zeros(nX1e + 1)
+X2p = zeros(nX2e + 1)
+
+state = State(NX1E, NX2E)
 
 def getX(loc, i, j):
   X = zeros(4)
@@ -50,10 +47,16 @@ def getX(loc, i, j):
 
   return X
 
-for i in range(nX2e):
-  X1[i] = getX(Location.CENT, i, 0)[1]#X1min + dX1*(i + 0.5 - ng)
+for i in range(nX1e):
+  X1[i] = getX(Location.CENT, i, 0)[1]
 for j in range(nX2e):
-  X2[j] = getX(Location.CENT, 0, j)[2]#X2min + dX2*(j + 0.5 - ng)
+  X2[j] = getX(Location.CENT, 0, j)[2]
+
+for i in range(nX1e + 1):
+  X1p[i] = getX(Location.CORN, i, 0)[1]
+for j in range(nX2e + 1):
+  X2p[j] = getX(Location.CORN, 0, j)[2]
+
 
 # Variables
 prim = {}
@@ -99,114 +102,29 @@ for i in range(nX1e):
     vsq_mink = 0
     for mu in range(1,4):
       for nu in range(1,4):
-        print("nu: %i" % nu)
         vsq_mink += gcov[mu,nu]*vcon_mink[mu]*vcon_mink[nu]
+    Gamma_mink = 1./sqrt(1. - vsq_mink)
+    ucon_mink = zeros(4)
+    ucon_mink[0] = Gamma_mink
+    ucon_mink[1] = Gamma_mink*vcon_mink[1]
+    ucon_mink[2] = Gamma_mink*vcon_mink[2]
+    ucon_mink[3] = Gamma_mink*vcon_mink[3]
+    Jinv = geom.Jinv(X)
+    ucon_snake = zeros(4)
+    for mu in range(4):
+      for nu in range(4):
+        ucon_snake[mu] += Jinv[mu,nu]*ucon_mink[nu]
+    Gamma_snake = ucon_snake[0]
+    prim['v1'][i,j] = ucon_snake[1]/Gamma_snake
+    prim['v2'][i,j] = ucon_snake[2]/Gamma_snake
 
-## Geometry
-#class Geometry:
-#  def gcon(self, loc, i, j):
-#    X = getX(loc, i, j)
-#    return self.gcon(X)
-#
-#  def gcon(self, X):
-#    gcov = self.gcov(X)
-#    return linalg.inv(gcov)
-#
-#  def dgcov(self, loc, i, j):
-#    X = getX(loc, i, j)
-#    return self.dgcov(X)
-#
-#  def dgcov(self, X):
-#    dgcov = zeros([4,4,4])
-#    eps = 1.e-5
-#    X0 = zeros(4)
-#    X1 = zeros(4)
-#    for lam in range(4):
-#      for mu in range(4):
-#        X0[mu] = X[mu]
-#        X1[mu] = X[mu]
-#      X0[lam] -= eps
-#      X1[lam] += eps
-#      gcov0 = self.gcov(X0)
-#      gcov1 = self.gcov(X1)
-#      for mu in range(4):
-#        for nu in range(4):
-#          dgcov[mu,nu,lam] = (gcov1[mu,nu] - gcov0[mu,nu])/(X1[lam] - X0[lam])
-#    return dgcov
-#
-#  def dgcon(self, loc, i, j):
-#    X = getX(loc, i, j)
-#    return self.dgcon(X)
-#
-#  def dgcon(self, X):
-#    dgcon = zeros([4,4,4])
-#    eps = 1.e-5
-#    X0 = zeros(4)
-#    X1 = zeros(4)
-#    for lam in range(4):
-#      for mu in range(4):
-#        X0[mu] = X[mu]
-#        X1[mu] = X[mu]
-#      X0[lam] -= eps
-#      X1[lam] += eps
-#      gcon0 = self.gcon(X0)
-#      gcon1 = self.gcon(X1)
-#      for mu in range(4):
-#        for nu in range(4):
-#          dgcon[mu,nu,lam] = (gcon1[mu,nu] - gcon0[mu,nu])/(X1[lam] - X0[lam])
-#    return dgcon
-#
-#  def Jinv(self, loc, i, j):
-#    X = getX(loc, i, j)
-#    return self.Jinv(X)
-#
-#  def Jinv(self, X):
-#    J = self.J(X)
-#    return J.inv()
-#
-#class Snake(Geometry):
-#  def __init__(self, a, k):
-#    self.a = a
-#    self.k = k
-#
-#  def gcov(self, loc, i, j):
-#    X = getX(loc, i, j)
-#    return self.gcov(X)
-#
-#  def gcov(self, X):
-#    gcov = zeros([4, 4])
-#    delta = self.a*self.k*cos(self.k*X[1])
-#    gcov[0,0] = -1
-#    gcov[1,1] = 1
-#    gcov[2,1] = -delta
-#    gcov[1,2] = -delta
-#    gcov[2,2] = delta**2 + 1
-#    gcov[3,3] = 1
-#    return gcov
-#
-#  def J(self, loc, i, j):
-#    X = getX(loc, i, j)
-#    return self.J(X)
-#
-#  def J(self, X):
-#    J = zeros([4, 4])
-#    for mu in range(4):
-#      J[mu,mu] = 1.
-#    J[2,1] = self.a*self.k*cos(self.k*X[1])
-#
-## Parameters
-#a = 0.2
-#k = pi
-#
-#
-#geom = Snake(a, k)
-
-print(geom.gcov([0, 0, 0, 0]))
-print(geom.gcon([0, 0, 0, 0]))
-print(geom.dgcov([0, 0, 0, 0]))
-print(geom.dgcon([0, 0, 0, 0]))
+    state.prim_rho[i,j] = prim['rho'][i,j]
 
 import matplotlib.pyplot as plt
 plt.figure()
-plt.pcolormesh(prim['rho'], cmap='jet')
+plt.pcolormesh(X1p, X2p, prim['v2'], cmap='jet')
+ax = plt.gca()
+ax.set_aspect('equal')
+ax.set_xlim([X1min, X1max])
+ax.set_ylim([X2min, X2max])
 plt.show()
