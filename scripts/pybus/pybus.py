@@ -79,7 +79,7 @@ k1 = 2.*pi
 k2 = 2.*pi
 amp = 1.e-3
 
-state = State(NX1E, NX2E, geom)
+#state = State(NX1E, NX2E, geom)
 
 for i in range(nX1e):
   for j in range(nX2e):
@@ -124,14 +124,14 @@ for i in range(nX1e):
     prim['v1'][i,j] = ucon_snake[1]/Gamma_snake
     prim['v2'][i,j] = ucon_snake[2]/Gamma_snake
 
-    state.prim_rho[i,j] = prim['rho'][i,j]
-    state.prim_ug[i, j] = prim['ug'][i,j]
-    state.prim_v1[i,j] = prim['v1'][i,j]
-    state.prim_v2[i,j] = prim['v2'][i,j]
+#    state.prim_rho[i,j] = prim['rho'][i,j]
+#    state.prim_ug[i, j] = prim['ug'][i,j]
+#    state.prim_v1[i,j] = prim['v1'][i,j]
+#    state.prim_v2[i,j] = prim['v2'][i,j]
 
 
-state.print(Location.CENT, 32, 32)
-state.print(Location.CENT, 31, 32)
+#state.print(Location.CENT, 32, 32)
+#state.print(Location.CENT, 31, 32)
 
 #stateL = zeros(4)
 #stateL[Var.RHO] = 1.000511
