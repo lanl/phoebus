@@ -6,46 +6,45 @@ sys.dont_write_bytecode = True
 from geometry import *
 from state import *
 from util import *
+from coordinates import *
 
 # Coordinates
-X1min = -1
-X1max = 1
-X2min = -1
-X2max = 1
-nX1 = 128
-nX2 = 128
-ng = 4
-dX1 = (X1max - X1min)/nX1
-dX2 = (X2max - X2min)/nX2
-nX1e = nX1 + 2*ng
-nX2e = nX2 + 2*ng
-NX1E = nX1e
-NX2E = nX2e
-X1 = zeros(nX1e)
-X2 = zeros(nX2e)
-X1p = zeros(nX1e + 1)
-X2p = zeros(nX2e + 1)
+#X1min = -1
+#X1max = 1
+#X2min = -1
+#X2max = 1
+#nX1 = 128
+#nX2 = 128
+#ng = 4
+#dX1 = (X1max - X1min)/nX1
+#dX2 = (X2max - X2min)/nX2
+#nX1e = nX1 + 2*ng
+#nX2e = nX2 + 2*ng
+#NX1E = nX1e
+#NX2E = nX2e
+#X1 = zeros(nX1e)
+#X2 = zeros(nX2e)
+#X1p = zeros(nX1e + 1)
+#X2p = zeros(nX2e + 1)
 
-state = State(NX1E, NX2E)
-
-def getX(loc, i, j):
-  X = zeros(4)
-  if loc == Location.CENT:
-    X[1] = X1min + dX1*(i + 0.5 - ng)
-    X[2] = X2min + dX2*(j + 0.5 - ng)
-  elif loc == Location.FACE1:
-    X[1] = X1min + dX1*(i - ng)
-    X[2] = X2min + dX2*(j + 0.5 - ng)
-  elif loc == Location.FACE2:
-    X[1] = X1min + dX1*(i + 0.5 - ng)
-    X[2] = X2min + dX2*(j - ng)
-  elif loc == Location.CORN:
-    X[1] = X1min + dX1*(i - ng)
-    X[2] = X2min + dX2*(j - ng)
-  else:
-    FAIL("loc not supported!")
-
-  return X
+#def getX(loc, i, j):
+#  X = zeros(4)
+#  if loc == Location.CENT:
+#    X[1] = X1min + dX1*(i + 0.5 - ng)
+#    X[2] = X2min + dX2*(j + 0.5 - ng)
+#  elif loc == Location.FACE1:
+#    X[1] = X1min + dX1*(i - ng)
+#    X[2] = X2min + dX2*(j + 0.5 - ng)
+#  elif loc == Location.FACE2:
+#    X[1] = X1min + dX1*(i + 0.5 - ng)
+#    X[2] = X2min + dX2*(j - ng)
+#  elif loc == Location.CORN:
+#    X[1] = X1min + dX1*(i - ng)
+#    X[2] = X2min + dX2*(j - ng)
+#  else:
+#    FAIL("loc not supported!")
+#
+#  return X
 
 for i in range(nX1e):
   X1[i] = getX(Location.CENT, i, 0)[1]
@@ -84,8 +83,11 @@ a = 0.2
 k = pi
 geom = Snake(a, k)
 
+state = State(NX1E, NX2E, geom)
+
 for i in range(nX1e):
   for j in range(nX2e):
+    loc = Location.CENT
     X = getX(Location.CENT, i, j)
     mode = amp*cos(k1*X1[i] + k2*X2[j])
     prim['rho'][i,j] = rho0 + (drho*mode).real
@@ -98,7 +100,7 @@ for i in range(nX1e):
     vcon_mink[1] = prim['v1'][i,j]
     vcon_mink[2] = prim['v2'][i,j]
 
-    gcov = geom.gcov(X)
+    gcov = geom.gcov(Location.CENT, i, j)#X)
     vsq_mink = 0
     for mu in range(1,4):
       for nu in range(1,4):
@@ -109,7 +111,7 @@ for i in range(nX1e):
     ucon_mink[1] = Gamma_mink*vcon_mink[1]
     ucon_mink[2] = Gamma_mink*vcon_mink[2]
     ucon_mink[3] = Gamma_mink*vcon_mink[3]
-    Jinv = geom.Jinv(X)
+    Jinv = geom.Jinv(loc, i, j)
     ucon_snake = zeros(4)
     for mu in range(4):
       for nu in range(4):
@@ -119,6 +121,12 @@ for i in range(nX1e):
     prim['v2'][i,j] = ucon_snake[2]/Gamma_snake
 
     state.prim_rho[i,j] = prim['rho'][i,j]
+    state.prim_ug[i, j] = prim['ug'][i,j]
+    state.prim_v1[i,j] = prim['v1'][i,j]
+    state.prim_v2[i,j] = prim['v2'][i,j]
+
+print(state.ucon(Location.CENT, 64, 64))
+
 
 import matplotlib.pyplot as plt
 plt.figure()
