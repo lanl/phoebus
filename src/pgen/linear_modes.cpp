@@ -233,9 +233,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo+2, k, j, i) = ucon_snake[3]/Gamma;
 
         // Enforce zero B fields for now
-        v(ib_lo, k, j, i) = 0.;
-        v(ib_lo + 1, k, j, i) = 0.;
-        v(ib_lo + 2, k, j, i) = 0.;
+        if (ib_hi >= 3) {
+          v(ib_lo, k, j, i) = 0.;
+          v(ib_lo + 1, k, j, i) = 0.;
+          v(ib_lo + 2, k, j, i) = 0.;
+        }
       }
     });
 
