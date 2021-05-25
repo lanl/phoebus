@@ -172,6 +172,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         y = y - a_snake*sin(k_snake*x);
       }
 
+      if (i == 4 && j == 4) {
+        printf("x = %e y = %e\n", x, y);
+      }
+
       const double mode = amp*cos(k1*x + k2*y);
 
       double rho = rho0 + (drho*mode).real();
@@ -237,6 +241,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(ib_lo, k, j, i) = 0.;
           v(ib_lo + 1, k, j, i) = 0.;
           v(ib_lo + 2, k, j, i) = 0.;
+        }
+
+        if (i == 64 && j == 64) {
+          printf("x = %e y = %e\n", x, y);
+          printf("rho ug P v1 v2: %e %e %e %e %e\n",
+            v(irho, k, j, i), v(ieng, k, j, i), v(iprs, k, j, i), v(ivlo, k, j, i),
+            v(ivlo+1, k, j, i));
         }
       }
     });
