@@ -135,12 +135,12 @@ class FluxState {
     // conserved momentum
     const Real rhohWsq = (rho + u + P)*W*W;
     const Real bsqWsq = bsq*W*W;
-    if (i == 32 && j == 32) {
+    /*if (i == 32 && j == 32) {
       SPACETIMELOOP2(mu, nu) {
         printf("gcov[%i][%i] = %e\n", mu, nu, g.gcov[mu][nu]);
       }
       printf("vcon: %e %e %e\n", vcon[0], vcon[1], vcon[2]);
-    }
+    }*/
     for (int m = 0; m < 3; m++) {
       Real bcovm = g.gcov[m+1][0] * b0/g.alpha;
       Real vcovm = 0.0;
@@ -227,7 +227,7 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl);
   fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr);
 
-  if (j == 32 && i == 32) {
+  /*if (j == 32 && i == 32) {
     printf("d: %i\n", d);
 
     printf("Ul = %e %e %e %e %e\n", Ul[0], Ul[1], Ul[2], Ul[3], Ul[4]);
@@ -238,7 +238,7 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
     if (d == 2) {
       exit(-1);
     }
-  }
+  }*/
 
   const Real cmax = std::max(std::max(-vml,vpl), std::max(-vmr,vpr));
 
