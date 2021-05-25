@@ -7,6 +7,7 @@ from geometry import *
 from state import *
 from util import *
 from coordinates import *
+from problem import *
 
 # Coordinates
 #X1min = -1
@@ -76,12 +77,7 @@ v10 = 0.0
 v20 = 0.0
 k1 = 2.*pi
 k2 = 2.*pi
-amp = 1.e-5
-
-# Choose geometry
-a = 0.2
-k = pi
-geom = Snake(a, k)
+amp = 1.e-3
 
 state = State(NX1E, NX2E, geom)
 
@@ -89,11 +85,19 @@ for i in range(nX1e):
   for j in range(nX2e):
     loc = Location.CENT
     X = getX(Location.CENT, i, j)
-    mode = amp*cos(k1*X1[i] + k2*X2[j])
+    x = X[1]
+    y = X[2] - a*sin(k*x)
+    #mode = amp*cos(k1*X1[i] + k2*X2[j])
+    mode = amp*cos(k1*x + k2*y)
     prim['rho'][i,j] = rho0 + (drho*mode).real
     prim['ug'][i,j] = ug0 + (dug*mode).real
     prim['v1'][i,j] = v10 + (dv1*mode).real
     prim['v2'][i,j] = v20 + (dv2*mode).real
+
+    if i == 64 and j == 64:
+      print("x = %e" % x)
+      print("y = %e" % y)
+      print(prim['rho'][i,j])
 
     # Convert Minkowski velocity to snake coordinates
     vcon_mink = zeros(4)
@@ -125,14 +129,57 @@ for i in range(nX1e):
     state.prim_v1[i,j] = prim['v1'][i,j]
     state.prim_v2[i,j] = prim['v2'][i,j]
 
-print(state.ucon(Location.CENT, 64, 64))
 
+state.print(Location.CENT, 32, 32)
+state.print(Location.CENT, 31, 32)
 
-import matplotlib.pyplot as plt
-plt.figure()
-plt.pcolormesh(X1p, X2p, prim['v2'], cmap='jet')
-ax = plt.gca()
-ax.set_aspect('equal')
-ax.set_xlim([X1min, X1max])
-ax.set_ylim([X2min, X2max])
-plt.show()
+#stateL = zeros(4)
+#stateL[Var.RHO] = 1.000511
+#stateL[Var.UG] = 1.000682
+#stateL[Var.V1] = 1.577645
+rhoL = 1.000511
+ugL = 1.000682
+v1L = 1.577645e-4
+v2L = 1.386013e-4
+
+i = 32
+j = 32
+# X1 dir
+print("X1 dir")
+d = 1
+ql = Point(Location.FACE1, i, j, 1.000511e+00, 1.000682e+00, 1.577645e-04, 1.386013e-04)
+qr = Point(Location.FACE1, i, j, 1.000511e+00, 1.000681e+00, 1.576970e-04, 1.384516e-04)
+Ul = ql.get_cons()
+Ur = qr.get_cons()
+Fl = ql.get_F(d)
+Fr = qr.get_F(d)
+print("Ul: ", Ul)
+print("Ur: ", Ur)
+print("Fl: ", Fl)
+print("Fr: ", Fr)
+print("")
+
+# X2 dir
+print("X2 dir")
+d = 2
+ql = Point(Location.FACE2, i, j, 1.000510e+00, 1.000679e+00, 1.572381e-04, 1.403478e-04)
+qr = Point(Location.FACE2, i, j, 1.000509e+00, 1.000679e+00, 1.572177e-04, 1.403296e-04)
+Ul = ql.get_cons()
+Ur = qr.get_cons()
+Fl = ql.get_F(d)
+Fr = qr.get_F(d)
+print("Ul: ", Ul)
+print("Ur: ", Ur)
+print("Fl: ", Fl)
+print("Fr: ", Fr)
+print("")
+
+if do_plot:
+  import matplotlib.pyplot as plt
+  plt.figure()
+  plt.pcolormesh(X1p, X2p, prim['v2'], cmap='jet')
+  ax = plt.gca()
+  ax.set_aspect('equal')
+  ax.set_xlim([X1min, X1max])
+  ax.set_ylim([X2min, X2max])
+  plt.show()

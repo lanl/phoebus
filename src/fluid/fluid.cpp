@@ -311,6 +311,14 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
         if (pye > 0) {
           v(b, cye, k, j, i) = v(b, crho, k, j, i) * v(b, pye, k, j, i);
         }
+
+        if (i == 32 && j == 32) {
+          printf("CONS rho = %e u = %e v1 = %e v2 = %e\n",
+            v(b, crho, k, j, i),
+            v(b, ceng, k, j, i),
+            v(b, cmom_lo, k, j, i),
+            v(b, cmom_lo + 1, k, j, i));
+        }
       });
 
   return TaskStatus::complete;
@@ -448,6 +456,12 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
             }
           }
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
+        }
+        if (i == 32 && j == 32) {
+          SPACETIMELOOP2(mu,nu) {
+            printf("Tmunu[%i][%i] = %e\n", mu,nu,Tmunu[mu][nu]);
+          }
+          //exit(-1);
         }
 
 /*        if ((i == 64 && j == 64) || (i == 16 && j == 16)) {
