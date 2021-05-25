@@ -1,26 +1,21 @@
 from numpy import *
-from enum import Enum
 
-class Location(Enum):
-  CENT = 0
-  FACE1 = 1
-  FACE2 = 2
-  CORN = 3
+from coordinates import *
 
 class Geometry:
-  #def gcon(self, loc, i, j):
-  #  X = getX(loc, i, j)
-  #  return self.gcon(X)
+  def gcon(self, loc, i, j):
+    X = getX(loc, i, j)
+    return self.gcon_X(X)
 
-  def gcon(self, X):
-    gcov = self.gcov(X)
+  def gcon_X(self, X):
+    gcov = self.gcov_X(X)
     return linalg.inv(gcov)
 
   def dgcov(self, loc, i, j):
     X = getX(loc, i, j)
-    return self.dgcov(X)
+    return self.dgcov_X(X)
 
-  def dgcov(self, X):
+  def dgcov_X(self, X):
     dgcov = zeros([4,4,4])
     eps = 1.e-5
     X0 = zeros(4)
@@ -31,8 +26,8 @@ class Geometry:
         X1[mu] = X[mu]
       X0[lam] -= eps
       X1[lam] += eps
-      gcov0 = self.gcov(X0)
-      gcov1 = self.gcov(X1)
+      gcov0 = self.gcov_X(X0)
+      gcov1 = self.gcov_X(X1)
       for mu in range(4):
         for nu in range(4):
           dgcov[mu,nu,lam] = (gcov1[mu,nu] - gcov0[mu,nu])/(X1[lam] - X0[lam])
@@ -40,9 +35,9 @@ class Geometry:
 
   def dgcon(self, loc, i, j):
     X = getX(loc, i, j)
-    return self.dgcon(X)
+    return self.dgcon_X(X)
 
-  def dgcon(self, X):
+  def dgcon_X(self, X):
     dgcon = zeros([4,4,4])
     eps = 1.e-5
     X0 = zeros(4)
@@ -62,10 +57,10 @@ class Geometry:
 
   def Jinv(self, loc, i, j):
     X = getX(loc, i, j)
-    return self.Jinv(X)
+    return self.Jinv_X(X)
 
-  def Jinv(self, X):
-    J = self.J(X)
+  def Jinv_X(self, X):
+    J = self.J_X(X)
     return linalg.inv(J)
 
 class Snake(Geometry):
@@ -75,9 +70,9 @@ class Snake(Geometry):
 
   def gcov(self, loc, i, j):
     X = getX(loc, i, j)
-    return self.gcov(X)
+    return self.gcov_X(X)
 
-  def gcov(self, X):
+  def gcov_X(self, X):
     gcov = zeros([4, 4])
     delta = self.a*self.k*cos(self.k*X[1])
     gcov[0,0] = -1
@@ -90,12 +85,19 @@ class Snake(Geometry):
 
   def J(self, loc, i, j):
     X = getX(loc, i, j)
-    return self.J(X)
+    return self.J_X(X)
 
-  def J(self, X):
+  def J_X(self, X):
     J = zeros([4, 4])
     for mu in range(4):
       J[mu,mu] = 1.
     J[2,1] = -self.a*self.k*cos(self.k*X[1])
 
     return J
+
+  def lapse(self, loc, i, j):
+    return 1.;
+
+  def shift(self, loc, i, j):
+    shift = zeros(4)
+    return shift
