@@ -32,10 +32,19 @@ class State:
     return 1. + ug/rho + P/rho
 
   def PrimToCons(self):
+    loc = Location.CENT
     for i in range(N1TOT):
       for j in range(N2TOT):
-        vcov = self.get_vcov()
-        Gamma = self.get_Gamma()
+        vcon = array([0, self.prim[i,j,Var.V1], self.prim[i,j,Var.V2], 0])
+        vcov = zeros(4)
+        for mu in range(1,4):
+          for nu in range(1,4):
+            vcov[mu] += geom.gcov[i,j,loc,mu,nu]
+        vsq = 0
+        for mu in range(1,4):
+          vsq += vcon[mu]*vcov[mu]
+        Gamma = 1./sqrt(1. - vsq)
+
         rho = self.prim[i,j,Var.RHO]
         ug = self.prim[i,j,Var.UG]
         P = self.get_pressure(i,j)

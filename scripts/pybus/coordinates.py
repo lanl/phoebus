@@ -13,6 +13,7 @@ class Location(IntEnum):
   FACE1 = 1
   FACE2 = 2
   CORN = 3
+  SIZE = 4
 
 # Coordinates
 dX1 = (X1max - X1min)/N1

@@ -63,6 +63,9 @@ class Geometry:
     J = self.J_X(X)
     return linalg.inv(J)
 
+  gcov = zeros([N1TOT, N2TOT, Location.SIZE, 4, 4])
+  gcon = zeros([N1TOT, N2TOT, Location.SIZE, 4, 4])
+
 class Snake(Geometry):
   def __init__(self, geom_params):
     self.a = geom_params['a']
