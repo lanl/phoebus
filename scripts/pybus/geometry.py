@@ -64,9 +64,9 @@ class Geometry:
     return linalg.inv(J)
 
 class Snake(Geometry):
-  def __init__(self, a, k):
-    self.a = a
-    self.k = k
+  def __init__(self, geom_params):
+    self.a = geom_params['a']
+    self.k = geom_params['k']
 
   def gcov(self, loc, i, j):
     X = getX(loc, i, j)
@@ -101,3 +101,9 @@ class Snake(Geometry):
   def shift(self, loc, i, j):
     shift = zeros(4)
     return shift
+
+# Select geometry and provide to code
+if geometry == "snake":
+  geom = Snake(geom_params)
+else:
+  FAIL("Geometry \"" + geometry + "\" not recognized!")

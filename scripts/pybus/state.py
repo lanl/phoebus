@@ -1,6 +1,6 @@
 from numpy import *
+from params import *
 from geometry import *
-from problem import *
 from util import *
 
 from enum import IntEnum
@@ -10,8 +10,68 @@ class Var(IntEnum):
   UG = 1
   V1 = 2
   V2 = 3
+  SIZE = 4
 
 class State:
+  prim = zeros([N1TOT, N2TOT, Var.SIZE])
+  cons = zeros([N1TOT, N2TOT, Var.SIZE])
+  ql = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
+  qr = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
+  Ul = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
+  Ur = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
+  Fl = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
+  Fr = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
+
+  def get_pressure(self, i, j):
+    return (gam - 1.)*self.prim[i,j,Var.UG]
+
+  def get_h(self, i, j):
+    rho = self.prim[i,j,Var.RHO]
+    ug = self.prim[i,j,Var.UG]
+    P = self.get_pressure(i,j)
+    return 1. + ug/rho + P/rho
+
+  def PrimToCons(self):
+    for i in range(N1TOT):
+      for j in range(N2TOT):
+        vcov = self.get_vcov()
+        Gamma = self.get_Gamma()
+        rho = self.prim[i,j,Var.RHO]
+        ug = self.prim[i,j,Var.UG]
+        P = self.get_pressure(i,j)
+        h = self.get_h(i,j)
+        D = rho*Gamma
+
+        self.cons[i,j,Var.RHO] = Gamma*rho
+        self.cons[i,j,Var.UG] = rho*h*Gamma**2 - P - D
+        self.cons[i,j,Var.V1] = rho*h*Gamma**2*vcov[1]
+        self.cons[i,j,Var.V2] = rho*h*Gamma**2*vcov[2]
+
+  def get_vcon(self, i, j):
+    vcon = zeros(4)
+    vcon[1] = self.prim[i,j,Var.V1]
+    vcon[2] = self.prim[i,j,Var.V2]
+    return vcon
+
+  def get_vcov(self, i, j):
+    vcov = zeros(4)
+    vcon = self.get_vcon(i,j)
+    gcov = geom.gcov(self.loc, self.i, self.j)
+    for mu in range(1,4):
+      for nu in range(1,4):
+        vcov[mu] += gcov[mu,nu]*vcon[nu]
+    return vcov
+
+  def get_Gamma(self):
+    vcon = self.get_vcon()
+    vcov = self.get_vcov()
+    vsq = 0
+    for mu in range(1,4):
+      vsq += vcon[mu]*vcov[mu]
+    Gamma = 1./sqrt(1. - vsq)
+    return Gamma
+
+class Point:
   def __init__(self, loc, i, j, rho, ug, v1, v2):
     self.loc = loc
     self.i = i
