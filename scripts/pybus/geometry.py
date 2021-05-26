@@ -3,12 +3,23 @@ from numpy import *
 from coordinates import *
 
 class Geometry:
-  def gcon(self, loc, i, j):
-    X = getX(loc, i, j)
-    return self.gcon_X(X)
+  def __init__(self):
+    print("Initializing geometry... ", end='', flush=True)
+    for i in range(N1TOT):
+      for j in range(N2TOT):
+        for loc in range(Location.SIZE):
+          self.gcov[i,j,loc,:,:] = self.get_gcov(loc, i, j)
+          self.gcon[i,j,loc,:,:] = self.get_gcon(loc, i, j)
+          self.alpha[i,j,loc] = self.get_lapse(loc, i, j)
+          self.beta[i,j,loc,:] = self.get_shift(loc, i, j)
+    print("done!")
 
-  def gcon_X(self, X):
-    gcov = self.gcov_X(X)
+  def get_gcon(self, loc, i, j):
+    X = getX(loc, i, j)
+    return self.get_gcon_X(X)
+
+  def get_gcon_X(self, X):
+    gcov = self.get_gcov_X(X)
     return linalg.inv(gcov)
 
   def dgcov(self, loc, i, j):
@@ -65,17 +76,20 @@ class Geometry:
 
   gcov = zeros([N1TOT, N2TOT, Location.SIZE, 4, 4])
   gcon = zeros([N1TOT, N2TOT, Location.SIZE, 4, 4])
+  alpha = zeros([N1TOT, N2TOT, Location.SIZE])
+  beta = zeros([N1TOT, N2TOT, Location.SIZE, 4])
 
 class Snake(Geometry):
   def __init__(self, geom_params):
     self.a = geom_params['a']
     self.k = geom_params['k']
+    super().__init__()
 
-  def gcov(self, loc, i, j):
+  def get_gcov(self, loc, i, j):
     X = getX(loc, i, j)
-    return self.gcov_X(X)
+    return self.get_gcov_X(X)
 
-  def gcov_X(self, X):
+  def get_gcov_X(self, X):
     gcov = zeros([4, 4])
     delta = self.a*self.k*cos(self.k*X[1])
     gcov[0,0] = -1
@@ -98,10 +112,10 @@ class Snake(Geometry):
 
     return J
 
-  def lapse(self, loc, i, j):
+  def get_lapse(self, loc, i, j):
     return 1.;
 
-  def shift(self, loc, i, j):
+  def get_shift(self, loc, i, j):
     shift = zeros(4)
     return shift
 

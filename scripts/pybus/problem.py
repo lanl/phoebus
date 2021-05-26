@@ -23,7 +23,7 @@ def initialize_zone(prim, geom, i, j):
   vcon_mink = zeros(4)
   vcon_mink[1] = v1
   vcon_mink[2] = v2
-  gcov = geom.gcov(loc, i, j)
+  gcov = geom.get_gcov(loc, i, j)
   vsq_mink = 0
   for mu in range(1,4):
     for nu in range(1,4):
