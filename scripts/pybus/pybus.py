@@ -47,37 +47,49 @@ from problem import *
 #
 #  return X
 
-for i in range(nX1e):
-  X1[i] = getX(Location.CENT, i, 0)[1]
-for j in range(nX2e):
-  X2[j] = getX(Location.CENT, 0, j)[2]
+#for i in range(nX1e):
+#  X1[i] = getX(Location.CENT, i, 0)[1]
+#for j in range(nX2e):
+#  X2[j] = getX(Location.CENT, 0, j)[2]
 
-for i in range(nX1e + 1):
-  X1p[i] = getX(Location.CORN, i, 0)[1]
-for j in range(nX2e + 1):
-  X2p[j] = getX(Location.CORN, 0, j)[2]
+#for i in range(nX1e + 1):
+#  X1p[i] = getX(Location.CORN, i, 0)[1]
+#for j in range(nX2e + 1):
+#  X2p[j] = getX(Location.CORN, 0, j)[2]
 
-
-# Variables
-prim = {}
-prim['rho'] = zeros([nX1e, nX2e])
-prim['ug'] = zeros([nX1e, nX2e])
-prim['v1'] = zeros([nX1e, nX2e])
-prim['v2'] = zeros([nX1e, nX2e])
 
 # Initial conditions
-omega = 0.0 + 3.8780661653218766j
-drho = 0.5804294924639213
-dug = 0.7739059899518947
-dv1 = 0.1791244302079596
-dv2 = 0.1791244302079596
-rho0 = 1.0
-ug0 = 1.0
-v10 = 0.0
-v20 = 0.0
-k1 = 2.*pi
-k2 = 2.*pi
-amp = 1.e-3
+#omega = 0.0 + 3.8780661653218766j
+#drho = 0.5804294924639213
+#dug = 0.7739059899518947
+#dv1 = 0.1791244302079596
+#dv2 = 0.1791244302079596
+#rho0 = 1.0
+#ug0 = 1.0
+#v10 = 0.0
+#v20 = 0.0
+#k1 = 2.*pi
+#k2 = 2.*pi
+#amp = 1.e-3
+
+#state = zeros([N1TOT, N2TOT, Var.SIZE])
+
+state = State()
+
+for i in range(N1TOT):
+  for j in range(N2TOT):
+    initialize_zone(state.prim, geom, i, j)
+
+import matplotlib.pyplot as plt
+plt.figure()
+plt.pcolormesh(state.prim[:,:,Var.RHO], cmap='jet')
+ax = plt.gca()
+ax.set_aspect('equal')
+#ax.set_xlim([X1min, X1max])
+#ax.set_ylim([X2min, X2max])
+plt.show()
+
+sys.exit()
 
 for i in range(nX1e):
   for j in range(nX2e):
@@ -154,12 +166,12 @@ for i in range(nX1e):
 #print("Fr: ", Fr)
 #print("")
 
-if do_plot:
-  import matplotlib.pyplot as plt
-  plt.figure()
-  plt.pcolormesh(X1p, X2p, prim['v2'], cmap='jet')
-  ax = plt.gca()
-  ax.set_aspect('equal')
-  ax.set_xlim([X1min, X1max])
-  ax.set_ylim([X2min, X2max])
-  plt.show()
+#if do_plot:
+#  import matplotlib.pyplot as plt
+#  plt.figure()
+#  plt.pcolormesh(X1p, X2p, prim['v2'], cmap='jet')
+#  ax = plt.gca()
+#  ax.set_aspect('equal')
+#  ax.set_xlim([X1min, X1max])
+#  ax.set_ylim([X2min, X2max])
+#  plt.show()

@@ -1,47 +1,39 @@
-from enum import Enum
+from enum import IntEnum
 
 from numpy import *
-from problem import *
+from params import *
 
-class Location(Enum):
+class Dir(IntEnum):
+  X1 = 0
+  X2 = 1
+  SIZE = 2
+
+class Location(IntEnum):
   CENT = 0
   FACE1 = 1
   FACE2 = 2
   CORN = 3
 
 # Coordinates
-X1min = -1
-X1max = 1
-X2min = -1
-X2max = 1
-nX1 = 128
-nX2 = 128
-ng = 4
-dX1 = (X1max - X1min)/nX1
-dX2 = (X2max - X2min)/nX2
-nX1e = nX1 + 2*ng
-nX2e = nX2 + 2*ng
-NX1E = nX1e
-NX2E = nX2e
-X1 = zeros(nX1e)
-X2 = zeros(nX2e)
-X1p = zeros(nX1e + 1)
-X2p = zeros(nX2e + 1)
+dX1 = (X1max - X1min)/N1
+dX2 = (X2max - X2min)/N2
+N1TOT = N1 + 2*NG
+N2TOT = N2 + 2*NG
 
 def getX(loc, i, j):
   X = zeros(4)
   if loc == Location.CENT:
-    X[1] = X1min + dX1*(i + 0.5 - ng)
-    X[2] = X2min + dX2*(j + 0.5 - ng)
+    X[1] = X1min + dX1*(i + 0.5 - NG)
+    X[2] = X2min + dX2*(j + 0.5 - NG)
   elif loc == Location.FACE1:
-    X[1] = X1min + dX1*(i - ng)
-    X[2] = X2min + dX2*(j + 0.5 - ng)
+    X[1] = X1min + dX1*(i - NG)
+    X[2] = X2min + dX2*(j + 0.5 - NG)
   elif loc == Location.FACE2:
-    X[1] = X1min + dX1*(i + 0.5 - ng)
-    X[2] = X2min + dX2*(j - ng)
+    X[1] = X1min + dX1*(i + 0.5 - NG)
+    X[2] = X2min + dX2*(j - NG)
   elif loc == Location.CORN:
-    X[1] = X1min + dX1*(i - ng)
-    X[2] = X2min + dX2*(j - ng)
+    X[1] = X1min + dX1*(i - NG)
+    X[2] = X2min + dX2*(j - NG)
   else:
     FAIL("loc not supported!")
 
