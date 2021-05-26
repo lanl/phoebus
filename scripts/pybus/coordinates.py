@@ -1,5 +1,7 @@
-from numpy import *
 from enum import Enum
+
+from numpy import *
+from problem import *
 
 class Location(Enum):
   CENT = 0
