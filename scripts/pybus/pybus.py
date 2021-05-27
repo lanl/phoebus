@@ -7,6 +7,7 @@ from geometry import *
 from state import *
 from util import *
 from coordinates import *
+from physics import *
 from problem import *
 
 # Coordinates
@@ -80,6 +81,9 @@ for i in range(N1TOT):
   for j in range(N2TOT):
     initialize_zone(state.prim, geom, i, j)
 
+prim_to_cons(state.prim, state.cons)
+cons_to_prim(state.cons, state.prim)
+
 import matplotlib.pyplot as plt
 plt.figure()
 plt.pcolormesh(state.prim[:,:,Var.RHO], cmap='jet')
@@ -91,48 +95,48 @@ plt.show()
 
 sys.exit()
 
-for i in range(nX1e):
-  for j in range(nX2e):
-    loc = Location.CENT
-    X = getX(Location.CENT, i, j)
-    x = X[1]
-    y = X[2] - a*sin(k*x)
-    #mode = amp*cos(k1*X1[i] + k2*X2[j])
-    mode = amp*cos(k1*x + k2*y)
-    prim['rho'][i,j] = rho0 + (drho*mode).real
-    prim['ug'][i,j] = ug0 + (dug*mode).real
-    prim['v1'][i,j] = v10 + (dv1*mode).real
-    prim['v2'][i,j] = v20 + (dv2*mode).real
-
-    if i == 64 and j == 64:
-      print("x = %e" % x)
-      print("y = %e" % y)
-      print(prim['rho'][i,j])
-
-    # Convert Minkowski velocity to snake coordinates
-    vcon_mink = zeros(4)
-    vcon_mink[1] = prim['v1'][i,j]
-    vcon_mink[2] = prim['v2'][i,j]
-
-    gcov = geom.gcov(Location.CENT, i, j)#X)
-    vsq_mink = 0
-    for mu in range(1,4):
-      for nu in range(1,4):
-        vsq_mink += gcov[mu,nu]*vcon_mink[mu]*vcon_mink[nu]
-    Gamma_mink = 1./sqrt(1. - vsq_mink)
-    ucon_mink = zeros(4)
-    ucon_mink[0] = Gamma_mink
-    ucon_mink[1] = Gamma_mink*vcon_mink[1]
-    ucon_mink[2] = Gamma_mink*vcon_mink[2]
-    ucon_mink[3] = Gamma_mink*vcon_mink[3]
-    Jinv = geom.Jinv(loc, i, j)
-    ucon_snake = zeros(4)
-    for mu in range(4):
-      for nu in range(4):
-        ucon_snake[mu] += Jinv[mu,nu]*ucon_mink[nu]
-    Gamma_snake = ucon_snake[0]
-    prim['v1'][i,j] = ucon_snake[1]/Gamma_snake
-    prim['v2'][i,j] = ucon_snake[2]/Gamma_snake
+#for i in range(nX1e):
+#  for j in range(nX2e):
+#    loc = Location.CENT
+#    X = getX(Location.CENT, i, j)
+#    x = X[1]
+#    y = X[2] - a*sin(k*x)
+#    #mode = amp*cos(k1*X1[i] + k2*X2[j])
+#    mode = amp*cos(k1*x + k2*y)
+#    prim['rho'][i,j] = rho0 + (drho*mode).real
+#    prim['ug'][i,j] = ug0 + (dug*mode).real
+#    prim['v1'][i,j] = v10 + (dv1*mode).real
+#    prim['v2'][i,j] = v20 + (dv2*mode).real
+#
+#    if i == 64 and j == 64:
+#      print("x = %e" % x)
+#      print("y = %e" % y)
+#      print(prim['rho'][i,j])
+#
+#    # Convert Minkowski velocity to snake coordinates
+#    vcon_mink = zeros(4)
+#    vcon_mink[1] = prim['v1'][i,j]
+#    vcon_mink[2] = prim['v2'][i,j]
+#
+#    gcov = geom.gcov(Location.CENT, i, j)#X)
+#    vsq_mink = 0
+#    for mu in range(1,4):
+#      for nu in range(1,4):
+#        vsq_mink += gcov[mu,nu]*vcon_mink[mu]*vcon_mink[nu]
+#    Gamma_mink = 1./sqrt(1. - vsq_mink)
+#    ucon_mink = zeros(4)
+#    ucon_mink[0] = Gamma_mink
+#    ucon_mink[1] = Gamma_mink*vcon_mink[1]
+#    ucon_mink[2] = Gamma_mink*vcon_mink[2]
+#    ucon_mink[3] = Gamma_mink*vcon_mink[3]
+#    Jinv = geom.Jinv(loc, i, j)
+#    ucon_snake = zeros(4)
+#    for mu in range(4):
+#      for nu in range(4):
+#        ucon_snake[mu] += Jinv[mu,nu]*ucon_mink[nu]
+#    Gamma_snake = ucon_snake[0]
+#    prim['v1'][i,j] = ucon_snake[1]/Gamma_snake
+#    prim['v2'][i,j] = ucon_snake[2]/Gamma_snake
 
 #i = 32
 #j = 32
