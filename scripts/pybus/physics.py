@@ -110,7 +110,26 @@ def cons_to_prim(cons, prim):
         #sys.exit()
 
         xi = newton(resid, xi_guess, tol=1.e-12)
-        print(xi)
-        print(resid(xi))
+        Gamma = sqrt(1./(1. - Ssq/xi**2))
+        w = xi/Gamma**2
+        rho = D/Gamma
+        P = (gam - 1)/gam*(w - rho)
+        ug = P/(gam -1.)
+        #print(xi)
+        #print(resid(xi))
+
+        vcov = array([0, Scov[1]/xi, Scov[2]/xi, 0])
+        vcon = zeros(4)
+        for mu in range(1,4):
+          for nu in range(1,4):
+            vcon[mu] += geom.gcon[i,j,loc,mu,nu]*vcov[nu]
+
+        print(prim[i,j,:])
+        prim[i,j,Var.RHO] = rho
+        prim[i,j,Var.UG] = ug
+        prim[i,j,Var.V1] = vcon[1]
+        prim[i,j,Var.V2] = vcon[2]
+        print(prim[i,j,:])
+
         sys.exit()
 
