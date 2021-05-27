@@ -11,7 +11,7 @@ class Position:
     self.loc = loc
 
 def get_pressure(pvec):
-  return (gam - 1.)*pvec[Var.RHO]
+  return (gam - 1.)*pvec[Var.UG]
 
 def get_enthalpy(pvec):
   rho = pvec[Var.RHO]
@@ -69,35 +69,48 @@ def cons_to_prim(cons, prim):
       pos = Position(i, j, loc)
 
       if i == 32 and j == 32:
-        rho = prim[i,j,Var.RHO]
+        #rho = prim[i,j,Var.RHO]
         h = get_enthalpy(prim[i,j,:])
         w = prim[i,j,Var.RHO]*h
         Gamma = get_Gamma(prim[i,j,:], pos)
-        vcon = get_vcon(prim[i,j,:])
-        vcov = get_vcov(prim[i,j,:], pos)
-        print("xi: ", Gamma**2*w)
+        #vcon = get_vcon(prim[i,j,:])
+        #vcov = get_vcov(prim[i,j,:], pos)
+        #vsq = 0
+        #for mu in range(1,4):
+        #  vsq += vcon[mu]*vcov[mu]
+        #print("Gamma: ", Gamma)
+        xi_guess = Gamma**2*w
+        #print("xi: ", Gamma**2*w)
+        #print("True Ssq: ", (xi**2*vsq))
 
         cvec = cons[i,j,:]
         D = cvec[Var.RHO]
         Scov = array([0, cvec[Var.V1], cvec[Var.V2], 0])
         Ssq = 0
         tau = cvec[Var.UG]
-        print("tau: ", tau)
+        #print("D: ", D)
+        #print("tau: ", tau)
         for mu in range(1,4):
           for nu in range(1,4):
-            #Ssq += geom.gcon[i,j,loc,mu,nu]*Scov[mu]*Scov[nu]
-            Ssq += (rho*h*Gamma**2)**2*vcon[mu]*vcov[nu]
-        print("Scov: ", Scov)
-        print("Ssq: ", Ssq)
+            Ssq += geom.gcon[i,j,loc,mu,nu]*Scov[mu]*Scov[nu]
+            #Ssq += (rho*h*Gamma**2)**2*vcon[mu]*vcov[nu]
+        #print("Scov: ", Scov)
+        #print("Ssq: ", Ssq)
+        #xi = Gamma**2*w
+        #Gamma = sqrt(1./(1. - Ssq/xi**2))
+        #print("Now Gamma: ", Gamma)
 
         def resid(xi):
           Gamma = sqrt(1./(1. - Ssq/xi**2))
-          print("Gamma: ", Gamma)
           return xi - (gam - 1.)/gam*(xi/Gamma**2 - D/Gamma) - tau - D
 
         #print(resid(Gamma**2*w))
-        print(resid(2.334652))
+        #print(resid(2.466361842))
+        #print(resid(xi))
+        #sys.exit()
 
-        print(newton(resid, 2.334652, tol=1.e-12))
+        xi = newton(resid, xi_guess, tol=1.e-12)
+        print(xi)
+        print(resid(xi))
         sys.exit()
 
