@@ -21,6 +21,7 @@ class State:
   Ur = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
   Fl = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
   Fr = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
+  Flux = zeros([N1TOT, N2TOT, Var.SIZE, Dir.SIZE])
 
   def get_pressure(self, i, j):
     return (gam - 1.)*self.prim[i,j,Var.UG]
@@ -101,7 +102,7 @@ class Point:
   def get_vcov(self):
     vcov = zeros(4)
     vcon = self.get_vcon()
-    gcov = geom.gcov(self.loc, self.i, self.j)
+    gcov = geom.gcov[self.i,self.j,self.loc,:,:]#get_gcov(self.loc, self.i, self.j)
     for mu in range(1,4):
       for nu in range(1,4):
         vcov[mu] += gcov[mu,nu]*vcon[nu]
@@ -118,8 +119,8 @@ class Point:
 
   def get_ucon(self):
     ucon = zeros(4)
-    alpha = geom.lapse(loc, i, j)
-    beta = geom.shift(loc, i,j)
+    alpha = geom.alpha[self.i,self.j,self.loc]#get_lapse(loc, i, j)
+    beta = geom.beta[self.i,self.j,self.loc,:]#get_shift(loc, i,j)
     vcon = self.get_vcon()
     Gamma = self.get_Gamma()
 
@@ -131,7 +132,8 @@ class Point:
   def get_ucov(self):
     ucov = zeros(4)
     ucon = self.get_ucon()
-    gcov = geom.gcov(loc, i, j)
+    gcov = geom.gcov[self.i,self.j,self.loc,:,:]
+    #geom.get_gcov(loc, i, j)
     for mu in range(4):
       for nu in range(4):
         ucov[mu] += gcov[mu,nu]*ucon[nu]
@@ -208,8 +210,8 @@ class Point:
   def get_F(self, d):
     flux = zeros(4)
 
-    alpha = geom.lapse(self.loc, self.i, self.j)
-    beta = geom.shift(self.loc, self.i, self.j)
+    alpha = geom.get_lapse(self.loc, self.i, self.j)
+    beta = geom.get_shift(self.loc, self.i, self.j)
     vcon = self.get_vcon()
     Gamma = self.get_Gamma()
     S_U = self.get_S_U()

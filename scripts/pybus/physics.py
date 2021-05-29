@@ -42,11 +42,42 @@ def get_Gamma(pvec, pos):
   Gamma = 1./sqrt(1. - vsq)
   return Gamma
 
-def prim_to_cons(prim, cons):
-  loc = Location.CENT
+def prim_to_flux(prim, flux, loc, d):
   for i in range(N1TOT):
     for j in range(N2TOT):
       pvec = prim[i,j,:]
+      #fvec = flux[i,j,:,d]
+      #pos = Position(i, j, loc)
+      #vcon = get_vcon(pvec)
+      #alpha = geom.lapse[pos.i,pos.j,pos.loc]
+      #beta = geom.shift[pos.i,pos.j,pos.loc,:]
+      #V = zeros(4)
+      #for mu in range(1,4):
+      #  V[mu] = alpha*vcon[mu] - beta[mu]
+
+      #rho = pvec[Var.RHO]
+      #ug = pvec[Var.UG]
+      #P = get_pressure(pvec)
+      #h = get_enthalpy(pvec)
+      #D = rho*Gamma
+
+      point = Point(loc, i, j, pvec[Var.RHO], pvec[Var.UG], pvec[Var.V1], pvec[Var.V2])
+      flux = point.get_F(d)
+      #Scon = point.get_S_U()
+      #Wud = point.get_W_UD()
+
+      #flux[Var.RHO] = V[d]*D
+      #flux[Var.UG] = alpha*(Scon[d] - vcon[d]*D) - beta[d]*tau
+
+
+  #FAIL("not implemented")
+
+
+def prim_to_cons(prim, cons, loc):
+  for i in range(N1TOT):
+    for j in range(N2TOT):
+      pvec = prim[i,j,:]
+      # TODO(BRR) use Point class
       pos = Position(i, j, loc)
       vcov = get_vcov(pvec, pos)
       Gamma = get_Gamma(pvec, pos)
@@ -103,3 +134,57 @@ def cons_to_prim(cons, prim):
       prim[i,j,Var.UG] = ug
       prim[i,j,Var.V1] = vcon[1]
       prim[i,j,Var.V2] = vcon[2]
+
+def get_vchar(point, d):
+  i = point.i
+  j = point.j
+  loc = point.loc
+
+  Acov = zeros(4)
+  Acov[d] = 1.
+  Acon = zeros(4)
+  for mu in range(4):
+    for nu in range(4):
+      Acon[mu] += geom.gcon[i,j,loc,mu,nu]*Acov[nu]
+  Bcov = zeros(4)
+  Bcov[0] = 1
+  Bcon = zeros(4)
+  for mu in range(4):
+    for nu in range(4):
+      Bcon[mu] += geom.gcon[i,j,loc,mu,nu]*Bcov[nu]
+
+  ucon = point.get_ucon()
+  rho = point.prim[Var.RHO]
+  u = point.prim[Var.UG]
+  ef = rho + gam*u
+  cs2 = gam*(gam - 1.)*u/ef
+
+  Asq = 0
+  Bsq = 0
+  Au = 0
+  Bu = 0
+  AB = 0
+  for mu in range(4):
+    Asq += Acon[mu]*Acov[mu]
+    Bsq += Bcon[mu]*Bcov[mu]
+    Au += Acov[mu]*ucon[mu]
+    Bu += Bcov[mu]*ucon[mu]
+    AB += Acov[mu]*Bcon[mu]
+  Au2 = Au*Au
+  Bu2 = Bu*Bu
+  AuBu = Au*Bu
+
+  A = Bu2 - (Bsq + Bu2) * cs2
+  B = 2. * (AuBu - (AB + AuBu) * cs2)
+  C = Au2 - (Asq + Au2) * cs2
+  discr = sqrt(B * B - 4. * A * C)
+  vp = -(-B + discr)/(2.*A)
+  vm = -(-B - discr)/(2.*A)
+  if vp > vm:
+    vmax = vp
+    vmin = vm
+  else:
+    vmax = vm
+    vmin = vp
+
+  return vmax, vmin

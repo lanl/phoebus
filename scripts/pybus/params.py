@@ -2,6 +2,7 @@ from numpy import *
 
 # Parameters
 tf = 1.
+dt_init = 1.e-6
 gam = 4./3.
 do_plot = False
 
