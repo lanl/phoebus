@@ -16,8 +16,8 @@ X1min = -1
 X1max = 1
 X2min = -1
 X2max = 1
-N1 = 128
-N2 = 128
+N1 = 64
+N2 = 64
 NG = 4
 
 # Initial conditions
