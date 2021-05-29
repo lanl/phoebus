@@ -7,6 +7,7 @@ from geometry import *
 from state import *
 from util import *
 from coordinates import *
+from driver import *
 from physics import *
 from problem import *
 from reconstruction import *
@@ -77,17 +78,30 @@ from reconstruction import *
 #state = zeros([N1TOT, N2TOT, Var.SIZE])
 
 state = State()
+state_tmp = State()
 
-for i in range(N1TOT):
-  for j in range(N2TOT):
-    initialize_zone(state.prim, geom, i, j)
+#for i in range(N1TOT):
+#  for j in range(N2TOT):
+#    initialize_zone(state.prim, geom, i, j)
 
-prim_to_cons(state.prim, state.cons)
-cons_to_prim(state.cons, state.prim)
+#prim_to_cons(state.prim, state.cons)
+#cons_to_prim(state.cons, state.prim)
 
-reconstruct_prims(state)
+#reconstruct_prims(state)
 
-print(state.ql[:,:,Var.RHO,Dir.X1].max())
+t = 0
+dt = dt_init
+ncyc = 0
+while t < tf:
+  advance(state, state, state_tmp, dt)
+  print("n = %6d" % ncyc + " t = %e" % t + " dt = %e" % dt)
+
+  t += dt
+  ncyc += 1
+
+  if ncyc > 10:
+    sys.exit()
+
 
 import matplotlib.pyplot as plt
 plt.figure()
@@ -101,87 +115,3 @@ plt.show()
 
 sys.exit()
 
-#for i in range(nX1e):
-#  for j in range(nX2e):
-#    loc = Location.CENT
-#    X = getX(Location.CENT, i, j)
-#    x = X[1]
-#    y = X[2] - a*sin(k*x)
-#    #mode = amp*cos(k1*X1[i] + k2*X2[j])
-#    mode = amp*cos(k1*x + k2*y)
-#    prim['rho'][i,j] = rho0 + (drho*mode).real
-#    prim['ug'][i,j] = ug0 + (dug*mode).real
-#    prim['v1'][i,j] = v10 + (dv1*mode).real
-#    prim['v2'][i,j] = v20 + (dv2*mode).real
-#
-#    if i == 64 and j == 64:
-#      print("x = %e" % x)
-#      print("y = %e" % y)
-#      print(prim['rho'][i,j])
-#
-#    # Convert Minkowski velocity to snake coordinates
-#    vcon_mink = zeros(4)
-#    vcon_mink[1] = prim['v1'][i,j]
-#    vcon_mink[2] = prim['v2'][i,j]
-#
-#    gcov = geom.gcov(Location.CENT, i, j)#X)
-#    vsq_mink = 0
-#    for mu in range(1,4):
-#      for nu in range(1,4):
-#        vsq_mink += gcov[mu,nu]*vcon_mink[mu]*vcon_mink[nu]
-#    Gamma_mink = 1./sqrt(1. - vsq_mink)
-#    ucon_mink = zeros(4)
-#    ucon_mink[0] = Gamma_mink
-#    ucon_mink[1] = Gamma_mink*vcon_mink[1]
-#    ucon_mink[2] = Gamma_mink*vcon_mink[2]
-#    ucon_mink[3] = Gamma_mink*vcon_mink[3]
-#    Jinv = geom.Jinv(loc, i, j)
-#    ucon_snake = zeros(4)
-#    for mu in range(4):
-#      for nu in range(4):
-#        ucon_snake[mu] += Jinv[mu,nu]*ucon_mink[nu]
-#    Gamma_snake = ucon_snake[0]
-#    prim['v1'][i,j] = ucon_snake[1]/Gamma_snake
-#    prim['v2'][i,j] = ucon_snake[2]/Gamma_snake
-
-#i = 32
-#j = 32
-## X1 dir
-#print("X1 dir")
-#d = 1
-#ql = State(Location.FACE1, i, j, 1.000511e+00, 1.000682e+00, 1.577645e-04, 1.386013e-04)
-#qr = State(Location.FACE1, i, j, 1.000511e+00, 1.000681e+00, 1.576970e-04, 1.384516e-04)
-#Ul = ql.get_cons()
-#Ur = qr.get_cons()
-#Fl = ql.get_F(d)
-#Fr = qr.get_F(d)
-#print("Ul: ", Ul)
-#print("Ur: ", Ur)
-#print("Fl: ", Fl)
-#print("Fr: ", Fr)
-#print("")
-#
-## X2 dir
-#print("X2 dir")
-#d = 2
-#ql = State(Location.FACE2, i, j, 1.000510e+00, 1.000679e+00, 1.572381e-04, 1.403478e-04)
-#qr = State(Location.FACE2, i, j, 1.000509e+00, 1.000679e+00, 1.572177e-04, 1.403296e-04)
-#Ul = ql.get_cons()
-#Ur = qr.get_cons()
-#Fl = ql.get_F(d)
-#Fr = qr.get_F(d)
-#print("Ul: ", Ul)
-#print("Ur: ", Ur)
-#print("Fl: ", Fl)
-#print("Fr: ", Fr)
-#print("")
-
-#if do_plot:
-#  import matplotlib.pyplot as plt
-#  plt.figure()
-#  plt.pcolormesh(X1p, X2p, prim['v2'], cmap='jet')
-#  ax = plt.gca()
-#  ax.set_aspect('equal')
-#  ax.set_xlim([X1min, X1max])
-#  ax.set_ylim([X2min, X2max])
-#  plt.show()
