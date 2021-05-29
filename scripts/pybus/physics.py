@@ -67,69 +67,39 @@ def cons_to_prim(cons, prim):
   for i in range(N1TOT):
     for j in range(N2TOT):
       pos = Position(i, j, loc)
+      # Guess from previous primitives
+      h = get_enthalpy(prim[i,j,:])
+      w = prim[i,j,Var.RHO]*h
+      Gamma = get_Gamma(prim[i,j,:], pos)
+      xi_guess = Gamma**2*w
 
-      if i == 32 and j == 32:
-        #rho = prim[i,j,Var.RHO]
-        h = get_enthalpy(prim[i,j,:])
-        w = prim[i,j,Var.RHO]*h
-        Gamma = get_Gamma(prim[i,j,:], pos)
-        #vcon = get_vcon(prim[i,j,:])
-        #vcov = get_vcov(prim[i,j,:], pos)
-        #vsq = 0
-        #for mu in range(1,4):
-        #  vsq += vcon[mu]*vcov[mu]
-        #print("Gamma: ", Gamma)
-        xi_guess = Gamma**2*w
-        #print("xi: ", Gamma**2*w)
-        #print("True Ssq: ", (xi**2*vsq))
+      cvec = cons[i,j,:]
+      D = cvec[Var.RHO]
+      Scov = array([0, cvec[Var.V1], cvec[Var.V2], 0])
+      Ssq = 0
+      tau = cvec[Var.UG]
+      for mu in range(1,4):
+        for nu in range(1,4):
+          Ssq += geom.gcon[i,j,loc,mu,nu]*Scov[mu]*Scov[nu]
 
-        cvec = cons[i,j,:]
-        D = cvec[Var.RHO]
-        Scov = array([0, cvec[Var.V1], cvec[Var.V2], 0])
-        Ssq = 0
-        tau = cvec[Var.UG]
-        #print("D: ", D)
-        #print("tau: ", tau)
-        for mu in range(1,4):
-          for nu in range(1,4):
-            Ssq += geom.gcon[i,j,loc,mu,nu]*Scov[mu]*Scov[nu]
-            #Ssq += (rho*h*Gamma**2)**2*vcon[mu]*vcov[nu]
-        #print("Scov: ", Scov)
-        #print("Ssq: ", Ssq)
-        #xi = Gamma**2*w
-        #Gamma = sqrt(1./(1. - Ssq/xi**2))
-        #print("Now Gamma: ", Gamma)
-
-        def resid(xi):
-          Gamma = sqrt(1./(1. - Ssq/xi**2))
-          return xi - (gam - 1.)/gam*(xi/Gamma**2 - D/Gamma) - tau - D
-
-        #print(resid(Gamma**2*w))
-        #print(resid(2.466361842))
-        #print(resid(xi))
-        #sys.exit()
-
-        xi = newton(resid, xi_guess, tol=1.e-12)
+      def resid(xi):
         Gamma = sqrt(1./(1. - Ssq/xi**2))
-        w = xi/Gamma**2
-        rho = D/Gamma
-        P = (gam - 1)/gam*(w - rho)
-        ug = P/(gam -1.)
-        #print(xi)
-        #print(resid(xi))
+        return xi - (gam - 1.)/gam*(xi/Gamma**2 - D/Gamma) - tau - D
 
-        vcov = array([0, Scov[1]/xi, Scov[2]/xi, 0])
-        vcon = zeros(4)
-        for mu in range(1,4):
-          for nu in range(1,4):
-            vcon[mu] += geom.gcon[i,j,loc,mu,nu]*vcov[nu]
+      xi = newton(resid, xi_guess, tol=1.e-12)
+      Gamma = sqrt(1./(1. - Ssq/xi**2))
+      w = xi/Gamma**2
+      rho = D/Gamma
+      P = (gam - 1)/gam*(w - rho)
+      ug = P/(gam -1.)
 
-        print(prim[i,j,:])
-        prim[i,j,Var.RHO] = rho
-        prim[i,j,Var.UG] = ug
-        prim[i,j,Var.V1] = vcon[1]
-        prim[i,j,Var.V2] = vcon[2]
-        print(prim[i,j,:])
+      vcov = array([0, Scov[1]/xi, Scov[2]/xi, 0])
+      vcon = zeros(4)
+      for mu in range(1,4):
+        for nu in range(1,4):
+          vcon[mu] += geom.gcon[i,j,loc,mu,nu]*vcov[nu]
 
-        sys.exit()
-
+      prim[i,j,Var.RHO] = rho
+      prim[i,j,Var.UG] = ug
+      prim[i,j,Var.V1] = vcon[1]
+      prim[i,j,Var.V2] = vcon[2]

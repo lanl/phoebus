@@ -9,6 +9,7 @@ from util import *
 from coordinates import *
 from physics import *
 from problem import *
+from reconstruction import *
 
 # Coordinates
 #X1min = -1
@@ -84,9 +85,14 @@ for i in range(N1TOT):
 prim_to_cons(state.prim, state.cons)
 cons_to_prim(state.cons, state.prim)
 
+reconstruct_prims(state)
+
+print(state.ql[:,:,Var.RHO,Dir.X1].max())
+
 import matplotlib.pyplot as plt
 plt.figure()
-plt.pcolormesh(state.prim[:,:,Var.RHO], cmap='jet')
+#plt.pcolormesh(state.prim[:,:,Var.RHO], cmap='jet')
+plt.pcolormesh(state.ql[:,:,Var.RHO,Dir.X1], cmap='jet', vmin=1. - amp, vmax=1.+amp)
 ax = plt.gca()
 ax.set_aspect('equal')
 #ax.set_xlim([X1min, X1max])
