@@ -2,7 +2,7 @@ from numpy import *
 
 # Parameters
 tf = 1.
-dt_init = 1.e-6
+dt_init = 1.e-3
 gam = 4./3.
 cfl = 0.4
 do_plot = False
@@ -10,7 +10,7 @@ do_plot = False
 # Geometry
 geometry = "snake"
 geom_params = {}
-geom_params['a'] = 0.2
+geom_params['a'] = 0#0.2
 geom_params['k'] = pi
 
 # Coordinates

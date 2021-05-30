@@ -226,5 +226,10 @@ class Point:
     flux[Var.UG] = alpha*(S_U[d] - vcon[d]*D) - beta[d]*tau
     flux[Var.V1] = alpha*W_UD[d,1] - beta[d]*S_D[1]
     flux[Var.V2] = alpha*W_UD[d,2] - beta[d]*S_D[2]
+    print("INSIDE POINT ROUTINE")
+    print(D, h, P, tau)
+    print(vcon)
+    print((alpha*vcon[d] - beta[d])*D)
+    print(flux)
 
     return flux
