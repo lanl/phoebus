@@ -64,13 +64,14 @@ def prim_to_flux(prim, flux, loc, d):
 
       point = Point(loc, i, j, pvec[Var.RHO], pvec[Var.UG], pvec[Var.V1], pvec[Var.V2])
       flux[i,j,:,d] = point.get_F(d)
-      if i == NG and j == NG:
-        print("prim and flux")
-        print(pvec)
-        print(flux[i,j,:,d])
-        print("new flux")
-        print(point.get_F(d))
-        sys.exit()
+      #flux = point.get_F(d)
+      #if i == NG and j == NG:
+      #  print("prim and flux")
+      #  print(pvec)
+      #  print(flux)
+      #  print("new flux")
+      #  print(point.get_F(d))
+      #  sys.exit()
       #Scon = point.get_S_U()
       #Wud = point.get_W_UD()
 
@@ -81,7 +82,7 @@ def prim_to_flux(prim, flux, loc, d):
   #FAIL("not implemented")
 
 
-def prim_to_cons(prim, cons, loc):
+def prim_to_cons(prim, cons, loc, d=None):
   for i in range(N1TOT):
     for j in range(N2TOT):
       pvec = prim[i,j,:]
@@ -96,10 +97,16 @@ def prim_to_cons(prim, cons, loc):
       h = get_enthalpy(pvec)
       D = rho*Gamma
 
-      cons[i,j,Var.RHO] = Gamma*rho
-      cons[i,j,Var.UG] = rho*h*Gamma**2 - P - D
-      cons[i,j,Var.V1] = rho*h*Gamma**2*vcov[1]
-      cons[i,j,Var.V2] = rho*h*Gamma**2*vcov[2]
+      if d == None:
+        cons[i,j,Var.RHO] = Gamma*rho
+        cons[i,j,Var.UG] = rho*h*Gamma**2 - P - D
+        cons[i,j,Var.V1] = rho*h*Gamma**2*vcov[1]
+        cons[i,j,Var.V2] = rho*h*Gamma**2*vcov[2]
+      else:
+        cons[i,j,Var.RHO,d] = Gamma*rho
+        cons[i,j,Var.UG,d] = rho*h*Gamma**2 - P - D
+        cons[i,j,Var.V1,d] = rho*h*Gamma**2*vcov[1]
+        cons[i,j,Var.V2,d] = rho*h*Gamma**2*vcov[2]
 
 def cons_to_prim(cons, prim):
   loc = Location.CENT
