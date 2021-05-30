@@ -11,6 +11,7 @@ from driver import *
 from physics import *
 from problem import *
 from reconstruction import *
+from boundaries import *
 
 # Coordinates
 #X1min = -1
@@ -80,24 +81,47 @@ from reconstruction import *
 state = State()
 state_tmp = State()
 
-#for i in range(N1TOT):
-#  for j in range(N2TOT):
-#    initialize_zone(state.prim, geom, i, j)
+for i in range(NG,N1+NG):
+  for j in range(NG,N2+NG):
+    initialize_zone(state.prim, geom, i, j)
+apply_boundaries(state)
 
 #prim_to_cons(state.prim, state.cons)
 #cons_to_prim(state.cons, state.prim)
 
 #reconstruct_prims(state)
+import matplotlib.pyplot as plt
+plt.figure()
+plt.pcolormesh(state.prim[:,:,Var.RHO], cmap='jet', vmin=1. - amp, vmax=1.+amp)
+ax = plt.gca()
+ax.set_aspect('equal')
+plt.show()
 
 t = 0
 dt = dt_init
 ncyc = 0
+safe_dt = 1.3
 while t < tf:
-  advance(state, state, state_tmp, dt)
+  advance(state, state, state_tmp, dt/2)
+  apply_boundaries(state_tmp)
+  ndt = advance(state, state_tmp, state, dt)
+  apply_boundaries(state)
   print("n = %6d" % ncyc + " t = %e" % t + " dt = %e" % dt)
 
   t += dt
   ncyc += 1
+
+  if ndt > safe_dt*dt:
+    ndt = safe_dt*dt
+  dt = ndt
+
+
+  import matplotlib.pyplot as plt
+  plt.figure()
+  plt.pcolormesh(state.prim[:,:,Var.RHO], cmap='jet', vmin=1. - amp, vmax=1.+amp)
+  ax = plt.gca()
+  ax.set_aspect('equal')
+  plt.show()
 
   if ncyc > 10:
     sys.exit()

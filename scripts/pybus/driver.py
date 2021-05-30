@@ -81,8 +81,24 @@ def calc_fluxes(state):
 def advance(state_i, state_b, state_f, dt):
   state_f.prim = copy(state_i.prim)
 
-  reconstruct_prims(state_i)
+  reconstruct_prims(state_b)
 
   vmax1, vmax2 = calc_fluxes(state_b)
   print("vmax1: ", vmax1)
   print("vmax2: ", vmax2)
+
+  # Get sources
+
+  prim_to_cons(state_f.prim, state_f.cons, Location.CENT)
+  for i in range(NG, NG+N1):
+    for j in range(NG, NG+N2):
+      for v in range(Var.SIZE):
+        state_f.cons[i,j,v] += dt*(
+          (state_b.Flux[i,j,v,Dir.X1] - state_b.Flux[i+1,j,v,Dir.X1])/dX1
+        + (state_b.Flux[i,j,v,Dir.X2] - state_b.Flux[i,j+1,v,Dir.X2])/dX2)
+
+  cons_to_prim(state_f.cons, state_f.prim)
+
+  ndt1 = cfl*dX1/vmax1
+  ndt2 = cfl*dX2/vmax2
+  return 1./(1./ndt1 + 1./ndt2)
