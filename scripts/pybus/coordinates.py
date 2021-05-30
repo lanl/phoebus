@@ -4,9 +4,10 @@ from numpy import *
 from params import *
 
 class Dir(IntEnum):
-  X1 = 0
-  X2 = 1
-  SIZE = 2
+  X0 = 0
+  X1 = 1
+  X2 = 2
+  SIZE = 3
 
 class Location(IntEnum):
   CENT = 0

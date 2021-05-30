@@ -61,8 +61,16 @@ def prim_to_flux(prim, flux, loc, d):
       #h = get_enthalpy(pvec)
       #D = rho*Gamma
 
+
       point = Point(loc, i, j, pvec[Var.RHO], pvec[Var.UG], pvec[Var.V1], pvec[Var.V2])
-      flux = point.get_F(d)
+      flux[i,j,:,d] = point.get_F(d)
+      if i == NG and j == NG:
+        print("prim and flux")
+        print(pvec)
+        print(flux[i,j,:,d])
+        print("new flux")
+        print(point.get_F(d))
+        sys.exit()
       #Scon = point.get_S_U()
       #Wud = point.get_W_UD()
 

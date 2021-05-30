@@ -15,7 +15,7 @@ def apply_boundaries(state):
       for v in range(Var.SIZE):
         state.prim[i,j,v] = state.prim[iactive,j,v]
 
-  for i in range(NG,N1+NG):
+  for i in range(0,N1+2*NG):
     for j in range(0, NG):
       jactive = j + N2
       for v in range(Var.SIZE):
