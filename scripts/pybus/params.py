@@ -5,12 +5,13 @@ tf = 1.
 dt_init = 1.e-3
 gam = 4./3.
 cfl = 0.4
+DTd = 0.1
 do_plot = False
 
 # Geometry
 geometry = "snake"
 geom_params = {}
-geom_params['a'] = 0#0.2
+geom_params['a'] = 0.1
 geom_params['k'] = pi
 
 # Coordinates
@@ -35,3 +36,4 @@ v20 = 0.0
 k1 = 2.*pi
 k2 = 2.*pi
 amp = 1.e-3
+tf = 2.*pi/imag(omega) # Run for one wave period

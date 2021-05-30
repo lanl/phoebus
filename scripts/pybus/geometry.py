@@ -12,6 +12,7 @@ class Geometry:
           self.gcon[i,j,loc,:,:] = self.get_gcon(loc, i, j)
           self.alpha[i,j,loc] = self.get_lapse(loc, i, j)
           self.beta[i,j,loc,:] = self.get_shift(loc, i, j)
+          self.dgcov[i,j,loc,:,:,:] = self.get_dgcov(loc, i, j)
     print("done!")
 
   def get_gcon(self, loc, i, j):
@@ -22,7 +23,7 @@ class Geometry:
     gcov = self.get_gcov_X(X)
     return linalg.inv(gcov)
 
-  def dgcov(self, loc, i, j):
+  def get_dgcov(self, loc, i, j):
     X = getX(loc, i, j)
     return self.dgcov_X(X)
 
@@ -37,8 +38,8 @@ class Geometry:
         X1[mu] = X[mu]
       X0[lam] -= eps
       X1[lam] += eps
-      gcov0 = self.gcov_X(X0)
-      gcov1 = self.gcov_X(X1)
+      gcov0 = self.get_gcov_X(X0)
+      gcov1 = self.get_gcov_X(X1)
       for mu in range(4):
         for nu in range(4):
           dgcov[mu,nu,lam] = (gcov1[mu,nu] - gcov0[mu,nu])/(X1[lam] - X0[lam])
@@ -78,6 +79,7 @@ class Geometry:
   gcon = zeros([N1TOT, N2TOT, Location.SIZE, 4, 4])
   alpha = zeros([N1TOT, N2TOT, Location.SIZE])
   beta = zeros([N1TOT, N2TOT, Location.SIZE, 4])
+  dgcov = zeros([N1TOT, N2TOT, Location.SIZE, 4, 4, 4])
 
 class Snake(Geometry):
   def __init__(self, geom_params):
