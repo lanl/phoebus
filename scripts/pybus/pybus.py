@@ -13,6 +13,7 @@ from problem import *
 from reconstruction import *
 from boundaries import *
 from plotting import *
+from output import *
 
 state = State()
 state_tmp = State()
@@ -21,6 +22,10 @@ for i in range(NG,N1+NG):
   for j in range(NG,N2+NG):
     initialize_zone(state.prim, geom, i, j)
 apply_boundaries(state)
+
+write_dump(state, 0)
+nd = 1
+tdump = DTd
 
 #plot(state, 'rho')
 
@@ -35,15 +40,21 @@ while t < tf:
   ndt = advance(state, state_tmp, state, dt)
   apply_boundaries(state)
 
-  t += dt
-  ncyc += 1
-
   if ndt > safe_dt*dt:
     ndt = safe_dt*dt
   dt = ndt
+  if t + dt > tf:
+    dt = tf - t
 
-  if ncyc % 10 == 0:
-    plot(state, 'rho')
+  t += dt
+  ncyc += 1
 
-  if ncyc > 100:
-    sys.exit()
+  if t > tdump:
+    write_dump(state, nd)
+    tdump += DTd
+    nd += 1
+
+  #if ncyc % 10 == 0:
+  #  plot(state, 'rho')
+
+write_dump(state, nd)

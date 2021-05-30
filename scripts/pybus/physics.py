@@ -203,3 +203,16 @@ def get_vchar(point, d):
     vmin = vp
 
   return vmax, vmin
+
+def calc_sources(state):
+  dU = zeros([N1TOT, N2TOT, Var.SIZE])
+  for i in range(NG,N1+NG):
+    for j in range(NG,N2+NG):
+      point = Point(Location.CENT, i, j, state.prim[i,j,Var.RHO], state.prim[i,j,Var.UG],
+        state.prim[i,j,Var.V1], state.prim[i,j,Var.V2])
+      source = point.get_source()
+
+      for v in range(Var.SIZE):
+        dU[v] = source[v]
+
+  return dU

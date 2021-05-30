@@ -4,6 +4,9 @@ from state import *
 from util import *
 
 import matplotlib.pyplot as plt
+import sys
+import pickle
+import numpy as np
 
 x = zeros(N1+1)
 y = zeros(N2+1)
@@ -25,3 +28,18 @@ def plot(state, varname, vmin=None, vmax=None):
   ax.set_ylim([X2min, X2max])
   plt.colorbar()
   plt.show()
+
+if __name__ == '__main__':
+
+  print("Here!")
+  REQUIRE(len(sys.argv) == 2, "Format is:\n $ python plotting.py dumpname")
+  dumpname = sys.argv[1]
+
+  with open(dumpname, 'rb') as handle:
+    #state = pickle.load(handle)
+    prim = np.load(handle)
+
+  print(prim[:,:,Var.RHO].max())
+  state = State()
+  state.prim = np.copy(prim)
+  plot(state, 'rho')

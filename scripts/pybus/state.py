@@ -187,7 +187,7 @@ class Point:
     S = self.get_S_U()
     vcon = self.get_vcon()
     P = self.get_pressure()
-    gcon = geom.gcon(self.loc, self.i, self.j)
+    gcon = geom.gcon[self.i,self.j,self.loc,:,:]#(self.loc, self.i, self.j)
 
     for mu in range(1,4):
       for nu in range(1,4):
@@ -206,6 +206,25 @@ class Point:
         W[mu,nu] = S[mu]*vcov[nu] + P*delta(mu, nu)
 
     return W
+
+  def get_source(self):
+    source = zeros(4)
+
+    W_UU = self.get_W_UU()
+    alpha = geom.alpha[self.i,self.j,self.loc]
+    beta = geom.beta[self.i,self.j,self.loc,:]
+    dgcov = geom.dgcov[self.i,self.j,self.loc,:,:,:]
+
+    Smom = zeros(4)
+    for v in range(1,3):
+      for nu in range(1,4):
+        for lam in range(1,4):
+          Smom[v] += 1./2.*alpha*W_UU[nu,lam]*dgcov[v,nu,lam]
+
+    source[Var.V1] = Smom[1]
+    source[Var.V2] = Smom[2]
+
+    return source
 
   def get_F(self, d):
     flux = zeros(4)

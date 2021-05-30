@@ -31,9 +31,9 @@ def calc_fluxes(state):
   prim_to_cons(state.qr[:,:,:,Dir.X2], state.Ur, Location.FACE2, Dir.X2)
 
   # TODO(BRR) why are these NAN
-  print(state.Fl.max())
-  print(state.Fl[:,:,:,Dir.X1].max())
-  print(state.Fr[:,:,:,Dir.X1].max())
+  #print(state.Fl.max())
+  #print(state.Fl[:,:,:,Dir.X1].max())
+  #print(state.Fr[:,:,:,Dir.X1].max())
 
   # X1
   d = Dir.X1
@@ -74,32 +74,39 @@ def calc_fluxes(state):
         #  sys.exit()
 
   # X2
-#  d = Dir.X2
-#  vmax2 = 0
-#  for i in range(NG,N1+NG+1):
-#    for j in range(NG,N2+NG+1):
-#
-#      point_l = Point(Location.FACE2, i, j, state.ql[i,j,Var.RHO,d], state.ql[i,j,Var.UG,d],
-#        state.ql[i,j,Var.V1,d], state.ql[i,j,Var.V2,d])
-#      point_r = Point(Location.FACE2, i, j, state.qr[i,j-1,Var.RHO,d], state.qr[i,j-1,Var.UG,d],
-#        state.qr[i,j-1,Var.V1,d], state.qr[i,j-1,Var.V2,d])
-#
-#      vmax_l, vmin_l = get_vchar(point_l, d)
-#      vmax_r, vmin_r = get_vchar(point_r, d)
-#
-#      vmax = fabs(max(max(0, vmax_l), vmax_r))
-#      vmin = fabs(max(max(0., -vmin_l), -vmin_r))
-#      vtop = max(vmax, vmin)
-#      if vtop > vmax2:
-#        vmax2 = vtop
-#
-#      for v in range(Var.SIZE):
-#        Fl = state.Fl[i,j,v,d]
-#        Fr = state.Fr[i,j-1,v,d]
-#        Ul = state.Ul[i,j,v,d]
-#        Ur = state.Ur[i,j-1,v,d]
-#        state.Flux[i,j,v,d] = 0.5*(Fl + Fr - vtop*(Ur - Ul))
-  vmax2 = vmax1
+  d = Dir.X2
+  vmax2 = 0
+  for i in range(NG,N1+NG+1):
+    for j in range(NG,N2+NG+1):
+
+      #point_l = Point(Location.FACE2, i, j, state.ql[i,j,Var.RHO,d], state.ql[i,j,Var.UG,d],
+      #  state.ql[i,j,Var.V1,d], state.ql[i,j,Var.V2,d])
+      #point_r = Point(Location.FACE2, i, j, state.qr[i,j-1,Var.RHO,d], state.qr[i,j-1,Var.UG,d],
+      #  state.qr[i,j-1,Var.V1,d], state.qr[i,j-1,Var.V2,d])
+      point_r = Point(Location.FACE2, i, j, state.ql[i,j,Var.RHO,d], state.ql[i,j,Var.UG,d],
+        state.ql[i,j,Var.V1,d], state.ql[i,j,Var.V2,d])
+      point_l = Point(Location.FACE2, i, j, state.qr[i,j-1,Var.RHO,d], state.qr[i,j-1,Var.UG,d],
+        state.qr[i,j-1,Var.V1,d], state.qr[i,j-1,Var.V2,d])
+
+      vmax_l, vmin_l = get_vchar(point_l, d)
+      vmax_r, vmin_r = get_vchar(point_r, d)
+
+      vmax = fabs(max(max(0, vmax_l), vmax_r))
+      vmin = fabs(max(max(0., -vmin_l), -vmin_r))
+      vtop = max(vmax, vmin)
+      if vtop > vmax2:
+        vmax2 = vtop
+
+      for v in range(Var.SIZE):
+        #Fl = state.Fl[i,j,v,d]
+        #Fr = state.Fr[i,j-1,v,d]
+        #Ul = state.Ul[i,j,v,d]
+        #Ur = state.Ur[i,j-1,v,d]
+        Fr = state.Fl[i,j,v,d]
+        Fl = state.Fr[i,j-1,v,d]
+        Ur = state.Ul[i,j,v,d]
+        Ul = state.Ur[i,j-1,v,d]
+        state.Flux[i,j,v,d] = 0.5*(Fl + Fr - vtop*(Ur - Ul))
 
   return vmax1, vmax2
 
@@ -111,6 +118,7 @@ def advance(state_i, state_b, state_f, dt):
   vmax1, vmax2 = calc_fluxes(state_b)
 
   # Get sources
+  dU = calc_sources(state_b)
 
   prim_to_cons(state_f.prim, state_f.cons, Location.CENT)
   for i in range(NG, NG+N1):
@@ -118,7 +126,8 @@ def advance(state_i, state_b, state_f, dt):
       for v in range(Var.SIZE):
         state_f.cons[i,j,v] += dt*(
           (state_b.Flux[i,j,v,Dir.X1] - state_b.Flux[i+1,j,v,Dir.X1])/dX1
-        + (state_b.Flux[i,j,v,Dir.X2] - state_b.Flux[i,j+1,v,Dir.X2])/dX2)
+        + (state_b.Flux[i,j,v,Dir.X2] - state_b.Flux[i,j+1,v,Dir.X2])/dX2
+        + dU[i,j,v])
 
   cons_to_prim(state_f.cons, state_f.prim)
 
