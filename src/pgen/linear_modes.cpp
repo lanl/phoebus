@@ -213,8 +213,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real gcov[NDFULL][NDFULL] = {0};
         Real vcon[NDSPACE] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+        Real gcov_mink[4][4] = {0};
+        gcov_mink[0][0] = -1.;
+        gcov_mink[1][1] = 1.;
+        gcov_mink[2][2] = 1.;
+        gcov_mink[3][3] = 1.;
         SPACELOOP2(m, n) {
-          vsq += gcov[m+1][n+1]*vcon[m]*vcon[n];
+          //vsq += gcov[m+1][n+1]*vcon[m]*vcon[n];
+          vsq += gcov_mink[m+1][n+1]*vcon[m]*vcon[n];
         }
         Real Gamma = 1./sqrt(1. - vsq);
         Real ucon[NDFULL] = {Gamma, // alpha = 1

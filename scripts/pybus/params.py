@@ -4,6 +4,7 @@ from numpy import *
 tf = 1.
 dt_init = 1.e-6
 gam = 4./3.
+cfl = 0.4
 do_plot = False
 
 # Geometry
@@ -17,8 +18,8 @@ X1min = -1
 X1max = 1
 X2min = -1
 X2max = 1
-N1 = 64
-N2 = 64
+N1 = 32
+N2 = 32
 NG = 4
 
 # Initial conditions
