@@ -157,7 +157,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   Real a_snake, k_snake;
-  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
+      typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
   }
@@ -165,15 +166,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
     "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      const Real x = coords.x1v(i);
+      Real x = coords.x1v(i);
       Real y = coords.x2v(j);
 
       if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
         y = y - a_snake*sin(k_snake*x);
       }
-
-      if (i == 4 && j == 4) {
-        printf("x = %e y = %e\n", x, y);
+      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+        x = x - a_snake*sin(k_snake*x);
       }
 
       const double mode = amp*cos(k1*x + k2*y);
@@ -206,7 +206,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ib_lo + 2, k, j, i) = B30 + (dB3*mode).real();
       }
 
-      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
+          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
         Real vsq = 0.;
