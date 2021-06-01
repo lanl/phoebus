@@ -93,7 +93,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       drho = 1.;
       dug = 0.;
       du1 = 0.;
-      u10 = 0.1; // Uniform advection
+      //u10 = 0.1; // Uniform advection
     } else if (mode == "sound") {
       if (ndim == 1) {
         omega = complex<double>(0., 2.7422068833892093);
@@ -156,11 +156,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto gpkg = pmb->packages.Get("geometry");
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
-  Real a_snake, k_snake;
+  Real a_snake, k_snake, betax;
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
       typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
+  }
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
+    a_snake = gpkg->Param<Real>("a");
+    k_snake = gpkg->Param<Real>("k");
+    betax = gpkg->Param<Real>("betax");
   }
 
   pmb->par_for(
@@ -207,13 +212,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       }
 
       if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
-          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm) ||
+          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
         Real vsq = 0.;
         Real gcov[NDFULL][NDFULL] = {0};
         Real vcon[NDSPACE] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+        Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+        Real shift[NDSPACE];
+        geom.ContravariantShift(CellLocation::Cent, k, j, i);
         Real gcov_mink[4][4] = {0};
         gcov_mink[0][0] = -1.;
         gcov_mink[1][1] = 1.;
@@ -229,11 +238,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                              Gamma*v(ivlo+1, k, j, i),
                              Gamma*v(ivlo+2, k, j, i)};
         Real J[NDFULL][NDFULL] = {0};
-        J[0][0] = 1.;
-        J[1][1] = 1.;
-        J[2][2] = 1.;
-        J[3][3] = 1.;
-        J[2][1] = a_snake*k_snake*cos(k_snake*x);
+        if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+          J[0][0] = 1.;
+          J[1][1] = 1.;
+          J[2][2] = 1.;
+          J[3][3] = 1.;
+          J[2][1] = a_snake*k_snake*cos(k_snake*x);
+        } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+          PARTHENON_FAIL("This geometry isn't supported with a J!");
+        } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
+          PARTHENON_FAIL("This geometry isn't supported with a J!");
+        }
         Real ucon_snake[NDFULL] = {0, 0, 0, 0};
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
           ucon_snake[mu] += J[mu][nu]*ucon[nu];
