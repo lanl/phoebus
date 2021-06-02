@@ -44,7 +44,9 @@ namespace Geometry {
 class McKinneyGammieRyan {
 public:
   McKinneyGammieRyan()
-      : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(0),
+      //: derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(0),
+      //  smooth_(0.5), norm_(GetNorm_(alpha_, xt_)) {}
+      : derefine_poles_(false), h_(0.3), xt_(0.82), alpha_(14), x0_(0),
         smooth_(0.5), norm_(GetNorm_(alpha_, xt_)) {}
   McKinneyGammieRyan(Real x0) // this is the most common use-case
       : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(x0),
@@ -66,6 +68,7 @@ public:
 
     const Real drdX1 = std::exp(X1);
     const Real dthGdX2 = M_PI + M_PI * (1 - h_) * std::cos(2 * M_PI * X2);
+    printf("r: %e h_: %e X2: %e\n", r, h_, X2);
     Real dthdX1, dthdX2;
     if (derefine_poles_) {
       thJ_(X2, y, thJ);
