@@ -96,10 +96,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                                     Metadata::Derived, Metadata::OneCopy});
   Metadata mcons_scalar =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-                Metadata::Conserved, Metadata::FillGhost});
+            Metadata::Conserved, Metadata::WithFluxes, Metadata::FillGhost});
   Metadata mcons_threev =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-                Metadata::Conserved, Metadata::Vector, Metadata::FillGhost},
+            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes,
+            Metadata::FillGhost},
                three_vec);
 
   int ndim = 1;
