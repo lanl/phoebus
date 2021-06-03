@@ -104,7 +104,7 @@ endif()
 # HDF5
 if(PHOEBUS_ENABLE_HDF5)
   set(HDF5_PREFER_PARALLEL ${PHOEBUS_ENABLE_MPI})
-  find_package(HDF5 COMPONENTS C)
+  find_package(HDF5 COMPONENTS C HL)
   if (NOT HDF5_FOUND)
     message(FATAL_ERROR "HDF5 is required but couldn't be found. "
       "If you want to build Phoebus without HDF5, please rerun "
