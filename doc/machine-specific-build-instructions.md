@@ -54,7 +54,7 @@ The arguments `-DPAR_LOOP_LAYOUT` and `-DPAR_LOOP_INNER_LAYOUT` are important he
 - `MDRANGE_LOOP`
 - `TPTTR_LOOP`
 - `TPTVR_LOOP`
-- TPTTRTVR_LOOP
+- `TPTTRTVR_LOOP`
 
 The relevant options for `PAR_LOOP_INNER_LAYOUT` are
 - `SIMDFOR_INNER_LOOP`
