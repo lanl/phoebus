@@ -64,6 +64,7 @@ For more details, see arXiv:1905.04341. Note **do not** set `PAR_LOOP_LAYOUT=SIM
 
 ## MPI+pthreads
 
+To buld and run:
 ```bash
 mkdir -p phoebus/bin
 cd phoebus/bin
