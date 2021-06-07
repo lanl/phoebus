@@ -176,19 +176,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   std::vector<int> recon_shape({nrecon, ndim});
-  Metadata mrecon = Metadata({Metadata::Cell, Metadata::OneCopy}, recon_shape);
+  Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     recon_shape);
   physics->AddField(impl::ql, mrecon);
   physics->AddField(impl::qr, mrecon);
 
   std::vector<int> signal_shape(1, ndim);
   Metadata msignal =
-      Metadata({Metadata::Cell, Metadata::OneCopy}, signal_shape);
+	  Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+		   signal_shape);
   physics->AddField(impl::face_signal_speed, msignal);
   physics->AddField(impl::cell_signal_speed, msignal);
 
   std::vector<int> c2p_scratch_size(1, 5);
   Metadata c2p_meta =
-      Metadata({Metadata::Cell, Metadata::OneCopy}, c2p_scratch_size);
+	  Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+		   c2p_scratch_size);
   physics->AddField(impl::c2p_scratch, c2p_meta);
 
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
