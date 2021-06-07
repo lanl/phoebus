@@ -48,7 +48,7 @@ setting `-DHDF5_ROOT=/path/to/hdf5` at configure time.
 
 ### Installing hdf5 through spack
 
-If hdf5 isn't available on your target machine, here is one way to build it, using Spack.
+If hdf5 isn't available on your target machine, here is one way to build it, using [Spack](https://spack.readthedocs.io/en/latest/getting_started.html).
 ```bash
 # download spack
 git clone https://github.com/spack/spack.git
