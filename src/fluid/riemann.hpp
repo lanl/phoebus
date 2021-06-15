@@ -38,12 +38,16 @@ struct FaceGeom {
     gdd = gcon[d-1][d-1];
     g.SpacetimeMetric(loc,k,j,i,gcov);
     g.ContravariantShift(loc,k,j,i,beta);
+    g.Metric(loc,k,j,i,gammacov);
+    g.MetricInverse(loc,k,j,i,gammacon);
   }
   const Real alpha;
   const Real gdet;
   Real gcov[4][4];
   Real beta[3];
   Real gdd;
+  Real gammacov[3][3];
+  Real gammacon[3][3];
 };
 
 class FluxState {
@@ -141,6 +145,16 @@ class FluxState {
       }
       printf("vcon: %e %e %e\n", vcon[0], vcon[1], vcon[2]);
     }*/
+
+    /*Real MyDelta[3][3] = {0};
+    for (int l = 0; l < 3; l++) {
+      for (int m = 0; m < 3; m++) {
+        for (int n = 0; n < 3; n++) {
+          MyDelta[l][n] += g.gammacon[l][m]*g.gammacov[m][n];
+        }
+      }
+    }*/
+
     for (int m = 0; m < 3; m++) {
       Real bcovm = g.gcov[m+1][0] * b0/g.alpha;
       Real vcovm = 0.0;
@@ -153,7 +167,8 @@ class FluxState {
         printf("vcovm: %e\n", vcovm);
       }
       U[cmom_lo+m] = (rhohWsq+bsqWsq)*vcovm - b0*bcovm;
-      F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
+      //F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
+      F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*MyDelta[dir][m] - bcovm*Bcon[dir]/W;
     }
 
     // energy

@@ -37,7 +37,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     Real r = 4.;
     Real th = M_PI/4.;
     //Real X[4] = {0, r, th, M_PI/2.};
-    Real X[4] = {0, log(r), 0.5, M_PI/2.};
+    Real X[4] = {0, log(r), 0.25, M_PI/2.};
 
     //auto metric = Geometry::SphericalKerrSchild(a);
     auto metric = Geometry::FMKS();
