@@ -74,7 +74,7 @@ BoostedMinkowskiMesh GetCoordinateSystem<BoostedMinkowskiMesh>(MeshData<Real> *r
 template <>
 CBoostedMinkowskiMeshBlock
 GetCoordinateSystem<CBoostedMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
-  return GetCachedCoordinateSystem<CBoostedMinkowskiMeshBlock>(rc);
+  return GetCachedCoordinateSystem<BoostedMinkowskiMeshBlock>(rc);
 }
 
 template <>
@@ -86,8 +86,8 @@ template <>
 void SetGeometry<BoostedMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {}
 
 template <>
-void SetGeomety<CBoostedMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
-  SetCachedCoordinateSystem<BoostedMinkowskiMeshBlock>(rc)
+void SetGeometry<CBoostedMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
+  SetCachedCoordinateSystem<BoostedMinkowskiMeshBlock>(rc);
 }
 
 } // namespace Geometry

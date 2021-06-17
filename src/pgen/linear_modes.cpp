@@ -145,7 +145,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     msg << "Physics option \"" << physics << "\" not recognized!";
     PARTHENON_FAIL(msg);
   }
-  pin->SetReal("parthenon/time", "tlim", 2.*M_PI/omega.imag()); // Set final time to be one period
+  // Set final time to be one period
+  pin->SetReal("parthenon/time", "tlim", 2.*M_PI/omega.imag());
+  std::cout << "Resetting final time to 1 wave period: "
+	    << 2.*M_PI/omega.imag()
+	    << std::endl;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -228,7 +232,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
         Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
         Real shift[NDSPACE];
-        geom.ContravariantShift(CellLocation::Cent, k, j, i);
+        geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
         Real gcov_mink[4][4] = {0};
         gcov_mink[0][0] = -1.;
         gcov_mink[1][1] = 1.;
@@ -264,7 +268,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
           ucon_transformed[mu] += J[mu][nu]*ucon[nu];
         }
-        Gamma = ucon_snake[0]; // alpha = 1
+        Gamma = ucon_transformed[0]; // alpha = 1
         v(ivlo, k, j, i) = ucon_transformed[1]/Gamma;
         v(ivlo+1, k, j, i) = ucon_transformed[2]/Gamma;
         v(ivlo+2, k, j, i) = ucon_transformed[3]/Gamma;
