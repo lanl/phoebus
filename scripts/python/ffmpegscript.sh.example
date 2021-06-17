@@ -1,0 +1,5 @@
+#!/bin/bash
+ffmpeg -r 10 -f image2 -i %04d.png -vcodec libx264 -crf 25  -pix_fmt yuv420p output.mp4
+
+#ffmpeg -i img%06d.png -frames 101 -c:v mjpeg -r 5 -filter:v "setpts=5.0*PTS" -stats -y output.mp4
+
