@@ -156,7 +156,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto gpkg = pmb->packages.Get("geometry");
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
-  Real a_snake, k_snake, betax;
+  Real a_snake, k_snake, betax, betay, betaz;
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
       typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
     a_snake = gpkg->Param<Real>("a");
@@ -166,6 +166,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
     betax = gpkg->Param<Real>("betax");
+  }
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+    betax = gpkg->Param<Real>("vx");
+    betay = gpkg->Param<Real>("vy");
+    betaz = gpkg->Param<Real>("vz");
   }
 
   pmb->par_for(
@@ -213,7 +218,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
           typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm) ||
-          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
+          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy) ||
+	  typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
         Real vsq = 0.;
@@ -244,19 +250,24 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           J[2][2] = 1.;
           J[3][3] = 1.;
           J[2][1] = a_snake*k_snake*cos(k_snake*x);
+	} else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+	  J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
+	  J[1][0] = -betax;
+	  J[2][0] = -betay;
+	  J[3][0] = -betaz;
         } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
           PARTHENON_FAIL("This geometry isn't supported with a J!");
         } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
           PARTHENON_FAIL("This geometry isn't supported with a J!");
         }
-        Real ucon_snake[NDFULL] = {0, 0, 0, 0};
+        Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
-          ucon_snake[mu] += J[mu][nu]*ucon[nu];
+          ucon_transformed[mu] += J[mu][nu]*ucon[nu];
         }
         Gamma = ucon_snake[0]; // alpha = 1
-        v(ivlo, k, j, i) = ucon_snake[1]/Gamma;
-        v(ivlo+1, k, j, i) = ucon_snake[2]/Gamma;
-        v(ivlo+2, k, j, i) = ucon_snake[3]/Gamma;
+        v(ivlo, k, j, i) = ucon_transformed[1]/Gamma;
+        v(ivlo+1, k, j, i) = ucon_transformed[2]/Gamma;
+        v(ivlo+2, k, j, i) = ucon_transformed[3]/Gamma;
 
         // Enforce zero B fields for now
         if (ib_hi >= 3) {
