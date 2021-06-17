@@ -43,7 +43,9 @@ class BoostedMinkowski {
  public:
   BoostedMinkowski() : vx_(0), vy_(0), vz_(0) {}
   BoostedMinkowski(const Real &vx, const Real &vy, const Real &vz)
-      : vx_(vx), vy_(vy), vz_(vz) {}
+      : vx_(vx), vy_(vy), vz_(vz) {
+    //printf("vx, vy, vz = %g, %g, %g\n", vx_, vy_, vz_);
+  }
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const { return 1.; }
   KOKKOS_INLINE_FUNCTION
@@ -78,13 +80,13 @@ class BoostedMinkowski {
   KOKKOS_INLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
     LinearAlgebra::SetZero(gamma, NDSPACE, NDSPACE);
-    g[0][0] = g[1][1] = g[2][2] = 1;
+    gamma[0][0] = gamma[1][1] = gamma[2][2] = 1;
   }
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
                      Real gamma[NDSPACE][NDSPACE]) const {
     LinearAlgebra::SetZero(gamma, NDSPACE, NDSPACE);
-    g[0][0] = g[1][1] = g[2][2] = 1;
+    gamma[0][0] = gamma[1][1] = gamma[2][2] = 1;
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const { return 1.; }
@@ -114,7 +116,7 @@ class BoostedMinkowski {
   }
 
  private:
-  const Real vx_, vy_, vz_;
+  Real vx_, vy_, vz_;
 };
 
 using BoostedMinkowskiMeshBlock = Analytic<BoostedMinkowski, IndexerMeshBlock>;

@@ -91,10 +91,12 @@ class FluxState {
     const Real P = q(dir,prs,k,j,i);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
+    /*
     if (j == 32 && i == 32) {
       printf("rho = %e u = %e P = %e v = %e %e %e\n",
         rho, u, P, vcon[0], vcon[1], vcon[2]);
     }
+    */
 
     for (int m = pb_lo; m <= pb_hi; m++) {
       Bcon[m-pb_lo] = q(dir, m, k, j, i);
@@ -118,10 +120,12 @@ class FluxState {
     U[crho] = rho*W;
     F[crho] = U[crho]*vtil;
 
+    /*
     if (i == 32 && j == 32) {
-      printf("rho = %e W = %e vtil = %e vel = %e beta/alpha = %e Frho = %e\n",
-        rho, W, vtil, vel, g.beta[dir]/g.alpha, F[crho]);
+      printf("dir = %d rho = %e W = %e vtil = %e vel = %e beta/alpha = %e Frho = %e\n",
+	     dir, rho, W, vtil, vel, g.beta[dir]/g.alpha, F[crho]);
     }
+    */
 
     // composition
     if (cye>0) {
@@ -148,10 +152,13 @@ class FluxState {
         bcovm += g.gcov[m+1][n] * (Bcon[n-1]/W + b0*(vcon[n-1]-g.beta[n-1]/g.alpha));
         vcovm += g.gcov[m+1][n] * vcon[n-1];
       }
-      if (i == 32 && j == 32) {
 
+      /*
+      if (i == 32 && j == 32) {
         printf("vcovm: %e\n", vcovm);
       }
+      */
+
       U[cmom_lo+m] = (rhohWsq+bsqWsq)*vcovm - b0*bcovm;
       F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
     }
