@@ -26,7 +26,7 @@ variables = p.density,  &
 	          cs
 
 file_type   = hdf5      # Tabular data dump
-dt          = 0.5      # time increment between outputs
+dt          = 0.1      # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
@@ -70,6 +70,12 @@ field = c.c.bulk.rho
 method = derivative_order_1
 max_level = 3
 
+<coordinates>
+# vx = 0.308606699924204
+# vy = 0.308606699924204
+vx = 0.436436
+vy = 0.436436
+
 <eos>
 type = IdealGas
 Gamma = 1.333333333333333333
@@ -92,6 +98,6 @@ recon = linear
 c2p_tol = 1.e-12
 
 <hydro_modes>
-physics = mhd
-mode = alfven
+physics = hydro
+mode = sound
 amplitude = 1.e-5

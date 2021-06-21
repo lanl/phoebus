@@ -159,7 +159,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // update ghost cells
     auto send = tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
     auto recv = tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
-    auto fill_from_bufs = tl.AddTask(recv, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
+    auto fill_from_bufs = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, sc1);
   }
 
   TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);
