@@ -34,6 +34,7 @@ using namespace parthenon::package::prelude;
 
 // coordinate system includes
 #include "geometry/analytic_system.hpp"
+#include "geometry/boosted_minkowski.hpp"
 #include "geometry/boyer_lindquist.hpp"
 #include "geometry/cached_system.hpp"
 #include "geometry/fmks.hpp"

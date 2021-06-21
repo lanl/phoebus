@@ -24,11 +24,6 @@ B10 = 1.
 B20 = 0.
 B30 = 0.
 amp = 1.e-5
-physics = 'mhd'
-mode_name = 'alfven'
-recon = 'weno5'
-plot_each_wave = True
-plot_initial = False
 
 import numpy as np
 import sys
@@ -37,9 +32,44 @@ import shutil
 import os
 from subprocess import call, DEVNULL
 import glob
-sys.path.append(PHDF_PATH)
-import phdf
 import time
+from argparse import ArgumentParser
+
+try:
+  # if parthenon tools is installed
+  from parthenon_tools import phdf
+except:
+  sys.path.append(PHDF_PATH)
+  import phdf
+
+parser = ArgumentParser(description='Check linear mode convergence')
+parser.add_argument('-b','--boost',action='store_true',
+                    help='boost the coordinate system')
+parser.add_argument('-p','--physics',metavar='P',type=str,
+                    default='hydro',
+                    choices=['hydro','mhd'],
+                    help='What physics to use')
+parser.add_argument('-m','--mode',metavar='M',type=str,
+                    default='sound',
+                    choices=['entropy','sound','alfven','slow','fast'],
+                    help='What mode to test')
+parser.add_argument('-r','--recon',metavar='R',type=str,
+                    default='weno5',
+                    help='Reconstruction method')
+parser.add_argument('-s', '--save',type=str,
+                    default=None,
+                    help='File to save plot as')
+parser.add_argument('executable',metavar='E',type=str,
+                    help='Executable to run')
+parser.add_argument('input_file', metavar='pin',type=str,
+                    help='Input file to use')
+args = parser.parse_args()
+
+physics = args.physics
+mode_name = args.mode
+recon = 'weno5'
+plot_each_wave = True
+plot_initial = False
 
 def clean_dump_files():
   # Clean up dump files
@@ -49,6 +79,7 @@ def clean_dump_files():
 mode = {}
 mode['k1'] = 2.*np.pi
 mode['k2'] = 2.*np.pi
+mode['knorm'] = np.sqrt(mode['k1']**2 + mode['k2']**2)
 
 u1 = 0 # Boosted mode (for entropy)
 if physics == "hydro":
@@ -97,14 +128,15 @@ elif physics == "mhd":
 else:
   print("physics \"" + physics + "\" not understood")
 
-if len(sys.argv) != 3:
-  print("ERROR: format is")
-  print("  python linmode.py [executable] [inputfile]")
-  sys.exit()
+mode['cs'] = mode['omega'].imag/mode['knorm']
+mode['tf'] = 2.*np.pi/mode['omega'].imag
+mode['hf'] = 1./mode['tf']
+print('final time = %g. cs = %g. 1/tfinal = %g.'
+      % (mode['tf'], mode['cs'], mode['hf']))
 
-EXECUTABLE = sys.argv[1]
+EXECUTABLE = args.executable
 TMPINPUTFILE = 'tmplinmode.pin'
-shutil.copyfile(sys.argv[2], TMPINPUTFILE)
+shutil.copyfile(args.input_file, TMPINPUTFILE)
 
 def get_mode(x, y, t, var):
   k1 = mode['k1']
@@ -144,6 +176,16 @@ for n, N in enumerate(res):
         if (line.startswith("nx2")):
           lines[i] = "nx2 = %i" % N + "\n"
         #break
+      if line.startswith('vx'):
+        if args.boost:
+          lines[i] = 'vx = %g' % mode['hf'] + '\n'
+        else:
+          lines[i] = 'vx = %g' % 0 + '\n'
+      if line.startswith('vy'):
+        if args.boost:
+          lines[i] = 'vy = %g' % mode['hf'] + '\n'
+        else:
+          lines[i] = 'vy = %g' % 0 + '\n'
       if (line.startswith("physics")):
         lines[i] = "physics = " + physics + "\n"
       if (line.startswith("mode")):
@@ -172,7 +214,7 @@ for n, N in enumerate(res):
   dumps = np.sort(glob.glob('hydro_modes*.phdf'))
 
   dump = phdf.phdf(dumps[-1])
-  tf_soln = 2.*np.pi/mode['omega'].imag
+  tf_soln = mode['tf']
   t = dump.Time
   if (np.fabs(t - tf_soln)/tf_soln) > 0.05:
     print("Mismatch in expected solution times!")
@@ -254,4 +296,7 @@ for N in res:
 ax.set_xticklabels(ticks, minor=False)
 ax.xaxis.set_tick_params(which='minor', bottom=False)
 plt.minorticks_off()
-plt.show()
+if args.save:
+  plt.savefig(args.save,bbox_inches='tight')
+else:
+  plt.show()
