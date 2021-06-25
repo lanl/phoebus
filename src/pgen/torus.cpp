@@ -287,7 +287,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 }
 
 void ProblemModifier(ParameterInput *pin) {
-  Real router = pin->GetOrAddReal("torus", "r_outer", 40.0);
+  Real router = pin->GetOrAddReal("coordinates", "r_outer", 40.0);
   Real x1max = log(router);
   pin->SetReal("parthenon/mesh", "x1max", x1max);
 
