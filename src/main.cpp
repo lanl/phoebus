@@ -16,7 +16,7 @@
 #include <defs.hpp>
 #include <parthenon_manager.hpp>
 
-#include "initial_conditions.hpp"
+#include "pgen/pgen.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
 
@@ -60,6 +60,8 @@ int main(int argc, char *argv[]) {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
         Boundaries::OutflowOuterX1;
   }
+
+  phoebus::ProblemModifier(pman.pinput.get());
 
   // call ParthenonInit to set up the mesh
   pman.ParthenonInitPackagesAndMesh();

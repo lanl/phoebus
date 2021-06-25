@@ -17,6 +17,7 @@ add_executable(phoebus
   # alphabetical
 
   fluid/con2prim.hpp
+  fluid/con2prim_robust.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
   fluid/riemann.hpp
@@ -56,6 +57,7 @@ add_executable(phoebus
   pgen/rhs_tester.cpp
   pgen/shock_tube.cpp
   pgen/sedov.cpp
+  pgen/torus.cpp
 
   phoebus_boundaries/phoebus_boundaries.hpp
   phoebus_boundaries/phoebus_boundaries.cpp
@@ -66,6 +68,7 @@ add_executable(phoebus
   phoebus_utils/cell_locations.hpp
   phoebus_utils/debug_utils.hpp
   phoebus_utils/linear_algebra.hpp
+  phoebus_utils/robust.hpp
   phoebus_utils/variables.hpp
 
   reconstruction.hpp

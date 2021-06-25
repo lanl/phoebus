@@ -194,7 +194,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 		   c2p_scratch_size);
   physics->AddField(impl::c2p_scratch, c2p_meta);
 
-  physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
+  physics->FillDerivedBlock = ConservedToPrimitiveRobust<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
@@ -316,6 +316,54 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
           v(b, cye, k, j, i) = v(b, crho, k, j, i) * v(b, pye, k, j, i);
         }
       });
+
+  return TaskStatus::complete;
+}
+
+template <typename T> TaskStatus ConservedToPrimitiveRobust(T *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+
+  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  const Real c2p_tol = pkg->Param<Real>("c2p_tol");
+  const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
+  auto invert = con2prim_robust::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
+
+  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  auto coords = pmb->coords;
+
+  auto fail = rc->Get(internal_variables::fail).data;
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+
+  // breaking con2prim into 3 kernels seems more performant.  WHY?
+  // if we can combine them, we can get rid of the mesh sized scratch array
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
+      invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        auto status = invert(geom, eos, coords, k, j, i);
+        fail(k, j, i) = (status == con2prim_robust::ConToPrimStatus::success
+                                 ? con2prim_robust::FailFlags::success
+                                 : con2prim_robust::FailFlags::fail);
+      });
+  // this is where we might stick fixup
+  int fail_cnt;
+  parthenon::par_reduce(
+      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve", DevExecSpace(),
+      0, invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
+                    int &f) {
+        f += (fail(k, j, i) == con2prim_robust::FailFlags::success ? 0 : 1);
+        if (fail(k,j,i) != con2prim_robust::FailFlags::success) {
+          fprintf(stderr,"Con2Prim failed at %g %g %g\n", std::exp(coords.x1v(i)), coords.x2v(j), coords.x3v(k));
+        }
+      },
+      Kokkos::Sum<int>(fail_cnt));
+  PARTHENON_REQUIRE(fail_cnt == 0, "Con2Prim Failed!");
 
   return TaskStatus::complete;
 }
