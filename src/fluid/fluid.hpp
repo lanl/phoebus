@@ -22,6 +22,7 @@ using namespace parthenon::package::prelude;
 
 #include <eos/eos.hpp>
 #include "con2prim.hpp"
+#include "con2prim_robust.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -35,9 +36,7 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc);
 template <typename T>
-TaskStatus ConservedToPrimitive2(T *rc);
-template <typename T>
-TaskStatus ConservedToPrimitive3(T *rc);
+TaskStatus ConservedToPrimitiveRobust(T *rc);
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real> *rc_src);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
 TaskStatus FluxCT(MeshBlockData<Real> *rc);
