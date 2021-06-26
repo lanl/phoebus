@@ -160,11 +160,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto gpkg = pmb->packages.Get("geometry");
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
-  Real a_snake, k_snake, betax, betay, betaz;
+  Real a_snake, k_snake, alpha, betax, betay, betaz;
+  a_snake = k_snake = alpha = betax = betay = betaz = 0;
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
       typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
+    alpha = gpkg->Param<Real>("alpha");
+    betay = gpkg->Param<Real>("betay");
+    PARTHENON_REQUIRE_THROWS(alpha > 0, "lapse must be positive");
   }
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
     a_snake = gpkg->Param<Real>("a");
@@ -246,11 +250,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                              Gamma*v(ivlo+2, k, j, i)};
         Real J[NDFULL][NDFULL] = {0};
         if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
-          J[0][0] = 1.;
-          J[1][1] = 1.;
-          J[2][2] = 1.;
-          J[3][3] = 1.;
+          J[0][0] = 1/alpha;
+	  J[2][0] = -betay/alpha;
           J[2][1] = a_snake*k_snake*cos(k_snake*x);
+	  J[1][1] = J[2][2] = J[3][3] = 1;
 	} else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
 	  J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
 	  J[1][0] = -betax;
