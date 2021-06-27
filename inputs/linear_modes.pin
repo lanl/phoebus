@@ -40,14 +40,14 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 512       # Number of zones in X1-direction
+nx1         = 128       # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1         # maximum value of X1
 ix1_bc      = periodic  # Inner-X1 boundary condition flag
 ox1_bc      = periodic  # Outer-X1 boundary condition flag
 
-nx2         = 512       # Number of zones in X2-direction
-x2min       = -1        # minimum value of X2
+nx2         = 128       # Number of zones in X2-direction
+x2min       = 0         # minimum value of X2
 x2max       = 1         # maximum value of X2
 ix2_bc      = periodic  # Inner-X2 boundary condition flag
 ox2_bc      = periodic  # Outer-X2 boundary condition flag
@@ -61,8 +61,8 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 512
-nx2 = 512
+nx1 = 128
+nx2 = 128
 nx3 = 1
 
 <parthenon/refinement0>
@@ -70,11 +70,24 @@ field = c.c.bulk.rho
 method = derivative_order_1
 max_level = 3
 
+# Uses this one for Boosted Minkowski
 <coordinates>
 # vx = 0.308606699924204
 # vy = 0.308606699924204
 vx = 0.436436
 vy = 0.436436
+
+# Uses this one for boosted snake coordinates
+# TODO(JMM): Should we unify this interface
+<geometry>
+# k = 25.1327 # wave number. Default is 2*pi
+kmult = 4     # Multiply k by this factor
+a = 0.3       # amplitude of wiggle
+alpha = 0.85    # lapse
+vy = 0.524631
+# vy = 0.81     # shift. Default is 0.
+# vy = 0.617213 # shift. Default is 0.
+# vy = 0      # shift. Default is 0.
 
 <eos>
 type = IdealGas
