@@ -14,7 +14,8 @@
 # publicly, and to permit others to do so.
 
 PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
-res = [8, 16, 32]
+res_low = [8, 16, 32]
+res_high = [128, 256, 512]
 colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
           'tab:brown', 'tab:pink', 'tab:gray']
 
@@ -43,6 +44,12 @@ except:
   import phdf
 
 parser = ArgumentParser(description='Check linear mode convergence')
+parser.add_argument('--highres',action='store_true',
+                    help='Use higher resolution for convergence')
+parser.add_argument('-i','--use_initial',action='store_true',
+                    help='Use initial conditions as analytic solution')
+parser.add_argument('-a','--lapse', type=float, default = 1.0,
+                    help='Lapse to use')
 parser.add_argument('-b','--boost',action='store_true',
                     help='boost the coordinate system')
 parser.add_argument('-p','--physics',metavar='P',type=str,
@@ -59,11 +66,19 @@ parser.add_argument('-r','--recon',metavar='R',type=str,
 parser.add_argument('-s', '--save',type=str,
                     default=None,
                     help='File to save plot as')
+parser.add_argument("-d","--dim",type=int,default=2,
+                    choices=[1,2],
+                    help='Number of dimensions')
 parser.add_argument('executable',metavar='E',type=str,
                     help='Executable to run')
 parser.add_argument('input_file', metavar='pin',type=str,
                     help='Input file to use')
 args = parser.parse_args()
+
+if args.highres:
+  res = res_high
+else:
+  res = res_low
 
 physics = args.physics
 mode_name = args.mode
@@ -77,13 +92,14 @@ def clean_dump_files():
     os.remove(dump)
 
 mode = {}
+mode['lapse'] = args.lapse
 mode['k1'] = 2.*np.pi
 mode['k2'] = 2.*np.pi
 mode['knorm'] = np.sqrt(mode['k1']**2 + mode['k2']**2)
+mode['dim'] = args.dim
 
 u1 = 0 # Boosted mode (for entropy)
 if physics == "hydro":
-  mode['dim'] = 1
   if mode_name == "entropy":
     mode['omega'] = 0 + (2.*np.pi/10.)*1j
     mode['vars'] = ['rho']
@@ -91,15 +107,23 @@ if physics == "hydro":
     mode['ug'] = 0.
     u1 = 0.1
   elif mode_name == "sound":
-    mode['omega'] = 0 + 2.7422068833892093j
-    mode['vars'] = ['rho', 'ug', 'u1']
-    mode['rho'] = 0.5804294924639215
-    mode['ug'] = 0.7739059899518946
-    mode['u1'] = -0.2533201985524494
+    if mode['dim'] == 1:
+      mode['omega'] = 0 + 2.7422068833892093j
+      mode['vars'] = ['rho', 'ug', 'u1']
+      mode['rho'] = 0.5804294924639215
+      mode['ug'] = 0.7739059899518946
+      mode['u1'] = -0.2533201985524494
+    elif mode['dim'] == 2:
+      mode['omega'] = 0 + 3.8780661653218766j
+      mode['vars'] = ['rho', 'ug', 'u1', 'u2']
+      mode['rho'] = 0.5804294924639213
+      mode['ug'] = 0.7739059899518947
+      mode['u1'] = 0.1791244302079596
+      mode['u2'] = 0.1791244302079596
   else:
     print("mode_name \"" + mode_name + "\" not understood")
 elif physics == "mhd":
-  mode['dim'] = 2
+  assert mode['dim'] == 2
   if mode_name == "alfven":
     mode['omega'] = 0 + 3.44144232573j
     mode['vars'] = ['u3', 'B3']
@@ -130,6 +154,7 @@ else:
 
 mode['cs'] = mode['omega'].imag/mode['knorm']
 mode['tf'] = 2.*np.pi/mode['omega'].imag
+mode['tf'] /= mode['lapse']
 mode['hf'] = 1./mode['tf']
 print('final time = %g. cs = %g. 1/tfinal = %g.'
       % (mode['tf'], mode['cs'], mode['hf']))
@@ -165,6 +190,8 @@ for n, N in enumerate(res):
   with open(TMPINPUTFILE, 'r') as infile:
     lines = infile.readlines()
     for i, line in enumerate(lines):
+      if (line.startswith("dt") and 'dt_init_fact' not in line):
+        lines[i] = 'dt = %g' % mode['tf'] + '\n'
       if (line.startswith("nx1")):
         lines[i] = "nx1 = %i" % N + "\n"
       if mode['dim'] == 1:
@@ -176,6 +203,8 @@ for n, N in enumerate(res):
         if (line.startswith("nx2")):
           lines[i] = "nx2 = %i" % N + "\n"
         #break
+      if line.startswith('alpha'):
+        lines[i] = 'alpha = %g' % mode['lapse'] + '\n'
       if line.startswith('vx'):
         if args.boost:
           lines[i] = 'vx = %g' % mode['hf'] + '\n'
@@ -240,8 +269,26 @@ for n, N in enumerate(res):
     for key in parth.keys():
       parth[key] = parth[key][0,:]
 
-  for var in mode['vars']:
-    mode[var + '_soln'] = get_mode(x, y, t, var)
+  if args.use_initial:
+    dump = phdf.phdf(dumps[0])
+    mode['rho_soln'] = dump.Get('p.density', flatten=False)[0,0,:,:] - rho0
+    mode['ug_soln'] = dump.Get('p.energy', flatten=False)[0,0,:,:] - ug0
+    mode['u1_soln'] = dump.Get('p.velocity', flatten=False)[0,0,:,:,0]
+    mode['u2_soln'] = dump.Get('p.velocity', flatten=False)[0,0,:,:,1]
+    mode['u3_soln'] = dump.Get('p.velocity', flatten=False)[0,0,:,:,2]
+    if physics == 'mhd':
+      parth['B1_soln'] = dump.Get('p.bfield', flatten=False)[0,0,:,:,0] - B10
+      parth['B2_soln'] = dump.Get('p.bfield', flatten=False)[0,0,:,:,1] - B20
+      parth['B3_soln'] = dump.Get('p.bfield', flatten=False)[0,0,:,:,2] - B30
+    if mode['dim'] == 1:
+      for key in mode.keys():
+        if '_soln' in key:
+          mode[key] = mode[key][0,:]
+  else:
+    for var in mode['vars']:
+      mode[var + '_soln'] = get_mode(x, y, t, var)
+    
+  for var in mode['vars']:  
     L1[var][n] =  np.fabs(parth['d' + var] - mode[var + '_soln']).sum()/(N*N*amp)
 
   if plot_each_wave:
