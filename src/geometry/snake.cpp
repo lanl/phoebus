@@ -36,9 +36,15 @@ void Initialize<SnakeMeshBlock>(ParameterInput *pin,
                                       StateDescriptor *geometry) {
   Params &params = geometry->AllParams();
   Real a = pin->GetOrAddReal("geometry", "a", 0.3);
-  Real k = pin->GetOrAddReal("geometry", "k", M_PI/2.);
+  Real alpha = pin->GetOrAddReal("geometry", "alpha", 1.0);
+  Real vy = pin->GetOrAddReal("geometry", "vy", 0.0);
+  Real k = pin->GetOrAddReal("geometry", "k", 2*M_PI);
+  Real kmult = pin->GetOrAddReal("geometry", "kmult", 1);
+  k *= kmult;
   params.Add("a", a);
   params.Add("k", k);
+  params.Add("alpha", alpha);
+  params.Add("vy", vy);
 }
 
 template <> void SetGeometry<SnakeMeshBlock>(MeshBlockData<Real> *rc) {}
@@ -50,7 +56,9 @@ GetCoordinateSystem<SnakeMeshBlock>(MeshBlockData<Real> *rc) {
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real k = pkg->Param<Real>("k");
-  return SnakeMeshBlock(indexer, a, k);
+  Real alpha = pkg->Param<Real>("alpha");
+  Real vy = pkg->Param<Real>("vy");
+  return SnakeMeshBlock(indexer, a, k, alpha, vy);
 }
 template <>
 SnakeMesh GetCoordinateSystem<SnakeMesh>(MeshData<Real> *rc) {
@@ -58,7 +66,9 @@ SnakeMesh GetCoordinateSystem<SnakeMesh>(MeshData<Real> *rc) {
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real k = pkg->Param<Real>("k");
-  return SnakeMesh(indexer, a, k);
+  Real alpha = pkg->Param<Real>("alpha");
+  Real vy = pkg->Param<Real>("vy");
+  return SnakeMesh(indexer, a, k, alpha, vy);
 }
 
 template <>
