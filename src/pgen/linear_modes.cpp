@@ -74,8 +74,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double B30 = 0.;
 
   // Wavevector
-  double k1 = 2.*M_PI;
-  double k2 = 2.*M_PI;
+  constexpr double kk = 2*M_PI;
+  double k1 = kk;
+  double k2 = kk;
 
   complex<double> omega = 0.;
   complex<double> drho = 0.;
@@ -145,26 +146,32 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     msg << "Physics option \"" << physics << "\" not recognized!";
     PARTHENON_FAIL(msg);
   }
-  // Set final time to be one period
-  pin->SetReal("parthenon/time", "tlim", 2.*M_PI/omega.imag());
-  std::cout << "Resetting final time to 1 wave period: "
-	    << 2.*M_PI/omega.imag()
-	    << std::endl;
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  Real tf = 2.*M_PI/omega.imag();
+  Real cs = omega.imag() / (std::sqrt(2)*kk);
 
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
   auto gpkg = pmb->packages.Get("geometry");
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
-  Real a_snake, k_snake, betax, betay, betaz;
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+
+  Real a_snake, k_snake, alpha, betax, betay, betaz;
+  alpha = 1;
+  a_snake = k_snake = betax = betay = betaz = 0;
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
       typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
+    alpha = gpkg->Param<Real>("alpha");
+    betay = gpkg->Param<Real>("vy");
+    PARTHENON_REQUIRE_THROWS(alpha > 0, "lapse must be positive");
+
+    printf("a, k, alpha, beta = %g, %g, %g, %g\n",
+	   a_snake, k_snake, alpha, betay);
+    tf /= alpha;
   }
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
     a_snake = gpkg->Param<Real>("a");
@@ -176,6 +183,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     betay = gpkg->Param<Real>("vy");
     betaz = gpkg->Param<Real>("vz");
   }
+
+  // Set final time to be one period
+  pin->SetReal("parthenon/time", "tlim", tf);
+  tf = pin->GetReal("parthenon/time", "tlim");
+  std::cout << "Resetting final time to 1 wave period: "
+	    << tf
+	    << std::endl;
+  std::cout << "Wave frequency is: "
+	    << 1./tf
+	    << std::endl;
+  std::cout << "Wave speed is: "
+	    << cs
+	    << std::endl;
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -240,17 +260,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           vsq += gcov_mink[m+1][n+1]*vcon[m]*vcon[n];
         }
         Real Gamma = 1./sqrt(1. - vsq);
-        Real ucon[NDFULL] = {Gamma, // alpha = 1
+        Real ucon[NDFULL] = {Gamma, // alpha = 1 in Minkowski
                              Gamma*v(ivlo, k, j, i),
                              Gamma*v(ivlo+1, k, j, i),
                              Gamma*v(ivlo+2, k, j, i)};
         Real J[NDFULL][NDFULL] = {0};
         if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
-          J[0][0] = 1.;
-          J[1][1] = 1.;
-          J[2][2] = 1.;
-          J[3][3] = 1.;
+          J[0][0] = 1/alpha;
+	  J[2][0] = -betay/alpha;
           J[2][1] = a_snake*k_snake*cos(k_snake*x);
+	  J[1][1] = J[2][2] = J[3][3] = 1;
 	} else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
 	  J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
 	  J[1][0] = -betax;
