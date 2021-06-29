@@ -41,24 +41,46 @@ int main(int argc, char *argv[]) {
   // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
 
+  const std::string bc_vars = pman.pinput->GetOrAddString("phoebus", "bc_vars", "conserved");
+
   // TODO(JMM): Move this into another function somewhere?
   const std::string bc_ix1 =
       pman.pinput->GetOrAddString("phoebus", "bc_ix1", "reflect");
   const std::string bc_ox1 =
       pman.pinput->GetOrAddString("phoebus", "bc_ox1", "outflow");
-  if (bc_ix1 == "reflect") {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
-        Boundaries::ReflectInnerX1;
+
+  if (bc_vars == "conserved") {
+    if (bc_ix1 == "reflect") {
+      pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
+          Boundaries::ReflectInnerX1;
+    } else {
+      pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
+          Boundaries::OutflowInnerX1;
+    }
+    if (bc_ox1 == "reflect") {
+      pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
+          Boundaries::ReflectOuterX1;
+    } else {
+      pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
+          Boundaries::OutflowOuterX1;
+    }
+  } else if (bc_vars == "primitive") {
+    if (bc_ix1 == "reflect") {
+      pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
+          Boundaries::ReflectInnerX1;
+    } else {
+      pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
+          Boundaries::OutflowInnerX1;
+    }
+    if (bc_ox1 == "reflect") {
+      pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
+          Boundaries::ReflectOuterX1;
+    } else {
+      pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
+          Boundaries::OutflowOuterX1;
+    }
   } else {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
-        Boundaries::OutflowInnerX1;
-  }
-  if (bc_ox1 == "reflect") {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-        Boundaries::ReflectOuterX1;
-  } else {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-        Boundaries::OutflowOuterX1;
+    PARTHENON_FAIL("\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
 
   // call ParthenonInit to set up the mesh
