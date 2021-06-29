@@ -88,20 +88,43 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata m;
   std::vector<int> three_vec(1, 3);
 
-  Metadata mprim_threev =
+  const std::string bc_vars = pin->GetOrAddString("phoebus", "bc_vars", "conserved");
+
+  Metadata mprim_threev, mprim_scalar, mcons_scalar, mcons_threev;
+
+  if (bc_vars == "conserved") {
+    mprim_threev =
       Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                 Metadata::Derived, Metadata::OneCopy},
                three_vec);
-  Metadata mprim_scalar = Metadata({Metadata::Cell, Metadata::Intensive,
+    mprim_scalar = Metadata({Metadata::Cell, Metadata::Intensive,
                                     Metadata::Derived, Metadata::OneCopy});
-  Metadata mcons_scalar =
+    mcons_scalar =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
             Metadata::Conserved, Metadata::WithFluxes, Metadata::FillGhost});
-  Metadata mcons_threev =
+    mcons_threev =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
             Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes,
             Metadata::FillGhost},
                three_vec);
+  } else if (bc_vars == "primitive") {
+    mprim_threev =
+      Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
+                Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
+               three_vec);
+    mprim_scalar = Metadata({Metadata::Cell, Metadata::Intensive,
+                                    Metadata::Derived, Metadata::OneCopy,
+                                    Metadata::FillGhost});
+    mcons_scalar =
+      Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
+            Metadata::Conserved, Metadata::WithFluxes});
+    mcons_threev =
+      Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
+            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
+               three_vec);
+  } else {
+    PARTHENON_FAIL("\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
+  }
 
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
