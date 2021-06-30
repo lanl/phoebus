@@ -1,5 +1,9 @@
 //========================================================================================
+<<<<<<< HEAD
 // (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
+=======
+// (C) (or copyright) 2020. Triad National Security, LLC. All rights reserved.
+>>>>>>> asc-gitlab/MC
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -15,7 +19,11 @@
 #include <string>
 #include <vector>
 
+<<<<<<< HEAD
 //TODO(JCD): this should be exported by parthenon
+=======
+// TODO(JCD): this should be exported by parthenon
+>>>>>>> asc-gitlab/MC
 #include <refinement/refinement.hpp>
 
 // Local Includes
@@ -25,6 +33,10 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_driver.hpp"
 #include "phoebus_utils/debug_utils.hpp"
+<<<<<<< HEAD
+=======
+#include "radiation/radiation.hpp"
+>>>>>>> asc-gitlab/MC
 
 using namespace parthenon::driver::prelude;
 
@@ -57,19 +69,43 @@ TaskListStatus PhoebusDriver::Step() {
   static bool first_call = true;
   TaskListStatus status;
   Real dt_trial = tm.dt;
+<<<<<<< HEAD
   if (first_call) dt_trial = std::min(dt_trial, dt_init);
   dt_trial *= dt_init_fact;
   dt_init_fact = 1.0;
   if (tm.time + dt_trial > tm.tlim) dt_trial = tm.tlim-tm.time;
+=======
+  if (first_call)
+    dt_trial = std::min(dt_trial, dt_init);
+  dt_trial *= dt_init_fact;
+  dt_init_fact = 1.0;
+  if (tm.time + dt_trial > tm.tlim)
+    dt_trial = tm.tlim - tm.time;
+>>>>>>> asc-gitlab/MC
   tm.dt = dt_trial;
   integrator->dt = dt_trial;
 
   for (int stage = 1; stage <= integrator->nstages; stage++) {
     TaskCollection tc = RungeKuttaStage(stage);
     status = tc.Execute();
+<<<<<<< HEAD
     if (status != TaskListStatus::complete) break;
   }
 
+=======
+    if (status != TaskListStatus::complete)
+      break;
+  }
+
+  /*{
+    TaskCollection tc = RadiationStep();
+    status = tc.Execute();
+  }*/
+  status = RadiationStep();
+
+  // status = MonteCarloStep();
+
+>>>>>>> asc-gitlab/MC
   return status;
 }
 
@@ -87,10 +123,18 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   std::vector<std::string> src_names({fluid_cons::momentum, fluid_cons::energy});
 
   auto num_independent_task_lists = blocks.size();
+<<<<<<< HEAD
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region_1[ib];
+=======
+  TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
+
+  for (int ib = 0; ib < num_independent_task_lists; ib++) {
+    auto pmb = blocks[ib].get();
+    auto &tl = async_region[ib];
+>>>>>>> asc-gitlab/MC
 
     // first make other useful containers
     auto &base = pmb->meshblock_data.Get();
@@ -113,16 +157,27 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // pull out a container for the geometric source terms
     auto &gsrc = pmb->meshblock_data.Get("geometric source terms");
 
+<<<<<<< HEAD
     auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving,
                                  sc1.get(), BoundaryCommSubset::all);
 
     auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
     auto flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
     auto geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
+=======
+    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc1.get(),
+                                 BoundaryCommSubset::all);
+
+    auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
+    auto flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
+    auto geom_src =
+        tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
+>>>>>>> asc-gitlab/MC
 
     auto send_flux =
         tl.AddTask(flux_ct, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
 
+<<<<<<< HEAD
     auto recv_flux = tl.AddTask(
         flux_ct, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
 
@@ -186,12 +241,70 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (stage == integrator->nstages) {
       auto new_dt = tl.AddTask(
           fill_derived, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
+=======
+    auto recv_flux =
+        tl.AddTask(flux_ct, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
+
+    // compute the divergence of fluxes of conserved variables
+    auto flux_div =
+        tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>,
+                   sc0.get(), dudt.get());
+
+    auto add_rhs =
+        tl.AddTask(flux_div | geom_src, SumData<std::string, MeshBlockData<Real>>,
+                   src_names, dudt.get(), gsrc.get(), dudt.get());
+
+#if PRINT_RHS
+    auto print_rhs =
+        tl.AddTask(add_rhs, Debug::PrintRHS<MeshBlockData<Real>>, dudt.get());
+    auto next = print_rhs;
+#else
+    auto next = add_rhs;
+#endif
+
+    auto avg_container =
+        tl.AddTask(hydro_flux | geom_src, AverageIndependentData<MeshBlockData<Real>>,
+                   sc0.get(), base.get(), beta);
+    // apply du/dt to all independent fields in the container
+    auto update_container =
+        tl.AddTask(avg_container | next, UpdateIndependentData<MeshBlockData<Real>>,
+                   sc0.get(), dudt.get(), beta * dt, sc1.get());
+
+    // update ghost cells
+    auto send = tl.AddTask(update_container, &MeshBlockData<Real>::SendBoundaryBuffers,
+                           sc1.get());
+    auto recv = tl.AddTask(send, &MeshBlockData<Real>::ReceiveBoundaryBuffers, sc1.get());
+    auto fill_from_bufs =
+        tl.AddTask(recv, &MeshBlockData<Real>::SetBoundaries, sc1.get());
+    auto clear_comm_flags =
+        tl.AddTask(fill_from_bufs, &MeshBlockData<Real>::ClearBoundary, sc1.get(),
+                   BoundaryCommSubset::all);
+
+    auto prolongBound = tl.AddTask(fill_from_bufs, parthenon::ProlongateBoundaries, sc1);
+
+    // set physical boundaries
+    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc1);
+
+    // fill in derived fields
+    auto fill_derived = tl.AddTask(
+        set_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+
+    // estimate next time step
+    if (stage == integrator->nstages) {
+      auto new_dt =
+          tl.AddTask(fill_derived,
+                     parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
+>>>>>>> asc-gitlab/MC
 
       auto divb = tl.AddTask(set_bc, fluid::CalculateDivB, sc1.get());
 
       // Update refinement
       if (pmesh->adaptive) {
+<<<<<<< HEAD
         //using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
+=======
+        // using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
+>>>>>>> asc-gitlab/MC
         auto tag_refine = tl.AddTask(
             fill_derived, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
       }
@@ -201,14 +314,135 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   return tc;
 }
 
+<<<<<<< HEAD
+=======
+TaskStatus DefaultTask() { return TaskStatus::complete; }
+
+// TaskCollection PhoebusDriver::RadiationStep() {
+TaskListStatus PhoebusDriver::RadiationStep() {
+  TaskListStatus status;
+  TaskCollection tc;
+  TaskID none(0);
+
+  BlockList_t &blocks = pmesh->block_list;
+
+  const Real dt = integrator->dt;
+  const auto &stage_name = integrator->stage_name;
+
+  auto rad = pmesh->packages.Get("radiation");
+  const auto rad_active = rad->Param<bool>("active");
+  const auto rad_method = rad->Param<std::string>("method");
+  if (!rad_active) {
+    auto num_independent_task_lists = blocks.size();
+    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
+    for (int ib = 0; ib < num_independent_task_lists; ib++) {
+      auto pmb = blocks[ib].get();
+      auto &tl = async_region[ib];
+      auto default_task = tl.AddTask(none, DefaultTask);
+    }
+    return tc.Execute();
+  }
+
+  auto num_independent_task_lists = blocks.size();
+
+  if (rad_method == "cooling_function") {
+    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
+    for (int ib = 0; ib < num_independent_task_lists; ib++) {
+      auto pmb = blocks[ib].get();
+      auto &tl = async_region[ib];
+      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      auto calculate_four_force =
+          tl.AddTask(none, radiation::CoolingFunctionCalculateFourForce, sc0.get(), dt);
+      auto apply_four_force = tl.AddTask(
+          calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
+    }
+  } else if (rad_method == "moment") {
+    PARTHENON_FAIL("Moment method not implemented!");
+  } else if (rad_method == "monte_carlo") {
+    return MonteCarloStep();
+  } else if (rad_method == "mocmc") {
+    PARTHENON_FAIL("MOCMC not implemented!");
+  }
+
+  return tc.Execute();
+}
+
+>>>>>>> asc-gitlab/MC
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   parthenon::Packages_t packages;
 
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
   packages.Add(Geometry::Initialize(pin.get()));
   packages.Add(fluid::Initialize(pin.get()));
+<<<<<<< HEAD
+=======
+  packages.Add(radiation::Initialize(pin.get()));
+>>>>>>> asc-gitlab/MC
 
   return packages;
 }
 
+<<<<<<< HEAD
+=======
+TaskListStatus PhoebusDriver::MonteCarloStep() {
+  // TaskCollection PhoebusDriver::MonteCarloStep() {
+  TaskCollection tc;
+  TaskListStatus status; // tl;
+  const double t0 = tm.time;
+  const double dt = tm.dt;
+  TaskID none(0);
+  const auto &stage_name = integrator->stage_name;
+
+  BlockList_t &blocks = pmesh->block_list;
+  auto num_task_lists_executed_independently = blocks.size();
+
+  // Create all particles sourced due to emission during timestep
+  {
+    TaskCollection tc;
+    TaskRegion &sync_region0 = tc.AddRegion(1);
+    {
+      auto &tl = sync_region0[0];
+      auto initialize_comms =
+          tl.AddTask(none, radiation::InitializeCommunicationMesh, "monte_carlo", blocks);
+    }
+
+    TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
+    for (int i = 0; i < blocks.size(); i++) {
+      auto &pmb = blocks[i];
+      auto &tl = async_region0[i];
+      auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+      auto sample_particles = tl.AddTask(none, radiation::MonteCarloSourceParticles,
+                                         pmb.get(), mbd0.get(), sc0.get(), t0, dt);
+      auto transport_particles =
+          tl.AddTask(sample_particles, radiation::MonteCarloTransport, pmb.get(),
+                     mbd0.get(), sc0.get(), t0, dt);
+
+      auto send = tl.AddTask(transport_particles, &SwarmContainer::Send, sc0.get(),
+                             BoundaryCommSubset::all);
+
+      auto receive =
+          tl.AddTask(send, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
+    }
+    status = tc.Execute();
+  }
+
+  // Finalization calls
+  {
+    TaskCollection tc;
+    TaskRegion &async_region1 = tc.AddRegion(num_task_lists_executed_independently);
+    for (int ib = 0; ib < num_task_lists_executed_independently; ib++) {
+      auto pmb = blocks[ib].get();
+      auto &tl = async_region1[ib];
+      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      auto apply_four_force =
+          tl.AddTask(none, radiation::ApplyRadiationFourForce, sc0.get(), dt);
+    }
+    status = tc.Execute();
+  }
+
+  return status;
+}
+
+>>>>>>> asc-gitlab/MC
 } // namespace phoebus

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -11,6 +12,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+=======
+>>>>>>> asc-gitlab/MC
 #include "fluid.hpp"
 #include "reconstruction.hpp"
 #include "tmunu.hpp"
@@ -33,6 +36,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("fluid");
   Params &params = physics->AllParams();
 
+<<<<<<< HEAD
+=======
+  const bool hydro = pin->GetBoolean("physics", "hydro");
+  params.Add("hydro", hydro);
+
+>>>>>>> asc-gitlab/MC
   Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
   params.Add("cfl", cfl);
 
@@ -96,11 +105,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                                     Metadata::Derived, Metadata::OneCopy});
   Metadata mcons_scalar =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
+<<<<<<< HEAD
             Metadata::Conserved, Metadata::WithFluxes, Metadata::FillGhost});
   Metadata mcons_threev =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
             Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes,
             Metadata::FillGhost},
+=======
+                Metadata::Conserved, Metadata::FillGhost});
+  Metadata mcons_threev =
+      Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
+                Metadata::Conserved, Metadata::Vector, Metadata::FillGhost},
+>>>>>>> asc-gitlab/MC
                three_vec);
 
   int ndim = 1;
@@ -176,22 +192,34 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   std::vector<int> recon_shape({nrecon, ndim});
+<<<<<<< HEAD
   Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
 			     recon_shape);
+=======
+  Metadata mrecon = Metadata({Metadata::Cell, Metadata::OneCopy}, recon_shape);
+>>>>>>> asc-gitlab/MC
   physics->AddField(impl::ql, mrecon);
   physics->AddField(impl::qr, mrecon);
 
   std::vector<int> signal_shape(1, ndim);
   Metadata msignal =
+<<<<<<< HEAD
 	  Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
 		   signal_shape);
+=======
+      Metadata({Metadata::Cell, Metadata::OneCopy}, signal_shape);
+>>>>>>> asc-gitlab/MC
   physics->AddField(impl::face_signal_speed, msignal);
   physics->AddField(impl::cell_signal_speed, msignal);
 
   std::vector<int> c2p_scratch_size(1, 5);
   Metadata c2p_meta =
+<<<<<<< HEAD
 	  Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
 		   c2p_scratch_size);
+=======
+      Metadata({Metadata::Cell, Metadata::OneCopy}, c2p_scratch_size);
+>>>>>>> asc-gitlab/MC
   physics->AddField(impl::c2p_scratch, c2p_meta);
 
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
@@ -382,6 +410,11 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
+<<<<<<< HEAD
+=======
+  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+    return TaskStatus::complete;
+>>>>>>> asc-gitlab/MC
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -454,12 +487,21 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
         }
       });
+<<<<<<< HEAD
+=======
+
+>>>>>>> asc-gitlab/MC
   return TaskStatus::complete;
 }
 
 // template <typename T>
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
+<<<<<<< HEAD
+=======
+  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+    return TaskStatus::complete;
+>>>>>>> asc-gitlab/MC
 
   auto flux = riemann::FluxState(rc);
   auto sig = rc->Get(internal_variables::face_signal_speed).data;
@@ -659,9 +701,15 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
   auto &pars = pmb->packages.Get("fluid")->AllParams();
   Real min_dt;
+<<<<<<< HEAD
   auto csig = rc->Get(internal_variables::cell_signal_speed).data;
   if (pars.hasKey("has_face_speeds")) {
     auto fsig = rc->Get(internal_variables::face_signal_speed).data;
+=======
+  if (pars.hasKey("has_face_speeds")) {
+    auto fsig = rc->Get(internal_variables::face_signal_speed).data;
+    auto csig = rc->Get(internal_variables::cell_signal_speed).data;
+>>>>>>> asc-gitlab/MC
     pmb->par_reduce(
         "Hydro::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
@@ -679,6 +727,10 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
         },
         Kokkos::Min<Real>(min_dt));
   } else {
+<<<<<<< HEAD
+=======
+    auto csig = rc->Get(internal_variables::cell_signal_speed).data;
+>>>>>>> asc-gitlab/MC
     pmb->par_reduce(
         "Hydro::EstimateTimestep::0", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {

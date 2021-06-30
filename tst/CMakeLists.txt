@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # © 2021. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
@@ -10,6 +11,8 @@
 # prepare derivative works, distribute copies to the public, perform
 # publicly and display publicly, and to permit others to do so.
 
+=======
+>>>>>>> asc-gitlab/MC
 include(Catch)
 
 add_executable(phoebus_unit_tests phoebus_unit_test_main.cpp)

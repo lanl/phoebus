@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -11,6 +12,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+=======
+>>>>>>> asc-gitlab/MC
 #ifndef _PGEN_H_
 #define _PGEN_H_
 
@@ -29,9 +32,16 @@ using namespace parthenon::package::prelude;
 // add the name of a namespace that contains your new ProblemGenerator
 #define FOREACH_PROBLEM                                                                  \
   PROBLEM(phoebus)                                                                       \
+<<<<<<< HEAD
   PROBLEM(advection)                                                                     \
   PROBLEM(shock_tube)                                                                    \
   PROBLEM(linear_modes)                                                                  \
+=======
+  PROBLEM(shock_tube)                                                                    \
+  PROBLEM(linear_modes)                                                                  \
+  PROBLEM(thin_cooling)                                                                  \
+  PROBLEM(leptoneq)                                                                      \
+>>>>>>> asc-gitlab/MC
   PROBLEM(kelvin_helmholtz)                                                              \
   PROBLEM(rhs_tester)                                                                    \
   PROBLEM(sedov)                                                                         \

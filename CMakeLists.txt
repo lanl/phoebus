@@ -160,6 +160,9 @@ set(SINGULARITY_USE_KOKKOSKERNELS OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_BUILD_CLOSURE OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/singularity-eos singularity-eos)
 
+# Radiation
+include(cmake/Radiation.cmake)
+
 # Geometry
 include(cmake/Geometry.cmake)
 

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -11,14 +12,29 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+=======
+>>>>>>> asc-gitlab/MC
 #ifndef COMPILE_CONSTANTS_HPP_
 #define COMPILE_CONSTANTS_HPP_
 
 #define NCONS_MAX @MAX_NUMBER_CONSERVED_VARS@
+<<<<<<< HEAD
 
 #define GEOMETRY_MESH @GEOMETRY_MESH@
 #define GEOMETRY_MESH_BLOCK @GEOMETRY_MESH_BLOCK@
 
+=======
+#define GEOMETRY_MESH @GEOMETRY_MESH@
+#define GEOMETRY_MESH_BLOCK @GEOMETRY_MESH_BLOCK@
+
+#define RADIATION_BOUND_IX1 @RADIATION_BOUND_IX1@
+#define RADIATION_BOUND_OX1 @RADIATION_BOUND_OX1@
+#define RADIATION_BOUND_IX2 @RADIATION_BOUND_IX2@
+#define RADIATION_BOUND_OX2 @RADIATION_BOUND_OX2@
+#define RADIATION_BOUND_IX3 @RADIATION_BOUND_IX3@
+#define RADIATION_BOUND_OX3 @RADIATION_BOUND_OX3@
+
+>>>>>>> asc-gitlab/MC
 #define PRINT_RHS @PRINT_RHS@
 
 #endif //COMPILE_CONSTANTS_HPP_

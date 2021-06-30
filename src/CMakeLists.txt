@@ -33,6 +33,8 @@ add_executable(phoebus
   geometry/geometry.hpp
   geometry/geometry_defaults.hpp
   geometry/geometry_utils.hpp
+  geometry/tetrads.hpp
+
   geometry/mckinney_gammie_ryan.hpp
   geometry/mckinney_gammie_ryan.cpp
   geometry/modified_system.hpp
@@ -42,7 +44,7 @@ add_executable(phoebus
   geometry/spherical_kerr_schild.cpp
   geometry/spherical_minkowski.hpp
   geometry/spherical_minkowski.cpp
-  
+
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
 
@@ -52,9 +54,11 @@ add_executable(phoebus
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
   pgen/kh.cpp
+  pgen/leptoneq.cpp
   pgen/linear_modes.cpp
   pgen/rhs_tester.cpp
   pgen/shock_tube.cpp
+  pgen/thin_cooling.cpp
   pgen/sedov.cpp
 
   phoebus_boundaries/phoebus_boundaries.hpp
@@ -64,9 +68,17 @@ add_executable(phoebus
   phoebus_driver.hpp
 
   phoebus_utils/cell_locations.hpp
+  phoebus_utils/unit_conversions.cpp
+  phoebus_utils/unit_conversions.hpp
   phoebus_utils/debug_utils.hpp
   phoebus_utils/linear_algebra.hpp
   phoebus_utils/variables.hpp
+
+  radiation/radiation.hpp
+  radiation/radiation.cpp
+  radiation/cooling_function.cpp
+  radiation/monte_carlo.cpp
+  radiation/geodesics.hpp
 
   reconstruction.hpp
 )
