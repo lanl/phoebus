@@ -151,14 +151,21 @@ set(PARTHENON_DISABLE_EXAMPLES ON CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/parthenon parthenon)
 
-# singularity eos
-message("Configuring singularity-eos")
+# singularity common
+message("Configuring singularity")
 set(SINGULARITY_USE_KOKKOS ON CACHE BOOL "" FORCE)
 set(SINGULARITY_USE_FORTRAN OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_SUBMODULE_MODE ON CACHE BOOL "" FORCE)
 set(SINGULARITY_USE_KOKKOSKERNELS OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_BUILD_CLOSURE OFF CACHE BOOL "" FORCE)
+
+# singularity eos
+message("Configuring singularity-eos")
 add_subdirectory(external/singularity-eos singularity-eos)
+
+# singularity opac
+message("Configuring singularity-opac")
+add_subdirectory(external/singularity-opac singularity-opac)
 
 # Radiation
 include(cmake/Radiation.cmake)

@@ -2,8 +2,8 @@
 	path = external/singularity-eos
 	url = https://github.com/lanl/singularity-eos.git
 [submodule "external/singularity-opac"]
-  path = external/singularity-opac
-  url = https://github.com/lanl/singularity-opac.git
+	path = external/singularity-opac
+	url = https://github.com/lanl/singularity-opac.git
 [submodule "external/parthenon"]
 	path = external/parthenon
 	url = https://github.com/lanl/parthenon.git
