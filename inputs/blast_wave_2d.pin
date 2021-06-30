@@ -47,7 +47,6 @@ dt_init_fact = 1.e-6
 
 <parthenon/mesh>
 nghost = 4
-<<<<<<< HEAD
 refinement = adaptive
 numlevel = 3
 
@@ -60,20 +59,6 @@ ox1_bc      = periodic    # Outer-X1 boundary condition flag
 nx2         = 128           # Number of zones in X2-direction
 x2min       = -1            # minimum value of X2
 x2max       = 1             # maximum value of X2. Pi
-=======
-#refinement = adaptive
-#numlevel = 3
-
-nx1         = 64          # Number of zones in X1-direction
-x1min       = -0.3        # minimum value of X1
-x1max       = 0.3         # maximum value of X1
-ix1_bc      = periodic    # Inner-X1 boundary condition flag
-ox1_bc      = periodic    # Outer-X1 boundary condition flag
-
-nx2         = 64            # Number of zones in X2-direction
-x2min       = -0.3          # minimum value of X2
-x2max       = 0.3           # maximum value of X2. Pi
->>>>>>> asc-gitlab/MC
 ix2_bc      = periodic      # Inner-X2 boundary condition flag
 ox2_bc      = periodic      # Outer-X2 boundary condition flag
 
@@ -86,28 +71,19 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-<<<<<<< HEAD
 nx1 = 32
 nx2 = 32
 nx3 = 1
 
 <parthenon/refinement0>
 field = c.energy
-=======
-nx1 = 64
-nx2 = 64
-nx3 = 1
-
-<parthenon/refinement0>
-field = c.c.bulk.rho
->>>>>>> asc-gitlab/MC
 method = derivative_order_1
 max_level = 3
 
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
-Cv = 1.0
+Cv = 1.0 
 
 <physics>
 hydro = true
@@ -117,28 +93,15 @@ rad = false
 
 <fluid>
 xorder = 2
-<<<<<<< HEAD
 cfl = 1e-2
 riemann = llf
 recon = mp5
-=======
-cfl = 0.1
-riemann = hll
-recon = linear
->>>>>>> asc-gitlab/MC
 c2p_max_iter = 100
 Ye = false
 
 <sedov>
 rho_ambient = 1
-<<<<<<< HEAD
 p_ambient = 1e-3
 explosion_energy = 1e-2
 rinner = 0.1
-=======
-p_ambient = 1e-4
-explosion_energy = 1
-rinner = 0.1
-rescale = 1e-3
->>>>>>> asc-gitlab/MC
 spherical_coords = false
