@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -12,8 +11,6 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-=======
->>>>>>> asc-gitlab/MC
 #include <cmath>
 
 #include "pgen/pgen.hpp"
@@ -48,10 +45,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
 
-<<<<<<< HEAD
-=======
-  const Real rescale = pin->GetOrAddReal("sedov", "rescale", 1e-5);
->>>>>>> asc-gitlab/MC
   const Real rhoa = pin->GetOrAddReal("sedov", "rho_ambient", 1.0);
   const Real rinner = pin->GetOrAddReal("sedov", "rinner", 0.01);
   const bool spherical = pin->GetOrAddReal("sedov","spherical_coords",true);
@@ -59,18 +52,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &coords = pmb->coords;
   auto pmesh = pmb->pmy_mesh;
   int ndim = pmesh->ndim;
-<<<<<<< HEAD
 
   Real Pa = pin->GetOrAddReal("sedov", "P_ambient", 1e-5);
   Real Eexp = pin->GetOrAddReal("sedov", "explosion_energy", 1);
-=======
-  // Real rinner = pmesh->mesh_size.x1min + coords.Dx(X1DIR);
-
-  Real Pa = pin->GetOrAddReal("sedov", "P_ambient", 1e-5);
-  Real Eexp = pin->GetOrAddReal("sedov", "explosion_energy", 1);
-  Pa *= rescale*rescale;
-  Eexp *= rescale*rescale;
->>>>>>> asc-gitlab/MC
 
   const Real v_inner = (4./3.)*M_PI*std::pow(rinner,3.);
   const Real uinner = Eexp / v_inner;
@@ -89,15 +73,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       if (spherical) {
         r = std::abs(coords.x1v(i));
       } else {
-<<<<<<< HEAD
         Real x = coords.x1v(i);
         Real y = ndim > 1 ? coords.x2v(j) : 0;
         Real z = ndim > 2 ? coords.x3v(k) : 0;
-=======
-        Real x = coords.x1v(i)*coords.x1v(i);
-        Real y = ndim > 1 ? coords.x2v(j)*coords.x2v(j) : 0;
-        Real z = ndim > 2 ? coords.x3v(k)*coords.x3v(k) : 0;
->>>>>>> asc-gitlab/MC
         r = std::sqrt(x*x + y*y + z*z);
       }
       const Real rho = rhoa;
@@ -105,11 +83,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real ua = phoebus::energy_from_rho_P(eos, rho, Pa);
       const Real u = (r <= rinner) ? uinner : ua;
 
-<<<<<<< HEAD
       const Real eps = u / (rho + 1e-20);
-=======
-      const Real eps = (u / rho + 1e-20);
->>>>>>> asc-gitlab/MC
       const Real P = eos.PressureFromDensityInternalEnergy(rho, eps);
       const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps);
 
@@ -117,11 +91,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(iprs, k, j, i) = P;
       v(ieng, k, j, i) = u;
       v(itmp, k, j, i) = T;
-<<<<<<< HEAD
       for (int d = ivlo; d <= ivhi; d++) v(d, k, j, i) = 0.0;
-=======
-      for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
->>>>>>> asc-gitlab/MC
     });
 
   fluid::PrimitiveToConserved(rc.get());

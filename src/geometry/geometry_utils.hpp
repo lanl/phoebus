@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -12,8 +11,6 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-=======
->>>>>>> asc-gitlab/MC
 #ifndef GEOMETRY_GEOMETRY_UTILS_HPP_
 #define GEOMETRY_GEOMETRY_UTILS_HPP_
 
@@ -55,13 +52,9 @@ namespace Utils {
 template <typename T> KOKKOS_INLINE_FUNCTION int sgn(const T &val) {
   return (T(0) <= val) - (val < T(0));
 }
-<<<<<<< HEAD
 KOKKOS_INLINE_FUNCTION Real ratio(Real a, Real b) {
   return a / (b + sgn(b) * SMALL);
 }
-=======
-KOKKOS_INLINE_FUNCTION Real ratio(Real a, Real b) { return a / (b + sgn(b) * SMALL); }
->>>>>>> asc-gitlab/MC
 
 struct MeshBlockShape {
   MeshBlockShape(ParameterInput *pin) {
@@ -122,8 +115,6 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
   }
 }
 
-<<<<<<< HEAD
-=======
 KOKKOS_INLINE_FUNCTION
 void Lower(const double Vcon[NDFULL], const double Gcov[NDFULL][NDFULL],
            double Vcov[NDFULL]) {
@@ -159,7 +150,6 @@ int KroneckerDelta(const int a, const int b) {
   }
 }
 
->>>>>>> asc-gitlab/MC
 // TODO(JMM): Currently assumes static metric
 template <typename System>
 KOKKOS_INLINE_FUNCTION void

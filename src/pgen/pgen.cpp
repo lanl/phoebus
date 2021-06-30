@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -12,8 +11,6 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-=======
->>>>>>> asc-gitlab/MC
 #include "geometry/geometry.hpp"
 
 #include "pgen.hpp"
