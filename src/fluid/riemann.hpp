@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -12,8 +11,6 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-=======
->>>>>>> asc-gitlab/MC
 #ifndef FLUID_RIEMANN_HPP_
 #define FLUID_RIEMANN_HPP_
 
@@ -81,7 +78,7 @@ class FluxState {
   int NumConserved() const {
     return ncons;
   }
-  
+
   KOKKOS_INLINE_FUNCTION
   void prim_to_flux(const int d, const int k, const int j, const int i, const FaceGeom &g,
                     const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F) const {
