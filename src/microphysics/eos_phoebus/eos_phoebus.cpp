@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -11,6 +12,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+=======
+>>>>>>> asc-gitlab/MC
 // system includes
 #include <memory>
 #include <string>
@@ -25,6 +28,10 @@
 
 // phoebus includes
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
+<<<<<<< HEAD
+=======
+#include "phoebus_utils/unit_conversions.hpp"
+>>>>>>> asc-gitlab/MC
 
 namespace Microphysics {
 namespace EOS {
@@ -53,10 +60,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const std::vector<std::string> valid_eos_names = {
       IdealGas::EosType()
 #ifdef SPINER_USE_HDF
+<<<<<<< HEAD
       , SpinerEOSDependsRhoT::EosType(),
       SpinerEOSDependsRhoSie::EosType()
 #endif
   };
+=======
+      , SpinerEOSDependsRhoT::EosType()
+      , SpinerEOSDependsRhoSie::EosType()
+#endif // SPINER_USE_HDF
+      };
+>>>>>>> asc-gitlab/MC
   std::string eos_type = pin->GetString(block_name, std::string("type"));
   if (eos_type.compare(IdealGas::EosType()) == 0) {
     type = EOSBuilder::EOSType::IdealGas;
@@ -135,6 +149,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("h.EOS", eos_host);
   params.Add("needs_ye", needs_ye);
 
+<<<<<<< HEAD
+=======
+  params.Add("unit_conv", phoebus::UnitConversions(pin));
+
+>>>>>>> asc-gitlab/MC
   return pkg;
 }
 } // namespace EOS

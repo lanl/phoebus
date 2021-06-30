@@ -1,0 +1,113 @@
+<phoebus>
+problem = thin_cooling
+
+<parthenon/job>
+problem_id  = cooling       # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = p.density,  &
+	          c.density,  &
+            p.velocity, &
+            p.energy,   &
+            p.ye,       &
+            temperature
+
+file_type   = hdf5      # Tabular data dump
+#dt          = 1.e3      # time increment between outputs
+dt = 1.e-2
+
+<parthenon/time>
+nlim        = -1        # cycle limit
+#tlim        = 2.5e4       # time limit
+#tlim = 2.997925e-02
+#tlim = 1.e-3
+tlim = 2.e-1
+integrator  = rk2      # time integration algorithm
+ncycle_out  = 1        # interval for stdout summary info
+dt_init_fact = 1.e-6
+
+<parthenon/mesh>
+nghost = 4
+
+nx1         = 4        # Number of zones in X1-direction
+x1min       = 0        # minimum value of X1
+#x1max       = 1.e-7    # maximum value of X1 (for cooling_function)
+x1max       = 1.e-4    # maximum value of X1
+ix1_bc      = outflow  # Inner-X1 boundary condition flag
+ox1_bc      = outflow  # Outer-X1 boundary condition flag
+#ix1_bc      = periodic  # Inner-X1 boundary condition flag
+#ox1_bc      = periodic  # Outer-X1 boundary condition flag
+
+nx2         = 1         # Number of zones in X2-direction
+x2min       = -1        # minimum value of X2
+x2max       = 1         # maximum value of X2
+ix2_bc      = outflow   # Inner-X2 boundary condition flag
+ox2_bc      = outflow   # Outer-X2 boundary condition flag
+#ix2_bc      = periodic   # Inner-X2 boundary condition flag
+#ox2_bc      = periodic   # Outer-X2 boundary condition flag
+
+nx3         = 1         # Number of zones in X3-direction
+x3min       = -1        # minimum value of X3
+x3max       = 1         # maximum value of X3
+ix3_bc      = outflow   # Inner-X3 boundary condition flag
+ox3_bc      = outflow   # Inner-X3 boundary condition flag
+#ix3_bc      = periodic  # Outer-X3 boundary condition flfgag
+#ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
+
+num_threads = 1         # maximum number of OMP threads
+
+<parthenon/meshblock>
+nx1 = 4
+nx2 = 1
+nx3 = 1
+
+<eos>
+type = IdealGas
+Gamma = 1.6666666666666666667
+Cv = 1.995640e+03
+
+<units>
+#geom_length_cm = 1.e10
+#fluid_mass_g = 1.e20
+geom_length_cm = 1.e14
+fluid_mass_g = 1.e0
+
+<physics>
+hydro = false
+he = false
+3t = false
+rad = true
+mhd = false
+
+<fluid>
+xorder = 2
+cfl = 0.9
+riemann = hll
+recon = linear
+c2p_max_iter = 100
+Ye = true
+
+<radiation>
+#method = cooling_function
+method = monte_carlo
+nu_min = 1.e15
+nu_max = 0.9999e17
+nu_bins = 200
+#tune_emiss = 1.e-1
+tune_emiss = 1.e2
+num_particles = 16
+opacity_model = tophat
+absorption = false
+
+<monte_carlo>
+remove_emitted_particles = true
+
+<tophatopacity>
+C = 1.e0
+numin = 1.e15
+numax = 1.e17
+
+<thincooling>
+species = electron
+ne0 = 5.858732e+07 # cm^-3
+T0 = 1e8 # K

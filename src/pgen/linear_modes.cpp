@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -11,6 +12,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+=======
+>>>>>>> asc-gitlab/MC
 // #include <complex>
 #include <Kokkos_Complex.hpp>
 #include <sstream>
@@ -18,7 +21,10 @@
 #include "pgen/pgen.hpp"
 
 // Relativistic hydro linear modes.
+<<<<<<< HEAD
 // TODO: Make this 3D instead of 2D.
+=======
+>>>>>>> asc-gitlab/MC
 
 using Kokkos::complex;
 
@@ -70,6 +76,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Wavevector
   double k1 = 2.*M_PI;
   double k2 = 2.*M_PI;
+<<<<<<< HEAD
+=======
+  double k3 = 2.*M_PI;
+>>>>>>> asc-gitlab/MC
 
   complex<double> omega = 0.;
   complex<double> drho = 0.;

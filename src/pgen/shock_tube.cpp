@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -15,6 +16,12 @@
 
 // Single-material blast wave.
 // As descriged in the Athena test suite
+=======
+#include "pgen/pgen.hpp"
+
+// Single-material blast wave.
+// As described in the Athena test suite
+>>>>>>> asc-gitlab/MC
 // https://www.astro.princeton.edu/~jstone/Athena/tests/blast/blast.html
 // and in
 // Zachary, Malagoli, A., & Colella,P., SIAM J. Sci. Comp., 15, 263 (1994); Balsara, D., & Spicer, D., JCP 149, 270 (1999); Londrillo, P. & Del Zanna, L., ApJ 530, 508 (2000).

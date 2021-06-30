@@ -1,5 +1,9 @@
 //========================================================================================
+<<<<<<< HEAD
 // (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
+=======
+// (C) (or copyright) 2020. Triad National Security, LLC. All rights reserved.
+>>>>>>> asc-gitlab/MC
 //
 // This program was produced under U.S. Government contract 89233218CNA000001 for Los
 // Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -191,6 +195,10 @@ void WENO5A(const int d, const int n, const int k, const int j, const int i,
                                   {-1.0/6.0, 5.0/6.0, 1.0/3.0},
                                   {1.0/3.0, 5.0/6.0, -1.0/6.0}};
   constexpr Real w5gamma[3] = {0.1, 0.6, 0.3};
+<<<<<<< HEAD
+=======
+  constexpr Real eps = 1e-26; // value to compare beta gainst
+>>>>>>> asc-gitlab/MC
   // for WENO-Z type weights. The higher the number, the more diffusive
   // and the more aggressively the method approaches ENO in discontinuous regions
   constexpr Real p = 13; 

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # © 2021. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
@@ -12,6 +13,11 @@
 
 add_library(geometry_unit_tests OBJECT
   test_geometry.cpp
+=======
+add_library(geometry_unit_tests OBJECT
+  test_geometry.cpp
+  test_tetrads.cpp
+>>>>>>> asc-gitlab/MC
 
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/analytic_system.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/boyer_lindquist.hpp
