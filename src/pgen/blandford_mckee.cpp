@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // © 2021. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
@@ -12,8 +11,6 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-=======
->>>>>>> asc-gitlab/MC
 #include <cmath>
 
 #include <utils/error_checking.hpp>
@@ -58,11 +55,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(rescale <= 1, "Rescale must shrink velocities");
 
   auto &coords = pmb->coords;
-<<<<<<< HEAD
-=======
-  auto pmesh = pmb->pmy_mesh;
-  int ndim = pmesh->ndim;
->>>>>>> asc-gitlab/MC
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
