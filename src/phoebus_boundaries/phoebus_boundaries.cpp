@@ -37,14 +37,28 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
       std::vector<parthenon::MetadataFlag>{Metadata::FillGhost}, coarse);
   auto nb = IndexRange{0, q.GetDim(4) - 1};
 
-  pmb->par_for_bndry(
-      "OutflowInnerX1", nb, IndexDomain::inner_x1, coarse,
-      KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
-        Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
-        Real gratio = Geometry::Utils::ratio(detg, detg_ref);
-        q(l, k, j, i) = gratio * q(l, k, j, ref);
-      });
+  auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
+  std::string bc_vars = pkg->Param<std::string>("bc_vars");
+
+  if (bc_vars == "conserved") {
+    pmb->par_for_bndry(
+        "OutflowInnerX1", nb, IndexDomain::inner_x1, coarse,
+        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+          Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
+          Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
+          Real gratio = Geometry::Utils::ratio(detg, detg_ref);
+          q(l, k, j, i) = gratio * q(l, k, j, ref);
+        });
+  } else if (bc_vars == "primitive") {
+    pmb->par_for_bndry(
+        "OutflowInnerX1", nb, IndexDomain::inner_x1, coarse,
+        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+          Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
+          Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
+          Real gratio = Geometry::Utils::ratio(detg, detg_ref);
+          q(l, k, j, i) = gratio * q(l, k, j, ref);
+        });
+  }
 }
 
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {

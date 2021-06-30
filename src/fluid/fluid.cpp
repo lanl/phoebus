@@ -89,6 +89,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::vector<int> three_vec(1, 3);
 
   const std::string bc_vars = pin->GetOrAddString("phoebus", "bc_vars", "conserved");
+  params.Add("bc_vars", bc_vars);
 
   Metadata mprim_threev, mprim_scalar, mcons_scalar, mcons_threev;
 
