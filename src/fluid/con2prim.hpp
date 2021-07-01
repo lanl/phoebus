@@ -24,7 +24,7 @@
 using namespace parthenon::package::prelude;
 
 // singulaarity
-#include <eos/eos.hpp>
+#include <singularity-eos/eos/eos.hpp>
 
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
