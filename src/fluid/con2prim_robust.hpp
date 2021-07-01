@@ -24,6 +24,7 @@ using namespace parthenon::package::prelude;
 // singulaarity
 #include <eos/eos.hpp>
 
+#include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/robust.hpp"
@@ -38,18 +39,6 @@ struct FailFlags {
   static constexpr Real success = 0.0;
   static constexpr Real fail = 1.0;
 };
-
-KOKKOS_INLINE_FUNCTION
-void GetFloors(const Real &r, const Real &theta, Real &rho, Real &eps) {
-#if PHOEBUS_GEOMETRY == FMKS
-  rho = 1e-5*pow(r,-2);
-  eps = 1e-1*pow(r,-1);
-#else
-  rho = 1e-8;
-  eps = 1e-3;
-#endif // PHOEBUS_GEOMETRY
-}
-
 
 template <typename F>
 KOKKOS_INLINE_FUNCTION
@@ -294,8 +283,9 @@ struct CellGeom {
 template <typename Data_t, typename T>
 class ConToPrim {
  public:
-  ConToPrim(Data_t *rc, const Real tol, const int max_iterations)
-    : var(rc->PackVariables(Vars(), imap)),
+  ConToPrim(Data_t *rc, fixup::Floors flr, const Real tol, const int max_iterations)
+    : floor(flr),
+      var(rc->PackVariables(Vars(), imap)),
       prho(imap[fluid_prim::density].first),
       crho(imap[fluid_cons::density].first),
       pvel_lo(imap[fluid_prim::velocity].first),
@@ -317,11 +307,7 @@ class ConToPrim {
       gm1(imap[fluid_prim::gamma1].first),
       rel_tolerance(tol),
       max_iter(max_iterations),
-      h0sq_(1.0) {
-    auto *pm = rc->GetParentPointer().get();
-    StateDescriptor *pkg = pm->packages.Get("geometry").get();
-    transform = Geometry::GetTransformation<Geometry::McKinneyGammieRyan>(pkg);
-  }
+      h0sq_(1.0) { }
 
   std::vector<std::string> Vars() {
     return std::vector<std::string>({fluid_prim::density, fluid_cons::density,
@@ -333,6 +319,11 @@ class ConToPrim {
                                     internal_variables::cell_signal_speed, fluid_prim::gamma1});
   }
 
+  bool my_cell(const Real x1, const Real x2) const {
+    //if (fabs(x1 - 3.24365) < 1.e-3 && fabs(x2 - 0.493164) < 1.e-3) return true;
+    return false;
+  }
+
   template <typename CoordinateSystem, class... Args>
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus operator()(const CoordinateSystem &geom, const singularity::EOS &eos, const Coordinates_t &coords, Args &&... args) const {
@@ -342,7 +333,8 @@ class ConToPrim {
     //geom.Coords(CellLocation::Cent, std::forward<Args>(args)..., x);
     Real x1 = coords.x1v(std::forward<Args>(args)...);
     Real x2 = coords.x2v(std::forward<Args>(args)...);
-    return solve(v,g,eos,x1,x2);
+    Real x3 = coords.x3v(std::forward<Args>(args)...);
+    return solve(v,g,eos,x1,x2,x3);
   }
 
   int NumBlocks() {
@@ -350,6 +342,7 @@ class ConToPrim {
   }
 
  private:
+  fixup::Floors floor;
   PackIndexMap imap;
   const T var;
   const int prho, crho;
@@ -363,11 +356,10 @@ class ConToPrim {
   const Real rel_tolerance;
   const int max_iter;
   const Real h0sq_;
-  Geometry::McKinneyGammieRyan transform;
-  
 
   KOKKOS_INLINE_FUNCTION
-  ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos, Real x1, Real x2) const {
+  ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos,
+                        const Real x1, const Real x2, const Real x3) const {
     PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo)), "v(cmom_lo) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
@@ -380,6 +372,8 @@ class ConToPrim {
     }
     const Real igdet = 1.0/g.gdet;
     
+    Real rhoflr, epsflr;
+    floor.GetFloors(x1,x2,x3,rhoflr,epsflr);
     if (v(crho) <= 0.0) {
       printf("v(crho) < 0: %g    %g %g\n", v(crho)*igdet, x1, x2);
     }
@@ -444,7 +438,7 @@ class ConToPrim {
       SPACELOOP2(i,j) bsq += g.gcov[i][j] * bu[i] * bu[j];
 
       rbsq = bdotr*bdotr;
-      bsq_rpsq = bsq * rsq - rbsq + 1.0e-26;
+      bsq_rpsq = bsq * rsq - rbsq;
     }
     const Real zsq = rsq/h0sq_;
     Real v0sq = zsq/(1.0 + zsq);//, 1.0 - 1.0/1.0e4);
@@ -461,11 +455,6 @@ class ConToPrim {
     PARTHENON_REQUIRE(v0sq < 1, "v0sq >= 1: " + std::to_string(v0sq));
     PARTHENON_REQUIRE(v0sq >= 0, "v0sq < 0: " + std::to_string(v0sq));
 
-    // set up the residual functor
-    Real r_bl = transform.bl_radius(x1);
-    Real th_bl = transform.bl_theta(x1,x2);
-    Real rhoflr, epsflr;
-    GetFloors(r_bl,th_bl,rhoflr,epsflr);
     Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,rhoflr,epsflr);
 
     // find the upper bound
@@ -473,6 +462,9 @@ class ConToPrim {
     // solve
     const Real mu = find_root(res, 0.0, 1.0, rel_tolerance, __LINE__);
     //if(atm) printf("used atm\n");
+    if(my_cell(x1,x2)) {
+      std::cout << "res = " << res(mu) << std::endl;
+    }
 
     // now unwrap everything into primitive and conserved vars
     const Real x = res.x_mu(mu);
@@ -487,14 +479,19 @@ class ConToPrim {
     v(peng) *= v(prho);
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
 
-    // bool atm = v(prho) <= rhoflr;
-    /*if (!atm) {
-      printf("disk: %g %g %g\n", v(prho), v(peng)/v(prho), v(prs));
-    }*/
-
     SPACELOOP(i) {
       //v(pvel_lo+i) = atm ? 0 : mu*x*(rcon[i] + mu*bdotr*bu[i]);
       v(pvel_lo+i) = mu*x*(rcon[i] + mu*bdotr*bu[i]);
+    }
+
+    if (res.used_density_floor()) {
+      v(prho) = rhoflr;
+      v(peng) = rhoflr*epsflr;
+      SPACELOOP (i) {
+        v(pvel_lo+i) = 0.0;
+      }
+      v(tmp) = eos.TemperatureFromDensityInternalEnergy(rhoflr,epsflr);
+      v(prs) = eos.PressureFromDensityTemperature(rhoflr, v(tmp));
     }
     //SPACELOOP(i) v(pvel_lo+i) = mu*(x*rperp[i] - rpar[i]);
     // and now make sure v is appropriately bounded
@@ -592,7 +589,8 @@ class ConToPrim {
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+2)), "v(cmom_lo+2) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(ceng)), "v(ceng) = NaN");
-
+    PARTHENON_REQUIRE(v(prho) >= rhoflr*(1.0-1.e-8), "rho < rho_floor " + std::to_string(v(prho)) + " " + std::to_string(rhoflr));
+    PARTHENON_REQUIRE(v(peng)/v(prho) >= epsflr*(1.0 - 1.e-8), "sie < sie_floor " + std::to_string(v(peng)/v(prho)) + " " + std::to_string(epsflr));
 
     return ConToPrimStatus::success;
   }
@@ -601,8 +599,8 @@ class ConToPrim {
 using C2P_Block_t = ConToPrim<MeshBlockData<Real>,VariablePack<Real>>;
 using C2P_Mesh_t = ConToPrim<MeshData<Real>,MeshBlockPack<Real>>;
 
-inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, const Real tol, const int max_iter) {
-  return C2P_Block_t(rc, tol, max_iter);
+inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, fixup::Floors floor, const Real tol, const int max_iter) {
+  return C2P_Block_t(rc, floor, tol, max_iter);
 }
 /*inline C2P_Mesh_t ConToPrimSetup(MeshData<Real> *rc) {
   return C2P_Mesh_t(rc);

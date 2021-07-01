@@ -19,8 +19,10 @@
 using namespace parthenon::package::prelude;
 
 #include "compile_constants.hpp"
+#include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
 
@@ -38,12 +40,14 @@ struct FaceGeom {
     gdd = gcon[d-1][d-1];
     g.SpacetimeMetric(loc,k,j,i,gcov);
     g.ContravariantShift(loc,k,j,i,beta);
+    g.Coords(loc,k,j,i,X);
   }
   const Real alpha;
   const Real gdet;
   Real gcov[4][4];
   Real beta[3];
   Real gdd;
+  Real X[4];
 };
 
 class FluxState {
@@ -81,14 +85,23 @@ class FluxState {
   
   KOKKOS_INLINE_FUNCTION
   void prim_to_flux(const int d, const int k, const int j, const int i, const FaceGeom &g,
-                    const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F) const {
+                    const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F,
+                    const Real rho_floor, const Real sie_floor) const {
     const int dir = d-1;
+    //const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
     const Real rho = q(dir,prho,k,j,i);
-    const Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
+    if (rho == rho_floor) {
+      //std::cout << "Used rho_floor: " << q(dir,prho,k,j,i) << " " << rho_floor << std::endl;
+    }
+    Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
     const Real &vel = vcon[dir];
     Real Bcon[] = {0.0, 0.0, 0.0};
+    //const Real u = q(dir,peng,k,j,i)/rho > sie_floor ? q(dir,peng,k,j,i) : rho*sie_floor;
     const Real u = q(dir,peng,k,j,i);
-    const Real P = q(dir,prs,k,j,i);
+    if (u == rho*sie_floor) {
+      //std::cout << "Used sie_floor: " << q(dir,peng,k,j,i)/rho << " " << sie_floor << std::endl;
+    }
+    const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
     for (int m = pb_lo; m <= pb_hi; m++) {
@@ -104,6 +117,13 @@ class FluxState {
         Bdotv += g.gcov[m+1][n+1]*Bcon[m]*vcon[n];
         BdotB += g.gcov[m+1][n+1]*Bcon[m]*Bcon[n];
       }
+    }
+    if (vsq >= 1.0) {
+      const Real gamma_max_sq = 100.0*100.0;
+      Real scale = (1.0 - 1.0/gamma_max_sq)/vsq;
+      vsq *= scale;
+      scale = sqrt(scale);
+      for (int m = 0; m < 3; m++) vcon[m] *= scale;
     }
     const Real W = 1.0/sqrt(1-vsq);
 
@@ -146,15 +166,15 @@ class FluxState {
       F[m] = U[m]*vtil - Bcon[dir]*(vcon[m-cb_lo] - g.beta[m-cb_lo]/g.alpha);
     }
 
-    const Real vasq = bsqWsq/(rhohWsq+bsqWsq);
-    const Real cssq = gamma1*P*W*W/rhohWsq;
-    Real cmsq = cssq + vasq*(1.0 - cssq);
-    cmsq = (cmsq > 0.0 ? cmsq : 1.e-16); // TODO(JCD): what should this 1.e-16 be?
-    cmsq = (cmsq > 1.0 ? 1.0 : cmsq);
+    const Real vasq = bsqWsq/robust::make_positive(rhohWsq+bsqWsq);
+    const Real cssq = robust::make_bounded(gamma1*P*W*W/robust::make_positive(rhohWsq), 0.0, 1.0);
+    Real cmsq = robust::make_bounded(cssq + vasq*(1.0 - cssq), 0.0, 1.0);
+    //cmsq = (cmsq > 0.0 ? cmsq : 1.e-16); // TODO(JCD): what should this 1.e-16 be?
+    //cmsq = (cmsq > 1.0 ? 1.0 : cmsq);
 
     const Real vcoff = g.alpha/(1.0 - vsq*cmsq);
     const Real v0 = vel*(1.0 - cmsq);
-    const Real vpm = sqrt(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0));
+    const Real vpm = sqrt(robust::make_bounded(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0), 0.0, 1.0));
     vp = vcoff*(v0 + vpm) - g.beta[dir];
     vm = vcoff*(v0 - vpm) - g.beta[dir];
   }
@@ -163,6 +183,7 @@ class FluxState {
   const ParArrayND<Real> ql;
   const ParArrayND<Real> qr;
   const Geometry::CoordSysMeshBlock geom;
+  fixup::Floors floor;
  private:
   const int prho, pvel_lo, peng, pb_lo, pb_hi, pye, prs, gm1;
   const int crho, cmom_lo, ceng, cb_lo, cb_hi, cye, ncons;
@@ -172,6 +193,7 @@ class FluxState {
       ql(rc->Get("ql").data),
       qr(rc->Get("qr").data),
       geom(Geometry::GetCoordinateSystem(rc)),
+      floor(rc->GetParentPointer().get()->packages.Get("fixup").get()->Param<fixup::Floors>("floor")),
       prho(imap[fluid_prim::density].first),
       pvel_lo(imap[fluid_prim::velocity].first),
       peng(imap[fluid_prim::energy].first),
@@ -188,6 +210,9 @@ class FluxState {
       cye(imap[fluid_cons::ye].first),
       ncons(5 + (pb_hi-pb_lo+1) + (cye>0)) {
     PARTHENON_REQUIRE_THROWS(ncons <= NCONS_MAX, "ncons exceeds NCONS_MAX.  Reconfigure to increase NCONS_MAX.");
+    //auto *pmb = rc->GetParentPointer().get();
+    //StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+    //floor_ = fix_pkg->Param<fixup::Floors>("floor");
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
@@ -204,8 +229,12 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
 
   CellLocation loc = DirectionToFaceID(d);
   FaceGeom g(fs.geom, loc, d, k, j, i);
-  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl);
-  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr);
+  Real rho_floor, sie_floor;
+  fs.floor.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
+  rho_floor *= 0.1;
+  sie_floor *= 0.1;
+  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, rho_floor, sie_floor);
+  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, rho_floor, sie_floor);
 
   const Real cmax = std::max(std::max(-vml,vpl), std::max(-vmr,vpr));
 
@@ -223,8 +252,12 @@ Real hll(const FluxState &fs, const int d, const int k, const int j, const int i
 
   CellLocation loc = DirectionToFaceID(d);
   FaceGeom g(fs.geom, loc, d, k, j, i);
-  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl);
-  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr);
+  Real rho_floor, sie_floor;
+  fs.floor.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
+  rho_floor *= 0.1;
+  sie_floor *= 0.1;
+  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, rho_floor, sie_floor);
+  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, rho_floor, sie_floor);
 
   const Real cl = std::min(std::min(vml, vmr), 0.0);
   const Real cr = std::max(std::max(vpl, vpr), 0.0);

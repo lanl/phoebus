@@ -5,7 +5,7 @@
 
 namespace robust {
 
-constexpr Real tiny = 1.e-10;
+constexpr Real tiny = 1.e-14;
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real make_positive(const Real val) {

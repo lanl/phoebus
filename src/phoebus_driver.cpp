@@ -20,6 +20,7 @@
 
 // Local Includes
 #include "compile_constants.hpp"
+#include "fixup/fixup.hpp"
 #include "fluid/fluid.hpp"
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
@@ -117,6 +118,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                  sc1.get(), BoundaryCommSubset::all);
 
     auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
+    auto fix_flux = tl.AddTask(hydro_flux, fixup::NothingEscapes, sc0.get());
     auto flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
     auto geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
 
@@ -129,6 +131,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // compute the divergence of fluxes of conserved variables
     auto flux_div =
         tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>, sc0.get(), dudt.get());
+    
+    auto copy_flux_div = tl.AddTask(flux_div|geom_src, fluid::CopyFluxDivergence, dudt.get());
 
     auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,
                               src_names, dudt.get(), gsrc.get(), dudt.get());
@@ -207,6 +211,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
   packages.Add(Geometry::Initialize(pin.get()));
   packages.Add(fluid::Initialize(pin.get()));
+  packages.Add(fixup::Initialize(pin.get()));
 
   return packages;
 }

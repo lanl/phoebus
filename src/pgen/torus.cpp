@@ -139,6 +139,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -189,7 +190,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         //ucon[0] = ucon_norm(ucon,gcov);
         const Real W = ucon[0]*lapse;
         for (int d = 0; d < 3; d++) {
-          v(ivlo+d,k,j,i) = 0.0;//ucon[d+1]/W + beta[d]/lapse;
+          v(ivlo+d,k,j,i) = 0.0;//beta[d]/lapse;
         }
       }
       /* region inside magnetized torus; u^i is calculated in
@@ -212,21 +213,21 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         tr.bl_to_fmks(x1,x2,x3,a,ucon_bl,ucon);
         const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
         geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
-        //ucon[1] = -beta[0]/lapse;
-        //ucon[2] = 0.0;
-        //ucon[3] = -beta[2]/lapse;
+        geom.SpacetimeMetric(CellLocation::Cent,k,j,i, gcov);
         ucon[0] = ucon_norm(ucon, gcov);
         const Real W = lapse*ucon[0];
         for (int d = 0; d < 3; d++) {
           v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
         }
-
+        //v(ivlo,k,j,i) = beta[0]/lapse;
+        //v(ivlo+1,k,j,i) = beta[1]/lapse;
       }
       // fixup
       Real rhoflr, epsflr;
-      con2prim_robust::GetFloors(r, th, rhoflr, epsflr);
+      floor.GetFloors(x1, x2, x3, rhoflr, epsflr);
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
+      v(iprs,k,j,i) = eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
       
       v(itmp,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i)/Cv;
       //fprintf(stderr,"%g %g %g %g\n", r, th, v(irho,k,j,i), v(ieng,k,j,i));
@@ -282,8 +283,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     });//, Kokkos::Max(bsq_max));
   }
   // now normalize the b-field
-
   fluid::PrimitiveToConserved(rc);
+/*
+  Real beta[3];
+  geom.ContravariantShift(CellLocation::Cent,kb.s,jb.s+256,ib.s+440, beta);
+  alpha = geom.Lapse(CellLocation::Cent,kb.s,jb.s+256,ib.s+440);
+  std::cout << "rho, u = " << v(irho,kb.s,256,440) << " " << v(ieng, kb.s, 256, 440) << std::endl;
+  std::cout << "v1_0 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
+  fluid::PrimitiveToConserved(rc);
+  std::cout << "v1_1 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
+  fluid::ConservedToPrimitive(rc);
+  std::cout << "rho, u = " << v(irho,kb.s,256,440) << " " << v(ieng, kb.s, 256, 440) << std::endl;
+  std::cout << "v1_2 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
+  */
 }
 
 void ProblemModifier(ParameterInput *pin) {
