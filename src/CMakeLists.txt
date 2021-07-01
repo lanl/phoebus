@@ -15,6 +15,8 @@ add_executable(phoebus
   main.cpp # first
 
   # alphabetical
+  fixup/fixup.cpp
+  fixup/fixup.hpp
 
   fluid/con2prim.hpp
   fluid/con2prim_robust.hpp

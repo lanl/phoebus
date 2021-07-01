@@ -283,11 +283,11 @@ public:
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
-  void ConnectionCoefficient(CellLocation loc, int b, int k, int j, int i,
+  void ConnectionCoefficient(CellLocation loc, int bid, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
     if (axisymmetric_)
       k = k_;
-    Utils::SetConnectionCoeffByFD(*this, Gamma, loc, b, k, j, i);
+    Utils::SetConnectionCoeffByFD(*this, Gamma, loc, bid, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
@@ -453,6 +453,7 @@ template <typename System>
 void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetParentPointer();
   auto system = GetCoordinateSystem<System>(rc);
+  auto coords = pmb->coords;
 
   auto &pkg = pmb->packages.Get("geometry");
   bool axisymmetric = pkg->Param<bool>("axisymmetric");
@@ -552,8 +553,8 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  Real kbs = axisymmetric ? 0 : kb.s;
-  Real kbe = axisymmetric ? 0 : kb.e;
+  int kbs = axisymmetric ? 0 : kb.s;
+  int kbe = axisymmetric ? 0 : kb.e;
   pmb->par_for(
       "SetGeometry::Set Cached data, Cent", kbs, kbe, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -581,6 +582,36 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
       ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         lamb(k, j, i, CellLocation::Corn);
       });
+
+  /*kbs = axisymmetric ? 0 : kb.s;
+  kbe = axisymmetric ? 0 : kb.e;
+  const int ndim = pmb->pmy_mesh->ndim;
+  pmb->par_for(
+    "Overwrite Geometry", kbs, kbe, jb.s, jb.e, ib.s, ib.e,
+    KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      Real gcovp[4][4], gcovm[4][4];
+      const Real alpha0 = system.Lapse(CellLocation::Cent, k, j, i);
+      int lin = 0;
+      for (int sigma=1; sigma<=ndim; ++sigma) {
+        CellLocation locs[] = {CellLocation::Face1, CellLocation::Face2, CellLocation::Face3};
+        const int di = sigma==1 ? 1 : 0;
+        const int dj = sigma==2 ? 1 : 0;
+        const int dk = sigma==3 ? 1 : 0;
+        system.SpacetimeMetric(locs[sigma-1], k+dk, j+dj, i+di, gcovp);
+        system.SpacetimeMetric(locs[sigma-1], k, j, i, gcovm);
+        for (int mu=0; mu<NDFULL; ++mu) {
+          for (int nu=mu; nu<NDFULL; ++nu) {
+            int offst = idx[CellLocation::Cent].dg + lin;
+            pack(offst, k, j, i) = (gcovp[mu][nu] - gcovm[mu][nu])/coords.Dx(sigma,k,j,i);
+            lin++;
+          }
+        }
+        const Real alphap = system.Lapse(locs[sigma-1], k+dk, j+dj, i+di);
+        const Real alpham = system.Lapse(locs[sigma-1], k, j, i);
+        pack(idx[CellLocation::Cent].dalpha + sigma-1, k, j, i) = (alphap - alpham)/(alpha0*coords.Dx(sigma,k,j,i));
+      }
+    });*/
+    
   // don't let other kernels launch until geometry is set
   pmb->exec_space.fence();
 }

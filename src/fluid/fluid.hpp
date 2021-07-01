@@ -38,6 +38,7 @@ TaskStatus ConservedToPrimitive(T *rc);
 template <typename T>
 TaskStatus ConservedToPrimitiveRobust(T *rc);
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real> *rc_src);
+TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
 TaskStatus FluxCT(MeshBlockData<Real> *rc);
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc);
