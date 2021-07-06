@@ -29,6 +29,7 @@ using namespace parthenon::package::prelude;
 namespace Boundaries {
 
 void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
@@ -41,6 +42,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
+  printf("%s:%i\n", __FILE__, __LINE__);
 
 
   if (bc_vars == "conserved") {
@@ -58,15 +60,13 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
         });
-
-    const IndexRange ib = rc->GetBoundsI(domain);
-    const IndexRange jb = rc->GetBoundsJ(domain);
-    const IndexRange kb = rc->GetBoundsK(domain);
-    fluid::ConservedToPrimitiveRegion<MeshBlockData<Real>>(rc.get(), ib, jb, kb);
+  printf("%s:%i\n", __FILE__, __LINE__);
   }
+  printf("%s:%i\n", __FILE__, __LINE__);
 }
 
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
@@ -79,6 +79,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
@@ -95,11 +96,6 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
         });
-
-    const IndexRange ib = rc->GetBoundsI(domain);
-    const IndexRange jb = rc->GetBoundsJ(domain);
-    const IndexRange kb = rc->GetBoundsK(domain);
-    fluid::ConservedToPrimitiveRegion<MeshBlockData<Real>>(rc.get(), ib, jb, kb);
   }
 }
 
@@ -148,7 +144,30 @@ void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc) {
-  // if bc_vars == conserved do nothing, if primitive, call c2p in ghost zones
+  auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
+  std::string bc_vars = pkg->Param<std::string>("bc_vars");
+  auto pmb = rc->GetBlockPointer();
+  const int ndim = pmb->pmy_mesh->ndim;
+
+  std::vector<IndexDomain> domains = {IndexDomain::inner_x1, IndexDomain::outer_x1};
+  if (ndim > 1) {
+    domains.push_back(IndexDomain::inner_x2);
+    domains.push_back(IndexDomain::outer_x2);
+    if (ndim > 2) {
+      domains.push_back(IndexDomain::inner_x3);
+      domains.push_back(IndexDomain::outer_x3);
+    }
+  }
+
+  if (bc_vars == "primitive") {
+    for (auto &domain : domains) {
+      IndexRange ib = rc->GetBoundsI(domain);
+      IndexRange jb = rc->GetBoundsJ(domain);
+      IndexRange kb = rc->GetBoundsK(domain);
+      fluid::PrimitiveToConservedRegion(rc.get(), ib, jb, kb);
+    }
+  }
+
   return TaskStatus::complete;
 }
 
