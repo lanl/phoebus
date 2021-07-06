@@ -218,7 +218,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 		   c2p_scratch_size);
   physics->AddField(impl::c2p_scratch, c2p_meta);
 
-  physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
+  physics->FillDerivedBlock = ConservedToPrimitiveEntire<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
@@ -344,7 +344,17 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-template <typename T> TaskStatus ConservedToPrimitive(T *rc) {
+template <typename T>
+TaskStatus ConservedToPrimitiveEntire(T *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  return ConservedToPrimitiveRegion(rc, ib, jb, kb);
+}
+
+template <typename T> TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRange &ib,
+  const IndexRange &jb, const IndexRange &kb) {
   using namespace con2prim;
   auto *pmb = rc->GetParentPointer().get();
 
@@ -358,10 +368,6 @@ template <typename T> TaskStatus ConservedToPrimitive(T *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   auto fail = rc->Get(internal_variables::fail).data;
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
   // if we can combine them, we can get rid of the mesh sized scratch array

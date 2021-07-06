@@ -21,6 +21,7 @@
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
+#include "fluid/fluid.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
@@ -36,13 +37,15 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto q = rc->PackVariables(
       std::vector<parthenon::MetadataFlag>{Metadata::FillGhost}, coarse);
   auto nb = IndexRange{0, q.GetDim(4) - 1};
+  auto domain = IndexDomain::inner_x1;
 
   auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
 
+
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
-        "OutflowInnerX1", nb, IndexDomain::inner_x1, coarse,
+        "OutflowInnerX1Cons", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
           Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -51,13 +54,15 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         });
   } else if (bc_vars == "primitive") {
     pmb->par_for_bndry(
-        "OutflowInnerX1", nb, IndexDomain::inner_x1, coarse,
+        "OutflowInnerX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-          Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
-          Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
-          Real gratio = Geometry::Utils::ratio(detg, detg_ref);
-          q(l, k, j, i) = gratio * q(l, k, j, ref);
+          q(l, k, j, i) = q(l, k, j, ref);
         });
+
+    const IndexRange ib = rc->GetBoundsI(domain);
+    const IndexRange jb = rc->GetBoundsJ(domain);
+    const IndexRange kb = rc->GetBoundsK(domain);
+    fluid::ConservedToPrimitiveRegion<MeshBlockData<Real>>(rc.get(), ib, jb, kb);
   }
 }
 
@@ -70,15 +75,32 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto q = rc->PackVariables(
       std::vector<parthenon::MetadataFlag>{Metadata::FillGhost}, coarse);
   auto nb = IndexRange{0, q.GetDim(4) - 1};
+  auto domain = IndexDomain::outer_x1;
 
-  pmb->par_for_bndry(
-      "OutflowOuterX1", nb, IndexDomain::outer_x1, coarse,
-      KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
-        Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
-        Real gratio = Geometry::Utils::ratio(detg, detg_ref);
-        q(l, k, j, i) = gratio * q(l, k, j, ref);
-      });
+  auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
+  std::string bc_vars = pkg->Param<std::string>("bc_vars");
+
+  if (bc_vars == "conserved") {
+    pmb->par_for_bndry(
+        "OutflowOuterX1Cons", nb, IndexDomain::outer_x1, coarse,
+        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+          Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
+          Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
+          Real gratio = Geometry::Utils::ratio(detg, detg_ref);
+          q(l, k, j, i) = gratio * q(l, k, j, ref);
+        });
+  } else if (bc_vars == "primitive") {
+    pmb->par_for_bndry(
+        "OutflowOuterX1Prim", nb, domain, coarse,
+        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+          q(l, k, j, i) = q(l, k, j, ref);
+        });
+
+    const IndexRange ib = rc->GetBoundsI(domain);
+    const IndexRange jb = rc->GetBoundsJ(domain);
+    const IndexRange kb = rc->GetBoundsK(domain);
+    fluid::ConservedToPrimitiveRegion<MeshBlockData<Real>>(rc.get(), ib, jb, kb);
+  }
 }
 
 void ReflectInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {

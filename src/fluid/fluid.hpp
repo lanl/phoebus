@@ -33,7 +33,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
 template <typename T>
-TaskStatus ConservedToPrimitive(T *rc);
+TaskStatus ConservedToPrimitiveEntire(T *rc);
+template <typename T>
+TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRange &ib, const IndexRange &jb, const IndexRange &kb);
 template <typename T>
 TaskStatus ConservedToPrimitive2(T *rc);
 template <typename T>
