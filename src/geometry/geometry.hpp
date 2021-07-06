@@ -19,6 +19,7 @@
 #include <parthenon/package.hpp>
 
 #include "geometry/coordinate_systems.hpp"
+#include "geometry/tetrads.hpp"
 
 using namespace parthenon::package::prelude;
 
