@@ -218,14 +218,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 		   c2p_scratch_size);
   physics->AddField(impl::c2p_scratch, c2p_meta);
 
-  physics->FillDerivedBlock = ConservedToPrimitiveEntire<MeshBlockData<Real>>;
+  physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
 }
 
-// template <typename T>
+//template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  return PrimitiveToConservedRegion(rc, ib, jb, kb);
+}
+
+// template <typename T>
+TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange &ib, const IndexRange &jb, const IndexRange &kb) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   auto *pmb = rc->GetParentPointer().get();
@@ -252,10 +261,6 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   const int cb_hi = imap[c::bfield].second;
   int pye = imap[p::ye].second; // -1 if not present
   int cye = imap[c::ye].second;
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -345,7 +350,7 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
 }
 
 template <typename T>
-TaskStatus ConservedToPrimitiveEntire(T *rc) {
+TaskStatus ConservedToPrimitive(T *rc) {
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -504,6 +509,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>(
       "Recon");
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
+  printf("%s:%i\n", __FILE__, __LINE__);
 
 #define RECON(method)                                                          \
   parthenon::par_for(                                                          \
@@ -531,6 +537,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     PARTHENON_THROW("Invalid recon option.");
   }
 #undef RECON
+  printf("%s:%i\n", __FILE__, __LINE__);
 
 #define FLUX(method)                                                           \
   parthenon::par_for(                                                          \
@@ -551,6 +558,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     PARTHENON_THROW("Invalid riemann solver option.");
   }
 #undef FLUX
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   return TaskStatus::complete;
 }
