@@ -116,12 +116,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     mprim_scalar = Metadata({Metadata::Cell, Metadata::Intensive,
                                     Metadata::Derived, Metadata::OneCopy,
                                     Metadata::FillGhost});
+
+    // TODO(BRR) Issue with Parthenon buffers currently requires FillGhost flag even if we
+    // will overwrite these conserved variables in ghost zones later
     mcons_scalar =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::WithFluxes});
+            Metadata::Conserved, Metadata::WithFluxes, Metadata::FillGhost});
     mcons_threev =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
+            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes, Metadata::FillGhost},
                three_vec);
   } else {
     PARTHENON_FAIL("\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
@@ -509,7 +512,6 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>(
       "Recon");
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
-  printf("%s:%i\n", __FILE__, __LINE__);
 
 #define RECON(method)                                                          \
   parthenon::par_for(                                                          \
@@ -537,7 +539,6 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     PARTHENON_THROW("Invalid recon option.");
   }
 #undef RECON
-  printf("%s:%i\n", __FILE__, __LINE__);
 
 #define FLUX(method)                                                           \
   parthenon::par_for(                                                          \
@@ -558,7 +559,6 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     PARTHENON_THROW("Invalid riemann solver option.");
   }
 #undef FLUX
-  printf("%s:%i\n", __FILE__, __LINE__);
 
   return TaskStatus::complete;
 }

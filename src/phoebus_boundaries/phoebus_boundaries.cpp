@@ -29,7 +29,6 @@ using namespace parthenon::package::prelude;
 namespace Boundaries {
 
 void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
@@ -42,7 +41,6 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
-  printf("%s:%i\n", __FILE__, __LINE__);
 
 
   if (bc_vars == "conserved") {
@@ -60,13 +58,10 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
         });
-  printf("%s:%i\n", __FILE__, __LINE__);
   }
-  printf("%s:%i\n", __FILE__, __LINE__);
 }
 
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
@@ -79,7 +74,6 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
-  printf("%s:%i\n", __FILE__, __LINE__);
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
