@@ -27,6 +27,7 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_driver.hpp"
 #include "phoebus_utils/debug_utils.hpp"
+#include "phoebus_boundaries/phoebus_boundaries.hpp"
 
 using namespace parthenon::driver::prelude;
 using namespace parthenon::prelude;
@@ -174,16 +175,18 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto clear_comm_flags =
       tl.AddTask(none, &MeshBlockData<Real>::ClearBoundary, sc1.get(),
                    BoundaryCommSubset::all);
-    
+
     auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc1);
 
     // set physical boundaries
     auto set_bc =
       tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc1);
 
+    auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc1);
+
     // fill in derived fields
     auto fill_derived =
-        tl.AddTask(set_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+        tl.AddTask(convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
 
     // estimate next time step
     if (stage == integrator->nstages) {
