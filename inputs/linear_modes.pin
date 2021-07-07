@@ -12,7 +12,6 @@
 
 <phoebus>
 problem = linear_modes
-#bc_vars = primitive
 
 <parthenon/job>
 problem_id  = hydro_modes       # problem ID: basename of output filenames
