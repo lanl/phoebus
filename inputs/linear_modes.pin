@@ -60,6 +60,9 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
+<phoebus/mesh>
+bc_vars = primitive
+
 <parthenon/meshblock>
 nx1 = 512
 nx2 = 512
