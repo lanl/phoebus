@@ -109,10 +109,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     mcons_scalar.Set(Metadata::FillGhost);
     mcons_threev.Set(Metadata::FillGhost);
   } else if (bc_vars == "primitive") {
-    mcons_scalar.Set(Metadata::FillGhost);
-    mcons_threev.Set(Metadata::FillGhost);
     mprim_scalar.Set(Metadata::FillGhost);
     mprim_threev.Set(Metadata::FillGhost);
+    // TODO(BRR) Still set FillGhost on conserved variables to ensure buffers exist.
+    // Fixing this requires modifying parthenon Metadata logic.
+    mcons_scalar.Set(Metadata::FillGhost);
+    mcons_threev.Set(Metadata::FillGhost);
   } else {
     PARTHENON_REQUIRE_THROWS(bc_vars == "conserved" || bc_vars == "primitive",
       "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
