@@ -88,46 +88,34 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata m;
   std::vector<int> three_vec(1, 3);
 
-  const std::string bc_vars = pin->GetOrAddString("phoebus", "bc_vars", "conserved");
+  const std::string bc_vars = pin->GetOrAddString("phoebus/mesh", "bc_vars", "conserved");
   params.Add("bc_vars", bc_vars);
 
-  Metadata mprim_threev, mprim_scalar, mcons_scalar, mcons_threev;
-
-  if (bc_vars == "conserved") {
-    mprim_threev =
+  Metadata  mprim_threev =
       Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                 Metadata::Derived, Metadata::OneCopy},
                three_vec);
-    mprim_scalar = Metadata({Metadata::Cell, Metadata::Intensive,
+  Metadata mprim_scalar = Metadata({Metadata::Cell, Metadata::Intensive,
                                     Metadata::Derived, Metadata::OneCopy});
-    mcons_scalar =
+  Metadata mcons_scalar =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::WithFluxes, Metadata::FillGhost});
-    mcons_threev =
+            Metadata::Conserved, Metadata::WithFluxes});
+  Metadata mcons_threev =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes,
-            Metadata::FillGhost},
+            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
                three_vec);
-  } else if (bc_vars == "primitive") {
-    mprim_threev =
-      Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
-                Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
-               three_vec);
-    mprim_scalar = Metadata({Metadata::Cell, Metadata::Intensive,
-                                    Metadata::Derived, Metadata::OneCopy,
-                                    Metadata::FillGhost});
 
-    // TODO(BRR) Issue with Parthenon buffers currently requires FillGhost flag even if we
-    // will overwrite these conserved variables in ghost zones later
-    mcons_scalar =
-      Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::WithFluxes, Metadata::FillGhost});
-    mcons_threev =
-      Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes, Metadata::FillGhost},
-               three_vec);
+  if (bc_vars == "conserved") {
+    mcons_scalar.Set(Metadata::FillGhost);
+    mcons_threev.Set(Metadata::FillGhost);
+  } else if (bc_vars == "primitive") {
+    mcons_scalar.Set(Metadata::FillGhost);
+    mcons_threev.Set(Metadata::FillGhost);
+    mprim_scalar.Set(Metadata::FillGhost);
+    mprim_threev.Set(Metadata::FillGhost);
   } else {
-    PARTHENON_FAIL("\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
+    PARTHENON_REQUIRE_THROWS(bc_vars == "conserved" || bc_vars == "primitive",
+      "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
 
   int ndim = 1;
