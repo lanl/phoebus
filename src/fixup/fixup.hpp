@@ -18,16 +18,13 @@ static struct ConstantRhoSieFloor {
 static struct ExpX1RhoSieFloor {
 } exp_x1_rho_sie_floor_tag;
 
-
 class Floors {
  public:
   Floors() : Floors(constant_rho_sie_floor_tag, -1.e300, -1.e300) {}
   Floors(ConstantRhoSieFloor, const Real rho0, const Real sie0)
     : r0_(rho0), s0_(sie0), floor_flag_(1) {}
   Floors(ExpX1RhoSieFloor, const Real rho0, const Real sie0, const Real rp, const Real sp)
-    : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(2) {
-      std::cout << "Floor setup: " << r0_ << " " << s0_ << " " << ralpha_ << " " << salpha_ << std::endl;
-    }
+    : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(2) {}
 
   KOKKOS_INLINE_FUNCTION
   void GetFloors(const Real x1, const Real x2, const Real x3, Real &rflr, Real &sflr) const {
