@@ -25,6 +25,9 @@ namespace shock_tube {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski),
+    "Problem \"shock_tube\" requires \"Minkowski\" geometry!");
+
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
