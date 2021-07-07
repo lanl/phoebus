@@ -367,7 +367,11 @@ template <typename T> TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRa
 
   auto fail = rc->Get(internal_variables::fail).data;
 
-  Geometry::SetGeometryTask(rc);
+  // breaks templating unless mesh has a pointer to itself
+  auto *pmesh = pmb->pmy_mesh;
+  if (pmesh->multilevel) {
+    Geometry::SetGeometryTask(rc);
+  }
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
   // if we can combine them, we can get rid of the mesh sized scratch array
