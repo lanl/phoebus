@@ -36,6 +36,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
   params.Add("cfl", cfl);
 
+  std::string c2p_method = pin->GetOrAddString("fluid", "c2p_method", "robust");
+  params.Add("c2p_method", c2p_method);
+  if (c2p_method == "robust") {
+    params.Add("c2p_func", ConservedToPrimitiveRobust);
+  } else if (c2p_method == "classic") {
+    params.Add("c2p_func", ConservedToPrimitiveClassic);
+  } else {
+    PARTHENON_THROW("Invalid c2p_method.");
+  }
+
   Real c2p_tol = pin->GetOrAddReal("fluid", "c2p_tol", 1.e-8);
   params.Add("c2p_tol", c2p_tol);
 
@@ -88,7 +98,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata m;
   std::vector<int> three_vec(1, 3);
 
-  Metadata mprim_threev =
+  const std::string bc_vars = pin->GetOrAddString("phoebus/mesh", "bc_vars", "conserved");
+  params.Add("bc_vars", bc_vars);
+
+  Metadata  mprim_threev =
       Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                 Metadata::Derived, Metadata::OneCopy},
                three_vec);
@@ -96,12 +109,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                                     Metadata::Derived, Metadata::OneCopy});
   Metadata mcons_scalar =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::WithFluxes, Metadata::FillGhost});
+            Metadata::Conserved, Metadata::WithFluxes});
   Metadata mcons_threev =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes,
-            Metadata::FillGhost},
+            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
                three_vec);
+
+  if (bc_vars == "conserved") {
+    mcons_scalar.Set(Metadata::FillGhost);
+    mcons_threev.Set(Metadata::FillGhost);
+  } else if (bc_vars == "primitive") {
+    mprim_scalar.Set(Metadata::FillGhost);
+    mprim_threev.Set(Metadata::FillGhost);
+    // TODO(BRR) Still set FillGhost on conserved variables to ensure buffers exist.
+    // Fixing this requires modifying parthenon Metadata logic.
+    mcons_scalar.Set(Metadata::FillGhost);
+    mcons_threev.Set(Metadata::FillGhost);
+  } else {
+    PARTHENON_REQUIRE_THROWS(bc_vars == "conserved" || bc_vars == "primitive",
+      "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
+  }
 
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
@@ -203,14 +230,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 		   c2p_scratch_size);
   physics->AddField(impl::c2p_scratch, c2p_meta);
 
-  physics->FillDerivedBlock = ConservedToPrimitiveRobust<MeshBlockData<Real>>;
+  physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
 }
 
-// template <typename T>
+//template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  return PrimitiveToConservedRegion(rc, ib, jb, kb);
+}
+
+// template <typename T>
+TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange &ib, const IndexRange &jb, const IndexRange &kb) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   auto *pmb = rc->GetParentPointer().get();
@@ -237,10 +273,6 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   const int cb_hi = imap[c::bfield].second;
   int pye = imap[p::ye].second; // -1 if not present
   int cye = imap[c::ye].second;
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -329,7 +361,9 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-template <typename T> TaskStatus ConservedToPrimitiveRobust(T *rc) {
+template <typename T>
+TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRange &jb,
+                                      const IndexRange &kb) {
   auto *pmb = rc->GetParentPointer().get();
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
@@ -346,10 +380,6 @@ template <typename T> TaskStatus ConservedToPrimitiveRobust(T *rc) {
   auto coords = pmb->coords;
 
   auto fail = rc->Get(internal_variables::fail).data;
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
   // if we can combine them, we can get rid of the mesh sized scratch array
@@ -380,7 +410,21 @@ template <typename T> TaskStatus ConservedToPrimitiveRobust(T *rc) {
   return TaskStatus::complete;
 }
 
-template <typename T> TaskStatus ConservedToPrimitive(T *rc) {
+template <typename T>
+TaskStatus ConservedToPrimitive(T *rc) {
+  using c2p_type = std::function<TaskStatus(T *, const IndexRange &, const IndexRange &, const IndexRange &);
+  auto *pmb = rc->GetParentPointer().get();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  auto c2p = Param<c2p_type>("c2p_function");
+  return c2p(rc, ib, jb, kb);
+}
+
+template <typename T>
+TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexRange &jb,
+                                      const IndexRange &kb) {
   using namespace con2prim;
   auto *pmb = rc->GetParentPointer().get();
 
@@ -399,10 +443,6 @@ template <typename T> TaskStatus ConservedToPrimitive(T *rc) {
   auto coords = pmb->coords;
 
   auto fail = rc->Get(internal_variables::fail).data;
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
   // if we can combine them, we can get rid of the mesh sized scratch array

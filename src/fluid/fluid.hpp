@@ -33,10 +33,14 @@ namespace fluid {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
+//template <typename T>
+TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange &ib, const IndexRange &jb, const IndexRange &kb);
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc);
 template <typename T>
-TaskStatus ConservedToPrimitiveRobust(T *rc);
+TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexRange &jb, const IndexRange &kb);
+template <typename T>
+TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRange &jb, const IndexRange &kb);
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real> *rc_src);
 TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);

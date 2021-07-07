@@ -46,6 +46,7 @@ int main(int argc, char *argv[]) {
       pman.pinput->GetOrAddString("phoebus", "bc_ix1", "reflect");
   const std::string bc_ox1 =
       pman.pinput->GetOrAddString("phoebus", "bc_ox1", "outflow");
+
   if (bc_ix1 == "reflect") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
         Boundaries::ReflectInnerX1;
