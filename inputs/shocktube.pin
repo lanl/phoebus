@@ -12,7 +12,6 @@
 
 <phoebus>
 problem = shock_tube
-bc_vars = primitive
 
 <parthenon/job>
 problem_id  = sod       # problem ID: basename of output filenames
@@ -60,6 +59,9 @@ ix3_bc      = periodic  # Inner-X3 boundary condition flag
 ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
+
+<phoebus/mesh>
+bc_vars = conserved
 
 <parthenon/meshblock>
 nx1 = 512
