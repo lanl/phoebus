@@ -88,19 +88,19 @@ class FluxState {
                     const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F,
                     const Real rho_floor, const Real sie_floor) const {
     const int dir = d-1;
-    //const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
-    const Real rho = q(dir,prho,k,j,i);
-    if (rho == rho_floor) {
+    const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
+    //const Real rho = q(dir,prho,k,j,i);
+    //if (rho == rho_floor) {
       //std::cout << "Used rho_floor: " << q(dir,prho,k,j,i) << " " << rho_floor << std::endl;
-    }
+    //}
     Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
     const Real &vel = vcon[dir];
     Real Bcon[] = {0.0, 0.0, 0.0};
-    //const Real u = q(dir,peng,k,j,i)/rho > sie_floor ? q(dir,peng,k,j,i) : rho*sie_floor;
-    const Real u = q(dir,peng,k,j,i);
-    if (u == rho*sie_floor) {
+    const Real u = q(dir,peng,k,j,i)/rho > sie_floor ? q(dir,peng,k,j,i) : rho*sie_floor;
+    //const Real u = q(dir,peng,k,j,i);
+    //if (u == rho*sie_floor) {
       //std::cout << "Used sie_floor: " << q(dir,peng,k,j,i)/rho << " " << sie_floor << std::endl;
-    }
+    //}
     const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
@@ -174,7 +174,7 @@ class FluxState {
 
     const Real vcoff = g.alpha/(1.0 - vsq*cmsq);
     const Real v0 = vel*(1.0 - cmsq);
-    const Real vpm = sqrt(robust::make_bounded(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0), 0.0, 1.0));
+    const Real vpm = sqrt(robust::make_positive(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0)));
     vp = vcoff*(v0 + vpm) - g.beta[dir];
     vm = vcoff*(v0 - vpm) - g.beta[dir];
   }

@@ -374,8 +374,11 @@ class ConToPrim {
     
     Real rhoflr, epsflr;
     floor.GetFloors(x1,x2,x3,rhoflr,epsflr);
+    bool negative_crho = false;
     if (v(crho) <= 0.0) {
       printf("v(crho) < 0: %g    %g %g\n", v(crho)*igdet, x1, x2);
+      v(crho) = 1.e-50;
+      negative_crho = true;
     }
     const Real D = v(crho)*igdet;
     const Real tau = v(ceng)*igdet;
@@ -441,7 +444,7 @@ class ConToPrim {
       bsq_rpsq = bsq * rsq - rbsq;
     }
     const Real zsq = rsq/h0sq_;
-    Real v0sq = zsq/(1.0 + zsq);//, 1.0 - 1.0/1.0e4);
+    Real v0sq = std::min(zsq/(1.0 + zsq), 1.0 - 1.0/1.0e4);
     if (v0sq >= 1) {
       printf("whoa: %g %g %g %g\n", rsq, h0sq_, zsq, v0sq);
     }
@@ -484,12 +487,14 @@ class ConToPrim {
       v(pvel_lo+i) = mu*x*(rcon[i] + mu*bdotr*bu[i]);
     }
 
-    if (res.used_density_floor()) {
+    if (res.used_density_floor() || negative_crho) {
       v(prho) = rhoflr;
       v(peng) = rhoflr*epsflr;
       SPACELOOP (i) {
         v(pvel_lo+i) = 0.0;
       }
+      vsq = 0.0;
+      W = 1.0;
       v(tmp) = eos.TemperatureFromDensityInternalEnergy(rhoflr,epsflr);
       v(prs) = eos.PressureFromDensityTemperature(rhoflr, v(tmp));
     }
