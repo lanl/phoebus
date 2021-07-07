@@ -52,6 +52,11 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 template <>
 void Initialize<CFMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 
+template <>
+bool CoordinatesNeedSetting<FMKSMeshBlock>(MeshBlockData<Real> *rc);
+template <>
+bool CoordinatesNeedSetting<CFMKSMeshBlock>(MeshBlockData<Real> *rc);
+
 } // namespace Geometry
 
 #endif // GEOMETRY_FMKS_HPP_

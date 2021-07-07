@@ -126,6 +126,11 @@ using CMinkowskiMesh = CachedOverMesh<MinkowskiMesh>;
 template <>
 void Initialize<CMinkowskiMeshBlock>(ParameterInput *pin,
                                      StateDescriptor *geometry);
+template <>
+bool CoordinatesNeedSetting<MinkowskiMeshBlock>(MeshBlockData<Real> *rc);
+template <>
+bool CoordinatesNeedSetting<CMinkowskiMeshBlock>(MeshBlockData<Real> *rc);
+
 
 } // namespace Geometry
 

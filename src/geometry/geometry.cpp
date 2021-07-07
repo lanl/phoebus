@@ -99,10 +99,14 @@ CoordSysMeshBlock GetCoordinateSystem(MeshBlockData<Real> *rc) {
 CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc) {
   return GetCoordinateSystem<CoordSysMesh>(rc);
 }
-void SetGeometry(MeshBlockData<Real> *rc) {
-  auto system = GetCoordinateSystem(rc);
-  SetGeometry<CoordSysMeshBlock>(rc);
-  SetGeometryDefault(rc, system);
+TaskStatus SetGeometryTask(MeshBlockData<Real> *rc) {
+  if (CoordinatesNeedSetting<CoordSysMeshBlock>(rc)) {
+    std::cout << "Setting" << std::endl;
+    auto system = GetCoordinateSystem(rc);
+    SetGeometry<CoordSysMeshBlock>(rc);
+    SetGeometryDefault(rc, system);
+  }
+  return TaskStatus::complete;
 }
 
 } // namespace Geometry

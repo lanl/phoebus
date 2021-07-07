@@ -30,7 +30,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 
   auto &rc = pmb->meshblock_data.Get();
-  Geometry::SetGeometry(rc.get());
+  Geometry::SetGeometryTask(rc.get());
 
   auto f = pgen_dict[name];
   f(pmb, pin);

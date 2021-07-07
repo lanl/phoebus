@@ -62,5 +62,13 @@ CMinkowskiMesh GetCoordinateSystem<CMinkowskiMesh>(MeshData<Real> *rc) {
 template <> void SetGeometry<CMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<MinkowskiMeshBlock>(rc);
 }
+template <>
+bool CoordinatesNeedSetting<MinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
+  return false;
+}
+template <>
+bool CoordinatesNeedSetting<CMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
+  return CachedCoordinatesNeedSetting<MinkowskiMeshBlock>(rc);
+}
 
 } // namespace Geometry

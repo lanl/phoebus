@@ -244,6 +244,10 @@ template <>
 void Initialize<SphericalKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 template <>
 void Initialize<CSphericalKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+template <>
+bool CoordinatesNeedSetting<SphericalKSMeshBlock>(MeshBlockData<Real> *rc);
+template <>
+bool CoordinatesNeedSetting<CSphericalKSMeshBlock>(MeshBlockData<Real> *rc);
 
 } // namespace Geometry
 

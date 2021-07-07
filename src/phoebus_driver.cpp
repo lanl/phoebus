@@ -16,6 +16,8 @@
 #include <vector>
 
 //TODO(JCD): this should be exported by parthenon
+#include <parthenon/prelude.hpp>
+#include <utils/utils.hpp>
 #include <refinement/refinement.hpp>
 
 // Local Includes
@@ -27,6 +29,7 @@
 #include "phoebus_utils/debug_utils.hpp"
 
 using namespace parthenon::driver::prelude;
+using namespace parthenon::prelude;
 
 namespace phoebus {
 

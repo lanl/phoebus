@@ -76,5 +76,13 @@ template <>
 void SetGeometry<CSphericalKSMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<SphericalKSMeshBlock>(rc);
 }
+template <>
+bool CoordinatesNeedSetting<SphericalKSMeshBlock>(MeshBlockData<Real> *rc) {
+  return false;
+}
+template <>
+bool CoordinatesNeedSetting<CSphericalKSMeshBlock>(MeshBlockData<Real> *rc) {
+  return CachedCoordinatesNeedSetting<SphericalKSMeshBlock>(rc);
+}
 
 } // namespace Geometry

@@ -92,5 +92,13 @@ template <> CFMKSMesh GetCoordinateSystem<CFMKSMesh>(MeshData<Real> *rc) {
 template <> void SetGeometry<CFMKSMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<FMKSMeshBlock>(rc);
 }
+template <>
+bool CoordinatesNeedSetting<FMKSMeshBlock>(MeshBlockData<Real> *rc) {
+  return false;
+}
+template <>
+bool CoordinatesNeedSetting<CFMKSMeshBlock>(MeshBlockData<Real> *rc) {
+  return CachedCoordinatesNeedSetting<FMKSMeshBlock>(rc);
+}
 
 } // namespace Geometry

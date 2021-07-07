@@ -339,6 +339,8 @@ template <typename T> TaskStatus ConservedToPrimitive(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
+  Geometry::SetGeometryTask(rc);
+
   // breaking con2prim into 3 kernels seems more performant.  WHY?
   // if we can combine them, we can get rid of the mesh sized scratch array
   parthenon::par_for(
