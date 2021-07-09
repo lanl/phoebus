@@ -38,16 +38,12 @@ struct FaceGeom {
     gdd = gcon[d-1][d-1];
     g.SpacetimeMetric(loc,k,j,i,gcov);
     g.ContravariantShift(loc,k,j,i,beta);
-    g.Metric(loc,k,j,i,gammacov);
-    g.MetricInverse(loc,k,j,i,gammacon);
   }
   const Real alpha;
   const Real gdet;
   Real gcov[4][4];
   Real beta[3];
   Real gdd;
-  Real gammacov[3][3];
-  Real gammacon[3][3];
 };
 
 class FluxState {

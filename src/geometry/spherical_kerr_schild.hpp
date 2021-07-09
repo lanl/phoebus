@@ -40,8 +40,7 @@ namespace Geometry {
 // TODO(JMM): Should we modify to accept arbitrary M?
 class SphericalKerrSchild {
 public:
-  //SphericalKerrSchild() = default;
-  SphericalKerrSchild() : a_(0.9375), a2_(a_*a_) {}
+  SphericalKerrSchild() = default;
   KOKKOS_INLINE_FUNCTION
   SphericalKerrSchild(Real a) : a_(a), a2_(a * a) {}
 
