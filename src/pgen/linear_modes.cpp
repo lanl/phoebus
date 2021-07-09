@@ -175,14 +175,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     betay = gpkg->Param<Real>("vy");
     PARTHENON_REQUIRE_THROWS(alpha > 0, "lapse must be positive");
 
-    printf("a, k, alpha, beta = %g, %g, %g, %g\n",
-	   a_snake, k_snake, alpha, betay);
     tf /= alpha;
-  }
-  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
-    a_snake = gpkg->Param<Real>("a");
-    k_snake = gpkg->Param<Real>("k");
-    betax = gpkg->Param<Real>("betax");
   }
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
     betax = gpkg->Param<Real>("vx");
@@ -248,27 +241,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
           typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm) ||
-          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy) ||
-	  typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+	        typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
         Real vsq = 0.;
         Real gcov[NDFULL][NDFULL] = {0};
         Real vcon[NDSPACE] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-//<<<<<<< HEAD
-//        Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
-//        Real shift[NDSPACE];
-//        //geom.ContravariantShift(CellLocation::Cent, k, j, i);
-//=======
-//>>>>>>> 41fe7ca7ee405458907ea7ae00e7a76aaec74c72
         Real gcov_mink[4][4] = {0};
         gcov_mink[0][0] = -1.;
         gcov_mink[1][1] = 1.;
         gcov_mink[2][2] = 1.;
         gcov_mink[3][3] = 1.;
         SPACELOOP2(m, n) {
-          //vsq += gcov[m+1][n+1]*vcon[m]*vcon[n];
           vsq += gcov_mink[m+1][n+1]*vcon[m]*vcon[n];
         }
         Real Gamma = 1./sqrt(1. - vsq);
@@ -279,17 +264,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real J[NDFULL][NDFULL] = {0};
         if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
           J[0][0] = 1/alpha;
-	  J[2][0] = -betay/alpha;
+	        J[2][0] = -betay/alpha;
           J[2][1] = a_snake*k_snake*cos(k_snake*x);
-	  J[1][1] = J[2][2] = J[3][3] = 1;
-	} else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
-	  J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
-	  J[1][0] = -betax;
-	  J[2][0] = -betay;
-	  J[3][0] = -betaz;
+	        J[1][1] = J[2][2] = J[3][3] = 1;
+	      } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+	        J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
+	        J[1][0] = -betax;
+	        J[2][0] = -betay;
+	        J[3][0] = -betaz;
         } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
-          PARTHENON_FAIL("This geometry isn't supported with a J!");
-        } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
           PARTHENON_FAIL("This geometry isn't supported with a J!");
         }
         Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
@@ -309,13 +292,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(ib_lo, k, j, i) = 0.;
           v(ib_lo + 1, k, j, i) = 0.;
           v(ib_lo + 2, k, j, i) = 0.;
-        }
-
-        if (i == 64 && j == 64) {
-          printf("x = %e y = %e\n", x, y);
-          printf("rho ug P v1 v2: %e %e %e %e %e\n",
-            v(irho, k, j, i), v(ieng, k, j, i), v(iprs, k, j, i), v(ivlo, k, j, i),
-            v(ivlo+1, k, j, i));
         }
       }
     });

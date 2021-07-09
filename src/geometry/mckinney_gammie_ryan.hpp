@@ -68,7 +68,6 @@ public:
 
     const Real drdX1 = std::exp(X1);
     const Real dthGdX2 = M_PI + M_PI * (1 - h_) * std::cos(2 * M_PI * X2);
-    printf("r: %e h_: %e X2: %e\n", r, h_, X2);
     Real dthdX1, dthdX2;
     if (derefine_poles_) {
       thJ_(X2, y, thJ);
