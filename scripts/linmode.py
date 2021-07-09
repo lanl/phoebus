@@ -169,7 +169,7 @@ for n, N in enumerate(res):
   stop = time.time()
   print('done in %g seconds' % (stop - start))
 
-  dumps = np.sort(glob.glob('hydro_modes*.phdf'))
+  dumps = np.sort(glob.glob('hydro_modes.out1*.phdf'))
 
   dump = phdf.phdf(dumps[-1])
   tf_soln = 2.*np.pi/mode['omega'].imag
