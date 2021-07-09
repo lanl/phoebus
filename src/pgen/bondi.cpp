@@ -84,6 +84,9 @@ KOKKOS_INLINE_FUNCTION
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
+    "Problem \"bondi\" requires \"FMKS\" geometry!");
+
   auto rc = pmb->meshblock_data.Get().get();
 
   PackIndexMap imap;
