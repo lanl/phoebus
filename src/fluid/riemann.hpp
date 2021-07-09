@@ -125,12 +125,6 @@ class FluxState {
     // conserved momentum
     const Real rhohWsq = (rho + u + P)*W*W;
     const Real bsqWsq = bsq*W*W;
-    /*if (i == 32 && j == 32) {
-      SPACETIMELOOP2(mu, nu) {
-        printf("gcov[%i][%i] = %e\n", mu, nu, g.gcov[mu][nu]);
-      }
-      printf("vcon: %e %e %e\n", vcon[0], vcon[1], vcon[2]);
-    }*/
     for (int m = 0; m < 3; m++) {
       Real bcovm = g.gcov[m+1][0] * b0/g.alpha;
       Real vcovm = 0.0;
