@@ -23,6 +23,8 @@ add_executable(phoebus
   fluid/tmunu.hpp
 
   geometry/analytic_system.hpp
+  geometry/boosted_minkowski.hpp
+  geometry/boosted_minkowski.cpp
   geometry/boyer_lindquist.hpp
   geometry/boyer_lindquist.cpp
   geometry/cached_system.hpp

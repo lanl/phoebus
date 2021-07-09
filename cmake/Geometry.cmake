@@ -18,6 +18,7 @@ set(PHOEBUS_GEOMETRY "Minkowski" CACHE STRING "The metric used by Phoebus")
 
 set(PHOEBUS_ANALYTIC_GEOMETRIES
     "Minkowski"
+    "BoostedMinkowski"
     "SphericalMinkowski"
     "BoyerLindquist"
     "SphericalKerrSchild"

@@ -96,10 +96,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                                     Metadata::Derived, Metadata::OneCopy});
   Metadata mcons_scalar =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-                Metadata::Conserved, Metadata::FillGhost});
+            Metadata::Conserved, Metadata::WithFluxes, Metadata::FillGhost});
   Metadata mcons_threev =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-                Metadata::Conserved, Metadata::Vector, Metadata::FillGhost},
+            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes,
+            Metadata::FillGhost},
                three_vec);
 
   int ndim = 1;
@@ -175,19 +176,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   std::vector<int> recon_shape({nrecon, ndim});
-  Metadata mrecon = Metadata({Metadata::Cell, Metadata::OneCopy}, recon_shape);
+  Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     recon_shape);
   physics->AddField(impl::ql, mrecon);
   physics->AddField(impl::qr, mrecon);
 
   std::vector<int> signal_shape(1, ndim);
   Metadata msignal =
-      Metadata({Metadata::Cell, Metadata::OneCopy}, signal_shape);
+	  Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+		   signal_shape);
   physics->AddField(impl::face_signal_speed, msignal);
   physics->AddField(impl::cell_signal_speed, msignal);
 
   std::vector<int> c2p_scratch_size(1, 5);
   Metadata c2p_meta =
-      Metadata({Metadata::Cell, Metadata::OneCopy}, c2p_scratch_size);
+	  Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+		   c2p_scratch_size);
   physics->AddField(impl::c2p_scratch, c2p_meta);
 
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
@@ -451,88 +455,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
         }
 
-        /*src(crho, k, j, i) = 0.;
-        src(ceng, k, j, i) = 0.;
-        src(cmom_lo, k, j, i) = 0.;
-        src(cmom_lo + 1, k, j, i) = 0.;
-        src(cmom_lo + 2, k, j, i) = 0.;*/
 
-/*        if ((i == 64 && j == 64) || (i == 16 && j == 16)) {
-//        {
-          printf("Sources: %e %e %e %e %e\n",
-            0., src(ceng, k, j, i), src(cmom_lo, k, j, i),
-            src(cmom_lo+1, k, j, i), src(cmom_lo+2, k, j, i));
-
-          //Real Wik_UU[3][3] = {0};
-          Real dg_DDD[4][4][4];
-          geom.MetricDerivative(CellLocation::Cent, k, j, i, dg_DDD);
-          Real NewSMom[3] = {0};
-
-          // Now try to calculate via Porth:
-          Real ncon[4] = {1, 0, 0, 0};
-          Real ncov[4] = {-1, 0, 0, 0};
-          Real delta[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
-          Real proj[4][4];
-          Real Wij[4][4];
-          SPACETIMELOOP2(mu, nu) {
-            Wij[mu][nu] = 0.;
-            proj[mu][nu] = delta[mu][nu] + ncon[mu]*ncov[nu];
-          }
-          SPACETIMELOOP(mu) SPACETIMELOOP(nu) SPACETIMELOOP(kap) SPACETIMELOOP(lam) {
-            Wij[mu][nu] += proj[mu][kap]*proj[nu][lam]*Tmunu[kap][lam];
-          }
-//          SPACETIMELOOP2(mu, nu) {
-//            printf("Wij[%i][%i] = %e\n", mu, nu, Wij[mu][nu]);
-//          }
-
-          for (int jj = 0; jj < 3; jj++) {
-            for (int ii = 0; ii < 3; ii++) {
-              for (int kk = 0; kk < 3; kk++) {
-                //NewSMom[jj] += 0.5*Wij[ii+1][kk+1]*dg_DDD[jj+1][ii+1][kk+1];
-                NewSMom[jj] += 0.5*Wij[ii+1][kk+1]*dg_DDD[kk+1][ii+1][jj+1];
-              }
-            }
-            printf("NewSMom[%i] = %e\n", jj, NewSMom[jj]);
-            src(cmom_lo + jj, k, j, i) = NewSMom[jj];
-          }
-        }
-          printf("Tmunu:\n");
-          for (int n = 0; n < 4; n++) {
-            printf("%e %e %e %e\n", Tmunu[n][0], Tmunu[n][1], Tmunu[n][2], Tmunu[n][3]);
-          }
-          printf("\n");
-          printf("Sources:\n");
-          printf("%e %e %e %e %e\n",
-            0.,
-            src(ceng,k,j,i),
-            src(cmom_lo,k,j,i),
-            src(cmom_lo+1,k,j,i),
-            src(cmom_lo+2,k,j,i));
-
-          // Now try to calculate via Porth:
-          Real ncon[4] = {1, 0, 0, 0};
-          Real ncov[4] = {-1, 0, 0, 0};
-          Real delta[4][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
-          Real proj[4][4];
-          Real Wij[4][4];
-          SPACETIMELOOP2(mu, nu) {
-            Wij[mu][nu] = 0.;
-            proj[mu][nu] = delta[mu][nu] + ncon[mu]*ncov[nu];
-          }
-          SPACETIMELOOP(mu) SPACETIMELOOP(nu) SPACETIMELOOP(kap) SPACETIMELOOP(lam) {
-            Wij[mu][nu] += proj[mu][kap]*proj[nu][lam]*Tmunu[kap][lam];
-          }
-          Real ceng_src = 0.;
-          for (int ii = 1; ii < 4; ii++) {
-            for (int jj = 1; jj < 4; jj++) {
-              for (int kk = 1; kk < 4; kk++) {
-                ceng_src += 0.5*Wij[ii][kk]*gam[jj][ii][kk];
-              }
-            }
-          }
-          printf("ceng_src: %e\n", ceng_src);
-          exit(-1);
-        }*/
       });
   return TaskStatus::complete;
 }
