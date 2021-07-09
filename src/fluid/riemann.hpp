@@ -133,12 +133,6 @@ class FluxState {
         vcovm += g.gcov[m+1][n] * vcon[n-1];
       }
 
-      /*
-      if (i == 32 && j == 32) {
-        printf("vcovm: %e\n", vcovm);
-      }
-      */
-
       U[cmom_lo+m] = (rhohWsq+bsqWsq)*vcovm - b0*bcovm;
       F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
     }
