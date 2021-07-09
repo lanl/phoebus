@@ -91,13 +91,6 @@ class FluxState {
     const Real P = q(dir,prs,k,j,i);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
-    /*
-    if (j == 32 && i == 32) {
-      printf("rho = %e u = %e P = %e v = %e %e %e\n",
-        rho, u, P, vcon[0], vcon[1], vcon[2]);
-    }
-    */
-
     for (int m = pb_lo; m <= pb_hi; m++) {
       Bcon[m-pb_lo] = q(dir, m, k, j, i);
     }
