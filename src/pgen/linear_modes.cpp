@@ -31,6 +31,7 @@ namespace linear_modes {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+<<<<<<< HEAD
   // TEMPORARY
   {
     Real a = 0.9375;
@@ -98,6 +99,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     }
     exit(-1);
   }
+=======
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski),
+    "Problem \"linear_modes\" requires \"Minkowski\" geometry!");
+>>>>>>> origin/main
 
   auto &rc = pmb->meshblock_data.Get();
   const int ndim = pmb->pmy_mesh->ndim;

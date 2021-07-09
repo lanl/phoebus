@@ -29,6 +29,8 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void ReflectInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 
+TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc);
+
 } // namespace Boundaries
 
 #endif // PHOEBUS_BOUNDARIES_PHOEBUS_BOUNDARIES_HPP_
