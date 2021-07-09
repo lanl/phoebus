@@ -415,10 +415,9 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> vars({/*fluid_cons::density, */fluid_cons::momentum, fluid_cons::energy});
+  std::vector<std::string> vars({fluid_cons::momentum, fluid_cons::energy});
   PackIndexMap imap;
   auto src = rc_src->PackVariables(vars, imap);
-  //const int crho = imap[fluid_cons::density].first;
   const int cmom_lo = imap[fluid_cons::momentum].first;
   const int cmom_hi = imap[fluid_cons::momentum].second;
   const int ceng = imap[fluid_cons::energy].first;

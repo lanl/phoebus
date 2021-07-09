@@ -88,7 +88,6 @@ SetConnectionCoeffByFD(const System &s, Real Gamma[NDFULL][NDFULL][NDFULL],
       for (int c = 0; c < NDFULL; ++c) {
         Gamma[a][b][c] = 0.5 * (dg[b][a][c] + dg[c][a][b] - dg[b][c][a]);
         //Gamma[c][a][b] = 0.5 * (dg[c][a][b] + dg[c][b][a] - dg[a][b][c]);
-        //Gamma[c][a][b] = 0.5 * (dg[c][a][b] + dg[c][b][a] - dg[a][b][c]);
       }
     }
   }

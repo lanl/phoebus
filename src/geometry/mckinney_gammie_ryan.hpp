@@ -44,9 +44,7 @@ namespace Geometry {
 class McKinneyGammieRyan {
 public:
   McKinneyGammieRyan()
-      //: derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(0),
-      //  smooth_(0.5), norm_(GetNorm_(alpha_, xt_)) {}
-      : derefine_poles_(false), h_(0.3), xt_(0.82), alpha_(14), x0_(0),
+      : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(0),
         smooth_(0.5), norm_(GetNorm_(alpha_, xt_)) {}
   McKinneyGammieRyan(Real x0) // this is the most common use-case
       : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(x0),
