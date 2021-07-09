@@ -113,13 +113,6 @@ class FluxState {
     U[crho] = rho*W;
     F[crho] = U[crho]*vtil;
 
-    /*
-    if (i == 32 && j == 32) {
-      printf("dir = %d rho = %e W = %e vtil = %e vel = %e beta/alpha = %e Frho = %e\n",
-	     dir, rho, W, vtil, vel, g.beta[dir]/g.alpha, F[crho]);
-    }
-    */
-
     // composition
     if (cye>0) {
       U[cye] = U[crho]*q(dir,pye,k,j,i);
