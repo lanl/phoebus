@@ -39,7 +39,6 @@ using namespace parthenon::package::prelude;
 #include "geometry/cached_system.hpp"
 #include "geometry/fmks.hpp"
 #include "geometry/inchworm.hpp"
-#include "geometry/lumpy.hpp"
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "geometry/minkowski.hpp"
 #include "geometry/modified_system.hpp"

@@ -43,9 +43,7 @@ class BoostedMinkowski {
  public:
   BoostedMinkowski() : vx_(0), vy_(0), vz_(0) {}
   BoostedMinkowski(const Real &vx, const Real &vy, const Real &vz)
-      : vx_(vx), vy_(vy), vz_(vz) {
-    //printf("vx, vy, vz = %g, %g, %g\n", vx_, vy_, vz_);
-  }
+      : vx_(vx), vy_(vy), vz_(vz) {}
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const { return 1.; }
   KOKKOS_INLINE_FUNCTION

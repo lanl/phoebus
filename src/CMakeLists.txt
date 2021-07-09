@@ -37,8 +37,6 @@ add_executable(phoebus
   geometry/geometry_utils.hpp
   geometry/inchworm.hpp
   geometry/inchworm.cpp
-  geometry/lumpy.hpp
-  geometry/lumpy.cpp
   geometry/mckinney_gammie_ryan.hpp
   geometry/mckinney_gammie_ryan.cpp
   geometry/modified_system.hpp

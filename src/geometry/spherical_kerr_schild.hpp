@@ -73,7 +73,6 @@ public:
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
     // do this first b/c it shows up lots of places
     g[0][1] = g[1][0] = ratio(2 * r, rho2);
-  //  printf("a_: %e\n", a_); exit(-1);
 
     g[0][0] = -1 + g[0][1];
     g[0][3] = g[3][0] = -ratio(2 * a_ * r * sth2, rho2);
