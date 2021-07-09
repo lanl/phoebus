@@ -455,11 +455,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
         }
 
-        /*src(crho, k, j, i) = 0.;
-        src(ceng, k, j, i) = 0.;
-        src(cmom_lo, k, j, i) = 0.;
-        src(cmom_lo + 1, k, j, i) = 0.;
-        src(cmom_lo + 2, k, j, i) = 0.;*/
 
 /*        if ((i == 64 && j == 64) || (i == 16 && j == 16)) {
 //        {
