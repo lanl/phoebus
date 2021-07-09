@@ -26,6 +26,7 @@
 #include "phoebus_driver.hpp"
 #include "phoebus_utils/debug_utils.hpp"
 #include "radiation/radiation.hpp"
+#include "phoebus_boundaries/phoebus_boundaries.hpp"
 
 using namespace parthenon::driver::prelude;
 
@@ -184,9 +185,11 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto set_bc =
       tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc1);
 
+    auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc1);
+
     // fill in derived fields
     auto fill_derived =
-        tl.AddTask(set_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+        tl.AddTask(convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
 
     // estimate next time step
     if (stage == integrator->nstages) {

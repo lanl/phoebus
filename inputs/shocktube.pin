@@ -60,6 +60,9 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
+<phoebus/mesh>
+bc_vars = conserved
+
 <parthenon/meshblock>
 nx1 = 512
 nx2 = 1
@@ -73,7 +76,7 @@ max_level = 3
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
-Cv = 1.0 
+Cv = 1.0
 
 <physics>
 hydro = true
