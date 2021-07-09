@@ -31,78 +31,11 @@ namespace linear_modes {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
-<<<<<<< HEAD
-  // TEMPORARY
-  {
-    Real a = 0.9375;
-    Real r = 4.;
-    Real th = M_PI/4.;
-    //Real X[4] = {0, r, th, M_PI/2.};
-    Real X[4] = {0, log(r), 0.25, M_PI/2.};
-
-    //auto metric = Geometry::SphericalKerrSchild(a);
-    auto metric = Geometry::FMKS();
-
-    Real gcov[4][4];
-    metric.SpacetimeMetric(X[0], X[1], X[2], X[3], gcov);
-    Real gcon[4][4];
-    metric.SpacetimeMetricInverse(X[0], X[1], X[2], X[3], gcon);
-    printf("gcov:\n");
-    SPACETIMELOOP2(mu, nu) {
-      printf("  [%i][%i] = %e\n", mu, nu, gcov[mu][nu]);
-    }
-    printf("gcon:\n");
-    SPACETIMELOOP2(mu, nu) {
-      printf("  [%i][%i] = %e\n", mu, nu, gcon[mu][nu]);
-    }
-    printf("gdet:\n");
-    printf("  %e\n", metric.DetG(X[0], X[1], X[2], X[3]));
-    printf("alpha:\n");
-    printf("  %e\n", metric.Lapse(X[0], X[1], X[2], X[3]));
-    Real beta_con[3];
-    metric.ContravariantShift(X[0], X[1], X[2], X[3], beta_con);
-    printf("betacon:\n");
-    SPACELOOP(mu) {
-      printf("  [%i] = %e\n", mu, beta_con[mu]);
-    }
-    Real gammacov[3][3];
-    metric.Metric(X[0], X[1], X[2], X[3], gammacov);
-    Real gammacon[3][3];
-    metric.MetricInverse(X[0], X[1], X[2], X[3], gammacon);
-    printf("gammacov:\n");
-    SPACELOOP2(mu, nu) {
-      printf("  [%i][%i] = %e\n", mu, nu, gammacov[mu][nu]);
-    }
-    printf("gammacon:\n");
-    SPACELOOP2(mu, nu) {
-      printf("  [%i][%i] = %e\n", mu, nu, gammacon[mu][nu]);
-    }
-    printf("gammadet:\n");
-    printf("  %e\n", metric.DetGamma(X[0], X[1], X[2], X[3]));
-    Real conn[4][4][4];
-    metric.ConnectionCoefficient(X[0], X[1], X[2], X[3], conn);
-    Real dg[4][4][4];
-    metric.MetricDerivative(X[0], X[1], X[2], X[3], dg);
-    printf("Connection:\n");
-    SPACETIMELOOP3(mu,nu,lam) {
-      printf("  [%i][%i][%i] = %e\n", mu,nu,lam,conn[mu][nu][lam]);
-    }
-    printf("Metric Derivative:\n");
-    SPACETIMELOOP3(mu,nu,lam) {
-      printf("  [%i][%i][%i] = %e\n", mu,nu,lam,dg[mu][nu][lam]);
-    }
-    printf("Grad log alpha:\n");
-    Real gla[4];
-    metric.GradLnAlpha(X[0], X[1], X[2], X[3], gla);
-    SPACETIMELOOP(mu) {
-      printf("  [%i] = %e\n", mu,gla[mu]);
-    }
-    exit(-1);
-  }
-=======
-  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski),
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski) ||
+    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski) ||
+    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
+    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm),
     "Problem \"linear_modes\" requires \"Minkowski\" geometry!");
->>>>>>> origin/main
 
   auto &rc = pmb->meshblock_data.Get();
   const int ndim = pmb->pmy_mesh->ndim;
