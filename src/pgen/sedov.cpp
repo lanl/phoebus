@@ -23,6 +23,10 @@ namespace sedov {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski) ||
+    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::SphericalMinkowski),
+    "Problem \"sedov\" requires \"Minkowski\" or \"SphericalMinkowski\" geometry!");
+
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
