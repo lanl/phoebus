@@ -46,6 +46,27 @@ the appropriate module. If you are compiling with mpi, use
 If `cmake` can't find your hdf5 installation, You may have luck
 setting `-DHDF5_ROOT=/path/to/hdf5` at configure time.
 
+### Installing hdf5 through spack
+
+If hdf5 isn't available on your target machine, here is one way to build it, using [Spack](https://spack.readthedocs.io/en/latest/getting_started.html).
+```bash
+# download spack
+git clone https://github.com/spack/spack.git
+# Activate the spack bash aliases. This typically needs to be done every time you want to use spack. I have it in my bashrc
+. spack/share/spack/setup-env.sh
+# load your modules
+module load...
+# Tell spack to learn about compilers and loaded modules
+spack compiler find
+spack external find
+# Install parallel hdf5 with high-level libraries
+spack install hdf5+mpi+hl
+# load it
+spack load hdf5
+```
+
+Installing from source, or just building without hdf5 will also both probably work.
+
 ## Example builds
 
 Below are some example build commands

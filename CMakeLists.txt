@@ -103,6 +103,21 @@ endif()
 
 # HDF5
 if(PHOEBUS_ENABLE_HDF5)
+  set(HDF5_PREFER_PARALLEL ${PHOEBUS_ENABLE_MPI})
+  find_package(HDF5 COMPONENTS C HL)
+  if (NOT HDF5_FOUND)
+    message(FATAL_ERROR "HDF5 is required but couldn't be found. "
+      "If you want to build Phoebus without HDF5, please rerun "
+      "CMake with -DPHOEBUS_ENABLE_HDF5=OFF")
+  endif()
+  if (PHOEBUS_ENABLE_MPI AND (NOT HDF5_IS_PARALLEL))
+    message(FATAL_ERROR "Both MPI and HDF5 are enabled "
+      "but only a serial version of HDF5 was found. Please install "
+      "a parallel version of HDF5 (or point CMake to it by adding its path "
+      "to the CMAKE_PREFIX_PATH environment variable), or disable either MPI "
+      "or HDF5 by rerunning CMake with -DPHOEBUS_ENABLE_MPI=OFF or "
+      "-DPHOEBUS_ENABLE_HDF5=OFF".)
+  endif()
   set(SINGULARITY_USE_HDF5 ON CACHE BOOL "" FORCE)
   set(PARTHENON_DISABLE_HDF5 OFF CACHE BOOL "" FORCE)
 else()
@@ -118,9 +133,9 @@ endif()
 
 if(PHOEBUS_ENABLE_OPENMP)
   find_package(OpenMP COMPONENTS CXX)
+  set(PAR_LOOP_LAYOUT MDRANGE_LOOP CACHE STRING "" FORCE)
 else()
-  set(PARTHENON_DISABLE_OPENM
-  P ON CACHE BOOL "" FORCE)
+  set(PARTHENON_DISABLE_OPENMP ON CACHE BOOL "" FORCE)
 endif()
 
 # TODO(JMM): For some reason, order still maters for including
@@ -130,6 +145,7 @@ endif()
 # parthenon
 # TODO(JMM): This should be renamed PARTHENON_BUILD_TESTING
 message("Configuring Parthenon")
+set(PARTHENON_ENABLE_INIT_PACKING ON CACHE BOOL "" FORCE)
 set(PARTHENON_LINT_DEFAULT OFF CACHE BOOL "" FORCE)
 set(PARTHENON_DISABLE_EXAMPLES ON CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)

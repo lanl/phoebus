@@ -142,8 +142,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double B30 = 0.;
 
   // Wavevector
-  double k1 = 2.*M_PI;
-  double k2 = 2.*M_PI;
+  constexpr double kk = 2*M_PI;
+  double k1 = kk;
+  double k2 = kk;
 
   complex<double> omega = 0.;
   complex<double> drho = 0.;
@@ -213,28 +214,56 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     msg << "Physics option \"" << physics << "\" not recognized!";
     PARTHENON_FAIL(msg);
   }
-  pin->SetReal("parthenon/time", "tlim", 2.*M_PI/omega.imag()); // Set final time to be one period
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  Real tf = 2.*M_PI/omega.imag();
+  Real cs = omega.imag() / (std::sqrt(2)*kk);
 
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
   auto gpkg = pmb->packages.Get("geometry");
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
-  Real a_snake, k_snake, betax;
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+
+  Real a_snake, k_snake, alpha, betax, betay, betaz;
+  alpha = 1;
+  a_snake = k_snake = betax = betay = betaz = 0;
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
       typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
+    alpha = gpkg->Param<Real>("alpha");
+    betay = gpkg->Param<Real>("vy");
+    PARTHENON_REQUIRE_THROWS(alpha > 0, "lapse must be positive");
+
+    printf("a, k, alpha, beta = %g, %g, %g, %g\n",
+	   a_snake, k_snake, alpha, betay);
+    tf /= alpha;
   }
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
     betax = gpkg->Param<Real>("betax");
   }
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+    betax = gpkg->Param<Real>("vx");
+    betay = gpkg->Param<Real>("vy");
+    betaz = gpkg->Param<Real>("vz");
+  }
+
+  // Set final time to be one period
+  pin->SetReal("parthenon/time", "tlim", tf);
+  tf = pin->GetReal("parthenon/time", "tlim");
+  std::cout << "Resetting final time to 1 wave period: "
+	    << tf
+	    << std::endl;
+  std::cout << "Wave frequency is: "
+	    << 1./tf
+	    << std::endl;
+  std::cout << "Wave speed is: "
+	    << cs
+	    << std::endl;
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -281,16 +310,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
           typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm) ||
-          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
+          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy) ||
+	  typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
         Real vsq = 0.;
         Real gcov[NDFULL][NDFULL] = {0};
         Real vcon[NDSPACE] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-        Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
-        Real shift[NDSPACE];
-        //geom.ContravariantShift(CellLocation::Cent, k, j, i);
+//<<<<<<< HEAD
+//        Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+//        Real shift[NDSPACE];
+//        //geom.ContravariantShift(CellLocation::Cent, k, j, i);
+//=======
+//>>>>>>> 41fe7ca7ee405458907ea7ae00e7a76aaec74c72
         Real gcov_mink[4][4] = {0};
         gcov_mink[0][0] = -1.;
         gcov_mink[1][1] = 1.;
@@ -301,30 +334,37 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           vsq += gcov_mink[m+1][n+1]*vcon[m]*vcon[n];
         }
         Real Gamma = 1./sqrt(1. - vsq);
-        Real ucon[NDFULL] = {Gamma, // alpha = 1
+        Real ucon[NDFULL] = {Gamma, // alpha = 1 in Minkowski
                              Gamma*v(ivlo, k, j, i),
                              Gamma*v(ivlo+1, k, j, i),
                              Gamma*v(ivlo+2, k, j, i)};
         Real J[NDFULL][NDFULL] = {0};
         if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
-          J[0][0] = 1.;
-          J[1][1] = 1.;
-          J[2][2] = 1.;
-          J[3][3] = 1.;
+          J[0][0] = 1/alpha;
+	  J[2][0] = -betay/alpha;
           J[2][1] = a_snake*k_snake*cos(k_snake*x);
+	  J[1][1] = J[2][2] = J[3][3] = 1;
+	} else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+	  J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
+	  J[1][0] = -betax;
+	  J[2][0] = -betay;
+	  J[3][0] = -betaz;
         } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
           PARTHENON_FAIL("This geometry isn't supported with a J!");
         } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Lumpy)) {
           PARTHENON_FAIL("This geometry isn't supported with a J!");
         }
-        Real ucon_snake[NDFULL] = {0, 0, 0, 0};
+        Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
-          ucon_snake[mu] += J[mu][nu]*ucon[nu];
+          ucon_transformed[mu] += J[mu][nu]*ucon[nu];
         }
-        Gamma = ucon_snake[0]; // alpha = 1
-        v(ivlo, k, j, i) = ucon_snake[1]/Gamma;
-        v(ivlo+1, k, j, i) = ucon_snake[2]/Gamma;
-        v(ivlo+2, k, j, i) = ucon_snake[3]/Gamma;
+        const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+        Gamma = lapse * ucon_transformed[0];
+        Real shift[NDSPACE];
+        geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+        v(ivlo, k, j, i) = ucon_transformed[1]/Gamma + shift[0]/lapse;
+        v(ivlo+1, k, j, i) = ucon_transformed[2]/Gamma + shift[1]/lapse;
+        v(ivlo+2, k, j, i) = ucon_transformed[3]/Gamma + shift[2]/lapse;
 
         // Enforce zero B fields for now
         if (ib_hi >= 3) {

@@ -11,43 +11,43 @@
 # publicly and display publicly, and to permit others to do so.
 
 <phoebus>
-problem = linear_modes
+problem = shock_tube
 
 <parthenon/job>
-problem_id  = hydro_modes       # problem ID: basename of output filenames
+problem_id  = sod       # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = p.density,  &
-	          c.density,  &
+	    c.density,  &
             p.velocity, &
             p.energy,   &
-            p.bfield,   &
-	          pressure,	  &
-	          cs
+	    pressure,	&
+	    cs, &
+	    p.ye
 
 file_type   = hdf5      # Tabular data dump
-dt          = 0.1      # time increment between outputs
+dt          = 1.0      # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 0.4       # time limit
+tlim        = 4.e1       # time limit
 integrator  = rk2       # time integration algorithm
-ncycle_out  = 10        # interval for stdout summary info
-dt_init_fact = 0.1
+ncycle_out  = 1        # interval for stdout summary info
+dt_init_fact = 1.e-6
 
 <parthenon/mesh>
 nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 128       # Number of zones in X1-direction
+nx1         = 512       # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1         # maximum value of X1
-ix1_bc      = periodic  # Inner-X1 boundary condition flag
-ox1_bc      = periodic  # Outer-X1 boundary condition flag
+ix1_bc      = outflow  # Inner-X1 boundary condition flag
+ox1_bc      = outflow  # Outer-X1 boundary condition flag
 
-nx2         = 128       # Number of zones in X2-direction
-x2min       = 0         # minimum value of X2
+nx2         = 1       # Number of zones in X2-direction
+x2min       = -1        # minimum value of X2
 x2max       = 1         # maximum value of X2
 ix2_bc      = periodic  # Inner-X2 boundary condition flag
 ox2_bc      = periodic  # Outer-X2 boundary condition flag
@@ -61,8 +61,8 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 128
-nx2 = 128
+nx1 = 512
+nx2 = 1
 nx3 = 1
 
 <parthenon/refinement0>
@@ -70,29 +70,10 @@ field = c.c.bulk.rho
 method = derivative_order_1
 max_level = 3
 
-# Uses this one for Boosted Minkowski
-<coordinates>
-# vx = 0.308606699924204
-# vy = 0.308606699924204
-vx = 0.436436
-vy = 0.436436
-
-# Uses this one for boosted snake coordinates
-# TODO(JMM): Should we unify this interface
-<geometry>
-# k = 25.1327 # wave number. Default is 2*pi
-kmult = 4     # Multiply k by this factor
-a = 0.3       # amplitude of wiggle
-alpha = 0.85    # lapse
-vy = 0.524631
-# vy = 0.81     # shift. Default is 0.
-# vy = 0.617213 # shift. Default is 0.
-# vy = 0      # shift. Default is 0.
-
 <eos>
 type = IdealGas
-Gamma = 1.333333333333333333
-Cv = 1.0
+Gamma = 1.6666666666666666667
+Cv = 1.0 
 
 <physics>
 hydro = true
@@ -101,16 +82,17 @@ he = false
 rad = false
 
 <fluid>
-mhd = true
 xorder = 2
-cfl = 0.4
+cfl = 0.8
 riemann = hll
+recon = weno5
 c2p_max_iter = 100
-#recon = weno5
-recon = linear
-c2p_tol = 1.e-12
+Ye = true
 
-<hydro_modes>
-physics = hydro
-mode = sound
-amplitude = 1.e-5
+<shocktube>
+rhol = 1.0
+Pl = 1.e-5
+vl = 0.0
+rhor = 0.125
+Pr = 1.e-6
+vr = 0.0

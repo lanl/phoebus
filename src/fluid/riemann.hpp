@@ -95,11 +95,6 @@ class FluxState {
     const Real P = q(dir,prs,k,j,i);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
-    if (j == 32 && i == 32) {
-      printf("rho = %e u = %e P = %e v = %e %e %e\n",
-        rho, u, P, vcon[0], vcon[1], vcon[2]);
-    }
-
     for (int m = pb_lo; m <= pb_hi; m++) {
       Bcon[m-pb_lo] = q(dir, m, k, j, i);
     }
@@ -122,11 +117,6 @@ class FluxState {
     U[crho] = rho*W;
     F[crho] = U[crho]*vtil;
 
-    if (i == 32 && j == 32) {
-      printf("rho = %e W = %e vtil = %e vel = %e beta/alpha = %e Frho = %e\n",
-        rho, W, vtil, vel, g.beta[dir]/g.alpha, F[crho]);
-    }
-
     // composition
     if (cye>0) {
       U[cye] = U[crho]*q(dir,pye,k,j,i);
@@ -139,21 +129,6 @@ class FluxState {
     // conserved momentum
     const Real rhohWsq = (rho + u + P)*W*W;
     const Real bsqWsq = bsq*W*W;
-    /*if (i == 32 && j == 32) {
-      SPACETIMELOOP2(mu, nu) {
-        printf("gcov[%i][%i] = %e\n", mu, nu, g.gcov[mu][nu]);
-      }
-      printf("vcon: %e %e %e\n", vcon[0], vcon[1], vcon[2]);
-    }*/
-
-    /*Real MyDelta[3][3] = {0};
-    for (int l = 0; l < 3; l++) {
-      for (int m = 0; m < 3; m++) {
-        for (int n = 0; n < 3; n++) {
-          MyDelta[l][n] += g.gammacon[l][m]*g.gammacov[m][n];
-        }
-      }
-    }*/
 
     for (int m = 0; m < 3; m++) {
       Real bcovm = g.gcov[m+1][0] * b0/g.alpha;
@@ -162,13 +137,9 @@ class FluxState {
         bcovm += g.gcov[m+1][n] * (Bcon[n-1]/W + b0*(vcon[n-1]-g.beta[n-1]/g.alpha));
         vcovm += g.gcov[m+1][n] * vcon[n-1];
       }
-      if (i == 32 && j == 32) {
 
-        printf("vcovm: %e\n", vcovm);
-      }
       U[cmom_lo+m] = (rhohWsq+bsqWsq)*vcovm - b0*bcovm;
-      //F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
-      F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*MyDelta[dir][m] - bcovm*Bcon[dir]/W;
+      F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
     }
 
     // energy
@@ -241,19 +212,6 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   FaceGeom g(fs.geom, loc, d, k, j, i);
   fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl);
   fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr);
-
-  /*if (j == 32 && i == 32) {
-    printf("d: %i\n", d);
-
-    printf("Ul = %e %e %e %e %e\n", Ul[0], Ul[1], Ul[2], Ul[3], Ul[4]);
-    printf("Ur = %e %e %e %e %e\n", Ur[0], Ur[1], Ur[2], Ur[3], Ur[4]);
-    printf("Fl = %e %e %e %e %e\n", Fl[0], Fl[1], Fl[2], Fl[3], Fl[4]);
-    printf("Fr = %e %e %e %e %e\n", Fr[0], Fr[1], Fr[2], Fr[3], Fr[4]);
-
-    if (d == 2) {
-      exit(-1);
-    }
-  }*/
 
   const Real cmax = std::max(std::max(-vml,vpl), std::max(-vmr,vpr));
 
