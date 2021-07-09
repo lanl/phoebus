@@ -208,19 +208,6 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl);
   fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr);
 
-  /*if (j == 32 && i == 32) {
-    printf("d: %i\n", d);
-
-    printf("Ul = %e %e %e %e %e\n", Ul[0], Ul[1], Ul[2], Ul[3], Ul[4]);
-    printf("Ur = %e %e %e %e %e\n", Ur[0], Ur[1], Ur[2], Ur[3], Ur[4]);
-    printf("Fl = %e %e %e %e %e\n", Fl[0], Fl[1], Fl[2], Fl[3], Fl[4]);
-    printf("Fr = %e %e %e %e %e\n", Fr[0], Fr[1], Fr[2], Fr[3], Fr[4]);
-
-    if (d == 2) {
-      exit(-1);
-    }
-  }*/
-
   const Real cmax = std::max(std::max(-vml,vpl), std::max(-vmr,vpr));
 
   for (int m = 0; m < fs.NumConserved(); m++) {
