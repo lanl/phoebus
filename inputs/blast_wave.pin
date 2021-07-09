@@ -83,7 +83,7 @@ max_level = 3
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
-Cv = 1.0 
+Cv = 1.0
 
 <physics>
 hydro = true
@@ -104,3 +104,4 @@ rho_ambient = 1
 p_ambient = 1e-3
 explosion_energy = 1
 rinner = 0.05
+#spherical_coords = false
