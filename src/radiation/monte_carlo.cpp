@@ -15,8 +15,6 @@
 
 #include "radiation.hpp"
 
-#include "opacity.hpp"
-
 #include "geodesics.hpp"
 
 using Geometry::CoordSysMeshBlock;
@@ -51,7 +49,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_particles = rad->Param<int>("num_particles");
   const auto remove_emitted_particles = rad->Param<bool>("remove_emitted_particles");
 
-  const auto d_opacity = rad->Param<Opacity *>("d_opacity");
+  const auto d_opacity = rad->Param<Opacity *>("d.opacity");
 
   // Meshblock geometry
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);

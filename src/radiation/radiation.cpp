@@ -18,6 +18,8 @@
 #include "opacity.hpp"
 #include "phoebus_utils/variables.hpp"
 
+#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
+
 namespace radiation {
 
 parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
@@ -87,7 +89,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_FAIL(msg);
   }
 
-  Opacity *h_opacity, *d_opacity;
+  /*Opacity *h_opacity, *d_opacity;
 
   if (opacity_model == "tophat") {
     Real C = pin->GetReal("tophatopacity", "C");
@@ -96,6 +98,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("opacity_tophat_C", C);
     params.Add("opacity_tophat_numin", numin);
     params.Add("opacity_tophat_numax", numax);
+
+    auto opac = singularity::neutrinos::Tophat(C, numin, numax);
 
     auto opacity = TophatOpacity(C, numin, numax);
     h_opacity = &opacity;
@@ -115,7 +119,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("h_opacity", h_opacity);
   params.Add("d_opacity", d_opacity);
 
-  printf("d_opacity: %p\n", d_opacity);
+  printf("d_opacity: %p\n", d_opacity);*/
 
   if (method == "monte_carlo") {
     std::string swarm_name = "monte_carlo";
