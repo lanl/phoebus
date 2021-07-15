@@ -53,7 +53,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
   auto rad = pmb->packages.Get("radiation").get();
 
-  const auto d_opacity = rad->Param<Opacity*>("d_opacity");
+  const auto d_opacity = rad->Param<Opacity*>("d.opacity");
 
   const Real RHO = unit_conv.GetMassDensityCodeToCGS();
   const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();

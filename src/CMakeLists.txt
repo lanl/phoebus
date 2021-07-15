@@ -47,6 +47,8 @@ add_executable(phoebus
 
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
+  microphysics/opac_phoebus/opac_phoebus.hpp
+  microphysics/opac_phoebus/opac_phoebus.cpp
 
   pgen/pgen.hpp
   pgen/pgen.cpp
@@ -91,6 +93,7 @@ target_include_directories(phoebus PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-opac"
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/utils/herumi-fmath"
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/utils/ports-of-call"
 )
@@ -109,5 +112,7 @@ endif()
 target_link_libraries(phoebus PRIVATE parthenon
   singularity-eos::flags
   singularity-eos
-  $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
+  singularity-opac::flags
+  singularity-opac
+  $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5> # TODO(BRR) what do I do here
 )
