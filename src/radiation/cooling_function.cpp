@@ -17,8 +17,6 @@
 #include "phoebus_utils/variables.hpp"
 #include "radiation.hpp"
 
-#include "opacity.hpp"
-
 namespace radiation {
 
 TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt) {
