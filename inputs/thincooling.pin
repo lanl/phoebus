@@ -99,13 +99,14 @@ num_particles = 16
 opacity_model = tophat
 absorption = false
 
-<monte_carlo>
-remove_emitted_particles = true
-
-<tophatopacity>
-C = 1.e0
+<opacity>
+type = tophat
+tophat_C = 1.e0
 numin = 1.e15
 numax = 1.e17
+
+<monte_carlo>
+remove_emitted_particles = true
 
 <thincooling>
 species = electron

@@ -23,6 +23,7 @@
 #include "fluid/fluid.hpp"
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
+#include "microphysics/opac_phoebus/opac_phoebus.hpp"
 #include "phoebus_driver.hpp"
 #include "phoebus_utils/debug_utils.hpp"
 #include "radiation/radiation.hpp"
@@ -264,6 +265,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   parthenon::Packages_t packages;
 
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
+  packages.Add(Microphysics::Opacity::Initialize(pin.get()));
   packages.Add(Geometry::Initialize(pin.get()));
   packages.Add(fluid::Initialize(pin.get()));
   packages.Add(radiation::Initialize(pin.get()));

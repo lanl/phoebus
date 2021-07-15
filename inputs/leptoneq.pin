@@ -87,8 +87,9 @@ opacity_model = gray
 absorption = true
 rng_seed = 2783
 
-<grayopacity>
-kappa = 1.0e-1
+<opacity>
+type = gray
+gray_kappa = 1.e-1
 
 <leptoneq>
 species = electron
