@@ -17,7 +17,11 @@
 #include "phoebus_utils/variables.hpp"
 #include "radiation.hpp"
 
+#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
+
 namespace radiation {
+
+using namespace singularity::neutrinos;
 
 TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = fluid_prim;

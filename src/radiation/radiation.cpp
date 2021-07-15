@@ -15,7 +15,6 @@
 
 #include "radiation.hpp"
 #include "geometry/geometry.hpp"
-#include "opacity.hpp"
 #include "phoebus_utils/variables.hpp"
 
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>

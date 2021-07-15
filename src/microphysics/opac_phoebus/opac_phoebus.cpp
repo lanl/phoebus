@@ -35,14 +35,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   const std::string block_name = "opacity";
 
-  std::vector<std::string> known_opacity_models = {"tophat", "gray"};
-  if (std::find(known_opacity_models.begin(), known_opacity_models.end(),
-                opacity_model) == known_opacity_models.end()) {
-    std::stringstream msg;
-    msg << "Opacity model \"" << opacity_model << "\" not recognized!";
-    PARTHENON_FAIL(msg);
-
   std::string opacity_type = pin->GetString(block_name, "type");
+  std::vector<std::string> known_opacity_types = {"tophat", "gray"};
+  if (std::find(known_opacity_types.begin(), known_opacity_types.end(),
+                opacity_type) == known_opacity_types.end()) {
+    std::stringstream msg;
+    msg << "Opacity model \"" << opacity_type << "\" not recognized!";
+    PARTHENON_FAIL(msg);
+  }
+
   if (opacity_type == "tophat") {
     const Real C = pin->GetReal("opacity", "tophat_C");
     const Real numin = pin->GetReal("opacity", "tophat_numin");
