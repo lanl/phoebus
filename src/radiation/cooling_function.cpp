@@ -22,6 +22,7 @@
 namespace radiation {
 
 using namespace singularity::neutrinos;
+using singularity::RadiationType;
 
 TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = fluid_prim;
@@ -45,7 +46,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) Temporary cooling problem parameters
-  NeutrinoSpecies s = NeutrinoSpecies::Electron;
+  //NeutrinoSpecies s = NeutrinoSpecies::Electron;
+  auto s = RadiationType::NU_ELECTRON;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -54,8 +56,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
   auto rad = pmb->packages.Get("radiation").get();
+  auto opac = pmb->packages.Get("opacity").get();
 
-  const auto d_opacity = rad->Param<Opacity*>("d.opacity");
+  const auto d_opacity = opac->Param<Opacity*>("d.opacity");
 
   const Real RHO = unit_conv.GetMassDensityCodeToCGS();
   const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
@@ -80,8 +83,10 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
         const Real T_cgs = v(ptemp, k, j, i)*TEMPERATURE;
         const Real Ye = v(pye, k, j, i);
 
-        double J = d_opacity->GetJ(rho_cgs, T_cgs, Ye, s);
-        double Jye = d_opacity->GetJye(rho_cgs, T_cgs, Ye, s);
+        //double J = d_opacity->GetJ(rho_cgs, T_cgs, Ye, s);
+        //double Jye = d_opacity->GetJye(rho_cgs, T_cgs, Ye, s);
+        double J = d_opacity->Emissivity(s, rho_cgs, T_cgs, Ye);
+        double Jye = d_opacity->NumberEmissivity(s, rho_cgs, T_cgs, Ye);
         Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
         Real Gcov_coord[4];
         Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);

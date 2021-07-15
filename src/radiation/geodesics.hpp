@@ -16,6 +16,15 @@
 #ifndef RADIATION_GEODESICS_HPP_
 #define RADIATION_GEODESICS_HPP_
 
+#include <parthenon/driver.hpp>
+#include <parthenon/package.hpp>
+#include <utils/error_checking.hpp>
+using namespace parthenon::driver::prelude;
+using namespace parthenon::package::prelude;
+using namespace parthenon;
+
+#include "geometry/geometry.hpp"
+
 namespace radiation {
 
 using Geometry::NDFULL;

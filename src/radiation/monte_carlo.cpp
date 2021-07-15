@@ -13,17 +13,21 @@
 // so.
 //========================================================================================
 
+#include "geodesics.hpp"
 #include "radiation.hpp"
 
-#include "geodesics.hpp"
+#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
 using Geometry::CoordSysMeshBlock;
 using Geometry::NDFULL;
 
 namespace radiation {
 
+using namespace singularity::neutrinos;
+using singularity::RadiationType;
+
 // TODO(BRR) temporary
-NeutrinoSpecies s = NeutrinoSpecies::Electron;
+auto s = RadiationType::NU_ELECTRON;
 
 KOKKOS_INLINE_FUNCTION
 Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
@@ -34,6 +38,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
+  auto opac = pmb->packages.Get("opacity");
   auto rad = pmb->packages.Get("radiation");
   auto swarm = sc->Get("monte_carlo");
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
@@ -49,7 +54,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_particles = rad->Param<int>("num_particles");
   const auto remove_emitted_particles = rad->Param<bool>("remove_emitted_particles");
 
-  const auto d_opacity = rad->Param<Opacity *>("d.opacity");
+  const auto d_opacity = opac->Param<Opacity *>("d.opacity");
 
   // Meshblock geometry
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -125,7 +130,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         for (int n = 0; n <= nu_bins; n++) {
           Real nu = nusamp(n);
           Real wgt = GetWeight(wgtC, nu);
-          Real Jnu = d_opacity->GetJnu(rho_cgs, T_cgs, ye, s, nu);
+          Real Jnu = d_opacity->EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu);
 
           dN += Jnu * nu / (pc.h * nu * wgt) * dlnu;
 
@@ -144,9 +149,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         // Trapezoidal rule
         Real nu0 = nusamp[0];
         Real nu1 = nusamp[nu_bins];
-        dN -= 0.5 * d_opacity->GetJnu(rho_cgs, T_cgs, ye, s, nu0) * nu0 /
+        dN -= 0.5 * d_opacity->EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu0) * nu0 /
               (pc.h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
-        dN -= 0.5 * d_opacity->GetJnu(rho_cgs, T_cgs, ye, s, nu1) * nu1 /
+        dN -= 0.5 * d_opacity->EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu1) * nu1 /
               (pc.h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
         dN *= d3x_cgs * detG * dt * TIME;
 
@@ -319,6 +324,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   namespace iv = internal_variables;
   auto rad = pmb->packages.Get("radiation");
   auto swarm = sc->Get("monte_carlo");
+  auto opac = pmb->packages.Get("opacity");
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
   const auto tune_emiss = rad->Param<Real>("tune_emiss");
 
@@ -332,9 +338,10 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_particles = rad->Param<int>("num_particles");
   const auto absorption = rad->Param<bool>("absorption");
 
-  const auto d_opacity = rad->Param<Opacity *>("d_opacity");
+  const auto d_opacity = opac->Param<Opacity *>("d.opacity");
 
   // Meshblock geometry
+  const int ndim = pmb->pmy_mesh->ndim;
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -396,12 +403,24 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real dlam = dt / Kcon0;
 
           int k, j, i;
-          swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+          i = static_cast<int>(std::floor((x(n) - minx_i) / dx_i) + ib.s);
+          if (ndim > 1) {
+            j = static_cast<int>(std::floor((y(n) - minx_j) / dx_j) + jb.s);
+          } else {
+            j = 0;
+          }
+          if (ndim > 2) {
+            k = static_cast<int>(std::floor((z(n) - minx_k) / dx_k) + kb.s);
+          } else {
+            k = 0;
+          }
+          //swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
           const Real rho_cgs = v(prho, k, j, i) * DENSITY;
           const Real T_cgs = v(itemp, k, j, i) * TEMPERATURE;
           const Real Ye = v(iye, k, j, i);
 
-          Real alphanu = d_opacity->Getalphanu(rho_cgs, T_cgs, Ye, nu, s);
+          // TODO(BRR) Add AbsorptionCoefficientPerNuOmega to singularity-opac
+          Real alphanu = d_opacity->AbsorptionCoefficientPerNu(s, rho_cgs, T_cgs, Ye, nu)/(4.*M_PI);
 
           Real dtau_abs = LENGTH * pc.h / ENERGY * dlam * (nu * alphanu);
 
