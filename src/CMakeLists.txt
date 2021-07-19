@@ -23,6 +23,8 @@ add_executable(phoebus
   fluid/tmunu.hpp
 
   geometry/analytic_system.hpp
+  geometry/boosted_minkowski.hpp
+  geometry/boosted_minkowski.cpp
   geometry/boyer_lindquist.hpp
   geometry/boyer_lindquist.cpp
   geometry/cached_system.hpp
@@ -33,16 +35,20 @@ add_executable(phoebus
   geometry/geometry.hpp
   geometry/geometry_defaults.hpp
   geometry/geometry_utils.hpp
+  geometry/inchworm.hpp
+  geometry/inchworm.cpp
   geometry/mckinney_gammie_ryan.hpp
   geometry/mckinney_gammie_ryan.cpp
   geometry/modified_system.hpp
   geometry/minkowski.hpp
   geometry/minkowski.cpp
+  geometry/snake.hpp
+  geometry/snake.cpp
   geometry/spherical_kerr_schild.hpp
   geometry/spherical_kerr_schild.cpp
   geometry/spherical_minkowski.hpp
   geometry/spherical_minkowski.cpp
-  
+
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
 

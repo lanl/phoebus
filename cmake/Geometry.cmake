@@ -18,10 +18,13 @@ set(PHOEBUS_GEOMETRY "Minkowski" CACHE STRING "The metric used by Phoebus")
 
 set(PHOEBUS_ANALYTIC_GEOMETRIES
     "Minkowski"
+    "BoostedMinkowski"
     "SphericalMinkowski"
     "BoyerLindquist"
     "SphericalKerrSchild"
     "FMKS"
+    "Snake"
+    "Inchworm"
     )
 if(PHOEBUS_ANALYTIC_GEOMETRY)
   if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_ANALYTIC_GEOMETRIES)
@@ -32,7 +35,7 @@ if(PHOEBUS_ANALYTIC_GEOMETRY)
       set(GEOMETRY_MESH_BLOCK "CachedOverMeshBlock<${GEOMETRY_MESH_BLOCK}>")
     endif()
   else()
-    message(FATAL_ERROR "Unkown geometry")  
+    message(FATAL_ERROR "Unknown geometry")
   endif()
 else()
   message(FATAL_ERROR "Only analytic geometries currently supported")

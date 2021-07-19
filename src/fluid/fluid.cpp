@@ -481,6 +481,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
         }
+
+
       });
   return TaskStatus::complete;
 }
