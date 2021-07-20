@@ -122,7 +122,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   if (method == "monte_carlo") {
     std::string swarm_name = "monte_carlo";
-    Metadata swarm_metadata;
+    Metadata swarm_metadata({Metadata::Provides});
     physics->AddSwarm(swarm_name, swarm_metadata);
     Metadata real_swarmvalue_metadata({Metadata::Real});
     physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);

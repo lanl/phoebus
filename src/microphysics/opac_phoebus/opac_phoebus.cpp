@@ -30,7 +30,7 @@ namespace Microphysics {
 namespace Opacity {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   using namespace singularity::neutrinos;
-  auto pkg = std::make_shared<StateDescriptor>("eos");
+  auto pkg = std::make_shared<StateDescriptor>("opacity");
   Params &params = pkg->AllParams();
 
   const std::string block_name = "opacity";
@@ -49,15 +49,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     const Real numin = pin->GetReal("opacity", "tophat_numin");
     const Real numax = pin->GetReal("opacity", "tophat_numax");
 
-    auto opacity_host = Tophat(C, numin, numax);
-    auto opacity_device = opacity_host.GetOnDevice();
+    singularity::neutrinos::Opacity opacity_host = Tophat(C, numin, numax);
+    singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
     params.Add("h.opacity", opacity_host);
     params.Add("d.opacity", opacity_device);
   } else if (opacity_type == "gray") {
     const Real kappa = pin->GetReal("opacity", "gray_kappa");
 
-    auto opacity_host = Gray(kappa);
-    auto opacity_device = opacity_host.GetOnDevice();
+    singularity::neutrinos::Opacity opacity_host = Gray(kappa);
+    singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
     params.Add("h.opacity", opacity_host);
     params.Add("d.opacity", opacity_device);
   }
