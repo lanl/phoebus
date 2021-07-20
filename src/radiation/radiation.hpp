@@ -37,6 +37,8 @@ using namespace parthenon;
 
 namespace radiation {
 
+using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
+
 // TODO(BRR) Utilities that should be moved
 #define SMALL (1.e-200)
 KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(Real v[4],
@@ -82,7 +84,7 @@ Real LinearInterpLog(Real x, int k, int j, int i, ParArrayND<Real> table, Real l
 // Choice of RNG
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
-extern parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
+//extern parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
 enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
 
