@@ -54,7 +54,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_particles = rad->Param<int>("num_particles");
   const auto remove_emitted_particles = rad->Param<bool>("remove_emitted_particles");
 
-  const auto d_opacity = opac->Param<Opacity *>("d.opacity");
+  const auto d_opacity = opac->Param<Opacity>("d.opacity");
 
   // Meshblock geometry
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -130,7 +130,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         for (int n = 0; n <= nu_bins; n++) {
           Real nu = nusamp(n);
           Real wgt = GetWeight(wgtC, nu);
-          Real Jnu = d_opacity->EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu);
+          Real Jnu = d_opacity.EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu);
 
           dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
 
@@ -149,9 +149,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         // Trapezoidal rule
         Real nu0 = nusamp[0];
         Real nu1 = nusamp[nu_bins];
-        dN -= 0.5 * d_opacity->EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu0) * nu0 /
+        dN -= 0.5 * d_opacity.EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu0) * nu0 /
               (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
-        dN -= 0.5 * d_opacity->EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu1) * nu1 /
+        dN -= 0.5 * d_opacity.EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu1) * nu1 /
               (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
         dN *= d3x_cgs * detG * dt * TIME;
 
@@ -338,7 +338,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_particles = rad->Param<int>("num_particles");
   const auto absorption = rad->Param<bool>("absorption");
 
-  const auto d_opacity = opac->Param<Opacity *>("d.opacity");
+  const auto d_opacity = opac->Param<Opacity>("d.opacity");
 
   // Meshblock geometry
   const int ndim = pmb->pmy_mesh->ndim;
@@ -420,7 +420,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           const Real Ye = v(iye, k, j, i);
 
           // TODO(BRR) Add AbsorptionCoefficientPerNuOmega to singularity-opac
-          Real alphanu = d_opacity->AbsorptionCoefficientPerNu(s, rho_cgs, T_cgs, Ye, nu)/(4.*M_PI);
+          Real alphanu = d_opacity.AbsorptionCoefficientPerNu(s, rho_cgs, T_cgs, Ye, nu)/(4.*M_PI);
 
           Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
 
