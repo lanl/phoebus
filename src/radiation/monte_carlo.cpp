@@ -132,10 +132,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real wgt = GetWeight(wgtC, nu);
           Real Jnu = d_opacity->EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu);
 
-          dN += Jnu * nu / (pc.h * nu * wgt) * dlnu;
+          dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
 
           // Factors of nu in numerator and denominator cancel
-          Real dNdlnu = Jnu * d3x_cgs * detG / (pc.h * wgt);
+          Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
           v(idNdlnu + n, k, j, i) = dNdlnu;
           if (dNdlnu > dNdlnu_max) {
             dNdlnu_max = dNdlnu;
@@ -150,9 +150,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         Real nu0 = nusamp[0];
         Real nu1 = nusamp[nu_bins];
         dN -= 0.5 * d_opacity->EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu0) * nu0 /
-              (pc.h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
+              (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
         dN -= 0.5 * d_opacity->EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu1) * nu1 /
-              (pc.h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
+              (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
         dN *= d3x_cgs * detG * dt * TIME;
 
         v(idNdlnu_max, k, j, i) = dNdlnu_max;
@@ -277,7 +277,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
           // Encode frequency and randomly sample direction
-          Real E = nu * pc.h * CENERGY;
+          Real E = nu * pc::h * CENERGY;
           Real theta = acos(2. * rng_gen.drand() - 1.);
           Real phi = 2. * M_PI * rng_gen.drand();
           Real K_tetrad[4] = {-E, E * cos(theta), E * cos(phi) * sin(theta),
@@ -295,7 +295,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             v(mu, k, j, i) += 1. / dV_code * weight(m) * K_coord[mu - Gcov_lo];
           }
           // TODO(BRR) lepton sign
-          v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc.mp / MASS;
+          v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc::mp / MASS;
           rng_pool.free_state(rng_gen);
         }
       });
@@ -396,7 +396,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           auto rng_gen = rng_pool.get_state();
 
           // TODO(BRR) Get u^mu, evaluate -k.u
-          Real nu = -k0(n) * ENERGY / pc.h;
+          Real nu = -k0(n) * ENERGY / pc::h;
 
           // TODO(BRR) Get K^0 via metric
           Real Kcon0 = -k0(n);
@@ -422,7 +422,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           // TODO(BRR) Add AbsorptionCoefficientPerNuOmega to singularity-opac
           Real alphanu = d_opacity->AbsorptionCoefficientPerNu(s, rho_cgs, T_cgs, Ye, nu)/(4.*M_PI);
 
-          Real dtau_abs = LENGTH * pc.h / ENERGY * dlam * (nu * alphanu);
+          Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
 
           bool absorbed = false;
 
@@ -443,7 +443,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                  -1. / dV_code * weight(n) * k3(n));
               // TODO(BRR) Add Ucon[0] in the below
               Kokkos::atomic_add(&(v(iGye, k, j, i)),
-                                 1. / dV_code * weight(n) * pc.mp / MASS);
+                                 1. / dV_code * weight(n) * pc::mp / MASS);
 
               absorbed = true;
               swarm_d.MarkParticleForRemoval(n);
