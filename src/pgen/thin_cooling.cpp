@@ -56,6 +56,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real rho0 = 1.e6 * unit_conv.GetMassDensityCGSToCode();
   const Real u0 = 1.e20*unit_conv.GetEnergyCGSToCode()*unit_conv.GetNumberDensityCGSToCode();
 
+  const Real x1max = pin->GetReal("parthenon/mesh", "x1max");
+  const std::string rad_method = pin->GetString("radiation", "method");
+  if (x1max > 1.e-7 && rad_method == "cooling_function") {
+    PARTHENON_THROW("Set x1max = 1.e-7 for the cooling_function rad method to get small enough timesteps!");
+  }
+
   pmb->par_for(
       "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {

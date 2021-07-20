@@ -13,15 +13,11 @@ variables = p.density,  &
             temperature
 
 file_type   = hdf5      # Tabular data dump
-#dt          = 1.e3      # time increment between outputs
-dt = 1.e-2
+dt          = 1.e-2     # time increment between outputs
 
 <parthenon/time>
-nlim        = -1        # cycle limit
-#tlim        = 2.5e4       # time limit
-#tlim = 2.997925e-02
-#tlim = 1.e-3
-tlim = 2.e-1
+nlim        = -1       # cycle limit
+tlim = 2.e-1           # time limit
 integrator  = rk2      # time integration algorithm
 ncycle_out  = 1        # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -29,28 +25,22 @@ dt_init_fact = 1.e-6
 <parthenon/mesh>
 nghost = 4
 
-nx1         = 4        # Number of zones in X1-direction
-x1min       = 0        # minimum value of X1
-#x1max       = 1.e-7    # maximum value of X1 (for cooling_function)
-x1max       = 1.e-4    # maximum value of X1
-#ix1_bc      = outflow  # Inner-X1 boundary condition flag
-#ox1_bc      = outflow  # Outer-X1 boundary condition flag
+nx1         = 4         # Number of zones in X1-direction
+x1min       = 0         # minimum value of X1
+#x1max       = 1.e-7     # maximum value of X1 (for cooling_function)
+x1max       = 1.e-4     # maximum value of X1 (for monte_carlo)
 ix1_bc      = periodic  # Inner-X1 boundary condition flag
 ox1_bc      = periodic  # Outer-X1 boundary condition flag
 
-nx2         = 1         # Number of zones in X2-direction
-x2min       = -1        # minimum value of X2
-x2max       = 1         # maximum value of X2
-#ix2_bc      = outflow   # Inner-X2 boundary condition flag
-#ox2_bc      = outflow   # Outer-X2 boundary condition flag
+nx2         = 1          # Number of zones in X2-direction
+x2min       = -1         # minimum value of X2
+x2max       = 1          # maximum value of X2
 ix2_bc      = periodic   # Inner-X2 boundary condition flag
 ox2_bc      = periodic   # Outer-X2 boundary condition flag
 
 nx3         = 1         # Number of zones in X3-direction
 x3min       = -1        # minimum value of X3
 x3max       = 1         # maximum value of X3
-#ix3_bc      = outflow   # Inner-X3 boundary condition flag
-#ox3_bc      = outflow   # Inner-X3 boundary condition flag
 ix3_bc      = periodic  # Outer-X3 boundary condition flfgag
 ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
@@ -67,8 +57,6 @@ Gamma = 1.6666666666666666667
 Cv = 1.995640e+03
 
 <units>
-#geom_length_cm = 1.e10
-#fluid_mass_g = 1.e20
 geom_length_cm = 1.e14
 fluid_mass_g = 1.e0
 
@@ -93,7 +81,6 @@ method = monte_carlo
 nu_min = 1.e15
 nu_max = 0.9999e17
 nu_bins = 200
-#tune_emiss = 1.e-1
 tune_emiss = 1.e2
 num_particles = 16
 opacity_model = tophat
