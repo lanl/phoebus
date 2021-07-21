@@ -388,8 +388,6 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int iGcov_hi = imap[iv::Gcov].second;
   const int iGye = imap[iv::Gye].first;
 
-  printf("[%i] Number active particles: %i\n", pmb->gid, swarm->GetNumActive());
-
   pmb->par_for(
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
