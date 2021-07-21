@@ -75,7 +75,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
 
-  std::string opacity_model = pin->GetString("radiation", "opacity_model");
+  /*std::string opacity_model = pin->GetString("radiation", "opacity_model");
   params.Add("opacity_model", opacity_model);
 
   std::vector<std::string> known_opacity_models = {"tophat", "gray"};
@@ -84,7 +84,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     std::stringstream msg;
     msg << "Opacity model \"" << opacity_model << "\" not recognized!";
     PARTHENON_FAIL(msg);
-  }
+  }*/
 
   /*Opacity *h_opacity, *d_opacity;
 
