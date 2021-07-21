@@ -60,20 +60,17 @@ TaskListStatus PhoebusDriver::Step() {
   static bool first_call = true;
   TaskListStatus status;
   Real dt_trial = tm.dt;
-  if (first_call)
-    dt_trial = std::min(dt_trial, dt_init);
+  if (first_call) dt_trial = std::min(dt_trial, dt_init);
   dt_trial *= dt_init_fact;
   dt_init_fact = 1.0;
-  if (tm.time + dt_trial > tm.tlim)
-    dt_trial = tm.tlim - tm.time;
+  if (tm.time + dt_trial > tm.tlim) dt_trial = tm.tlim - tm.time;
   tm.dt = dt_trial;
   integrator->dt = dt_trial;
 
   for (int stage = 1; stage <= integrator->nstages; stage++) {
     TaskCollection tc = RungeKuttaStage(stage);
     status = tc.Execute();
-    if (status != TaskListStatus::complete)
-      break;
+    if (status != TaskListStatus::complete) break;
   }
 
   status = RadiationStep();
@@ -225,20 +222,13 @@ TaskListStatus PhoebusDriver::RadiationStep() {
 
   auto rad = pmesh->packages.Get("radiation");
   const auto rad_active = rad->Param<bool>("active");
-  const auto rad_method = rad->Param<std::string>("method");
   if (!rad_active) {
-    auto num_independent_task_lists = blocks.size();
-    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
-    for (int ib = 0; ib < num_independent_task_lists; ib++) {
-      auto pmb = blocks[ib].get();
-      auto &tl = async_region[ib];
-      auto default_task = tl.AddTask(none, DefaultTask);
-    }
-    return tc.Execute();
+    return TaskListStatus::complete;
   }
 
   auto num_independent_task_lists = blocks.size();
 
+  const auto rad_method = rad->Param<std::string>("method");
   if (rad_method == "cooling_function") {
     TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
     for (int ib = 0; ib < num_independent_task_lists; ib++) {

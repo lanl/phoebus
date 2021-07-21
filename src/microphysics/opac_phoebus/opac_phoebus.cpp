@@ -30,8 +30,14 @@ namespace Microphysics {
 namespace Opacity {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   using namespace singularity::neutrinos;
+
   auto pkg = std::make_shared<StateDescriptor>("opacity");
   Params &params = pkg->AllParams();
+
+  bool do_rad = pin->GetBoolean("physics", "rad");
+  if (!do_rad) {
+    return pkg;
+  }
 
   const std::string block_name = "opacity";
 
