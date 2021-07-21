@@ -167,9 +167,6 @@ add_subdirectory(external/singularity-eos singularity-eos)
 message("Configuring singularity-opac")
 add_subdirectory(external/singularity-opac singularity-opac)
 
-# Radiation
-include(cmake/Radiation.cmake)
-
 # Geometry
 include(cmake/Geometry.cmake)
 
