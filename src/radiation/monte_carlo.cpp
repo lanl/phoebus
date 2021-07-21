@@ -371,6 +371,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
   const Real MASS = unit_conv.GetMassCodeToCGS();
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
+  const Real TIME = unit_conv.GetTimeCodeToCGS();
   const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
   const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
   const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
@@ -421,6 +422,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real alphanu = d_opacity.AbsorptionCoefficientPerNu(s, rho_cgs, T_cgs, Ye, nu)/(4.*M_PI);
 
           Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
+          printf("dtau = %e rho = %e dt = %e dx = %e\n", dtau_abs, rho_cgs, dt*TIME, dt*TIME*pc::c);
 
           bool absorbed = false;
 
