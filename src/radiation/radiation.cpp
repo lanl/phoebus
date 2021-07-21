@@ -75,49 +75,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
 
-  /*std::string opacity_model = pin->GetString("radiation", "opacity_model");
-  params.Add("opacity_model", opacity_model);
-
-  std::vector<std::string> known_opacity_models = {"tophat", "gray"};
-  if (std::find(known_opacity_models.begin(), known_opacity_models.end(),
-                opacity_model) == known_opacity_models.end()) {
-    std::stringstream msg;
-    msg << "Opacity model \"" << opacity_model << "\" not recognized!";
-    PARTHENON_FAIL(msg);
-  }*/
-
-  /*Opacity *h_opacity, *d_opacity;
-
-  if (opacity_model == "tophat") {
-    Real C = pin->GetReal("tophatopacity", "C");
-    Real numin = pin->GetReal("tophatopacity", "numin");
-    Real numax = pin->GetReal("tophatopacity", "numax");
-    params.Add("opacity_tophat_C", C);
-    params.Add("opacity_tophat_numin", numin);
-    params.Add("opacity_tophat_numax", numax);
-
-    auto opac = singularity::neutrinos::Tophat(C, numin, numax);
-
-    auto opacity = TophatOpacity(C, numin, numax);
-    h_opacity = &opacity;
-    static auto p_opacity = RawDeviceCopy<TophatOpacity>(opacity);
-    d_opacity = p_opacity; //.get();
-    printf("J? %e\n", h_opacity->GetJ(0, 0, 0, NeutrinoSpecies::Electron));
-    printf("J? %e\n", d_opacity->GetJ(0, 0, 0, NeutrinoSpecies::Electron));
-  } else if (opacity_model == "gray") {
-    Real kappa = pin->GetReal("grayopacity", "kappa");
-
-    params.Add("opacity_gray_kappa", kappa);
-    auto opacity = GrayOpacity(kappa);
-    h_opacity = &opacity;
-    d_opacity = RawDeviceCopy<GrayOpacity>(opacity);
-  }
-
-  params.Add("h_opacity", h_opacity);
-  params.Add("d_opacity", d_opacity);
-
-  printf("d_opacity: %p\n", d_opacity);*/
-
   if (method == "monte_carlo") {
     std::string swarm_name = "monte_carlo";
     Metadata swarm_metadata({Metadata::Provides});
@@ -207,6 +164,18 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        printf("dU: %e %e %e %e %e\n",
+          v(Gcov_lo, k, j, i) * dt,
+          v(Gcov_lo + 1, k, j, i) * dt,
+          v(Gcov_lo + 2, k, j, i) * dt,
+          v(Gcov_lo + 3, k, j, i) * dt,
+          v(Gye, k, j, i) * dt);
+        printf("U: %e %e %e %e %e\n",
+          v(ceng, k, j, i),
+          v(cmom_lo, k, j, i),
+           v(cmom_lo + 1, k, j, i),
+            v(cmom_lo + 2, k, j, i),
+            v(cye, k, j, i));
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;

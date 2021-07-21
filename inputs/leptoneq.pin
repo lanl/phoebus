@@ -57,6 +57,7 @@ Gamma = 1.6666666666666666667
 Cv = 1.995640e+03
 
 <units>
+scale_free = false
 geom_length_cm = 1.
 fluid_mass_g = 1.e10
 
