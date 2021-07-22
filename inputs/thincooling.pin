@@ -86,6 +86,9 @@ tune_emiss = 1.e2
 num_particles = 16
 opacity_model = tophat
 absorption = false
+do_nu_electron = true
+do_nu_electron_anti = false
+do_nu_heavy = false
 
 <opacity>
 type = tophat

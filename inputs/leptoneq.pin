@@ -87,6 +87,9 @@ num_particles = 100
 #opacity_model = gray
 absorption = true
 rng_seed = 2783
+do_nu_electron = true
+do_nu_electron_anti = false
+do_nu_heavy = false
 
 <opacity>
 type = gray
