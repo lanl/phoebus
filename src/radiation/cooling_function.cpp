@@ -68,16 +68,19 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(),
-      0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // Initialize five-force to zero
-        if (sidx == 0) {
           for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
             v(mu, k, j, i) = 0.;
           }
           v(Gye, k, j, i) = 0.;
-        }
+      });
 
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(),
+      0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
         // Apply cooling for each neutrino species separately
         if (do_species[sidx]) {
           auto s = species[sidx];
@@ -102,9 +105,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
           Real detG = geom.DetG(CellLocation::Cent, k, j, i);
 
           for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-            v(mu, k, j, i) += detG * Gcov_coord[mu - Gcov_lo];
+            Kokkos::atomic_add(&(v(mu, k, j, i)), detG * Gcov_coord[mu - Gcov_lo]);
           }
-          v(Gye, k, j, i) -= detG * Jye * CDENSITY / CTIME;
+          Kokkos::atomic_add(&(v(Gye, k, j, i)), -detG * Jye * CDENSITY / CTIME);
         }
       });
 

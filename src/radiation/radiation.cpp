@@ -95,11 +95,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("weight", swarm_name, real_swarmvalue_metadata);
     Metadata int_swarmvalue_metadata({Metadata::Integer});
 
-    physics->AddField("dNdlnu_max", mscalar);
-    physics->AddField("dN", mscalar);
-    physics->AddField("Ns", mscalar);
+    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy}, std::vector<int>(1, NumRadiationTypes));
+    physics->AddField("dNdlnu_max", mspecies_scalar);
+    physics->AddField("dN", mspecies_scalar);
+    physics->AddField("Ns", mspecies_scalar);
 
-    std::vector<int> dNdlnu_size(1, nu_bins + 1);
+    std::vector<int> dNdlnu_size(NumRadiationTypes, nu_bins + 1);
     Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
     physics->AddField("dNdlnu", mdNdlnu);
 
