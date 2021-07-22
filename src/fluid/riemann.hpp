@@ -125,6 +125,7 @@ class FluxState {
     // conserved momentum
     const Real rhohWsq = (rho + u + P)*W*W;
     const Real bsqWsq = bsq*W*W;
+
     for (int m = 0; m < 3; m++) {
       Real bcovm = g.gcov[m+1][0] * b0/g.alpha;
       Real vcovm = 0.0;
@@ -132,6 +133,7 @@ class FluxState {
         bcovm += g.gcov[m+1][n] * (Bcon[n-1]/W + b0*(vcon[n-1]-g.beta[n-1]/g.alpha));
         vcovm += g.gcov[m+1][n] * vcon[n-1];
       }
+
       U[cmom_lo+m] = (rhohWsq+bsqWsq)*vcovm - b0*bcovm;
       F[cmom_lo+m] = U[cmom_lo+m]*vtil + (P + 0.5*bsq)*Delta(dir,m) - bcovm*Bcon[dir]/W;
     }
