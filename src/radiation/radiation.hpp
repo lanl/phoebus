@@ -41,6 +41,7 @@ using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
 
 constexpr RadiationType species[3] = {RadiationType::NU_ELECTRON, RadiationType::NU_ELECTRON_ANTI, RadiationType::NU_HEAVY};
+constexpr int NumRadiationTypes = 3;
 
 // TODO(BRR) Utilities that should be moved
 #define SMALL (1.e-200)
