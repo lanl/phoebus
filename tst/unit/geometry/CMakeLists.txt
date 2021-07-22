@@ -27,6 +27,8 @@ add_library(geometry_unit_tests OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/modified_system.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/minkowski.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/minkowski.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/snake.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/snake.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_kerr_schild.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_kerr_schild.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_minkowski.hpp
