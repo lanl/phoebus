@@ -94,5 +94,3 @@ gray_kappa = 1.e-11
 
 <leptoneq>
 species = electron
-ne0 = 5.858732e+07 # cm^-3
-T0 = 1e8 # K

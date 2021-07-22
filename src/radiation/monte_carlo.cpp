@@ -422,7 +422,6 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real alphanu = d_opacity.AbsorptionCoefficientPerNu(s, rho_cgs, T_cgs, Ye, nu)/(4.*M_PI);
 
           Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
-          printf("dtau = %e rho = %e dt = %e dx = %e\n", dtau_abs, rho_cgs, dt*TIME, dt*TIME*pc::c);
 
           bool absorbed = false;
 
