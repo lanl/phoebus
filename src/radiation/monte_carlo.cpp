@@ -100,6 +100,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int pvhi = imap[p::velocity].second;
   const int idNdlnu = imap["dNdlnu"].first;
   const int idNdlnu_max = imap["dNdlnu_max"].first;
+  printf("idNdlnu.first second: %i %i\n", imap["dNdlnu"].first, imap["dNdlnu"].second);
+  exit(-1);
   const int idN = imap["dN"].first;
   const int iNs = imap["Ns"].first;
   const int Gcov_lo = imap[iv::Gcov].first;
@@ -108,10 +110,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
   Real wgtC = 1.e50; // Typical-ish value
-
-  bool do_species[3] = {rad->Param<bool>("do_nu_electron"),
-                        rad->Param<bool>("do_nu_electron_anti"),
-                        rad->Param<bool>("do_nu_heavy")};
 
   pmb->par_for(
       "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -126,6 +124,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       "MonteCarlodNdlnu", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
         if (do_species[sidx]) {
+          auto s = species[sidx];
 
           auto rng_gen = rng_pool.get_state();
           Real detG = geom.DetG(CellLocation::Cent, k, j, i);
@@ -139,13 +138,14 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           for (int n = 0; n <= nu_bins; n++) {
             Real nu = nusamp(n);
             Real wgt = GetWeight(wgtC, nu);
-            Real Jnu = d_opacity.EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu);
+            Real Jnu = d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu);
 
             dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
 
             // Factors of nu in numerator and denominator cancel
             Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
-            v(idNdlnu + n, k, j, i) = dNdlnu;
+            //v(idNdlnu + n, sidx, k, j, i) = dNdlnu;
+            v(idNdlnu + sidx, n, k, j, i) = dNdlnu;
             if (dNdlnu > dNdlnu_max) {
               dNdlnu_max = dNdlnu;
             }
@@ -158,9 +158,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           // Trapezoidal rule
           Real nu0 = nusamp[0];
           Real nu1 = nusamp[nu_bins];
-          dN -= 0.5 * d_opacity.EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu0) * nu0 /
+          dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu0) * nu0 /
                 (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
-          dN -= 0.5 * d_opacity.EmissivityPerNu(s, rho_cgs, T_cgs, ye, nu1) * nu1 /
+          dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu1) * nu1 /
                 (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
           dN *= d3x_cgs * detG * dt * TIME;
 
@@ -228,6 +228,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto &k2 = swarm->Get<Real>("k2").Get();
   auto &k3 = swarm->Get<Real>("k3").Get();
   auto &weight = swarm->Get<Real>("weight").Get();
+  auto &swarm_species = swarm->Get<int>("species").Get();
   auto swarm_d = swarm->GetDeviceContext();
 
   // Calculate array of starting index for each zone to compute particles
@@ -250,65 +251,75 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto dNdlnu_max = rc->Get("dNdlnu_max").data;
 
   // Loop over zones and generate appropriate number of particles in each zone
-  pmb->par_for(
-      "MonteCarloSourceParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        // Create tetrad transformation once per zone
-        Real Gcov[4][4];
-        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
-        Real Ucon[4];
-        Real vel[4] = {0, v(pvlo, k, j, i), v(pvlo + 1, k, j, i), v(pvlo + 2, k, j, i)};
-        GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
-        Geometry::Tetrads Tetrads(Ucon, Gcov);
-        Real detG = geom.DetG(CellLocation::Cent, k, j, i);
-        int dNs = v(iNs, k, j, i);
+  for (int sidx = 0; sidx < 3; sidx++) {
+    if (do_species[sidx]) {
+      pmb->par_for(
+          "MonteCarloSourceParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            // Create tetrad transformation once per zone
+            Real Gcov[4][4];
+            geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
+            Real Ucon[4];
+            Real vel[4] = {0, v(pvlo, k, j, i), v(pvlo + 1, k, j, i), v(pvlo + 2, k, j, i)};
+            GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
+            Geometry::Tetrads Tetrads(Ucon, Gcov);
+            Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+            int dNs = v(iNs, k, j, i);
 
-        // Loop over particles to create in this zone
-        for (int n = 0; n < static_cast<int>(dNs); n++) {
-          const int m = new_indices(starting_index(k - kb.s, j - jb.s, i - ib.s) + n);
-          auto rng_gen = rng_pool.get_state();
+            auto s = species[sidx];
 
-          // Create particles at initial time
-          t(m) = t0;
+            // Loop over particles to create in this zone
+            for (int n = 0; n < static_cast<int>(dNs); n++) {
+              const int m = new_indices(starting_index(k - kb.s, j - jb.s, i - ib.s) + n);
+              auto rng_gen = rng_pool.get_state();
 
-          // Create particles at zone centers
-          x(m) = minx_i + (i - ib.s + 0.5) * dx_i;
-          y(m) = minx_j + (j - jb.s + 0.5) * dx_j;
-          z(m) = minx_k + (k - kb.s + 0.5) * dx_k;
+              // Set particle species
+              swarm_species(m) = static_cast<int>(s);
 
-          // Sample energy and set weight
-          Real nu;
-          int counter = 0;
-          do {
-            nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
-            counter++;
-          } while (rng_gen.drand() > LinearInterpLog(nu, k, j, i, dNdlnu, lnu_min, dlnu));
+              // Create particles at initial time
+              t(m) = t0;
 
-          weight(m) = GetWeight(wgtC / wgtCfac, nu);
+              // Create particles at zone centers
+              x(m) = minx_i + (i - ib.s + 0.5) * dx_i;
+              y(m) = minx_j + (j - jb.s + 0.5) * dx_j;
+              z(m) = minx_k + (k - kb.s + 0.5) * dx_k;
 
-          // Encode frequency and randomly sample direction
-          Real E = nu * pc::h * CENERGY;
-          Real theta = acos(2. * rng_gen.drand() - 1.);
-          Real phi = 2. * M_PI * rng_gen.drand();
-          Real K_tetrad[4] = {-E, E * cos(theta), E * cos(phi) * sin(theta),
-                              E * sin(phi) * sin(theta)};
-          Real K_coord[4];
-          Tetrads.TetradToCoordCov(K_tetrad, K_coord);
+              // Sample energy and set weight
+              Real nu;
+              int counter = 0;
+              do {
+                nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
+                counter++;
+              } while (rng_gen.drand() > LinearInterpLog(nu, k, j, i, dNdlnu, lnu_min, dlnu));
 
-          k0(m) = K_coord[0];
-          k1(m) = K_coord[1];
-          k2(m) = K_coord[2];
-          k3(m) = K_coord[3];
+              weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
-          for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-            // detG is in both numerator and denominator
-            v(mu, k, j, i) += 1. / dV_code * weight(m) * K_coord[mu - Gcov_lo];
-          }
-          // TODO(BRR) lepton sign
-          v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc::mp / MASS;
-          rng_pool.free_state(rng_gen);
-        }
-      });
+              // Encode frequency and randomly sample direction
+              Real E = nu * pc::h * CENERGY;
+              Real theta = acos(2. * rng_gen.drand() - 1.);
+              Real phi = 2. * M_PI * rng_gen.drand();
+              Real K_tetrad[4] = {-E, E * cos(theta), E * cos(phi) * sin(theta),
+                                  E * sin(phi) * sin(theta)};
+              Real K_coord[4];
+              Tetrads.TetradToCoordCov(K_tetrad, K_coord);
+
+              k0(m) = K_coord[0];
+              k1(m) = K_coord[1];
+              k2(m) = K_coord[2];
+              k3(m) = K_coord[3];
+
+              for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
+                // detG is in both numerator and denominator
+                v(mu, k, j, i) += 1. / dV_code * weight(m) * K_coord[mu - Gcov_lo];
+              }
+              // TODO(BRR) lepton sign
+              v(Gye, k, j, i) -= 1. / dV_code * Ucon[0] * weight(m) * pc::mp / MASS;
+
+              rng_pool.free_state(rng_gen);
+            }
+          });
+    }
+  }
 
   if (remove_emitted_particles) {
     pmb->par_for(
@@ -375,6 +386,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto &k2 = swarm->Get<Real>("k2").Get();
   auto &k3 = swarm->Get<Real>("k3").Get();
   auto &weight = swarm->Get<Real>("weight").Get();
+  auto &swarm_species = swarm->Get<int>("species").Get();
   auto swarm_d = swarm->GetDeviceContext();
 
   StateDescriptor *eos = pmb->packages.Get("eos").get();
@@ -404,6 +416,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
         if (swarm_d.IsActive(n)) {
           auto rng_gen = rng_pool.get_state();
 
+          auto s = static_cast<RadiationType>(swarm_species(n));
+
           // TODO(BRR) Get u^mu, evaluate -k.u
           Real nu = -k0(n) * ENERGY / pc::h;
 
@@ -429,7 +443,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           const Real Ye = v(iye, k, j, i);
 
           // TODO(BRR) Add AbsorptionCoefficientPerNuOmega to singularity-opac
-          Real alphanu = d_opacity.AbsorptionCoefficientPerNu(s, rho_cgs, T_cgs, Ye, nu)/(4.*M_PI);
+          Real alphanu = d_opacity.AbsorptionCoefficientPerNu(rho_cgs, T_cgs, Ye, s, nu)/(4.*M_PI);
 
           Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
 
