@@ -77,8 +77,8 @@ c2p_max_iter = 100
 Ye = true
 
 <radiation>
-method = cooling_function
-#method = monte_carlo
+#method = cooling_function
+method = monte_carlo
 nu_min = 1.e15
 nu_max = 0.9999e17
 nu_bins = 200

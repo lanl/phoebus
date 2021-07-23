@@ -96,9 +96,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
           const Real T_cgs = v(ptemp, k, j, i) * TEMPERATURE;
           const Real Ye = v(pye, k, j, i);
 
-          double J = d_opacity.Emissivity(s, rho_cgs, T_cgs, Ye);
+          double J = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, s);
           double Jye =
-              pc::mp * d_opacity.NumberEmissivity(s, rho_cgs, T_cgs, Ye);
+              pc::mp * d_opacity.NumberEmissivity(rho_cgs, T_cgs, Ye, s);
           Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
           Real Gcov_coord[4];
           Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
