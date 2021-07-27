@@ -101,8 +101,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField("dN", mspecies_scalar);
     physics->AddField("Ns", mspecies_scalar);
 
-    //std::vector<int> dNdlnu_size(NumRadiationTypes, nu_bins + 1);
-    std::vector<int> dNdlnu_size(1, nu_bins + 1);
+    std::vector<int> dNdlnu_size{NumRadiationTypes, nu_bins+1};
     Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
     physics->AddField("dNdlnu", mdNdlnu);
 

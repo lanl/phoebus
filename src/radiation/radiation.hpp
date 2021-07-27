@@ -76,13 +76,13 @@ KOKKOS_INLINE_FUNCTION void GetFourVelocity(Real v[4],
 }
 
 KOKKOS_INLINE_FUNCTION
-Real LinearInterpLog(Real x, int k, int j, int i, ParArrayND<Real> table, Real lx_min,
+Real LinearInterpLog(Real x, int sidx, int k, int j, int i, ParArrayND<Real> table, Real lx_min,
                      Real dlx) {
   Real lx = log(x);
   Real dn = (lx - lx_min) / dlx;
   int n = static_cast<int>(dn);
   dn = dn - n;
-  return (1. - dn) * table(n, k, j, i) + dn * table(n + 1, k, j, i);
+  return (1. - dn) * table(n, sidx, k, j, i) + dn * table(n + 1, sidx, k, j, i);
 }
 
 // Choice of RNG
