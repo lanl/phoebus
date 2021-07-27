@@ -100,8 +100,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int pvhi = imap[p::velocity].second;
   const int idNdlnu = imap["dNdlnu"].first;
   const int idNdlnu_max = imap["dNdlnu_max"].first;
-  printf("idNdlnu.first second: %i %i\n", imap["dNdlnu"].first, imap["dNdlnu"].second);
-  exit(-1);
   const int idN = imap["dN"].first;
   const int iNs = imap["Ns"].first;
   const int Gcov_lo = imap[iv::Gcov].first;
@@ -145,14 +143,14 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             // Factors of nu in numerator and denominator cancel
             Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
             //v(idNdlnu + n, sidx, k, j, i) = dNdlnu;
-            v(idNdlnu + sidx, n, k, j, i) = dNdlnu;
+            v(idNdlnu + sidx*(nu_bins+1) + n, k, j, i) = dNdlnu;
             if (dNdlnu > dNdlnu_max) {
               dNdlnu_max = dNdlnu;
             }
           }
 
           for (int n = 0; n <= nu_bins; n++) {
-            v(idNdlnu + n, k, j, i) /= dNdlnu_max;
+            v(idNdlnu + sidx*(nu_bins+1) + n, k, j, i) /= dNdlnu_max;
           }
 
           // Trapezoidal rule
@@ -164,7 +162,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
           dN *= d3x_cgs * detG * dt * TIME;
 
-          v(idNdlnu_max, k, j, i) = dNdlnu_max;
+          v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
 
           int Ns = static_cast<int>(dN);
           if (dN - Ns > rng_gen.drand()) {
@@ -172,8 +170,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           }
 
           // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
-          v(idN, k, j, i) = dN;
-          v(iNs, k, j, i) = static_cast<Real>(Ns);
+          v(idN + sidx, k, j, i) = dN;
+          v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
           rng_pool.free_state(rng_gen);
         }
       });
@@ -182,34 +180,40 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   Real dNtot = 0;
   parthenon::par_reduce(
       parthenon::loop_pattern_mdrange_tag, "MonteCarloReduceParticleCreation",
-      DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i, Real &dNtot) {
-        dNtot += v(idN, k, j, i);
+      DevExecSpace(), 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i, Real &dNtot) {
+        if (do_species[sidx]) {
+          dNtot += v(idN, sidx, k, j, i);
+        }
       },
       Kokkos::Sum<Real>(dNtot));
   // TODO(BRR) Mpi reduction here....... this really needs to be a separate task
   Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
   pmb->par_for(
-      "MonteCarlodiNsEval", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        auto rng_gen = rng_pool.get_state();
+      "MonteCarlodiNsEval", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int sidx ,const int k, const int j, const int i) {
+        if (do_species[sidx]) {
+          auto rng_gen = rng_pool.get_state();
 
-        Real dN_upd = wgtCfac * v(idN, k, j, i);
-        int Ns = static_cast<int>(dN_upd);
-        if (dN_upd - Ns > rng_gen.drand()) {
-          Ns++;
+          Real dN_upd = wgtCfac * v(idN + sidx, k, j, i);
+          int Ns = static_cast<int>(dN_upd);
+          if (dN_upd - Ns > rng_gen.drand()) {
+            Ns++;
+          }
+
+          // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
+          v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
+          rng_pool.free_state(rng_gen);
         }
-
-        // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
-        v(iNs, k, j, i) = static_cast<Real>(Ns);
-        rng_pool.free_state(rng_gen);
       });
   int Nstot = 0;
   parthenon::par_reduce(
       parthenon::loop_pattern_mdrange_tag, "MonteCarloReduceParticleCreationNs",
-      DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i, int &Nstot) {
-        Nstot += static_cast<int>(v(iNs, k, j, i));
+      DevExecSpace(), 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i, int &Nstot) {
+        if (do_species[sidx]) {
+          Nstot += static_cast<int>(v(iNs + sidx, k, j, i));
+        }
       },
       Kokkos::Sum<int>(Nstot));
   if (dNtot <= 0) {
@@ -237,6 +241,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto dN = rc->Get("Ns").data;
   auto dN_h = dN.GetHostMirrorAndCopy();
   int index = 0;
+  for (int sidx = 0; sidx < 3; sidx++) {
   for (int k = 0; k < nx_k; k++) {
     for (int j = 0; j < nx_j; j++) {
       for (int i = 0; i < nx_i; i++) {
@@ -248,11 +253,20 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   starting_index.DeepCopy(starting_index_h);
 
   auto dNdlnu = rc->Get("dNdlnu").data;
-  auto dNdlnu_max = rc->Get("dNdlnu_max").data;
+  //auto dNdlnu_max = rc->Get("dNdlnu_max").data;
 
   // Loop over zones and generate appropriate number of particles in each zone
   for (int sidx = 0; sidx < 3; sidx++) {
     if (do_species[sidx]) {
+      //auto dNdlnu_slice = dNdlnu;
+      /*auto dNdlnu_slice = dNdlnu.SliceD<4>(std::make_pair(3,sidx));
+      printf("%i %i %i %i %i %i\n",
+        dNdlnu_slice.GetDim(1),
+        dNdlnu_slice.GetDim(2),
+        dNdlnu_slice.GetDim(3),
+        dNdlnu_slice.GetDim(4),
+        dNdlnu_slice.GetDim(5),
+        dNdlnu_slice.GetDim(6));*/
       pmb->par_for(
           "MonteCarloSourceParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
           KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -264,7 +278,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
             Geometry::Tetrads Tetrads(Ucon, Gcov);
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
-            int dNs = v(iNs, k, j, i);
+            int dNs = v(iNs + sidx, k, j, i);
+            printf("dNs[%i] = %i\n", sidx, dNs);
 
             auto s = species[sidx];
 
@@ -290,7 +305,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               do {
                 nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
                 counter++;
-              } while (rng_gen.drand() > LinearInterpLog(nu, k, j, i, dNdlnu, lnu_min, dlnu));
+              } while (rng_gen.drand() > LinearInterpLog(nu, sidx, k, j, i, dNdlnu, lnu_min, dlnu));
 
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
@@ -323,13 +338,15 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   if (remove_emitted_particles) {
     pmb->par_for(
-        "MonteCarloRemoveEmittedParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          int dNs = v(iNs, k, j, i);
-          // Loop over particles to create in this zone
-          for (int n = 0; n < static_cast<int>(dNs); n++) {
-            const int m = new_indices(starting_index(k - kb.s, j - jb.s, i - ib.s) + n);
-            swarm_d.MarkParticleForRemoval(m);
+        "MonteCarloRemoveEmittedParticles", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
+          if (do_species[sidx]) {
+            int dNs = v(iNs + sidx, k, j, i);
+            // Loop over particles to create in this zone
+            for (int n = 0; n < static_cast<int>(dNs); n++) {
+              const int m = new_indices(starting_index(k - kb.s, j - jb.s, i - ib.s) + n);
+              swarm_d.MarkParticleForRemoval(m);
+            }
           }
         });
     swarm->RemoveMarkedParticles();
