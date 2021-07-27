@@ -20,7 +20,7 @@
 using namespace parthenon::package::prelude;
 
 // singularity includes
-#include <eos/eos.hpp>
+#include <singularity-eos/eos/eos.hpp>
 
 // internal includes
 #include "fluid/fluid.hpp"
