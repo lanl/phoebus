@@ -42,8 +42,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
-  std::vector<std::string> known_methods = {"cooling_function", "moment", "monte_carlo",
-                                            "mocmc"};
+  std::vector<std::string> known_methods = {"cooling_function", "moment",
+                                            "monte_carlo", "mocmc"};
   if (std::find(known_methods.begin(), known_methods.end(), method) ==
       known_methods.end()) {
     std::stringstream msg;
@@ -52,9 +52,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   // Set which neutrino species to include in simulation
-  bool do_nu_electron = pin->GetOrAddBoolean("radiation", "do_nu_electron", true);
+  bool do_nu_electron =
+      pin->GetOrAddBoolean("radiation", "do_nu_electron", true);
   params.Add("do_nu_electron", do_nu_electron);
-  bool do_nu_electron_anti = pin->GetOrAddBoolean("radiation", "do_nu_electron_anti", true);
+  bool do_nu_electron_anti =
+      pin->GetOrAddBoolean("radiation", "do_nu_electron_anti", true);
   params.Add("do_nu_electron_anti", do_nu_electron_anti);
   bool do_nu_heavy = pin->GetOrAddBoolean("radiation", "do_nu_heavy", true);
   params.Add("do_nu_heavy", do_nu_heavy);
@@ -96,13 +98,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata int_swarmvalue_metadata({Metadata::Integer});
     physics->AddSwarmValue("species", swarm_name, int_swarmvalue_metadata);
 
-    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy}, std::vector<int>(1, NumRadiationTypes));
+    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy},
+                                        std::vector<int>(1, NumRadiationTypes));
     physics->AddField("dNdlnu_max", mspecies_scalar);
     physics->AddField("dN", mspecies_scalar);
     physics->AddField("Ns", mspecies_scalar);
 
-    std::vector<int> dNdlnu_size{NumRadiationTypes, nu_bins+1};
-    Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
+    std::vector<int> dNdlnu_size{NumRadiationTypes, nu_bins + 1};
+    Metadata mdNdlnu =
+        Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
     physics->AddField("dNdlnu", mdNdlnu);
 
     Real tune_emiss = pin->GetOrAddReal("radiation", "tune_emiss", 1.);
@@ -155,7 +159,8 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace iv = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
+  std::vector<std::string> vars(
+      {c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int ceng = imap[c::energy].first;
@@ -171,8 +176,9 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
@@ -202,7 +208,8 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
         Real ldt = 0.0;
         Real csig = 1.0;
         for (int d = 0; d < ndim; d++) {
-          lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
+          lmin_dt =
+              std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
         }
       },
       Kokkos::Min<Real>(min_dt));
