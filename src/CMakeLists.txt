@@ -119,5 +119,5 @@ target_link_libraries(phoebus PRIVATE parthenon
   singularity-eos::flags
   singularity-eos
   singularity-opac::singularity-opac
-  $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5> # TODO(BRR) what do I do here
+  $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
 )
