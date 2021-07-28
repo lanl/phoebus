@@ -88,8 +88,6 @@ Real LinearInterpLog(Real x, int sidx, int k, int j, int i, ParArrayND<Real> tab
 // Choice of RNG
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
-enum class NeutrinoSpecies { Electron, ElectronAnti, Heavy };
-
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
