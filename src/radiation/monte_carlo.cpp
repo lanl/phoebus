@@ -107,7 +107,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
-  Real wgtC = 1.e50; // Typical-ish value
+  Real wgtC = 1.e50*tune_emiss; // Typical-ish value
 
   pmb->par_for(
       "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -139,6 +139,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real Jnu = d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu);
 
             dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
+            //printf("delta dN[%i]: %e\n", n, Jnu * nu / (pc::h * nu * wgt) * dlnu);
 
             // Factors of nu in numerator and denominator cancel
             Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
@@ -151,6 +152,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           for (int n = 0; n <= nu_bins; n++) {
             v(idNdlnu + sidx*(nu_bins+1) + n, k, j, i) /= dNdlnu_max;
+            //printf("dNdlnu[%i] = %e\n", n, v(idNdlnu + sidx*(nu_bins+1) + n, k, j, i));
           }
 
           // Trapezoidal rule
@@ -160,7 +162,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
           dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu1) * nu1 /
                 (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
+          //printf("dN before: %e\n", dN);
           dN *= d3x_cgs * detG * dt * TIME;
+          //printf("dN after: %e\n", dN);
 
           v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
 
@@ -168,13 +172,16 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           if (dN - Ns > rng_gen.drand()) {
             Ns++;
           }
+          //printf("[%i] Ns = %i dN = %e\n", sidx, Ns, dN);
 
           // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
           v(idN + sidx, k, j, i) = dN;
           v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
+          //printf("Storing Ns: (%i %i %i %i), %e\n", iNs+sidx, k, j, i, v(iNs + sidx, k, j, i));
           rng_pool.free_state(rng_gen);
         }
       });
+  //exit(-1);
 
   // Reduce dN over zones for calibrating weights (requires w ~ wgtC)
   Real dNtot = 0;
@@ -183,12 +190,13 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       DevExecSpace(), 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i, Real &dNtot) {
         if (do_species[sidx]) {
-          dNtot += v(idN, sidx, k, j, i);
+          dNtot += v(idN + sidx, k, j, i);
         }
       },
       Kokkos::Sum<Real>(dNtot));
   // TODO(BRR) Mpi reduction here....... this really needs to be a separate task
   Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
+  printf("num_particles = %i dNtot = %e wgtCfac = %e\n", num_particles, dNtot, wgtCfac);
   pmb->par_for(
       "MonteCarlodiNsEval", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int sidx ,const int k, const int j, const int i) {
@@ -196,13 +204,16 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           auto rng_gen = rng_pool.get_state();
 
           Real dN_upd = wgtCfac * v(idN + sidx, k, j, i);
+          //printf("dN_upd = %e\n", dN_upd);
           int Ns = static_cast<int>(dN_upd);
           if (dN_upd - Ns > rng_gen.drand()) {
             Ns++;
           }
 
           // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
+          //printf("Stored iNs: (%i %i %i %i) %e\n", iNs+sidx,k,j,i, v(iNs + sidx, k, j, i));
           v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
+          //printf("Updated iNs: (%i %i %i %i) %e\n", iNs+sidx,k,j,i, v(iNs + sidx, k, j, i));
           rng_pool.free_state(rng_gen);
         }
       });
@@ -216,6 +227,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         }
       },
       Kokkos::Sum<int>(Nstot));
+  //exit(-1);
   if (dNtot <= 0) {
     return TaskStatus::complete;
   }
@@ -236,17 +248,18 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto swarm_d = swarm->GetDeviceContext();
 
   // Calculate array of starting index for each zone to compute particles
-  ParArrayND<int> starting_index("Starting index", nx_k, nx_j, nx_i);
+  ParArrayND<int> starting_index("Starting index", 3, nx_k, nx_j, nx_i);
   auto starting_index_h = starting_index.GetHostMirror();
   auto dN = rc->Get("Ns").data;
   auto dN_h = dN.GetHostMirrorAndCopy();
   int index = 0;
   for (int sidx = 0; sidx < 3; sidx++) {
-  for (int k = 0; k < nx_k; k++) {
-    for (int j = 0; j < nx_j; j++) {
-      for (int i = 0; i < nx_i; i++) {
-        starting_index_h(k, j, i) = index;
-        index += static_cast<int>(dN_h(k + kb.s, j + jb.s, i + ib.s));
+    for (int k = 0; k < nx_k; k++) {
+      for (int j = 0; j < nx_j; j++) {
+        for (int i = 0; i < nx_i; i++) {
+          starting_index_h(sidx, k, j, i) = index;
+          index += static_cast<int>(dN_h(sidx, k + kb.s, j + jb.s, i + ib.s));
+        }
       }
     }
   }
@@ -278,6 +291,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
             Geometry::Tetrads Tetrads(Ucon, Gcov);
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+            printf("Ns real: %e\n", v(iNs + sidx, k, j, i));
             int dNs = v(iNs + sidx, k, j, i);
             printf("dNs[%i] = %i\n", sidx, dNs);
 
@@ -285,7 +299,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
             // Loop over particles to create in this zone
             for (int n = 0; n < static_cast<int>(dNs); n++) {
-              const int m = new_indices(starting_index(k - kb.s, j - jb.s, i - ib.s) + n);
+              const int m = new_indices(starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
               auto rng_gen = rng_pool.get_state();
 
               // Set particle species
@@ -344,7 +358,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             int dNs = v(iNs + sidx, k, j, i);
             // Loop over particles to create in this zone
             for (int n = 0; n < static_cast<int>(dNs); n++) {
-              const int m = new_indices(starting_index(k - kb.s, j - jb.s, i - ib.s) + n);
+              const int m = new_indices(starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
               swarm_d.MarkParticleForRemoval(m);
             }
           }
