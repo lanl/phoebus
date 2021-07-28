@@ -40,15 +40,16 @@ namespace radiation {
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
 
-constexpr RadiationType species[3] = {RadiationType::NU_ELECTRON, RadiationType::NU_ELECTRON_ANTI, RadiationType::NU_HEAVY};
+constexpr RadiationType species[3] = {RadiationType::NU_ELECTRON,
+                                      RadiationType::NU_ELECTRON_ANTI,
+                                      RadiationType::NU_HEAVY};
 constexpr int NumRadiationTypes = 3;
 
 // TODO(BRR) Utilities that should be moved
 #define SMALL (1.e-200)
-KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(Real v[4],
-                                             const Geometry::CoordSysMeshBlock &system,
-                                             CellLocation loc, const int k, const int j,
-                                             const int i) {
+KOKKOS_INLINE_FUNCTION Real
+GetLorentzFactor(Real v[4], const Geometry::CoordSysMeshBlock &system,
+                 CellLocation loc, const int k, const int j, const int i) {
   Real W = 1;
   Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
   system.Metric(loc, k, j, i, gamma);
@@ -61,10 +62,10 @@ KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(Real v[4],
   return W;
 }
 
-KOKKOS_INLINE_FUNCTION void GetFourVelocity(Real v[4],
-                                            const Geometry::CoordSysMeshBlock &system,
-                                            CellLocation loc, const int k, const int j,
-                                            const int i, Real u[Geometry::NDFULL]) {
+KOKKOS_INLINE_FUNCTION void
+GetFourVelocity(Real v[4], const Geometry::CoordSysMeshBlock &system,
+                CellLocation loc, const int k, const int j, const int i,
+                Real u[Geometry::NDFULL]) {
   Real beta[Geometry::NDSPACE];
   Real W = GetLorentzFactor(v, system, loc, k, j, i);
   Real alpha = system.Lapse(loc, k, j, i);
@@ -76,8 +77,8 @@ KOKKOS_INLINE_FUNCTION void GetFourVelocity(Real v[4],
 }
 
 KOKKOS_INLINE_FUNCTION
-Real LinearInterpLog(Real x, int sidx, int k, int j, int i, ParArrayND<Real> table, Real lx_min,
-                     Real dlx) {
+Real LinearInterpLog(Real x, int sidx, int k, int j, int i,
+                     ParArrayND<Real> table, Real lx_min, Real dlx) {
   Real lx = log(x);
   Real dn = (lx - lx_min) / dlx;
   int n = static_cast<int>(dn);
@@ -93,14 +94,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt);
 
 // Optically thin cooling function
-TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt);
+TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
+                                             const double dt);
 
 // Monte Carlo transport
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                      SwarmContainer *sc, const double t0,
                                      const double dt);
 TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
-                               SwarmContainer *sc, const double t0, const double dt);
+                               SwarmContainer *sc, const double t0,
+                               const double dt);
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
 // Mark all MPI requests as NULL / initialize boundary flags.
