@@ -258,8 +258,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   int pye = imap[p::ye].second; // -1 if not present
   int cye = imap[c::ye].second;
 
-  printf("pb_lo = %i pb_hi = %i\n", pb_lo, pb_hi);
-
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(
@@ -283,7 +281,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
                    v(b, pvel_lo + n, k, j, i);
           }
           for (int n = pb_lo; n <= pb_hi; n++) {
-            printf("n = %i\n", n);
             Bdotv += gcov[m][n - pb_lo] * v(b, pvel_lo + m, k, j, i) *
                      v(b, n, k, j, i);
             BdotB += gcov[m][n - pb_lo] * v(b, pb_lo + m, k, j, i) *
@@ -297,7 +294,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         // get the magnetic field 4-vector
         Real bcon[] = {W * Bdotv / lapse, 0.0, 0.0, 0.0};
         for (int m = pb_lo; m <= pb_hi; m++) {
-          printf("m = %i\n", m);
           bcon[m - pb_lo + 1] =
               v(b, m, k, j, i) / W + lapse * bcon[0] *
                                          (v(b, m - pb_lo + pvel_lo, k, j, i) -
