@@ -28,6 +28,7 @@ using namespace parthenon::package::prelude;
 
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
+#include "phoebus_utils/relativity_utils.hpp"
 
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
@@ -45,39 +46,8 @@ constexpr RadiationType species[3] = {RadiationType::NU_ELECTRON,
                                       RadiationType::NU_HEAVY};
 constexpr int NumRadiationTypes = 3;
 
-// TODO(BRR) Utilities that should be moved
-#define SMALL (1.e-200)
-KOKKOS_INLINE_FUNCTION Real
-GetLorentzFactor(Real v[4], const Geometry::CoordSysMeshBlock &system,
-                 CellLocation loc, const int k, const int j, const int i) {
-  Real W = 1;
-  Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
-  system.Metric(loc, k, j, i, gamma);
-  for (int l = 1; l < Geometry::NDFULL; ++l) {
-    for (int m = 1; m < Geometry::NDFULL; ++m) {
-      W -= v[l] * v[m] * gamma[l - 1][m - 1];
-    }
-  }
-  W = 1. / std::sqrt(std::abs(W) + SMALL);
-  return W;
-}
-
-KOKKOS_INLINE_FUNCTION void
-GetFourVelocity(Real v[4], const Geometry::CoordSysMeshBlock &system,
-                CellLocation loc, const int k, const int j, const int i,
-                Real u[Geometry::NDFULL]) {
-  Real beta[Geometry::NDSPACE];
-  Real W = GetLorentzFactor(v, system, loc, k, j, i);
-  Real alpha = system.Lapse(loc, k, j, i);
-  system.ContravariantShift(loc, k, j, i, beta);
-  u[0] = W / (std::abs(alpha) + SMALL);
-  for (int l = 1; l < Geometry::NDFULL; ++l) {
-    u[l] = W * v[l - 1] - u[0] * beta[l - 1];
-  }
-}
-
 KOKKOS_INLINE_FUNCTION
-Real LinearInterpLog(Real x, int sidx, int k, int j, int i,
+Real LogLinearInterp(Real x, int sidx, int k, int j, int i,
                      ParArrayND<Real> table, Real lx_min, Real dlx) {
   Real lx = log(x);
   Real dn = (lx - lx_min) / dlx;

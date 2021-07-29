@@ -308,7 +308,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               do {
                 nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
                 counter++;
-              } while (rng_gen.drand() > LinearInterpLog(nu, sidx, k, j, i,
+              } while (rng_gen.drand() > LogLinearInterp(nu, sidx, k, j, i,
                                                          dNdlnu, lnu_min,
                                                          dlnu));
 

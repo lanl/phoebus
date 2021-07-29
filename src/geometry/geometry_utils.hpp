@@ -118,27 +118,23 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
 KOKKOS_INLINE_FUNCTION
 void Lower(const double Vcon[NDFULL], const double Gcov[NDFULL][NDFULL],
            double Vcov[NDFULL]) {
-  Vcov[0] = Gcov[0][0] * Vcon[0] + Gcov[0][1] * Vcon[1] + Gcov[0][2] * Vcon[2] +
-            Gcov[0][3] * Vcon[3];
-  Vcov[1] = Gcov[1][0] * Vcon[0] + Gcov[1][1] * Vcon[1] + Gcov[1][2] * Vcon[2] +
-            Gcov[1][3] * Vcon[3];
-  Vcov[2] = Gcov[2][0] * Vcon[0] + Gcov[2][1] * Vcon[1] + Gcov[2][2] * Vcon[2] +
-            Gcov[2][3] * Vcon[3];
-  Vcov[3] = Gcov[3][0] * Vcon[0] + Gcov[3][1] * Vcon[1] + Gcov[3][2] * Vcon[2] +
-            Gcov[3][3] * Vcon[3];
+  SPACETIMELOOP(mu) {
+    Vcov[mu] = 0.;
+    SPACETIMELOOP(nu) {
+      Vcov[mu] += Gcov[mu][nu]*Vcon[nu];
+    }
+  }
 }
 
 KOKKOS_INLINE_FUNCTION
 void Raise(const double Vcov[NDFULL], const double Gcon[NDFULL][NDFULL],
            double Vcon[NDFULL]) {
-  Vcon[0] = Gcon[0][0] * Vcov[0] + Gcon[0][1] * Vcov[1] + Gcon[0][2] * Vcov[2] +
-            Gcon[0][3] * Vcov[3];
-  Vcon[1] = Gcon[1][0] * Vcov[0] + Gcon[1][1] * Vcov[1] + Gcon[1][2] * Vcov[2] +
-            Gcon[1][3] * Vcov[3];
-  Vcon[2] = Gcon[2][0] * Vcov[0] + Gcon[2][1] * Vcov[1] + Gcon[2][2] * Vcov[2] +
-            Gcon[2][3] * Vcov[3];
-  Vcon[3] = Gcon[3][0] * Vcov[0] + Gcon[3][1] * Vcov[1] + Gcon[3][2] * Vcov[2] +
-            Gcon[3][3] * Vcov[3];
+  SPACETIMELOOP(mu) {
+    Vcon[mu] = 0.;
+    SPACETIMELOOP(nu) {
+      Vcon[mu] += Gcon[mu][nu]*Vcov[nu];
+    }
+  }
 }
 
 KOKKOS_INLINE_FUNCTION

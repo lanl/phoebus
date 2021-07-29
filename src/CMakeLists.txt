@@ -80,6 +80,7 @@ add_executable(phoebus
   phoebus_utils/unit_conversions.hpp
   phoebus_utils/debug_utils.hpp
   phoebus_utils/linear_algebra.hpp
+  phoebus_utils/relativity_utils.hpp
   phoebus_utils/variables.hpp
 
   radiation/radiation.hpp
