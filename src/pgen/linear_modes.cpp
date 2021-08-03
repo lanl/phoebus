@@ -14,6 +14,9 @@
 // #include <complex>
 #include <Kokkos_Complex.hpp>
 #include <sstream>
+#include <typeinfo>
+
+#include "geometry/geometry.hpp"
 
 #include "pgen/pgen.hpp"
 
@@ -21,12 +24,21 @@
 // TODO: Make this 3D instead of 2D.
 
 using Kokkos::complex;
+using Geometry::NDFULL;
+using Geometry::NDSPACE;
 
 namespace linear_modes {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski) ||
+    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski) ||
+    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
+    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm),
+    "Problem \"linear_modes\" requires \"Minkowski\" geometry!");
+
   auto &rc = pmb->meshblock_data.Get();
+  const int ndim = pmb->pmy_mesh->ndim;
 
   PackIndexMap imap;
   auto v = rc->PackVariables({"p.density",
@@ -63,13 +75,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double u10 = 0.;
   double u20 = 0.;
   double u30 = 0.;
-  double B10 = 1.;
+  double B10 = 0.;
   double B20 = 0.;
   double B30 = 0.;
 
   // Wavevector
-  double k1 = 2.*M_PI;
-  double k2 = 2.*M_PI;
+  constexpr double kk = 2*M_PI;
+  double k1 = kk;
+  double k2 = kk;
 
   complex<double> omega = 0.;
   complex<double> drho = 0.;
@@ -87,18 +100,29 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       drho = 1.;
       dug = 0.;
       du1 = 0.;
-      u10 = 0.1; // Uniform advection
+      //u10 = 0.1; // Uniform advection
     } else if (mode == "sound") {
-      omega = complex<double>(0., 2.7422068833892093);
-      drho = 0.5804294924639215;
-      dug = 0.7739059899518946;
-      du1 = -0.2533201985524494;
+      if (ndim == 1) {
+        omega = complex<double>(0., 2.7422068833892093);
+        drho = 0.5804294924639215;
+        dug = 0.7739059899518946;
+        du1 = -0.2533201985524494;
+      } else if (ndim == 2) {
+        omega = complex<double>(0., 3.8780661653218766);
+        drho = 0.5804294924639213;
+        dug = 0.7739059899518947;
+        du1 = 0.1791244302079596;
+        du2 = 0.1791244302079596;
+      } else {
+        PARTHENON_FAIL("ndim == 3 not supported!");
+      }
     } else {
       std::stringstream msg;
       msg << "Mode \"" << mode << "\" not recognized!";
       PARTHENON_FAIL(msg);
     }
   } else if (physics == "mhd") {
+    B10 = 1.0;
     if (mode == "slow") {
       omega = complex<double>(0., 2.41024185339);
       drho = 0.558104461559;
@@ -129,20 +153,62 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     msg << "Physics option \"" << physics << "\" not recognized!";
     PARTHENON_FAIL(msg);
   }
-  pin->SetReal("parthenon/time", "tlim", 2.*M_PI/omega.imag()); // Set final time to be one period
+  Real tf = 2.*M_PI/omega.imag();
+  Real cs = omega.imag() / (std::sqrt(2)*kk);
+
+  auto &coords = pmb->coords;
+  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto gpkg = pmb->packages.Get("geometry");
+  auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  auto &coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  Real a_snake, k_snake, alpha, betax, betay, betaz;
+  alpha = 1;
+  a_snake = k_snake = betax = betay = betaz = 0;
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
+      typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+    a_snake = gpkg->Param<Real>("a");
+    k_snake = gpkg->Param<Real>("k");
+    alpha = gpkg->Param<Real>("alpha");
+    betay = gpkg->Param<Real>("vy");
+    PARTHENON_REQUIRE_THROWS(alpha > 0, "lapse must be positive");
+
+    tf /= alpha;
+  }
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+    betax = gpkg->Param<Real>("vx");
+    betay = gpkg->Param<Real>("vy");
+    betaz = gpkg->Param<Real>("vz");
+  }
+
+  // Set final time to be one period
+  pin->SetReal("parthenon/time", "tlim", tf);
+  tf = pin->GetReal("parthenon/time", "tlim");
+  std::cout << "Resetting final time to 1 wave period: "
+	    << tf
+	    << std::endl;
+  std::cout << "Wave frequency is: "
+	    << 1./tf
+	    << std::endl;
+  std::cout << "Wave speed is: "
+	    << cs
+	    << std::endl;
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      const Real x = coords.x1v(i);
-      const Real y = coords.x2v(j);
+      Real x = coords.x1v(i);
+      Real y = coords.x2v(j);
+
+      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+        y = y - a_snake*sin(k_snake*x);
+      }
+      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+        x = x - a_snake*sin(k_snake*x);
+      }
 
       const double mode = amp*cos(k1*x + k2*y);
 
@@ -172,6 +238,62 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       }
       if (ib_hi >= 3) {
         v(ib_lo + 2, k, j, i) = B30 + (dB3*mode).real();
+      }
+
+      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
+          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm) ||
+	        typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+        PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
+        // Transform velocity
+        Real vsq = 0.;
+        Real gcov[NDFULL][NDFULL] = {0};
+        Real vcon[NDSPACE] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
+        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+        Real gcov_mink[4][4] = {0};
+        gcov_mink[0][0] = -1.;
+        gcov_mink[1][1] = 1.;
+        gcov_mink[2][2] = 1.;
+        gcov_mink[3][3] = 1.;
+        SPACELOOP2(m, n) {
+          vsq += gcov_mink[m+1][n+1]*vcon[m]*vcon[n];
+        }
+        Real Gamma = 1./sqrt(1. - vsq);
+        Real ucon[NDFULL] = {Gamma, // alpha = 1 in Minkowski
+                             Gamma*v(ivlo, k, j, i),
+                             Gamma*v(ivlo+1, k, j, i),
+                             Gamma*v(ivlo+2, k, j, i)};
+        Real J[NDFULL][NDFULL] = {0};
+        if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+          J[0][0] = 1/alpha;
+	        J[2][0] = -betay/alpha;
+          J[2][1] = a_snake*k_snake*cos(k_snake*x);
+	        J[1][1] = J[2][2] = J[3][3] = 1;
+	      } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+	        J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
+	        J[1][0] = -betax;
+	        J[2][0] = -betay;
+	        J[3][0] = -betaz;
+        } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+          PARTHENON_FAIL("This geometry isn't supported with a J!");
+        }
+        Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
+        SPACETIMELOOP(mu) SPACETIMELOOP(nu){
+          ucon_transformed[mu] += J[mu][nu]*ucon[nu];
+        }
+        const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+        Gamma = lapse * ucon_transformed[0];
+        Real shift[NDSPACE];
+        geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+        v(ivlo, k, j, i) = ucon_transformed[1]/Gamma + shift[0]/lapse;
+        v(ivlo+1, k, j, i) = ucon_transformed[2]/Gamma + shift[1]/lapse;
+        v(ivlo+2, k, j, i) = ucon_transformed[3]/Gamma + shift[2]/lapse;
+
+        // Enforce zero B fields for now
+        if (ib_hi >= 3) {
+          v(ib_lo, k, j, i) = 0.;
+          v(ib_lo + 1, k, j, i) = 0.;
+          v(ib_lo + 2, k, j, i) = 0.;
+        }
       }
     });
 

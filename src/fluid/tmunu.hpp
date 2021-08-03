@@ -25,7 +25,6 @@
 
 namespace fluid {
 
-// TODO(JMM): Add B-fields
 const std::vector<std::string> TMUNU_VARS = {
     fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
     fluid_prim::pressure, fluid_prim::bfield};
