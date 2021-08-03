@@ -135,25 +135,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return physics;
 }
 
-TaskStatus TransportMCParticles(MeshBlockData<Real> *rc, const double t0,
-                                const double dt) {
-  auto *pmb = rc->GetParentPointer().get();
-  auto swarm = pmb->swarm_data.Get()->Get("neutrinos");
-  int max_active_index = swarm->GetMaxActiveIndex();
-
-  auto &t = swarm->Get<Real>("t").Get();
-  auto &x = swarm->Get<Real>("x").Get();
-  auto &y = swarm->Get<Real>("y").Get();
-  auto &z = swarm->Get<Real>("z").Get();
-  const auto &vx = swarm->Get<Real>("vx").Get();
-  const auto &vy = swarm->Get<Real>("vy").Get();
-  const auto &vz = swarm->Get<Real>("vz").Get();
-
-  return TaskStatus::complete;
-}
-
-// TaskStatus ApplyRadiationFourForce
-
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace c = fluid_cons;
   namespace iv = internal_variables;

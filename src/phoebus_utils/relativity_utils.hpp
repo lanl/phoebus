@@ -21,17 +21,17 @@ namespace phoebus {
 /*
  * Calculate the normal observer Lorentz factor from normal observer three-velocity
  *
- * PARAM[IN]    v[3]   Normal observer three-velocity (phoebus primitive velocity)
- * PARAM[IN]    system Coordinate system
- * PARAM[IN]    loc    Location on spatial cell where geometry is processed
- * PARAM[IN]    k      k index of meshblock cell
- * PARAM[IN]    j      j index of meshblock cell
- * PARAM[IN]    i      i index of meshblock cell
+ * PARAM[IN] - v[3] - Normal observer three-velocity (phoebus primitive velocity)
+ * PARAM[IN] - system - Coordinate system
+ * PARAM[IN] - loc - Location on spatial cell where geometry is processed
+ * PARAM[IN] - k - k index of meshblock cell
+ * PARAM[IN] - j - j index of meshblock cell
+ * PARAM[IN] - i - i index of meshblock cell
  *
- * RETURN Lorentz factor in normal observer frame
+ * RETURN - Lorentz factor in normal observer frame
  */
 KOKKOS_INLINE_FUNCTION Real
-GetLorentzFactor(Real v[3], const Geometry::CoordSysMeshBlock &system,
+GetLorentzFactor(const Real v[3], const Geometry::CoordSysMeshBlock &system,
                  CellLocation loc, const int k, const int j, const int i) {
   Real W = 1;
   Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
@@ -48,16 +48,16 @@ GetLorentzFactor(Real v[3], const Geometry::CoordSysMeshBlock &system,
 /*
  * Calculate the coordinate frame four-velocity from the normal observer three-velocity
  *
- * PARAM[IN]    v[3]   Normal observer three-velocity (phoebus primitive velocity)
- * PARAM[IN]    system Coordinate system
- * PARAM[IN]    loc    Location on spatial cell where geometry is processed
- * PARAM[IN]    k      k index of meshblock cell
- * PARAM[IN]    j      j index of meshblock cell
- * PARAM[IN]    i      i index of meshblock cell
- * PARAM[OUT]   u      Coordinate frame four-velocity
+ * PARAM[IN] - v[3] - Normal observer three-velocity (phoebus primitive velocity)
+ * PARAM[IN] - system - Coordinate system
+ * PARAM[IN] - loc - Location on spatial cell where geometry is processed
+ * PARAM[IN] - k - X3 index of meshblock cell
+ * PARAM[IN] - j - X2 index of meshblock cell
+ * PARAM[IN] - i - X1 index of meshblock cell
+ * PARAM[OUT] - u - Coordinate frame contravariant four-velocity
  */
 KOKKOS_INLINE_FUNCTION void
-GetFourVelocity(Real v[3], const Geometry::CoordSysMeshBlock &system,
+GetFourVelocity(const Real v[3], const Geometry::CoordSysMeshBlock &system,
                 CellLocation loc, const int k, const int j, const int i,
                 Real u[Geometry::NDFULL]) {
   Real beta[Geometry::NDSPACE];
