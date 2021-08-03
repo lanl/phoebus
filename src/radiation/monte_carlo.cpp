@@ -276,7 +276,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real Gcov[4][4];
             geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
             Real Ucon[4];
-            Real vel[4] = {0, v(pvlo, k, j, i), v(pvlo + 1, k, j, i),
+            Real vel[3] = {v(pvlo, k, j, i),
+                           v(pvlo + 1, k, j, i),
                            v(pvlo + 2, k, j, i)};
             GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
             Geometry::Tetrads Tetrads(Ucon, Gcov);

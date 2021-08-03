@@ -36,6 +36,8 @@ using namespace parthenon::driver::prelude;
 using namespace parthenon::package::prelude;
 using namespace parthenon;
 
+using namespace phoebus;
+
 namespace radiation {
 
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;

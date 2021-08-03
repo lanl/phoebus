@@ -20,6 +20,7 @@ target_link_libraries(phoebus_unit_tests
     Kokkos::kokkos)
 
 catch_discover_tests(phoebus_unit_tests TEST_SPEC "[geometry]" TEST_PREFIX "geometry:")
+catch_discover_tests(phoebus_unit_tests TEST_SPEC "[relativity_utils]" TEST_PREFIX "relativity_utils:")
 
 if(PHOEBUS_ENABLE_UNIT_TESTS)
   message("Building unit tests.")
