@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
   pman.app_input->ProcessPackages = phoebus::ProcessPackages;
   // pman.app_input->ProcessProperties = phoebus::ProcessProperties;
   pman.app_input->ProblemGenerator = phoebus::ProblemGenerator;
-  pman.app_input->InitUserMeshBlockData = Geometry::SetGeometryBlock;
+  pman.app_input->InitMeshBlockUserData = Geometry::SetGeometryBlock;
   // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
 

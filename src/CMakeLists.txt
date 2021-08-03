@@ -35,6 +35,8 @@ add_executable(phoebus
   geometry/geometry.hpp
   geometry/geometry_defaults.hpp
   geometry/geometry_utils.hpp
+  geometry/tetrads.hpp
+
   geometry/inchworm.hpp
   geometry/inchworm.cpp
   geometry/mckinney_gammie_ryan.hpp
@@ -51,6 +53,8 @@ add_executable(phoebus
 
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
+  microphysics/opac_phoebus/opac_phoebus.hpp
+  microphysics/opac_phoebus/opac_phoebus.cpp
 
   pgen/pgen.hpp
   pgen/pgen.cpp
@@ -58,9 +62,11 @@ add_executable(phoebus
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
   pgen/kh.cpp
+  pgen/leptoneq.cpp
   pgen/linear_modes.cpp
   pgen/rhs_tester.cpp
   pgen/shock_tube.cpp
+  pgen/thin_cooling.cpp
   pgen/sedov.cpp
 
   phoebus_boundaries/phoebus_boundaries.hpp
@@ -70,9 +76,18 @@ add_executable(phoebus
   phoebus_driver.hpp
 
   phoebus_utils/cell_locations.hpp
+  phoebus_utils/unit_conversions.cpp
+  phoebus_utils/unit_conversions.hpp
   phoebus_utils/debug_utils.hpp
   phoebus_utils/linear_algebra.hpp
+  phoebus_utils/relativity_utils.hpp
   phoebus_utils/variables.hpp
+
+  radiation/radiation.hpp
+  radiation/radiation.cpp
+  radiation/cooling_function.cpp
+  radiation/monte_carlo.cpp
+  radiation/geodesics.hpp
 
   reconstruction.hpp
 )
@@ -85,6 +100,7 @@ target_include_directories(phoebus PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-opac"
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/utils/herumi-fmath"
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/utils/ports-of-call"
 )
@@ -103,5 +119,6 @@ endif()
 target_link_libraries(phoebus PRIVATE parthenon
   singularity-eos::flags
   singularity-eos
+  singularity-opac::singularity-opac
   $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
 )
