@@ -1,5 +1,18 @@
 #!/usr/bin/env python
 
+# © 2021. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract
+# 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
+# is operated by Triad National Security, LLC for the U.S.  Department
+# of Energy/National Nuclear Security Administration. All rights in
+# the program are reserved by Triad National Security, LLC, and the
+# U.S. Department of Energy/National Nuclear Security
+# Administration. The Government is granted for itself and others
+# acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+# license in this material to reproduce, prepare derivative works,
+# distribute copies to the public, perform publicly and display
+# publicly, and to permit others to do so.
+
 import argparse
 import os
 import sys
@@ -7,7 +20,6 @@ import shutil
 import glob
 from numpy import sort, array, savetxt, loadtxt, fabs
 from subprocess import call
-# Get phdf reader
 sys.path.append("../../external/parthenon/scripts/python/packages/parthenon_tools")
 from parthenon_tools import phdf
 
@@ -32,10 +44,10 @@ def soft_equiv(val, ref, tol = 1.e-5):
     return True
 
 # Build code
-#if os.path.isdir(BUILD_DIR):
-#  print("BUILD_DIR already exists! Clean up before calling this script!")
-#  sys.exit()
-#os.mkdir(BUILD_DIR)
+if os.path.isdir(BUILD_DIR):
+  print("BUILD_DIR already exists! Clean up before calling this script!")
+  sys.exit()
+os.mkdir(BUILD_DIR)
 os.chdir(BUILD_DIR)
 
 configure_options = []
@@ -57,24 +69,16 @@ call(cmake_call)
 call(['cmake', '--build', '.', '--parallel', str(NUM_PROCS)])
 
 # Run test problem
-#call(['./src/phoebus', '-i', '../../../inputs/linear_modes.pin'])
+call(['./src/phoebus', '-i', '../../../inputs/linear_modes.pin'])
 
-# Get last dump files
+# Get last dump file
 dumpfiles = sort(glob.glob('hydro_modes.*.phdf'))
-print(dumpfiles)
-last_dumpfile = dumpfiles[-1]
-print(last_dumpfile)
-dump = phdf.phdf(last_dumpfile)
-print(dump.Variables)
+dump = phdf.phdf(dumpfiles[-1])
 
+# Construct array of results values
 import numpy as np
 variables = np.empty(shape=(0))
-print(variables.shape)
 for variable_name in VARIABLES_TO_COMPARE:
-
-  #print(len(dump.Get(variable)))
-  #variables.append(array(dump.Get(variable)))
-  #print(type(dump.Get(variable)))
   variable = dump.Get(variable_name)
   if len(variable.shape) > 1:
     dim = variable.shape[1]
@@ -83,12 +87,7 @@ for variable_name in VARIABLES_TO_COMPARE:
   else:
     variables = np.concatenate((variables, variable))
 
-  #variables = variables + dump.Get(variable)
-  #np.concatenate((variables, dump.Get(variable)))
-
-  #for d in range(dim):
-  #  np.concatenate
-
+# Compress results, if desired
 COMPRESSION_FACTOR = int(COMPRESSION_FACTOR)
 compressed_variables = np.zeros(len(variables) // COMPRESSION_FACTOR)
 for n in range(len(compressed_variables)):
@@ -99,8 +98,6 @@ variables = compressed_variables
 FAILED = False
 gold_name = os.path.join('../', SCRIPT_NAME) + '.gold'
 if args.upgold:
-  print(__file__.split('/')[1])
-  print(gold_name)
   savetxt(gold_name, variables, newline='\n')
 else:
   gold_variables = loadtxt(gold_name)
@@ -111,14 +108,9 @@ else:
     for n in range(len(gold_variables)):
       if not soft_equiv(variables[n], gold_variables[n]):
         FAILED = True
-  print(__file__)
-
-print((not FAILED))
 
 # Leave build directory
 os.chdir('..')
-
-sys.exit()
 
 # Clean up build directory, first checking for RELATIVE PATH ONLY
 if os.path.isabs(BUILD_DIR):
@@ -129,7 +121,12 @@ try:
 except:
   print("Error cleaning up build directory!")
 
-if FAILED:
-  sys.exit(os.EX_SOFTWARE)
-else:
-  sys.exit(os.EX_OK)
+# Report success or failure to the system
+if args.upgold:
+  print(f"Gold file {gold_name} updated!")
+  if FAILED:
+    print("TEST FAILED")
+    sys.exit(os.EX_SOFTWARE)
+  else:
+    print("TEST PASSED")
+    sys.exit(os.EX_OK)
