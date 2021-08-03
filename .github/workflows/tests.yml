@@ -13,7 +13,7 @@ jobs:
         - name: Checkout code
           uses: actions/checkout@v2
           with:
-            submodules: true
+            submodules: recursive
         - name: Set system to non-interactive mode
           run: export DEBIAN_FRONTEND=noninteractive
         - name: Install dependencies
