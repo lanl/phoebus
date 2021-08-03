@@ -34,7 +34,7 @@ jobs:
         - name: Build code
           run: |
             pwd
-            cd ../../
+            #cd ../../
             mkdir build
             cd build
             cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../
