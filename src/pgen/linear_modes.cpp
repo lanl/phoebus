@@ -75,7 +75,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double u10 = 0.;
   double u20 = 0.;
   double u30 = 0.;
-  double B10 = 1.;
+  double B10 = 0.;
   double B20 = 0.;
   double B30 = 0.;
 
@@ -122,6 +122,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       PARTHENON_FAIL(msg);
     }
   } else if (physics == "mhd") {
+    B10 = 1.0;
     if (mode == "slow") {
       omega = complex<double>(0., 2.41024185339);
       drho = 0.558104461559;
