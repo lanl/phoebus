@@ -154,10 +154,12 @@ TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc) 
   }
 
   if (bc_vars == "primitive") {
+    //auto c2p = pkg->Param<fluid::c2p_meshblock_type>("c2p_func");
     for (auto &domain : domains) {
       IndexRange ib = rc->GetBoundsI(domain);
       IndexRange jb = rc->GetBoundsJ(domain);
       IndexRange kb = rc->GetBoundsK(domain);
+      //c2p(rc.get(), ib, jb, kb);
       fluid::PrimitiveToConservedRegion(rc.get(), ib, jb, kb);
     }
   }

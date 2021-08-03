@@ -39,9 +39,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string c2p_method = pin->GetOrAddString("fluid", "c2p_method", "robust");
   params.Add("c2p_method", c2p_method);
   if (c2p_method == "robust") {
-    params.Add("c2p_func", ConservedToPrimitiveRobust);
+    params.Add("c2p_func", ConservedToPrimitiveRobust<MeshBlockData<Real>>);
   } else if (c2p_method == "classic") {
-    params.Add("c2p_func", ConservedToPrimitiveClassic);
+    params.Add("c2p_func", ConservedToPrimitiveClassic<MeshBlockData<Real>>);
   } else {
     PARTHENON_THROW("Invalid c2p_method.");
   }
@@ -412,13 +412,12 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
-  using c2p_type = std::function<TaskStatus(T *, const IndexRange &, const IndexRange &, const IndexRange &);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
-  auto c2p = Param<c2p_type>("c2p_function");
+  auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
   return c2p(rc, ib, jb, kb);
 }
 
