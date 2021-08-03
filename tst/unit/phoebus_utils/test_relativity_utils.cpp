@@ -44,27 +44,61 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
     auto mb = GetDummyMeshBlock();
     auto rc = GetDummyMeshBlockData(mb);
     auto system = GetCoordinateSystem(rc.get());
-    const Real v[3] = {0., 0., 0.};
-    const Real ucon_ref[4] = {1., 0., 0., 0.};
-    CellLocation loc = CellLocation::Cent;
-    int k = 0;
-    int j = 0;
-    int i = 0;
-    THEN("The four-velocity is correctly calculated") {
-      int n_wrong = 4;
-      printf("Entering kokkos:\n");
-      Kokkos::parallel_reduce(
-          "get n wrong", 0,
-          KOKKOS_LAMBDA(const int i, int &update) {
-            Real ucon[4];
-            GetFourVelocity(v, system, loc, k, j, i, ucon);
-            SPACETIMELOOP(mu) {
-              if (SoftEquiv(ucon[mu], ucon_ref[mu])) {
-                update -= 1;
+    // Dummy grid position
+    const CellLocation loc = CellLocation::Cent;
+    const int k = 0;
+    const int j = 0;
+    const int i = 0;
+    {
+      const Real v[3] = {0., 0., 0.};
+      const Real Gamma_ref = 1.;
+      const Real ucon_ref[4] = {1., 0., 0., 0.};
+      THEN("The Lorentz factor and four-velocity are correctly calculated") {
+        int n_wrong = 1;
+        Kokkos::parallel_reduce(
+            "get n wrong", 1,
+            KOKKOS_LAMBDA(const int i, int &update) {
+              Real Gamma = GetLorentzFactor(v, system, loc, k, j, i);
+              if (!SoftEquiv(Gamma, Gamma_ref)) {
+                update += 1;
               }
-            }
-          }, n_wrong);
-      REQUIRE(n_wrong == 0);
+              Real ucon[4];
+              GetFourVelocity(v, system, loc, k, j, i, ucon);
+              SPACETIMELOOP(mu) {
+                if (!SoftEquiv(ucon[mu], ucon_ref[mu])) {
+                  update += 1;
+                }
+              }
+            }, n_wrong);
+        REQUIRE(n_wrong == 0);
+      }
+    }
+    {
+      const Real v[3] = {0.7, 0.2, 0.1};
+      const Real Gamma_ref = 1.474419561548971247e+00;
+      const Real ucon_ref[4] = {1.474419561548971247e+00,
+                                1.032093693084279895e+00,
+                                2.948839123097942716e-01,
+                                1.474419561548971358e-01};
+      THEN("The Lorentz factor and four-velocity are correctly calculated") {
+        int n_wrong = 1;
+        Kokkos::parallel_reduce(
+            "get n wrong", 1,
+            KOKKOS_LAMBDA(const int i, int &update) {
+              Real Gamma = GetLorentzFactor(v, system, loc, k, j, i);
+              if (!SoftEquiv(Gamma, Gamma_ref)) {
+                update += 1;
+              }
+              Real ucon[4];
+              GetFourVelocity(v, system, loc, k, j, i, ucon);
+              SPACETIMELOOP(mu) {
+                if (!SoftEquiv(ucon[mu], ucon_ref[mu])) {
+                  update += 1;
+                }
+              }
+            }, n_wrong);
+        REQUIRE(n_wrong == 0);
+      }
     }
   }
 }
