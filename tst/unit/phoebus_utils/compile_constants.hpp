@@ -11,31 +11,15 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef GEOMETRY_GEOMETRY_HPP_
-#define GEOMETRY_GEOMETRY_HPP_
+#ifndef COMPILE_CONSTANTS_HPP_
+#define COMPILE_CONSTANTS_HPP_
 
-#include <memory>
+#define NCONS_MAX 10
 
-#include <parthenon/package.hpp>
+#define PHOEBUS_GEOMETRY Geometry::Minkowski
+#define GEOMETRY_MESH Analytic<Minkowski, IndexerMesh>
+#define GEOMETRY_MESH_BLOCK Analytic<Minkowski, IndexerMeshBlock>
 
-#include "geometry/coordinate_systems.hpp"
-#include "geometry/tetrads.hpp"
+#define PRINT_RHS 0
 
-using namespace parthenon::package::prelude;
-
-namespace Geometry {
-
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-
-// Set geometry data on grid, if needed.
-// Potentially a very expensive operation. You only want to do this
-// once, but it is deally done per meshblock, right at the beginning of
-// a problem generator.
-void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin);
-
-CoordSysMeshBlock GetCoordinateSystem(MeshBlockData<Real> *rc);
-CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc);
-
-} // namespace Geometry
-
-#endif // GEOMETRY_GEOMETRY_HPP_
+#endif //COMPILE_CONSTANTS_HPP_

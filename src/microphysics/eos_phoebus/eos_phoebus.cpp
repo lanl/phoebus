@@ -20,11 +20,12 @@
 #include <parthenon/package.hpp>
 
 // singularity includes
-#include <eos/eos.hpp>
-#include <eos/eos_builder.hpp>
+#include <singularity-eos/eos/eos.hpp>
+#include <singularity-eos/eos/eos_builder.hpp>
 
 // phoebus includes
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
+#include "phoebus_utils/unit_conversions.hpp"
 
 namespace Microphysics {
 namespace EOS {
@@ -134,6 +135,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("d.EOS", eos_device);
   params.Add("h.EOS", eos_host);
   params.Add("needs_ye", needs_ye);
+
+  params.Add("unit_conv", phoebus::UnitConversions(pin));
 
   return pkg;
 }

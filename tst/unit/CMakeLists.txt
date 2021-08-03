@@ -12,3 +12,4 @@
 # publicly, and to permit others to do so.
 
 add_subdirectory(geometry)
+add_subdirectory(phoebus_utils)
