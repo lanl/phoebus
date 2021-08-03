@@ -1,0 +1,24 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+    tests:
+      name: Run regression tests
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v2
+          with:
+            submodules: true
+        - name: Set system to non-interactive mode
+          run: export DEBIAN_FRONTEND=noninteractive
+        - name: Install dependencies
+          run: sudo apt-get install -y --force-yes -qq build-essential
+        - name: Run test scripts
+          run: |
+            cd tst/regression
+            ./linear_modes.py
