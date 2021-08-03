@@ -48,6 +48,10 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc);
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc);
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
+template <typename T>
+using c2p_type = TaskStatus(*)(T *, const IndexRange &, const IndexRange &, const IndexRange &);
+using c2p_meshblock_type = c2p_type<MeshBlockData<Real>>;
+using c2p_mesh_type = c2p_type<MeshData<Real>>;
 
 } // namespace fluid
 
