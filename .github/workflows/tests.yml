@@ -33,6 +33,7 @@ jobs:
             ./linear_modes.py
         - name: Build code
           run: |
+            pwd
             cd ../../
             mkdir build
             cd build
