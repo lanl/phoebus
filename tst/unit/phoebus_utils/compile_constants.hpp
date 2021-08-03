@@ -17,8 +17,6 @@
 #define NCONS_MAX 10
 
 #define PHOEBUS_GEOMETRY Geometry::Minkowski
-//#define GEOMETRY_MESH CachedOverMesh<Analytic<Minkowski, IndexerMesh>>
-//#define GEOMETRY_MESH_BLOCK CachedOverMeshBlock<Analytic<Minkowski, IndexerMeshBlock>>
 #define GEOMETRY_MESH Analytic<Minkowski, IndexerMesh>
 #define GEOMETRY_MESH_BLOCK Analytic<Minkowski, IndexerMeshBlock>
 

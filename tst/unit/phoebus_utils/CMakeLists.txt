@@ -13,8 +13,6 @@
 add_library(phoebus_utils_unit_tests OBJECT
   test_relativity_utils.cpp
 
-  #${CMAKE_CURRENT_SOURCE_DIR}/../../../src/phoebus_utils/relativity_utils.hpp
-  #${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/minkowski.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/geometry.cpp
 )
 
