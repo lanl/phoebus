@@ -17,7 +17,15 @@ jobs:
         - name: Set system to non-interactive mode
           run: export DEBIAN_FRONTEND=noninteractive
         - name: Install dependencies
-          run: sudo apt-get install -y --force-yes -qq build-essential
+          run: |
+            apt-get update -qq
+            apt-get install -qq --no-install-recommends tzdata
+            apt-get install -qq git
+            apt-get install -qq make cmake g++
+            apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
+            apt-get install -qq openssh-client
+            apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
+            apt-get install -qq lua5.3 liblua5.3-dev
         - name: Run test scripts
           run: |
             cd tst/regression
