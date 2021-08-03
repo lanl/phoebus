@@ -30,7 +30,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 // Potentially a very expensive operation. You only want to do this
 // once, but it is deally done per meshblock, right at the beginning of
 // a problem generator.
-void SetGeometry(MeshBlockData<Real> *rc);
+void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin);
 
 CoordSysMeshBlock GetCoordinateSystem(MeshBlockData<Real> *rc);
 CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc);
