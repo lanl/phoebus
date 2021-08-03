@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser(description='Run a phoebus problem as a test')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
 args = parser.parse_args()
 
-SCRIPT_NAME=(__file__.split('/')[1]).split('.py')[0]
+SCRIPT_NAME=os.path.basename(__file__).split('.py')[0]
 COMPRESSION_FACTOR=10
 SOURCE_DIR='../../../'
 BUILD_DIR='build'
