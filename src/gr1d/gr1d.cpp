@@ -20,8 +20,10 @@
 
 using namespace parthenon::package::prelude;
 
+namespace GR1D {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto gr1d = std::make_shared<StateDescriptor>("GR1D");
   bool enable_gr1d = pin->GetOrAddBoolean("GR1D", "enabled", false);
   if (!enable_gr1d) return gr1d;
 }
+} // namespace GR1D
