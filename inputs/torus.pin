@@ -20,6 +20,10 @@ variables = p.density,  &
 	    g.c.coord, &
 	    g.n.coord, &
 	    g.c.detgam, &
+	    g.c.bcon, &
+	    g.c.alpha, &
+	    src_terms, &
+	    flux_divergence, &
 	    p.bfield
 
 file_type   = hdf5      # Tabular data dump
@@ -79,6 +83,7 @@ he = false
 rad = false
 
 <fluid>
+bc_vars = primitive
 xorder = 2
 cfl = 0.8
 riemann = llf
@@ -86,7 +91,7 @@ recon = linear
 c2p_max_iter = 100
 c2p_tol = 1.e-8
 Ye = false
-mhd = false
+mhd = true
 
 <geometry>
 a = 0.0
@@ -95,9 +100,18 @@ a = 0.0
 derefine_poles = false
 r_outer = 40.0
 
+<fixup>
+enable_floors = true
+enable_flux_fixup = true
+floor_type = ExpX1RhoSie
+rho0 = 1.0e-8
+sie0 = 1.0e-3
+rho_exp = -2.0
+sie_exp = -1.0
+
 <torus>
 u_jitter = 0.0
-Bnorm = 0.0
+Bnorm = 0.01
 kappa = 0.01
 rin = 8.0
 rmax = 15.0
