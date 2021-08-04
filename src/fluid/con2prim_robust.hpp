@@ -128,7 +128,7 @@ class Residual {
 	   const Real rbsq, const Real v0sq, const singularity::EOS &eos,
 	   const Real rho_floor = 1e-11, const Real e_floor = 1e-9)
     : D_(D), q_(q), bsq_(bsq), bsq_rpsq_(bsq_rpsq), rsq_(rsq),
-      rbsq_(rbsq), v0sq_(v0sq),
+      rbsq_(rbsq), v0sq_(v0sq), iWmin_(std::sqrt(1.0-v0sq)),
       eos_(eos), rho_floor_(rho_floor), e_floor_(e_floor) {}
 
   KOKKOS_FORCEINLINE_FUNCTION
@@ -150,7 +150,7 @@ class Residual {
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real iWhat_mu(const Real vhatsq) {
-    return std::sqrt(1.0 - vhatsq);
+    return std::max(std::sqrt(1.0 - vhatsq), iWmin_);
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real rhohat_mu(const Real iWhat) {
@@ -168,7 +168,14 @@ class Residual {
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real ehat_mu(const Real mu, const Real qbar, const Real rbarsq, const Real vhatsq, const Real What) {
-    return std::max(What*(qbar - mu*rbarsq) + vhatsq*What*What/(1.0 + What), e_floor_);
+    const Real ehat_trial = What*(qbar - mu*rbarsq) + vhatsq*What*What/(1.0 + What);
+    if (ehat_trial <= e_floor_) {
+      used_energy_floor_ = true;
+      return e_floor_;
+    } else {
+      used_energy_floor_ = false;
+      return ehat_trial;
+    }
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -210,15 +217,14 @@ class Residual {
 
   KOKKOS_INLINE_FUNCTION
   bool used_density_floor() const { return used_density_floor_; }
-
   KOKKOS_INLINE_FUNCTION
-  Real get_density_floor() const {return rho_floor_;}
+  bool used_energy_floor() const { return used_energy_floor_; }
 
  private:
-  const Real D_, q_, bsq_, bsq_rpsq_, rsq_, rbsq_, v0sq_;
+  const Real D_, q_, bsq_, bsq_rpsq_, rsq_, rbsq_, v0sq_, iWmin_;
   const singularity::EOS &eos_;
   const Real rho_floor_, e_floor_;
-  bool used_density_floor_;
+  bool used_density_floor_, used_energy_floor_;
 
   KOKKOS_FORCEINLINE_FUNCTION
   Real aux_func(const Real mu, const Real h0sq) {
@@ -375,15 +381,15 @@ class ConToPrim {
     Real rhoflr, epsflr;
     floor.GetFloors(x1,x2,x3,rhoflr,epsflr);
     bool negative_crho = false;
-    if (v(crho) <= 0.0) {
+    /*if (v(crho) <= 0.0) {
       printf("v(crho) < 0: %g    %g %g\n", v(crho)*igdet, x1, x2);
       v(crho) = 1.e-50;
       negative_crho = true;
-    }
+    }*/
     const Real D = v(crho)*igdet;
     const Real tau = v(ceng)*igdet;
     const Real q = tau/D;
-    PARTHENON_REQUIRE(D > 0, "D < 0");
+    //PARTHENON_REQUIRE(D > 0, "D < 0");
 
     if (pye > 0) v(pye) = v(cye)/v(crho);
 
@@ -432,13 +438,14 @@ class ConToPrim {
       SPACELOOP(i) {
         v(pb_lo+i) = v(cb_lo+i)*igdet;
       }
-      const Real sD = 1.0/std::sqrt(D);
+      const Real sD = 1.0/std::sqrt(std::max(D,rhoflr));
       // b^i
       SPACELOOP(i) {
         bu[i] = v(pb_lo+i)*sD;
         bdotr += bu[i]*rcov[i];
       }
       SPACELOOP2(i,j) bsq += g.gcov[i][j] * bu[i] * bu[j];
+      bsq = std::max(0.0, bsq);
 
       rbsq = bdotr*bdotr;
       bsq_rpsq = bsq * rsq - rbsq;
@@ -451,12 +458,12 @@ class ConToPrim {
     //v0sq = make_bounded(v0sq, 0.0, 1.0);
     PARTHENON_REQUIRE(bsq >= 0, "bsq < 0: " + std::to_string(bsq));
     PARTHENON_REQUIRE(rbsq >= 0, "rbsq < 0: " + std::to_string(rbsq));
-    PARTHENON_REQUIRE(bsq_rpsq >= 0, "bsq_rpsq < 0: " + std::to_string(bsq_rpsq)
+    /*PARTHENON_REQUIRE(bsq_rpsq >= 0, "bsq_rpsq < 0: " + std::to_string(bsq_rpsq)
       + " " + std::to_string(bsq)
       + " " + std::to_string(rsq)
-      + " " + std::to_string(rbsq));
-    PARTHENON_REQUIRE(v0sq < 1, "v0sq >= 1: " + std::to_string(v0sq));
-    PARTHENON_REQUIRE(v0sq >= 0, "v0sq < 0: " + std::to_string(v0sq));
+      + " " + std::to_string(rbsq));*/
+    //PARTHENON_REQUIRE(v0sq < 1, "v0sq >= 1: " + std::to_string(v0sq));
+    //PARTHENON_REQUIRE(v0sq >= 0, "v0sq < 0: " + std::to_string(v0sq));
 
     Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,rhoflr,epsflr);
 
@@ -482,12 +489,13 @@ class ConToPrim {
     v(peng) *= v(prho);
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
 
+    //const Real vscale = (W > 10 ? 10.0/W : 1.0);
     SPACELOOP(i) {
       //v(pvel_lo+i) = atm ? 0 : mu*x*(rcon[i] + mu*bdotr*bu[i]);
       v(pvel_lo+i) = mu*x*(rcon[i] + mu*bdotr*bu[i]);
     }
 
-    if (res.used_density_floor() || negative_crho) {
+    /*if (res.used_density_floor()) {
       v(prho) = rhoflr;
       v(peng) = rhoflr*epsflr;
       SPACELOOP (i) {
@@ -497,6 +505,10 @@ class ConToPrim {
       W = 1.0;
       v(tmp) = eos.TemperatureFromDensityInternalEnergy(rhoflr,epsflr);
       v(prs) = eos.PressureFromDensityTemperature(rhoflr, v(tmp));
+    }*/
+
+    if (res.used_density_floor() || res.used_energy_floor()) {
+      //std::cout << "Used floor: " << res.used_density_floor() << " " << res.used_energy_floor() << " " << x1 << " " << x2 << std::endl;
     }
     //SPACELOOP(i) v(pvel_lo+i) = mu*(x*rperp[i] - rpar[i]);
     // and now make sure v is appropriately bounded
