@@ -43,14 +43,14 @@ Real minmod(const Real dm, const Real dp) {
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real ltanh(const Real dm, const Real dp) {
-  if (std::abs(dp) > 0.0) 
+  if (std::abs(dp) > 0.0)
     return 2.0*std::tanh(dm/dp);
   return 2.0;
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real barth_jespersen(const Real dm, const Real dp) {
-  const Real r = (std::abs(dp) > 0. ? dm/dp : 3.0); 
+  const Real r = (std::abs(dp) > 0. ? dm/dp : 3.0);
   return std::min(std::min(1.0, 4.0/(1.0+r)), 4.0*r/(1.0+r));
 }
 
@@ -156,11 +156,11 @@ void WENO5Z(const int d, const int n, const int k, const int j, const int i,
   Real w1 = w5gamma[1]*beta1;
   Real w2 = w5gamma[2]*beta2;
   Real wsum = 1.0/(w0 + w1 + w2);
-  Real ql = wsum * 
+  Real ql = wsum *
            (w0 * (w5alpha[0][0]*q0 + w5alpha[0][1]*q1 + w5alpha[0][2]*q2)
           + w1 * (w5alpha[1][0]*q1 + w5alpha[1][1]*q2 + w5alpha[1][2]*q3)
           + w2 * (w5alpha[2][0]*q2 + w5alpha[2][1]*q3 + w5alpha[2][2]*q4));
-  
+
   const Real alpha_l = 3.0*wsum/(w5gamma[0]/(w0+eps) + w5gamma[1]/(w1+eps) + w5gamma[2]/(w2+eps));
 
   w0 = w5gamma[0]*beta2;
@@ -195,7 +195,7 @@ void WENO5A(const int d, const int n, const int k, const int j, const int i,
   constexpr Real w5gamma[3] = {0.1, 0.6, 0.3};
   // for WENO-Z type weights. The higher the number, the more diffusive
   // and the more aggressively the method approaches ENO in discontinuous regions
-  constexpr Real p = 13; 
+  constexpr Real p = 13;
 
   const int dir = d-1;
   const int di = (d == X1DIR ? 1 : 0);
@@ -236,7 +236,7 @@ void WENO5A(const int d, const int n, const int k, const int j, const int i,
   // Normalizations
   Real wsuml = 0.0;
   Real wsumr = 0.0;
-    
+
   // WENO-A scheme introduced in Wang, Wang, and Don, 2019.
   for (int l = 0; l < 3; l++) {
     wl[l] = w5gamma[l]*std::max(1., PHI*std::pow(tau5/beta[l],p));

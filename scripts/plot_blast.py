@@ -47,8 +47,8 @@ def make_frame_static(i,clear=False):
     plt.savefig('frame_%02d.png' % i)
     if clear:
         plt.clf()
-    
-    
+
+
 def make_frame_blast(i,clear=False):
     import matplotlib as mpl
     from matplotlib import pyplot as plt
