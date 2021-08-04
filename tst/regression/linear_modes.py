@@ -121,9 +121,10 @@ try:
 except:
   print("Error cleaning up build directory!")
 
-# Report success or failure to the system
+# Report upgold, or success or failure to the system
 if args.upgold:
   print(f"Gold file {gold_name} updated!")
+else:
   if FAILED:
     print("TEST FAILED", flush=True)
     sys.exit(os.EX_SOFTWARE)
