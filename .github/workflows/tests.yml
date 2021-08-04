@@ -1,0 +1,43 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+    tests:
+      name: Run regression tests
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v2
+          with:
+            submodules: recursive
+        - name: Set system to non-interactive mode
+          run: export DEBIAN_FRONTEND=noninteractive
+        - name: Install dependencies
+          run: |
+            sudo apt-get update -qq
+            sudo apt-get install -qq --no-install-recommends tzdata
+            sudo apt-get install -qq git
+            sudo apt-get install -qq make cmake g++
+            sudo apt-get install -qq libopenmpi-dev libhdf5-openmpi-dev
+            sudo apt-get install -qq openssh-client
+            sudo apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
+        - name: Run test scripts
+          run: |
+            cd tst/regression
+            ./linear_modes.py
+        - name: Build code
+          run: |
+            mkdir build
+            cd build
+            cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../
+            cmake --build . --parallel 4
+        - name: Run unit tests
+          run: |
+            cd build
+            ctest
