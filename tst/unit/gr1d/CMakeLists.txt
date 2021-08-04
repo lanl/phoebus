@@ -10,29 +10,24 @@
 # prepare derivative works, distribute copies to the public, perform
 # publicly and display publicly, and to permit others to do so.
 
-include(Catch)
+add_library(gr1d_unit_tests OBJECT
+  test_gr1d.cpp
 
-add_executable(phoebus_unit_tests phoebus_unit_test_main.cpp)
-target_link_libraries(phoebus_unit_tests
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/gr1d/gr1d.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/gr1d/gr1d.cpp
+  )
+
+target_link_libraries(gr1d_unit_tests
   PRIVATE
-    parthenon
-    Catch2::Catch2
-    Kokkos::kokkos)
+  parthenon
+  Catch2::Catch2
+  Kokkos::kokkos
+  )
 
-catch_discover_tests(phoebus_unit_tests
-  TEST_SPEC "[geometry]" TEST_PREFIX "geometry:")
-catch_discover_tests(phoebus_unit_tests
-  TEST_SPEC "[GR1D]" TEST_PREFIX "GR1D:")
+target_include_directories(gr1d_unit_tests PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
+  )
 
-if(PHOEBUS_ENABLE_UNIT_TESTS)
-  message("Building unit tests.")
-  add_subdirectory(unit)
-endif()
-if(PHOEBUS_ENABLE_INTEGRATION_TESTS)
-  message("Building integration tests.")
-  add_subdirectory(integration)
-endif()
-if(PHOEBUS_ENABLE_REGRESSION_TESTS)
-  message("Building regression tests.")
-  add_subdirectory(regression)
-endif()
+target_sources(phoebus_unit_tests PRIVATE $<TARGET_OBJECTS:gr1d_unit_tests>)

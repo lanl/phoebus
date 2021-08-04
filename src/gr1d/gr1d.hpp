@@ -15,11 +15,97 @@
 #define GR1D_GR1D_HPP_
 
 #include <memory>
+
+#include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 
 using namespace parthenon::package::prelude;
 
+/*
+  ASSUMPTIONS:
+  -------------
+  ADM split:
+
+  ds^2 = (-alpha^2 + beta_i beta^i) dt^2 + 2 beta_i dt dx^i + gamma_{ij} dx^i dx^j
+
+  where alpha is lapse, beta is shift, gamma is 3-metric
+
+  with spherically symmetric ansatz:
+
+  ^(3)ds^2 = gamma_{ij} dx^i dx^j
+           = a^2 dr^2 + b^2 r^2 dOmega^2
+
+  Areal coordinates, meaning surface area of sphere = pi r^2
+  => b = 1
+
+  Extrinsic curvature defines time-evolution of metric:
+
+  (partial_t - Lie_beta) gamma_{ij} = -2 alpha K_{ij}
+
+  We assume trace of extrinsic curvature vanishes:
+
+  K = K^i_i = 0
+
+  This is so-called "maximal slicing" and provides
+  singularity-avoiding coordinates.
+
+  Note that:
+
+  Lie_beta gamma_{ij} = gamma_{kj} \partial_i beta^k
+                        + beta^k \partial_k gamma_{ij}
+                        + gamma_{ki} \partial_j beta^k
+			
+  Trace-free + spherical symmetry implies that
+  only non-vanishing components of extrinsic curvature are:
+
+  K^th_th = K^ph_ph = -(1/2) K^r_r
+
+  so we work with K^r_r
+
+  GOVERNING EQUATIONS, SUMMARY:
+  ------------------------------
+  gamm_{ij} = diag(a^2, r^2, r^2 sin^2(th))
+  K^i_j = K^r_r diag(1, -1/2, -1/2)
+
+  da/dr = (a/2) (r^2 (16 pi rho - (3/2) (K^r_r)^2) - a + 1)
+  d K^r_r/dr = k pi a^2 j^r - (3/r) K^r_r
+  d alpha/dr = aleph
+  d aleph/dr = a^2 alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) - (da/dr) aleph/a
+  beta^r = -(1/2) alpha r K^r_r
+
+  BOUNDARY CONDITIONS
+  -------------------
+  at r = 0:
+     da/dr = 0
+     d K^r_r /dr = 0
+     aleph = 0
+
+  at outer boundary (idealy r = infinity)
+  da/dr = (a - a^3) / 2 r
+  K^r_r = 0
+  a aleph = (1 - a)/r
+
+  MATTER COMPONENTS:
+  ------------------
+  rho    = n^mu n^nu T_{mu nu}
+  j^i    = - P^{i mu} n^nu T_{mu nu}
+  S_{ij} = P^mu_i P^nu_i T_{munu}
+  where n^mu is unit normal of hypersurface, P^{i mu} is projector
+ */
+
 namespace GR1D {
+
+struct Grids {
+  using MetricGrid_t = parthenon::ParArray2D<Real>;
+  using MatterGrid_t = parthenon::ParArray1D<Real>;
+  MetricGrid_t a;      // sqrt(g_{11}). rr-component of 3-metric
+  MetricGrid_t K_rr;   // K^r_r. rr-component of extrinsic curvature
+  MetricGrid_t alpha;  // lapse
+  MetricGrid_t aleph;  // partial_r alpha
+  MatterGrid_t rho;    // Primitive density... (0,0)-component of Tmunu
+  MatterGrid_t j_r;    // Radial momentum, (r,t)-component of Tmunu
+  MatterGrid_t trcS;   // Trace of the stress tensor: S = S^i_i
+};
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
