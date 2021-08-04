@@ -22,7 +22,7 @@
 using namespace parthenon::package::prelude;
 
 // singulaarity
-#include <eos/eos.hpp>
+#include <singularity-eos/eos/eos.hpp>
 
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"

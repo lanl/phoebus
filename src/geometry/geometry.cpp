@@ -99,7 +99,8 @@ CoordSysMeshBlock GetCoordinateSystem(MeshBlockData<Real> *rc) {
 CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc) {
   return GetCoordinateSystem<CoordSysMesh>(rc);
 }
-void SetGeometry(MeshBlockData<Real> *rc) {
+void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin) {
+  MeshBlockData<Real> *rc = pmb->meshblock_data.Get().get();
   auto system = GetCoordinateSystem(rc);
   SetGeometry<CoordSysMeshBlock>(rc);
   SetGeometryDefault(rc, system);

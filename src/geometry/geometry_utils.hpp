@@ -115,6 +115,37 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
   }
 }
 
+KOKKOS_INLINE_FUNCTION
+void Lower(const double Vcon[NDFULL], const double Gcov[NDFULL][NDFULL],
+           double Vcov[NDFULL]) {
+  SPACETIMELOOP(mu) {
+    Vcov[mu] = 0.;
+    SPACETIMELOOP(nu) {
+      Vcov[mu] += Gcov[mu][nu]*Vcon[nu];
+    }
+  }
+}
+
+KOKKOS_INLINE_FUNCTION
+void Raise(const double Vcov[NDFULL], const double Gcon[NDFULL][NDFULL],
+           double Vcon[NDFULL]) {
+  SPACETIMELOOP(mu) {
+    Vcon[mu] = 0.;
+    SPACETIMELOOP(nu) {
+      Vcon[mu] += Gcon[mu][nu]*Vcov[nu];
+    }
+  }
+}
+
+KOKKOS_INLINE_FUNCTION
+int KroneckerDelta(const int a, const int b) {
+  if (a == b) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
 // TODO(JMM): Currently assumes static metric
 template <typename System>
 KOKKOS_INLINE_FUNCTION void
