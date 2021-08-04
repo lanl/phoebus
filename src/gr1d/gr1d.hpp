@@ -14,10 +14,16 @@
 #ifndef GR1D_GR1D_HPP_
 #define GR1D_GR1D_HPP_
 
+// stdlib
 #include <memory>
 
+// Spiner
+#include <spiner/interpolation.hpp>
+
+// Parthenon
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
+#include <utils/error_checking.hpp>
 
 using namespace parthenon::package::prelude;
 
@@ -80,17 +86,31 @@ using namespace parthenon::package::prelude;
      d K^r_r /dr = 0
      aleph = 0
 
-  at outer boundary (idealy r = infinity)
-  da/dr = (a - a^3) / 2 r
-  K^r_r = 0
-  a aleph = (1 - a)/r
+  at outer boundary (idealy r = infinity):
+     da/dr = (a - a^3) / 2 r OR a = 1
+     K^r_r = 0
+     a aleph = (1 - a)/r     OR alpha = 1
 
   MATTER COMPONENTS:
   ------------------
-  rho    = n^mu n^nu T_{mu nu}
-  j^i    = - P^{i mu} n^nu T_{mu nu}
+
+  In ADM formulation:
+
+  rho    = TOTAL mass-energy.
+  j^i    = CONSERVED 3-momentum vector
+  S_{ij} = 3-stress tensor
+  ---------------------------------------
+  rho    = n^mu n^nu T_{mu nu} = tau + D
+  j^i    = - P^{i mu} n^nu T_{mu nu} = S^i 
   S_{ij} = P^mu_i P^nu_i T_{munu}
+
   where n^mu is unit normal of hypersurface, P^{i mu} is projector
+
+  Translates to (in Valencia variables):
+
+  rho    = tau + D
+  j^i    = S^i
+  Trc(S) = (rho_0 h + b^2)W^2 + 3(P + b^2/2) - b^i b_i
  */
 
 namespace GR1D {
@@ -106,6 +126,9 @@ struct Grids {
   MatterGrid_t j_r;    // Radial momentum, (r,t)-component of Tmunu
   MatterGrid_t trcS;   // Trace of the stress tensor: S = S^i_i
 };
+
+// TODO(JMM): Do we want this?
+using Radius = Spiner::RegularGrid1D;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 

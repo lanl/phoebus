@@ -29,6 +29,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("enable_gr1d", enable_gr1d);
   if (!enable_gr1d) return gr1d; // Short-circuit with nothing
 
+  // TODO(JMM): Ghost zones or one-sided differences/BCs?
   int npoints = pin->GetOrAddInteger("GR1D", "npoints", 100);
   params.Add("npoints", npoints);
 
@@ -50,6 +51,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   grids.j_r   = Grids::MatterGrid_t("GR1D j^r",   npoints);
   grids.trcS  = Grids::MatterGrid_t("GR1D S",     npoints);
   params.Add("grids", grids);
+
+  // The radius object, returns radius vs index and index vs radius
+  Radius radius(rin, rout, npoints);
+  params.Add("radius", radius);
   
   return gr1d;
 }

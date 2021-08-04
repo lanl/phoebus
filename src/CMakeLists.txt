@@ -88,8 +88,9 @@ target_include_directories(phoebus PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../external/utils/herumi-fmath"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../external/utils/ports-of-call"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils/herumi-fmath"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils/ports-of-call"
 )
 
 target_compile_features(phoebus PUBLIC cxx_std_14)
