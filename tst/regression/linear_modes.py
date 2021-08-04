@@ -125,8 +125,8 @@ except:
 if args.upgold:
   print(f"Gold file {gold_name} updated!")
   if FAILED:
-    print("TEST FAILED")
+    print("TEST FAILED", flush=True)
     sys.exit(os.EX_SOFTWARE)
   else:
-    print("TEST PASSED")
+    print("TEST PASSED", flush=True)
     sys.exit(os.EX_OK)
