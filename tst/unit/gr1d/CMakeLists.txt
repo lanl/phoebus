@@ -22,10 +22,15 @@ target_link_libraries(gr1d_unit_tests
   parthenon
   Catch2::Catch2
   Kokkos::kokkos
+  singularity-eos::flags
+  singularity-eos
+  $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
   )
 
 target_include_directories(gr1d_unit_tests PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils"
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   )

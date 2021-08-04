@@ -14,6 +14,7 @@
 // ======================================================================
 
 // stdlib includes
+#include <cmath>
 
 // External includes
 #include "catch2/catch.hpp"
@@ -32,6 +33,11 @@ using namespace parthenon::package::prelude;
 
 constexpr int NPOINTS = 123; // just different from what's in grid.cpp
 constexpr Real ROUT = 91;
+
+KOKKOS_INLINE_FUNCTION
+Real Gaussian(const Real x, const Real a, const Real b, const Real c) {
+  return a * std::exp(-(x - b) * (x - b) / (2 * c * c));
+}
 
 TEST_CASE("GR1D is disabled by default", "[GR1D]") {
   GIVEN("A parthenon input object without enabling GR1D") {
@@ -66,11 +72,12 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     auto pkg = GR1D::Initialize(pin);
     auto &params = pkg->AllParams();
 
-    bool enabled = params.Get<bool>("enable_gr1d");
-    int npoints = params.Get<int>("npoints");
-    Real rin = params.Get<Real>("rin");
-    Real rout = params.Get<Real>("rout");
-    GR1D::Grids grids = params.Get<GR1D::Grids>("grids");
+    auto enabled = params.Get<bool>("enable_gr1d");
+    auto npoints = params.Get<int>("npoints");
+    auto rin = params.Get<Real>("rin");
+    auto rout = params.Get<Real>("rout");
+    auto radius = params.Get<GR1D::Radius>("radius");
+    auto grids = params.Get<GR1D::Grids>("grids");
 
     THEN("The params match our expectations") {
       REQUIRE(enabled);
@@ -79,26 +86,39 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
       REQUIRE(rout == ROUT);
     }
 
-    WHEN("We set the matter fields on the grid") {
+    THEN("The radius object works as expected") {
+      REQUIRE(radius.x(0) == rin);
+      REQUIRE(radius.x(npoints - 1) == rout);
+    }
+
+    WHEN("We set the matter fields on the grid, for a stationary system") {
       auto rho = grids.rho;
+      auto j = grids.j_r;
+      auto S = grids.trcS;
+      constexpr Real eps_eos = 1e-2;
+      constexpr Real Gamma_eos = 4. / 3.;
+
       parthenon::par_for(
-          parthenon::loop_pattern_flatrange_tag, "Set rho grid",
-	  parthenon::DevExecSpace(),
-	  0, npoints - 1,
-	  KOKKOS_LAMBDA(const int i) { rho(i) = i; });
+          parthenon::loop_pattern_flatrange_tag, "Set matter grid, stationary",
+          parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+            Real r = radius.x(i);
+            rho(i) = Gaussian(r, 1, 0, 10);
+            j(i) = 0;
+            S(i) = 3 * (Gamma_eos - 1.) * rho(i) * eps_eos;
+          });
       THEN("We can retrieve this information") {
-        Real sum = 0;
-        Real target_sum = 0;
-        for (int i = 0; i < npoints; ++i) {
-          target_sum += i;
-        }
+        int nwrong = 0;
         parthenon::par_reduce(
             parthenon::loop_pattern_flatrange_tag, "Check rho grid",
-	    parthenon::DevExecSpace(),
-	    0, npoints - 1,
-            KOKKOS_LAMBDA(const int i, Real &slocal) { slocal += rho(i); },
-	    sum);
-        REQUIRE(sum == target_sum);
+            parthenon::DevExecSpace(), 0, npoints - 1,
+            KOKKOS_LAMBDA(const int i, int &nw) {
+	      Real r = radius.x(i);
+              if (rho(i) != Gaussian(r, 1, 0, 10)) nw += 1;
+              if (j(i) != 0) nw += 1;
+              if (S(i) != 3 * (Gamma_eos - 1.) * rho(i) * eps_eos) nw += 1;
+            },
+            nwrong);
+        REQUIRE(nwrong == 0);
       }
     }
   }
