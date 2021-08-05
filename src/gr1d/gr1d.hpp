@@ -27,6 +27,7 @@
 
 using namespace parthenon::package::prelude;
 
+// TODO(JMM): Clean up notation? Or is it fine?
 /*
   ASSUMPTIONS:
   -------------
@@ -74,9 +75,9 @@ using namespace parthenon::package::prelude;
   K^i_j = K^r_r diag(1, -1/2, -1/2)
 
   da/dr = (a/2) (r^2 (16 pi rho - (3/2) (K^r_r)^2) - a + 1)
-  d K^r_r/dr = k pi a^2 j^r - (3/r) K^r_r
+  r d K^r_r/dr = r k pi a^2 j^r - 3 K^r_r
   d alpha/dr = aleph
-  d aleph/dr = a^2 alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) - (da/dr) aleph/a
+  a d aleph/dr = a^3 alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) - (da/dr) aleph
   beta^r = -(1/2) alpha r K^r_r
 
   BOUNDARY CONDITIONS
@@ -111,26 +112,62 @@ using namespace parthenon::package::prelude;
   rho    = tau + D
   j^i    = S^i
   Trc(S) = (rho_0 h + b^2)W^2 + 3(P + b^2/2) - b^i b_i
+
+  In case of no B fields,
+
+  trc(S) = (tau + D) + 4 P - rho_0 h
+
+  where rho_0 here is primitive density and h is enthalpy.
  */
 
 namespace GR1D {
 
 struct Grids {
-  using MetricGrid_t = parthenon::ParArray2D<Real>;
-  using MatterGrid_t = parthenon::ParArray1D<Real>;
-  MetricGrid_t a;      // sqrt(g_{11}). rr-component of 3-metric
-  MetricGrid_t K_rr;   // K^r_r. rr-component of extrinsic curvature
-  MetricGrid_t alpha;  // lapse
-  MetricGrid_t aleph;  // partial_r alpha
-  MatterGrid_t rho;    // Primitive density... (0,0)-component of Tmunu
-  MatterGrid_t j_r;    // Radial momentum, (r,t)-component of Tmunu
-  MatterGrid_t trcS;   // Trace of the stress tensor: S = S^i_i
+  using Grid_t = parthenon::ParArray1D<Real>;
+  Grid_t a;      // sqrt(g_{11}). rr-component of 3-metric
+  Grid_t dadr;
+  Grid_t K_rr;   // K^r_r. rr-component of extrinsic curvature
+  Grid_t dKdr;
+  Grid_t alpha;  // lapse
+  Grid_t dalphadr;
+  Grid_t aleph;  // partial_r alpha
+  Grid_t dalephdr;
+  Grid_t rho;    // Primitive density... (0,0)-component of Tmunu
+  Grid_t j_r;    // Radial momentum, (r,t)-component of Tmunu
+  Grid_t trcS;   // Trace of the stress tensor: S = S^i_i
 };
 
 // TODO(JMM): Do we want this?
 using Radius = Spiner::RegularGrid1D;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+
+TaskStatus IterativeSolve(StateDescriptor *pkg);
+
+constexpr int FD_ORDER = 4;
+constexpr int NGHOST = FD_ORDER / 2;
+
+KOKKOS_FORCEINLINE_FUNCTION
+Real CenteredFD4(const Grids::Grid_t &v, const int i, const Real dx) {
+  return ((-1 / 12.) * v(i - 2) + (-2. / 3.) * v(i - 1) + (2. / 3.) * v(i + 1) +
+          (-1. / 12.) * v(i + 2)) /
+         dx;
+}
+KOKKOS_FORCEINLINE_FUNCTION
+Real CenteredFD2(const Grids::Grid_t &v, const int i, const Real dx) {
+  return (v(i + 1) - v(i - 1))/(2*dx);
+}
+KOKKOS_FORCEINLINE_FUNCTION
+void SummationByPartsFD4(parthenon::team_mbr_t member, const Grids::Grid_t &v,
+                         const Grids::Grid_t &dvdx, const int npoints, const Real dx) {
+  parthenon::par_for_inner(member, NGHOST, npoints - 1 - NGHOST, [&](const int i) {
+    dvdx(i) = CenteredFD4(v, i, dx);
+  });
+  dvdx(0) = (v(1) - v(0))/dx;
+  dvdx(1) = CenteredFD2(v, 1, dx);
+  dvdx(npoints - 2) = CenteredFD2(v, npoints - 2, dx);
+  dvdx(npoints - 1) = (v(npoints - 1) - v(npoints - 2))/dx;
+}
 
 } // GR1D
 
