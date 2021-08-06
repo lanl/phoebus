@@ -126,11 +126,11 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
         for (int iter = 0; iter < niters_check; ++iter) {
           // BCs on vars
           aleph(0) = 0;
-	  alpha(npoints - 1) = 1;
-          // aleph(npoints - 1) =
-          //     Geometry::Utils::ratio(1 - a(npoints - 1), radius.max() * a(npoints - 1));
+	  //alpha(npoints - 1) = 1;
+          aleph(npoints - 1) =
+	    Geometry::Utils::ratio(1 - a(npoints - 1), radius.max() * a(npoints - 1));
           K(npoints - 1) = 0;
-	  a(npoints - 1) = 1;
+	  //a(npoints - 1) = 1;
           member.team_barrier();
 
           // FD
@@ -143,8 +143,8 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
           // BCS on derivatives
           dadr(0) = 0;
           dKdr(0) = 0;
-          // dadr(npoints - 1) =
-          //     a(npoints - 1) * (1 - a(npoints - 1) * a(npoints - 1)) / (2 * radius.max());
+          dadr(npoints - 1) =
+	    a(npoints - 1) * (1 - a(npoints - 1) * a(npoints - 1)) / (2 * radius.max());
           member.team_barrier();
 
           // Iterations
