@@ -68,7 +68,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     pin->SetBoolean("GR1D", "enabled", true);
     pin->SetInteger("GR1D", "npoints", NPOINTS);
     pin->SetReal("GR1D", "rout", ROUT);
-    pin->SetReal("GR1D", "niters_check", 1);
+    pin->SetReal("GR1D", "niters_check", 100);
 
     auto pkg = GR1D::Initialize(pin);
     auto &params = pkg->AllParams();
@@ -142,20 +142,22 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
           });
       THEN("The iterative solver runs") {
 	GR1D::IterativeSolve(pkg.get());
-	AND_THEN("The solution converges to a=alpha=1, everything else 0") {
+	AND_THEN("The solution converges identically to a=alpha=1, everything else 0") {
 	  Real error = 0;
 	  parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag, "Check solution trivial",
 				parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i, Real &e) {
-				  e += (a(i) - 1);
-				  //e += dadr(i);
-				  e += K_rr(i);
-				  //e += dKdr(i);
-				  e + (alpha(i) - 1);
-				  //e += dalphadr(i);
-				  e += aleph(i);
-				  //e += dalephdr(i);
+				  e += std::pow((a(i) - 1),2);
+				  e += std::pow(dadr(i), 2);
+				  e += std::pow(K_rr(i), 2);
+				  e += std::pow(dKdr(i), 2);
+				  e += std::pow((alpha(i) - 1), 2);
+				  e += std::pow(dalphadr(i), 2);
+				  e += std::pow(aleph(i), 2);
+				  e += std::pow(dalephdr(i), 2);
 				}, error);
-	  std::cout << "error = " << error << std::endl;
+	  error /= 8*npoints;
+	  error = std::sqrt(error);
+	  REQUIRE( error <= 1e-12 );
 	}
       }
     }

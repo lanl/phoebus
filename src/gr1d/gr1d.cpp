@@ -123,7 +123,6 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
       lp_outer, "GR1D iterative solve for metric", parthenon::DevExecSpace(),
       scratch_size_in_bytes, scratch_level, 1, 1,
       KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int team) {
-        member.team_barrier();
         for (int iter = 0; iter < niters_check; ++iter) {
           // BCs on vars
           aleph(0) = 0;
@@ -156,7 +155,6 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
             Real Kl = K(i);
             Real alphal = alpha(i);
             Real alephl = aleph(i);
-	    printf("%g %g %g %g %g %g %g %g\n", al, Kl, alphal, alephl, dadr(i), dKdr(i), dalphadr(i), dalephdr(i)); // debug
             a(i) +=
                 (al / 2) * (r * r * (16 * M_PI * rho(i) - (3 / 2) * Kl * Kl) - al + 1) -
                 dadr(i);
