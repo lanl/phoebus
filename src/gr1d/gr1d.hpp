@@ -150,7 +150,7 @@ constexpr int NGHOST = FD_ORDER / 2;
 KOKKOS_FORCEINLINE_FUNCTION
 Real CenteredFD4(const Grids::Grid_t &v, const int i, const Real dx) {
   return ((-1 / 12.) * v(i - 2) + (-2. / 3.) * v(i - 1) + (2. / 3.) * v(i + 1) +
-          (-1. / 12.) * v(i + 2)) /
+          (1. / 12.) * v(i + 2)) /
          dx;
 }
 KOKKOS_FORCEINLINE_FUNCTION
