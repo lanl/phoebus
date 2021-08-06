@@ -68,6 +68,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     pin->SetBoolean("GR1D", "enabled", true);
     pin->SetInteger("GR1D", "npoints", NPOINTS);
     pin->SetReal("GR1D", "rout", ROUT);
+    pin->SetReal("GR1D", "niters_check", 1);
 
     auto pkg = GR1D::Initialize(pin);
     auto &params = pkg->AllParams();
@@ -91,10 +92,19 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
       REQUIRE(radius.x(npoints - 1) == rout);
     }
 
+    auto a = grids.a;
+    auto dadr = grids.dadr;
+    auto K_rr = grids.K_rr;
+    auto dKdr = grids.dKdr;
+    auto alpha = grids.alpha;
+    auto dalphadr = grids.dalphadr;
+    auto aleph = grids.aleph;
+    auto dalephdr = grids.dalephdr;
+    auto rho = grids.rho;
+    auto j = grids.j_r;
+    auto S = grids.trcS;
+    
     WHEN("We set the matter fields on the grid, for a stationary system") {
-      auto rho = grids.rho;
-      auto j = grids.j_r;
-      auto S = grids.trcS;
       constexpr Real eps_eos = 1e-2;
       constexpr Real Gamma_eos = 4. / 3.;
 
@@ -119,6 +129,34 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
             },
             nwrong);
         REQUIRE(nwrong == 0);
+      }
+    }
+
+    WHEN("We set the matter fields to zero") {
+      parthenon::par_for(
+          parthenon::loop_pattern_flatrange_tag, "Set matter grid to 0",
+          parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+            rho(i) = 0;
+            j(i) = 0;
+            S(i) = 0;
+          });
+      THEN("The iterative solver runs") {
+	GR1D::IterativeSolve(pkg.get());
+	AND_THEN("The solution converges to a=alpha=1, everything else 0") {
+	  Real error = 0;
+	  parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag, "Check solution trivial",
+				parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i, Real &e) {
+				  e += (a(i) - 1);
+				  //e += dadr(i);
+				  e += K_rr(i);
+				  //e += dKdr(i);
+				  e + (alpha(i) - 1);
+				  //e += dalphadr(i);
+				  e += aleph(i);
+				  //e += dalephdr(i);
+				}, error);
+	  std::cout << "error = " << error << std::endl;
+	}
       }
     }
   }

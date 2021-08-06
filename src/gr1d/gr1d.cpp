@@ -63,6 +63,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   grids.j_r = Grids::Grid_t("GR1D j^r", npoints);
   grids.trcS = Grids::Grid_t("GR1D S", npoints);
 
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "GR1D initialize grids",
+      parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+        grids.a(i) = 1;
+        grids.dadr(i) = 0;
+        grids.K_rr(i) = 0;
+        grids.dKdr(i) = 0;
+        grids.alpha(i) = 1;
+        grids.dalphadr(i) = 0;
+        grids.aleph(i) = 0;
+        grids.dalephdr(i) = 0;
+        grids.rho(i) = 0;
+        grids.j_r(i) = 0;
+        grids.trcS(i) = 0;
+      });
+
   // TODO(JMM): Initialize all grids to zero
   params.Add("grids", grids);
 
@@ -111,9 +127,11 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
         for (int iter = 0; iter < niters_check; ++iter) {
           // BCs on vars
           aleph(0) = 0;
-          aleph(npoints - 1) =
-              Geometry::Utils::ratio(1 - a(npoints - 1), radius.max() * a(npoints - 1));
+	  alpha(npoints - 1) = 1;
+          // aleph(npoints - 1) =
+          //     Geometry::Utils::ratio(1 - a(npoints - 1), radius.max() * a(npoints - 1));
           K(npoints - 1) = 0;
+	  a(npoints - 1) = 1;
           member.team_barrier();
 
           // FD
@@ -126,8 +144,8 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
           // BCS on derivatives
           dadr(0) = 0;
           dKdr(0) = 0;
-          dadr(npoints - 1) =
-              a(npoints - 1) * (1 - a(npoints - 1) * a(npoints - 1)) / (2 * radius.max());
+          // dadr(npoints - 1) =
+          //     a(npoints - 1) * (1 - a(npoints - 1) * a(npoints - 1)) / (2 * radius.max());
           member.team_barrier();
 
           // Iterations
@@ -138,13 +156,14 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
             Real Kl = K(i);
             Real alphal = alpha(i);
             Real alephl = aleph(i);
+	    printf("%g %g %g %g %g %g %g %g\n", al, Kl, alphal, alephl, dadr(i), dKdr(i), dalphadr(i), dalephdr(i)); // debug
             a(i) +=
                 (al / 2) * (r * r * (16 * M_PI * rho(i) - (3 / 2) * Kl * Kl) - al + 1) -
                 dadr(i);
 
             K(i) += r * Kl * M_PI * al * al * j(i) - 3 * Kl - r * dKdr(i);
 
-            alpha(i) = alephl - dalphadr(i);
+            alpha(i) += alephl - dalphadr(i);
 
             aleph(i) +=
                 al * al * al * alphal * ((3 / 2) * Kl * Kl + 4 * M_PI * (rho(i) + S(i))) -
