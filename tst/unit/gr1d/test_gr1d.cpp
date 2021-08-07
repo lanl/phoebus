@@ -32,7 +32,8 @@
 using namespace parthenon::package::prelude;
 
 constexpr int NPOINTS = 123; // just different from what's in grid.cpp
-constexpr Real ROUT = 91;
+constexpr Real ROUT = 90;
+constexpr int NITERS_MAX = 10000000;
 
 KOKKOS_INLINE_FUNCTION
 Real Gaussian(const Real x, const Real a, const Real b, const Real c) {
@@ -68,7 +69,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     pin->SetBoolean("GR1D", "enabled", true);
     pin->SetInteger("GR1D", "npoints", NPOINTS);
     pin->SetReal("GR1D", "rout", ROUT);
-    pin->SetReal("GR1D", "niters_check", 100);
+    pin->SetReal("GR1D", "niters_check", 10000000);
 
     auto pkg = GR1D::Initialize(pin);
     auto &params = pkg->AllParams();
@@ -79,6 +80,8 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     auto rout = params.Get<Real>("rout");
     auto radius = params.Get<GR1D::Radius>("radius");
     auto grids = params.Get<GR1D::Grids>("grids");
+
+    auto niters_check = params.Get<int>("niters_check");
 
     THEN("The params match our expectations") {
       REQUIRE(enabled);
@@ -130,6 +133,14 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
             nwrong);
         REQUIRE(nwrong == 0);
       }
+      THEN("The solver can converge") {
+	for (int niters = 0; niters < NITERS_MAX; niters += niters_check) {
+	  //std::cout << "niters = " << niters << std::endl;
+	  GR1D::IterativeSolve(pkg.get());
+	  if (GR1D::Converged(pkg.get())) break;
+	}
+	REQUIRE( GR1D::Converged(pkg.get()) );
+      }
     }
 
     WHEN("We set the matter fields to zero") {
@@ -159,6 +170,9 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
 	  error = std::sqrt(error);
 	  REQUIRE( error <= 1e-12 );
 	}
+	// AND_THEN("The solution is converged in the solver snese") {
+	//   REQUIRE( GR1D::Converged(pkg.get()) );
+	// }
       }
     }
   }
