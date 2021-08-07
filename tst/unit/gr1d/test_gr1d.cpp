@@ -31,8 +31,8 @@
 
 using namespace parthenon::package::prelude;
 
-constexpr int NPOINTS = 123; // just different from what's in grid.cpp
-constexpr Real ROUT = 90;
+constexpr int NPOINTS = 128; // just different from what's in grid.cpp
+constexpr Real ROUT = 100;
 constexpr int NITERS_MAX = 10000000;
 
 KOKKOS_INLINE_FUNCTION
@@ -107,42 +107,6 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     auto j = grids.j_r;
     auto S = grids.trcS;
     
-    WHEN("We set the matter fields on the grid, for a stationary system") {
-      constexpr Real eps_eos = 1e-2;
-      constexpr Real Gamma_eos = 4. / 3.;
-
-      parthenon::par_for(
-          parthenon::loop_pattern_flatrange_tag, "Set matter grid, stationary",
-          parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
-            Real r = radius.x(i);
-            rho(i) = Gaussian(r, 1, 0, 10);
-            j(i) = 0;
-            S(i) = 3 * (Gamma_eos - 1.) * rho(i) * eps_eos;
-          });
-      THEN("We can retrieve this information") {
-        int nwrong = 0;
-        parthenon::par_reduce(
-            parthenon::loop_pattern_flatrange_tag, "Check rho grid",
-            parthenon::DevExecSpace(), 0, npoints - 1,
-            KOKKOS_LAMBDA(const int i, int &nw) {
-	      Real r = radius.x(i);
-              if (rho(i) != Gaussian(r, 1, 0, 10)) nw += 1;
-              if (j(i) != 0) nw += 1;
-              if (S(i) != 3 * (Gamma_eos - 1.) * rho(i) * eps_eos) nw += 1;
-            },
-            nwrong);
-        REQUIRE(nwrong == 0);
-      }
-      THEN("The solver can converge") {
-	for (int niters = 0; niters < NITERS_MAX; niters += niters_check) {
-	  //std::cout << "niters = " << niters << std::endl;
-	  GR1D::IterativeSolve(pkg.get());
-	  if (GR1D::Converged(pkg.get())) break;
-	}
-	REQUIRE( GR1D::Converged(pkg.get()) );
-      }
-    }
-
     WHEN("We set the matter fields to zero") {
       parthenon::par_for(
           parthenon::loop_pattern_flatrange_tag, "Set matter grid to 0",
@@ -170,9 +134,47 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
 	  error = std::sqrt(error);
 	  REQUIRE( error <= 1e-12 );
 	}
-	// AND_THEN("The solution is converged in the solver snese") {
-	//   REQUIRE( GR1D::Converged(pkg.get()) );
-	// }
+      }
+    }
+
+    WHEN("We set the matter fields on the grid, for a stationary system") {
+      constexpr Real eps_eos = 1e-2;
+      constexpr Real Gamma_eos = 4. / 3.;
+
+      parthenon::par_for(
+          parthenon::loop_pattern_flatrange_tag, "Set matter grid, stationary",
+          parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+            Real r = radius.x(i);
+            rho(i) = Gaussian(r, 0.005, 40, 5);
+            j(i) = 0;
+            S(i) = 0;//3 * (Gamma_eos - 1.) * rho(i) * eps_eos;
+          });
+      THEN("We can retrieve this information") {
+        int nwrong = 0;
+        parthenon::par_reduce(
+            parthenon::loop_pattern_flatrange_tag, "Check rho grid",
+            parthenon::DevExecSpace(), 0, npoints - 1,
+            KOKKOS_LAMBDA(const int i, int &nw) {
+	      Real r = radius.x(i);
+              if (rho(i) != Gaussian(r, 0.005, 40, 5)) nw += 1;
+              if (j(i) != 0) nw += 1;
+	      if (S(i) != 0) nw += 1;
+              //if (S(i) != 3 * (Gamma_eos - 1.) * rho(i) * eps_eos) nw += 1;
+            },
+            nwrong);
+        REQUIRE(nwrong == 0);
+      }
+      THEN("The solver can converge") {
+	for (int niters = 0; niters < NITERS_MAX; niters += niters_check) {
+	  //std::cout << "niters = " << niters << std::endl;
+	  GR1D::IterativeSolve(pkg.get());
+	  if (GR1D::Converged(pkg.get())) break;
+	}
+	REQUIRE( GR1D::Converged(pkg.get()) );
+
+	AND_THEN("We can output the solver data") {
+	  GR1D::DumpToTxt("gr1d.dat", pkg.get());
+	}
       }
     }
   }
