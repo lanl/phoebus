@@ -25,6 +25,9 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
+// Phoebus
+#include "geometry/geometry_utils.hpp"
+
 using namespace parthenon::package::prelude;
 
 // TODO(JMM): Clean up notation? Or is it fine?
@@ -74,10 +77,10 @@ using namespace parthenon::package::prelude;
   gamm_{ij} = diag(a^2, r^2, r^2 sin^2(th))
   K^i_j = K^r_r diag(1, -1/2, -1/2)
 
-  da/dr = (a/2) (r^2 (16 pi rho - (3/2) (K^r_r)^2) - a + 1)
-  r d K^r_r/dr = r k pi a^2 j^r - 3 K^r_r
+  da/dr = (a/2 r) (r^2 (16 pi rho - (3/2) (K^r_r)^2) - a + 1)
+  d K^r_r/dr = k pi a^2 j^r - (3/r) K^r_r
   d alpha/dr = aleph
-  a d aleph/dr = a^3 alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) - (da/dr) aleph
+  d aleph/dr = a^2 alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) - (da/dr) aleph/a
   beta^r = -(1/2) alpha r K^r_r
 
   BOUNDARY CONDITIONS
@@ -122,16 +125,21 @@ using namespace parthenon::package::prelude;
 
 namespace GR1D {
 
+// TODO(JMM): This is pretty manual and might be annoying to loop through.
 struct Grids {
   using Grid_t = parthenon::ParArray1D<Real>;
-  Grid_t a;      // sqrt(g_{11}). rr-component of 3-metric
-  Grid_t dadr;
-  Grid_t K_rr;   // K^r_r. rr-component of extrinsic curvature
+  Grid_t a;       // sqrt(g_{11}). rr-component of 3-metric
+  Grid_t dadr;    // gradient
+  Grid_t delta_a; // change per iteration
+  Grid_t K_rr;    // K^r_r. rr-component of extrinsic curvature
   Grid_t dKdr;
-  Grid_t alpha;  // lapse
+  Grid_t delta_K; 
+  Grid_t alpha;   // lapse
   Grid_t dalphadr;
+  Grid_t delta_alpha;
   Grid_t aleph;  // partial_r alpha
   Grid_t dalephdr;
+  Grid_t delta_aleph;
   Grid_t rho;    // Primitive density... (0,0)-component of Tmunu
   Grid_t j_r;    // Radial momentum, (r,t)-component of Tmunu
   Grid_t trcS;   // Trace of the stress tensor: S = S^i_i
@@ -143,6 +151,8 @@ using Radius = Spiner::RegularGrid1D;
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus IterativeSolve(StateDescriptor *pkg);
+
+bool Converged(StateDescriptor *pkg);
 
 constexpr int FD_ORDER = 4;
 constexpr int NGHOST = FD_ORDER / 2;
@@ -167,6 +177,16 @@ void SummationByPartsFD4(parthenon::team_mbr_t member, const Grids::Grid_t &v,
   dvdx(1) = CenteredFD2(v, 1, dx);
   dvdx(npoints - 2) = CenteredFD2(v, npoints - 2, dx);
   dvdx(npoints - 1) = (v(npoints - 1) - v(npoints - 2))/dx;
+}
+
+KOKKOS_FORCEINLINE_FUNCTION
+Real GetError(const Grids::Grid_t &v, const Grids::Grid_t &dv, const int i) {
+  Real reps = std::abs(Geometry::Utils::ratio(dv(i), v(i)));
+  Real aeps = std::abs(dv(i));
+  Real out = std::min(reps, aeps);
+  // printf("%s %d: %14g %14g --- %14g, %14g\n", v.label().c_str(), i, v(i), dv(i), reps, aeps);
+  // if (std::isnan(dv(i)) || std::isnan(v(i))) exit(1);
+  return out;
 }
 
 } // GR1D
