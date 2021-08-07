@@ -64,7 +64,7 @@ using namespace parthenon::package::prelude;
   Lie_beta gamma_{ij} = gamma_{kj} \partial_i beta^k
                         + beta^k \partial_k gamma_{ij}
                         + gamma_{ki} \partial_j beta^k
-			
+
   Trace-free + spherical symmetry implies that
   only non-vanishing components of extrinsic curvature are:
 
@@ -105,7 +105,7 @@ using namespace parthenon::package::prelude;
   S_{ij} = 3-stress tensor
   ---------------------------------------
   rho    = n^mu n^nu T_{mu nu} = tau + D
-  j^i    = - P^{i mu} n^nu T_{mu nu} = S^i 
+  j^i    = - P^{i mu} n^nu T_{mu nu} = S^i
   S_{ij} = P^mu_i P^nu_i T_{munu}
 
   where n^mu is unit normal of hypersurface, P^{i mu} is projector
@@ -125,6 +125,9 @@ using namespace parthenon::package::prelude;
 
 namespace GR1D {
 
+constexpr int FD_ORDER = 4;
+constexpr int NGHOST = FD_ORDER / 2;
+
 // TODO(JMM): This is pretty manual and might be annoying to loop through.
 struct Grids {
   using Grid_t = parthenon::ParArray1D<Real>;
@@ -133,16 +136,16 @@ struct Grids {
   Grid_t delta_a; // change per iteration
   Grid_t K_rr;    // K^r_r. rr-component of extrinsic curvature
   Grid_t dKdr;
-  Grid_t delta_K; 
-  Grid_t alpha;   // lapse
+  Grid_t delta_K;
+  Grid_t alpha; // lapse
   Grid_t dalphadr;
   Grid_t delta_alpha;
-  Grid_t aleph;  // partial_r alpha
+  Grid_t aleph; // partial_r alpha
   Grid_t dalephdr;
   Grid_t delta_aleph;
-  Grid_t rho;    // Primitive density... (0,0)-component of Tmunu
-  Grid_t j_r;    // Radial momentum, (r,t)-component of Tmunu
-  Grid_t trcS;   // Trace of the stress tensor: S = S^i_i
+  Grid_t rho;  // Primitive density... (0,0)-component of Tmunu
+  Grid_t j_r;  // Radial momentum, (r,t)-component of Tmunu
+  Grid_t trcS; // Trace of the stress tensor: S = S^i_i
 };
 
 // TODO(JMM): Do we want this?
@@ -154,8 +157,7 @@ TaskStatus IterativeSolve(StateDescriptor *pkg);
 
 bool Converged(StateDescriptor *pkg);
 
-constexpr int FD_ORDER = 4;
-constexpr int NGHOST = FD_ORDER / 2;
+void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real CenteredFD4(const Grids::Grid_t &v, const int i, const Real dx) {
@@ -165,18 +167,17 @@ Real CenteredFD4(const Grids::Grid_t &v, const int i, const Real dx) {
 }
 KOKKOS_FORCEINLINE_FUNCTION
 Real CenteredFD2(const Grids::Grid_t &v, const int i, const Real dx) {
-  return (v(i + 1) - v(i - 1))/(2*dx);
+  return (v(i + 1) - v(i - 1)) / (2 * dx);
 }
 KOKKOS_FORCEINLINE_FUNCTION
 void SummationByPartsFD4(parthenon::team_mbr_t member, const Grids::Grid_t &v,
                          const Grids::Grid_t &dvdx, const int npoints, const Real dx) {
-  parthenon::par_for_inner(member, NGHOST, npoints - 1 - NGHOST, [&](const int i) {
-    dvdx(i) = CenteredFD4(v, i, dx);
-  });
-  dvdx(0) = (v(1) - v(0))/dx;
+  parthenon::par_for_inner(member, NGHOST, npoints - 1 - NGHOST,
+                           [&](const int i) { dvdx(i) = CenteredFD4(v, i, dx); });
+  dvdx(0) = (v(1) - v(0)) / dx;
   dvdx(1) = CenteredFD2(v, 1, dx);
   dvdx(npoints - 2) = CenteredFD2(v, npoints - 2, dx);
-  dvdx(npoints - 1) = (v(npoints - 1) - v(npoints - 2))/dx;
+  dvdx(npoints - 1) = (v(npoints - 1) - v(npoints - 2)) / dx;
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
@@ -184,11 +185,14 @@ Real GetError(const Grids::Grid_t &v, const Grids::Grid_t &dv, const int i) {
   Real reps = std::abs(Geometry::Utils::ratio(dv(i), v(i)));
   Real aeps = std::abs(dv(i));
   Real out = std::min(reps, aeps);
-  // printf("%s %d: %14g %14g --- %14g, %14g\n", v.label().c_str(), i, v(i), dv(i), reps, aeps);
-  // if (std::isnan(dv(i)) || std::isnan(v(i))) exit(1);
+  // if (std::isnan(dv(i)) || std::isnan(v(i))) {
+  //   printf("%s %d: %14g %14g --- %14g, %14g\n", v.label().c_str(), i, v(i), dv(i), reps,
+  //          aeps);
+  //   PARTHENON_FAIL("Nan detected!");
+  // }
   return out;
 }
 
-} // GR1D
+} // namespace GR1D
 
 #endif // GR1D_GR1D_HPP_
