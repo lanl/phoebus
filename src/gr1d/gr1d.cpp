@@ -48,7 +48,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("niters_check", niters_check);
 
   // Error tolerance
-  Real error_tolerance = pin->GetOrAddReal("GR1D", "error_tolerance", 1e-6);
+  Real error_tolerance = pin->GetOrAddReal("GR1D", "error_tolerance", 1e-4);
   PARTHENON_REQUIRE_THROWS(error_tolerance > 0,
                            "Error tolerance must be strictly positive");
   params.Add("error_tolerance", error_tolerance);
@@ -61,14 +61,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("rout", rout);
 
   // Jacobi Step size
-  Real jacobi_step_size = pin->GetOrAddReal("GR1D", "jacobi_step_size", 1e-4);
+  Real jacobi_step_size = pin->GetOrAddReal("GR1D", "jacobi_step_size", 1e-6);
   params.Add("jacobi_step_size", jacobi_step_size);
 
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
   Grids grids;
   grids.a = Grids::Grid_t("GR1D a", npoints);
-  grids.dadr = Grids::Grid_t("GR1D da/dr", npoints);
+  grids.lna = Grids::Grid_t("GR1D ln(a)", npoints);
+  grids.dlnadr = Grids::Grid_t("GR1D dln(a)/dr", npoints);
   grids.delta_a = Grids::Grid_t("GR1D delta a", npoints);
   grids.K_rr = Grids::Grid_t("GR1D K^r_r", npoints);
   grids.dKdr = Grids::Grid_t("GR1D dK/dr", npoints);
@@ -76,9 +77,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   grids.alpha = Grids::Grid_t("GR1D alpha", npoints);
   grids.dalphadr = Grids::Grid_t("GR1D dalpha/dr", npoints);
   grids.delta_alpha = Grids::Grid_t("GR1D delta alpha", npoints);
-  grids.aleph = Grids::Grid_t("GR1D aleph", npoints);
-  grids.dalephdr = Grids::Grid_t("GR1D daleph/dr", npoints);
-  grids.delta_aleph = Grids::Grid_t("GR1D delta aleph", npoints);
   grids.rho = Grids::Grid_t("GR1D rho", npoints);
   grids.j_r = Grids::Grid_t("GR1D j^r", npoints);
   grids.trcS = Grids::Grid_t("GR1D S", npoints);
@@ -87,13 +85,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       parthenon::loop_pattern_flatrange_tag, "GR1D initialize grids",
       parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
         grids.a(i) = 1;
-        grids.dadr(i) = 0;
+        grids.lna(i) = 0;
+        grids.dlnadr(i) = 0;
         grids.K_rr(i) = 0;
         grids.dKdr(i) = 0;
         grids.alpha(i) = 1;
         grids.dalphadr(i) = 0;
-        grids.aleph(i) = 0;
-        grids.dalephdr(i) = 0;
         grids.rho(i) = 0;
         grids.j_r(i) = 0;
         grids.trcS(i) = 0;
@@ -121,8 +118,11 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
   auto jacobi_step_size = params.Get<Real>("jacobi_step_size");
   auto grids = params.Get<GR1D::Grids>("grids");
 
+  auto error_tolerance = params.Get<Real>("error_tolerance");
+
   auto a = grids.a;
-  auto dadr = grids.dadr;
+  auto lna = grids.lna;
+  auto dlnadr = grids.dlnadr;
   auto delta_a = grids.delta_a;
   auto K = grids.K_rr;
   auto dKdr = grids.dKdr;
@@ -130,15 +130,12 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
   auto alpha = grids.alpha;
   auto dalphadr = grids.dalphadr;
   auto delta_alpha = grids.delta_alpha;
-  auto aleph = grids.aleph;
-  auto delta_aleph = grids.delta_aleph;
-  auto dalephdr = grids.dalephdr;
   auto rho = grids.rho;
   auto j = grids.j_r;
   auto S = grids.trcS;
   const Real dr = radius.dx();
 
-  Real tau = std::min(jacobi_step_size * dr * dr, 1. / (npoints * npoints));
+  Real tau = jacobi_step_size*dr*dr;
 
   // Do we actually need scratch?
   int scratch_level = 1;
@@ -151,51 +148,58 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
       scratch_size_in_bytes, scratch_level, 1, 1,
       KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int team) {
         for (int iter = 0; iter < niters_check; ++iter) {
+          // logs, temps
+          par_for_inner(member, 0, npoints - 1,
+                        [&](const int i) { lna(i) = std::log(a(i)); });
+          member.team_barrier();
+
           // FD
-          SummationByPartsFD4(member, a, dadr, npoints, dr);
+          SummationByPartsFD4(member, lna, dlnadr, npoints, dr);
           SummationByPartsFD4(member, K, dKdr, npoints, dr);
-          SummationByPartsFD4(member, alpha, dalphadr, npoints, dr);
-          SummationByPartsFD4(member, aleph, dalephdr, npoints, dr);
+          // SummationByPartsFD4(member, alpha, dalphadr, npoints, dr);
           member.team_barrier();
 
           // Deltas
           par_for_inner(member, 0, npoints - 1, [&](const int i) {
             Real r = radius.x(i);
 
-            delta_a(i) =
-                (a(i) / (2 * r)) *
-                    (r * r * (16 * M_PI * rho(i) - (3 / 2) * K(i) * K(i)) - a(i) + 1) -
-                dadr(i);
+            delta_a(i) = r * r * (16 * M_PI * rho(i) - (3. / 2.) * K(i) * K(i)) -
+                         2 * r * dlnadr(i) + 1;
+            delta_a(i) -= a(i);
 
-            delta_K(i) = K(i) * M_PI * a(i) * a(i) * j(i) - (3 / r) * K(i) - dKdr(i);
+            delta_K(i) = (r / 3.) * (8 * M_PI * a(i) * a(i) * j(i) - dKdr(i));
+            delta_K(i) -= K(i);
 
-            delta_alpha(i) = aleph(i) - dalphadr(i);
-            delta_aleph(i) = a(i) * a(i) * alpha(i) *
-                                 ((3 / 2) * K(i) * K(i) + 4 * M_PI * (rho(i) + S(i))) -
-	      dadr(i) * aleph(i)/ (std::abs(a(i)) + 1e-20) - dalephdr(i);
+            // delta_alpha(i) = aleph(i) - dalphadr(i);
+            // delta_aleph(i) = a(i) * a(i) * alpha(i) *
+            //                      ((3 / 2) * K(i) * K(i) + 4 * M_PI * (rho(i) + S(i))) -
+            //   dadr(i) * aleph(i)/ (std::abs(a(i)) + 1e-20) - dalephdr(i);
           });
           member.team_barrier();
 
           // Boundary conditions
           // r = 0
-          delta_a(0) = -dadr(0);
-          delta_K(0) = -dKdr(0);
-          delta_aleph(0) = -aleph(0);
+          delta_a(0) = a(1) - a(0);
+          delta_K(0) = K(1) - K(0);
           // r outer
           Real aout = a(npoints - 1);
+          Real aout3 = aout * aout * aout;
           Real rmax = radius.max();
-          delta_a(npoints - 1) = -(aout - 1);
-	    //(aout - aout * aout * aout) / (2 * rmax) - dadr(npoints - 1);
-          delta_K(npoints - 1) = -K(npoints - 1);
-          delta_aleph(npoints - 1) = -aleph(npoints-1);//(1 - aout) / (aout * rmax) - aleph(npoints - 1);
+          delta_a(npoints - 1) = dr * (aout - aout3) / (2. * rmax) + a(npoints - 2);
+          delta_a(npoints - 1) -= a(npoints - 1);
+          delta_K(npoints - 1) = -K(npoints - 1); // K -> 0
           member.team_barrier();
 
           // Update
+          //printf("%d\n", iter);
           par_for_inner(member, 0, npoints - 1, [&](const int i) {
-            a(i) -= tau * delta_a(i);
-            K(i) -= tau * delta_K(i);
-            alpha(i) -= tau * delta_alpha(i);
-            aleph(i) -= tau * delta_aleph(i);
+            // printf("\t%d: %14e %14e %14e %14e %14e %14e %14e\n", i, a(i), K(i), lna(i),
+            //        dlnadr(i), dKdr(i), delta_a(i), delta_K(i));
+            a(i) += tau*delta_a(i);
+            K(i) += tau*delta_K(i);
+	    // ensure a is strictly positive
+	    a(i) = std::max(error_tolerance, a(i));
+            // alpha(i) -= tau * delta_alpha(i);
           });
           member.team_barrier();
         }
@@ -221,13 +225,11 @@ bool Converged(StateDescriptor *pkg) {
       KOKKOS_LAMBDA(const int i, Real &eps) {
         eps = std::max(eps, GetError(grids.a, grids.delta_a, i));
         eps = std::max(eps, GetError(grids.K_rr, grids.delta_K, i));
-        //eps = std::max(eps, GetError(grids.alpha, grids.delta_alpha, i));
-        //eps = std::max(eps, GetError(grids.aleph, grids.delta_aleph, i));
-        // printf("\terr = %14g\n", eps);
+        //printf("\terr = %14g\n", eps);
       },
       Kokkos::Max<Real>(max_err));
   max_err = std::abs(max_err);
-  //printf("max error = %.14e\n", max_err);
+  printf("max error = %.14e\n", max_err);
   return max_err < error_tolerance;
 }
 
