@@ -79,8 +79,7 @@ using namespace parthenon::package::prelude;
 
   da/dr = (a/2 r) (r^2 (16 pi rho - (3/2) (K^r_r)^2) - a + 1)
   d K^r_r/dr = k pi a^2 j^r - (3/r) K^r_r
-  d alpha/dr = aleph
-  d aleph/dr = a^2 alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) - (da/dr) aleph/a
+  d^2 alpha/dr^2 = a^2 alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) - (1/a)(da/dr) dalpha/dr
   beta^r = -(1/2) alpha r K^r_r
 
   BOUNDARY CONDITIONS
@@ -88,12 +87,12 @@ using namespace parthenon::package::prelude;
   at r = 0:
      da/dr = 0
      d K^r_r /dr = 0
-     aleph = 0
+     dalpha/dr = 0
 
   at outer boundary (idealy r = infinity):
      da/dr = (a - a^3) / 2 r OR a = 1
      K^r_r = 0
-     a aleph = (1 - a)/r     OR alpha = 1
+     a (dalpha/dr) = (1 - a)/r     OR alpha = 1
 
   MATTER COMPONENTS:
   ------------------
@@ -132,7 +131,8 @@ constexpr int NGHOST = FD_ORDER / 2;
 struct Grids {
   using Grid_t = parthenon::ParArray1D<Real>;
   Grid_t a;       // sqrt(g_{11}). rr-component of 3-metric
-  Grid_t dadr;    // gradient
+  Grid_t lna;     // log(a)
+  Grid_t dlnadr;  // gradient of log(a)
   Grid_t delta_a; // change per iteration
   Grid_t K_rr;    // K^r_r. rr-component of extrinsic curvature
   Grid_t dKdr;
@@ -140,9 +140,6 @@ struct Grids {
   Grid_t alpha; // lapse
   Grid_t dalphadr;
   Grid_t delta_alpha;
-  Grid_t aleph; // partial_r alpha
-  Grid_t dalephdr;
-  Grid_t delta_aleph;
   Grid_t rho;  // Primitive density... (0,0)-component of Tmunu
   Grid_t j_r;  // Radial momentum, (r,t)-component of Tmunu
   Grid_t trcS; // Trace of the stress tensor: S = S^i_i

@@ -31,9 +31,9 @@
 
 using namespace parthenon::package::prelude;
 
-constexpr int NPOINTS = 128; // just different from what's in grid.cpp
-constexpr Real ROUT = 100;
-constexpr int NITERS_MAX = 10000000;
+constexpr int NPOINTS = 512; // just different from what's in grid.cpp
+constexpr Real ROUT = 90;
+constexpr int NITERS_MAX = 1000000000;
 
 KOKKOS_INLINE_FUNCTION
 Real Gaussian(const Real x, const Real a, const Real b, const Real c) {
@@ -69,7 +69,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     pin->SetBoolean("GR1D", "enabled", true);
     pin->SetInteger("GR1D", "npoints", NPOINTS);
     pin->SetReal("GR1D", "rout", ROUT);
-    pin->SetReal("GR1D", "niters_check", 10000000);
+    pin->SetReal("GR1D", "niters_check", 100000);
 
     auto pkg = GR1D::Initialize(pin);
     auto &params = pkg->AllParams();
@@ -96,13 +96,11 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     }
 
     auto a = grids.a;
-    auto dadr = grids.dadr;
+    auto dlnadr = grids.dlnadr;
     auto K_rr = grids.K_rr;
     auto dKdr = grids.dKdr;
     auto alpha = grids.alpha;
     auto dalphadr = grids.dalphadr;
-    auto aleph = grids.aleph;
-    auto dalephdr = grids.dalephdr;
     auto rho = grids.rho;
     auto j = grids.j_r;
     auto S = grids.trcS;
@@ -122,13 +120,11 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
 	  parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag, "Check solution trivial",
 				parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i, Real &e) {
 				  e += std::pow((a(i) - 1),2);
-				  e += std::pow(dadr(i), 2);
+				  e += std::pow(dlnadr(i), 2);
 				  e += std::pow(K_rr(i), 2);
 				  e += std::pow(dKdr(i), 2);
 				  e += std::pow((alpha(i) - 1), 2);
 				  e += std::pow(dalphadr(i), 2);
-				  e += std::pow(aleph(i), 2);
-				  e += std::pow(dalephdr(i), 2);
 				}, error);
 	  error /= 8*npoints;
 	  error = std::sqrt(error);
@@ -145,8 +141,8 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
           parthenon::loop_pattern_flatrange_tag, "Set matter grid, stationary",
           parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
             Real r = radius.x(i);
-            rho(i) = Gaussian(r, 0.005, 40, 5);
-            j(i) = 0;
+            rho(i) = Gaussian(r, 0.005, 20, 5);
+            j(i) = -1e-4*rho(i);
             S(i) = 0;//3 * (Gamma_eos - 1.) * rho(i) * eps_eos;
           });
       THEN("We can retrieve this information") {
@@ -156,8 +152,8 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
             parthenon::DevExecSpace(), 0, npoints - 1,
             KOKKOS_LAMBDA(const int i, int &nw) {
 	      Real r = radius.x(i);
-              if (rho(i) != Gaussian(r, 0.005, 40, 5)) nw += 1;
-              if (j(i) != 0) nw += 1;
+              if (rho(i) != Gaussian(r, 0.005, 20, 5)) nw += 1;
+              if (j(i) != -1e-4*rho(i)) nw += 1;
 	      if (S(i) != 0) nw += 1;
               //if (S(i) != 3 * (Gamma_eos - 1.) * rho(i) * eps_eos) nw += 1;
             },
@@ -166,7 +162,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
       }
       THEN("The solver can converge") {
 	for (int niters = 0; niters < NITERS_MAX; niters += niters_check) {
-	  //std::cout << "niters = " << niters << std::endl;
+	  std::cout << "niters = " << niters << std::endl;
 	  GR1D::IterativeSolve(pkg.get());
 	  if (GR1D::Converged(pkg.get())) break;
 	}
