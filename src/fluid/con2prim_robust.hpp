@@ -29,6 +29,7 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
+#include "prim2con.hpp"
 
 namespace con2prim_robust {
 
@@ -36,8 +37,8 @@ using namespace robust;
 
 enum class ConToPrimStatus {success, failure};
 struct FailFlags {
-  static constexpr Real success = 0.0;
-  static constexpr Real fail = 1.0;
+  static constexpr Real success = 1.0;
+  static constexpr Real fail = 0.0;
 };
 
 template <typename F>
@@ -126,10 +127,12 @@ class Residual {
   Residual(const Real D, const Real q, const Real bsq,
 	   const Real bsq_rpsq, const Real rsq,
 	   const Real rbsq, const Real v0sq, const singularity::EOS &eos,
-	   const Real rho_floor = 1e-11, const Real e_floor = 1e-9)
+	   const Real rho_floor, const Real e_floor,
+     const Real gam_max, const Real e_max)
     : D_(D), q_(q), bsq_(bsq), bsq_rpsq_(bsq_rpsq), rsq_(rsq),
-      rbsq_(rbsq), v0sq_(v0sq), iWmin_(std::sqrt(1.0-v0sq)),
-      eos_(eos), rho_floor_(rho_floor), e_floor_(e_floor) {}
+      rbsq_(rbsq), v0sq_(v0sq),
+      eos_(eos), rho_floor_(rho_floor), e_floor_(e_floor),
+      gam_max_(gam_max), e_max_(e_max) {}
 
   KOKKOS_FORCEINLINE_FUNCTION
   Real x_mu(const Real mu) {
@@ -146,11 +149,18 @@ class Residual {
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real vhatsq_mu(const Real mu, const Real rbarsq) {
-    return std::min(mu*mu*rbarsq, v0sq_);
+    const Real vsq_trial = mu*mu*rbarsq;
+    if (vsq_trial > v0sq_) {
+      used_gamma_max_ = true;
+      return v0sq_;
+    } else {
+      used_gamma_max_ = false;
+      return vsq_trial;
+    }
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real iWhat_mu(const Real vhatsq) {
-    return std::max(std::sqrt(1.0 - vhatsq), iWmin_);
+    return std::sqrt(1.0 - vhatsq);
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real rhohat_mu(const Real iWhat) {
@@ -169,11 +179,15 @@ class Residual {
   KOKKOS_FORCEINLINE_FUNCTION
   Real ehat_mu(const Real mu, const Real qbar, const Real rbarsq, const Real vhatsq, const Real What) {
     const Real ehat_trial = What*(qbar - mu*rbarsq) + vhatsq*What*What/(1.0 + What);
+    used_energy_floor_ = false;
+    used_energy_max_ = false;
     if (ehat_trial <= e_floor_) {
       used_energy_floor_ = true;
       return e_floor_;
+    } else if (ehat_trial > e_max_) {
+      used_energy_max_ = true;
+      return e_max_;
     } else {
-      used_energy_floor_ = false;
       return ehat_trial;
     }
   }
@@ -219,12 +233,16 @@ class Residual {
   bool used_density_floor() const { return used_density_floor_; }
   KOKKOS_INLINE_FUNCTION
   bool used_energy_floor() const { return used_energy_floor_; }
+  KOKKOS_INLINE_FUNCTION
+  bool used_energy_max() const { return used_energy_max_; }
+  KOKKOS_INLINE_FUNCTION
+  bool used_gamma_max() const { return used_gamma_max_; }
 
  private:
-  const Real D_, q_, bsq_, bsq_rpsq_, rsq_, rbsq_, v0sq_, iWmin_;
+  const Real D_, q_, bsq_, bsq_rpsq_, rsq_, rbsq_, v0sq_;
   const singularity::EOS &eos_;
-  const Real rho_floor_, e_floor_;
-  bool used_density_floor_, used_energy_floor_;
+  const Real rho_floor_, e_floor_, gam_max_, e_max_;
+  bool used_density_floor_, used_energy_floor_, used_energy_max_, used_gamma_max_;
 
   KOKKOS_FORCEINLINE_FUNCTION
   Real aux_func(const Real mu, const Real h0sq) {
@@ -289,8 +307,8 @@ struct CellGeom {
 template <typename Data_t, typename T>
 class ConToPrim {
  public:
-  ConToPrim(Data_t *rc, fixup::Floors flr, const Real tol, const int max_iterations)
-    : floor(flr),
+  ConToPrim(Data_t *rc, fixup::Bounds bnds, const Real tol, const int max_iterations)
+    : bounds(bnds),
       var(rc->PackVariables(Vars(), imap)),
       prho(imap[fluid_prim::density].first),
       crho(imap[fluid_cons::density].first),
@@ -348,7 +366,7 @@ class ConToPrim {
   }
 
  private:
-  fixup::Floors floor;
+  fixup::Bounds bounds;
   PackIndexMap imap;
   const T var;
   const int prho, crho;
@@ -366,7 +384,7 @@ class ConToPrim {
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos,
                         const Real x1, const Real x2, const Real x3) const {
-    PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
+    /*PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo)), "v(cmom_lo) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+2)), "v(cmom_lo+2) = NaN");
@@ -375,11 +393,15 @@ class ConToPrim {
       PARTHENON_REQUIRE(!std::isnan(v(cb_lo)), "v(cb_lo) = NaN");
       PARTHENON_REQUIRE(!std::isnan(v(cb_lo+1)), "v(cb_lo+1) = NaN");
       PARTHENON_REQUIRE(!std::isnan(v(cb_lo+2)), "v(cb_lo+2) = NaN");
-    }
+    }*/
+    int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);
+    if (num_nans > 0) return ConToPrimStatus::failure;
     const Real igdet = 1.0/g.gdet;
     
     Real rhoflr, epsflr;
-    floor.GetFloors(x1,x2,x3,rhoflr,epsflr);
+    bounds.GetFloors(x1,x2,x3,rhoflr,epsflr);
+    Real gam_max, eps_max;
+    bounds.GetCeilings(x1,x2,x3,gam_max,eps_max);
     bool negative_crho = false;
     /*if (v(crho) <= 0.0) {
       printf("v(crho) < 0: %g    %g %g\n", v(crho)*igdet, x1, x2);
@@ -451,7 +473,7 @@ class ConToPrim {
       bsq_rpsq = bsq * rsq - rbsq;
     }
     const Real zsq = rsq/h0sq_;
-    Real v0sq = std::min(zsq/(1.0 + zsq), 1.0 - 1.0/1.0e4);
+    Real v0sq = std::min(zsq/(1.0 + zsq), 1.0 - 1.0/(gam_max*gam_max));
     if (v0sq >= 1) {
       printf("whoa: %g %g %g %g\n", rsq, h0sq_, zsq, v0sq);
     }
@@ -465,7 +487,7 @@ class ConToPrim {
     //PARTHENON_REQUIRE(v0sq < 1, "v0sq >= 1: " + std::to_string(v0sq));
     //PARTHENON_REQUIRE(v0sq >= 0, "v0sq < 0: " + std::to_string(v0sq));
 
-    Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,rhoflr,epsflr);
+    Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,rhoflr,epsflr,gam_max,eps_max);
 
     // find the upper bound
     //const Real mu_r = res.compute_upper_bound(h0sq_);
@@ -488,127 +510,75 @@ class ConToPrim {
     v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
     v(peng) *= v(prho);
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
+    v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
+
+    if (v(prho) < 0.99999*rhoflr ||
+        v(peng)/v(prho) < 0.99999*epsflr ||
+        v(peng)/v(prho) > 1.00001*eps_max ||
+        W > 1.00001*gam_max) {
+      std::cout << "bounds violated " << v(prho)/rhoflr << " "
+                                      << v(peng)/v(prho)/epsflr << " "
+                                      << v(peng)/v(prho)/eps_max << " " 
+                                      << W/gam_max << std::endl;
+    }
 
     //const Real vscale = (W > 10 ? 10.0/W : 1.0);
+    Real vel[3];
     SPACELOOP(i) {
       //v(pvel_lo+i) = atm ? 0 : mu*x*(rcon[i] + mu*bdotr*bu[i]);
       v(pvel_lo+i) = mu*x*(rcon[i] + mu*bdotr*bu[i]);
+      vel[i] = v(pvel_lo+i);
+      bu[i] = v(pb_lo+i);
     }
 
-    /*if (res.used_density_floor()) {
+    /*if (res.used_density_floor() ||
+        res.used_energy_floor() ||
+        res.used_gamma_max()) {
       v(prho) = rhoflr;
-      v(peng) = rhoflr*epsflr;
-      SPACELOOP (i) {
-        v(pvel_lo+i) = 0.0;
-      }
-      vsq = 0.0;
-      W = 1.0;
-      v(tmp) = eos.TemperatureFromDensityInternalEnergy(rhoflr,epsflr);
-      v(prs) = eos.PressureFromDensityTemperature(rhoflr, v(tmp));
-    }*/
-
-    if (res.used_density_floor() || res.used_energy_floor()) {
-      //std::cout << "Used floor: " << res.used_density_floor() << " " << res.used_energy_floor() << " " << x1 << " " << x2 << std::endl;
-    }
-    //SPACELOOP(i) v(pvel_lo+i) = mu*(x*rperp[i] - rpar[i]);
-    // and now make sure v is appropriately bounded
-    //if (atm) {
-    //if (std::isnan(W) || W > 100.0) printf("W large: %g %g\n", vsq, W);
-    //}
-    /*
-    if (vsq > 1.0 - iW*iW) {
-      const Real scale = std::sqrt( (1.0 - iW*iW)/vsq );
-      //printf("scaling velocity %g %g %g\n", scale, vsq, iW);
-      SPACELOOP(i) v(pvel_lo+i) *= scale;
-    }*/
-    // primitives are recovered
-
-    // now recompute conserved vars to ensure consistency
-
-    // first density
-    v(crho) = v(prho) * W * g.gdet;
-    if (std::isnan(v(crho)) || v(crho) < 0.0) {
-      printf("caught NaN rho: %g %g %g %g %g\n", v(crho), v(prho), W, 1.0-vsq, g.gdet);
-    }
-  
-    Real Bdotv = 0.0;
-    Real bcon[] = {0.0, 0.0, 0.0, 0.0};
-    Real bcov[] = {0.0, 0.0, 0.0};
-    bsq = 0.0;
-    if (pb_hi > 0) {
-      Real Bsq = 0.0;
-      SPACELOOP2(i,j) {
-        Bsq += g.gcov[i][j] * v(pb_lo+i) * v(pb_lo+j);
-        Bdotv += g.gcov[i][j] * v(pb_lo+i) * v(pvel_lo+j);
-      }
-      bcon[0] = W * Bdotv / g.lapse;
-      bsq = (Bsq + g.lapse*g.lapse*bcon[0]*bcon[0])*iW*iW;
-      SPACELOOP(i) bcon[i+1] = v(pb_lo+i)/W + g.lapse*bcon[0] * (v(pvel_lo+i) - g.beta[i]/g.lapse);
       SPACELOOP(i) {
-        bcov[i] = 0.0;
-        SPACETIMELOOP(j) {
-          bcov[i] += g.gcov4[i+1][j] * bcon[j];
-        }
+        v(pvel_lo+i) = 0.0;
+        vel[i] = v(pvel_lo+i);
       }
-    }
+      v(peng) = epsflr;
+      v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
+      v(peng) *= v(prho);
+      v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
+      v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
+    }*/
 
-    // set momentum
-    const Real rhohWsq = (v(prho) + v(peng) + v(prs) + bsq) * W * W;
+    Real ye_prim = 0.0;
+    if (pye > 0) ye_prim = v(pye);
+    Real ye_cons;
+    Real S[3];
+    Real bcons[3];
+    Real sig[3];
+    prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
+                  g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
+                  v(crho), S, bcons, v(ceng), ye_cons, sig);
+
     SPACELOOP(i) {
-      Real vcovi = 0.0;
-      SPACELOOP(j) {
-        vcovi += g.gcov[i][j] * v(pvel_lo+j);
-      }
-      v(cmom_lo + i) = g.gdet * rhohWsq * vcovi - g.lapse*bcon[0] * bcov[i];
+      v(cmom_lo+i) = S[i];
     }
 
-    // now energy
-    v(ceng) = g.gdet*(rhohWsq - (v(prs) + 0.5*bsq) - g.lapse*g.lapse*bcon[0]*bcon[0]) - v(crho);
-    
-    if (cye > 0) v(cye) = v(pye)*v(crho);
-
-    // and finally get signal speeds
-    Real vasq = bsq*W*W/rhohWsq;
-    v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
-    Real cssq = v(gm1)*v(prs)/(v(prho) + v(peng) + v(prs));
-    cssq += vasq - cssq*vasq; // estimate of fast magneto-sonic speed
-    const Real vcoff = g.lapse/(1.0 - vsq*cssq);
-
-    // get a null vector
-    /*Real k[] = {0.0, 0.0, 0.0, 0.0};
-    k[1] = 1.0;
-    Real AA = gcov4[0][0];
-    Real BB = 2.0*gcov[0][1]*k[1];
-    Real CC = gcov[1][1]*k[1]*k[1];
-    k[0] = (-BB - std::sqrt(BB*BB - 4.0*AA*CC))/(2.0*AA);
-    Real null_speed0 = k[1]/k[0];*/
+    if (pye > 0) v(cye) = ye_cons;
 
     for (int i = 0; i < sig_hi-sig_lo+1; i++) {
-      const Real vpm = std::sqrt(cssq*(1.0 - vsq)
-                        *(g.gcon[i][i]*(1.0 - vsq*cssq) 
-                          - v(pvel_lo+i)*v(pvel_lo+i)*(1.0 - cssq)));
-      Real vp = vcoff*(v(pvel_lo+i)*(1.0 - cssq) + vpm) - g.beta[i];
-      Real vm = vcoff*(v(pvel_lo+i)*(1.0 - cssq) - vpm) - g.beta[i];
-      v(sig_lo+i) = std::max(std::fabs(vp), std::fabs(vm));
+      v(sig_lo+i) = sig[i];
     }
 
-    /*if (atm) {
-      printf("\natm state:\n");
-      printf("rho: %g %g\n", v(crho), v(prho));
-      printf("v1: %g %g\n", v(cmom_lo), v(pvel_lo));
-      printf("v2: %g %g\n", v(cmom_lo+1), v(pvel_lo+1));
-      printf("v3: %g %g\n", v(cmom_lo+2), v(pvel_lo+2));
-      printf("eng: %g %g\n\n", v(ceng), v(peng));
-    }*/
+    num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);
+    //PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
+    //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo)), "v(cmom_lo) = NaN");
+    //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
+    //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+2)), "v(cmom_lo+2) = NaN");
+    //PARTHENON_REQUIRE(!std::isnan(v(ceng)), "v(ceng) = NaN");
 
-    PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
-    PARTHENON_REQUIRE(!std::isnan(v(cmom_lo)), "v(cmom_lo) = NaN");
-    PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
-    PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+2)), "v(cmom_lo+2) = NaN");
-    PARTHENON_REQUIRE(!std::isnan(v(ceng)), "v(ceng) = NaN");
-    PARTHENON_REQUIRE(v(prho) >= rhoflr*(1.0-1.e-8), "rho < rho_floor " + std::to_string(v(prho)) + " " + std::to_string(rhoflr));
-    PARTHENON_REQUIRE(v(peng)/v(prho) >= epsflr*(1.0 - 1.e-8), "sie < sie_floor " + std::to_string(v(peng)/v(prho)) + " " + std::to_string(epsflr));
-
+    if (res.used_density_floor() ||
+        res.used_energy_max() ||
+        res.used_energy_floor() ||
+        res.used_gamma_max() ||
+        num_nans > 0)
+      return ConToPrimStatus::failure;
     return ConToPrimStatus::success;
   }
 };
@@ -616,8 +586,8 @@ class ConToPrim {
 using C2P_Block_t = ConToPrim<MeshBlockData<Real>,VariablePack<Real>>;
 using C2P_Mesh_t = ConToPrim<MeshData<Real>,MeshBlockPack<Real>>;
 
-inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, fixup::Floors floor, const Real tol, const int max_iter) {
-  return C2P_Block_t(rc, floor, tol, max_iter);
+inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, fixup::Bounds bounds, const Real tol, const int max_iter) {
+  return C2P_Block_t(rc, bounds, tol, max_iter);
 }
 /*inline C2P_Mesh_t ConToPrimSetup(MeshData<Real> *rc) {
   return C2P_Mesh_t(rc);

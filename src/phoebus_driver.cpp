@@ -193,6 +193,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fill_derived =
         tl.AddTask(convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
 
+    auto fixup = tl.AddTask(fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+
     // estimate next time step
     if (stage == integrator->nstages) {
       auto new_dt = tl.AddTask(

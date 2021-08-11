@@ -24,6 +24,7 @@ using namespace parthenon::package::prelude;
 
 // internal includes
 #include "fluid/fluid.hpp"
+#include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
 // add the name of a namespace that contains your new ProblemGenerator

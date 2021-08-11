@@ -247,6 +247,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     });
 
   //Real bsq_max;
+  
   if (ibhi > 0) {
   pmb->par_for(
     "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e-1, ib.s, ib.e-1,
