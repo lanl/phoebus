@@ -146,10 +146,10 @@ public:
     ContravariantShift(X0, X1, X2, X3, beta);
 
     LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
-    g[1][1] = ratio(mu, DD);
-    g[2][2] = r2 * mu;
-    g[3][3] = ratio(r3dm * (2 * a2_ + r2 * (2 + DD * rm)) * sth2, denom);
-    g[3][3] += ratio(beta[3] * beta[3], alpha * alpha);
+    g[0][0] = ratio(mu, DD);
+    g[1][1] = r2 * mu;
+    g[2][2] = ratio(r3dm * (2 * a2_ + r2 * (2 + DD * rm)) * sth2, denom);
+    g[2][2] += ratio(beta[2] * beta[2], alpha * alpha);
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
