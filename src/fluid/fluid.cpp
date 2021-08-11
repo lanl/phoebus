@@ -12,8 +12,18 @@
 // publicly, and to permit others to do so.
 
 #include "fluid.hpp"
+
+#include "con2prim.hpp"
+#include "con2prim_robust.hpp"
+#include "geometry/geometry.hpp"
+#include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/variables.hpp"
+#include "prim2con.hpp"
 #include "reconstruction.hpp"
+#include "riemann.hpp"
 #include "tmunu.hpp"
+
+#include <singularity-eos/eos/eos.hpp>
 
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
@@ -252,11 +262,13 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
 TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange &ib, const IndexRange &jb, const IndexRange &kb) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
+  namespace impl = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({p::density, c::density, p::velocity,
-                                 c::momentum, p::energy, c::energy, p::bfield,
-                                 c::bfield, p::ye, c::ye, p::pressure});
+  const std::vector<std::string> vars({p::density, c::density, p::velocity,
+                                       c::momentum, p::energy, c::energy, p::bfield,
+                                       c::bfield, p::ye, c::ye, p::pressure, p::gamma1,
+                                       impl::cell_signal_speed});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -270,12 +282,15 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   const int peng = imap[p::energy].first;
   const int ceng = imap[c::energy].first;
   const int prs = imap[p::pressure].first;
+  const int gm1 = imap[p::gamma1].first;
   const int pb_lo = imap[p::bfield].first;
   const int pb_hi = imap[p::bfield].second;
   const int cb_lo = imap[c::bfield].first;
   const int cb_hi = imap[c::bfield].second;
-  int pye = imap[p::ye].second; // -1 if not present
-  int cye = imap[c::ye].second;
+  const int pye = imap[p::ye].second; // -1 if not present
+  const int cye = imap[c::ye].second;
+  const int sig_lo = imap[impl::cell_signal_speed].first;
+  const int sig_hi = imap[impl::cell_signal_speed].second;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -283,86 +298,60 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
       DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(), 0, v.GetDim(5) - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        Real gcov[3][3];
-        geom.Metric(CellLocation::Cent, k, j, i, gcov);
         Real gcov4[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
+        Real gcon[3][3];
+        geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
         Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
         Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
         Real shift[3];
         geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
-        Real vsq = 0.0;
-        Real Bdotv = 0.0;
-        Real BdotB = 0.0;
-        SPACELOOP(m) {
-          SPACELOOP(n) {
-            vsq += gcov[m][n] * v(b, pvel_lo + m, k, j, i) *
-                   v(b, pvel_lo + n, k, j, i);
-          }
-          for (int n = pb_lo; n <= pb_hi; n++) {
-            Bdotv += gcov[m][n - pb_lo] * v(b, pvel_lo + m, k, j, i) *
-                     v(b, n, k, j, i);
-            BdotB += gcov[m][n - pb_lo] * v(b, pb_lo + m, k, j, i) *
-                     v(b, n, k, j, i);
-          }
-        }
 
-        // Lorentz factor
-        const Real W = 1.0 / sqrt(1.0 - vsq);
-
-        // get the magnetic field 4-vector
-        Real bcon[] = {W * Bdotv / lapse, 0.0, 0.0, 0.0};
-        for (int m = pb_lo; m <= pb_hi; m++) {
-          bcon[m - pb_lo + 1] =
-              v(b, m, k, j, i) / W + lapse * bcon[0] *
-                                         (v(b, m - pb_lo + pvel_lo, k, j, i) -
-                                          shift[m - pb_lo] / lapse);
-        }
-        const Real bsq = (BdotB + lapse * lapse * bcon[0] * bcon[0]) / (W * W);
-        Real bcov[3] = {0.0, 0.0, 0.0};
+        Real S[3];
+        const Real vel[] = {v(b, pvel_lo, k, j, i),
+                            v(b, pvel_lo+1, k, j, i),
+                            v(b, pvel_hi, k, j, i)};
+        Real bcons[3];
+        Real bp[3] = {0.0, 0.0, 0.0};
         if (pb_hi > 0) {
-          for (int m = 0; m < 3; m++) {
-            for (int n = 0; n < 4; n++) {
-              bcov[m] += gcov4[m + 1][n] * bcon[n];
-            }
-          }
+          bp[0] = v(b, pb_lo, k, j, i);
+          bp[1] = v(b, pb_lo+1, k, j, i);
+          bp[2] = v(b, pb_hi, k, j, i);
         }
-
-        // conserved density D = \sqrt{\gamma} \rho W
-        v(b, crho, k, j, i) = gdet * v(b, prho, k, j, i) * W;
-
-        // enthalpy
-        Real rhohWsq = (v(b, prho, k, j, i) + v(b, peng, k, j, i) +
-                        v(b, prs, k, j, i) + bsq) *
-                       W * W;
-
-        // momentum
-        SPACELOOP(m) {
-          Real vcov = 0.0;
-          SPACELOOP(n) {
-            vcov += gcov[m][n] * v(b, pvel_lo + n, k, j, i);
-          }
-          v(b, cmom_lo + m, k, j, i) =
-              gdet * rhohWsq * vcov - lapse * bcon[0] * bcov[m];
-        }
-
-        // energy
-        v(b, ceng, k, j, i) =
-            gdet * (rhohWsq - (v(b, prs, k, j, i) + 0.5 * bsq) -
-                    lapse * lapse * bcon[0] * bcon[0]) -
-            v(b, crho, k, j, i);
-
-        for (int m = cb_lo; m <= cb_hi; m++) {
-          v(b, m, k, j, i) = gdet * v(b, m - cb_lo + pb_lo, k, j, i);
-        }
-        // conserved lepton density
+        Real ye_cons;
+        Real ye_prim = 0.0;
         if (pye > 0) {
-          v(b, cye, k, j, i) = v(b, crho, k, j, i) * v(b, pye, k, j, i);
+          ye_prim = v(b, pye, k, j, i);
+        }
+
+        Real sig[3];
+        prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
+            v(b, prs, k, j, i), v(b, gm1, k, j, i),
+            gcov4, gcon, shift, lapse, gdet,
+            v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons, sig);
+
+        v(b, cmom_lo, k, j, i) = S[0];
+        v(b, cmom_lo+1, k, j, i) = S[1];
+        v(b, cmom_hi, k, j, i) = S[2];
+
+        if (pb_hi > 0) {
+          v(b, cb_lo, k, j, i) = bcons[0];
+          v(b, cb_lo+1, k, j, i) = bcons[1];
+          v(b, cb_hi, k, j, i) = bcons[2];
+        }
+
+        if (pye > 0) {
+          v(b, cye, k, j, i) = ye_cons;
+        }
+
+        for (int m = sig_lo; m <= sig_hi; m++) {
+          v(b, m, k, j, i) = sig[m-sig_lo];
         }
       });
 
   return TaskStatus::complete;
 }
+
 
 template <typename T>
 TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRange &jb,
@@ -370,12 +359,12 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   auto *pmb = rc->GetParentPointer().get();
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  auto floor = fix_pkg->Param<fixup::Floors>("floor");
+  auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
 
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
-  auto invert = con2prim_robust::ConToPrimSetup(rc, floor, c2p_tol, c2p_max_iter);
+  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
@@ -395,20 +384,6 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
                                  ? con2prim_robust::FailFlags::success
                                  : con2prim_robust::FailFlags::fail);
       });
-  // this is where we might stick fixup
-  int fail_cnt;
-  parthenon::par_reduce(
-      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve", DevExecSpace(),
-      0, invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
-                    int &f) {
-        f += (fail(k, j, i) == con2prim_robust::FailFlags::success ? 0 : 1);
-        if (fail(k,j,i) != con2prim_robust::FailFlags::success) {
-          fprintf(stderr,"Con2Prim failed at %g %g %g\n", std::exp(coords.x1v(i)), coords.x2v(j), coords.x3v(k));
-        }
-      },
-      Kokkos::Sum<int>(fail_cnt));
-  PARTHENON_REQUIRE(fail_cnt == 0, "Con2Prim Failed!");
 
   return TaskStatus::complete;
 }
@@ -431,13 +406,13 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   auto *pmb = rc->GetParentPointer().get();
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  auto floor = fix_pkg->Param<fixup::Floors>("floor");
+  auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
 
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
   auto invert = con2prim::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
-  auto invert_robust = con2prim_robust::ConToPrimSetup(rc, floor, c2p_tol, c2p_max_iter);
+  auto invert_robust = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
@@ -459,18 +434,18 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
       invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         auto status = invert(eos, k, j, i);
-        if (status != ConToPrimStatus::success) {
+        /*if (status != ConToPrimStatus::success) {
           invert_robust(geom, eos, coords, k, j, i);
           status = ConToPrimStatus::success;
           if (j==256 && i == 440) {
             std::cout << "used robust solver on i=440, j=256" << std::endl;
           }
-        }
+        }*/
         fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
                                                             : FailFlags::fail);
       });
   // this is where we might stick fixup
-  int fail_cnt;
+  /*int fail_cnt;
   parthenon::par_reduce(
       parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve", DevExecSpace(),
       0, invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -479,7 +454,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
         f += (fail(k, j, i) == FailFlags::success ? 0 : 1);
       },
       Kokkos::Sum<int>(fail_cnt));
-  PARTHENON_REQUIRE(fail_cnt == 0, "Con2Prim Failed!");
+  PARTHENON_REQUIRE(fail_cnt == 0, "Con2Prim Failed!");*/
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Finalize", DevExecSpace(), 0,
       invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -854,5 +829,6 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   const auto &cfl = pars.Get<Real>("cfl");
   return cfl * min_dt;
 }
+
 
 } // namespace fluid

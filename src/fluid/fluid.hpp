@@ -20,14 +20,6 @@
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
-#include <singularity-eos/eos/eos.hpp>
-#include "con2prim.hpp"
-#include "con2prim_robust.hpp"
-#include "geometry/geometry.hpp"
-#include "phoebus_utils/cell_locations.hpp"
-#include "phoebus_utils/variables.hpp"
-#include "riemann.hpp"
-
 namespace fluid {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
@@ -47,6 +39,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
 TaskStatus FluxCT(MeshBlockData<Real> *rc);
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc);
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
+
 
 template <typename T>
 using c2p_type = TaskStatus(*)(T *, const IndexRange &, const IndexRange &, const IndexRange &);

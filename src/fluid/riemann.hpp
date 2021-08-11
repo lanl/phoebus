@@ -86,21 +86,18 @@ class FluxState {
   KOKKOS_INLINE_FUNCTION
   void prim_to_flux(const int d, const int k, const int j, const int i, const FaceGeom &g,
                     const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F,
-                    const Real rho_floor, const Real sie_floor) const {
+                    const Real rho_floor, const Real sie_floor, const Real sie_max,
+                    const Real gam_max) const {
     const int dir = d-1;
     const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
-    //const Real rho = q(dir,prho,k,j,i);
-    //if (rho == rho_floor) {
-      //std::cout << "Used rho_floor: " << q(dir,prho,k,j,i) << " " << rho_floor << std::endl;
-    //}
     Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
     const Real &vel = vcon[dir];
     Real Bcon[] = {0.0, 0.0, 0.0};
-    const Real u = q(dir,peng,k,j,i)/rho > sie_floor ? q(dir,peng,k,j,i) : rho*sie_floor;
-    //const Real u = q(dir,peng,k,j,i);
-    //if (u == rho*sie_floor) {
-      //std::cout << "Used sie_floor: " << q(dir,peng,k,j,i)/rho << " " << sie_floor << std::endl;
-    //}
+    const Real u = (q(dir,peng,k,j,i)/rho > sie_floor
+                      ? (q(dir,peng,k,j,i)/rho > sie_max
+                          ? rho*sie_max
+                          : q(dir,peng,k,j,i))
+                      : rho*sie_floor);
     const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
@@ -118,11 +115,12 @@ class FluxState {
         BdotB += g.gcov[m+1][n+1]*Bcon[m]*Bcon[n];
       }
     }
-    if (vsq >= 1.0) {
-      const Real gamma_max_sq = 100.0*100.0;
-      Real scale = (1.0 - 1.0/gamma_max_sq)/vsq;
+    const Real vsq_max = 1.0 - 1.0/(gam_max*gam_max);
+    if (vsq > vsq_max) {
+      Real scale = vsq_max/vsq;
       vsq *= scale;
-      scale = sqrt(scale);
+      scale = std::sqrt(scale);
+      Bdotv *= scale;
       for (int m = 0; m < 3; m++) vcon[m] *= scale;
     }
     const Real W = 1.0/sqrt(1-vsq);
@@ -185,7 +183,7 @@ class FluxState {
   const ParArrayND<Real> ql;
   const ParArrayND<Real> qr;
   const Geometry::CoordSysMeshBlock geom;
-  fixup::Floors floor;
+  fixup::Bounds bounds;
  private:
   const int prho, pvel_lo, peng, pb_lo, pb_hi, pye, prs, gm1;
   const int crho, cmom_lo, ceng, cb_lo, cb_hi, cye, ncons;
@@ -195,7 +193,7 @@ class FluxState {
       ql(rc->Get("ql").data),
       qr(rc->Get("qr").data),
       geom(Geometry::GetCoordinateSystem(rc)),
-      floor(rc->GetParentPointer().get()->packages.Get("fixup").get()->Param<fixup::Floors>("floor")),
+      bounds(rc->GetParentPointer().get()->packages.Get("fixup").get()->Param<fixup::Bounds>("bounds")),
       prho(imap[fluid_prim::density].first),
       pvel_lo(imap[fluid_prim::velocity].first),
       peng(imap[fluid_prim::energy].first),
@@ -232,11 +230,11 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   CellLocation loc = DirectionToFaceID(d);
   FaceGeom g(fs.geom, loc, d, k, j, i);
   Real rho_floor, sie_floor;
-  fs.floor.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
-  rho_floor *= 0.1;
-  sie_floor *= 0.1;
-  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, rho_floor, sie_floor);
-  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, rho_floor, sie_floor);
+  fs.bounds.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
+  Real gam_max, sie_max;
+  fs.bounds.GetCeilings(g.X[1], g.X[2], g.X[3], gam_max, sie_max);
+  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, rho_floor, sie_floor, sie_max, gam_max);
+  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, rho_floor, sie_floor, sie_max, gam_max);
 
   const Real cmax = std::max(std::max(-vml,vpl), std::max(-vmr,vpr));
 
@@ -255,11 +253,11 @@ Real hll(const FluxState &fs, const int d, const int k, const int j, const int i
   CellLocation loc = DirectionToFaceID(d);
   FaceGeom g(fs.geom, loc, d, k, j, i);
   Real rho_floor, sie_floor;
-  fs.floor.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
-  rho_floor *= 0.1;
-  sie_floor *= 0.1;
-  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, rho_floor, sie_floor);
-  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, rho_floor, sie_floor);
+  fs.bounds.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
+  Real gam_max, sie_max;
+  fs.bounds.GetCeilings(g.X[1], g.X[2], g.X[3], gam_max, sie_max);
+  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, rho_floor, sie_floor, sie_max, gam_max);
+  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, rho_floor, sie_floor, sie_max, gam_max);
 
   const Real cl = std::min(std::min(vml, vmr), 0.0);
   const Real cr = std::max(std::max(vpl, vpr), 0.0);
