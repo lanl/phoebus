@@ -50,6 +50,7 @@ add_executable(phoebus
   geometry/spherical_minkowski.cpp
 
   gr1d/gr1d.hpp
+  gr1d/gr1d_utils.hpp
   gr1d/gr1d.cpp
 
   microphysics/eos_phoebus/eos_phoebus.hpp

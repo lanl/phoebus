@@ -14,6 +14,7 @@ add_library(gr1d_unit_tests OBJECT
   test_gr1d.cpp
 
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/gr1d/gr1d.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/gr1d/gr1d_utils.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/gr1d/gr1d.cpp
   )
 

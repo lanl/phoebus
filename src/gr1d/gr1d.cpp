@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <sstream>
 
 // Parthenon
 #include <kokkos_abstraction.hpp>
@@ -25,44 +26,11 @@
 #include "geometry/geometry_utils.hpp"
 
 #include "gr1d.hpp"
+#include "gr1d_utils.hpp"
 
 using namespace parthenon::package::prelude;
 
 namespace GR1D {
-
-namespace ShootingMethod {
-KOKKOS_INLINE_FUNCTION
-Real get_arhs(Real a, Real K, Real r, Real rho) {
-  return (r <= 0)
-             ? 0
-             : (a / (2. * r)) * (r * r * (16 * M_PI * rho - (3. / 2.) * K * K) - a + 1);
-}
-KOKKOS_INLINE_FUNCTION
-Real get_Krhs(Real a, Real K, Real r, Real j) {
-  return (r <= 0) ? 0 : 8 * M_PI * a * a * j - (3. / r) * K;
-}
-KOKKOS_INLINE_FUNCTION
-void hypersurface_rhs(Real r, const Real in[NHYPER], const Real matter[NMAT],
-                      Real out[NHYPER]) {
-  Real a = in[Hypersurface::A];
-  Real K = in[Hypersurface::K];
-  Real rho = matter[Matter::RHO];
-  Real j = matter[Matter::J_R];
-  out[Hypersurface::A] = get_arhs(a, K, r, rho);
-  out[Hypersurface::K] = get_Krhs(a, K, r, j);
-}
-
-template <typename H, typename M>
-KOKKOS_INLINE_FUNCTION void get_residual(const H &h, const M &m, Real r, int npoints,
-                                         Real R[NHYPER]) {
-  Real a = h(Hypersurface::A, npoints - 1);
-  Real K = h(Hypersurface::K, npoints - 1);
-  Real rho = m(Matter::RHO, npoints - 1);
-  Real dadr = get_arhs(a, K, r, rho);
-  R[Hypersurface::A] = (a - a * a * a) / (2 * r) - dadr;
-  R[Hypersurface::K] = K;
-}
-} // namespace ShootingMethod
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto gr1d = std::make_shared<StateDescriptor>("GR1D");
@@ -72,10 +40,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("enable_gr1d", enable_gr1d);
   if (!enable_gr1d) return gr1d; // Short-circuit with nothing
 
-  // TODO(JMM): Ghost zones or one-sided differences/BCs?
+  // Points and Refinement levels
   int npoints = pin->GetOrAddInteger("GR1D", "npoints", 100);
   PARTHENON_REQUIRE_THROWS(npoints > 0, "npoints must be strictly positive");
+
+  int nlevels = log2(npoints);
+  int npoints_reconstructed = 1 << nlevels;
+  bool npoints_is_power_of_2 = (npoints_reconstructed == npoints);
+  if (!npoints_is_power_of_2) {
+    std::stringstream msg;
+    msg << "GR1D: npoints = " << npoints << " is not a factor of 2. Setting to "
+        << npoints_reconstructed << std::endl;
+    PARTHENON_WARN(msg);
+    npoints = npoints_reconstructed;
+    nlevels = log2(npoints);
+  }
   params.Add("npoints", npoints);
+  params.Add("nlevels", nlevels);
 
   // Number of iterations per cycle, before checking error
   int niters_check = pin->GetOrAddInteger("GR1D", "niters_check", 1000);
@@ -97,26 +78,29 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
-  Matter_t matter("GR1D matter grid", NMAT, npoints);
-  Matter_host_t matter_h = Kokkos::create_mirror_view(matter);
-  Hypersurface_t hypersurface("GR1D hypersurface grid", NHYPER, npoints);
-  Hypersurface_host_t hypersurface_h = Kokkos::create_mirror_view(hypersurface);
-  Alpha_t alpha("GR1D lapse grid", npoints);
-  Alpha_t dalpha("GR1D delta lapse grid", npoints);
+  Matter_t matter("GR1D matter grid", nlevels, NMAT, npoints);
+  Hypersurface_t hypersurface("GR1D hypersurface grid", nlevels, NHYPER, npoints);
+  Alpha_t alpha("GR1D lapse grid", nlevels, npoints);
+  Alpha_t dalpha("GR1D delta lapse grid", nlevels, npoints);
 
   parthenon::par_for(
-      parthenon::loop_pattern_flatrange_tag, "GR1D initialize grids",
-      parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+      parthenon::loop_pattern_mdrange_tag, "GR1D initialize grids",
+      parthenon::DevExecSpace(), 0, nlevels - 1, 0, npoints - 1,
+      KOKKOS_LAMBDA(const int l, const int i) {
         for (int v = 0; v < NMAT; ++v) {
-          matter(v, i) = 0;
+          matter(l, v, i) = 0;
         }
-        hypersurface(Hypersurface::A, i) = 1;
-        hypersurface(Hypersurface::K, i) = 0;
-        alpha(i) = 100;
-        dalpha(i) = 0;
+        hypersurface(l, Hypersurface::A, i) = 1;
+        hypersurface(l, Hypersurface::K, i) = 0;
+        alpha(l, i) = 100;
+        dalpha(l, i) = 0;
       });
-  Kokkos::deep_copy(matter_h, matter);
-  Kokkos::deep_copy(hypersurface_h, hypersurface);
+
+  auto matter_fine = matter.Get<2>();
+  auto hypersurface_fine = hypersurface.Get<2>();
+
+  auto matter_h = Kokkos::create_mirror_view(matter_fine);
+  auto hypersurface_h = Kokkos::create_mirror_view(hypersurface_fine);
 
   params.Add("matter", matter);
   params.Add("matter_h", matter_h);
@@ -145,11 +129,16 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   auto npoints = params.Get<int>("npoints");
   auto radius = params.Get<GR1D::Radius>("radius");
   auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
-  auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
   auto matter = params.Get<Matter_t>("matter");
-  auto matter_h = params.Get<Matter_host_t>("matter_h");
 
-  Kokkos::deep_copy(matter_h, matter);
+
+  auto matter_fine = matter.Get<2>();
+  auto hypersurface_fine = hypersurface.Get<2>();
+
+  auto matter_h = params.Get<Matter_host_t>("matter_h");
+  auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
+
+  Kokkos::deep_copy(matter_h, matter_fine);
 
   int iA = Hypersurface::A;
   int iK = Hypersurface::K;
@@ -193,7 +182,7 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
     }
   }
 
-  Kokkos::deep_copy(hypersurface, hypersurface_h);
+  Kokkos::deep_copy(hypersurface_fine, hypersurface_h);
 
   return TaskStatus::complete;
 }
@@ -247,11 +236,11 @@ TaskStatus JacobiStepForLapse(StateDescriptor *pkg) {
             Real dadr = ShootingMethod::get_arhs(a, K, r, rho);
 
             // Formula from mathematica. Unweighted Jacobi
-	    /*
+            /*
             dalpha(i) = ((2 * a * dadr * dr) * alpha(i - 1) +
                          (2 * a + dadr * dr) * alpha(i + 1)) /
                         (a * (4 + a * a * dr * dr * (3 * K * K + 8 * M_PI * (rho + S))));
-	    */
+            */
             dalpha(i) =
                 ((2 * a - dadr * dr) * alpha(i - 1) + (2 * a + dadr * dr) * alpha(i + 1) -
                  a * a * a * dr * dr * (3 * K * K + 8 * M_PI * (S + rho)) * alpha(i)) /
@@ -268,19 +257,19 @@ TaskStatus JacobiStepForLapse(StateDescriptor *pkg) {
           dalpha(0) = alpha(1) - alpha(0);
           // r outer
           dalpha(npoints - 1) = 1 - alpha(npoints - 1);
-	  /*
-	  // Robin boundary condition seems to work less well
+          /*
+          // Robin boundary condition seems to work less well
           Real aout = hypersurface(iA, npoints - 1);
           Real rmax = radius.max();
           dalpha(npoints - 1) =
              dr * ((1 - aout) / (rmax * aout)) + alpha(npoints - 2) - alpha(npoints -
              1);
-	  */
+          */
           member.team_barrier();
 
           // Update
           par_for_inner(member, 0, npoints - 1,
-                        [&](const int i) { alpha(i) += (2./3.)*dalpha(i); });
+                        [&](const int i) { alpha(i) += (2. / 3.) * dalpha(i); });
           member.team_barrier();
         }
       });
@@ -345,11 +334,15 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
   auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
   auto alpha = params.Get<Alpha_t>("lapse");
 
-  auto alpha_h = Kokkos::create_mirror_view(alpha);
+  auto matter_fine = matter.Get<2>();
+  auto hypersurface_fine = hypersurface.Get<2>();
 
-  Kokkos::deep_copy(matter_h, matter);
-  Kokkos::deep_copy(hypersurface_h, hypersurface);
-  Kokkos::deep_copy(alpha_h, alpha);
+  auto alpha_fine = alpha.Get<1>();
+  auto alpha_h = Kokkos::create_mirror_view(alpha_fine);
+
+  Kokkos::deep_copy(matter_h, matter_fine);
+  Kokkos::deep_copy(hypersurface_h, hypersurface_fine);
+  Kokkos::deep_copy(alpha_h, alpha_fine);
 
   FILE *pf;
   pf = fopen(filename.c_str(), "w");
