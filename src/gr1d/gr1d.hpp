@@ -89,6 +89,11 @@ using namespace parthenon::package::prelude;
      d K^r_r /dr = 0
      dalpha/dr = 0
 
+  Examination of the equations shows that this translates to:
+     a = 1
+     K = 0
+     dalpha/dr = 0
+
   at outer boundary (idealy r = infinity):
      da/dr = (a - a^3) / 2 r OR a = 1
      K^r_r = 0
@@ -124,71 +129,43 @@ using namespace parthenon::package::prelude;
 
 namespace GR1D {
 
-constexpr int FD_ORDER = 4;
-constexpr int NGHOST = FD_ORDER / 2;
-
 // TODO(JMM): This is pretty manual and might be annoying to loop through.
-struct Grids {
-  using Grid_t = parthenon::ParArray1D<Real>;
-  Grid_t a;       // sqrt(g_{11}). rr-component of 3-metric
-  Grid_t lna;     // log(a)
-  Grid_t dlnadr;  // gradient of log(a)
-  Grid_t delta_a; // change per iteration
-  Grid_t K_rr;    // K^r_r. rr-component of extrinsic curvature
-  Grid_t dKdr;
-  Grid_t delta_K;
-  Grid_t alpha; // lapse
-  Grid_t dalphadr;
-  Grid_t delta_alpha;
-  Grid_t rho;  // Primitive density... (0,0)-component of Tmunu
-  Grid_t j_r;  // Radial momentum, (r,t)-component of Tmunu
-  Grid_t trcS; // Trace of the stress tensor: S = S^i_i
+using Matter_t = parthenon::ParArray2D<Real>;
+using Matter_host_t = typename Matter_t::HostMirror;
+
+constexpr int NMAT = 3;
+constexpr int NMAT_H = NMAT - 1;
+enum Matter {
+  RHO = 0, // Primitive density... (0,0)-component of Tmunu
+  J_R = 1, // Radial momentum, (r,t)-component of Tmunu
+  trcS = 2 // Trace of the stress tensor: S = S^i_i
 };
+
+using Hypersurface_t = parthenon::ParArray2D<Real>;
+using Hypersurface_host_t = typename Hypersurface_t::HostMirror;
+
+constexpr int NHYPER = 2;
+enum Hypersurface {
+  A = 0, // (r,r)-component of metric
+  K = 1  // K^r_r, extrinsic curvature
+};
+
+using Alpha_t = parthenon::ParArray1D<Real>;
 
 // TODO(JMM): Do we want this?
 using Radius = Spiner::RegularGrid1D;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
-TaskStatus IterativeSolve(StateDescriptor *pkg);
+TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 
-bool Converged(StateDescriptor *pkg);
+TaskStatus JacobiStepForLapse(StateDescriptor *pkg);
+
+Real LapseError(StateDescriptor *pkg);
+
+bool LapseConverged(StateDescriptor *pkg);
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
-
-KOKKOS_FORCEINLINE_FUNCTION
-Real CenteredFD4(const Grids::Grid_t &v, const int i, const Real dx) {
-  return ((-1 / 12.) * v(i - 2) + (-2. / 3.) * v(i - 1) + (2. / 3.) * v(i + 1) +
-          (1. / 12.) * v(i + 2)) /
-         dx;
-}
-KOKKOS_FORCEINLINE_FUNCTION
-Real CenteredFD2(const Grids::Grid_t &v, const int i, const Real dx) {
-  return (v(i + 1) - v(i - 1)) / (2 * dx);
-}
-KOKKOS_FORCEINLINE_FUNCTION
-void SummationByPartsFD4(parthenon::team_mbr_t member, const Grids::Grid_t &v,
-                         const Grids::Grid_t &dvdx, const int npoints, const Real dx) {
-  parthenon::par_for_inner(member, NGHOST, npoints - 1 - NGHOST,
-                           [&](const int i) { dvdx(i) = CenteredFD4(v, i, dx); });
-  dvdx(0) = (v(1) - v(0)) / dx;
-  dvdx(1) = CenteredFD2(v, 1, dx);
-  dvdx(npoints - 2) = CenteredFD2(v, npoints - 2, dx);
-  dvdx(npoints - 1) = (v(npoints - 1) - v(npoints - 2)) / dx;
-}
-
-KOKKOS_FORCEINLINE_FUNCTION
-Real GetError(const Grids::Grid_t &v, const Grids::Grid_t &dv, const int i) {
-  Real reps = std::abs(Geometry::Utils::ratio(dv(i), v(i)));
-  Real aeps = std::abs(dv(i));
-  Real out = std::min(reps, aeps);
-  // if (std::isnan(dv(i)) || std::isnan(v(i))) {
-  //   printf("%s %d: %14g %14g --- %14g, %14g\n", v.label().c_str(), i, v(i), dv(i), reps,
-  //          aeps);
-  //   PARTHENON_FAIL("Nan detected!");
-  // }
-  return out;
-}
 
 } // namespace GR1D
 

@@ -31,9 +31,9 @@
 
 using namespace parthenon::package::prelude;
 
-constexpr int NPOINTS = 512; // just different from what's in grid.cpp
+constexpr int NPOINTS = 256; // just different from what's in grid.cpp
 constexpr Real ROUT = 90;
-constexpr int NITERS_MAX = 1000000000;
+constexpr int NITERS_MAX = 1000000;
 
 KOKKOS_INLINE_FUNCTION
 Real Gaussian(const Real x, const Real a, const Real b, const Real c) {
@@ -55,7 +55,6 @@ TEST_CASE("GR1D is disabled by default", "[GR1D]") {
         REQUIRE(!params.hasKey("npoints"));
         REQUIRE(!params.hasKey("rin"));
         REQUIRE(!params.hasKey("rout"));
-        REQUIRE(!params.hasKey("grids"));
       }
     }
   }
@@ -69,7 +68,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     pin->SetBoolean("GR1D", "enabled", true);
     pin->SetInteger("GR1D", "npoints", NPOINTS);
     pin->SetReal("GR1D", "rout", ROUT);
-    pin->SetReal("GR1D", "niters_check", 100000);
+    pin->SetReal("GR1D", "niters_check", 10000);
 
     auto pkg = GR1D::Initialize(pin);
     auto &params = pkg->AllParams();
@@ -79,7 +78,6 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     auto rin = params.Get<Real>("rin");
     auto rout = params.Get<Real>("rout");
     auto radius = params.Get<GR1D::Radius>("radius");
-    auto grids = params.Get<GR1D::Grids>("grids");
 
     auto niters_check = params.Get<int>("niters_check");
 
@@ -95,41 +93,41 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
       REQUIRE(radius.x(npoints - 1) == rout);
     }
 
-    auto a = grids.a;
-    auto dlnadr = grids.dlnadr;
-    auto K_rr = grids.K_rr;
-    auto dKdr = grids.dKdr;
-    auto alpha = grids.alpha;
-    auto dalphadr = grids.dalphadr;
-    auto rho = grids.rho;
-    auto j = grids.j_r;
-    auto S = grids.trcS;
-    
+    auto hypersurface = params.Get<GR1D::Hypersurface_t>("hypersurface");
+    auto hypersurface_h = params.Get<GR1D::Hypersurface_host_t>("hypersurface_h");
+    auto matter = params.Get<GR1D::Matter_t>("matter");
+    auto matter_h = params.Get<GR1D::Matter_host_t>("matter_h");
+
+    const int iA = GR1D::Hypersurface::A;
+    const int iK = GR1D::Hypersurface::K;
+    const int iRHO = GR1D::Matter::RHO;
+    const int iJ = GR1D::Matter::J_R;
+    const int iS = GR1D::Matter::trcS;
+
     WHEN("We set the matter fields to zero") {
       parthenon::par_for(
           parthenon::loop_pattern_flatrange_tag, "Set matter grid to 0",
           parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
-            rho(i) = 0;
-            j(i) = 0;
-            S(i) = 0;
+            matter(iRHO, i) = 0;
+            matter(iJ, i) = 0;
+            matter(iS, i) = 0;
           });
-      THEN("The iterative solver runs") {
-	GR1D::IterativeSolve(pkg.get());
-	AND_THEN("The solution converges identically to a=alpha=1, everything else 0") {
-	  Real error = 0;
-	  parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag, "Check solution trivial",
-				parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i, Real &e) {
-				  e += std::pow((a(i) - 1),2);
-				  e += std::pow(dlnadr(i), 2);
-				  e += std::pow(K_rr(i), 2);
-				  e += std::pow(dKdr(i), 2);
-				  e += std::pow((alpha(i) - 1), 2);
-				  e += std::pow(dalphadr(i), 2);
-				}, error);
-	  error /= 8*npoints;
-	  error = std::sqrt(error);
-	  REQUIRE( error <= 1e-12 );
-	}
+      THEN("We can integrate along the hypersurface, with initial guesses A=1, K=0") {
+        GR1D::IntegrateHypersurface(pkg.get());
+        AND_THEN("The solution converges identically to a=alpha=1, everything else 0") {
+          Real error = 0;
+          parthenon::par_reduce(
+              parthenon::loop_pattern_flatrange_tag, "Check solution trivial",
+              parthenon::DevExecSpace(), 0, npoints - 1,
+              KOKKOS_LAMBDA(const int i, Real &e) {
+                e += pow(hypersurface(iA, i) - 1, 2);
+                e += pow(hypersurface(iK, i), 2);
+              },
+              error);
+          error /= 3 * npoints;
+          error = std::sqrt(error);
+          REQUIRE(error <= 1e-12);
+        }
       }
     }
 
@@ -137,13 +135,17 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
       constexpr Real eps_eos = 1e-2;
       constexpr Real Gamma_eos = 4. / 3.;
 
+      Real amp = 1e-4;
+      Real mu = 10;
+      Real sigma = 10;
       parthenon::par_for(
           parthenon::loop_pattern_flatrange_tag, "Set matter grid, stationary",
           parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
             Real r = radius.x(i);
-            rho(i) = Gaussian(r, 0.005, 20, 5);
-            j(i) = -1e-4*rho(i);
-            S(i) = 0;//3 * (Gamma_eos - 1.) * rho(i) * eps_eos;
+            Real rho = Gaussian(r, amp, mu, sigma);
+            matter(iRHO, i) = rho;
+            matter(iJ, i) = r*1e-2 * rho;
+            matter(iS, i) = 3 * (Gamma_eos - 1.) * rho * eps_eos;
           });
       THEN("We can retrieve this information") {
         int nwrong = 0;
@@ -151,26 +153,36 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
             parthenon::loop_pattern_flatrange_tag, "Check rho grid",
             parthenon::DevExecSpace(), 0, npoints - 1,
             KOKKOS_LAMBDA(const int i, int &nw) {
-	      Real r = radius.x(i);
-              if (rho(i) != Gaussian(r, 0.005, 20, 5)) nw += 1;
-              if (j(i) != -1e-4*rho(i)) nw += 1;
-	      if (S(i) != 0) nw += 1;
-              //if (S(i) != 3 * (Gamma_eos - 1.) * rho(i) * eps_eos) nw += 1;
+              Real r = radius.x(i);
+              Real rho = Gaussian(r, amp, mu, sigma);
+              if (matter(iRHO, i) != rho) {
+                nw += 1;
+              }
+              if (matter(iJ, i) != r*1e-2 * rho) {
+                nw += 1;
+              }
+              if (matter(iS, i) != 3 * (Gamma_eos - 1.) * rho * eps_eos) {
+                nw += 1;
+              }
             },
             nwrong);
         REQUIRE(nwrong == 0);
       }
-      THEN("The solver can converge") {
-	for (int niters = 0; niters < NITERS_MAX; niters += niters_check) {
-	  std::cout << "niters = " << niters << std::endl;
-	  GR1D::IterativeSolve(pkg.get());
-	  if (GR1D::Converged(pkg.get())) break;
-	}
-	REQUIRE( GR1D::Converged(pkg.get()) );
-
-	AND_THEN("We can output the solver data") {
-	  GR1D::DumpToTxt("gr1d.dat", pkg.get());
-	}
+      WHEN("We integrate the hypersurface") {
+        GR1D::IntegrateHypersurface(pkg.get());
+        THEN("We can solve for alpha via Jacobi") {
+	  auto error_tol = params.Get<Real>("error_tolerance");
+          for (int niters = 0; niters < NITERS_MAX; niters += niters_check) {
+            GR1D::JacobiStepForLapse(pkg.get());
+	    Real err = GR1D::LapseError(pkg.get());
+	    printf("iter %d, err = %14e\n", niters, err);
+            if (err < error_tol) break;
+          }
+          REQUIRE(GR1D::LapseConverged(pkg.get()));
+          AND_THEN("We can output the solver data") {
+            GR1D::DumpToTxt("gr1d.dat", pkg.get());
+          }
+        }
       }
     }
   }
