@@ -129,9 +129,14 @@ using namespace parthenon::package::prelude;
 
 namespace GR1D {
 
-// TODO(JMM): This is pretty manual and might be annoying to loop through.
-using Matter_t = parthenon::ParArray2D<Real>;
-using Matter_host_t = typename Matter_t::HostMirror;
+/*
+  Array structure:
+  Slowest moving index is refinement level. 0 is finest.
+  Next index is variable (if appropriate)
+  Next index is grid point
+ */
+using Matter_t = parthenon::ParArrayND<Real>;
+using Matter_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
 constexpr int NMAT = 3;
 constexpr int NMAT_H = NMAT - 1;
@@ -141,8 +146,8 @@ enum Matter {
   trcS = 2 // Trace of the stress tensor: S = S^i_i
 };
 
-using Hypersurface_t = parthenon::ParArray2D<Real>;
-using Hypersurface_host_t = typename Hypersurface_t::HostMirror;
+using Hypersurface_t = parthenon::ParArrayND<Real>;
+using Hypersurface_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
 constexpr int NHYPER = 2;
 enum Hypersurface {
@@ -150,7 +155,7 @@ enum Hypersurface {
   K = 1  // K^r_r, extrinsic curvature
 };
 
-using Alpha_t = parthenon::ParArray1D<Real>;
+using Alpha_t = parthenon::ParArrayND<Real>;
 
 // TODO(JMM): Do we want this?
 using Radius = Spiner::RegularGrid1D;
