@@ -29,6 +29,41 @@
 using namespace parthenon::package::prelude;
 
 namespace GR1D {
+
+namespace ShootingMethod {
+KOKKOS_INLINE_FUNCTION
+Real get_arhs(Real a, Real K, Real r, Real rho) {
+  return (r <= 0)
+             ? 0
+             : (a / (2. * r)) * (r * r * (16 * M_PI * rho - (3. / 2.) * K * K) - a + 1);
+}
+KOKKOS_INLINE_FUNCTION
+Real get_Krhs(Real a, Real K, Real r, Real j) {
+  return (r <= 0) ? 0 : 8 * M_PI * a * a * j - (3. / r) * K;
+}
+KOKKOS_INLINE_FUNCTION
+void hypersurface_rhs(Real r, const Real in[NHYPER], const Real matter[NMAT],
+                      Real out[NHYPER]) {
+  Real a = in[Hypersurface::A];
+  Real K = in[Hypersurface::K];
+  Real rho = matter[Matter::RHO];
+  Real j = matter[Matter::J_R];
+  out[Hypersurface::A] = get_arhs(a, K, r, rho);
+  out[Hypersurface::K] = get_Krhs(a, K, r, j);
+}
+
+template <typename H, typename M>
+KOKKOS_INLINE_FUNCTION void get_residual(const H &h, const M &m, Real r, int npoints,
+                                         Real R[NHYPER]) {
+  Real a = h(Hypersurface::A, npoints - 1);
+  Real K = h(Hypersurface::K, npoints - 1);
+  Real rho = m(Matter::RHO, npoints - 1);
+  Real dadr = get_arhs(a, K, r, rho);
+  R[Hypersurface::A] = (a - a * a * a) / (2 * r) - dadr;
+  R[Hypersurface::K] = K;
+}
+} // namespace ShootingMethod
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto gr1d = std::make_shared<StateDescriptor>("GR1D");
   Params &params = gr1d->AllParams();
@@ -43,12 +78,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("npoints", npoints);
 
   // Number of iterations per cycle, before checking error
-  int niters_check = pin->GetOrAddInteger("GR1D", "niters_check", 10000);
+  int niters_check = pin->GetOrAddInteger("GR1D", "niters_check", 1000);
   PARTHENON_REQUIRE_THROWS(niters_check > 0, "niters must be strictly positive");
   params.Add("niters_check", niters_check);
 
   // Error tolerance
-  Real error_tolerance = pin->GetOrAddReal("GR1D", "error_tolerance", 1e-4);
+  Real error_tolerance = pin->GetOrAddReal("GR1D", "error_tolerance", 1e-6);
   PARTHENON_REQUIRE_THROWS(error_tolerance > 0,
                            "Error tolerance must be strictly positive");
   params.Add("error_tolerance", error_tolerance);
@@ -60,44 +95,35 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("rin", rin);
   params.Add("rout", rout);
 
-  // Jacobi Step size
-  Real jacobi_step_size = pin->GetOrAddReal("GR1D", "jacobi_step_size", 1e-6);
-  params.Add("jacobi_step_size", jacobi_step_size);
-
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
-  Grids grids;
-  grids.a = Grids::Grid_t("GR1D a", npoints);
-  grids.lna = Grids::Grid_t("GR1D ln(a)", npoints);
-  grids.dlnadr = Grids::Grid_t("GR1D dln(a)/dr", npoints);
-  grids.delta_a = Grids::Grid_t("GR1D delta a", npoints);
-  grids.K_rr = Grids::Grid_t("GR1D K^r_r", npoints);
-  grids.dKdr = Grids::Grid_t("GR1D dK/dr", npoints);
-  grids.delta_K = Grids::Grid_t("GR1D delta K", npoints);
-  grids.alpha = Grids::Grid_t("GR1D alpha", npoints);
-  grids.dalphadr = Grids::Grid_t("GR1D dalpha/dr", npoints);
-  grids.delta_alpha = Grids::Grid_t("GR1D delta alpha", npoints);
-  grids.rho = Grids::Grid_t("GR1D rho", npoints);
-  grids.j_r = Grids::Grid_t("GR1D j^r", npoints);
-  grids.trcS = Grids::Grid_t("GR1D S", npoints);
+  Matter_t matter("GR1D matter grid", NMAT, npoints);
+  Matter_host_t matter_h = Kokkos::create_mirror_view(matter);
+  Hypersurface_t hypersurface("GR1D hypersurface grid", NHYPER, npoints);
+  Hypersurface_host_t hypersurface_h = Kokkos::create_mirror_view(hypersurface);
+  Alpha_t alpha("GR1D lapse grid", npoints);
+  Alpha_t dalpha("GR1D delta lapse grid", npoints);
 
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "GR1D initialize grids",
       parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
-        grids.a(i) = 1;
-        grids.lna(i) = 0;
-        grids.dlnadr(i) = 0;
-        grids.K_rr(i) = 0;
-        grids.dKdr(i) = 0;
-        grids.alpha(i) = 1;
-        grids.dalphadr(i) = 0;
-        grids.rho(i) = 0;
-        grids.j_r(i) = 0;
-        grids.trcS(i) = 0;
+        for (int v = 0; v < NMAT; ++v) {
+          matter(v, i) = 0;
+        }
+        hypersurface(Hypersurface::A, i) = 1;
+        hypersurface(Hypersurface::K, i) = 0;
+        alpha(i) = 100;
+        dalpha(i) = 0;
       });
+  Kokkos::deep_copy(matter_h, matter);
+  Kokkos::deep_copy(hypersurface_h, hypersurface);
 
-  // TODO(JMM): Initialize all grids to zero
-  params.Add("grids", grids);
+  params.Add("matter", matter);
+  params.Add("matter_h", matter_h);
+  params.Add("hypersurface", hypersurface);
+  params.Add("hypersurface_h", hypersurface_h);
+  params.Add("lapse", alpha);
+  params.Add("delta_lapse", dalpha);
 
   // The radius object, returns radius vs index and index vs radius
   Radius radius(rin, rout, npoints);
@@ -106,7 +132,74 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return gr1d;
 }
 
-TaskStatus IterativeSolve(StateDescriptor *pkg) {
+TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
+  using namespace ShootingMethod;
+
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+
+  auto &params = pkg->AllParams();
+
+  auto enabled = params.Get<bool>("enable_gr1d");
+  if (!enabled) return TaskStatus::complete;
+
+  auto npoints = params.Get<int>("npoints");
+  auto radius = params.Get<GR1D::Radius>("radius");
+  auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
+  auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
+  auto matter = params.Get<Matter_t>("matter");
+  auto matter_h = params.Get<Matter_host_t>("matter_h");
+
+  Kokkos::deep_copy(matter_h, matter);
+
+  int iA = Hypersurface::A;
+  int iK = Hypersurface::K;
+  int irho = Matter::RHO;
+  int iJ = Matter::J_R;
+  Real dr = radius.dx();
+
+  Real state[NHYPER];
+  Real k1[NHYPER];
+  Real src[NMAT_H];
+  Real src_k[NMAT_H];
+  Real rhs[NHYPER];
+  Real rhs_k[NHYPER];
+
+  hypersurface_h(iA, 0) = 1.0;
+  hypersurface_h(iK, 0) = 0.0;
+  for (int i = 0; i < npoints - 1; ++i) {
+    Real r = radius.x(i);
+#pragma omp simd
+    for (int v = 0; v < NHYPER; ++v) {
+      state[v] = hypersurface_h(v, i);
+    }
+#pragma omp simd
+    for (int v = 0; v < NMAT_H; ++v) {
+      src[v] = matter_h(v, i);
+    }
+
+    hypersurface_rhs(r, state, src, rhs);
+#pragma omp simd
+    for (int v = 0; v < NHYPER; ++v) {
+      k1[v] = state[v] + 0.5 * dr * rhs[v];
+    }
+#pragma omp simd
+    for (int v = 0; v < NMAT_H; ++v) {
+      src_k[v] = 0.5 * (matter_h(v, i) + matter_h(v, i + 1));
+    }
+    hypersurface_rhs(r, k1, src_k, rhs_k);
+#pragma omp simd
+    for (int v = 0; v < NHYPER; ++v) {
+      hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr * rhs_k[v];
+    }
+  }
+
+  Kokkos::deep_copy(hypersurface, hypersurface_h);
+
+  return TaskStatus::complete;
+}
+
+TaskStatus JacobiStepForLapse(StateDescriptor *pkg) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
   auto &params = pkg->AllParams();
 
   auto enabled = params.Get<bool>("enable_gr1d");
@@ -114,28 +207,21 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
 
   auto npoints = params.Get<int>("npoints");
   auto niters_check = params.Get<int>("niters_check");
-  auto radius = params.Get<GR1D::Radius>("radius");
-  auto jacobi_step_size = params.Get<Real>("jacobi_step_size");
-  auto grids = params.Get<GR1D::Grids>("grids");
-
   auto error_tolerance = params.Get<Real>("error_tolerance");
+  auto radius = params.Get<GR1D::Radius>("radius");
 
-  auto a = grids.a;
-  auto lna = grids.lna;
-  auto dlnadr = grids.dlnadr;
-  auto delta_a = grids.delta_a;
-  auto K = grids.K_rr;
-  auto dKdr = grids.dKdr;
-  auto delta_K = grids.delta_K;
-  auto alpha = grids.alpha;
-  auto dalphadr = grids.dalphadr;
-  auto delta_alpha = grids.delta_alpha;
-  auto rho = grids.rho;
-  auto j = grids.j_r;
-  auto S = grids.trcS;
+  auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
+  auto matter = params.Get<Matter_t>("matter");
+  auto alpha = params.Get<Alpha_t>("lapse");
+  auto dalpha = params.Get<Alpha_t>("delta_lapse");
+
   const Real dr = radius.dx();
 
-  Real tau = jacobi_step_size*dr*dr;
+  const int iA = GR1D::Hypersurface::A;
+  const int iK = GR1D::Hypersurface::K;
+  const int iRHO = GR1D::Matter::RHO;
+  const int iJ = GR1D::Matter::J_R;
+  const int iS = GR1D::Matter::trcS;
 
   // Do we actually need scratch?
   int scratch_level = 1;
@@ -148,59 +234,52 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
       scratch_size_in_bytes, scratch_level, 1, 1,
       KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int team) {
         for (int iter = 0; iter < niters_check; ++iter) {
-          // logs, temps
-          par_for_inner(member, 0, npoints - 1,
-                        [&](const int i) { lna(i) = std::log(a(i)); });
-          member.team_barrier();
-
-          // FD
-          SummationByPartsFD4(member, lna, dlnadr, npoints, dr);
-          SummationByPartsFD4(member, K, dKdr, npoints, dr);
-          // SummationByPartsFD4(member, alpha, dalphadr, npoints, dr);
-          member.team_barrier();
 
           // Deltas
-          par_for_inner(member, 0, npoints - 1, [&](const int i) {
+          par_for_inner(member, 1, npoints - 2, [&](const int i) {
             Real r = radius.x(i);
 
-            delta_a(i) = r * r * (16 * M_PI * rho(i) - (3. / 2.) * K(i) * K(i)) -
-                         2 * r * dlnadr(i) + 1;
-            delta_a(i) -= a(i);
+            Real a = hypersurface(iA, i);
+            Real K = hypersurface(iK, i);
+            Real rho = matter(iRHO, i);
+            Real S = matter(iS, i);
 
-            delta_K(i) = (r / 3.) * (8 * M_PI * a(i) * a(i) * j(i) - dKdr(i));
-            delta_K(i) -= K(i);
+            Real dadr = ShootingMethod::get_arhs(a, K, r, rho);
 
-            // delta_alpha(i) = aleph(i) - dalphadr(i);
-            // delta_aleph(i) = a(i) * a(i) * alpha(i) *
-            //                      ((3 / 2) * K(i) * K(i) + 4 * M_PI * (rho(i) + S(i))) -
-            //   dadr(i) * aleph(i)/ (std::abs(a(i)) + 1e-20) - dalephdr(i);
+            // Formula from mathematica. Unweighted Jacobi
+	    /*
+            dalpha(i) = ((2 * a * dadr * dr) * alpha(i - 1) +
+                         (2 * a + dadr * dr) * alpha(i + 1)) /
+                        (a * (4 + a * a * dr * dr * (3 * K * K + 8 * M_PI * (rho + S))));
+	    */
+            dalpha(i) =
+                ((2 * a - dadr * dr) * alpha(i - 1) + (2 * a + dadr * dr) * alpha(i + 1) -
+                 a * a * a * dr * dr * (3 * K * K + 8 * M_PI * (S + rho)) * alpha(i)) /
+                (4 * a);
+            if (dalpha(i) < error_tolerance) dalpha(i) = 1;
+            // printf("%d: alphanew = %14e\n", i, dalpha(i));
+
+            dalpha(i) -= alpha(i); // make it a delta
           });
           member.team_barrier();
 
           // Boundary conditions
           // r = 0
-          delta_a(0) = a(1) - a(0);
-          delta_K(0) = K(1) - K(0);
+          dalpha(0) = alpha(1) - alpha(0);
           // r outer
-          Real aout = a(npoints - 1);
-          Real aout3 = aout * aout * aout;
+	  /*
+          Real aout = hypersurface(iA, npoints - 1);
           Real rmax = radius.max();
-          delta_a(npoints - 1) = dr * (aout - aout3) / (2. * rmax) + a(npoints - 2);
-          delta_a(npoints - 1) -= a(npoints - 1);
-          delta_K(npoints - 1) = -K(npoints - 1); // K -> 0
+          dalpha(npoints - 1) =
+             dr * ((1 - aout) / (rmax * aout)) + alpha(npoints - 2) - alpha(npoints -
+             1);
+	  */
+          dalpha(npoints - 1) = 1 - alpha(npoints - 1);
           member.team_barrier();
 
           // Update
-          //printf("%d\n", iter);
-          par_for_inner(member, 0, npoints - 1, [&](const int i) {
-            // printf("\t%d: %14e %14e %14e %14e %14e %14e %14e\n", i, a(i), K(i), lna(i),
-            //        dlnadr(i), dKdr(i), delta_a(i), delta_K(i));
-            a(i) += tau*delta_a(i);
-            K(i) += tau*delta_K(i);
-	    // ensure a is strictly positive
-	    a(i) = std::max(error_tolerance, a(i));
-            // alpha(i) -= tau * delta_alpha(i);
-          });
+          par_for_inner(member, 0, npoints - 1,
+                        [&](const int i) { alpha(i) += (2./3.)*dalpha(i); });
           member.team_barrier();
         }
       });
@@ -208,7 +287,8 @@ TaskStatus IterativeSolve(StateDescriptor *pkg) {
   return TaskStatus::complete;
 }
 
-bool Converged(StateDescriptor *pkg) {
+Real LapseError(StateDescriptor *pkg) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
   auto &params = pkg->AllParams();
 
   auto enabled = params.Get<bool>("enable_gr1d");
@@ -216,24 +296,40 @@ bool Converged(StateDescriptor *pkg) {
 
   auto npoints = params.Get<int>("npoints");
   auto error_tolerance = params.Get<Real>("error_tolerance");
-  auto grids = params.Get<GR1D::Grids>("grids");
+
+  auto alpha = params.Get<Alpha_t>("lapse");
+  auto dalpha = params.Get<Alpha_t>("delta_lapse");
 
   Real max_err = 0;
   parthenon::par_reduce(
       parthenon::loop_pattern_flatrange_tag, "GR1D: CheckConvergence",
       parthenon::DevExecSpace(), 0, npoints - 1,
       KOKKOS_LAMBDA(const int i, Real &eps) {
-        eps = std::max(eps, GetError(grids.a, grids.delta_a, i));
-        eps = std::max(eps, GetError(grids.K_rr, grids.delta_K, i));
-        //printf("\terr = %14g\n", eps);
+        Real reps = std::abs(dalpha(i) / (alpha(i) + error_tolerance));
+        Real aeps = std::abs(dalpha(i));
+        eps = std::max(eps, std::min(reps, aeps));
+        PARTHENON_REQUIRE(!(std::isnan(reps) || std::isnan(aeps)), "NaNs detected!");
       },
       Kokkos::Max<Real>(max_err));
   max_err = std::abs(max_err);
-  printf("max error = %.14e\n", max_err);
+  return max_err;
+}
+
+bool LapseConverged(StateDescriptor *pkg) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  auto &params = pkg->AllParams();
+
+  auto enabled = params.Get<bool>("enable_gr1d");
+  if (!enabled) return true;
+
+  auto error_tolerance = params.Get<Real>("error_tolerance");
+  Real max_err = LapseError(pkg);
+
   return max_err < error_tolerance;
 }
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
   auto &params = pkg->AllParams();
 
   auto enabled = params.Get<bool>("enable_gr1d");
@@ -241,36 +337,28 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
 
   auto npoints = params.Get<int>("npoints");
   auto radius = params.Get<GR1D::Radius>("radius");
-  auto grids = params.Get<GR1D::Grids>("grids");
 
-  auto a = grids.a;
-  auto K = grids.K_rr;
-  auto alpha = grids.alpha;
-  auto rho = grids.rho;
-  auto j = grids.j_r;
-  auto S = grids.trcS;
+  auto matter = params.Get<Matter_t>("matter");
+  auto matter_h = params.Get<Matter_host_t>("matter_h");
+  auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
+  auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
+  auto alpha = params.Get<Alpha_t>("lapse");
 
-  auto a_h = Kokkos::create_mirror_view(a);
-  auto K_h = Kokkos::create_mirror_view(K);
   auto alpha_h = Kokkos::create_mirror_view(alpha);
-  auto rho_h = Kokkos::create_mirror_view(rho);
-  auto j_h = Kokkos::create_mirror_view(j);
-  auto S_h = Kokkos::create_mirror_view(S);
 
-  Kokkos::deep_copy(a_h, a);
-  Kokkos::deep_copy(K_h, K);
+  Kokkos::deep_copy(matter_h, matter);
+  Kokkos::deep_copy(hypersurface_h, hypersurface);
   Kokkos::deep_copy(alpha_h, alpha);
-  Kokkos::deep_copy(rho_h, rho);
-  Kokkos::deep_copy(j_h, j);
-  Kokkos::deep_copy(S_h, S);
 
   FILE *pf;
   pf = fopen(filename.c_str(), "w");
   fprintf(pf, "#r\ta\tK\talpha\trho\tj\tS\n");
   for (int i = 0; i < npoints; ++i) {
     Real r = radius.x(i);
-    fprintf(pf, "%.8e %.8e %.8e %.8e %.8e %.8e %.8e\n", r, a_h(i), K_h(i), alpha_h(i),
-            rho_h(i), j_h(i), S_h(i));
+    fprintf(pf, "%.8e %.8e %.8e %.8e %.8e %.8e %.8e\n", r,
+            hypersurface_h(Hypersurface::A, i), hypersurface_h(Hypersurface::K, i),
+            alpha_h(i), matter_h(Matter::RHO, i), matter_h(Matter::J_R, i),
+            matter_h(Matter::trcS, i));
   }
   fclose(pf);
 }
