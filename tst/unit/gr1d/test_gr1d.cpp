@@ -13,8 +13,11 @@
 // publicly, and to permit others to do so.
 // ======================================================================
 
-// stdlib includes
+// C stdlib includes
 #include <cmath>
+
+// C++ stdlib includes
+#include <chrono>
 
 // External includes
 #include "catch2/catch.hpp"
@@ -30,10 +33,12 @@
 #include "gr1d/gr1d.hpp"
 
 using namespace parthenon::package::prelude;
+using Duration_t = std::chrono::microseconds;
 
-constexpr int NPOINTS = 256; // just different from what's in grid.cpp
-constexpr Real ROUT = 90;
-constexpr int NITERS_MAX = 1000000;
+constexpr int NPOINTS = 1024; // just different from what's in grid.cpp
+constexpr Real ROUT = 512;
+constexpr int NITERS_MAX   = 100000000;
+constexpr int NITERS_CHECK = 1000000;
 
 KOKKOS_INLINE_FUNCTION
 Real Gaussian(const Real x, const Real a, const Real b, const Real c) {
@@ -68,7 +73,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     pin->SetBoolean("GR1D", "enabled", true);
     pin->SetInteger("GR1D", "npoints", NPOINTS);
     pin->SetReal("GR1D", "rout", ROUT);
-    pin->SetReal("GR1D", "niters_check", 10000);
+    pin->SetInteger("GR1D", "niters_check", NITERS_CHECK);
 
     auto pkg = GR1D::Initialize(pin);
     auto &params = pkg->AllParams();
@@ -79,13 +84,12 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     auto rout = params.Get<Real>("rout");
     auto radius = params.Get<GR1D::Radius>("radius");
 
-    auto niters_check = params.Get<int>("niters_check");
-
     THEN("The params match our expectations") {
       REQUIRE(enabled);
       REQUIRE(npoints == NPOINTS);
       REQUIRE(rin == 0);
       REQUIRE(rout == ROUT);
+      REQUIRE(params.Get<int>("niters_check") == NITERS_CHECK);
     }
 
     THEN("The radius object works as expected") {
@@ -169,15 +173,29 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
         REQUIRE(nwrong == 0);
       }
       WHEN("We integrate the hypersurface") {
+	auto start = std::chrono::high_resolution_clock::now();
         GR1D::IntegrateHypersurface(pkg.get());
+	auto stop = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<Duration_t>(stop-start);
+	printf("Time for integrate hypersurface with %d points = %ld microseconds\n",
+	       NPOINTS, duration.count());
         THEN("We can solve for alpha via Jacobi") {
 	  auto error_tol = params.Get<Real>("error_tolerance");
-          for (int niters = 0; niters < NITERS_MAX; niters += niters_check) {
+	  auto niters_check = params.Get<int>("niters_check");
+	  start = std::chrono::high_resolution_clock::now();
+	  int niters;
+          for (niters = 0; niters < NITERS_MAX; niters += niters_check) {
             GR1D::JacobiStepForLapse(pkg.get());
 	    Real err = GR1D::LapseError(pkg.get());
 	    printf("iter %d, err = %14e\n", niters, err);
             if (err < error_tol) break;
           }
+	  stop = std::chrono::high_resolution_clock::now();
+	  duration = std::chrono::duration_cast<Duration_t>(stop-start);
+	  printf("Time for lapse with %d points, %d interations = %ld microseconds\n"
+		 "=> %14e microseconds / point*iteration\n",
+		 NPOINTS, niters, duration.count(),
+		 static_cast<Real>(duration.count())/(NPOINTS*niters));
           REQUIRE(GR1D::LapseConverged(pkg.get()));
           AND_THEN("We can output the solver data") {
             GR1D::DumpToTxt("gr1d.dat", pkg.get());
