@@ -267,14 +267,15 @@ TaskStatus JacobiStepForLapse(StateDescriptor *pkg) {
           // r = 0
           dalpha(0) = alpha(1) - alpha(0);
           // r outer
+          dalpha(npoints - 1) = 1 - alpha(npoints - 1);
 	  /*
+	  // Robin boundary condition seems to work less well
           Real aout = hypersurface(iA, npoints - 1);
           Real rmax = radius.max();
           dalpha(npoints - 1) =
              dr * ((1 - aout) / (rmax * aout)) + alpha(npoints - 2) - alpha(npoints -
              1);
 	  */
-          dalpha(npoints - 1) = 1 - alpha(npoints - 1);
           member.team_barrier();
 
           // Update
