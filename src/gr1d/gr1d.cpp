@@ -131,7 +131,6 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
   auto matter = params.Get<Matter_t>("matter");
 
-
   auto matter_fine = matter.Get<2>();
   auto hypersurface_fine = hypersurface.Get<2>();
 
@@ -245,7 +244,7 @@ TaskStatus JacobiStepForLapse(StateDescriptor *pkg) {
                 ((2 * a - dadr * dr) * alpha(i - 1) + (2 * a + dadr * dr) * alpha(i + 1) -
                  a * a * a * dr * dr * (3 * K * K + 8 * M_PI * (S + rho)) * alpha(i)) /
                 (4 * a);
-            if (dalpha(i) < error_tolerance) dalpha(i) = 1;
+            if (dalpha(i) < error_tolerance) dalpha(i) = error_tolerance;
             // printf("%d: alphanew = %14e\n", i, dalpha(i));
 
             dalpha(i) -= alpha(i); // make it a delta
@@ -256,15 +255,13 @@ TaskStatus JacobiStepForLapse(StateDescriptor *pkg) {
           // r = 0
           dalpha(0) = alpha(1) - alpha(0);
           // r outer
-          dalpha(npoints - 1) = 1 - alpha(npoints - 1);
-          /*
-          // Robin boundary condition seems to work less well
-          Real aout = hypersurface(iA, npoints - 1);
           Real rmax = radius.max();
-          dalpha(npoints - 1) =
-             dr * ((1 - aout) / (rmax * aout)) + alpha(npoints - 2) - alpha(npoints -
-             1);
-          */
+          dalpha(npoints - 1) = (dr + rmax*alpha(npoints - 2))/(dr + rmax);
+          if (dalpha(npoints - 1) < error_tolerance)
+            dalpha(npoints - 1) = error_tolerance;
+	  if (dalpha(npoints - 1) > 1)
+	    dalpha(npoints - 1) = 1;
+	  dalpha(npoints - 1) -= alpha(npoints - 1);
           member.team_barrier();
 
           // Update

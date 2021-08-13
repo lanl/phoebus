@@ -97,7 +97,7 @@ using namespace parthenon::package::prelude;
   at outer boundary (idealy r = infinity):
      da/dr = (a - a^3) / 2 r OR a = 1
      K^r_r = 0
-     a (dalpha/dr) = (1 - a)/r     OR alpha = 1
+     alpha = 1 - r (dalpha/dr) OR alpha = 1
 
   MATTER COMPONENTS:
   ------------------

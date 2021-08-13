@@ -193,9 +193,9 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
 	  stop = std::chrono::high_resolution_clock::now();
 	  duration = std::chrono::duration_cast<Duration_t>(stop-start);
 	  printf("Time for lapse with %d points, %d interations = %ld microseconds\n"
-		 "=> %14e microseconds / point*iteration\n",
+		 "=> %14e microseconds / iteration\n",
 		 NPOINTS, niters, duration.count(),
-		 static_cast<Real>(duration.count())/(NPOINTS*niters));
+		 static_cast<Real>(duration.count())/(niters));
           REQUIRE(GR1D::LapseConverged(pkg.get()));
           AND_THEN("We can output the solver data") {
             GR1D::DumpToTxt("gr1d.dat", pkg.get());
