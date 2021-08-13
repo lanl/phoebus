@@ -23,7 +23,7 @@ namespace Microphysics {
 
 namespace EOS {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-}
+} // namespace EOS
 
 } // namespace Microphysics
 

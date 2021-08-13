@@ -13,3 +13,4 @@
 
 add_subdirectory(geometry)
 add_subdirectory(gr1d)
+add_subdirectory(phoebus_utils)

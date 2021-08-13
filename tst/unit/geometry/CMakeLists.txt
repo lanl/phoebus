@@ -12,6 +12,7 @@
 
 add_library(geometry_unit_tests OBJECT
   test_geometry.cpp
+  test_tetrads.cpp
 
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/analytic_system.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/boyer_lindquist.hpp
