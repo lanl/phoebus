@@ -33,6 +33,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("fluid");
   Params &params = physics->AllParams();
 
+  const bool hydro = pin->GetBoolean("physics", "hydro");
+  params.Add("hydro", hydro);
+
   Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
   params.Add("cfl", cfl);
 
@@ -410,6 +413,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
+  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+    return TaskStatus::complete;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -484,12 +489,15 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 
 
       });
+
   return TaskStatus::complete;
 }
 
 // template <typename T>
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
+  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+    return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
   auto sig = rc->Get(internal_variables::face_signal_speed).data;

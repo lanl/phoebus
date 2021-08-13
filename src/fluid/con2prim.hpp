@@ -24,7 +24,7 @@
 using namespace parthenon::package::prelude;
 
 // singulaarity
-#include <eos/eos.hpp>
+#include <singularity-eos/eos/eos.hpp>
 
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
@@ -226,7 +226,11 @@ private:
         sconi += g.gcon[i][j] * v(cmom_lo + j);
       }
       sconi *= igdet;
-      v(pvel_lo + i) = izbsq * (sconi + BdotS * v(pb_lo + i) / z);
+      if (pb_lo > 0) {
+        v(pvel_lo + i) = izbsq * (sconi + BdotS * v(pb_lo + i) / z);
+      } else {
+        v(pvel_lo + i) = izbsq * sconi;
+      }
     }
 
     // cell-centered signal speeds

@@ -20,7 +20,7 @@
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
-#include <eos/eos.hpp>
+#include <singularity-eos/eos/eos.hpp>
 #include "con2prim.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
