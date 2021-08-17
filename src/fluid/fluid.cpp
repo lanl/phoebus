@@ -185,10 +185,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // DIAGNOSTIC STUFF FOR DEBUGGING
   std::vector<int> five_vec(1,5);
-  Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
+  Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                              Metadata::Derived, Metadata::OneCopy},
                              five_vec);
-  physics->AddField("flux_divergence", mdiag);
+  physics->AddField("flux_divergence", mdiv);
+  std::vector<int> seven_vec(1,7);
+  Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
+                             Metadata::Derived, Metadata::OneCopy},
+                             seven_vec);
   physics->AddField("src_terms", mdiag);
 
 
@@ -568,6 +572,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
           diag(4,k,j,i) = src(ceng,k,j,i);
+          diag(5,k,j,i) = gdet*alpha*Ta;
+          diag(6,k,j,i) = -gdet*alpha*TGam;
           //std::cerr << Ta << " " << TGam << std::endl;
         }
 

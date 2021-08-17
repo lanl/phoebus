@@ -83,13 +83,14 @@ he = false
 rad = false
 
 <fluid>
-bc_vars = primitive
+#bc_vars = primitive
 xorder = 2
 cfl = 0.8
 riemann = llf
-recon = linear
+recon = weno5
 c2p_max_iter = 100
 c2p_tol = 1.e-8
+c2p_method = robust
 Ye = false
 mhd = true
 
@@ -102,16 +103,21 @@ r_outer = 40.0
 
 <fixup>
 enable_floors = true
-enable_flux_fixup = true
+enable_ceilings = true
+enable_flux_fixup = false
+enable_c2p_fixup = true
 floor_type = ExpX1RhoSie
-rho0 = 1.0e-8
-sie0 = 1.0e-3
-rho_exp = -2.0
-sie_exp = -1.0
+rho0_floor = 1.0e-8
+sie0_floor = 1.0e-3
+rho_exp_floor = -2.0
+sie_exp_floor = -1.0
+ceiling_type = ConstantGamSie
+sie0_ceiling = 1.0;
+gam0_ceiling = 10.0;
 
 <torus>
 u_jitter = 0.0
-Bnorm = 0.01
+Bnorm = 0.0 #0.001
 kappa = 0.01
 rin = 8.0
 rmax = 15.0
