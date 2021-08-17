@@ -44,7 +44,7 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 256        # Number of zones in X1-direction
+nx1         = 256       # Number of zones in X1-direction
 x1min       = 0.59           # minimum value of X1
 x1max       = 5           # maximum value of X1
 ix1_bc      = outflow  # Inner-X1 boundary condition flag
@@ -77,7 +77,7 @@ max_level = 3
 <eos>
 type = IdealGas
 Gamma = 1.4
-Cv = 2.5 
+Cv = 2.5
 
 <physics>
 hydro = true
@@ -90,13 +90,14 @@ xorder = 2
 cfl = 0.8
 riemann = llf
 recon = linear
+c2p_method = classic
 c2p_max_iter = 100
 c2p_tol = 1.e-8
 Ye = false
 
 <geometry>
 a = 0
-    
+
 <coordinates>
 derefine_poles = false
 
