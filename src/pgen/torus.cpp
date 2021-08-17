@@ -247,11 +247,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     });
 
   //Real bsq_max;
-  
+  Real beta_min;
   if (ibhi > 0) {
-  pmb->par_for(
+  pmb->par_reduce(
     "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e-1, ib.s, ib.e-1,
-    KOKKOS_LAMBDA(const int k, const int j, const int i) { //, Real &b2max) {
+    KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bmin) {
       const Real gdet = geom.DetGamma(CellLocation::Cent,k,j,i);
       v(iblo,k,j,i) = - ( A(j,i) - A(j+1,i)
                          + A(j,i+1) - A(j+1,i+1) ) 
@@ -266,7 +266,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
 
       // compute bsq for max
-      /*Real vsq = 0.0;
+      Real vsq = 0.0;
       Real Bsq = 0.0;
       Real Bdotv = 0.0;
       Real gcov[3][3];
@@ -279,9 +279,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real W = 1.0/std::sqrt(1.0 - vsq);
       Real b0 = W*Bdotv;
       Real bsq = (Bsq + b0*b0)/(W*W);
-
-      if (bsq > b2max) b2max = bsq;*/
-    });//, Kokkos::Max(bsq_max));
+      Real beta = v(iprs,k,j,i)/(0.5*bsq + 1.e-10);
+      if (v(irho,k,j,i) > 1.e-8 && beta < bmin) bmin = beta;
+      //if (bsq > b2max) b2max = bsq;
+    }, Kokkos::Min<Real>(beta_min));
+    if (parthenon::Globals::my_rank == 0)
+      std::cout << "beta_min = " << beta_min << std::endl;
   }
   // now normalize the b-field
   fluid::PrimitiveToConserved(rc);
