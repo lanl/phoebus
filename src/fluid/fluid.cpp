@@ -590,6 +590,11 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
         }
 
+        if (i == 128) {
+          printf("src: %e %e %e %e\n", src(ceng,k,j,i), src(cmom_lo,k,j,i),
+            src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i));
+        }
+
 
       });
 
@@ -662,6 +667,11 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     PARTHENON_THROW("Invalid riemann solver option.");
   }
 #undef FLUX
+
+  printf("i = 128: DF\n");
+  for (int n = 0; n < 5; n++) {
+    printf("  [%i] %e\n", n, flux.v.flux(1,n,0,0,129) - flux.v.flux(1,n,0,0,128));
+  }
 
   return TaskStatus::complete;
 }

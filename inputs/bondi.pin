@@ -25,26 +25,29 @@ variables = p.density,  &
 	    c.energy,   &
 	    pressure,	&
 	    cs, &
-	    p.ye &
-	    g.c.coord &
-	    g.n.coord
+	    p.ye, &
+	    g.c.coord, &
+	    g.n.coord, &
+      src_terms, &
+      flux_divergence
 
 file_type   = hdf5      # Tabular data dump
 dt          = 10.0       # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 100.0    # time limit
-integrator  = rk2       # time integration algorithm
+tlim        = 1.e-100 #100.0    # time limit
+# TODO(BRR) GO BACK TO RK2!!
+integrator  = rk1 # rk2       # time integration algorithm
 ncycle_out  = 1        # interval for stdout summary info
-dt_init_fact = 1.e-6
+dt_init_fact = 1. #e-6
 
 <parthenon/mesh>
 nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 128      # Number of zones in X1-direction
+nx1         = 256      # Number of zones in X1-direction
 x1min       = 0.59           # minimum value of X1
 x1max       = 5           # maximum value of X1
 ix1_bc      = outflow  # Inner-X1 boundary condition flag
@@ -88,8 +91,10 @@ rad = false
 <fluid>
 xorder = 2
 cfl = 0.8
-riemann = llf
-recon = linear
+riemann = hll
+#riemann = llf
+#recon = linear
+recon = weno5z
 c2p_method = classic
 c2p_max_iter = 100
 c2p_tol = 1.e-8
