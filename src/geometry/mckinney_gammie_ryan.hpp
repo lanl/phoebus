@@ -135,11 +135,11 @@ public:
     LinearAlgebra::SetZero(trans, NDFULL, NDFULL);
     trans[0][0] = 1.0;
     SPACELOOP2(i,j) {
-      trans[i+1][j+1] = Jcov[i][j];
+      trans[i+1][j+1] = Jcon[i][j];
     }
     LinearAlgebra::SetZero(ucon_fmks, NDFULL);
     SPACETIMELOOP2(mu,nu) {
-      ucon_fmks[mu] += trans[nu][mu]*ucon_ks[nu];
+      ucon_fmks[mu] += trans[mu][nu]*ucon_ks[nu];
     }
   }
 
