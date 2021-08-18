@@ -208,14 +208,19 @@ void BondiOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   auto nb = IndexRange{0, 1 - 1};
 
-  pmb->par_for_bndry(
-      "OutflowOuterX1Bondi", nb, IndexDomain::outer_x1, coarse,
-      KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        printf("%i %i %i %i\n", l, k, j, i);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::outer_x1);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::outer_x1);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::outer_x1);
 
-  //pmb->par_for(
-  //  "Phoebus::ProblemGenerator::Bondi", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-  //  KOKKOS_LAMBDA(const int k, const int j, const int i) {
+  //ib.s -= 10;
+
+  //pmb->par_for_bndry(
+  //    "OutflowOuterX1Bondi", nb, IndexDomain::outer_x1, coarse,
+  //    KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+
+  pmb->par_for(
+    "Phoebus::ProblemGenerator::Bondi", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+    KOKKOS_LAMBDA(const int k, const int j, const int i) {
       Real x1 = coords.x1v(k,j,i);
       const Real x2 = coords.x2v(k,j,i);
       const Real x3 = coords.x3v(k,j,i);
@@ -279,8 +284,7 @@ void BondiOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
       }
     });
 
-  // TODO(BRR) inefficient
-  fluid::PrimitiveToConserved(rc.get());
+  fluid::PrimitiveToConservedRegion(rc.get(), ib, jb, kb);
 }
 
 void ReflectInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
