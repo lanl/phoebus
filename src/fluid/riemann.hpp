@@ -240,6 +240,9 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
 
   for (int m = 0; m < fs.NumConserved(); m++) {
     fs.v.flux(d,m,k,j,i) = 0.5*(Fl[m] + Fr[m] - cmax*(Ur[m] - Ul[m])) * g.gdet;
+    if (i > 126 && i < 130) {
+      printf("fs.v.flux(%i,%i,%i,%i,%i) = %e\n", d, m, k,j,i, fs.v.flux(d,m,k,j,i));
+    }
   }
   return cmax;
 }

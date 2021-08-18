@@ -123,8 +123,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Solution constants
   const Real uc = std::sqrt(1.0/(2.*rs));
-  const Real Vc = -std::sqrt(std::pow(uc,2)/(1. - 3.*std::pow(uc,2)));
-  const Real Tc = -n*std::pow(Vc,2)/((n + 1.)*(n*std::pow(Vc,2) - 1.));
+  //const Real Vc = -std::sqrt(std::pow(uc,2)/(1. - 3.*std::pow(uc,2)));
+  const Real Vc = std::sqrt(std::pow(uc,2)/(1. - 3.*std::pow(uc,2)));
+  //const Real Tc = -n*std::pow(Vc,2)/((n + 1.)*(n*std::pow(Vc,2) - 1.));
+  const Real Tc = n*std::pow(Vc,2)/((n + 1.)*(-n*std::pow(Vc,2) + 1.));
   const Real C1 = uc*std::pow(rs,2)*std::pow(Tc,n);
   const Real C2 = std::pow(1. + (1. + n)*Tc,2)*(1. - 2./rs + std::pow(C1,2)/
        (std::pow(rs,4)*std::pow(Tc,2*n)));
@@ -186,6 +188,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real discr = BB*BB - 4.*AA*CC;
       ucon_bl[0] = (-BB - std::sqrt(discr))/(2.*AA);
       const Real W_bl = ucon_bl[0]*bl.Lapse(0.0, r, th, x3);
+      double udu = 0.;
+      SPACETIMELOOP2(mu, nu) {
+        udu += gcov[mu][nu]*ucon_bl[mu]*ucon_bl[nu];
+      }
+      printf("[%i] ubl.ubl = %e\n", i, udu);
 
       Real ucon[4];
       tr.bl_to_fmks(x1,x2,x3,a,ucon_bl, ucon);
@@ -206,6 +213,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       discr = BB*BB - 4.*AA*CC;
       PARTHENON_REQUIRE(discr > 0, "discr < 0");
       ucon[0] = (-BB - std::sqrt(discr))/(2.*AA);
+      udu = 0.;
+      SPACETIMELOOP2(mu, nu) {
+        udu += gcov[mu][nu]*ucon[mu]*ucon[nu];
+      }
+      printf("[%i] u.u = %e\n", i, udu);
 
       // now get three velocity
       const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
@@ -218,6 +230,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     });
 
   fluid::PrimitiveToConserved(rc);
+  exit(-1);
 }
 
 }
