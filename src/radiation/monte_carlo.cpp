@@ -535,6 +535,7 @@ TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks) {
   // Boundary transfers on same MPI proc are blocking
+#ifdef MPI_PARALLEL
   for (auto &block : blocks) {
     auto swarm = block->swarm_data.Get()->Get(swarmName);
     for (int n = 0; n < block->pbval->nneighbor; n++) {
@@ -542,6 +543,7 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
       swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
     }
   }
+#endif // MPI_PARALLEL
 
   for (auto &block : blocks) {
     auto &pmb = block;
