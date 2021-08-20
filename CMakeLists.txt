@@ -178,6 +178,13 @@ else()
    set(PRINT_RHS 0)
 endif()
 
+# MPI parallel
+if (PHOEBUS_ENABLE_MPI)
+  set(MPI_OPTION MPI_PARALLEL)
+else ()
+  set(MPI_OPTION NOT_MPI_PARALLEL)
+endif()
+
 # Phoebus src
 message("\nConfiguring src")
 add_subdirectory(src)
