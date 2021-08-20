@@ -22,4 +22,9 @@
 
 #define PRINT_RHS @PRINT_RHS@
 
+// MPI paralellization (MPI_PARALLEL or NOT_MPI_PARALLEL)
+// TODO(BRR) This may be unnecessary in the future once swarms are more self-
+// contained in parthenon
+#define @MPI_OPTION@
+
 #endif //COMPILE_CONSTANTS_HPP_
