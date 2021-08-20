@@ -77,13 +77,15 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
         v(Gye, k, j, i) = 0.;
       });
 
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(),
-      0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
-        // Apply cooling for each neutrino species separately
-        if (do_species[sidx]) {
-          auto s = species[sidx];
+  for (int sidx = 0; sidx < 3; sidx++) {
+    // Apply cooling for each neutrino species separately
+      if (do_species[sidx]) {
+        auto s = species[sidx];
+
+        parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(),
+        kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i) {
           Real Gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
           Real Ucon[4];
@@ -111,8 +113,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
           }
           Kokkos::atomic_add(&(v(Gye, k, j, i)),
                              -detG * Jye * CDENSITY / CTIME);
-        }
-      });
+        });
+      }
+  }
 
   return TaskStatus::complete;
 }
