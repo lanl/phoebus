@@ -164,7 +164,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 
-TaskStatus JacobiStepForLapse(StateDescriptor *pkg);
+TaskStatus RestrictHypersurface(StateDescriptor *pkg);
+
+TaskStatus JacobiStepForLapse(StateDescriptor *pkg, const int level);
+
+TaskStatus RestrictAlphaResidual(StateDescriptor *pkg, const int lcoarse);
+
+TaskStatus ErrorCorrectAlpha(StateDescriptor *pkg, const int lfine);
+
+TaskStatus ResetLevels(StateDescriptor *pkg);
 
 Real LapseError(StateDescriptor *pkg);
 
