@@ -18,6 +18,7 @@
 
 // C++ stdlib includes
 #include <chrono>
+#include <limits>
 
 // External includes
 #include "catch2/catch.hpp"
@@ -35,10 +36,10 @@
 using namespace parthenon::package::prelude;
 using Duration_t = std::chrono::microseconds;
 
-constexpr int NPOINTS = 1024; // just different from what's in grid.cpp
-constexpr Real ROUT = 512;
-constexpr int NITERS_MAX   = 100000000;
-constexpr int NITERS_CHECK = 1000000;
+constexpr int NPOINTS = 2048+1;
+constexpr Real ROUT = 1024;
+constexpr int NITERS_MAX   = 100000;
+constexpr int NITERS_CHECK = 100;
 
 KOKKOS_INLINE_FUNCTION
 Real Gaussian(const Real x, const Real a, const Real b, const Real c) {
@@ -80,6 +81,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
 
     auto enabled = params.Get<bool>("enable_gr1d");
     auto npoints = params.Get<int>("npoints");
+    auto nlevels = params.Get<int>("nlevels");
     auto rin = params.Get<Real>("rin");
     auto rout = params.Get<Real>("rout");
     auto radius = params.Get<GR1D::Radius>("radius");
@@ -139,9 +141,9 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
       constexpr Real eps_eos = 1e-2;
       constexpr Real Gamma_eos = 4. / 3.;
 
-      Real amp = 1e-4;
+      Real amp = 1e-5;
       Real mu = 10;
-      Real sigma = 10;
+      Real sigma = 15;
       parthenon::par_for(
           parthenon::loop_pattern_flatrange_tag, "Set matter grid, stationary",
           parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
@@ -179,17 +181,43 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
 	auto duration = std::chrono::duration_cast<Duration_t>(stop-start);
 	printf("Time for integrate hypersurface with %d points = %ld microseconds\n",
 	       NPOINTS, duration.count());
-        THEN("We can solve for alpha via Jacobi") {
+	THEN("We can restrict the solution to all levels") {
+	}
+        THEN("We can solve for alpha via multigrid") {
 	  auto error_tol = params.Get<Real>("error_tolerance");
 	  auto niters_check = params.Get<int>("niters_check");
 	  start = std::chrono::high_resolution_clock::now();
+
+	  GR1D::RestrictHypersurface(pkg.get());
+
 	  int niters;
-          for (niters = 0; niters < NITERS_MAX; niters += niters_check) {
-            GR1D::JacobiStepForLapse(pkg.get());
-	    Real err = GR1D::LapseError(pkg.get());
-	    printf("iter %d, err = %14e\n", niters, err);
-            if (err < error_tol) break;
+	  const int nsmooth_1=10;
+	  const int nsmooth_2=10;
+	  //nlevels = 3;
+          for (niters = 0; niters < NITERS_MAX; niters ++) {
+	    GR1D::ResetLevels(pkg.get());
+	    for (int s = 0; s < nsmooth_1; ++s) {
+	      GR1D::JacobiStepForLapse(pkg.get(), 0);
+	    }
+	    for (int l = 0; l < nlevels-1; ++l) {
+	      GR1D::RestrictAlphaResidual(pkg.get(), l+1);
+	      for (int s = 0; s < nsmooth_1; ++s) {
+		GR1D::JacobiStepForLapse(pkg.get(), l+1);
+	      }
+	    }
+	    for (int l = nlevels-2; l >= 0; l -= 1) {
+	      GR1D::ErrorCorrectAlpha(pkg.get(), l);
+	      for (int s = 0; s < nsmooth_2; ++s) {
+		GR1D::JacobiStepForLapse(pkg.get(), l);
+	      }
+	    }
+	    if (niters % niters_check == 0) {
+	      Real err = GR1D::LapseError(pkg.get());
+	      printf("iter %d, err = %14e\n", niters, err);
+	      if (err < error_tol) break;
+	    }
           }
+
 	  stop = std::chrono::high_resolution_clock::now();
 	  duration = std::chrono::duration_cast<Duration_t>(stop-start);
 	  printf("Time for lapse with %d points, %d interations = %ld microseconds\n"

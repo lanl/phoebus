@@ -42,19 +42,25 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Points and Refinement levels
   int npoints = pin->GetOrAddInteger("GR1D", "npoints", 100);
-  PARTHENON_REQUIRE_THROWS(npoints > 0, "npoints must be strictly positive");
+  {
+    std::stringstream msg;
+    msg << "npoints must be at least " << Multigrid::MIN_NPOINTS << std::endl;
+    PARTHENON_REQUIRE_THROWS(npoints >= Multigrid::MIN_NPOINTS, msg);
+  }
 
   int nlevels = log2(npoints);
   int npoints_reconstructed = 1 << nlevels;
-  bool npoints_is_power_of_2 = (npoints_reconstructed == npoints);
-  if (!npoints_is_power_of_2) {
+  if (npoints != npoints_reconstructed + 1) {
     std::stringstream msg;
-    msg << "GR1D: npoints = " << npoints << " is not a factor of 2. Setting to "
-        << npoints_reconstructed << std::endl;
+    msg << "GR1D: npoints = " << npoints << " is not 2^p - 1. Setting to "
+        << npoints_reconstructed + 1<< std::endl;
     PARTHENON_WARN(msg);
-    npoints = npoints_reconstructed;
+    npoints = npoints_reconstructed + 1;
     nlevels = log2(npoints);
   }
+  // Size of coarsest level should be Multigrid::MIN_NPOINTS If finest
+  // level already has MIN_NPOINTS, there should be only one level
+  nlevels = (nlevels - Multigrid::LEVEL_OFFSET) + 1;
   params.Add("npoints", npoints);
   params.Add("nlevels", nlevels);
 
@@ -81,8 +87,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Matter_t matter("GR1D matter grid", nlevels, NMAT, npoints);
   Hypersurface_t hypersurface("GR1D hypersurface grid", nlevels, NHYPER, npoints);
   Alpha_t alpha("GR1D lapse grid", nlevels, npoints);
-  Alpha_t dalpha("GR1D delta lapse grid", nlevels, npoints);
-
+  Alpha_t alpha_r("GR1D alpha residual grid", nlevels, npoints);
+  Alpha_t alpha_src("GR1D source term for alpha", nlevels, npoints);
+  
   parthenon::par_for(
       parthenon::loop_pattern_mdrange_tag, "GR1D initialize grids",
       parthenon::DevExecSpace(), 0, nlevels - 1, 0, npoints - 1,
@@ -92,8 +99,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         }
         hypersurface(l, Hypersurface::A, i) = 1;
         hypersurface(l, Hypersurface::K, i) = 0;
-        alpha(l, i) = 100;
-        dalpha(l, i) = 0;
+        alpha(l, i) = (l == 0) ? 1 : 0;
+	alpha_r(l, i) = 0;
+        alpha_src(l, i) = 0;
       });
 
   auto matter_fine = matter.Get<2>();
@@ -107,7 +115,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("hypersurface", hypersurface);
   params.Add("hypersurface_h", hypersurface_h);
   params.Add("lapse", alpha);
-  params.Add("delta_lapse", dalpha);
+  params.Add("lapse_residual", alpha_r);
+  params.Add("lapse_source", alpha_src);
 
   // The radius object, returns radius vs index and index vs radius
   Radius radius(rin, rout, npoints);
@@ -165,7 +174,7 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
       src[v] = matter_h(v, i);
     }
 
-    hypersurface_rhs(r, state, src, rhs);
+    HypersurfaceRHS(r, state, src, rhs);
 #pragma omp simd
     for (int v = 0; v < NHYPER; ++v) {
       k1[v] = state[v] + 0.5 * dr * rhs[v];
@@ -174,7 +183,7 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
     for (int v = 0; v < NMAT_H; ++v) {
       src_k[v] = 0.5 * (matter_h(v, i) + matter_h(v, i + 1));
     }
-    hypersurface_rhs(r, k1, src_k, rhs_k);
+    HypersurfaceRHS(r, k1, src_k, rhs_k);
 #pragma omp simd
     for (int v = 0; v < NHYPER; ++v) {
       hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr * rhs_k[v];
@@ -186,7 +195,7 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   return TaskStatus::complete;
 }
 
-TaskStatus JacobiStepForLapse(StateDescriptor *pkg) {
+TaskStatus RestrictHypersurface(StateDescriptor *pkg) {
   PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
   auto &params = pkg->AllParams();
 
@@ -194,14 +203,68 @@ TaskStatus JacobiStepForLapse(StateDescriptor *pkg) {
   if (!enabled) return TaskStatus::complete;
 
   auto npoints = params.Get<int>("npoints");
-  auto niters_check = params.Get<int>("niters_check");
+  auto nlevels = params.Get<int>("nlevels");
+
+  auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
+  auto matter = params.Get<Matter_t>("matter");
+  auto alpha = params.Get<Alpha_t>("lapse");
+
+  for (int level = 1; level < nlevels; ++level) {
+    auto npoints_coarse = Multigrid::NPointsPLevel(level, npoints);
+    parthenon::par_for(
+        parthenon::loop_pattern_flatrange_tag,
+        "restrict to level " + std::to_string(level), parthenon::DevExecSpace(), 0,
+        npoints_coarse - 1, KOKKOS_LAMBDA(const int icoarse) {
+          Multigrid::RestrictVar(hypersurface, level, icoarse, NHYPER, npoints_coarse);
+          Multigrid::RestrictVar(matter, level, icoarse, NMAT, npoints_coarse);
+        });
+  }
+  return TaskStatus::complete;
+}
+
+TaskStatus ResetLevels(StateDescriptor *pkg) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  auto &params = pkg->AllParams();
+
+  auto enabled = params.Get<bool>("enable_gr1d");
+  if (!enabled) return TaskStatus::complete;
+
+  auto npoints = params.Get<int>("npoints");
+  auto nlevels = params.Get<int>("nlevels");
+
+  auto alpha = params.Get<Alpha_t>("lapse");
+  auto alpha_r = params.Get<Alpha_t>("lapse_residual");
+  auto alpha_src = params.Get<Alpha_t>("lapse_source");
+
+  parthenon::par_for(
+      parthenon::loop_pattern_mdrange_tag, "GR1D initialize grids",
+      parthenon::DevExecSpace(), 1, nlevels - 1, 0, npoints - 1,
+      KOKKOS_LAMBDA(const int l, const int i) {
+        alpha(l, i) = 0;
+	alpha_r(l, i) = 0;
+        alpha_src(l, i) = 0;
+      });
+  return TaskStatus::complete;
+}
+
+TaskStatus JacobiStepForLapse(StateDescriptor *pkg, const int l) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  auto &params = pkg->AllParams();
+
+  auto enabled = params.Get<bool>("enable_gr1d");
+  if (!enabled) return TaskStatus::complete;
+
+  auto npoints_fine = params.Get<int>("npoints");
+  auto npoints = Multigrid::NPointsPLevel(l, npoints_fine);
+
   auto error_tolerance = params.Get<Real>("error_tolerance");
   auto radius = params.Get<GR1D::Radius>("radius");
 
   auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
   auto matter = params.Get<Matter_t>("matter");
   auto alpha = params.Get<Alpha_t>("lapse");
-  auto dalpha = params.Get<Alpha_t>("delta_lapse");
+  auto alpha_r = params.Get<Alpha_t>("lapse_residual");
+  auto alpha_src = params.Get<Alpha_t>("lapse_source");
 
   const Real dr = radius.dx();
 
@@ -211,66 +274,120 @@ TaskStatus JacobiStepForLapse(StateDescriptor *pkg) {
   const int iJ = GR1D::Matter::J_R;
   const int iS = GR1D::Matter::trcS;
 
-  // Do we actually need scratch?
-  int scratch_level = 1;
-  size_t scratch_size_in_bytes = parthenon::ScratchPad1D<Real>::shmem_size(1);
+  bool error_eqn = l > 0;
+  Real jacobi_weight = (2./3.);//std::min(1.0,0.5*dr*dr);
+  //jacobi_weight /= (1 << l);
 
-  // little trick to do sequential iterations on the GPU without launch overhead
-  auto lp_outer = parthenon::outer_loop_pattern_teams_tag;
-  parthenon::par_for_outer(
-      lp_outer, "GR1D iterative solve for metric", parthenon::DevExecSpace(),
-      scratch_size_in_bytes, scratch_level, 1, 1,
-      KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int team) {
-        for (int iter = 0; iter < niters_check; ++iter) {
+  // Residual
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "GR1D compute residual",
+      parthenon::DevExecSpace(), 1, npoints - 2, KOKKOS_LAMBDA(const int i) {
+        Real r = radius.x(i);
 
-          // Deltas
-          par_for_inner(member, 1, npoints - 2, [&](const int i) {
-            Real r = radius.x(i);
+        Real a = hypersurface(l, iA, i);
+        Real K = hypersurface(l, iK, i);
+        Real rho = matter(l, iRHO, i);
+        Real S = matter(l, iS, i);
 
-            Real a = hypersurface(iA, i);
-            Real K = hypersurface(iK, i);
-            Real rho = matter(iRHO, i);
-            Real S = matter(iS, i);
+        Real dadr = ShootingMethod::GetARHS(a, K, r, rho);
 
-            Real dadr = ShootingMethod::get_arhs(a, K, r, rho);
+	alpha_r(l, i) =
+	  ((-2 * a + dadr * dr) * alpha(l, i - 1) -
+	   (2 * a + dadr * dr) * alpha(l, i + 1) +
+	   a * (4 + a * a * dr * dr * (3 * K * K + 8 * M_PI * (S + rho))) *
+	   alpha(l, i)) /
+	  (2 * a * dr * dr);
+	if (error_eqn) {
+	  alpha_r(l, i) += alpha_src(l,i);
+	}
 
-            // Formula from mathematica. Unweighted Jacobi
-            /*
-            dalpha(i) = ((2 * a * dadr * dr) * alpha(i - 1) +
-                         (2 * a + dadr * dr) * alpha(i + 1)) /
-                        (a * (4 + a * a * dr * dr * (3 * K * K + 8 * M_PI * (rho + S))));
-            */
-            dalpha(i) =
-                ((2 * a - dadr * dr) * alpha(i - 1) + (2 * a + dadr * dr) * alpha(i + 1) -
-                 a * a * a * dr * dr * (3 * K * K + 8 * M_PI * (S + rho)) * alpha(i)) /
-                (4 * a);
-            if (dalpha(i) < error_tolerance) dalpha(i) = error_tolerance;
-            // printf("%d: alphanew = %14e\n", i, dalpha(i));
+      });
+  // update
+  // don't update boundary if we're in error-correction mode.
+  // the boundary = 0 in error_correction mode.
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "GR1D jacobi update",
+      parthenon::DevExecSpace(), 0, npoints - 1,
+      KOKKOS_LAMBDA(const int i) {
 
-            dalpha(i) -= alpha(i); // make it a delta
-          });
-          member.team_barrier();
+	Real r = radius.x(i);
+        Real a = hypersurface(l, iA, i);
+        Real K = hypersurface(l, iK, i);
+        Real rho = matter(l, iRHO, i);
+        Real S = matter(l, iS, i);
 
-          // Boundary conditions
-          // r = 0
-          dalpha(0) = alpha(1) - alpha(0);
-          // r outer
-          Real rmax = radius.max();
-          dalpha(npoints - 1) = (dr + rmax*alpha(npoints - 2))/(dr + rmax);
-          if (dalpha(npoints - 1) < error_tolerance)
-            dalpha(npoints - 1) = error_tolerance;
-	  if (dalpha(npoints - 1) > 1)
-	    dalpha(npoints - 1) = 1;
-	  dalpha(npoints - 1) -= alpha(npoints - 1);
-          member.team_barrier();
-
-          // Update
-          par_for_inner(member, 0, npoints - 1,
-                        [&](const int i) { alpha(i) += (2. / 3.) * dalpha(i); });
-          member.team_barrier();
-        }
+	if (i == 0) { // r inner
+	  alpha(l, i) = error_eqn ? 0 : alpha(l, i + 1);
+	} else if (i == npoints - 1) { // r outer
+	  alpha(l, i) = error_eqn ? 0 : (dr + r * alpha(i - 1)) / (dr + r);
+	} else {
+	  Real Dinverse = -2*dr*dr/(4 + a*a*dr*dr*(3*K*K + 8*M_PI*(rho+S)));
+	  Real update = Dinverse*alpha_r(l, i);
+	  alpha(l,i) += jacobi_weight*update;
+	}
+	if (l == 0 && alpha(l,i) < error_tolerance) {
+	  alpha(l,i) = error_tolerance;
+	}
       });
 
+  return TaskStatus::complete;
+}
+
+TaskStatus RestrictAlphaResidual(StateDescriptor *pkg, const int lcoarse) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  auto &params = pkg->AllParams();
+
+  auto enabled = params.Get<bool>("enable_gr1d");
+  if (!enabled) return TaskStatus::complete;
+
+  auto npoints_finest = params.Get<int>("npoints");
+  auto npoints = Multigrid::NPointsPLevel(lcoarse, npoints_finest);
+
+  auto res = params.Get<Alpha_t>("lapse_residual");
+  auto src = params.Get<Alpha_t>("lapse_source");
+
+  const int lfine = lcoarse - 1;
+
+  // skip boundaries. The residual and error vanish at boundaries.
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "GR1D restrict alpha",
+      parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int icoarse) {
+        const int ifine = 2 * icoarse;
+	if (icoarse == 0 || icoarse == npoints - 1) {
+	  src(lcoarse,icoarse) = 0;
+	} else {
+	  src(lcoarse, icoarse) = 0.25 * (res(lfine, ifine - 1) + 2 * res(lfine, ifine) +
+					  res(lfine, ifine + 1));
+	}
+      });
+
+  return TaskStatus::complete;
+}
+
+TaskStatus ErrorCorrectAlpha(StateDescriptor *pkg, const int lfine) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  auto &params = pkg->AllParams();
+
+  auto enabled = params.Get<bool>("enable_gr1d");
+  if (!enabled) return TaskStatus::complete;
+
+  auto npoints_finest = params.Get<int>("npoints");
+  auto npoints = Multigrid::NPointsPLevel(lfine, npoints_finest);
+  auto alpha = params.Get<Alpha_t>("lapse");
+
+  const int lcoarse = lfine + 1;
+  const int npoints_coarse = npoints / 2 + 1;
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "GR1D error correction step",
+      parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int ifine) {
+        const int icoarse = ifine / 2;
+        if (ifine % 2 == 0) { // these line up at nodes
+          alpha(lfine, ifine) += alpha(lcoarse, icoarse);
+        } else { // these require interpolation
+          alpha(lfine, ifine) +=
+              0.5 * (alpha(lcoarse, icoarse) + alpha(lcoarse, icoarse + 1));
+        }
+      });
   return TaskStatus::complete;
 }
 
@@ -285,12 +402,12 @@ Real LapseError(StateDescriptor *pkg) {
   auto error_tolerance = params.Get<Real>("error_tolerance");
 
   auto alpha = params.Get<Alpha_t>("lapse");
-  auto dalpha = params.Get<Alpha_t>("delta_lapse");
+  auto dalpha = params.Get<Alpha_t>("lapse_residual");
 
   Real max_err = 0;
   parthenon::par_reduce(
       parthenon::loop_pattern_flatrange_tag, "GR1D: CheckConvergence",
-      parthenon::DevExecSpace(), 0, npoints - 1,
+      parthenon::DevExecSpace(), 1, npoints - 2,
       KOKKOS_LAMBDA(const int i, Real &eps) {
         Real reps = std::abs(dalpha(i) / (alpha(i) + error_tolerance));
         Real aeps = std::abs(dalpha(i));
