@@ -59,42 +59,6 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
 }
 } // namespace ShootingMethod
 
-// ======================================================================
-
-namespace Multigrid {
-
-constexpr unsigned int MIN_NPOINTS = 5;
-constexpr unsigned int LEVEL_OFFSET = log2(MIN_NPOINTS);
-
-KOKKOS_INLINE_FUNCTION unsigned int NPointsPLevel(const unsigned int level,
-                                                  const unsigned int npoints_fine) {
-  return level == 0 ? npoints_fine : (npoints_fine >> level) + 1;
-}
-
-template <typename V>
-KOKKOS_INLINE_FUNCTION void RestrictVar(const V &v, const int lcoarse, const int icoarse,
-                                        const int nvars, const int npoints_coarse) {
-  PARTHENON_DEBUG_REQUIRE(lcoarse > 1, "We must be restricting to a level > 0");
-  PARTHENON_DEBUG_REQUIRE(npoints_coarse >= MIN_NPOINTS,
-                          "We must not be at the coarsest level");
-  const int lfine = lcoarse - 1;
-  const int npoints_fine = (npoints_coarse - 1) * 2;
-  const int ifine = 2 * icoarse;
-  for (int ivar = 0; ivar < nvars; ++ivar) {
-    if (icoarse == 0) { // use injection at boundaries
-      v(lcoarse, ivar, icoarse) = v(lfine, ivar, ifine);
-    } else if (icoarse == npoints_coarse - 1) {
-      v(lcoarse, ivar, npoints_coarse - 1) = v(lfine, ivar, npoints_fine - 1);
-    } else { // use full weighting
-      v(lcoarse, ivar, icoarse) =
-          0.25 * (v(lfine, ivar, ifine - 1) + 2 * v(lfine, ivar, ifine) +
-                  v(lfine, ivar, ifine + 1));
-    }
-  }
-}
-
-} // namespace Multigrid
-
 } // namespace GR1D
 
 #endif // GR1D_GRD1D_UTILS_HPP_

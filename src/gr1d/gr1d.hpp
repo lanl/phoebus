@@ -79,7 +79,7 @@ using namespace parthenon::package::prelude;
 
   da/dr = (a/2 r) (r^2 (16 pi rho - (3/2) (K^r_r)^2) - a + 1)
   d K^r_r/dr = k pi a^2 j^r - (3/r) K^r_r
-  d^2 alpha/dr^2 = a^2 alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) - (1/a)(da/dr) dalpha/dr
+  r d^2 alpha/dr^2 = a^2 r alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) + ((1/a)(da/dr)r-2) dalpha/dr
   beta^r = -(1/2) alpha r K^r_r
 
   BOUNDARY CONDITIONS
@@ -129,13 +129,15 @@ using namespace parthenon::package::prelude;
 
 namespace GR1D {
 
+constexpr int MIN_NPOINTS = 5;
+
 /*
   Array structure:
   Slowest moving index is refinement level. 0 is finest.
   Next index is variable (if appropriate)
   Next index is grid point
  */
-using Matter_t = parthenon::ParArrayND<Real>;
+using Matter_t = parthenon::ParArray2D<Real>;
 using Matter_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
 constexpr int NMAT = 3;
@@ -146,7 +148,7 @@ enum Matter {
   trcS = 2 // Trace of the stress tensor: S = S^i_i
 };
 
-using Hypersurface_t = parthenon::ParArrayND<Real>;
+using Hypersurface_t = parthenon::ParArray2D<Real>;
 using Hypersurface_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
 constexpr int NHYPER = 2;
@@ -155,28 +157,21 @@ enum Hypersurface {
   K = 1  // K^r_r, extrinsic curvature
 };
 
-using Alpha_t = parthenon::ParArrayND<Real>;
+using Alpha_t = parthenon::ParArray1D<Real>;
+using Alpha_host_t = typename parthenon::ParArray1D<Real>::HostMirror;
 
 // TODO(JMM): Do we want this?
 using Radius = Spiner::RegularGrid1D;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
+TaskStatus MatterToHost(StateDescriptor *pkg);
+
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 
-TaskStatus RestrictHypersurface(StateDescriptor *pkg);
+TaskStatus LinearSolveForAlpha(StateDescriptor *pkg);
 
-TaskStatus JacobiStepForLapse(StateDescriptor *pkg, const int level);
-
-TaskStatus RestrictAlphaResidual(StateDescriptor *pkg, const int lcoarse);
-
-TaskStatus ErrorCorrectAlpha(StateDescriptor *pkg, const int lfine);
-
-TaskStatus ResetLevels(StateDescriptor *pkg);
-
-Real LapseError(StateDescriptor *pkg);
-
-bool LapseConverged(StateDescriptor *pkg);
+TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 
