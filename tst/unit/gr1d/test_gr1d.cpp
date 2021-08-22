@@ -36,10 +36,8 @@
 using namespace parthenon::package::prelude;
 using Duration_t = std::chrono::microseconds;
 
-constexpr int NPOINTS = 2048+1;
-constexpr Real ROUT = 1024;
-constexpr int NITERS_MAX   = 100000;
-constexpr int NITERS_CHECK = 1;
+constexpr int NPOINTS = 256+1;
+constexpr Real ROUT = 256;
 
 KOKKOS_INLINE_FUNCTION
 Real Gaussian(const Real x, const Real a, const Real b, const Real c) {
@@ -74,14 +72,12 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
     pin->SetBoolean("GR1D", "enabled", true);
     pin->SetInteger("GR1D", "npoints", NPOINTS);
     pin->SetReal("GR1D", "rout", ROUT);
-    pin->SetInteger("GR1D", "niters_check", NITERS_CHECK);
 
     auto pkg = GR1D::Initialize(pin);
     auto &params = pkg->AllParams();
 
     auto enabled = params.Get<bool>("enable_gr1d");
     auto npoints = params.Get<int>("npoints");
-    auto nlevels = params.Get<int>("nlevels");
     auto rin = params.Get<Real>("rin");
     auto rout = params.Get<Real>("rout");
     auto radius = params.Get<GR1D::Radius>("radius");
@@ -91,7 +87,6 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
       REQUIRE(npoints == NPOINTS);
       REQUIRE(rin == 0);
       REQUIRE(rout == ROUT);
-      REQUIRE(params.Get<int>("niters_check") == NITERS_CHECK);
     }
 
     THEN("The radius object works as expected") {
@@ -142,7 +137,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
       constexpr Real Gamma_eos = 4. / 3.;
 
       Real amp = 1e-5;
-      Real mu = 10;
+      Real mu = 50;
       Real sigma = 15;
       parthenon::par_for(
           parthenon::loop_pattern_flatrange_tag, "Set matter grid, stationary",
@@ -150,7 +145,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
             Real r = radius.x(i);
             Real rho = Gaussian(r, amp, mu, sigma);
             matter(iRHO, i) = rho;
-            matter(iJ, i) = r*1e-2 * rho;
+            matter(iJ, i) = -r*1e-2 * rho;
             matter(iS, i) = 3 * (Gamma_eos - 1.) * rho * eps_eos;
           });
       THEN("We can retrieve this information") {
@@ -164,7 +159,7 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
               if (matter(iRHO, i) != rho) {
                 nw += 1;
               }
-              if (matter(iJ, i) != r*1e-2 * rho) {
+              if (matter(iJ, i) != -r*1e-2 * rho) {
                 nw += 1;
               }
               if (matter(iS, i) != 3 * (Gamma_eos - 1.) * rho * eps_eos) {
@@ -176,59 +171,24 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
       }
       WHEN("We integrate the hypersurface") {
 	auto start = std::chrono::high_resolution_clock::now();
+	GR1D::MatterToHost(pkg.get());
         GR1D::IntegrateHypersurface(pkg.get());
 	auto stop = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<Duration_t>(stop-start);
 	printf("Time for integrate hypersurface with %d points = %ld microseconds\n",
 	       NPOINTS, duration.count());
-	THEN("We can restrict the solution to all levels") {
-	}
-        THEN("We can solve for alpha via multigrid") {
-	  auto error_tol = params.Get<Real>("error_tolerance");
-	  auto niters_check = params.Get<int>("niters_check");
+	THEN("We can tridiagonal solve for alpha") {
 	  start = std::chrono::high_resolution_clock::now();
-
-	  GR1D::RestrictHypersurface(pkg.get());
-
-	  int niters;
-	  const int nsmooth_1=3;
-	  const int nsmooth_2=10000;
-	  //nlevels = 3;
-          for (niters = 0; niters < NITERS_MAX; niters ++) {
-	    GR1D::ResetLevels(pkg.get());
-	    for (int s = 0; s < nsmooth_1; ++s) {
-	      GR1D::JacobiStepForLapse(pkg.get(), 0);
-	    }
-	    for (int l = 0; l < nlevels-1; ++l) {
-	      GR1D::RestrictAlphaResidual(pkg.get(), l+1);
-	      for (int s = 0; s < nsmooth_1; ++s) {
-		GR1D::JacobiStepForLapse(pkg.get(), l+1);
-	      }
-	    }
-	    for (int l = nlevels-2; l >= 0; l -= 1) {
-	      GR1D::ErrorCorrectAlpha(pkg.get(), l);
-	      for (int s = 0; s < nsmooth_2; ++s) {
-		GR1D::JacobiStepForLapse(pkg.get(), l);
-	      }
-	    }
-	    if (niters % niters_check == 0) {
-	      Real err = GR1D::LapseError(pkg.get());
-	      printf("iter %d, err = %14e\n", niters, err);
-	      if (err < error_tol) break;
-	    }
-          }
-
+	  GR1D::LinearSolveForAlpha(pkg.get());
+	  GR1D::SpacetimeToDevice(pkg.get());
 	  stop = std::chrono::high_resolution_clock::now();
 	  duration = std::chrono::duration_cast<Duration_t>(stop-start);
-	  printf("Time for lapse with %d points, %d interations = %ld microseconds\n"
-		 "=> %14e microseconds / iteration\n",
-		 NPOINTS, niters, duration.count(),
-		 static_cast<Real>(duration.count())/(niters));
-          REQUIRE(GR1D::LapseConverged(pkg.get()));
-          AND_THEN("We can output the solver data") {
+	  printf("Time for linear solve with %d points = %ld microseconds\n",
+		 NPOINTS, duration.count());
+	  AND_THEN("We can output the solver data") {
             GR1D::DumpToTxt("gr1d.dat", pkg.get());
           }
-        }
+	}
       }
     }
   }
