@@ -39,7 +39,7 @@ using Duration_t = std::chrono::microseconds;
 constexpr int NPOINTS = 2048+1;
 constexpr Real ROUT = 1024;
 constexpr int NITERS_MAX   = 100000;
-constexpr int NITERS_CHECK = 100;
+constexpr int NITERS_CHECK = 1;
 
 KOKKOS_INLINE_FUNCTION
 Real Gaussian(const Real x, const Real a, const Real b, const Real c) {
@@ -191,8 +191,8 @@ TEST_CASE("Working with GR1D Grids", "[GR1D]") {
 	  GR1D::RestrictHypersurface(pkg.get());
 
 	  int niters;
-	  const int nsmooth_1=10;
-	  const int nsmooth_2=10;
+	  const int nsmooth_1=3;
+	  const int nsmooth_2=10000;
 	  //nlevels = 3;
           for (niters = 0; niters < NITERS_MAX; niters ++) {
 	    GR1D::ResetLevels(pkg.get());
