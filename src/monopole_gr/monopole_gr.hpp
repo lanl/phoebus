@@ -160,6 +160,17 @@ enum Hypersurface {
 using Alpha_t = parthenon::ParArray1D<Real>;
 using Alpha_host_t = typename parthenon::ParArray1D<Real>::HostMirror;
 
+using Beta_t = parthenon::ParArray1D<Real>;
+
+constexpr int NGRAD = 4;
+using Gradients_t = parthenon::ParArray2D<Real>;
+enum Gradients {
+  DADR = 0,     // dadr
+  DKDR = 1,     // dKdr
+  DALPHADR = 2, // dalphadr
+  DBETADR = 3   // dbetadr
+};
+
 // TODO(JMM): Do we want this?
 using Radius = Spiner::RegularGrid1D;
 

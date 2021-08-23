@@ -73,14 +73,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         alpha(i) = 1;
       });
 
+  // Host mirrors
   auto matter_h = Kokkos::create_mirror_view(matter);
   auto hypersurface_h = Kokkos::create_mirror_view(hypersurface);
   auto alpha_h = Kokkos::create_mirror_view(alpha);
 
+  // Host-only scratch arrays for Thomas' Method
   Alpha_host_t alpha_m_l("monopole_gr alpha matrix, band below diagonal", npoints);
   Alpha_host_t alpha_m_d("monopole_gr alpha matrix, diagonal", npoints);
   Alpha_host_t alpha_m_u("monopole_gr alpha matrix, band above diagonal", npoints);
   Alpha_host_t alpha_m_b("monopole_gr alpha matrix eqn, rhs", npoints);
+
+  // Device-only arrays for the geometry API
+  Gradients_t gradients("monopole_gr gradients", NGRAD, npoints);
+  Beta_t beta("monopole_gr shift", npoints);
 
   params.Add("matter", matter);
   params.Add("matter_h", matter_h);
@@ -93,6 +99,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("alpha_m_d", alpha_m_d);
   params.Add("alpha_m_u", alpha_m_u);
   params.Add("alpha_m_b", alpha_m_b);
+  // geometry arrays
+  params.Add("gradients", gradients);
+  params.Add("shift", beta);
 
   // The radius object, returns radius vs index and index vs radius
   Radius radius(rin, rout, npoints);
@@ -210,21 +219,20 @@ TaskStatus LinearSolveForAlpha(StateDescriptor *pkg) {
   const int iS = MonopoleGR::Matter::trcS;
 
   auto GetCell = [&](const int i, Real &r, Real &a, Real &K, Real &rho, Real &S,
-                     Real &dadr, Real &denom) {
+                     Real &dadr) {
     r = radius.x(i);
     a = hypersurface(iA, i);
     K = hypersurface(iK, i);
     rho = matter(iRHO, i);
     S = matter(iS, i);
     dadr = ShootingMethod::GetARHS(a, K, r, rho);
-    denom = a * (4 + a * a * dr2 * (3 * K * K + 8 * M_PI * (S + rho)));
   };
 
   // define coefficients
   // by rows. Do first and last rows by hand
   for (int i = 1; i < npoints - 1; ++i) {
-    Real r, a, K, rho, S, dadr, denom;
-    GetCell(i, r, a, K, rho, S, dadr, denom);
+    Real r, a, K, rho, S, dadr;
+    GetCell(i, r, a, K, rho, S, dadr);
     d(i) = -r * (4 + a * a * dr * dr * (3 * K * K + 8 * M_PI * (S + rho))) / (2 * dr);
     u(i) = 1 - (dadr * r / (2 * a)) + r * idr;
     l(i) = -1 + (dadr * r) / (2 * a) + r * idr;
@@ -232,16 +240,13 @@ TaskStatus LinearSolveForAlpha(StateDescriptor *pkg) {
   }
   { // row 0
     const int i = 0;
-    Real r, a, K, rho, S, dadr, fac;
-    GetCell(i, r, a, K, rho, S, dadr, fac);
     d(i) = -1;
     u(i) = 1;
     b(i) = 0;
   }
   { // row n - 1
     int i = npoints - 1;
-    Real r, a, K, rho, S, dadr, fac;
-    GetCell(i, r, a, K, rho, S, dadr, fac);
+    Real r = radius.x(i);
     d(i) = -(r + dr);
     l(i) = r;
     b(i) = -dr;
@@ -270,13 +275,49 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
-  auto hypersurface = params.Get<Matter_t>("hypersurface");
-  auto hypersurface_h = params.Get<Matter_host_t>("hypersurface_h");
+  auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
+  auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
   Kokkos::deep_copy(hypersurface, hypersurface_h);
 
   auto alpha = params.Get<Alpha_t>("lapse");
   auto alpha_h = params.Get<Alpha_host_t>("lapse_h");
   Kokkos::deep_copy(alpha, alpha_h);
+
+  // Fill device-side arrays
+  auto npoints = params.Get<int>("npoints");
+  auto radius = params.Get<MonopoleGR::Radius>("radius");
+  Real dr = radius.dx();
+  auto matter = params.Get<Matter_t>("matter");
+  auto beta = params.Get<Beta_t>("shift");
+  auto gradients = params.Get<Gradients_t>("gradients");
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "monopole_gr gradients and shift",
+      parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+        Real r = radius.x(i);
+        Real a = hypersurface(Hypersurface::A, i);
+        Real K = hypersurface(Hypersurface::K, i);
+        Real rho = matter(Matter::RHO, i);
+        Real j = matter(Matter::J_R, i);
+        Real dadr = ShootingMethod::GetARHS(a, K, r, rho);
+        Real dKdr = ShootingMethod::GetKRHS(a, K, r, j);
+
+        Real dalphadr;
+        if (i == 0) {
+          dalphadr = (alpha(i + 1) - alpha(i)) / dr;
+        } else if (i == npoints - 1) {
+          dalphadr = (alpha(i) - alpha(i - 1)) / dr;
+        } else {
+          dalphadr = (alpha(i + 1) - alpha(i - 1)) / (2. * dr);
+        }
+
+        beta(i) = -0.5 * alpha(i) * r * K;
+
+        gradients(Gradients::DADR, i) = dadr;
+        gradients(Gradients::DKDR, i) = dKdr;
+        gradients(Gradients::DALPHADR, i) = dalphadr;
+        gradients(Gradients::DBETADR, i) =
+            -0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr);
+      });
 
   return TaskStatus::complete;
 }
