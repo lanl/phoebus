@@ -51,14 +51,14 @@ add_executable(phoebus
   geometry/spherical_minkowski.hpp
   geometry/spherical_minkowski.cpp
 
-  gr1d/gr1d.hpp
-  gr1d/gr1d_utils.hpp
-  gr1d/gr1d.cpp
-
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
   microphysics/opac_phoebus/opac_phoebus.hpp
   microphysics/opac_phoebus/opac_phoebus.cpp
+
+  monopole_gr/monopole_gr.hpp
+  monopole_gr/monopole_gr_utils.hpp
+  monopole_gr/monopole_gr.cpp
 
   pgen/pgen.hpp
   pgen/pgen.cpp

@@ -10,15 +10,15 @@
 # prepare derivative works, distribute copies to the public, perform
 # publicly and display publicly, and to permit others to do so.
 
-add_library(gr1d_unit_tests OBJECT
-  test_gr1d.cpp
+add_library(monopole_gr_unit_tests OBJECT
+  test_monopole_gr.cpp
 
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/gr1d/gr1d.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/gr1d/gr1d_utils.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/gr1d/gr1d.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr_utils.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr.cpp
   )
 
-target_link_libraries(gr1d_unit_tests
+target_link_libraries(monopole_gr_unit_tests
   PRIVATE
   parthenon
   Catch2::Catch2
@@ -28,7 +28,7 @@ target_link_libraries(gr1d_unit_tests
   $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
   )
 
-target_include_directories(gr1d_unit_tests PRIVATE
+target_include_directories(monopole_gr_unit_tests PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils"
@@ -36,4 +36,4 @@ target_include_directories(gr1d_unit_tests PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   )
 
-target_sources(phoebus_unit_tests PRIVATE $<TARGET_OBJECTS:gr1d_unit_tests>)
+target_sources(phoebus_unit_tests PRIVATE $<TARGET_OBJECTS:monopole_gr_unit_tests>)

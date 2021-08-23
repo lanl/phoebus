@@ -22,7 +22,7 @@
 #include "compile_constants.hpp"
 #include "fluid/fluid.hpp"
 #include "geometry/geometry.hpp"
-#include "gr1d/gr1d.hpp"
+#include "monopole_gr/monopole_gr.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "microphysics/opac_phoebus/opac_phoebus.hpp"
 #include "phoebus_driver.hpp"
@@ -260,7 +260,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(Geometry::Initialize(pin.get()));
   packages.Add(fluid::Initialize(pin.get()));
   packages.Add(radiation::Initialize(pin.get()));
-  packages.Add(GR1D::Initialize(pin.get())); // Does nothing if not enabled
+  packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
 
   return packages;
 }
