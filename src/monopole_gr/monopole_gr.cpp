@@ -25,23 +25,23 @@
 // Phoebus
 #include "geometry/geometry_utils.hpp"
 
-#include "gr1d.hpp"
-#include "gr1d_utils.hpp"
+#include "monopole_gr.hpp"
+#include "monopole_gr_utils.hpp"
 
 using namespace parthenon::package::prelude;
 
-namespace GR1D {
+namespace MonopoleGR {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
-  auto gr1d = std::make_shared<StateDescriptor>("GR1D");
-  Params &params = gr1d->AllParams();
+  auto monopole_gr = std::make_shared<StateDescriptor>("monopole_gr");
+  Params &params = monopole_gr->AllParams();
 
-  bool enable_gr1d = pin->GetOrAddBoolean("GR1D", "enabled", false);
-  params.Add("enable_gr1d", enable_gr1d);
-  if (!enable_gr1d) return gr1d; // Short-circuit with nothing
+  bool enable_monopole_gr = pin->GetOrAddBoolean("monopole_gr", "enabled", false);
+  params.Add("enable_monopole_gr", enable_monopole_gr);
+  if (!enable_monopole_gr) return monopole_gr; // Short-circuit with nothing
 
   // Points and Refinement levels
-  int npoints = pin->GetOrAddInteger("GR1D", "npoints", 100);
+  int npoints = pin->GetOrAddInteger("monopole_gr", "npoints", 100);
   {
     std::stringstream msg;
     msg << "npoints must be at least " << MIN_NPOINTS << std::endl;
@@ -52,20 +52,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Rin and Rout are not necessarily the same as
   // bounds for the fluid
   Real rin = 0;
-  Real rout = pin->GetOrAddReal("GR1D", "rout", 100);
+  Real rout = pin->GetOrAddReal("monopole_gr", "rout", 100);
   params.Add("rin", rin);
   params.Add("rout", rout);
 
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
-  Matter_t matter("GR1D matter grid", NMAT, npoints);
-  Hypersurface_t hypersurface("GR1D hypersurface grid", NHYPER, npoints);
-  Alpha_t alpha("GR1D lapse grid", npoints);
-  
+  Matter_t matter("monopole_gr matter grid", NMAT, npoints);
+  Hypersurface_t hypersurface("monopole_gr hypersurface grid", NHYPER, npoints);
+  Alpha_t alpha("monopole_gr lapse grid", npoints);
+
   parthenon::par_for(
-      parthenon::loop_pattern_flatrange_tag, "GR1D initialize grids",
-      parthenon::DevExecSpace(), 0, npoints - 1,
-      KOKKOS_LAMBDA(const int i) {
+      parthenon::loop_pattern_flatrange_tag, "monopole_gr initialize grids",
+      parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
         for (int v = 0; v < NMAT; ++v) {
           matter(v, i) = 0;
         }
@@ -78,10 +77,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto hypersurface_h = Kokkos::create_mirror_view(hypersurface);
   auto alpha_h = Kokkos::create_mirror_view(alpha);
 
-  Alpha_host_t alpha_m_l("GR1D alpha matrix, band below diagonal", npoints);
-  Alpha_host_t alpha_m_d("GR1D alpha matrix, diagonal", npoints);
-  Alpha_host_t alpha_m_u("GR1D alpha matrix, band above diagonal", npoints);
-  Alpha_host_t alpha_m_b("GR1D alpha matrix eqn, rhs", npoints);
+  Alpha_host_t alpha_m_l("monopole_gr alpha matrix, band below diagonal", npoints);
+  Alpha_host_t alpha_m_d("monopole_gr alpha matrix, diagonal", npoints);
+  Alpha_host_t alpha_m_u("monopole_gr alpha matrix, band above diagonal", npoints);
+  Alpha_host_t alpha_m_b("monopole_gr alpha matrix eqn, rhs", npoints);
 
   params.Add("matter", matter);
   params.Add("matter_h", matter_h);
@@ -99,13 +98,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Radius radius(rin, rout, npoints);
   params.Add("radius", radius);
 
-  return gr1d;
+  return monopole_gr;
 }
 
 TaskStatus MatterToHost(StateDescriptor *pkg) {
-  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
   auto &params = pkg->AllParams();
-  auto enabled = params.Get<bool>("enable_gr1d");
+  auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
   auto matter = params.Get<Matter_t>("matter");
@@ -118,15 +118,16 @@ TaskStatus MatterToHost(StateDescriptor *pkg) {
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   using namespace ShootingMethod;
 
-  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
 
   auto &params = pkg->AllParams();
 
-  auto enabled = params.Get<bool>("enable_gr1d");
+  auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
   auto npoints = params.Get<int>("npoints");
-  auto radius = params.Get<GR1D::Radius>("radius");
+  auto radius = params.Get<MonopoleGR::Radius>("radius");
 
   auto matter_h = params.Get<Matter_host_t>("matter_h");
   auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
@@ -177,14 +178,15 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
 }
 
 TaskStatus LinearSolveForAlpha(StateDescriptor *pkg) {
-  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
   auto &params = pkg->AllParams();
 
-  auto enabled = params.Get<bool>("enable_gr1d");
+  auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
   auto npoints = params.Get<int>("npoints");
-  auto radius = params.Get<GR1D::Radius>("radius");
+  auto radius = params.Get<MonopoleGR::Radius>("radius");
 
   // Everything done on host
   auto hypersurface = params.Get<Hypersurface_host_t>("hypersurface_h");
@@ -198,14 +200,14 @@ TaskStatus LinearSolveForAlpha(StateDescriptor *pkg) {
 
   const Real rmax = radius.max();
   const Real dr = radius.dx();
-  const Real idr = 1./dr;
-  const Real dr2 = dr*dr;
-  const Real idr2 = 1./dr2;
+  const Real idr = 1. / dr;
+  const Real dr2 = dr * dr;
+  const Real idr2 = 1. / dr2;
 
-  const int iA = GR1D::Hypersurface::A;
-  const int iK = GR1D::Hypersurface::K;
-  const int iRHO = GR1D::Matter::RHO;
-  const int iS = GR1D::Matter::trcS;
+  const int iA = MonopoleGR::Hypersurface::A;
+  const int iK = MonopoleGR::Hypersurface::K;
+  const int iRHO = MonopoleGR::Matter::RHO;
+  const int iS = MonopoleGR::Matter::trcS;
 
   auto GetCell = [&](const int i, Real &r, Real &a, Real &K, Real &rho, Real &S,
                      Real &dadr, Real &denom) {
@@ -215,17 +217,17 @@ TaskStatus LinearSolveForAlpha(StateDescriptor *pkg) {
     rho = matter(iRHO, i);
     S = matter(iS, i);
     dadr = ShootingMethod::GetARHS(a, K, r, rho);
-    denom = a*(4 + a * a * dr2 * (3 * K * K + 8 * M_PI * (S + rho)));
+    denom = a * (4 + a * a * dr2 * (3 * K * K + 8 * M_PI * (S + rho)));
   };
 
   // define coefficients
   // by rows. Do first and last rows by hand
-  for (int i = 1; i < npoints-1; ++i) {
+  for (int i = 1; i < npoints - 1; ++i) {
     Real r, a, K, rho, S, dadr, denom;
     GetCell(i, r, a, K, rho, S, dadr, denom);
-    d(i) = -r*(4 + a*a*dr*dr*(3*K*K + 8*M_PI*(S + rho)))/(2*dr);
-    u(i) = 1 - (dadr*r/(2*a)) + r*idr;
-    l(i) = -1 + (dadr*r)/(2*a) + r*idr;
+    d(i) = -r * (4 + a * a * dr * dr * (3 * K * K + 8 * M_PI * (S + rho))) / (2 * dr);
+    u(i) = 1 - (dadr * r / (2 * a)) + r * idr;
+    l(i) = -1 + (dadr * r) / (2 * a) + r * idr;
     b(i) = 0;
   }
   { // row 0
@@ -245,26 +247,27 @@ TaskStatus LinearSolveForAlpha(StateDescriptor *pkg) {
     b(i) = -dr;
   }
 
-  //Forward substitution
+  // Forward substitution
   for (int i = 1; i < npoints; ++i) {
-    Real w = l(i)/d(i-1);
-    d(i) = d(i) - w*u(i-1);
-    b(i) = b(i) - w*b(i-1);
+    Real w = l(i) / d(i - 1);
+    d(i) = d(i) - w * u(i - 1);
+    b(i) = b(i) - w * b(i - 1);
   }
 
   // Back substitution
-  alpha(npoints - 1) = b(npoints-1)/d(npoints-1);
+  alpha(npoints - 1) = b(npoints - 1) / d(npoints - 1);
   for (int i = npoints - 2; i >= 0; i -= 1) {
-    alpha(i) = (b(i) - u(i)*alpha(i+1))/d(i);
+    alpha(i) = (b(i) - u(i) * alpha(i + 1)) / d(i);
   }
 
   return TaskStatus::complete;
 }
 
 TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
-  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
   auto &params = pkg->AllParams();
-  auto enabled = params.Get<bool>("enable_gr1d");
+  auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
   auto hypersurface = params.Get<Matter_t>("hypersurface");
@@ -279,14 +282,15 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
 }
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
-  PARTHENON_REQUIRE_THROWS(pkg->label() == "GR1D", "Requires the GR1D package");
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
   auto &params = pkg->AllParams();
 
-  auto enabled = params.Get<bool>("enable_gr1d");
+  auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return;
 
   auto npoints = params.Get<int>("npoints");
-  auto radius = params.Get<GR1D::Radius>("radius");
+  auto radius = params.Get<MonopoleGR::Radius>("radius");
 
   auto matter = params.Get<Matter_t>("matter");
   auto matter_h = params.Get<Matter_host_t>("matter_h");
@@ -312,4 +316,4 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
   fclose(pf);
 }
 
-} // namespace GR1D
+} // namespace MonopoleGR

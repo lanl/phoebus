@@ -11,8 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef GR1D_GR1D_HPP_
-#define GR1D_GR1D_HPP_
+#ifndef MONOPOLE_GR_MONOPOLE_GR_HPP_
+#define MONOPOLE_GR_MONOPOLE_GR_HPP_
 
 // stdlib
 #include <memory>
@@ -79,8 +79,8 @@ using namespace parthenon::package::prelude;
 
   da/dr = (a/2 r) (r^2 (16 pi rho - (3/2) (K^r_r)^2) - a + 1)
   d K^r_r/dr = k pi a^2 j^r - (3/r) K^r_r
-  r d^2 alpha/dr^2 = a^2 r alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) + ((1/a)(da/dr)r-2) dalpha/dr
-  beta^r = -(1/2) alpha r K^r_r
+  r d^2 alpha/dr^2 = a^2 r alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) + ((1/a)(da/dr)r-2)
+  dalpha/dr beta^r = -(1/2) alpha r K^r_r
 
   BOUNDARY CONDITIONS
   -------------------
@@ -127,7 +127,7 @@ using namespace parthenon::package::prelude;
   where rho_0 here is primitive density and h is enthalpy.
  */
 
-namespace GR1D {
+namespace MonopoleGR {
 
 constexpr int MIN_NPOINTS = 5;
 
@@ -175,6 +175,6 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 
-} // namespace GR1D
+} // namespace MonopoleGR
 
-#endif // GR1D_GR1D_HPP_
+#endif // MONOPOLE_GR_MONOPOLE_GR_HPP_

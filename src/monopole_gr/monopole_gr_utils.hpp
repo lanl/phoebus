@@ -11,12 +11,12 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef GR1D_GRD1D_UTILS_HPP_
-#define GR1D_GRD1D_UTILS_HPP_
+#ifndef MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
+#define MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
 
-#include "gr1d.hpp"
+#include "monopole_gr.hpp"
 
-namespace GR1D {
+namespace MonopoleGR {
 
 constexpr unsigned int log2(unsigned int n) { return (n > 1) ? 1 + log2(n >> 1) : 0; }
 
@@ -59,6 +59,6 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
 }
 } // namespace ShootingMethod
 
-} // namespace GR1D
+} // namespace MonopoleGR
 
-#endif // GR1D_GRD1D_UTILS_HPP_
+#endif // MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
