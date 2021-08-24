@@ -621,6 +621,10 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
       "Recon");
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
+  for (int i = TESTI - 1; i < TESTI + 2; i++) {
+    printf("[%i] CalculateFluxes v^1 = %e\n", i, flux.v(1,0,0,i));
+  }
+
 #define RECON(method)                                                          \
   parthenon::par_for(                                                          \
       DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(), X1DIR,              \

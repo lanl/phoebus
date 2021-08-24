@@ -115,6 +115,10 @@ void PiecewiseLinear(const int d, const int n,
   dq = minmod(v(n,k,j,i)-v(n,k-dk,j-dj,i-di), dq)*dq;
   ql(dir,n,k+dk,j+dj,i+di) = v(n,k,j,i) + 0.5*dq;
   qr(dir,n,k,j,i) = v(n,k,j,i) - 0.5*dq;
+  if (i > TESTI - 2 && i < TESTI + 2 && n == 1) {
+    printf("[%i] vel = %e ql = %e qr = %e\n",
+      i, v(n,k,j,i), ql(dir,n,k+dk,j+dj,i+di), qr(dir,n,k,j,i));
+  }
 }
 
 template <typename T>

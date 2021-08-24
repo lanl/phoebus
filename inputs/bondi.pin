@@ -47,7 +47,7 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 128      # Number of zones in X1-direction
+nx1         = 1024      # Number of zones in X1-direction
 x1min       = 0.59           # minimum value of X1
 x1max       = 5           # maximum value of X1
 ix1_bc      = outflow  # Inner-X1 boundary condition flag
@@ -96,6 +96,7 @@ riemann = llf
 recon = linear
 #recon = weno5z
 c2p_method = classic
+#c2p_method = robust
 c2p_max_iter = 100
 c2p_tol = 1.e-8
 Ye = false

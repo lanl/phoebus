@@ -22,4 +22,6 @@
 
 #define PRINT_RHS @PRINT_RHS@
 
+#define TESTI (512 + parthenon::Globals::nghost)
+
 #endif //COMPILE_CONSTANTS_HPP_
