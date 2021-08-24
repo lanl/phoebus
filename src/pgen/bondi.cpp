@@ -96,7 +96,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                               fluid_prim::bfield,
                               fluid_prim::ye,
                               fluid_prim::pressure,
-                              fluid_prim::temperature},
+                              fluid_prim::temperature,
+                              fluid_cons::density,
+                              fluid_cons::momentum},
                               imap);
 
   const int irho = imap[fluid_prim::density].first;
@@ -108,6 +110,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iye  = imap[fluid_prim::ye].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
+  const int crho = imap[fluid_cons::density].first;
+  const int cvlo = imap[fluid_cons::momentum].first;
+  const int cvhi = imap[fluid_cons::momentum].second;
 
   // this only works with ideal gases
   const std::string eos_type = pin->GetString("eos","type");
@@ -153,6 +158,76 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real smooth = gpkg->Param<Real>("smooth");
   auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
+  //int TESTI = 128 + parthenon::Globals::nghost;
+  // Get true solution for comparison
+  {
+    int k = 0;
+    int j = 0;
+    int i = TESTI;
+    Real x1 = coords.x1f(k,j,i);
+    Real x2 = coords.x2v(k,j,i);
+    Real x3 = coords.x3v(k,j,i);
+    Real r = tr.bl_radius(x1);
+    Real T = get_bondi_temp(r, n, C1, C2, Tc, rs);
+    Real rho = std::pow(T,n);
+    Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
+    ucon_bl[1] = -C1/(std::pow(T,n)*std::pow(r,2));
+
+    Real gcov[4][4];
+    const Real th = tr.bl_theta(x1,x2);
+    bl.SpacetimeMetric(0.0, r, th, x3, gcov);
+    Real AA = gcov[0][0];
+    Real BB = 2.*(gcov[0][1]*ucon_bl[1] +
+                  gcov[0][2]*ucon_bl[2] +
+                  gcov[0][3]*ucon_bl[3]);
+    Real CC = 1. + gcov[1][1]*ucon_bl[1]*ucon_bl[1] +
+                   gcov[2][2]*ucon_bl[2]*ucon_bl[2] +
+                   gcov[3][3]*ucon_bl[3]*ucon_bl[3] +
+              2. *(gcov[1][2]*ucon_bl[1]*ucon_bl[2] +
+                   gcov[1][3]*ucon_bl[1]*ucon_bl[3] +
+                   gcov[2][3]*ucon_bl[2]*ucon_bl[3]);
+    Real discr = BB*BB - 4.*AA*CC;
+    ucon_bl[0] = (-BB - std::sqrt(discr))/(2.*AA);
+    const Real W_bl = ucon_bl[0]*bl.Lapse(0.0, r, th, x3);
+
+    Real ucon[4];
+    tr.bl_to_fmks(x1,x2,x3,a,ucon_bl, ucon);
+
+    // ucon won't be properly normalized here if x1 is not consistent with i
+    // so renormalize
+    geom.SpacetimeMetric(CellLocation::Face1, k, j, i, gcov);
+    AA = gcov[0][0];
+    BB = 2.*(gcov[0][1]*ucon[1] +
+             gcov[0][2]*ucon[2] +
+             gcov[0][3]*ucon[3]);
+    CC = 1. + gcov[1][1]*ucon[1]*ucon[1] +
+              gcov[2][2]*ucon[2]*ucon[2] +
+              gcov[3][3]*ucon[3]*ucon[3] +
+         2. *(gcov[1][2]*ucon[1]*ucon[2] +
+              gcov[1][3]*ucon[1]*ucon[3] +
+              gcov[2][3]*ucon[2]*ucon[3]);
+    discr = BB*BB - 4.*AA*CC;
+    PARTHENON_REQUIRE(discr > 0, "discr < 0");
+    ucon[0] = (-BB - std::sqrt(discr))/(2.*AA);
+
+    // now get three velocity
+    const Real lapse = geom.Lapse(CellLocation::Face1, k, j, i);
+    Real beta[3];
+    geom.ContravariantShift(CellLocation::Face1, k, j, i, beta);
+    Real W = lapse * ucon[0];
+    Real vprim[3];
+    for (int d = 0; d < 3; d++) {
+      vprim[d] = ucon[d+1]/W + beta[d]/lapse;
+    }
+    printf("/////////// FACE VALUE!\n");
+    printf("TESTI: %i\n", TESTI);
+    printf("r = %e\n", r);
+    printf("rho = %e T = %e v^1 = %e\n", rho, T, vprim[0]);
+    printf("D = %e\n", rho*W);
+    printf("Gamma = %e\n", W);
+    printf("///////////\n");
+  }
+
   pmb->par_for(
     "Phoebus::ProblemGenerator::Bondi", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -162,7 +237,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       Real r = tr.bl_radius(x1);
       while (r < Rhor) {
-        printf("[%i] increase r to %e!\n", i, r);
         x1 += coords.dx1v(i);
         r = tr.bl_radius(x1);
       }
@@ -193,7 +267,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       SPACETIMELOOP2(mu, nu) {
         udu += gcov[mu][nu]*ucon_bl[mu]*ucon_bl[nu];
       }
-      printf("[%i] ubl.ubl = %e\n", i, udu);
 
       Real ucon[4];
       tr.bl_to_fmks(x1,x2,x3,a,ucon_bl, ucon);
@@ -223,9 +296,40 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       for (int d = 0; d < 3; d++) {
         v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
       }
+
+      v(iprs,k,j,i) = (gam - 1.0)*v(ieng,k,j,i);
+
+      if (i > TESTI - 2 && i < TESTI + 2) {
+        double gammadet = geom.DetGamma(CellLocation::Cent, k, j, i);
+        double gdet = geom.DetG(CellLocation::Cent, k, j, i);
+        /*printf("[%i] rho = %e v = %e %e %e\n", i, v(irho,k,j,i), v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
+        printf("gammadet = %e gdet = %e\n", gammadet, gdet);
+        printf("       my crho = %e\n", gammadet*v(irho,k,j,i)*W);
+        printf("Gamma = %e beta = %e %e %e alpha = %e\n", W, beta[0], beta[1], beta[2], lapse);*/
+        Real h = 1. + v(ieng,k,j,i)/v(irho,k,j,i) + (gam - 1.0)*v(ieng,k,j,i)/v(irho,k,j,i);
+        Real vcov[3] = {0};
+        Real gammacov[3][3] = {0};
+        geom.Metric(CellLocation::Cent, k, j, i, gammacov);
+        SPACELOOP2(mu, nu) {
+          vcov[mu] += gammacov[mu][nu]*v(ivlo+nu,k,j,i);
+        }
+        printf("       h = %e eps = %e p/rho = %e vcov1 = %e\n", h, v(ieng,k,j,i)/v(irho,k,j,i),
+          (gam - 1.0)*v(ieng,k,j,i)/v(irho,k,j,i), vcov[0]);
+        printf("       my cmom = %e\n", gammadet*v(irho,k,j,i)*h*W*W*vcov[0]);
+      }
     });
 
   fluid::PrimitiveToConserved(rc);
+
+  fluid::ConservedToPrimitive(rc);
+  for (int i = TESTI - 1; i < TESTI + 2; i++) {
+    int k = 0;
+    int j = 0;
+    printf("[%i] after c2p rho = %e v = %e %e %e\n", i, v(irho,k,j,i), v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
+    printf("                 crho = %e cv = %e %e %e\n", v(crho,k,j,i), v(cvlo,k,j,i),
+                                                         v(cvlo+1,k,j,i), v(cvlo+2,k,j,i));
+  }
+
   //exit(-1);
 }
 
