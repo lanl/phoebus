@@ -25,7 +25,6 @@ import __main__
 # Constants
 #
 
-PROBLEM='test'
 BUILD_DIR='build'
 SOURCE_DIR='../../../'
 NUM_PROCS=4 # Default values for cmake --build --parallel can overwhelm CI systems
@@ -145,14 +144,6 @@ def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, com
     print(f"Not currently in build directory \"{BUILD_DIR}\"!")
     sys.exit()
 
-  #print(os.getcwd())
-  #if not os.path.isdir(BUILD_DIR):
-  #  print(f"BUILD_DIR \"{BUILD_DIR}\" does not exist!")
-  #  sys.exit()
-
-  # Inputs to always modify
-  #modified_inputs['phoebus/problem'] = PROBLEM
-
   # Copy test problem and modify inputs
   shutil.copyfile(input_file, TEMPORARY_INPUT_FILE)
   for key in modified_inputs:
@@ -162,7 +153,6 @@ def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, com
   call(['./src/phoebus', '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
-  #dumpfiles = np.sort(glob.glob(PROBLEM + '.*.phdf'))
   dumpfiles = np.sort(glob.glob('*.phdf'))
   if len(dumpfiles) == 0:
     print("Could not load any dump files!")
