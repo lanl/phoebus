@@ -590,10 +590,10 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
         }
 
-        if (i == 128) {
+        /*if (i == 128) {
           printf("src: %e %e %e %e\n", src(ceng,k,j,i), src(cmom_lo,k,j,i),
             src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i));
-        }
+        }*/
 
 
       });
@@ -621,9 +621,9 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
       "Recon");
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
-  for (int i = TESTI - 1; i < TESTI + 2; i++) {
-    printf("[%i] CalculateFluxes v^1 = %e\n", i, flux.v(1,0,0,i));
-  }
+//  for (int i = TESTI - 1; i < TESTI + 2; i++) {
+//    printf("[%i] CalculateFluxes v^1 = %e\n", i, flux.v(1,0,0,i));
+//  }
 
 #define RECON(method)                                                          \
   parthenon::par_for(                                                          \
@@ -672,10 +672,10 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   }
 #undef FLUX
 
-  printf("i = 128: DF\n");
+  /*printf("i = 128: DF\n");
   for (int n = 0; n < 5; n++) {
     printf("  [%i] %e\n", n, flux.v.flux(1,n,0,0,129) - flux.v.flux(1,n,0,0,128));
-  }
+  }*/
 
   return TaskStatus::complete;
 }
