@@ -160,7 +160,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   //int TESTI = 128 + parthenon::Globals::nghost;
   // Get true solution for comparison
-  {
+  /*{
     int k = 0;
     int j = 0;
     int i = TESTI;
@@ -226,7 +226,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     printf("D = %e\n", rho*W);
     printf("Gamma = %e\n", W);
     printf("///////////\n");
-  }
+  }*/
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::Bondi", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -244,6 +244,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(itmp,k,j,i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
       v(irho,k,j,i) = std::pow(v(itmp,k,j,i),n);
       v(ieng,k,j,i) = v(irho,k,j,i)*v(itmp,k,j,i)/(gam - 1.0);
+      v(iprs,k,j,i) = eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
       Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
       ucon_bl[1] = -C1/(std::pow(v(itmp,k,j,i),n)*std::pow(r,2));
 
@@ -297,8 +298,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
       }
 
-      v(iprs,k,j,i) = (gam - 1.0)*v(ieng,k,j,i);
-
       if (i > TESTI - 2 && i < TESTI + 2) {
         double gammadet = geom.DetGamma(CellLocation::Cent, k, j, i);
         double gdet = geom.DetG(CellLocation::Cent, k, j, i);
@@ -313,22 +312,22 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         SPACELOOP2(mu, nu) {
           vcov[mu] += gammacov[mu][nu]*v(ivlo+nu,k,j,i);
         }
-        printf("       h = %e eps = %e p/rho = %e vcov1 = %e\n", h, v(ieng,k,j,i)/v(irho,k,j,i),
-          (gam - 1.0)*v(ieng,k,j,i)/v(irho,k,j,i), vcov[0]);
-        printf("       my cmom = %e\n", gammadet*v(irho,k,j,i)*h*W*W*vcov[0]);
+//        printf("       h = %e eps = %e p/rho = %e vcov1 = %e\n", h, v(ieng,k,j,i)/v(irho,k,j,i),
+//          (gam - 1.0)*v(ieng,k,j,i)/v(irho,k,j,i), vcov[0]);
+//        printf("       my cmom = %e\n", gammadet*v(irho,k,j,i)*h*W*W*vcov[0]);
       }
     });
 
   fluid::PrimitiveToConserved(rc);
 
-  fluid::ConservedToPrimitive(rc);
+/*  fluid::ConservedToPrimitive(rc);
   for (int i = TESTI - 1; i < TESTI + 2; i++) {
     int k = 0;
     int j = 0;
     printf("[%i] after c2p rho = %e v = %e %e %e\n", i, v(irho,k,j,i), v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
     printf("                 crho = %e cv = %e %e %e\n", v(crho,k,j,i), v(cvlo,k,j,i),
                                                          v(cvlo+1,k,j,i), v(cvlo+2,k,j,i));
-  }
+  }*/
 
   //exit(-1);
 }
