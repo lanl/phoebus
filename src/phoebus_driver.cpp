@@ -136,7 +136,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // compute the divergence of fluxes of conserved variables
     auto flux_div =
         tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>, sc0.get(), dudt.get());
-    
+
     auto copy_flux_div = tl.AddTask(flux_div|geom_src, fluid::CopyFluxDivergence, dudt.get());
 
     auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,

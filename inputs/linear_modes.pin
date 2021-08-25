@@ -112,6 +112,7 @@ c2p_max_iter = 100
 #recon = weno5
 recon = linear
 c2p_tol = 1.e-12
+c2p_method = classic
 
 <hydro_modes>
 physics = hydro
