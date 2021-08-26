@@ -21,7 +21,7 @@ sys.path.append("../../external/parthenon/scripts/python/packages/parthenon_tool
 from parthenon_tools import phdf
 import __main__
 
-#
+# ------------------------------------------------------------------------------------------------ #
 # Constants
 #
 
@@ -31,10 +31,11 @@ NUM_PROCS=4 # Default values for cmake --build --parallel can overwhelm CI syste
 TEMPORARY_INPUT_FILE='test_input.pin'
 SCRIPT_NAME=os.path.basename(__main__.__file__).split('.py')[0]
 
-#
+# ------------------------------------------------------------------------------------------------ #
 # Utility functions
 #
 
+# -- Compare two values up to some floating point tolerance
 def soft_equiv(val, ref, tol = 1.e-5):
   if ref < 1.e-100:
     return True
@@ -44,6 +45,7 @@ def soft_equiv(val, ref, tol = 1.e-5):
   else:
     return True
 
+# -- Modify key in input file, add key (and block) if not present, write new file
 def modify_input(dict_key, value, input_file):
   key = dict_key.split('/')[-1]
   block = dict_key.split(key)[0][:-1]
@@ -89,22 +91,30 @@ def modify_input(dict_key, value, input_file):
 
       new_input_file.append(line)
 
+  index = None
   if input_found == False:
     print(f"Input \"{block}\" \"{key}\" not found!")
-    sys.exit()
+    for i, line in enumerate(new_input_file):
+      if line == f"<{block}>":
+        index = i
 
-  with open(TEMPORARY_INPUT_FILE, 'w') as outfile:
+  if index is None:
+    # Block doesn't exist
+    new_input_file.append(f"<{block}>\n")
+    new_input_file.append(key + ' = ' + str(value) + '\n')
+  else:
+    # Block exists but key doesn't
+    new_input_file.insert(index, key + ' = ' + str(value) + '\n')
+
+  with open(input_file, 'w') as outfile:
     for line in new_input_file:
       outfile.write(line)
 
-#
+# ------------------------------------------------------------------------------------------------ #
 # Common regression test tools
 #
 
 # -- Configure and build phoebus with problem-specific options
-#
-#    geometry: String specifying the compile-time geometry for configuring the code
-#
 def build_code(geometry):
   if os.path.isdir(BUILD_DIR):
     print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
@@ -137,8 +147,6 @@ def build_code(geometry):
 
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
-#
-#    variables: List of variable name strings with which to compare
 def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, compression_factor=1):
   if not os.getcwd().endswith(BUILD_DIR):
     print(f"Not currently in build directory \"{BUILD_DIR}\"!")
@@ -213,4 +221,3 @@ def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, com
     else:
       print("TEST FAILED")
       sys.exit(os.EX_SOFTWARE)
-
