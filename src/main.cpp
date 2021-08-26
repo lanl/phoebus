@@ -65,10 +65,10 @@ int main(int argc, char *argv[]) {
   }
 
   std::string problem_name = pman.pinput->GetString("phoebus", "problem");
-  if (problem_name == "bondi") {
+  /*if (problem_name == "bondi") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
         Boundaries::BondiOuterX1;
-  }
+  }*/
 
   phoebus::ProblemModifier(pman.pinput.get());
 
