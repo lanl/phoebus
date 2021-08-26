@@ -265,7 +265,7 @@ Real hll(const FluxState &fs, const int d, const int k, const int j, const int i
   const Real cr = std::max(std::max(vpl, vpr), 0.0);
 
   for (int m = 0; m < fs.NumConserved(); m++) {
-    fs.v.flux(d,m,k,j,i) = (cr*Fl[m] - cl*Fr[m] + cr*cl*(Ur[m] - Ul[m]))/(cr - cl) * g.gdet;
+    fs.v.flux(d,m,k,j,i) = ((cr*Fl[m] - cl*Fr[m])*g.gdet + cr*cl*(Ur[m] - Ul[m])*g.gammadet)/(cr - cl);
   }
   return std::max(-cl,cr);
 }
