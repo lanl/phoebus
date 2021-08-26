@@ -56,11 +56,6 @@ void p2c(const Real &rho, const Real v[], const Real b[], const Real &u,
     }
     S[m] = gdet * (rho_rel*vcov - alpha*bcon[0]*bcov[m]);
     bcons[m] = gdet * b[m];
-    if (rho > 6.13e-04 && rho < 6.18e-4 && m == 0) {
-      printf("D = %e gdet = %e rho = %e W = %e\n", D, gdet, rho, W);
-      printf("h = %e vcov = %e S = %e\n", (1. + u/rho + p/rho), vcov, S[m]);
-      printf("eps = %e P/rho = %e\n", u/rho, p/rho);
-    }
   }
 
   tau = gdet * (rho_rel - (p + 0.5*bsq) - alpha*alpha*bcon[0]*bcon[0]) - D;

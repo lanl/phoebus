@@ -34,18 +34,18 @@ struct FaceGeom {
   KOKKOS_INLINE_FUNCTION
   FaceGeom(const Geometry::CoordSysMeshBlock &g, const CellLocation loc,
            const int d, const int k, const int j, const int i)
-           : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetG(loc,k,j,i)) {
+           : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetG(loc,k,j,i)),
+             gammadet(g.DetGamma(loc,k,j,i)) {
     auto gcon = reinterpret_cast<Real (*)[3]>(&gcov[0][0]);
     g.MetricInverse(loc,k,j,i,gcon);
     gdd = gcon[d-1][d-1];
     g.SpacetimeMetric(loc,k,j,i,gcov);
     g.ContravariantShift(loc,k,j,i,beta);
     g.Coords(loc,k,j,i,X);
-    gammadet = g.DetGamma(loc,k,j,i);
   }
   const Real alpha;
   const Real gdet;
-  Real gammadet;
+  const Real gammadet;
   Real gcov[4][4];
   Real beta[3];
   Real gdd;
@@ -92,7 +92,6 @@ class FluxState {
                     const Real gam_max) const {
     const int dir = d-1;
     const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
-    //printf("rho = %e (%e %e)\n", rho, q(dir,prho,k,j,i), rho_floor);
     Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
     const Real &vel = vcon[dir];
     Real Bcon[] = {0.0, 0.0, 0.0};
@@ -101,7 +100,6 @@ class FluxState {
                           ? rho*sie_max
                           : q(dir,peng,k,j,i))
                       : rho*sie_floor);
-    //printf("u = %e (%e %e %e)\n", u, rho*sie_max, q(dir,peng,k,j,i), rho*sie_floor);
     const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
@@ -120,7 +118,6 @@ class FluxState {
       }
     }
     const Real vsq_max = 1.0 - 1.0/(gam_max*gam_max);
-    //printf("vsq = %e vsq_max = %e\n", vsq, vsq_max);
     if (vsq > vsq_max) {
       Real scale = vsq_max/vsq;
       vsq *= scale;
@@ -131,12 +128,6 @@ class FluxState {
     const Real W = 1.0/sqrt(1-vsq);
 
     const Real vtil = vel - g.beta[dir]/g.alpha;
-    //const Real vtil = g.alpha*vel - g.beta[dir];
-
-    if (i > TESTI - 2 && i < TESTI + 2) {
-      printf("[%i] vtil = %e alpha = %e vel = %e beta[0] = %e\n",
-        i, vtil, g.alpha, vel, g.beta[dir]);
-    }
 
     // density
     U[crho] = rho*W;
@@ -250,18 +241,7 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   const Real cmax = std::max(std::max(-vml,vpl), std::max(-vmr,vpr));
 
   for (int m = 0; m < fs.NumConserved(); m++) {
-    //fs.v.flux(d,m,k,j,i) = 0.5*(Fl[m] + Fr[m] - cmax*(Ur[m] - Ul[m])) * g.gdet;
     fs.v.flux(d,m,k,j,i) = 0.5*((Fl[m] + Fr[m])*g.gdet - cmax*((Ur[m] - Ul[m])*g.gammadet));
-    if (i == TESTI) {
-      if (m == 0) {
-        printf("[%i] v.flux = %e Fl = %e Fr = %e cmax = %e Ur = %e Ul = %e\n",
-          i, fs.v.flux(d,m,k,j,i), Fl[m], Fr[m], cmax, Ur[m], Ul[m]);
-        printf("      gdet = %e gammadet = %e \n", g.gdet, g.gammadet);
-        printf("      g*Fl = %e g*Fr = %e gamma*Ur = %e gamma*Ul = %e\n",
-          g.gdet*Fl[m], g.gdet*Fr[m], g.gammadet*Ur[m], g.gammadet*Ul[m]);
-      }
-      //printf("fs.v.flux(%i,%i,%i,%i,%i) = %e\n", d, m, k,j,i, fs.v.flux(d,m,k,j,i));
-    }
   }
   return cmax;
 }
