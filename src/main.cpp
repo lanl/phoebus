@@ -64,12 +64,6 @@ int main(int argc, char *argv[]) {
         Boundaries::OutflowOuterX1;
   }
 
-  std::string problem_name = pman.pinput->GetString("phoebus", "problem");
-  /*if (problem_name == "bondi") {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-        Boundaries::BondiOuterX1;
-  }*/
-
   phoebus::ProblemModifier(pman.pinput.get());
 
   // call ParthenonInit to set up the mesh
