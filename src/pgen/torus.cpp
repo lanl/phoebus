@@ -287,7 +287,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       std::cout << "beta_min = " << beta_min << std::endl;
   }
   // now normalize the b-field
+  //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
+  //fluid::ConservedToPrimitive(rc);
+  //}
 /*
   Real beta[3];
   geom.ContravariantShift(CellLocation::Cent,kb.s,jb.s+256,ib.s+440, beta);

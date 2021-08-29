@@ -48,7 +48,7 @@ Real find_root(F &func, Real a, Real b, const Real tol, int line) {
   constexpr Real kappa2 = 2.0;
   constexpr int n0 = 0;
 
-  const int nmax = std::ceil(std::log2((b-a)/tol)) + n0;
+  const int nmax = std::ceil(std::log2(0.5*(b-a)/tol)) + n0;
   int j = 0;
 
   Real ya = func(a);
@@ -61,14 +61,14 @@ Real find_root(F &func, Real a, Real b, const Real tol, int line) {
   ya *= sign;
   yb *= sign;
 
-  while (b-a > tol) {
+  while (b-a > 2.0*tol) {
     const Real xh = 0.5*(a + b);
     const Real xf = (yb*a - ya*b)/(yb - ya);
     const Real xhxf = xh - xf;
     const Real delta = std::min(kappa1*std::pow(b-a,kappa2),std::abs(xhxf));
     const Real sigma = (xhxf > 0 ? 1.0 : -1.0);
     const Real xt = (delta <= sigma*xhxf ? xf + sigma*delta : xh);
-    const Real r = std::min(0.5*tol*(1<<(nmax-j)) - 0.5*(b - a), std::abs(xt-xh));
+    const Real r = tol*std::pow(2.0,nmax-j) - 0.5*(b - a);
     const Real xitp = (std::fabs(xt - xh) > r ? xh - sigma*r : xt);
     const Real yitp = sign*func(xitp);
     if (yitp > 0.0) {
