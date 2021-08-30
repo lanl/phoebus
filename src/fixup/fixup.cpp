@@ -103,7 +103,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   int ifail = imap[impl::fail].first;
 
   const int ndim = pmb->pmy_mesh->ndim;
-  
+
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -113,7 +113,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
-          v(b,iv,k,j,i)  = v(b,ifail,k,j,i-1)*v(b,iv,k,j,i-1) 
+          v(b,iv,k,j,i)  = v(b,ifail,k,j,i-1)*v(b,iv,k,j,i-1)
                          + v(b,ifail,k,j,i+1)*v(b,iv,k,j,i+1);
           if (ndim > 1) {
             v(b,iv,k,j,i) += v(b,ifail,k,j-1,i)*v(b,iv,k,j-1,i)
@@ -220,7 +220,7 @@ TaskStatus FixFailures(MeshBlockData<Real> *rc) {
   auto gpkg = pmb->packages.Get("geometry");
   const Real a = gpkg->Param<Real>("a");
   const Real reh = 1. + sqrt(1. - a * a);
-  const Real x1eh = std::log(reh); // TODO(BRR) still coordinate dependent     
+  const Real x1eh = std::log(reh); // TODO(BRR) still coordinate dependent
 
   parthenon::par_for(
     DEFAULT_LOOP_PATTERN, "Fix velocity inside horizon", DevExecSpace(),
@@ -249,7 +249,7 @@ TaskStatus NothingEscapes(MeshBlockData<Real> *rc) {
   auto gpkg = pmb->packages.Get("geometry");
   const Real a = gpkg->Param<Real>("a");
   const Real reh = 1. + sqrt(1. - a * a);
-  const Real x1eh = std::log(reh); // TODO(BRR) still coordinate dependent     
+  const Real x1eh = std::log(reh); // TODO(BRR) still coordinate dependent
 
   auto flux = rc->PackVariablesAndFluxes({fluid_cons::density, fluid_cons::energy, fluid_cons::momentum, fluid_prim::pressure},
                                          {fluid_cons::density, fluid_cons::energy, fluid_cons::momentum});

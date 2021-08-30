@@ -16,12 +16,16 @@
 import argparse
 import regression_test as rt
 
-parser = argparse.ArgumentParser(description='Run a linear mode as a test')
+parser = argparse.ArgumentParser(description='Run the Bondi accretion problem as a test')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
 args = parser.parse_args()
 
-rt.build_code(geometry="Minkowski")
+modified_inputs = {}
+modified_inputs['parthenon/mesh/nx1'] = 128
+
+rt.build_code(geometry="FMKS")
 rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                   input_file='../../../inputs/linear_modes.pin',
+                   input_file='../../../inputs/bondi.pin',
+                   modified_inputs=modified_inputs,
                    upgold=args.upgold,
-                   compression_factor=10)
+                   compression_factor=1)

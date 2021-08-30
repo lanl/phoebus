@@ -397,7 +397,7 @@ class ConToPrim {
     int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);
     if (num_nans > 0) return ConToPrimStatus::failure;
     const Real igdet = 1.0/g.gdet;
-    
+
     Real rhoflr, epsflr;
     bounds.GetFloors(x1,x2,x3,rhoflr,epsflr);
     Real gam_max, eps_max;
@@ -518,7 +518,7 @@ class ConToPrim {
         W > 1.00001*gam_max) {
       std::cout << "bounds violated " << v(prho)/rhoflr << " "
                                       << v(peng)/v(prho)/epsflr << " "
-                                      << v(peng)/v(prho)/eps_max << " " 
+                                      << v(peng)/v(prho)/eps_max << " "
                                       << W/gam_max << std::endl;
     }
 
@@ -528,7 +528,11 @@ class ConToPrim {
       //v(pvel_lo+i) = atm ? 0 : mu*x*(rcon[i] + mu*bdotr*bu[i]);
       v(pvel_lo+i) = mu*x*(rcon[i] + mu*bdotr*bu[i]);
       vel[i] = v(pvel_lo+i);
-      bu[i] = v(pb_lo+i);
+    }
+    if (pb_hi > 0) {
+      SPACELOOP(i) {
+        bu[i] = v(pb_lo+i);
+      }
     }
 
     /*if (res.used_density_floor() ||
