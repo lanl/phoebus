@@ -48,8 +48,7 @@ Real find_root(F &func, Real a, Real b, const Real tol, int line) {
   constexpr Real kappa2 = 2.0;
   constexpr int n0 = 0;
 
-  const int nmax = std::ceil(std::log2((b-a)/tol)) + n0;
-  //printf("nmax: %i b: %e a: %e tol: %e n0: %i\n", nmax, b, a, tol, n0);
+  const int nmax = std::ceil(std::log2(0.5*(b-a)/tol)) + n0;
   int j = 0;
 
   Real ya = func(a);
@@ -62,63 +61,16 @@ Real find_root(F &func, Real a, Real b, const Real tol, int line) {
   ya *= sign;
   yb *= sign;
 
-  constexpr int maxiter = 100;
-  int niter = 0;
-  int side = 0;
-  //while (b-a > tol) {
-  double fa = func(a);
-  double fb = func(b);
-  double r;
-  double fr;
-  while (true) {//b-a > tol*(b+a)) {
-    r = (fa * b - fb * a) / (fa - fb);
-    if (fabs(b - a) < tol*fabs(a + b)) {
-      break;
-    }
-    fr = func(r);
-    // TODO(BRR) extra hack
-    //if (fabs(fr) < tol) {
-    //  return r;
-    //}
-
-    //printf("[%i] b = %e a = %e b-a= %e tol = %e\n", niter, b, a, b-a, tol);
-    //printf("     fa = %e fr = %e fb = %e\n", fa, fr, fb);
-    if (fr * fb > 0) {
-      //printf("%s:%i b-a = %e\n", __FILE__, __LINE__, b-a);
-      b = r;
-      fb = fr;
-      if (side == -1) {
-        fa /= 2.;
-      }
-      side = -1;
-    } else if (fa * fr > 0) {
-      //printf("%s:%i\n", __FILE__, __LINE__);
-      //printf("%s:%i b-a = %e\n", __FILE__, __LINE__, b-a);
-      a = r;
-      fa = fr;
-      if (side == 1) {
-        fb /= 2.;
-      }
-      side = 1;
-    } else {
-      //printf("%s:%i\n", __FILE__, __LINE__);
-      //printf("%s:%i b-a = %e\n", __FILE__, __LINE__, b-a);
-      break;
-    }
-    //printf("b-a: %e tol*(b+a): %e\n", b-a, tol*(b+a), b-a>tol*(b+a));
-    //continue;
-    /*printf("b = %e a = %e b-a= %e tol = %e\n", b, a, b-a, tol);
+  while (b-a > 2.0*tol) {
     const Real xh = 0.5*(a + b);
     const Real xf = (yb*a - ya*b)/(yb - ya);
     const Real xhxf = xh - xf;
     const Real delta = std::min(kappa1*std::pow(b-a,kappa2),std::abs(xhxf));
     const Real sigma = (xhxf > 0 ? 1.0 : -1.0);
     const Real xt = (delta <= sigma*xhxf ? xf + sigma*delta : xh);
-    const Real r = std::min(0.5*tol*(1<<(nmax-j)) - 0.5*(b - a), std::abs(xt-xh));
+    const Real r = tol*std::pow(2.0,nmax-j) - 0.5*(b - a);
     const Real xitp = (std::fabs(xt - xh) > r ? xh - sigma*r : xt);
     const Real yitp = sign*func(xitp);
-    printf("xh: %e xf: %e xhxf: %e delta: %e sigma: %e\n", xh, xf, xhxf, delta, sigma);
-    printf("xt: %e r: %e xitp: %e yitp: %e\n", xt, r, xitp, yitp);
     if (yitp > 0.0) {
       b = xitp;
       yb = yitp;
@@ -128,17 +80,9 @@ Real find_root(F &func, Real a, Real b, const Real tol, int line) {
     } else {
       a = xitp;
       b = xitp;
-    }*/
-    j++;
-    niter++;
-    if (niter >= maxiter) {
-      PARTHENON_FAIL("niter >= maxiter during c2p!");
     }
+    j++;
   }
-  printf("fr: %e\n", fr);
-  return r;
-  //printf("%s:%i ans = %e b-a = %e\n", __FILE__, __LINE__, 0.5*(a+b), b-a);
-  //exit(-1);
   return 0.5*(a+b);
 }
 
