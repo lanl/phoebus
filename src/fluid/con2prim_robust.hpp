@@ -528,7 +528,11 @@ class ConToPrim {
       //v(pvel_lo+i) = atm ? 0 : mu*x*(rcon[i] + mu*bdotr*bu[i]);
       v(pvel_lo+i) = mu*x*(rcon[i] + mu*bdotr*bu[i]);
       vel[i] = v(pvel_lo+i);
-      bu[i] = v(pb_lo+i);
+    }
+    if (pb_hi > 0) {
+      SPACELOOP(i) {
+        bu[i] = v(pb_lo+i);
+      }
     }
 
     /*if (res.used_density_floor() ||
