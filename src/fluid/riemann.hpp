@@ -34,7 +34,8 @@ struct FaceGeom {
   KOKKOS_INLINE_FUNCTION
   FaceGeom(const Geometry::CoordSysMeshBlock &g, const CellLocation loc,
            const int d, const int k, const int j, const int i)
-           : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetG(loc,k,j,i)) {
+           : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetG(loc,k,j,i)),
+             gammadet(g.DetGamma(loc,k,j,i)) {
     auto gcon = reinterpret_cast<Real (*)[3]>(&gcov[0][0]);
     g.MetricInverse(loc,k,j,i,gcon);
     gdd = gcon[d-1][d-1];
@@ -44,6 +45,7 @@ struct FaceGeom {
   }
   const Real alpha;
   const Real gdet;
+  const Real gammadet;
   Real gcov[4][4];
   Real beta[3];
   Real gdd;
@@ -239,7 +241,7 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   const Real cmax = std::max(std::max(-vml,vpl), std::max(-vmr,vpr));
 
   for (int m = 0; m < fs.NumConserved(); m++) {
-    fs.v.flux(d,m,k,j,i) = 0.5*(Fl[m] + Fr[m] - cmax*(Ur[m] - Ul[m])) * g.gdet;
+    fs.v.flux(d,m,k,j,i) = 0.5*((Fl[m] + Fr[m])*g.gdet - cmax*((Ur[m] - Ul[m])*g.gammadet));
   }
   return cmax;
 }
@@ -263,7 +265,7 @@ Real hll(const FluxState &fs, const int d, const int k, const int j, const int i
   const Real cr = std::max(std::max(vpl, vpr), 0.0);
 
   for (int m = 0; m < fs.NumConserved(); m++) {
-    fs.v.flux(d,m,k,j,i) = (cr*Fl[m] - cl*Fr[m] + cr*cl*(Ur[m] - Ul[m]))/(cr - cl) * g.gdet;
+    fs.v.flux(d,m,k,j,i) = ((cr*Fl[m] - cl*Fr[m])*g.gdet + cr*cl*(Ur[m] - Ul[m])*g.gammadet)/(cr - cl);
   }
   return std::max(-cl,cr);
 }
