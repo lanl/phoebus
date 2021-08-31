@@ -500,6 +500,28 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   );
   return TaskStatus::complete;
 }
+TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  std::vector<std::string> vars({fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
+  PackIndexMap imap;
+  auto du = rc->PackVariables(vars, imap);
+  const int ceng = imap[fluid_cons::energy].first;
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
+      jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        for (int m = 0; m < 5; m++)
+          du(m,k,j,i) = 0.0;
+      }
+  );
+  return TaskStatus::complete;
+}
 
 
 // template <typename T>
