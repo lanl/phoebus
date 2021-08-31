@@ -72,15 +72,22 @@ using namespace parthenon::package::prelude;
 
   so we work with K^r_r
 
+
   GOVERNING EQUATIONS, SUMMARY:
   ------------------------------
   gamm_{ij} = diag(a^2, r^2, r^2 sin^2(th))
+
   K^i_j = K^r_r diag(1, -1/2, -1/2)
 
   da/dr = (a/2 r) (r^2 (16 pi rho - (3/2) (K^r_r)^2) - a + 1)
+
   d K^r_r/dr = k pi a^2 j^r - (3/r) K^r_r
-  r d^2 alpha/dr^2 = a^2 r alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) + ((1/a)(da/dr)r-2)
-  dalpha/dr beta^r = -(1/2) alpha r K^r_r
+
+  r d^2 alpha/dr^2 = a^2 r alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) +
+  ((1/a)(da/dr)r-2)dalpha/dr
+
+  beta^r = -(1/2) alpha r K^r_r
+
 
   BOUNDARY CONDITIONS
   -------------------
@@ -98,6 +105,30 @@ using namespace parthenon::package::prelude;
      da/dr = (a - a^3) / 2 r OR a = 1
      K^r_r = 0
      alpha = 1 - r (dalpha/dr) OR alpha = 1
+
+
+  TIME DERIVATIVES
+  ----------------
+
+  The ADM constraint equations are sufficient to determine a, K,
+  alpha, beta. However, the Christoffel coefficients depend on
+  derivatives of these quantities. We can determine the spatial
+  derivatives by taking gradients or using the above equations. For
+  time derivatives, we rely on the Einstein evolution equations:
+
+  (\partial_t - Lie_beta) g_{mu nu} = - 2 alpha K_{mu nu}
+
+  (\partial_t - Lie_beta) K_{i j} = -D_i D_j alpha + alpha [^{(3)}R_{ij} + K K_{ij} - 2
+  K_{ik} K^k_j] + 4 pi alpha [gamma_{ij} (S - rho) - 2 S_{ij}]
+
+  where here "D" is the covariant derivative operator on a hypersurface.
+
+  In particular, this allows us to derive that
+
+  d K^r_r/dt = beta^r (d K^r_r/dr) - (1/a^2) (d^2 alpha/dr^2) + alpha [(2/(a^3 r)) (da/dr)
+  - r (K^r_r)^2] + 4 pi alpha [S - rho - 2 S^r_r]
+
+
 
   MATTER COMPONENTS:
   ------------------
@@ -125,6 +156,9 @@ using namespace parthenon::package::prelude;
   trc(S) = (tau + D) + 4 P - rho_0 h
 
   where rho_0 here is primitive density and h is enthalpy.
+
+  We also need S^r_r = T^r_r for the Christoffel symbols:
+  T^r_r = (rho + u + P + b^2) u^r u_r + (P + (1/2) b^2) - b^r b_r
  */
 
 namespace MonopoleGR {
@@ -183,6 +217,24 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 TaskStatus LinearSolveForAlpha(StateDescriptor *pkg);
 
 TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
+
+template <typename Array_t>
+PORTABLE_INLINE_FUNCTION Real Interpolate(const Real r, const Array_t &A,
+                                          const Radius &rgrid) {
+  int ix;
+  Spiner::weights_t w;
+  rgrid.weights(x, ix, w);
+  return w[0] * A(ix) + w[1] * A(ix + 1);
+}
+
+template <typename Array_t>
+PORTABLE_INLINE_FUNCTION Real Interpolate(const Real r, const Array_t &A,
+                                          const Radius &rgrid, const int ivar) {
+  int ix;
+  Spiner::weights_t w;
+  rgrid.weights(x, ix, w);
+  return w[0] * A(ivar, ix) + w[1] * A(ivar, ix + 1);
+}
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 
