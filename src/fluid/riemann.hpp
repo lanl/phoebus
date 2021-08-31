@@ -32,7 +32,7 @@ enum class solver {LLF, HLL};
 
 struct FaceGeom {
   KOKKOS_INLINE_FUNCTION
-  FaceGeom(const Geometry::CoordSysMeshBlock &g, const CellLocation loc,
+  FaceGeom(const Coordinates_t &coords, const Geometry::CoordSysMeshBlock &g, const CellLocation loc,
            const int d, const int k, const int j, const int i)
            : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetG(loc,k,j,i)),
              gammadet(g.DetGamma(loc,k,j,i)) {
@@ -41,7 +41,9 @@ struct FaceGeom {
     gdd = gcon[d-1][d-1];
     g.SpacetimeMetric(loc,k,j,i,gcov);
     g.ContravariantShift(loc,k,j,i,beta);
-    g.Coords(loc,k,j,i,X);
+    X[1] = (loc == CellLocation::Face1 ? coords.x1f(k, j, i) : coords.x1v(k, j, i));
+    X[2] = (loc == CellLocation::Face2 ? coords.x2f(k, j, i) : coords.x2v(k, j, i));
+    X[3] = (loc == CellLocation::Face3 ? coords.x3f(k, j, i) : coords.x3v(k, j, i));
   }
   const Real alpha;
   const Real gdet;
@@ -185,6 +187,7 @@ class FluxState {
   const ParArrayND<Real> ql;
   const ParArrayND<Real> qr;
   const Geometry::CoordSysMeshBlock geom;
+  const Coordinates_t coords;
   fixup::Bounds bounds;
  private:
   const int prho, pvel_lo, peng, pb_lo, pb_hi, pye, prs, gm1;
@@ -195,6 +198,7 @@ class FluxState {
       ql(rc->Get("ql").data),
       qr(rc->Get("qr").data),
       geom(Geometry::GetCoordinateSystem(rc)),
+      coords(rc->GetParentPointer().get()->coords),
       bounds(rc->GetParentPointer().get()->packages.Get("fixup").get()->Param<fixup::Bounds>("bounds")),
       prho(imap[fluid_prim::density].first),
       pvel_lo(imap[fluid_prim::velocity].first),
@@ -230,7 +234,7 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   Real vml, vpl, vmr, vpr;
 
   CellLocation loc = DirectionToFaceID(d);
-  FaceGeom g(fs.geom, loc, d, k, j, i);
+  FaceGeom g(fs.coords, fs.geom, loc, d, k, j, i);
   Real rho_floor, sie_floor;
   fs.bounds.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
   Real gam_max, sie_max;
@@ -253,7 +257,7 @@ Real hll(const FluxState &fs, const int d, const int k, const int j, const int i
   Real vml, vpl, vmr, vpr;
 
   CellLocation loc = DirectionToFaceID(d);
-  FaceGeom g(fs.geom, loc, d, k, j, i);
+  FaceGeom g(fs.coords, fs.geom, loc, d, k, j, i);
   Real rho_floor, sie_floor;
   fs.bounds.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
   Real gam_max, sie_max;
