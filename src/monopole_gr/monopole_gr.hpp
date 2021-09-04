@@ -79,7 +79,7 @@ using namespace parthenon::package::prelude;
 
   K^i_j = K^r_r diag(1, -1/2, -1/2)
 
-  da/dr = (a/2 r) (r^2 (16 pi rho - (3/2) (K^r_r)^2) - a + 1)
+  da/dr = (a/2 r) (r^2 (8 pi rho - (3/2) (K^r_r)^2) - a + 1)
 
   d K^r_r/dr = k pi a^2 j^r - (3/r) K^r_r
 
@@ -174,12 +174,13 @@ constexpr int MIN_NPOINTS = 5;
 using Matter_t = parthenon::ParArray2D<Real>;
 using Matter_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
-constexpr int NMAT = 3;
-constexpr int NMAT_H = NMAT - 1;
+constexpr int NMAT = 4;
+constexpr int NMAT_H = NMAT - 2;
 enum Matter {
-  RHO = 0, // Primitive density... (0,0)-component of Tmunu
-  J_R = 1, // Radial momentum, (r,t)-component of Tmunu
-  trcS = 2 // Trace of the stress tensor: S = S^i_i
+  RHO = 0,  // Primitive density... (0,0)-component of Tmunu
+  J_R = 1,  // Radial momentum, (r,t)-component of Tmunu
+  trcS = 2, // Trace of the stress tensor: S = S^i_i
+  Srr = 3   // The r-r component of the stress tensor
 };
 
 using Hypersurface_t = parthenon::ParArray2D<Real>;
@@ -196,13 +197,17 @@ using Alpha_host_t = typename parthenon::ParArray1D<Real>::HostMirror;
 
 using Beta_t = parthenon::ParArray1D<Real>;
 
-constexpr int NGRAD = 4;
+constexpr int NGRAD = 8;
 using Gradients_t = parthenon::ParArray2D<Real>;
 enum Gradients {
   DADR = 0,     // dadr
   DKDR = 1,     // dKdr
   DALPHADR = 2, // dalphadr
-  DBETADR = 3   // dbetadr
+  DBETADR = 3,  // dbetadr
+  DADT = 4,     // dadt
+  DALPHADT = 5, // dalphadt
+  DKDT = 6,     // dKdt
+  DBETADT = 7   // dbetadt
 };
 
 // TODO(JMM): Do we want this?
@@ -223,7 +228,7 @@ PORTABLE_INLINE_FUNCTION Real Interpolate(const Real r, const Array_t &A,
                                           const Radius &rgrid) {
   int ix;
   Spiner::weights_t w;
-  rgrid.weights(x, ix, w);
+  rgrid.weights(r, ix, w);
   return w[0] * A(ix) + w[1] * A(ix + 1);
 }
 
@@ -232,7 +237,7 @@ PORTABLE_INLINE_FUNCTION Real Interpolate(const Real r, const Array_t &A,
                                           const Radius &rgrid, const int ivar) {
   int ix;
   Spiner::weights_t w;
-  rgrid.weights(x, ix, w);
+  rgrid.weights(r, ix, w);
   return w[0] * A(ivar, ix) + w[1] * A(ivar, ix + 1);
 }
 
