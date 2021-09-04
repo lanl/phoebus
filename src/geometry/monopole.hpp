@@ -87,7 +87,7 @@ class MonopoleSph {
 
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
-                              g[NDFULL][NDFULL]) const {
+                              Real g[NDFULL][NDFULL]) const {
     const Real r = std::abs(X1);
     const Real ir2 = Utils::ratio(1., r * r);
     const Real sth = std::sin(X2);
@@ -106,7 +106,7 @@ class MonopoleSph {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void Metric(Real X0, Real X1, Real X2, Real X3, g[NDSPACE][NDSPACE]) const {
+  void Metric(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     const Real r = std::abs(X1);
     const Real r2 = r * r;
     const Real sth = std::sin(X2);
@@ -119,7 +119,7 @@ class MonopoleSph {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void MetricInverse(Real X0, Real X1, Real X2, Real X3, g[NDSPACE][NDSPACE]) const {
+  void MetricInverse(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     const Real r = std::abs(X1);
     const Real ir2 = Utils::ratio(1., r * r);
     const Real sth = std::sin(X2);
@@ -205,20 +205,20 @@ class MonopoleSph {
     const Real dbetadt =
         MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DBETADT);
 
-    LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero(Gamma, NDFULL, NDFULL, NDFULL);
 
-    Christoffel[0][0][0] = -alpha * dalphadt;
-    Christoffel[0][0][1] = Christoffel[0][1][0] = -alpha * dalphadr;
+    Gamma[0][0][0] = -alpha * dalphadt;
+    Gamma[0][0][1] = Gamma[0][1][0] = -alpha * dalphadr;
 
-    Christoffel[1][0][0] = alpha * dalphadr - beta * dbetadr + dbetadt;
-    Christoffel[1][2][2] = -r;
-    Christoffel[1][2][2] = -r * sth * sth;
+    Gamma[1][0][0] = alpha * dalphadr - beta * dbetadr + dbetadt;
+    Gamma[1][2][2] = -r;
+    Gamma[1][2][2] = -r * sth * sth;
 
-    Christoffel[2][1][2] = Christoffel[2][2][1] = r;
-    Christoffel[2][3][3] = -r * cth * sth;
+    Gamma[2][1][2] = Gamma[2][2][1] = r;
+    Gamma[2][3][3] = -r * cth * sth;
 
-    Christoffel[3][1][3] = Christoffel[3][3][1] = r * sth * sth;
-    Christoffel[3][2][3] = Christoffel[3][3][2] = r * r * cth * sth;
+    Gamma[3][1][3] = Gamma[3][3][1] = r * sth * sth;
+    Gamma[3][2][3] = Gamma[3][3][2] = r * r * cth * sth;
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -254,7 +254,7 @@ class MonopoleSph {
   MonopoleGR::Beta_t beta_;
   MonopoleGR::Gradients_t gradients_;
   MonopoleGR::Radius rgrid_;
-}
+};
 
 class MonopoleCart {
  public:
@@ -309,7 +309,7 @@ class MonopoleCart {
     Real gsph[NDFULL][NDFULL];
     Real J[NDFULL][NDFULL];
     sph_.SpacetimeMetricInverse(X0, r, th, ph, gsph);
-    S2C(X1, X2, X3, r, J);
+    S2C(r, th, ph, J);
     SPACETIMELOOP2(mup, nup) {
       g[mup][nup] = 0;
       SPACETIMELOOP2(mu, nu) { g[mup][nup] += J[mup][mu] * J[nup][nu] * gsph[mu][nu]; }
@@ -317,7 +317,7 @@ class MonopoleCart {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void Metric(Real X0, Real X1, Real X2, Real X3, g[NDSPACE][NDSPACE]) const {
+  void Metric(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     Real r, th, ph;
     Cart2Sph(X1, X2, X3, r, th, ph);
     Real gsph[NDSPACE][NDSPACE];
@@ -331,13 +331,13 @@ class MonopoleCart {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void MetricInverse(Real X0, Real X1, Real X2, Real X3, g[NDSPACE][NDSPACE]) const {
+  void MetricInverse(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     Real r, th, ph;
     Cart2Sph(X1, X2, X3, r, th, ph);
     Real gsph[NDSPACE][NDSPACE];
     Real J[NDFULL][NDFULL];
     sph_.MetricInverse(X0, r, th, ph, gsph);
-    S2C(X1, X2, X3, r, J);
+    S2C(r, th, ph, J);
     SPACELOOP2(ip, jp) {
       g[ip][jp] = 0;
       SPACELOOP2(i, j) { g[ip][jp] += J[ip + 1][i + 1] * J[jp + 1][j + 1] * gsph[i][j]; }
@@ -348,8 +348,8 @@ class MonopoleCart {
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
     Real r, th, ph;
     Cart2Sph(X1, X2, X3, r, th, ph);
-    const Real a =
-        MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
+    const Real a = MonopoleGR::Interpolate(r, sph_.hypersurface_, sph_.rgrid_,
+                                           MonopoleGR::Hypersurface::A);
     return a * r * std::sqrt(std::abs(std::sin(th)));
   }
 
@@ -380,7 +380,7 @@ class MonopoleCart {
     Hessian(X1, X2, X3, r, H);
 
     Real dgsph[NDFULL][NDFULL][NDFULL];
-    sph_.MetricDerivatives(X0, r, th, ph, dgsph);
+    sph_.MetricDerivative(X0, r, th, ph, dgsph);
 
     SPACETIMELOOP3(mup, nup, sp) {
       dg[mup][nup][sp] = 0;
@@ -416,9 +416,9 @@ class MonopoleCart {
 
  private:
   MonopoleSph sph_;
-  void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Reah &ph) const {
+  void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph) const {
     r = std::sqrt(X1 * X1 + X2 * X2 + X3 * X3);
-    th = std::acos(Utils::ratio(X3 / r));
+    th = std::acos(Utils::ratio(X3, r));
     ph = std::atan2(X2, X1);
   }
   // These are dx^{mu'}/dx^{mu}
@@ -442,7 +442,7 @@ class MonopoleCart {
     J[3][2] = -r * sth;
     J[3][3] = 0;
   }
-  void C2S(Real x, Real y, Real z, Real r, Real J[NDFULL][JDFULL]) const {
+  void C2S(Real x, Real y, Real z, Real r, Real J[NDFULL][NDFULL]) const {
     const Real r2 = r * r;
     const Real rho2 = x * x + y * y;
     const Real rho = std::sqrt(rho2);
@@ -480,9 +480,10 @@ class MonopoleCart {
     const Real irho = Utils::ratio(1., rho);
     const Real irho3 = Utils::ratio(1., rho3);
     const Real irho4 = Utils::ratio(1., rho4);
+    const Real ir3 = Utils::ratio(1.,r3);
     const Real ir4 = Utils::ratio(1., r4);
 
-    LinearAlgebra::SetZero(J, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero(H, NDFULL, NDFULL, NDFULL);
     H[1][1][1] = (y2 + z2) * ir3;
     H[1][2][1] = -(x * y) * ir3;
     H[1][3][1] = -(x * z) * ir3;
@@ -512,5 +513,16 @@ class MonopoleCart {
     // H[3][*][3] = 0;
   }
 };
+
+using MplSphMeshBlock = Analytic<MonopoleSph, IndexerMeshBlock>;
+using MplCartMeshBlock = Analytic<MonopoleCart, IndexerMeshBlock>;
+
+using MplSphMesh = Analytic<MonopoleSph, IndexerMesh>;
+using MplCartMesh = Analytic<MonopoleCart, IndexerMesh>;
+
+template <>
+void Initialize<MplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+template <>
+void Initialize<MplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 
 } // namespace Geometry
