@@ -81,7 +81,7 @@ using namespace parthenon::package::prelude;
 
   da/dr = (a/2 r) (r^2 (8 pi rho - (3/2) (K^r_r)^2) - a + 1)
 
-  d K^r_r/dr = k pi a^2 j^r - (3/r) K^r_r
+  d K^r_r/dr = 8 pi a^2 j^r - (3/r) K^r_r
 
   r d^2 alpha/dr^2 = a^2 r alpha ((3/2) (K^r_r)^2 + 4 pi (rho + S)) +
   ((1/a)(da/dr)r-2)dalpha/dr
@@ -125,9 +125,16 @@ using namespace parthenon::package::prelude;
 
   In particular, this allows us to derive that
 
-  d K^r_r/dt = beta^r (d K^r_r/dr) - (1/a^2) (d^2 alpha/dr^2) + alpha [(2/(a^3 r)) (da/dr)
-  - r (K^r_r)^2] + 4 pi alpha [S - rho - 2 S^r_r]
+  da/dt = (da/dr) beta^r + a (d beta^r/dr) - alpha a K^r_r
 
+  d alpha/dr = beta^r [ a beta^r (da/dt)/alpha + a^2 K^r_r beta^r
+                        + 2 (da/dr) (1 - (beta^r)^2) - 2 a^2 beta^r (d beta^r/dr)/alpha ]
+
+  d K^r_r/dt = beta^r (d K^r_r/dr) - (1/a^2) (d^2 alpha/dr^2) + alpha [(2/(a^3 r)) (da/dr)
+                - r (K^r_r)^2] + 4 pi alpha [S - rho - 2 S^r_r]
+
+  d K^r_r/dt = beta^r (d K^r_r/dr) - (d^2 alpha/dr^2)/a^2
+              + a [2 (da/dr)/(a^2 r) - 4 (K^r_r)^2 ] + 4 pi alpha (s - rho - 2 S^r_r)
 
 
   MATTER COMPONENTS:
