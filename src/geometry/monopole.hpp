@@ -359,32 +359,59 @@ class MonopoleCart {
     return alpha * DetGamma(X0, X1, X2, X3);
   }
 
-  // TODO(JMM): Metric Derivative. DO it with The following formula
   /*
     Hessian formula for derivative of metric in new coordinate system:
     -----
     g_{mu' nu', sigma') = (d^2 x^mu/dx^mu' dx^sigma') (dx^nu/dx^nu') g_{mu nu}
                          + (d^2 x^nu/dx^nu' dx^sigma') (dx^mu/dx^mu') g_{mu nu}
-			 + (dx^sigma/dx^sigma') (d/dx^sigma) g_{mu nu}
+                         + (dx^sigma/dx^sigma') (d/dx^sigma) g_{mu nu}
    */
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
-    PARTHENON_FAIL("STUB!");
+    Real r, th, ph;
+    Cart2Sph(X1, X2, X3, r, th, ph);
+    Real g[NDFULL][NDFULL];
+    sph_.SpacetimeMetric(X0, r, th, ph, g);
+
+    Real J[NDFULL][NDFULL];
+    C2S(X1, X2, X3, r, J);
+    Real H[NDFULL][NDFULL][NDFULL];
+    Hessian(X1, X2, X3, r, H);
+
+    Real dgsph[NDFULL][NDFULL][NDFULL];
+    sph_.MetricDerivatives(X0, r, th, ph, dgsph);
+
+    SPACETIMELOOP3(mup, nup, sp) {
+      dg[mup][nup][sp] = 0;
+      SPACETIMELOOP3(mu, nu, sig) {
+        dg[mup][nup][sp] += H[mu][mup][sp] * J[nu][nup] * g[mu][nu] +
+                            H[nu][nup][sp] * J[mu][mup] * g[mu][nu] +
+                            J[sig][sp] * dgsph[mu][nu][sig];
+      }
+    }
   }
 
-  // TODO(JMM): Connection coefficients. Here we have options...
   /*
     Hessian formula for the transformation of a Christoffel symbol:
     -------
-    Gamma_{sigma' mu' nu'} = (dx^sigma/dx_sigma') (dx^mu'/dx^mu)(dx^nu'/dx^nu) Gamma_{sigma mu nu}
+    Gamma_{sigma' mu' nu'} = (dx^sigma/dx_sigma') (dx^mu'/dx^mu)(dx^nu'/dx^nu)
+    Gamma_{sigma mu nu}
                             + (d^2 x^rho/dx^mu' dx^nu') (dx^sigma)(dx^sigma')
   */
   // Or we can Just compute the combinatorics from the metric
   // derivative.
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    PARTHENON_FAIL("STUB!");
+    Real dg[NDFULL][NDFULL][NDFULL];
+    MetricDerivative(X0, X1, X2, X3, dg);
+    for (int a = 0; a < NDFULL; ++a) {
+      for (int b = 0; b < NDFULL; ++b) {
+        for (int c = 0; c < NDFULL; ++c) {
+          Gamma[a][b][c] = 0.5 * (dg[b][a][c] + dg[c][a][b] - dg[b][c][a]);
+        }
+      }
+    }
   }
 
  private:
@@ -431,6 +458,58 @@ class MonopoleCart {
     J[3][1] = -Utils::ratio(y, rho2);
     J[3][2] = Utils::ratio(x, rho2);
     J[3][3] = 0;
+  }
+  // Hessian
+  // d^2 x^mu/dx^mu' dx^sigma'
+  // where x^mu = {r,th,ph}
+  // and x^mu' = {x,y,z}
+  void Hessian(Real x, Real y, Real z, Real r, Real H[NDFULL][NDFULL][NDFULL]) const {
+    const Real x2 = x * x;
+    const Real y2 = y * y;
+    const Real z2 = z * z;
+    const Real x4 = x2 * x2;
+    const Real y4 = y2 * y2;
+    const Real r2 = r * r;
+    const Real r3 = r2 * r;
+    const Real r4 = r3 * r;
+    const Real rho2 = x2 + y2;
+    const Real rho = std::sqrt(rho2);
+    const Real rho3 = rho2 * rho;
+    const Real rho4 = rho3 * rho;
+
+    const Real irho = Utils::ratio(1., rho);
+    const Real irho3 = Utils::ratio(1., rho3);
+    const Real irho4 = Utils::ratio(1., rho4);
+    const Real ir4 = Utils::ratio(1., r4);
+
+    LinearAlgebra::SetZero(J, NDFULL, NDFULL, NDFULL);
+    H[1][1][1] = (y2 + z2) * ir3;
+    H[1][2][1] = -(x * y) * ir3;
+    H[1][3][1] = -(x * z) * ir3;
+    H[2][1][1] = (z * (-2 * x4 - x2 * y2 + y4 + y2 * z2)) * irho3 * ir4;
+    H[2][2][1] = -(x * y * z * (3 * rho2 + z2)) * irho3 * ir4;
+    H[2][3][1] = (x * (x2 + y2 - z2)) * irho * ir4;
+    H[3][1][1] = (2 * x * y) * irho4;
+    H[3][2][1] = (y2 - x2) * irho4;
+    // H[3][3][1] = 0;
+
+    H[1][1][2] = -(x * y) * ir3;
+    H[1][2][2] = (x2 + z2) * ir3;
+    H[1][3][2] = -(y * z) * ir3;
+    H[2][1][2] = -(x * y * z * (3 * rho2 + z2)) * irho3 * ir4;
+    H[2][2][2] = (z * (x4 - 2 * y4 + x2 * (z2 - y2))) * irho3 * ir4;
+    H[2][3][2] = (y * (x2 + y2 - z2)) * irho * ir4;
+    H[3][1][2] = (y2 - x2) * irho4;
+    H[3][2][2] = -(2 * x * y) * irho4;
+    // H[3][3][2] = 0;
+
+    H[1][1][3] = -(x * z) * irho3;
+    H[1][2][3] = -(y * z) * irho3;
+    H[1][3][3] = (x2 + y2) * irho3;
+    H[2][1][3] = x * (x2 + y2 - z2) * irho * ir4;
+    H[2][2][3] = y * (x2 + y2 - z2) * irho * ir4;
+    H[2][3][3] = 2 * rho * z * ir4;
+    // H[3][*][3] = 0;
   }
 };
 
