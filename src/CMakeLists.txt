@@ -44,6 +44,8 @@ add_executable(phoebus
   geometry/modified_system.hpp
   geometry/minkowski.hpp
   geometry/minkowski.cpp
+  geometry/monopole.hpp
+  geometry/monopole.cpp
   geometry/snake.hpp
   geometry/snake.cpp
   geometry/spherical_kerr_schild.hpp
