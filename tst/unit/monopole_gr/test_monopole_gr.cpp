@@ -104,6 +104,7 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
     const int iRHO = MonopoleGR::Matter::RHO;
     const int iJ = MonopoleGR::Matter::J_R;
     const int iS = MonopoleGR::Matter::trcS;
+    const int iSrr = MonopoleGR::Matter::Srr;
 
     WHEN("We set the matter fields to zero") {
       parthenon::par_for(
@@ -112,6 +113,7 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
             matter(iRHO, i) = 0;
             matter(iJ, i) = 0;
             matter(iS, i) = 0;
+	    matter(iSrr, i) = 0;
           });
       THEN("We can integrate along the hypersurface, with initial guesses A=1, K=0") {
         MonopoleGR::IntegrateHypersurface(pkg.get());
@@ -147,6 +149,7 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
             matter(iRHO, i) = rho;
             matter(iJ, i) = -r * 1e-2 * rho;
             matter(iS, i) = 3 * (Gamma_eos - 1.) * rho * eps_eos;
+	    matter(iSrr, i) = (Gamma_eos - 1.) * rho * eps_eos;
           });
       THEN("We can retrieve this information") {
         int nwrong = 0;
@@ -163,6 +166,9 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
                 nw += 1;
               }
               if (matter(iS, i) != 3 * (Gamma_eos - 1.) * rho * eps_eos) {
+                nw += 1;
+              }
+	      if (matter(iSrr, i) != (Gamma_eos - 1.) * rho * eps_eos) {
                 nw += 1;
               }
             },

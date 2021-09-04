@@ -287,6 +287,7 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   auto npoints = params.Get<int>("npoints");
   auto radius = params.Get<MonopoleGR::Radius>("radius");
   Real dr = radius.dx();
+  Real dr2 = dr * dr;
   auto matter = params.Get<Matter_t>("matter");
   auto beta = params.Get<Beta_t>("shift");
   auto gradients = params.Get<Gradients_t>("gradients");
@@ -298,25 +299,52 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
         Real K = hypersurface(Hypersurface::K, i);
         Real rho = matter(Matter::RHO, i);
         Real j = matter(Matter::J_R, i);
+        Real S = matter(Matter::trcS, i);
+        Real Srr = matter(Matter::Srr, i);
         Real dadr = ShootingMethod::GetARHS(a, K, r, rho);
         Real dKdr = ShootingMethod::GetKRHS(a, K, r, j);
 
-        Real dalphadr;
+        Real a2 = a * a;
+	Real K2 = K*K;
+        Real beta2 = beta(i) * beta(i);
+        Real beta3 = beta(i) * beta2;
+
+        Real dalphadr, d2alphadr2;
         if (i == 0) {
-          dalphadr = (alpha(i + 1) - alpha(i)) / dr;
+          dalphadr = 0;
+	  d2alphadr2 = (alpha(i) + alpha(i+2) - 2*alpha(i+1))/dr2;
         } else if (i == npoints - 1) {
           dalphadr = (alpha(i) - alpha(i - 1)) / dr;
+	  d2alphadr2 = (alpha(i-2) + alpha(i) - 2*alpha(i-1))/dr2;
         } else {
           dalphadr = (alpha(i + 1) - alpha(i - 1)) / (2. * dr);
+	  d2alphadr2 = (alpha(i-1) + alpha(i+1) - 2*alpha(i))/dr2;
         }
 
         beta(i) = -0.5 * alpha(i) * r * K;
+        Real dbetadr = -0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr);
 
         gradients(Gradients::DADR, i) = dadr;
         gradients(Gradients::DKDR, i) = dKdr;
         gradients(Gradients::DALPHADR, i) = dalphadr;
-        gradients(Gradients::DBETADR, i) =
-            -0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr);
+        gradients(Gradients::DBETADR, i) = dbetadr;
+
+        Real dadt = dadr * beta(i) + a * dbetadr - alpha(i) * a * K;
+	if (i == 0) dadt = 0;
+        Real dalphadt =
+            beta(i) * ((a * beta(i) * dadt / alpha(i)) + a2 * K * beta(i) +
+                       2 * dadr * (1 - beta2) - 2 * (a2 * beta(i) / alpha(i)) * dbetadr);
+	Real dadror = (r > 1e-2) ? dadr/r : 1;
+        Real dKdt = beta(i) * dKdr - (d2alphadr2 / a2) +
+                    alpha(i) * ((2 * dadror / a2) - 4 * K * K) +
+                    4 * M_PI * alpha(i) * (S - rho - Srr);
+	if (i == 0) dKdt = 0;
+        Real dbetadt = -0.5 * r * (alpha(i) * dKdt + K * dalphadt);
+
+        gradients(Gradients::DADT, i) = dadt;
+        gradients(Gradients::DALPHADT, i) = dalphadt;
+        gradients(Gradients::DKDT, i) = dKdt;
+        gradients(Gradients::DBETADT, i) = dbetadt;
       });
 
   return TaskStatus::complete;
@@ -340,19 +368,28 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
   auto alpha = params.Get<Alpha_t>("lapse");
   auto alpha_h = params.Get<Alpha_host_t>("lapse_h");
 
+  auto gradients = params.Get<Gradients_t>("gradients");
+  auto gradients_h = Kokkos::create_mirror_view(gradients);
+
   Kokkos::deep_copy(matter_h, matter);
   Kokkos::deep_copy(hypersurface_h, hypersurface);
   Kokkos::deep_copy(alpha_h, alpha);
+  Kokkos::deep_copy(gradients_h, gradients);
 
   FILE *pf;
   pf = fopen(filename.c_str(), "w");
   fprintf(pf, "#r\ta\tK\talpha\trho\tj\tS\n");
   for (int i = 0; i < npoints; ++i) {
     Real r = radius.x(i);
-    fprintf(pf, "%.8e %.8e %.8e %.8e %.8e %.8e %.8e\n", r,
+    fprintf(pf, "%.8e %.8e %.8e %.8e %.8e %.8e %.8e %.8e "
+	    "%.8e %.8e %.8e %.8e %.8e %.8e %.8e %.8e\n", r,
             hypersurface_h(Hypersurface::A, i), hypersurface_h(Hypersurface::K, i),
             alpha_h(i), matter_h(Matter::RHO, i), matter_h(Matter::J_R, i),
-            matter_h(Matter::trcS, i));
+            matter_h(Matter::trcS, i), matter_h(Matter::Srr, i),
+	    gradients_h(Gradients::DADR, i), gradients_h(Gradients::DKDR, i),
+	    gradients_h(Gradients::DALPHADR, i), gradients_h(Gradients::DBETADR, i),
+	    gradients_h(Gradients::DADT, i), gradients_h(Gradients::DALPHADT, i),
+	    gradients_h(Gradients::DKDR, i), gradients_h(Gradients::DBETADT, i));
   }
   fclose(pf);
 }

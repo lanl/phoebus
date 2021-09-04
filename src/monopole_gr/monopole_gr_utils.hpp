@@ -28,7 +28,7 @@ KOKKOS_INLINE_FUNCTION
 Real GetARHS(Real a, Real K, Real r, Real rho) {
   return (r <= 0)
              ? 0
-             : (a / (2. * r)) * (r * r * (16 * M_PI * rho - (3. / 2.) * K * K) - a + 1);
+             : (a / (2. * r)) * (r * r * (8 * M_PI * rho - (3. / 2.) * K * K) - a + 1);
 }
 
 KOKKOS_INLINE_FUNCTION
