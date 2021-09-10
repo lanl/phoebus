@@ -59,6 +59,19 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
 }
 } // namespace ShootingMethod
 
+namespace TOV {
+
+KOKKOS_INLINE_FUNCTION
+Real GetMRHS(Real r, Real rho_adm) {
+  return r == 0 ? 0 : 4*M_PI*r*r*rho_adm;
+}
+
+Real GetPRHS(Real r, Real rho_adm, Real m, Real P) {
+  return r == 0 ? 0 : -(rho_adm + P)*(m + 4*M_PI*r*r*r*P)/(r*(r-2*m));
+}
+
+} // namespace TOV
+
 } // namespace MonopoleGR
 
 #endif // MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
