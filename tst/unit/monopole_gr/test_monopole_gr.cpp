@@ -29,6 +29,7 @@
 #include <parthenon/package.hpp>
 
 // phoebus includes
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 
 // monopole_gr includes
 #include "monopole_gr/monopole_gr.hpp"
@@ -197,5 +198,34 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
         }
       }
     }
+  }
+}
+
+TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
+  GIVEN("TOV, EOS, and MonopoleGR packages initialized appropriately") {
+    parthenon::ParameterInput in;
+    parthenon::ParameterInput *pin = &in;
+
+    pin->SetBoolean("monopole_gr", "enabled", true);
+    pin->SetInteger("monopole_gr", "npoints", NPOINTS);
+    pin->SetReal("monopole_gr", "rout", 25);
+
+    Real T = 1e1;
+    pin->SetBoolean("TOV", "enabled", true);
+    pin->SetReal("TOV","Pc", 0.05);
+    pin->SetReal("TOV", "temperature", T);
+
+    // P = (Gamma - 1) rho e = (Gamma - 1) rho (Cv T)
+    // P = K rho^1
+    Real Gamma = 1.4;
+    Real gm1 = Gamma - 1;
+    Real K = 1; // Polytropic entropy
+    Real Cv = K/(gm1*T);
+    pin->SetString("eos", "type", "IdealGas");
+    pin->SetReal("eos","Gamma", Gamma);
+    pin->SetReal("eos", "Cv", Cv);
+
+    auto monopole_pkg = MonopoleGR::Initialize(pin);
+    auto eos_pkg = Microphysics::EOS::Initialize(pin);
   }
 }
