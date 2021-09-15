@@ -56,6 +56,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("rin", rin);
   params.Add("rout", rout);
 
+  // TOV tricks
+  Real tov_pc = pin->GetOrAddReal("tov", "Pc", 10);
+  params.Add("tov_pc", tov_pc);
+
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
   Matter_t matter("monopole_gr matter grid", NMAT, npoints);
@@ -184,6 +188,29 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   }
 
   return TaskStatus::complete;
+}
+
+TaskStatus IntegrateTov(StateDescriptor *pkg) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
+  
+  auto &params = pkg->AllParams();
+
+  auto enabled = params.Get<bool>("enable_monopole_gr");
+  if (!enabled) return TaskStatus::complete;
+
+  auto npoints = params.Get<int>("npoints");
+  auto Pc = params.Get<Real>("tov_pc");
+  auto radius = params.Get<MonopoleGR::Radius>("radius");
+
+  auto matter_h = params.Get<Matter_host_t>("matter_h");
+
+  int irho = Matter::RHO;
+  int iJ = Matter::J_R;
+  int iS = Matter::trcS;
+  int iSrr = Matter::Srr;
+
+  
 }
 
 TaskStatus LinearSolveForAlpha(StateDescriptor *pkg) {
