@@ -17,7 +17,11 @@ target_link_libraries(phoebus_unit_tests
   PRIVATE
     parthenon
     Catch2::Catch2
-    Kokkos::kokkos)
+    Kokkos::kokkos
+    singularity-eos::flags
+    singularity-eos
+    $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
+    )
 
 catch_discover_tests(phoebus_unit_tests
   TEST_SPEC "[geometry]" TEST_PREFIX "geometry:")

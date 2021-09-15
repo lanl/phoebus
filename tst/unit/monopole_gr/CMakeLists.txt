@@ -16,6 +16,12 @@ add_library(monopole_gr_unit_tests OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr_utils.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr.cpp
+
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/phoebus_utils/unit_conversions.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/phoebus_utils/unit_conversions.cpp
+  
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/microphysics/eos_phoebus/eos_phoebus.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/microphysics/eos_phoebus/eos_phoebus.cpp
   )
 
 target_link_libraries(monopole_gr_unit_tests

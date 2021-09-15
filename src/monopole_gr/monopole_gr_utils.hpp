@@ -14,7 +14,7 @@
 #ifndef MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
 #define MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
 
-#include "microphysics/eos_phoebus.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 
 #include "monopole_gr.hpp"
 
@@ -63,8 +63,6 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
 
 namespace TOV {
 
-constexpr int NTOV = 2;
-
 KOKKOS_INLINE_FUNCTION
 Real GetMRHS(Real r, Real rho_adm) { return r == 0 ? 0 : 4 * M_PI * r * r * rho_adm; }
 
@@ -78,6 +76,7 @@ void TovRHS(Real r, const Real in[NTOV], singularity::EOS &eos, const Real T,
   Real m = in[0];
   Real P = in[1];
   Real rho, eps;
+  // TODO(JMM): Use lambdas
   eos.DensityEnergyFromPressureTemperature(P, T, nullptr, rho, eps);
   Real rho_adm = rho * (1 + eps);
   out[0] = GetMRHS(r, rho_adm);

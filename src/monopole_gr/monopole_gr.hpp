@@ -190,6 +190,22 @@ enum Matter {
   Srr = 3   // The r-r component of the stress tensor
 };
 
+namespace TOV {
+constexpr int NTOV = 2;
+
+using State_t = parthenon::ParArray2D<Real>;
+using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
+
+constexpr int M = 0;
+constexpr int P = 0;
+
+constexpr int NINTRINSIC = 2;
+
+constexpr int RHO0 = 0;
+constexpr int EPS = 1;
+  
+} // namespace TOV
+
 using Hypersurface_t = parthenon::ParArray2D<Real>;
 using Hypersurface_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
@@ -226,7 +242,7 @@ TaskStatus MatterToHost(StateDescriptor *pkg);
 
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 
-TaskStatus IntegrateTov(StateDescriptor *pkg);
+TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg);
 
 TaskStatus LinearSolveForAlpha(StateDescriptor *pkg);
 
