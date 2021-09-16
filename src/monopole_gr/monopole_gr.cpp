@@ -121,7 +121,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("tov_pc", tov_pc);
 
   // temperature
-  Real tov_T = pin->GetOrAddReal("TOV", "temperature", 1);
+  Real tov_s = pin->GetOrAddReal("TOV", "entropy", 8);
 
   // Arrays for TOV if it's needed
   if (do_tov) {
@@ -131,10 +131,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     TOV::State_t tov_intrinsic("TOV intrinsic vars", TOV::NINTRINSIC, npoints);
     auto tov_intrinsic_h = Kokkos::create_mirror_view(tov_intrinsic);
 
+    params.Add("tov_s", tov_s);
     params.Add("tov_state", tov_state);
-    params.Add("tov_host_state", tov_state_h);
+    params.Add("tov_state_h", tov_state_h);
     params.Add("tov_intrinsic", tov_intrinsic);
-    params.Add("tov_host_intrinsic", tov_intrinsic_h);
+    params.Add("tov_intrinsic_h", tov_intrinsic_h);
   }
 
   return monopole_gr;
@@ -218,6 +219,8 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
 
 TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg) {
   using TOV::NTOV;
+  using TOV::PolytropeK;
+  using TOV::PolytropeThermoFromP;
   using TOV::TovRHS;
 
   PARTHENON_REQUIRE_THROWS(monopolepkg->label() == "monopole_gr",
@@ -237,11 +240,12 @@ TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg) {
   auto state_h = params.Get<TOV::State_host_t>("tov_state_h");
   auto intrinsic_h = params.Get<TOV::State_host_t>("tov_intrinsic_h");
 
-  auto pc = params.Get<Real>("toc_pc");
-  auto T = params.Get<Real>("tov_T");
-
-  auto eos = eospkg->Param<singularity::EOS>("h.EOS");
-  Real dr = radius.dx();
+  auto pc = params.Get<Real>("tov_pc");
+  auto s = params.Get<Real>("tov_s");
+  auto gm1 = eospkg->Param<Real>("gm1");
+  const Real Gamma = gm1 + 1;
+  const Real K = PolytropeK(s, Gamma);
+  const Real dr = radius.dx();
 
   state_h(TOV::M, 0) = 0;
   state_h(TOV::P, 0) = pc;
@@ -258,15 +262,15 @@ TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg) {
     for (int v = 0; v < NTOV; ++v) {
       state[v] = state_h(v, i);
     }
-    TovRHS(r, state, eos, T, rhs);
+    TovRHS(r, state, K, Gamma, rhs);
 #pragma omp simd
     for (int v = 0; v < NTOV; ++v) {
       k1[v] = state[v] + 0.5 * dr * rhs[v];
     }
-    TovRHS(r, k1, eos, T, rhs_k);
+    TovRHS(r, k1, K, Gamma, rhs_k);
 #pragma omp simd
     for (int v = 0; v < NTOV; ++v) {
-      state_h(v, i) = state[v] + dr * rhs_k[v];
+      state_h(v, i + 1) = state_h(v, i) + dr * rhs_k[v];
     }
   }
 
@@ -276,7 +280,7 @@ TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg) {
     Real press = state_h(TOV::P, i);
     // TODO(JMM): Use lambdas
     Real rho, eps;
-    eos.DensityEnergyFromPressureTemperature(press, T, nullptr, rho, eps);
+    PolytropeThermoFromP(press, K, Gamma, rho, eps);
     intrinsic_h(TOV::RHO0, i) = rho;
     intrinsic_h(TOV::EPS, i) = eps;
     matter_h(Matter::RHO, i) = rho * (1 + eps); // ADM mass
@@ -415,6 +419,7 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
         Real dKdr = ShootingMethod::GetKRHS(a, K, r, j);
 
         Real a2 = a * a;
+        Real a3 = a2 * a;
         Real K2 = K * K;
         Real beta2 = beta(i) * beta(i);
         Real beta3 = beta(i) * beta2;
@@ -445,12 +450,13 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
             beta(i) * ((a * beta(i) * dadt / alpha(i)) + a2 * K * beta(i) +
                        2 * dadr * (1 - beta2) - 2 * (a2 * beta(i) / alpha(i)) * dbetadr);
         Real dadror = (r > 1e-2) ? dadr / r : 1;
-        Real dKdt = beta(i) * dKdr - (d2alphadr2 / a2) +
-                    alpha(i) * ((2 * dadror / a2) - 4 * K * K) +
+        Real dKdt = beta(i) * dKdr - (d2alphadr2 / a2) + (dadr / a3) * dalphadr +
+                    alpha(i) * ((2 * dadror / (a3 * r)) - 4 * K * K) +
                     4 * M_PI * alpha(i) * (S - rho - Srr);
         if (i == 0) dKdt = 0;
         Real dbetadt = -0.5 * r * (alpha(i) * dKdt + K * dalphadt);
 
+	printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
         gradients(Gradients::DADT, i) = dadt;
         gradients(Gradients::DALPHADT, i) = dalphadt;
         gradients(Gradients::DKDT, i) = dKdt;
@@ -492,8 +498,8 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
   for (int i = 0; i < npoints; ++i) {
     Real r = radius.x(i);
     fprintf(pf,
-            "%.8e %.8e %.8e %.8e %.8e %.8e %.8e %.8e "
-            "%.8e %.8e %.8e %.8e %.8e %.8e %.8e %.8e\n",
+            "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e "
+            "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e\n",
             r, hypersurface_h(Hypersurface::A, i), hypersurface_h(Hypersurface::K, i),
             alpha_h(i), matter_h(Matter::RHO, i), matter_h(Matter::J_R, i),
             matter_h(Matter::trcS, i), matter_h(Matter::Srr, i),

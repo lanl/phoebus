@@ -37,7 +37,7 @@
 using namespace parthenon::package::prelude;
 using Duration_t = std::chrono::microseconds;
 
-constexpr int NPOINTS = 256 + 1;
+constexpr int NPOINTS = 1024 + 1;
 constexpr Real ROUT = 256;
 
 KOKKOS_INLINE_FUNCTION
@@ -212,20 +212,33 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
 
     Real T = 1e1;
     pin->SetBoolean("TOV", "enabled", true);
-    pin->SetReal("TOV","Pc", 0.05);
-    pin->SetReal("TOV", "temperature", T);
-
+    pin->SetReal("TOV","Pc", 0.01);
+    pin->SetReal("TOV", "entropy", 8);
+    
     // P = (Gamma - 1) rho e = (Gamma - 1) rho (Cv T)
-    // P = K rho^1
-    Real Gamma = 1.4;
+    // P = K rho^Gamma with e set to force it
+    Real Gamma = 2; // degenerate matter
     Real gm1 = Gamma - 1;
     Real K = 1; // Polytropic entropy
-    Real Cv = K/(gm1*T);
+    Real Cv = gm1; // sets m/kb = 1
     pin->SetString("eos", "type", "IdealGas");
     pin->SetReal("eos","Gamma", Gamma);
     pin->SetReal("eos", "Cv", Cv);
 
     auto monopole_pkg = MonopoleGR::Initialize(pin);
     auto eos_pkg = Microphysics::EOS::Initialize(pin);
+
+    WHEN("We integrate the TOV equations") {
+      MonopoleGR::IntegrateTov(monopole_pkg.get(), eos_pkg.get());
+      THEN("We can solve for the metric") {
+	MonopoleGR::MatterToHost(monopole_pkg.get());
+	MonopoleGR::IntegrateHypersurface(monopole_pkg.get());
+	MonopoleGR::LinearSolveForAlpha(monopole_pkg.get());
+	MonopoleGR::SpacetimeToDevice(monopole_pkg.get());
+	AND_THEN("We can output the solver data") {
+	  MonopoleGR::DumpToTxt("tov.dat", monopole_pkg.get());
+	}
+      }
+    }
   }
 }
