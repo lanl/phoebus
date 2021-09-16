@@ -30,7 +30,7 @@ KOKKOS_INLINE_FUNCTION
 Real GetARHS(Real a, Real K, Real r, Real rho) {
   return (r <= 0)
              ? 0
-             : (a / (2. * r)) * (r * r * (8 * M_PI * rho - (3. / 2.) * K * K) - a + 1);
+    : a*(4 + a*a*(-4 + r*r*(-3*K*K + 32*M_PI*rho)))/(8*r);
 }
 
 KOKKOS_INLINE_FUNCTION
@@ -63,24 +63,37 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
 
 namespace TOV {
 
+/*
+ * Only valid for polytropic EOS's
+ */
 KOKKOS_INLINE_FUNCTION
-Real GetMRHS(Real r, Real rho_adm) { return r == 0 ? 0 : 4 * M_PI * r * r * rho_adm; }
+void PolytropeThermoFromP(const Real P, const Real K, const Real Gamma, Real &rho,
+                          Real &eps) {
+  rho = std::pow(P / K, 1 / Gamma);
+  eps = (K / (Gamma - 1)) * std::pow(P / K, (Gamma - 1) / Gamma);
+}
+
+KOKKOS_INLINE_FUNCTION
+Real PolytropeK(const Real s, const Real Gamma) { return std::exp(s * (Gamma - 1)); }
+
+KOKKOS_INLINE_FUNCTION
+Real GetMRHS(Real r, Real rho_adm) { return 4 * M_PI * r * r * rho_adm; }
 
 Real GetPRHS(Real r, Real rho_adm, Real m, Real P) {
   return r == 0 ? 0 : -(rho_adm + P) * (m + 4 * M_PI * r * r * r * P) / (r * (r - 2 * m));
 }
 
 KOKKOS_INLINE_FUNCTION
-void TovRHS(Real r, const Real in[NTOV], singularity::EOS &eos, const Real T,
-            Real out[NTOV]) {
-  Real m = in[0];
-  Real P = in[1];
+void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, Real out[NTOV]) {
+  Real m = in[TOV::M];
+  Real P = in[TOV::P];
   Real rho, eps;
-  // TODO(JMM): Use lambdas
-  eos.DensityEnergyFromPressureTemperature(P, T, nullptr, rho, eps);
+  // TODO(JMM): THIS ASSUMES A POLYTROPIC EOS.
+  // More generality requires exposing entropy in singularity-eos
+  PolytropeThermoFromP(P, K, Gamma, rho, eps);
   Real rho_adm = rho * (1 + eps);
-  out[0] = GetMRHS(r, rho_adm);
-  out[1] = GetPRHS(r, rho_adm, m, P);
+  out[TOV::M] = GetMRHS(r, rho_adm);
+  out[TOV::P] = GetPRHS(r, rho_adm, m, P);
 }
 
 } // namespace TOV

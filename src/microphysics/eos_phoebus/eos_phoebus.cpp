@@ -62,8 +62,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (eos_type.compare(IdealGas::EosType()) == 0) {
     type = EOSBuilder::EOSType::IdealGas;
     names = {"Cv"};
-    base_params["gm1"].emplace<Real>(
-        pin->GetReal(block_name, std::string("Gamma")) - 1.0);
+    Real gm1 = pin->GetReal(block_name, std::string("Gamma")) - 1.0;
+    params.Add("gm1", gm1);
+    base_params["gm1"].emplace<Real>(gm1);
     /*
       // TODO(JMM): Disabling these for now
   } else if (eos_type.compare(Gruneisen::EosType()) == 0) {
@@ -135,6 +136,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("d.EOS", eos_device);
   params.Add("h.EOS", eos_host);
   params.Add("needs_ye", needs_ye);
+
+  // Store eos params in case they're needed
+  for (auto &name : names) {
+    params.Add(name, (pin->GetReal(block_name, name)));
+  }
 
   params.Add("unit_conv", phoebus::UnitConversions(pin));
 
