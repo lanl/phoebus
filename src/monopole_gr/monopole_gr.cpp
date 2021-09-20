@@ -120,6 +120,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real tov_pc = pin->GetOrAddReal("TOV", "Pc", 10);
   params.Add("tov_pc", tov_pc);
 
+  // Minimum pressure
+  Real tov_pmin = pin->GetOrAddReal("TOV", "Pmin", 1e-9);
+  params.Add("tov_pmin", tov_pmin);
+
   // temperature
   Real tov_s = pin->GetOrAddReal("TOV", "entropy", 8);
 
@@ -242,6 +246,7 @@ TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg) {
 
   auto pc = params.Get<Real>("tov_pc");
   auto s = params.Get<Real>("tov_s");
+  auto Pmin = params.Get<Real>("tov_pmin");
   auto gm1 = eospkg->Param<Real>("gm1");
   const Real Gamma = gm1 + 1;
   const Real K = PolytropeK(s, Gamma);
@@ -262,12 +267,12 @@ TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg) {
     for (int v = 0; v < NTOV; ++v) {
       state[v] = state_h(v, i);
     }
-    TovRHS(r, state, K, Gamma, rhs);
+    TovRHS(r, state, K, Gamma, Pmin, rhs);
 #pragma omp simd
     for (int v = 0; v < NTOV; ++v) {
       k1[v] = state[v] + 0.5 * dr * rhs[v];
     }
-    TovRHS(r, k1, K, Gamma, rhs_k);
+    TovRHS(r, k1, K, Gamma, Pmin, rhs_k);
 #pragma omp simd
     for (int v = 0; v < NTOV; ++v) {
       state_h(v, i + 1) = state_h(v, i) + dr * rhs_k[v];
@@ -278,9 +283,12 @@ TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg) {
   for (int i = 0; i < npoints; ++i) {
     Real mass = state_h(TOV::M, i);
     Real press = state_h(TOV::P, i);
-    // TODO(JMM): Use lambdas
     Real rho, eps;
-    PolytropeThermoFromP(press, K, Gamma, rho, eps);
+    if (press <= 1.1*Pmin) {
+      press = rho = eps = 0;
+    } else {
+      PolytropeThermoFromP(press, K, Gamma, rho, eps);
+    }
     intrinsic_h(TOV::RHO0, i) = rho;
     intrinsic_h(TOV::EPS, i) = eps;
     matter_h(Matter::RHO, i) = rho * (1 + eps); // ADM mass
@@ -451,12 +459,12 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
                        2 * dadr * (1 - beta2) - 2 * (a2 * beta(i) / alpha(i)) * dbetadr);
         Real dadror = (r > 1e-2) ? dadr / r : 1;
         Real dKdt = beta(i) * dKdr - (d2alphadr2 / a2) + (dadr / a3) * dalphadr +
-                    alpha(i) * ((2 * dadror / (a3 * r)) - 4 * K * K) +
-                    4 * M_PI * alpha(i) * (S - rho - Srr);
+                    alpha(i) * ((2 * dadror / a3) - 4 * K * K) +
+                    4 * M_PI * alpha(i) * (S - rho - 2*Srr);
         if (i == 0) dKdt = 0;
         Real dbetadt = -0.5 * r * (alpha(i) * dKdt + K * dalphadt);
 
-	printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
+	//printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
         gradients(Gradients::DADT, i) = dadt;
         gradients(Gradients::DALPHADT, i) = dalphadt;
         gradients(Gradients::DKDT, i) = dKdt;
