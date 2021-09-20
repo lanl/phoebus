@@ -207,12 +207,12 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
     parthenon::ParameterInput *pin = &in;
 
     pin->SetBoolean("monopole_gr", "enabled", true);
-    pin->SetInteger("monopole_gr", "npoints", NPOINTS);
-    pin->SetReal("monopole_gr", "rout", 25);
+    pin->SetInteger("monopole_gr", "npoints", 16*NPOINTS);
+    pin->SetReal("monopole_gr", "rout", 250);
 
     Real T = 1e1;
     pin->SetBoolean("TOV", "enabled", true);
-    pin->SetReal("TOV","Pc", 0.01);
+    pin->SetReal("TOV","Pc", 1e-2);
     pin->SetReal("TOV", "entropy", 8);
     
     // P = (Gamma - 1) rho e = (Gamma - 1) rho (Cv T)

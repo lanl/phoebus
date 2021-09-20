@@ -27,10 +27,9 @@ constexpr unsigned int log2(unsigned int n) { return (n > 1) ? 1 + log2(n >> 1) 
 namespace ShootingMethod {
 
 KOKKOS_INLINE_FUNCTION
-Real GetARHS(Real a, Real K, Real r, Real rho) {
-  return (r <= 0)
-             ? 0
-    : a*(4 + a*a*(-4 + r*r*(-3*K*K + 32*M_PI*rho)))/(8*r);
+Real GetARHS(const Real a, const Real K, const Real r, const Real rho) {
+  if (r <= 0) return 0;
+  return a * (4 + a * a * (-4 + r * r * (-3 * K * K + 32 * M_PI * rho))) / (8 * r);
 }
 
 KOKKOS_INLINE_FUNCTION
@@ -77,14 +76,18 @@ KOKKOS_INLINE_FUNCTION
 Real PolytropeK(const Real s, const Real Gamma) { return std::exp(s * (Gamma - 1)); }
 
 KOKKOS_INLINE_FUNCTION
-Real GetMRHS(Real r, Real rho_adm) { return 4 * M_PI * r * r * rho_adm; }
+Real GetMRHS(const Real r, const Real rho_adm) { return 4 * M_PI * r * r * rho_adm; }
 
-Real GetPRHS(Real r, Real rho_adm, Real m, Real P) {
-  return r == 0 ? 0 : -(rho_adm + P) * (m + 4 * M_PI * r * r * r * P) / (r * (r - 2 * m));
+Real GetPRHS(const Real r, const Real rho_adm, const Real m, const Real P,
+             const Real Pmin) {
+  if (P < Pmin) return Pmin;
+  if (r == 0) return 0;
+  return -(rho_adm + P) * (m + 4 * M_PI * r * r * r * P) / (r * (r - 2 * m));
 }
 
 KOKKOS_INLINE_FUNCTION
-void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, Real out[NTOV]) {
+void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, const Real Pmin,
+            Real out[NTOV]) {
   Real m = in[TOV::M];
   Real P = in[TOV::P];
   Real rho, eps;
@@ -93,7 +96,7 @@ void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, Real ou
   PolytropeThermoFromP(P, K, Gamma, rho, eps);
   Real rho_adm = rho * (1 + eps);
   out[TOV::M] = GetMRHS(r, rho_adm);
-  out[TOV::P] = GetPRHS(r, rho_adm, m, P);
+  out[TOV::P] = GetPRHS(r, rho_adm, m, P, Pmin);
 }
 
 } // namespace TOV
