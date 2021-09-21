@@ -350,7 +350,7 @@ class MonopoleCart {
     Cart2Sph(X1, X2, X3, r, th, ph);
     const Real a = MonopoleGR::Interpolate(r, sph_.hypersurface_, sph_.rgrid_,
                                            MonopoleGR::Hypersurface::A);
-    return a * r * std::sqrt(std::abs(std::sin(th)));
+    return a;
   }
 
   KOKKOS_INLINE_FUNCTION
