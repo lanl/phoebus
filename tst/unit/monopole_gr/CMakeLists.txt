@@ -17,6 +17,9 @@ add_library(monopole_gr_unit_tests OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr_utils.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr.cpp
 
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/tov/tov.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/tov/tov.cpp
+
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/phoebus_utils/unit_conversions.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/phoebus_utils/unit_conversions.cpp
   

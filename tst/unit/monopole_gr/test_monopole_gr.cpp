@@ -33,16 +33,24 @@
 
 // monopole_gr includes
 #include "monopole_gr/monopole_gr.hpp"
+#include "tov/tov.hpp"
 
 using namespace parthenon::package::prelude;
 using Duration_t = std::chrono::microseconds;
 
 constexpr int NPOINTS = 1024 + 1;
 constexpr Real ROUT = 256;
+constexpr Real EPS = 1e-2;
 
 KOKKOS_INLINE_FUNCTION
 Real Gaussian(const Real x, const Real a, const Real b, const Real c) {
   return a * std::exp(-(x - b) * (x - b) / (2 * c * c));
+}
+KOKKOS_INLINE_FUNCTION
+Real FractionalError(const Real a, const Real b) {
+  Real diff = b - a;
+  Real avg = 2. * (std::abs(a) + std::abs(b));
+  return (std::abs(diff) < avg) ? diff / (avg + EPS) : diff;
 }
 
 TEST_CASE("monopole_gr is disabled by default", "[MonopoleGR]") {
@@ -114,7 +122,7 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
             matter(iRHO, i) = 0;
             matter(iJ, i) = 0;
             matter(iS, i) = 0;
-	    matter(iSrr, i) = 0;
+            matter(iSrr, i) = 0;
           });
       THEN("We can integrate along the hypersurface, with initial guesses A=1, K=0") {
         MonopoleGR::IntegrateHypersurface(pkg.get());
@@ -150,7 +158,7 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
             matter(iRHO, i) = rho;
             matter(iJ, i) = -r * 1e-2 * rho;
             matter(iS, i) = 3 * (Gamma_eos - 1.) * rho * eps_eos;
-	    matter(iSrr, i) = (Gamma_eos - 1.) * rho * eps_eos;
+            matter(iSrr, i) = (Gamma_eos - 1.) * rho * eps_eos;
           });
       THEN("We can retrieve this information") {
         int nwrong = 0;
@@ -169,7 +177,7 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
               if (matter(iS, i) != 3 * (Gamma_eos - 1.) * rho * eps_eos) {
                 nw += 1;
               }
-	      if (matter(iSrr, i) != (Gamma_eos - 1.) * rho * eps_eos) {
+              if (matter(iSrr, i) != (Gamma_eos - 1.) * rho * eps_eos) {
                 nw += 1;
               }
             },
@@ -207,37 +215,100 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
     parthenon::ParameterInput *pin = &in;
 
     pin->SetBoolean("monopole_gr", "enabled", true);
-    pin->SetInteger("monopole_gr", "npoints", 16*NPOINTS);
+    pin->SetInteger("monopole_gr", "npoints", 16 * NPOINTS);
     pin->SetReal("monopole_gr", "rout", 250);
 
     Real T = 1e1;
     pin->SetBoolean("TOV", "enabled", true);
-    pin->SetReal("TOV","Pc", 1e-2);
+    pin->SetReal("TOV", "Pc", 1e-2);
     pin->SetReal("TOV", "entropy", 8);
-    
+
     // P = (Gamma - 1) rho e = (Gamma - 1) rho (Cv T)
     // P = K rho^Gamma with e set to force it
     Real Gamma = 2; // degenerate matter
     Real gm1 = Gamma - 1;
-    Real K = 1; // Polytropic entropy
+    Real K = 1;    // Polytropic entropy
     Real Cv = gm1; // sets m/kb = 1
     pin->SetString("eos", "type", "IdealGas");
-    pin->SetReal("eos","Gamma", Gamma);
+    pin->SetReal("eos", "Gamma", Gamma);
     pin->SetReal("eos", "Cv", Cv);
 
     auto monopole_pkg = MonopoleGR::Initialize(pin);
+    auto tov_pkg = TOV::Initialize(pin);
     auto eos_pkg = Microphysics::EOS::Initialize(pin);
 
     WHEN("We integrate the TOV equations") {
-      MonopoleGR::IntegrateTov(monopole_pkg.get(), eos_pkg.get());
+      TOV::IntegrateTov(tov_pkg.get(), monopole_pkg.get(), eos_pkg.get());
       THEN("We can solve for the metric") {
-	MonopoleGR::MatterToHost(monopole_pkg.get());
-	MonopoleGR::IntegrateHypersurface(monopole_pkg.get());
-	MonopoleGR::LinearSolveForAlpha(monopole_pkg.get());
-	MonopoleGR::SpacetimeToDevice(monopole_pkg.get());
-	AND_THEN("We can output the solver data") {
-	  MonopoleGR::DumpToTxt("tov.dat", monopole_pkg.get());
-	}
+        MonopoleGR::MatterToHost(monopole_pkg.get());
+        MonopoleGR::IntegrateHypersurface(monopole_pkg.get());
+        MonopoleGR::LinearSolveForAlpha(monopole_pkg.get());
+        MonopoleGR::SpacetimeToDevice(monopole_pkg.get());
+        AND_THEN("The metric is the same as the TOV metric") {
+	  TOV::IntegrateTov(tov_pkg.get(), monopole_pkg.get(), eos_pkg.get());
+
+          using MonopoleGR::Alpha_t;
+          using MonopoleGR::Gradients_t;
+          using MonopoleGR::Hypersurface_t;
+          using TOV::State_t;
+
+          auto radius = monopole_pkg->Param<MonopoleGR::Radius>("radius");
+          auto hypersurface = monopole_pkg->Param<Hypersurface_t>("hypersurface");
+          auto alpha_array = monopole_pkg->Param<Alpha_t>("lapse");
+          auto gradients = monopole_pkg->Param<Gradients_t>("gradients");
+          auto tov_state = tov_pkg->Param<State_t>("tov_state");
+          int npoints = monopole_pkg->Param<int>("npoints");
+
+          int nwrong = 0;
+          parthenon::par_reduce(
+              parthenon::loop_pattern_flatrange_tag,
+              "check TOV solution against monopole", parthenon::DevExecSpace(), 0,
+              npoints - 1,
+              KOKKOS_LAMBDA(const int i, int &nw) {
+                Real r = radius.x(i);
+                Real m = tov_state(TOV::M, i);
+                Real phi = tov_state(TOV::PHI, i);
+                Real tov_grr = 1. / (1 - 2 * (m / r));
+                Real tov_alpha = std::exp(phi);
+
+                Real a = hypersurface(MonopoleGR::Hypersurface::A, i);
+                Real grr = a * a;
+                Real K = hypersurface(MonopoleGR::Hypersurface::K, i);
+                Real alpha = alpha_array(i);
+
+                Real dadt = gradients(MonopoleGR::Gradients::DADT, i);
+                Real dalphadt = gradients(MonopoleGR::Gradients::DALPHADT, i);
+                Real dKdt = gradients(MonopoleGR::Gradients::DKDT, i);
+                Real dbetadt = gradients(MonopoleGR::Gradients::DBETADT, i);
+
+                if (FractionalError(grr, tov_grr) > EPS) {
+                  nw += 1;
+                }
+                if (FractionalError(alpha, tov_alpha) > EPS) {
+                  nw += 1;
+                }
+                if (K > EPS) {
+                  nw += 1;
+                }
+                if (dadt > EPS) {
+                  nw += 1;
+                }
+                if (dalphadt > EPS) {
+                  nw += 1;
+                }
+                if (dKdt > EPS) {
+                  nw += 1;
+                }
+                if (dbetadt > EPS) {
+                  nw += 1;
+                }
+              },
+              nwrong);
+          REQUIRE(nwrong == 0);
+        }
+        AND_THEN("We can output the solver data") {
+          MonopoleGR::DumpToTxt("tov.dat", monopole_pkg.get());
+        }
       }
     }
   }

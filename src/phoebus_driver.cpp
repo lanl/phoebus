@@ -28,6 +28,7 @@
 #include "phoebus_driver.hpp"
 #include "phoebus_utils/debug_utils.hpp"
 #include "radiation/radiation.hpp"
+#include "tov/tov.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 
 using namespace parthenon::driver::prelude;
@@ -261,6 +262,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(fluid::Initialize(pin.get()));
   packages.Add(radiation::Initialize(pin.get()));
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
+  packages.Add(TOV::Initialize(pin.get())); // Does nothing if not enabled.
 
   return packages;
 }

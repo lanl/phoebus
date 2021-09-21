@@ -96,6 +96,9 @@ add_executable(phoebus
   radiation/geodesics.hpp
 
   reconstruction.hpp
+
+  tov/tov.hpp
+  tov/tov.cpp
 )
 
 set(MAX_NUMBER_CONSERVED_VARS 9 CACHE INTEGER "Maximum number of conserved variables")
