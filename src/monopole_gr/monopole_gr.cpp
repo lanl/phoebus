@@ -57,6 +57,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // bounds for the fluid
   Real rin = 0;
   Real rout = pin->GetOrAddReal("monopole_gr", "rout", 100);
+
+  Real x1max = pin->GetReal("parthenon/mesh", "x1max");
+  Real x2max = pin->GetReal("parthenon/mesh", "x2max");
+  Real x3max = pin->GetReal("parthenon/mesh", "x3max");
+
+  // Estimate r since we may not know if we're Spherical or Cartesian
+  Real r_fluid_est = std::sqrt(x1max*x1max + x2max*x2max + x3max*x3max);
+  if (r_fluid_est < rout) {
+    std::stringstream msg;
+    msg << "Outer radius of fluid may be less than outer radius of of spacetime.\n"
+	<< "x1max, x2max, x3max, rout_spacetime = "
+	<< x1max << ", " << x2max << ", " << x3max << ", " << rout
+	<< std::endl;
+    PARTHENON_WARN(msg);
+  }
+
   params.Add("rin", rin);
   params.Add("rout", rout);
 
