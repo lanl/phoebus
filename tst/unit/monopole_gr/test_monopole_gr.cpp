@@ -226,7 +226,6 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
     pin->SetReal("parthenon/mesh", "x2max", M_PI);
     pin->SetReal("parthenon/mesh", "x3max", 2*M_PI);
 
-    Real T = 1e1;
     pin->SetBoolean("TOV", "enabled", true);
     pin->SetReal("TOV", "Pc", 1e-2);
     pin->SetReal("TOV", "entropy", 8);
@@ -235,7 +234,6 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
     // P = K rho^Gamma with e set to force it
     Real Gamma = 2; // degenerate matter
     Real gm1 = Gamma - 1;
-    Real K = 1;    // Polytropic entropy
     Real Cv = gm1; // sets m/kb = 1
     pin->SetString("eos", "type", "IdealGas");
     pin->SetReal("eos", "Gamma", Gamma);
@@ -268,14 +266,16 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
           int npoints = monopole_pkg->Param<int>("npoints");
 
           int nwrong = 0;
+	  int im = TOV::M;
+	  int iphi = TOV::PHI;
           parthenon::par_reduce(
               parthenon::loop_pattern_flatrange_tag,
               "check TOV solution against monopole", parthenon::DevExecSpace(), 0,
               npoints - 1,
               KOKKOS_LAMBDA(const int i, int &nw) {
                 Real r = radius.x(i);
-                Real m = tov_state(TOV::M, i);
-                Real phi = tov_state(TOV::PHI, i);
+                Real m = tov_state(im, i);
+                Real phi = tov_state(iphi, i);
                 Real tov_grr = 1. / (1 - 2 * (m / r));
                 Real tov_alpha = std::exp(phi);
 
