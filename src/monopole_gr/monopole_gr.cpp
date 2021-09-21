@@ -44,7 +44,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("enable_monopole_gr", enable_monopole_gr);
   if (!enable_monopole_gr) return monopole_gr; // Short-circuit with nothing
 
-  // Points and Refinement levels
+  // Points
   int npoints = pin->GetOrAddInteger("monopole_gr", "npoints", 100);
   {
     std::stringstream msg;
@@ -110,37 +110,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // The radius object, returns radius vs index and index vs radius
   Radius radius(rin, rout, npoints);
   params.Add("radius", radius);
-
-  // TOV stuff
-  // TODO(JMM): Should this be in a separate package?
-  bool do_tov = pin->GetOrAddBoolean("TOV", "enabled", false);
-  params.Add("do_tov", do_tov);
-
-  // central pressure
-  Real tov_pc = pin->GetOrAddReal("TOV", "Pc", 10);
-  params.Add("tov_pc", tov_pc);
-
-  // Minimum pressure
-  Real tov_pmin = pin->GetOrAddReal("TOV", "Pmin", 1e-9);
-  params.Add("tov_pmin", tov_pmin);
-
-  // temperature
-  Real tov_s = pin->GetOrAddReal("TOV", "entropy", 8);
-
-  // Arrays for TOV if it's needed
-  if (do_tov) {
-    TOV::State_t tov_state("TOV state", TOV::NTOV, npoints);
-    auto tov_state_h = Kokkos::create_mirror_view(tov_state);
-
-    TOV::State_t tov_intrinsic("TOV intrinsic vars", TOV::NINTRINSIC, npoints);
-    auto tov_intrinsic_h = Kokkos::create_mirror_view(tov_intrinsic);
-
-    params.Add("tov_s", tov_s);
-    params.Add("tov_state", tov_state);
-    params.Add("tov_state_h", tov_state_h);
-    params.Add("tov_intrinsic", tov_intrinsic);
-    params.Add("tov_intrinsic_h", tov_intrinsic_h);
-  }
 
   return monopole_gr;
 }
@@ -217,93 +186,6 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
       hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr * rhs_k[v];
     }
   }
-
-  return TaskStatus::complete;
-}
-
-TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg) {
-  using TOV::NTOV;
-  using TOV::PolytropeK;
-  using TOV::PolytropeThermoFromP;
-  using TOV::TovRHS;
-
-  PARTHENON_REQUIRE_THROWS(monopolepkg->label() == "monopole_gr",
-                           "Requires the monopole_gr package");
-  PARTHENON_REQUIRE_THROWS(eospkg->label() == "eos", "REquires the eos package");
-
-  auto &params = monopolepkg->AllParams();
-
-  auto enabled = params.Get<bool>("enable_monopole_gr");
-  if (!enabled) return TaskStatus::complete;
-
-  auto npoints = params.Get<int>("npoints");
-  auto Pc = params.Get<Real>("tov_pc");
-  auto radius = params.Get<MonopoleGR::Radius>("radius");
-
-  auto matter_h = params.Get<Matter_host_t>("matter_h");
-  auto state_h = params.Get<TOV::State_host_t>("tov_state_h");
-  auto intrinsic_h = params.Get<TOV::State_host_t>("tov_intrinsic_h");
-
-  auto pc = params.Get<Real>("tov_pc");
-  auto s = params.Get<Real>("tov_s");
-  auto Pmin = params.Get<Real>("tov_pmin");
-  auto gm1 = eospkg->Param<Real>("gm1");
-  const Real Gamma = gm1 + 1;
-  const Real K = PolytropeK(s, Gamma);
-  const Real dr = radius.dx();
-
-  state_h(TOV::M, 0) = 0;
-  state_h(TOV::P, 0) = pc;
-
-  Real state[NTOV];
-  Real k1[NTOV];
-  Real rhs[NTOV];
-  Real rhs_k[NTOV];
-
-  // first loop, to solve for pressure
-  for (int i = 0; i < npoints - 1; ++i) {
-    Real r = radius.x(i);
-#pragma omp simd
-    for (int v = 0; v < NTOV; ++v) {
-      state[v] = state_h(v, i);
-    }
-    TovRHS(r, state, K, Gamma, Pmin, rhs);
-#pragma omp simd
-    for (int v = 0; v < NTOV; ++v) {
-      k1[v] = state[v] + 0.5 * dr * rhs[v];
-    }
-    TovRHS(r, k1, K, Gamma, Pmin, rhs_k);
-#pragma omp simd
-    for (int v = 0; v < NTOV; ++v) {
-      state_h(v, i + 1) = state_h(v, i) + dr * rhs_k[v];
-    }
-  }
-
-  // second loop, to set density, specific energy, and matter state
-  for (int i = 0; i < npoints; ++i) {
-    Real mass = state_h(TOV::M, i);
-    Real press = state_h(TOV::P, i);
-    Real rho, eps;
-    if (press <= 1.1*Pmin) {
-      press = rho = eps = 0;
-    } else {
-      PolytropeThermoFromP(press, K, Gamma, rho, eps);
-    }
-    intrinsic_h(TOV::RHO0, i) = rho;
-    intrinsic_h(TOV::EPS, i) = eps;
-    matter_h(Matter::RHO, i) = rho * (1 + eps); // ADM mass
-    matter_h(Matter::J_R, i) = 0;               // momentum
-    matter_h(Matter::trcS, i) = 3 * press;      // in rest frame of fluid
-    matter_h(Matter::Srr, i) = press;
-  }
-
-  // Copy to device
-  auto matter_d = params.Get<Matter_t>("matter");
-  auto state_d = params.Get<TOV::State_t>("tov_state");
-  auto intrinsic_d = params.Get<TOV::State_t>("tov_intrinsic");
-  Kokkos::deep_copy(matter_d, matter_h);
-  Kokkos::deep_copy(state_d, state_h);
-  Kokkos::deep_copy(intrinsic_d, intrinsic_h);
 
   return TaskStatus::complete;
 }

@@ -60,47 +60,6 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
 }
 } // namespace ShootingMethod
 
-namespace TOV {
-
-/*
- * Only valid for polytropic EOS's
- */
-KOKKOS_INLINE_FUNCTION
-void PolytropeThermoFromP(const Real P, const Real K, const Real Gamma, Real &rho,
-                          Real &eps) {
-  rho = std::pow(P / K, 1 / Gamma);
-  eps = (K / (Gamma - 1)) * std::pow(P / K, (Gamma - 1) / Gamma);
-}
-
-KOKKOS_INLINE_FUNCTION
-Real PolytropeK(const Real s, const Real Gamma) { return std::exp(s * (Gamma - 1)); }
-
-KOKKOS_INLINE_FUNCTION
-Real GetMRHS(const Real r, const Real rho_adm) { return 4 * M_PI * r * r * rho_adm; }
-
-Real GetPRHS(const Real r, const Real rho_adm, const Real m, const Real P,
-             const Real Pmin) {
-  if (P < Pmin) return Pmin;
-  if (r == 0) return 0;
-  return -(rho_adm + P) * (m + 4 * M_PI * r * r * r * P) / (r * (r - 2 * m));
-}
-
-KOKKOS_INLINE_FUNCTION
-void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, const Real Pmin,
-            Real out[NTOV]) {
-  Real m = in[TOV::M];
-  Real P = in[TOV::P];
-  Real rho, eps;
-  // TODO(JMM): THIS ASSUMES A POLYTROPIC EOS.
-  // More generality requires exposing entropy in singularity-eos
-  PolytropeThermoFromP(P, K, Gamma, rho, eps);
-  Real rho_adm = rho * (1 + eps);
-  out[TOV::M] = GetMRHS(r, rho_adm);
-  out[TOV::P] = GetPRHS(r, rho_adm, m, P, Pmin);
-}
-
-} // namespace TOV
-
 } // namespace MonopoleGR
 
 #endif // MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
