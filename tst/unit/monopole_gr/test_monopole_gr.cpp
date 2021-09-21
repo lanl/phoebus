@@ -82,6 +82,10 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
     pin->SetInteger("monopole_gr", "npoints", NPOINTS);
     pin->SetReal("monopole_gr", "rout", ROUT);
 
+    pin->SetReal("parthenon/mesh", "x1max", ROUT);
+    pin->SetReal("parthenon/mesh", "x2max", M_PI);
+    pin->SetReal("parthenon/mesh", "x3max", 2*M_PI);
+
     auto pkg = MonopoleGR::Initialize(pin);
     auto &params = pkg->AllParams();
 
@@ -217,6 +221,10 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
     pin->SetBoolean("monopole_gr", "enabled", true);
     pin->SetInteger("monopole_gr", "npoints", 16 * NPOINTS);
     pin->SetReal("monopole_gr", "rout", 250);
+
+    pin->SetReal("parthenon/mesh", "x1max", ROUT);
+    pin->SetReal("parthenon/mesh", "x2max", M_PI);
+    pin->SetReal("parthenon/mesh", "x3max", 2*M_PI);
 
     Real T = 1e1;
     pin->SetBoolean("TOV", "enabled", true);
