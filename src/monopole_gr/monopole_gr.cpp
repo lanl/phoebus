@@ -163,8 +163,8 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
 
   int iA = Hypersurface::A;
   int iK = Hypersurface::K;
-  int irho = Matter::RHO;
-  int iJ = Matter::J_R;
+  // int irho = Matter::RHO;
+  // int iJ = Matter::J_R;
   Real dr = radius.dx();
 
   Real state[NHYPER];

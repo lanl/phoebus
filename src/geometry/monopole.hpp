@@ -416,15 +416,19 @@ class MonopoleCart {
 
  private:
   MonopoleSph sph_;
+
+  KOKKOS_INLINE_FUNCTION
   void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph) const {
     r = std::sqrt(X1 * X1 + X2 * X2 + X3 * X3);
     th = std::acos(Utils::ratio(X3, r));
     ph = std::atan2(X2, X1);
   }
+
   // These are dx^{mu'}/dx^{mu}
   // convention is mu' is first index, mu is second
   // S2C has x^{mu'} = {x,y,z}
   // C2S has x^{mu'} = {r,th,ph}
+  KOKKOS_INLINE_FUNCTION
   void S2C(Real r, Real th, Real ph, Real J[NDFULL][NDFULL]) const {
     Real cth = std::cos(th);
     Real sth = std::sin(th);
@@ -442,6 +446,7 @@ class MonopoleCart {
     J[3][2] = -r * sth;
     J[3][3] = 0;
   }
+  KOKKOS_INLINE_FUNCTION
   void C2S(Real x, Real y, Real z, Real r, Real J[NDFULL][NDFULL]) const {
     const Real r2 = r * r;
     const Real rho2 = x * x + y * y;
@@ -463,6 +468,7 @@ class MonopoleCart {
   // d^2 x^mu/dx^mu' dx^sigma'
   // where x^mu = {r,th,ph}
   // and x^mu' = {x,y,z}
+  KOKKOS_INLINE_FUNCTION
   void Hessian(Real x, Real y, Real z, Real r, Real H[NDFULL][NDFULL][NDFULL]) const {
     const Real x2 = x * x;
     const Real y2 = y * y;

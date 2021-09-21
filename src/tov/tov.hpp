@@ -69,7 +69,7 @@ void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, const R
             Real out[NTOV]) {
   Real m = in[TOV::M];
   Real P = in[TOV::P];
-  Real phi = in[TOV::PHI];
+  // Real phi = in[TOV::PHI];
   if (P < Pmin) P = 0;
   
   Real rho, eps;
