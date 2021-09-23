@@ -42,7 +42,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const std::string block_name = "opacity";
 
   std::string opacity_type = pin->GetString(block_name, "type");
-  std::vector<std::string> known_opacity_types = {"tophat", "gray"};
+  std::vector<std::string> known_opacity_types = {"tophat", "gray", "tabular"};
   if (std::find(known_opacity_types.begin(), known_opacity_types.end(),
                 opacity_type) == known_opacity_types.end()) {
     std::stringstream msg;
@@ -63,6 +63,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     const Real kappa = pin->GetReal("opacity", "gray_kappa");
 
     singularity::neutrinos::Opacity opacity_host = Gray(kappa);
+    singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
+    params.Add("h.opacity", opacity_host);
+    params.Add("d.opacity", opacity_device);
+  } else if (opacity_type == "tabular") {
+    const std::string filename = pin->GetString("opacity", "filename");
+
+    singularity::neutrinos::Opacity opacity_host = SpinerOpacity(filename);
     singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
     params.Add("h.opacity", opacity_host);
     params.Add("d.opacity", opacity_device);

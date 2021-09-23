@@ -100,6 +100,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
           << block_name << std::endl;
       PARTHENON_THROW(msg);
     }
+  } else if (eos_type == StellarCollapse::EosType()) {
+    type = EOSBuilder::EOSType::StellarCollapse;
+    base_params["filename"].emplace<std::string>(
+        pin->GetString(block_name, "filename"));
+    base_params["use_sp5"].emplace<bool>(
+        pin->GetOrAddBoolean(block_name, "use_sp5", true));
+    auto use_ye = pin->GetOrAddBoolean("fluid", "Ye", false);
+    PARTHENON_REQUIRE_THROWS(use_ye, "\"StellarCollapse\" EOS requires that Ye be enabled!");
 #endif
   } else {
     std::stringstream error_mesg;
