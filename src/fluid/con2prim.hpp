@@ -212,7 +212,7 @@ private:
     Real &rho_guess = v(prho);
     Real &T_guess = v(tmp);
     double lambda[2] = {0., 0.};
-    v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess), lambda;
+    v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess, lambda);
     v(peng) = rho_guess *
               eos.InternalEnergyFromDensityTemperature(rho_guess, T_guess, lambda);
     const Real H = rho_guess + v(peng) + v(prs);
