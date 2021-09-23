@@ -45,7 +45,12 @@ public:
   Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
            const Real BdotS, const singularity::EOS &eos)
       : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
-        eos_(eos) {}
+        Ye_(0.), eos_(eos) {}
+  KOKKOS_FUNCTION
+  Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
+           const Real BdotS, const Real Ye, const singularity::EOS &eos)
+      : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
+        Ye_(Ye), eos_(eos) {}
   KOKKOS_FORCEINLINE_FUNCTION
   Real sfunc(const Real z, const Real Wp) const {
     Real zBsq = (z + Bsq_);
@@ -59,7 +64,7 @@ public:
   }
   KOKKOS_FORCEINLINE_FUNCTION
   void operator()(const Real rho, const Real Temp, Real res[2]) {
-    double lambda[2] = {0., 0.};
+    double lambda[2] = {Ye_, 0.};
     const Real p = eos_.PressureFromDensityTemperature(rho, Temp, lambda);
     const Real sie = eos_.InternalEnergyFromDensityTemperature(rho, Temp, lambda);
     const Real Wp = D_ / rho;
@@ -76,7 +81,7 @@ public:
 #endif
 private:
   const singularity::EOS &eos_;
-  const Real D_, tau_, Bsq_, Ssq_, BdotSsq_;
+  const Real D_, tau_, Bsq_, Ssq_, BdotSsq_, Ye_;
 };
 
 template <typename T> class VarAccessor {
@@ -212,6 +217,9 @@ private:
     Real &rho_guess = v(prho);
     Real &T_guess = v(tmp);
     double lambda[2] = {0., 0.};
+    if (pye >= 0) {
+      lambda[0] = v(pye);
+    }
     v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess, lambda);
     v(peng) = rho_guess *
               eos.InternalEnergyFromDensityTemperature(rho_guess, T_guess, lambda);
