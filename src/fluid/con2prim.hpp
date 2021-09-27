@@ -45,7 +45,7 @@ public:
   Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
            const Real BdotS, const singularity::EOS &eos)
       : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
-        Ye_(0.), eos_(eos) {}
+        Ye_(std::numeric_limits<Real>::signaling_NaN()), eos_(eos) {}
   KOKKOS_FUNCTION
   Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
            const Real BdotS, const Real Ye, const singularity::EOS &eos)
