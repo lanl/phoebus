@@ -5,17 +5,19 @@
 
 namespace robust {
 
-constexpr Real tiny = 1.e-14;
+#define TINY (1.e-14)
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real make_positive(const Real val) {
-  return std::max(val,tiny);
+  return std::max(val,TINY);
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real make_bounded(const Real val, const Real vmin, const Real vmax) {
-  return std::min(std::max(val,vmin+tiny), vmax*(1.0-tiny));
+  return std::min(std::max(val,vmin+TINY), vmax*(1.0-TINY));
 }
+
+#undef TINY
 
 } // namespace robust
 

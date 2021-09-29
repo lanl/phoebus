@@ -115,7 +115,7 @@ def modify_input(dict_key, value, input_file):
 #
 
 # -- Configure and build phoebus with problem-specific options
-def build_code(geometry):
+def build_code(geometry, use_gpu=False):
   if os.path.isdir(BUILD_DIR):
     print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
     sys.exit()
@@ -129,6 +129,8 @@ def build_code(geometry):
   configure_options.append("-DMAX_NUMBER_CONSERVED_VARS=10")
   configure_options.append("-DPHOEBUS_CACHE_GEOMETRY=ON")
   configure_options.append("-DPARTHENON_DISABLE_HDF5_COMPRESSION=ON")
+  if use_gpu:
+    configure_options.append("-DPHOEBUS_ENABLE_CUDA=ON")
 
   # Geometry (problem-dependent)
   configure_options.append(f"-DPHOEBUS_GEOMETRY={geometry}")

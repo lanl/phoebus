@@ -478,8 +478,14 @@ class ConToPrim {
       printf("whoa: %g %g %g %g\n", rsq, h0sq_, zsq, v0sq);
     }
     //v0sq = make_bounded(v0sq, 0.0, 1.0);
-    PARTHENON_REQUIRE(bsq >= 0, "bsq < 0: " + std::to_string(bsq));
-    PARTHENON_REQUIRE(rbsq >= 0, "rbsq < 0: " + std::to_string(rbsq));
+    if (!(bsq >= 0)) {
+      printf("bsq < 0: %e\n", bsq);
+      PARTHENON_FAIL("bsq < 0");
+    }
+    if (!(rbsq >= 0)) {
+      printf("rbsq < 0: %e\n", rbsq);
+      PARTHENON_FAIL("rbsq < 0");
+    }
     /*PARTHENON_REQUIRE(bsq_rpsq >= 0, "bsq_rpsq < 0: " + std::to_string(bsq_rpsq)
       + " " + std::to_string(bsq)
       + " " + std::to_string(rsq)
@@ -495,7 +501,7 @@ class ConToPrim {
     const Real mu = find_root(res, 0.0, 1.0, rel_tolerance, __LINE__);
     //if(atm) printf("used atm\n");
     if(my_cell(x1,x2)) {
-      std::cout << "res = " << res(mu) << std::endl;
+      printf("res = %e\n", res(mu));
     }
 
     // now unwrap everything into primitive and conserved vars
@@ -516,10 +522,8 @@ class ConToPrim {
         v(peng)/v(prho) < 0.99999*epsflr ||
         v(peng)/v(prho) > 1.00001*eps_max ||
         W > 1.00001*gam_max) {
-      std::cout << "bounds violated " << v(prho)/rhoflr << " "
-                                      << v(peng)/v(prho)/epsflr << " "
-                                      << v(peng)/v(prho)/eps_max << " "
-                                      << W/gam_max << std::endl;
+      printf("bounds violated %e %e %e %e\n", v(prho)/rhoflr, v(peng)/v(prho)/epsflr,
+                                              v(peng)/v(prho)/eps_max, W/gam_max);
     }
 
     //const Real vscale = (W > 10 ? 10.0/W : 1.0);

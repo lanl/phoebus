@@ -18,12 +18,13 @@ import regression_test as rt
 
 parser = argparse.ArgumentParser(description='Run the Bondi accretion problem as a test')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
+parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
 args = parser.parse_args()
 
 modified_inputs = {}
 modified_inputs['parthenon/mesh/nx1'] = 128
 
-rt.build_code(geometry="FMKS")
+rt.build_code(geometry="FMKS", use_gpu=args.use_gpu)
 rt.gold_comparison(variables=['p.density', 'p.velocity'],
                    input_file='../../../inputs/bondi.pin',
                    modified_inputs=modified_inputs,
