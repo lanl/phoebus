@@ -18,9 +18,10 @@ import regression_test as rt
 
 parser = argparse.ArgumentParser(description='Run a linear mode as a test')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
+parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
 args = parser.parse_args()
 
-rt.build_code(geometry="Minkowski")
+rt.build_code(geometry="Minkowski", use_gpu=args.use_gpu)
 rt.gold_comparison(variables=['p.density', 'p.velocity'],
                    input_file='../../../inputs/linear_modes.pin',
                    upgold=args.upgold,
