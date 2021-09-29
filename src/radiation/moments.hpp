@@ -20,7 +20,9 @@
 #define KOKKOS_FORCEINLINE_FUNCTION inline 
 
 #define SPACELOOP(i) for (int i = 0; i < NDSPACE; ++i) 
+
 #include <cmath>
+#include <iostream>
 
 /// TODO: Add parthenon includes
 
@@ -33,6 +35,7 @@
 namespace radiationMoments { 
 
 typedef double Real;
+
 // Taken from https://pharr.org/matt/blog/2019/11/03/difference-of-floats 
 // meant to reduce floating point rounding error in cancellations,
 // returns ab - cd
@@ -40,7 +43,7 @@ template <class T>
 inline 
 T DifferenceOfProducts(T a, T b, T c, T d) {
     T cd = c * d;
-    T err = std::fma(-c, d, cd); // Fused multiply add that is rounded only once
+    T err = std::fma(-c, d, cd); // Round off error correction for cd
     T dop = std::fma(a, b, -cd);
     return dop + err;
 }
@@ -84,18 +87,19 @@ struct CellBackground {
     matrixInverse3x3(cov_gamma, con_gamma); 
 
     lower3Vector(con_v, cov_v);
-    double v2 = 0.0; 
+    Real v2 = 0.0; 
     SPACELOOP(i) v2 += con_v[i]*cov_v[i]; 
     W = 1/std::sqrt(1 - v2);  
     W2 = W*W; 
     W3 = W*W2; 
     W4 = W*W3; 
   }
-  double W, W2, W3, W4;
-  double cov_v[NDSPACE]; 
-  double con_v[NDSPACE]; 
-  double cov_gamma[NDSPACE][NDSPACE]; 
-  double con_gamma[NDSPACE][NDSPACE]; 
+  Real W, W2, W3, W4;
+  Real cov_v[NDSPACE]; 
+  Real con_v[NDSPACE]; 
+  Real con_beta[NDSPACE];
+  Real cov_gamma[NDSPACE][NDSPACE]; 
+  Real con_gamma[NDSPACE][NDSPACE]; 
   
   void lower3Vector(const Real con_U[NDSPACE], Real cov_U[NDSPACE]) const {
     SPACELOOP(i) {
@@ -120,15 +124,18 @@ struct CellBackground {
 KOKKOS_FORCEINLINE_FUNCTION
 void GetTilPiContractions(const Real con_TilPi[NDSPACE][NDSPACE],
                           const CellBackground &bg,
-                          Real con_vPi[NDSPACE], Real* vvPi) {
+                          Real cov_vPi[NDSPACE], Real* vvPi) {
+Real con_vPi[NDSPACE];
 *vvPi = 0.0;
-SPACELOOP(i) { 
+SPACELOOP(i) {
     con_vPi[i] = 0.0;
     SPACELOOP(j) {
       con_vPi[i] += bg.cov_v[j]*con_TilPi[i][j]; 
     }
     *vvPi += bg.cov_v[i]*con_vPi[i];
   }
+  bg.lower3Vector(con_vPi, cov_vPi);
+  
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
@@ -137,9 +144,8 @@ void RadPrim2Con(const Real J, const Real cov_H[NDSPACE],
                  const CellBackground &bg, 
                  Real *E, Real cov_F[NDSPACE]) {
   
-  double vvPi, con_vPi[NDSPACE], cov_vPi[NDSPACE]; 
-  GetTilPiContractions(con_TilPi, bg, con_vPi, &vvPi); 
-  bg.lower3Vector(con_vPi, cov_vPi);
+  double vvPi, cov_vPi[NDSPACE]; 
+  GetTilPiContractions(con_TilPi, bg, cov_vPi, &vvPi); 
   
   double vH = 0.0; 
   SPACELOOP(i) vH += bg.con_v[i]*cov_H[i];
@@ -149,6 +155,32 @@ void RadPrim2Con(const Real J, const Real cov_H[NDSPACE],
                           + bg.W*cov_H[i] + J*cov_vPi[i];
 }
 
+ 
+
+KOKKOS_FORCEINLINE_FUNCTION 
+void RadCon2Prim(const Real E, const Real cov_F[NDSPACE], 
+                 const Real vvTilPi, const Real cov_vTilPi[NDSPACE],
+                 const CellBackground& bg, 
+                 Real* J, Real cov_tilH[NDSPACE]) { 
+  double vF = 0.0; 
+  SPACELOOP(i) vF += bg.con_v[i]*cov_F[i];
+  
+  // lam is proportional to the determinant of the 2x2 linear system relating 
+  // E and v_i F^i to J and v_i H^i for fixed tilde pi^ij 
+  const Real lam = (2.0*bg.W2 + 1.0)/3.0 + (2*bg.W4 - 3*bg.W2)*vvTilPi; 
+  
+  // zeta = v_i H^i
+  // const Real zeta = -bg.W/lam*(((4*bg.W2-4)/3 + vvPi)*E 
+  //                             -((4*bg.W2-1)/3 + bg.W2*vvPi)*vF);
+  // a = 4 W^2/3 J + W zeta  
+  const Real a = bg.W2/lam*((4*bg.W2/3 - vvTilPi)*E - ((4*bg.W2+1)/3 - bg.W2*vvTilPi)*vF); 
+  
+  // Calculate fluid rest frame (i.e. primitive) quantities
+  *J = ((2*bg.W2 - 1)*E - 2*bg.W2*vF)/lam; 
+  SPACELOOP(i) cov_tilH[i] = (cov_F[i] - (*J)*cov_vTilPi[i] - bg.cov_v[i]*a)/bg.W; 
+   
+}
+
 KOKKOS_FORCEINLINE_FUNCTION 
 void RadCon2Prim(const Real E, const Real cov_F[NDSPACE], 
                  const Real con_TilPi[NDSPACE][NDSPACE], 
@@ -156,27 +188,10 @@ void RadCon2Prim(const Real E, const Real cov_F[NDSPACE],
                  Real* J, Real cov_tilH[NDSPACE]) {
   
   // Calculate contractions of three velocity with projected fluid frame pressure tensor
-  double vvPi, con_vPi[NDSPACE], cov_vPi[NDSPACE]; 
-  GetTilPiContractions(con_TilPi, bg, con_vPi, &vvPi); 
-  bg.lower3Vector(con_vPi, cov_vPi);
-  
-  double vF = 0.0; 
-  SPACELOOP(i) vF += bg.con_v[i]*cov_F[i];
-  
-  // lam is proportional to the determinant of the 2x2 linear system relating 
-  // E and v_i F^i to J and v_i H^i for fixed tilde pi^ij 
-  const Real lam = (2.0*bg.W2 + 1.0)/3.0 + (2*bg.W4 - 3*bg.W2)*vvPi; 
-  
-  // zeta = v_i H^i
-  // const Real zeta = -bg.W/lam*(((4*bg.W2-4)/3 + vvPi)*E 
-  //                             -((4*bg.W2-1)/3 + bg.W2*vvPi)*vF);
-  // a = 4 W^2/3 J + W zeta  
-  const Real a = bg.W2/lam*((4*bg.W2/3 - vvPi)*E - ((4*bg.W2+1)/3 - bg.W2*vvPi)*vF); 
-  
-  // Calculate fluid rest frame (i.e. primitive) quantities
-  *J = ((2*bg.W2 - 1)*E - 2*bg.W2*vF)/lam; 
-  SPACELOOP(i) cov_tilH[i] = (cov_F[i] - (*J)*cov_vPi[i] - bg.cov_v[i]*a)/bg.W; 
-   
+  double vvPi, cov_vPi[NDSPACE]; 
+  GetTilPiContractions(con_TilPi, bg, cov_vPi, &vvPi); 
+
+  RadCon2Prim(E, cov_F, vvPi, cov_vPi, bg, J, cov_tilH);
 }
 
 KOKKOS_FORCEINLINE_FUNCTION 
@@ -195,6 +210,98 @@ void getContravariantP(const Real J, const Real cov_tilH[NDSPACE],
   }
 }
 
+
+KOKKOS_FORCEINLINE_FUNCTION
+void getTilPiThin(const Real E, const Real cov_F[NDSPACE], 
+                  const CellBackground& bg,
+                  Real con_tilPi_thin[NDSPACE][NDSPACE]) { 
+  
+  Real con_F[NDSPACE]; 
+  bg.raise3Vector(cov_F, con_F); 
+  Real Fmag(0.0); 
+  SPACELOOP(i) Fmag += cov_F[i]*con_F[i]; 
+  Fmag = std::sqrt(Fmag); 
+  Real vl(0.0);
+  SPACELOOP(i) vl += bg.cov_v[i]*con_F[i];
+  vl /= Fmag;
+
+  Real con_tilf[NDSPACE];
+   
+  SPACELOOP(i) { 
+    con_tilf[i] = con_F[i]/(Fmag*bg.W*(1 - vl)) - bg.W*bg.con_v[i];
+  }
+
+  SPACELOOP(i) {
+    SPACELOOP(j) {
+      con_tilPi_thin[i][j] = con_tilf[i]*con_tilf[j] 
+                             - (bg.W2*bg.con_v[i]*bg.con_v[j] + bg.con_gamma[i][j])/3;
+    }
+  }
+}
+
+// MEFD Closure 
+KOKKOS_FORCEINLINE_FUNCTION 
+Real closure(double xi) {
+    //return (1.0 - 2*std::pow(xi, 2) + 4*std::pow(xi,3))/3.0;
+    return (1.0 + 2*xi*xi)/3; 
+}
+
+KOKKOS_FORCEINLINE_FUNCTION 
+Real findM1Xi(const Real E, const Real cov_F[NDSPACE],
+              const CellBackground& bg, Real xi_guess) { 
+
+  // Calculate the stationary observer frame projected fluid frame propagation direction
+  Real con_tilPi_thin[NDSPACE][NDSPACE]; 
+  getTilPiThin(E, cov_F, bg, con_tilPi_thin); 
+  double vvTilPi_thin, cov_vTilPi_thin[NDSPACE]; 
+  GetTilPiContractions(con_tilPi_thin, bg, cov_vTilPi_thin, &vvTilPi_thin); 
+
+  
+  auto calculateXiResidual = [=](Real xi) {
+    
+    // Calculate the Eddington tensor for xi_mid 
+    Real athin = 0.5*(3*closure(xi) - 1);
+    Real cov_vTilPi[NDSPACE]; 
+    SPACELOOP(i) { cov_vTilPi[i] = athin*cov_vTilPi_thin[i]; } 
+
+    // Find J and tilde H^alpha for xi_mid 
+    Real J, cov_tilH[NDSPACE];
+    //RadCon2Prim(E, cov_F, athin*vvTilPi_thin, cov_vTilPi, bg, &J, cov_tilH);
+    
+    Real con_tilPi[NDSPACE][NDSPACE]; 
+    SPACELOOP(i) { SPACELOOP(j) {con_tilPi[i][j] = athin*con_tilPi_thin[i][j];}}
+    RadCon2Prim(E, cov_F, con_tilPi, bg, &J, cov_tilH);
+    
+    // Calculate H_alpha H^alpha using tilde H^alpha and H_alpha u^\alpha = 0  
+    Real H2(0.0), vtilH(0.0);
+    SPACELOOP(i) { SPACELOOP(j) { H2 += cov_tilH[i]*cov_tilH[j]*bg.con_gamma[i][j]; } } 
+    SPACELOOP(i) vtilH += bg.con_v[i]*cov_tilH[i]; 
+    H2 -= vtilH*vtilH; 
+    
+    return xi - std::sqrt(H2/(J*J));
+  };
+  
+  printf("Guess (residual): %f %e \n", xi_guess, calculateXiResidual(xi_guess)); 
+
+  // First try bisection over the interval 
+  Real xi_low(0.0), xi_high(1.0);
+  Real f_low = calculateXiResidual(xi_low);
+  Real f_high = calculateXiResidual(xi_high);
+  printf("%e %e \n", f_low, f_high);
+  Real xi_mid, f_mid;
+  for (int iter=0; iter<35; ++iter) {
+    xi_mid = 0.5*(xi_high + xi_low);
+    f_mid = calculateXiResidual(xi_mid); 
+    if (f_mid*f_low >= 0.0) {
+      f_low = f_mid; 
+      xi_low = xi_mid;
+    } else {
+      f_high = f_mid; 
+      xi_high = xi_mid;
+    }
+  } 
+  return xi_mid;
+}
 } // namespace radiationMoments 
 
 #endif // MOMENTS_HPP_
