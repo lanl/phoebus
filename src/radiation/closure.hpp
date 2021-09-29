@@ -97,15 +97,33 @@ class Closure {
   template<class VA, class VB, class T2> 
   Status Con2Prim(const Real E, const VA cov_F, const T2 con_tilPi, Real* J, VB* cov_H);
   
+ 
+  // Con2Prim and Prim2Con for closure
+  template<class VA, class VB, class T2> 
+  Status Con2PrimM1(const Real E, const VA cov_F, Real xi_guess, Real phi_guess, 
+                    Real* J, VB* cov_H, T2* con_tilPi);
+  
+  template<class VA, class VB, class T2>  
+  Status Con2PrimM1(const Real E, const VA cov_F, Real* J, VB* cov_H, T2* con_tilPi) {
+    return Con2PrimM1(E, cov_F, 0.5, 3.14159, J, cov_H, con_tilPi);
+  }
+
+  template<class VA, class VB, class T2>  
+  Status Prim2ConM1(const Real J, const VA cov_H, Real* E, VB* cov_F, T2* con_tilPi);
+  
+  // Calculate the momentum density flux
   template<class V, class T2A, class T2B> 
   Status getContravariantPFromPrim(const Real J, const V cov_tilH, const T2A con_TilPi, 
                             T2B* con_P);
-
-  // Con2Prim for closure
-  template<class VA, class VB, class T2>  
-  Status Con2PrimM1(const Real E, const VA cov_F, Real* J, VB* cov_H, T2* con_tilPi);
-  template<class VA, class VB, class T2>  
-  Status Prim2ConM1(const Real J, const VA cov_H, Real* E, VB* cov_F, T2* con_tilPi);
+   
+ protected:
+  Real W, W2, W3, W4;
+  Vec cov_v; 
+  Vec con_v; 
+  Real gdet, alpha;
+  Vec con_beta;
+  Tens2 cov_gamma; 
+  Tens2 con_gamma; 
   
   template<class V> 
   Status M1Residuals(const Real E, const V cov_F, 
@@ -123,16 +141,7 @@ class Closure {
   template<class V> 
   Status SolveClosure(const Real E, const V cov_F, 
                       Real* xi_out, Real* phi_out,
-                      const Real xi_guess = 0.5, const Real phi_guess = 3.14159); 
- protected:
-  Real W, W2, W3, W4;
-  Vec cov_v; 
-  Vec con_v; 
-  Real gdet, alpha;
-  Vec con_beta;
-  Tens2 cov_gamma; 
-  Tens2 con_gamma; 
-  
+                      const Real xi_guess = 0.5, const Real phi_guess = 3.14159);
   template<class VA, class VB>
   KOKKOS_FORCEINLINE_FUNCTION 
   void lower3Vector(const VA& con_U, VB* cov_U) const {
@@ -253,11 +262,12 @@ Status Closure<Vec, Tens2>::Prim2ConM1(const Real J, const VA cov_H,
 
 template<class Vec, class Tens2> 
 template<class VA, class VB, class T2>  
-Status Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F, Real* J, 
-                                       VB* cov_H, T2* con_tilPi){
+Status Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F, 
+                                       const Real xi_guess, const Real phi_guess,
+                                       Real* J, VB* cov_H, T2* con_tilPi){
   Real xi, phi;
   Vec con_tilf;
-  auto status = SolveClosure(E, cov_F, &xi, &phi);
+  auto status = SolveClosure(E, cov_F, &xi, &phi, xi_guess, phi_guess);
   M1FluidPressureTensor(E, cov_F, xi, phi, con_tilPi, &con_tilf); 
   Con2Prim(E, cov_F, *con_tilPi, J, cov_H);
   return status;
