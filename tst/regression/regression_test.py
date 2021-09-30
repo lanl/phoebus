@@ -131,6 +131,10 @@ def build_code(geometry, use_gpu=False):
   configure_options.append("-DPARTHENON_DISABLE_HDF5_COMPRESSION=ON")
   if use_gpu:
     configure_options.append("-DPHOEBUS_ENABLE_CUDA=ON")
+    configure_options.append("-DKokkos_ARCH_VOLTA70=ON")
+    configure_options.append("-DKokkos_ARCH_POWER9=ON")
+    configure_options.append("-DKokkos_ENABLE_CUDA=ON")
+    configure_options.append("-DCMAKE_CXX_COMPILER=/home/brryan/github/phoebus/external/parthenon/external/Kokkos/bin/nvcc_wrapper")
 
   # Geometry (problem-dependent)
   configure_options.append(f"-DPHOEBUS_GEOMETRY={geometry}")
@@ -167,8 +171,7 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
-  #call(['./src/phoebus', '-i', TEMPORARY_INPUT_FILE])
-  call([executable, '-i', TEMPORARY_INPUT_FILE])
+  call(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))
