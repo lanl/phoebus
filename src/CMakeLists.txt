@@ -78,6 +78,7 @@ add_executable(phoebus
   pgen/thin_cooling.cpp
   pgen/sedov.cpp
   pgen/torus.cpp
+  pgen/tov.cpp
 
   phoebus_boundaries/phoebus_boundaries.hpp
   phoebus_boundaries/phoebus_boundaries.cpp

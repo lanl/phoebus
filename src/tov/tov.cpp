@@ -93,7 +93,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   PARTHENON_REQUIRE_THROWS(tovpkg->label() == "tov", "Requires the tov package");
   PARTHENON_REQUIRE_THROWS(monopolepkg->label() == "monopole_gr",
                            "Requires the monopole_gr package");
-  PARTHENON_REQUIRE_THROWS(eospkg->label() == "eos", "REquires the eos package");
+  PARTHENON_REQUIRE_THROWS(eospkg->label() == "eos", "Requires the eos package");
 
   auto &params = tovpkg->AllParams();
 
