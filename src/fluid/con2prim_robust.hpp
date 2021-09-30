@@ -343,6 +343,7 @@ class ConToPrim {
                                     internal_variables::cell_signal_speed, fluid_prim::gamma1});
   }
 
+  KOKKOS_INLINE_FUNCTION
   bool my_cell(const Real x1, const Real x2) const {
     //if (fabs(x1 - 3.24365) < 1.e-3 && fabs(x2 - 0.493164) < 1.e-3) return true;
     return false;
