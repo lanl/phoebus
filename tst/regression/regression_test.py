@@ -149,10 +149,17 @@ def build_code(geometry, use_gpu=False):
 
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
-def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, compression_factor=1):
+def gold_comparison(variables, input_file, modified_inputs={}, executable='./src/phoebus',
+                    upgold=False, compression_factor=1):
+
   if not os.getcwd().endswith(BUILD_DIR):
-    print(f"Not currently in build directory \"{BUILD_DIR}\"!")
-    sys.exit()
+    if os.path.isdir(BUILD_DIR):
+      print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
+      sys.exit()
+    os.mkdir(BUILD_DIR)
+    os.chdir(BUILD_DIR)
+    #print(f"Not currently in build directory \"{BUILD_DIR}\"!")
+    #sys.exit()
 
   # Copy test problem and modify inputs
   shutil.copyfile(input_file, TEMPORARY_INPUT_FILE)
@@ -160,7 +167,8 @@ def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, com
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
-  call(['./src/phoebus', '-i', TEMPORARY_INPUT_FILE])
+  #call(['./src/phoebus', '-i', TEMPORARY_INPUT_FILE])
+  call([executable, '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))
@@ -222,4 +230,6 @@ def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, com
       sys.exit(os.EX_OK)
     else:
       print("TEST FAILED")
+      mean_error = np.mean(variables_data - gold_variables)
+      print(f"Mean error: {mean_error}")
       sys.exit(os.EX_SOFTWARE)
