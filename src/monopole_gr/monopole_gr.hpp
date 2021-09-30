@@ -242,8 +242,6 @@ TaskStatus MatterToHost(StateDescriptor *pkg);
 
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 
-TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg);
-
 TaskStatus LinearSolveForAlpha(StateDescriptor *pkg);
 
 TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
