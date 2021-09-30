@@ -279,7 +279,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   auto monopole_pkg = packages.Get("monopole_gr");
   auto eos_pkg = packages.Get("eos");
   const auto enable_tov = tov_pkg->Param<bool>("enabled");
-  const auto enable_monopole = monopole_pkg->Param<bool>("enabled");
+  const auto enable_monopole = monopole_pkg->Param<bool>("enable_monopole_gr");
   const bool is_monopole_cart = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
   const bool is_monopole_sph = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
   if (enable_tov && !enable_monopole) {
