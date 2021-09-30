@@ -162,8 +162,6 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
       sys.exit()
     os.mkdir(BUILD_DIR)
     os.chdir(BUILD_DIR)
-    #print(f"Not currently in build directory \"{BUILD_DIR}\"!")
-    #sys.exit()
 
   # Copy test problem and modify inputs
   shutil.copyfile(input_file, TEMPORARY_INPUT_FILE)
