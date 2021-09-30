@@ -48,7 +48,7 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
     const CellLocation loc = CellLocation::Cent;
     const int k = 0;
     const int j = 0;
-    const int i = 0;
+    // const int i = 0;
     {
       const Real v[3] = {0., 0., 0.};
       const Real Gamma_ref = 1.;
