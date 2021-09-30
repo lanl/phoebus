@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-//TODO(JCD): this should be exported by parthenon
+// TODO(JCD): this should be exported by parthenon
 #include <refinement/refinement.hpp>
 #include <utils/error_checking.hpp>
 
@@ -24,14 +24,14 @@
 #include "fixup/fixup.hpp"
 #include "fluid/fluid.hpp"
 #include "geometry/geometry.hpp"
-#include "monopole_gr/monopole_gr.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "microphysics/opac_phoebus/opac_phoebus.hpp"
+#include "monopole_gr/monopole_gr.hpp"
+#include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
 #include "phoebus_utils/debug_utils.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
-#include "phoebus_boundaries/phoebus_boundaries.hpp"
 
 using namespace parthenon::driver::prelude;
 
@@ -122,35 +122,40 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // pull out a container for the geometric source terms
     auto &gsrc = pmb->meshblock_data.Get("geometric source terms");
 
-    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving,
-                                 sc1.get(), BoundaryCommSubset::all);
+    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc1.get(),
+                                 BoundaryCommSubset::all);
 
     auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
     auto fix_flux = tl.AddTask(hydro_flux, fixup::NothingEscapes, sc0.get());
     auto flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
-    auto geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
+    auto geom_src =
+        tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
 
     auto send_flux =
         tl.AddTask(flux_ct, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
 
-    auto recv_flux = tl.AddTask(
-        flux_ct, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
+    auto recv_flux =
+        tl.AddTask(flux_ct, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
 
     // compute the divergence of fluxes of conserved variables
     auto flux_div =
-        tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>, sc0.get(), dudt.get());
+        tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>,
+                   sc0.get(), dudt.get());
 
-    auto copy_flux_div = tl.AddTask(flux_div|geom_src, fluid::CopyFluxDivergence, dudt.get());
+    auto copy_flux_div =
+        tl.AddTask(flux_div | geom_src, fluid::CopyFluxDivergence, dudt.get());
 
-    auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,
-                              src_names, dudt.get(), gsrc.get(), dudt.get());
+    auto add_rhs =
+        tl.AddTask(flux_div | geom_src, SumData<std::string, MeshBlockData<Real>>,
+                   src_names, dudt.get(), gsrc.get(), dudt.get());
 
-    #if PRINT_RHS
-    auto print_rhs = tl.AddTask(add_rhs, Debug::PrintRHS<MeshBlockData<Real>>, dudt.get());
+#if PRINT_RHS
+    auto print_rhs =
+        tl.AddTask(add_rhs, Debug::PrintRHS<MeshBlockData<Real>>, dudt.get());
     auto next = print_rhs;
-    #else
+#else
     auto next = add_rhs;
-    #endif
+#endif
   }
 
   const int num_partitions = pmesh->DefaultNumPartitions();
@@ -163,15 +168,18 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &tl = sync_region[ib];
 
     // update step
-    auto avg_data = tl.AddTask(none, AverageIndependentData<MeshData<Real>>,
-                               sc0.get(), base.get(), beta);
+    auto avg_data = tl.AddTask(none, AverageIndependentData<MeshData<Real>>, sc0.get(),
+                               base.get(), beta);
     auto update = tl.AddTask(avg_data, UpdateIndependentData<MeshData<Real>>, sc0.get(),
-                             dudt.get(), beta*dt, sc1.get());
+                             dudt.get(), beta * dt, sc1.get());
 
     // update ghost cells
-    auto send = tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
-    auto recv = tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
-    auto fill_from_bufs = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, sc1);
+    auto send =
+        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
+    auto recv =
+        tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
+    auto fill_from_bufs =
+        tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, sc1);
   }
 
   TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);
@@ -180,34 +188,34 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &tl = async_region_2[ib];
     auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
 
-    auto clear_comm_flags =
-      tl.AddTask(none, &MeshBlockData<Real>::ClearBoundary, sc1.get(),
-                   BoundaryCommSubset::all);
+    auto clear_comm_flags = tl.AddTask(none, &MeshBlockData<Real>::ClearBoundary,
+                                       sc1.get(), BoundaryCommSubset::all);
 
     auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc1);
 
     // set physical boundaries
-    auto set_bc =
-      tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc1);
+    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc1);
 
     auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc1);
 
     // fill in derived fields
-    auto fill_derived =
-        tl.AddTask(convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+    auto fill_derived = tl.AddTask(
+        convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
 
-    auto fixup = tl.AddTask(fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+    auto fixup = tl.AddTask(
+        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
     // estimate next time step
     if (stage == integrator->nstages) {
-      auto new_dt = tl.AddTask(
-          fill_derived, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
+      auto new_dt =
+          tl.AddTask(fill_derived,
+                     parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
 
       auto divb = tl.AddTask(set_bc, fluid::CalculateDivB, sc1.get());
 
       // Update refinement
       if (pmesh->adaptive) {
-        //using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
+        // using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
         auto tag_refine = tl.AddTask(
             fill_derived, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
       }
@@ -270,7 +278,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(radiation::Initialize(pin.get()));
   packages.Add(fixup::Initialize(pin.get()));
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
-  packages.Add(TOV::Initialize(pin.get())); // Does nothing if not enabled.
+  packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
 
   // TODO(JMM): I need to do this before problem generators get
   // called. For now I'm hacking this in here. But in the long term,
@@ -280,16 +288,18 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   auto eos_pkg = packages.Get("eos");
   const auto enable_tov = tov_pkg->Param<bool>("enabled");
   const auto enable_monopole = monopole_pkg->Param<bool>("enable_monopole_gr");
-  const bool is_monopole_cart = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
-  const bool is_monopole_sph = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
+  const bool is_monopole_cart =
+      (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
+  const bool is_monopole_sph =
+      (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
   if (enable_tov && !enable_monopole) {
     PARTHENON_THROW("MonopoleGR required for TOV initialization");
   }
   if (enable_monopole && !enable_tov) {
     PARTHENON_THROW("Currently monopole GR only enabled with TOV");
   }
-  if ((enable_monopole && !(is_monopole_cart || is_monopole_sph))
-      || (is_monopole_cart || is_monopole_sph) && !enable_monopole) {
+  if ((enable_monopole && !(is_monopole_cart || is_monopole_sph)) ||
+      (is_monopole_cart || is_monopole_sph) && !enable_monopole) {
     PARTHENON_THROW("MonopoleGR must be coupled with monopole metric");
   }
   if (enable_tov) {
