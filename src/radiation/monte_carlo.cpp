@@ -475,9 +475,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           const Real T_cgs = v(itemp, k, j, i) * TEMPERATURE;
           const Real Ye = v(iye, k, j, i);
 
-          // TODO(BRR) Add AbsorptionCoefficientPerNuOmega to singularity-opac
           Real alphanu =
-              d_opacity.AbsorptionCoefficientPerNu(rho_cgs, T_cgs, Ye, s, nu) /
+              d_opacity.AbsorptionCoefficient(rho_cgs, T_cgs, Ye, s, nu) /
               (4. * M_PI);
 
           Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
