@@ -49,6 +49,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   EOSBuilder::modifiers_t modifiers;
   EOSBuilder::params_t base_params;
   EOSBuilder::params_t relativity_params;
+  EOSBuilder::params_t units_params;
   // EOSBuilder::params_t shifted_params, scaled_params;
 
   const std::vector<std::string> valid_eos_names = {
@@ -122,6 +123,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
   FillRealParams(pin, base_params, names);
 
+  params.Add("unit_conv", phoebus::UnitConversions(pin));
+  auto &unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
+
   // modifiers
   /*
   // TODO(JMM): Disabling this for now
@@ -136,6 +140,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     modifiers[EOSBuilder::EOSModifier::Scaled] = scaled_params;
   }
   */
+  units_params["use_length_time"].emplace<bool>(true);
+  units_params["time_unit"].emplace<Real>(unit_conv.GetTimeCodeToCGS());
+  units_params["length_unit"].emplace<Real>(unit_conv.GetLengthCodeToCGS());
+  units_params["mass_unit"].emplace<Real>(unit_conv.GetMassCodeToCGS());
+  units_params["temp_unit"].emplace<Real>(unit_conv.GetTemperatureCodeToCGS());
+  modifiers[EOSBuilder::EOSModifier::UnitSystem] = units_params;
 
   // Build the EOS
   singularity::EOS eos_host =
@@ -149,8 +159,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   for (auto &name : names) {
     params.Add(name, (pin->GetReal(block_name, name)));
   }
-
-  params.Add("unit_conv", phoebus::UnitConversions(pin));
 
   return pkg;
 }
