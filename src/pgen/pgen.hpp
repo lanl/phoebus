@@ -40,7 +40,8 @@ using namespace parthenon::package::prelude;
   PROBLEM(sedov)                                                                         \
   PROBLEM(blandford_mckee)                                                               \
   PROBLEM(bondi)                                                                         \
-  PROBLEM(torus)
+  PROBLEM(torus)                                                                         \
+  PROBLEM(tov)
 
 // if you need problem-specific modifications to inputs, add the name here
 #define FOREACH_MODIFIER                                                                 \

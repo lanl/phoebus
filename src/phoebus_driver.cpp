@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <string>
+#include <typeinfo>
 #include <vector>
 
 // TODO(JCD): this should be exported by parthenon
