@@ -17,6 +17,7 @@
 
 //TODO(JCD): this should be exported by parthenon
 #include <refinement/refinement.hpp>
+#include <utils/error_checking.hpp>
 
 // Local Includes
 #include "compile_constants.hpp"
@@ -270,6 +271,36 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(fixup::Initialize(pin.get()));
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
   packages.Add(TOV::Initialize(pin.get())); // Does nothing if not enabled.
+
+  // TODO(JMM): I need to do this before problem generators get
+  // called. For now I'm hacking this in here. But in the long term,
+  // it may require a shift in how parthenon does things.
+  auto tov_pkg = packages.Get("tov");
+  auto monopole_pkg = packages.Get("monopole_gr");
+  auto eos_pkg = packages.Get("eos");
+  const auto enable_tov = tov_pkg->Param<bool>("enabled");
+  const auto enable_monopole = monopole_pkg->Param<bool>("enabled");
+  const bool is_monopole_cart = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
+  const bool is_monopole_sph = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
+  if (enable_tov && !enable_monopole) {
+    PARTHENON_THROW("MonopoleGR required for TOV initialization");
+  }
+  if (enable_monopole && !enable_tov) {
+    PARTHENON_THROW("Currently monopole GR only enabled with TOV");
+  }
+  if ((enable_monopole && !(is_monopole_cart || is_monopole_sph))
+      || (is_monopole_cart || is_monopole_sph) && !enable_monopole) {
+    PARTHENON_THROW("MonopoleGR must be coupled with monopole metric");
+  }
+  if (enable_tov) {
+    TOV::IntegrateTov(tov_pkg.get(), monopole_pkg.get(), eos_pkg.get());
+  }
+  if (enable_monopole) {
+    MonopoleGR::MatterToHost(monopole_pkg.get());
+    MonopoleGR::IntegrateHypersurface(monopole_pkg.get());
+    MonopoleGR::LinearSolveForAlpha(monopole_pkg.get());
+    MonopoleGR::SpacetimeToDevice(monopole_pkg.get());
+  }
 
   return packages;
 }

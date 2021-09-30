@@ -76,6 +76,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("rin", rin);
   params.Add("rout", rout);
 
+  // Force static spacetime
+  bool force_static = pin->GetOrAddBoolean("monopole_gr", "force_static", false);
+  params.Add("force_static", force_static);
+
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
   Matter_t matter("monopole_gr matter grid", NMAT, npoints);
@@ -295,6 +299,8 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
+  auto force_static = params.Get<bool>("force_static");
+
   auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
   auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
   Kokkos::deep_copy(hypersurface, hypersurface_h);
@@ -363,10 +369,10 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
         Real dbetadt = -0.5 * r * (alpha(i) * dKdt + K * dalphadt);
 
 	//printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
-        gradients(Gradients::DADT, i) = dadt;
-        gradients(Gradients::DALPHADT, i) = dalphadt;
-        gradients(Gradients::DKDT, i) = dKdt;
-        gradients(Gradients::DBETADT, i) = dbetadt;
+        gradients(Gradients::DADT, i) = force_static ? 0 : dadt;
+        gradients(Gradients::DALPHADT, i) = force_static ? 0 : dalphadt;
+        gradients(Gradients::DKDT, i) = force_static ? 0 : dKdt;
+        gradients(Gradients::DBETADT, i) = force_static ? 0 : dbetadt;
       });
 
   return TaskStatus::complete;
