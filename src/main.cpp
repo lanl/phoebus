@@ -45,9 +45,9 @@ int main(int argc, char *argv[]) {
 
   // TODO(JMM): Move this into another function somewhere?
   const std::string bc_ix1 =
-      pman.pinput->GetOrAddString("phoebus", "bc_ix1", "reflect");
+      pman.pinput->GetString("phoebus/mesh", "ix1_bc");
   const std::string bc_ox1 =
-      pman.pinput->GetOrAddString("phoebus", "bc_ox1", "outflow");
+      pman.pinput->GetString("phoebus/mesh", "ox1_bc");
 
   if (bc_ix1 == "reflect") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =

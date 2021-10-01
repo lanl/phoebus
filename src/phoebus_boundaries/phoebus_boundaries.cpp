@@ -34,14 +34,16 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   int ref = bounds.GetBoundsI(IndexDomain::interior).s;
+  PackIndexMap imap;
   auto q = rc->PackVariables(
-      std::vector<parthenon::MetadataFlag>{Metadata::FillGhost}, coarse);
+      std::vector<parthenon::MetadataFlag>{Metadata::FillGhost}, imap, coarse);
   auto nb = IndexRange{0, q.GetDim(4) - 1};
   auto domain = IndexDomain::inner_x1;
 
+  const int pv1 = imap[fluid_prim::velocity].first;
+
   auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
-
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
@@ -57,6 +59,14 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         "OutflowInnerX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
+
+          // Check that u^1 <= 0
+          Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real beta[3];
+          geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
+          if (q(pv1, k, j, i) - beta[0]/alpha > 0.) {
+            q(pv1, k, j, i) = beta[0]/alpha;
+          }
         });
   }
 }
@@ -67,10 +77,13 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   int ref = bounds.GetBoundsI(IndexDomain::interior).e;
+  PackIndexMap imap;
   auto q = rc->PackVariables(
-      std::vector<parthenon::MetadataFlag>{Metadata::FillGhost}, coarse);
+      std::vector<parthenon::MetadataFlag>{Metadata::FillGhost}, imap, coarse);
   auto nb = IndexRange{0, q.GetDim(4) - 1};
   auto domain = IndexDomain::outer_x1;
+  
+  const int pv1 = imap[fluid_prim::velocity].first;
 
   auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
@@ -89,6 +102,14 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         "OutflowOuterX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
+          
+          // Check that u^1 <= 0
+          Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real beta[3];
+          geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
+          if (q(pv1, k, j, i) - beta[0]/alpha < 0.) {
+            q(pv1, k, j, i) = beta[0]/alpha;
+          }
         });
   }
 }
