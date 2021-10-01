@@ -286,6 +286,46 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     if (parthenon::Globals::my_rank == 0)
       std::cout << "beta_min = " << beta_min << std::endl;
   }
+
+  // Lets smooth the fluid out and see what happens
+  const int nsmooth = 0;
+  ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  for (int n = 0; n < nsmooth; n++) {
+    //auto rho_copy = 
+    auto pkg = pmb->packages.Get("fluid");
+    auto rho = pmb->meshblock_data.Get()->Get(fluid_prim::density).data;
+    auto rho_copy = rho.GetMirrorAndCopy(Kokkos::DefaultExecutionSpace());
+    auto ug = pmb->meshblock_data.Get()->Get(fluid_prim::energy).data;
+    auto ug_copy = ug.GetMirrorAndCopy(Kokkos::DefaultExecutionSpace());
+    auto v = pmb->meshblock_data.Get()->Get(fluid_prim::velocity).data;
+    auto v_copy = v.GetMirrorAndCopy(Kokkos::DefaultExecutionSpace());
+    auto t = pmb->meshblock_data.Get()->Get(fluid_prim::temperature).data;
+    auto t_copy = t.GetMirrorAndCopy(Kokkos::DefaultExecutionSpace());
+
+    pmb->par_for(
+      "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        double ref = rho(k,j,i);
+        if (rho_copy(0,0,0,k,j,i+1) > 10.*ref || rho_copy(0,0,0,k,j,i-1) > 10.*ref || 
+            rho_copy(0,0,0,k,j+1,i) > 10.*ref || rho_copy(0,0,0,k,j-1,i) > 10.*ref) {
+          rho(k,j,i) = (1./4.)*(rho_copy(0,0,0,k,j,i+1) + rho_copy(0,0,0,k,j,i-1) + 
+                                rho_copy(0,0,0,k,j+1,i) + rho_copy(0,0,0,k,j-1,i));
+          ug(k,j,i) = (1./4.)*(ug_copy(0,0,0,k,j,i+1) + ug_copy(0,0,0,k,j,i-1) + 
+                                ug_copy(0,0,0,k,j+1,i) + ug_copy(0,0,0,k,j-1,i));
+          for (int ii = 0; ii < 3; ii++) {
+            v(ii,k,j,i) = (1./4.)*(v_copy(0,0,ii,k,j,i+1) + v_copy(0,0,ii,k,j,i-1) + 
+                                  v_copy(0,0,ii,k,j+1,i) + v_copy(0,0,ii,k,j-1,i));
+          }
+          t(k,j,i) = ug(k,j,i)/rho(k,j,i)/Cv;
+        }
+      });
+
+    //parthenon::ApplyBoundaryConditions(pmb->meshblock_data.Get());
+    // Boundary conditions
+  }
+
   // now normalize the b-field
   //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
