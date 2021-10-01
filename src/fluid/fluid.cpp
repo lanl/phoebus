@@ -439,11 +439,8 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         auto status = invert(eos, k, j, i);
         /*if (status != ConToPrimStatus::success) {
-          invert_robust(geom, eos, coords, k, j, i);
-          status = ConToPrimStatus::success;
-          if (j==256 && i == 440) {
-            std::cout << "used robust solver on i=440, j=256" << std::endl;
-          }
+          auto rstatus = invert_robust(geom, eos, coords, k, j, i);
+          status = (rstatus == con2prim_robust::ConToPrimStatus::success ? ConToPrimStatus::success : ConToPrimStatus::failure);
         }*/
         fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
                                                             : FailFlags::fail);
@@ -465,6 +462,20 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         invert.Finalize(eos, geom, k, j, i);
       });
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
+      invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        auto status = invert(eos, k, j, i);
+        //if (fail(k, j, i) != FailFlags::success) {
+          auto rstatus = invert_robust(geom, eos, coords, k, j, i);
+          status = (rstatus == con2prim_robust::ConToPrimStatus::success ? ConToPrimStatus::success : ConToPrimStatus::failure);
+          fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
+                                                              : FailFlags::fail);
+        //}
+      });
+
 
   return TaskStatus::complete;
 }
