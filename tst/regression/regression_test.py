@@ -115,7 +115,7 @@ def modify_input(dict_key, value, input_file):
 #
 
 # -- Configure and build phoebus with problem-specific options
-def build_code(geometry):
+def build_code(geometry, use_gpu=False):
   if os.path.isdir(BUILD_DIR):
     print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
     sys.exit()
@@ -129,6 +129,12 @@ def build_code(geometry):
   configure_options.append("-DMAX_NUMBER_CONSERVED_VARS=10")
   configure_options.append("-DPHOEBUS_CACHE_GEOMETRY=ON")
   configure_options.append("-DPARTHENON_DISABLE_HDF5_COMPRESSION=ON")
+  if use_gpu:
+    configure_options.append("-DPHOEBUS_ENABLE_CUDA=ON")
+    configure_options.append("-DKokkos_ARCH_VOLTA70=ON")
+    configure_options.append("-DKokkos_ARCH_POWER9=ON")
+    configure_options.append("-DKokkos_ENABLE_CUDA=ON")
+    configure_options.append("-DCMAKE_CXX_COMPILER=/home/brryan/github/phoebus/external/parthenon/external/Kokkos/bin/nvcc_wrapper")
 
   # Geometry (problem-dependent)
   configure_options.append(f"-DPHOEBUS_GEOMETRY={geometry}")
@@ -147,10 +153,15 @@ def build_code(geometry):
 
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
-def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, compression_factor=1):
+def gold_comparison(variables, input_file, modified_inputs={}, executable='./src/phoebus',
+                    upgold=False, compression_factor=1):
+
   if not os.getcwd().endswith(BUILD_DIR):
-    print(f"Not currently in build directory \"{BUILD_DIR}\"!")
-    sys.exit()
+    if os.path.isdir(BUILD_DIR):
+      print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
+      sys.exit()
+    os.mkdir(BUILD_DIR)
+    os.chdir(BUILD_DIR)
 
   # Copy test problem and modify inputs
   shutil.copyfile(input_file, TEMPORARY_INPUT_FILE)
@@ -158,7 +169,7 @@ def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, com
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
-  call(['./src/phoebus', '-i', TEMPORARY_INPUT_FILE])
+  call(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))
@@ -220,4 +231,6 @@ def gold_comparison(variables, input_file, modified_inputs={}, upgold=False, com
       sys.exit(os.EX_OK)
     else:
       print("TEST FAILED")
+      mean_error = np.mean(variables_data - gold_variables)
+      print(f"Mean error: {mean_error}")
       sys.exit(os.EX_SOFTWARE)
