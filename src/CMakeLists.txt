@@ -47,6 +47,8 @@ add_executable(phoebus
   geometry/modified_system.hpp
   geometry/minkowski.hpp
   geometry/minkowski.cpp
+  geometry/monopole.hpp
+  geometry/monopole.cpp
   geometry/snake.hpp
   geometry/snake.cpp
   geometry/spherical_kerr_schild.hpp
@@ -58,6 +60,10 @@ add_executable(phoebus
   microphysics/eos_phoebus/eos_phoebus.cpp
   microphysics/opac_phoebus/opac_phoebus.hpp
   microphysics/opac_phoebus/opac_phoebus.cpp
+
+  monopole_gr/monopole_gr.hpp
+  monopole_gr/monopole_gr_utils.hpp
+  monopole_gr/monopole_gr.cpp
 
   pgen/pgen.hpp
   pgen/pgen.cpp
@@ -95,6 +101,9 @@ add_executable(phoebus
   radiation/geodesics.hpp
 
   reconstruction.hpp
+
+  tov/tov.hpp
+  tov/tov.cpp
 )
 
 set(MAX_NUMBER_CONSERVED_VARS 9 CACHE INTEGER "Maximum number of conserved variables")

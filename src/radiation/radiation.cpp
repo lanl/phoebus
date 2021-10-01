@@ -186,7 +186,6 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   pmb->par_reduce(
       "Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
-        Real ldt = 0.0;
         Real csig = 1.0;
         for (int d = 0; d < ndim; d++) {
           lmin_dt =
