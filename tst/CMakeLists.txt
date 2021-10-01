@@ -17,10 +17,18 @@ target_link_libraries(phoebus_unit_tests
   PRIVATE
     parthenon
     Catch2::Catch2
-    Kokkos::kokkos)
+    Kokkos::kokkos
+    singularity-eos::flags
+    singularity-eos
+    $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
+    )
 
-catch_discover_tests(phoebus_unit_tests TEST_SPEC "[geometry]" TEST_PREFIX "geometry:")
-catch_discover_tests(phoebus_unit_tests TEST_SPEC "[relativity_utils]" TEST_PREFIX "relativity_utils:")
+catch_discover_tests(phoebus_unit_tests
+  TEST_SPEC "[geometry]" TEST_PREFIX "geometry:")
+catch_discover_tests(phoebus_unit_tests
+  TEST_SPEC "[MonopoleGR]" TEST_PREFIX "MonopoleGR:")
+catch_discover_tests(phoebus_unit_tests
+  TEST_SPEC "[relativity_utils]" TEST_PREFIX "relativity_utils:")
 
 if(PHOEBUS_ENABLE_UNIT_TESTS)
   message("Building unit tests.")
