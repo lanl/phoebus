@@ -40,9 +40,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   const std::string block_name = "opacity";
+  
+  auto unit_conv = phoebus::UnitConversions(pin);
+  double time_unit = unit_conv.GetTimeCodeToCGS();
+  double mass_unit = unit_conv.GetMassCodeToCGS();
+  double length_unit = unit_conv.GetLengthCodeToCGS();
+  double temp_unit = unit_conv.GetTemperatureCodeToCGS();
 
   std::string opacity_type = pin->GetString(block_name, "type");
-  std::vector<std::string> known_opacity_types = {"tophat", "gray"};
+  std::vector<std::string> known_opacity_types = {"tophat", "gray", "tabular"};
   if (std::find(known_opacity_types.begin(), known_opacity_types.end(),
                 opacity_type) == known_opacity_types.end()) {
     std::stringstream msg;
@@ -55,14 +61,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     const Real numin = pin->GetReal("opacity", "tophat_numin");
     const Real numax = pin->GetReal("opacity", "tophat_numax");
 
-    singularity::neutrinos::Opacity opacity_host = Tophat(C, numin, numax);
+    singularity::neutrinos::Opacity opacity_host = NonCGSUnits<Tophat>(Tophat(C, numin, numax), time_unit, mass_unit, length_unit, temp_unit);
     singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
     params.Add("h.opacity", opacity_host);
     params.Add("d.opacity", opacity_device);
   } else if (opacity_type == "gray") {
     const Real kappa = pin->GetReal("opacity", "gray_kappa");
 
-    singularity::neutrinos::Opacity opacity_host = Gray(kappa);
+    singularity::neutrinos::Opacity opacity_host = NonCGSUnits<Gray>(Gray(kappa), time_unit, mass_unit, length_unit, temp_unit);
+    singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
+    params.Add("h.opacity", opacity_host);
+    params.Add("d.opacity", opacity_device);
+  } else if (opacity_type == "tabular") {
+    const std::string filename = pin->GetString("opacity", "filename");
+
+    singularity::neutrinos::Opacity opacity_host = NonCGSUnits<SpinerOpacity>(SpinerOpacity(filename), time_unit, mass_unit, length_unit, temp_unit);
     singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
     params.Add("h.opacity", opacity_host);
     params.Add("d.opacity", opacity_device);

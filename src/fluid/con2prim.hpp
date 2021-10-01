@@ -45,7 +45,12 @@ public:
   Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
            const Real BdotS, const singularity::EOS &eos)
       : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
-        eos_(eos) {}
+        Ye_(std::numeric_limits<Real>::signaling_NaN()), eos_(eos) {}
+  KOKKOS_FUNCTION
+  Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
+           const Real BdotS, const Real Ye, const singularity::EOS &eos)
+      : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
+        Ye_(Ye), eos_(eos) {}
   KOKKOS_FORCEINLINE_FUNCTION
   Real sfunc(const Real z, const Real Wp) const {
     Real zBsq = (z + Bsq_);
@@ -59,8 +64,9 @@ public:
   }
   KOKKOS_FORCEINLINE_FUNCTION
   void operator()(const Real rho, const Real Temp, Real res[2]) {
-    const Real p = eos_.PressureFromDensityTemperature(rho, Temp);
-    const Real sie = eos_.InternalEnergyFromDensityTemperature(rho, Temp);
+    double lambda[2] = {Ye_, 0.};
+    const Real p = eos_.PressureFromDensityTemperature(rho, Temp, lambda);
+    const Real sie = eos_.InternalEnergyFromDensityTemperature(rho, Temp, lambda);
     const Real Wp = D_ / rho;
     const Real z = (rho * (1.0 + sie) + p) * Wp * Wp;
     res[0] = sfunc(z, Wp);
@@ -75,7 +81,7 @@ public:
 #endif
 private:
   const singularity::EOS &eos_;
-  const Real D_, tau_, Bsq_, Ssq_, BdotSsq_;
+  const Real D_, tau_, Bsq_, Ssq_, BdotSsq_, Ye_;
 };
 
 template <typename T> class VarAccessor {
@@ -210,11 +216,15 @@ private:
     const Real &BdotS = v(scr_lo + iBdotS);
     Real &rho_guess = v(prho);
     Real &T_guess = v(tmp);
-    v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess);
+    double lambda[2] = {0., 0.};
+    if (pye >= 0) {
+      lambda[0] = v(pye);
+    }
+    v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess, lambda);
     v(peng) = rho_guess *
-              eos.InternalEnergyFromDensityTemperature(rho_guess, T_guess);
+              eos.InternalEnergyFromDensityTemperature(rho_guess, T_guess, lambda);
     const Real H = rho_guess + v(peng) + v(prs);
-    v(gm1) = eos.BulkModulusFromDensityTemperature(rho_guess, T_guess) / v(prs);
+    v(gm1) = eos.BulkModulusFromDensityTemperature(rho_guess, T_guess, lambda) / v(prs);
 
     const Real W = D / rho_guess;
     const Real W2 = W * W;

@@ -53,8 +53,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const Real rho0 = 1.e10 * unit_conv.GetMassDensityCGSToCode();
   const Real T0 = 2.5*1.e6*pc.eV/pc.kb * unit_conv.GetTemperatureCGSToCode();
-  const Real u0 = rho0*eos.InternalEnergyFromDensityTemperature(rho0, T0);
-  const Real P0 = eos.PressureFromDensityTemperature(rho0, T0);
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -62,8 +60,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real x = coords.x1v(i);
         const Real y = coords.x2v(j);
         v(irho, k, j, i) = rho0;
-        v(ieng, k, j, i) = u0;
-        v(iprs, k, j, i) = P0;
         v(itmp, k, j, i) = T0;
 
         if (x >= -0.75 && x <= -0.25 && y >= -0.75 && y <= -0.25) {
@@ -73,6 +69,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         } else {
           v(iye, k, j, i) = 0.225;
         }
+
+        double lambda[2] = {v(iye, k, j, i), 0.};
+        v(ieng, k, j, i) = rho0*eos.InternalEnergyFromDensityTemperature(rho0, T0, lambda);
+        v(iprs, k, j, i) = eos.PressureFromDensityTemperature(rho0, T0, lambda);
 
         for (int d = 0; d < 3; d++)
           v(ivlo + d, k, j, i) = 0.0;

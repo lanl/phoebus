@@ -25,12 +25,22 @@ set(PHOEBUS_ANALYTIC_GEOMETRIES
     "FMKS"
     "Snake"
     "Inchworm"
+    "MonopoleSph"
+    "MonopoleCart"
     )
+set(PHOEBUS_GEOMETRY_NO_CACHE
+    "MonopoleSph"
+    "MonopoleCart"
+    )
+
 if(PHOEBUS_ANALYTIC_GEOMETRY)
   if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_ANALYTIC_GEOMETRIES)
     set(GEOMETRY_MESH "Analytic<${PHOEBUS_GEOMETRY}, IndexerMesh>")
     set(GEOMETRY_MESH_BLOCK "Analytic<${PHOEBUS_GEOMETRY}, IndexerMeshBlock>")
     if (PHOEBUS_CACHE_GEOMETRY)
+      if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_GEOMETRY_NO_CACHE)
+	message(FATAL_ERROR "The elected geometry does not support caching")
+      endif()
       set(GEOMETRY_MESH "CachedOverMesh<${GEOMETRY_MESH}>")
       set(GEOMETRY_MESH_BLOCK "CachedOverMeshBlock<${GEOMETRY_MESH_BLOCK}>")
     endif()
