@@ -25,6 +25,11 @@ rmax = 40
 plot_meshblocks = True
 h_ = 0.3
 
+xmin = 0
+xmax = 10
+ymin = -10
+ymax = 10
+
 nfinal = -1
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
@@ -137,8 +142,8 @@ def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet'):
       if rmax is not None:
         ax.set_xlim([0,rmax])
         ax.set_ylim([-rmax,rmax])
-      ax.set_xlim([6,20])
-      ax.set_ylim([-12,12])
+      ax.set_xlim([xmin,xmax])
+      ax.set_ylim([ymin,ymax])
     else:
       print("Plotting coordinates \"" + plot + "\" unknown")
       sys.exit()
