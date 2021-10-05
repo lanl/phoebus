@@ -183,6 +183,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // Nominal values; real value set by fixup
         v(irho,k,j,i) = 0.0;
         v(ieng,k,j,i) = 0.0;
+        // Actually start out with a hot atmosphere
+        //v(irho,k,j,i) = 1e-3*pow(r,-2.);
+        //v(ieng,k,j,i) = v(irho,k,j,i)*pow(r,-1.);
         geom.SpacetimeMetric(CellLocation::Cent,k,j,i,gcov);
         geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
         const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);

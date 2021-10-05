@@ -107,11 +107,29 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+  
+  auto bounds = fix_pkg->Param<Bounds>("bounds");
+        
+  Coordinates_t coords = rc->GetParentPointer().get()->coords;
+  
+  int nfail_total;
+  parthenon::par_reduce(
+      //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+        if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
+        }, Kokkos::Sum<int>(nfail_total));
+  printf("total nfail: %i\n", nfail_total);
+  
+
+  //parthenon::par_for(
+  int nfixed;
+  parthenon::par_reduce(
+      //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),
+      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b,iv,k,j,i)  = v(b,ifail,k,j,i-1)*v(b,iv,k,j,i-1)
                          + v(b,ifail,k,j,i+1)*v(b,iv,k,j,i+1);
@@ -137,13 +155,25 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             }
             //v(b,tmp,k,j,i) = fixup(tmp, norm);
             //v(b,peng,k,j,i) = v(b,prho,k,j,i)*eos.InternalEnergyFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+            //TODO(BRR) apply floors to rho, ug here? Getting rho = 0, T = 0...
             v(b,peng,k,j,i) = fixup(peng, norm);
             if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
+  
+            double rho_floor, sie_floor;
+            bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i), rho_floor, sie_floor);
+            v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
+            double u_floor = v(b,prho,k,j,i)*sie_floor;
+            v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
+            
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
                                 v(b,peng,k,j,i)/v(b,prho,k,j,i));
             v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
                                   v(b,tmp,k,j,i))/v(b,prs,k,j,i);
+            if (isnan(v(b,gm1,k,j,i))) {
+              printf("gm1 is nan! %e %e %e %e\n", v(b,gm1,k,j,i), v(b,prho,k,j,i), v(b,tmp,k,j,i), v(b,prs,k,j,i));
+              PARTHENON_FAIL("gm1 is nan!");
+            }
 
             // TODO(jcd): make this work with MeshBlockPacks
             // TODOO(jcd): don't forget Ye!!!
@@ -182,10 +212,23 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             for (int m = slo; m <= shi; m++) {
               v(b,m,k,j,i) = sig[m-slo];
             }
+            nf++;
           } else {
-            //std::cout << "Found no valid neighbors" << std::endl;
+            //printf("Found no valid neighbors\n");
           }
         }
+        PARTHENON_REQUIRE(!isnan(v(b,crho,k,j,i)), "crho still nan!");
+        PARTHENON_REQUIRE(!isnan(v(b,gm1,k,j,i)), "gm1 still nan!");
+      //});
+      }, Kokkos::Sum<int>(nfixed));
+  printf("nfixed: %i\n", nfixed);
+
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        PARTHENON_REQUIRE(!isnan(v(b,crho,k,j,i)), "crho still nan!");
       });
   return TaskStatus::complete;
 }
@@ -251,9 +294,42 @@ TaskStatus NothingEscapes(MeshBlockData<Real> *rc) {
   const Real reh = 1. + sqrt(1. - a * a);
   const Real x1eh = std::log(reh); // TODO(BRR) still coordinate dependent
 
+  PackIndexMap imap;
   auto flux = rc->PackVariablesAndFluxes({fluid_cons::density, fluid_cons::energy, fluid_cons::momentum, fluid_prim::pressure},
-                                         {fluid_cons::density, fluid_cons::energy, fluid_cons::momentum});
-
+                                         {fluid_cons::density, fluid_cons::energy, fluid_cons::momentum},
+                                         imap);
+  const int crho = imap[fluid_cons::density].first;
+  
+  int d = 1;
+  //int crho = flux.crho;
+  int NumConserved = 5;
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.s,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        flux.flux(d,crho,k,j,i) = flux.flux(d,crho,k,j,i) > 0 ? 0. : flux.flux(d,crho,k,j,i);
+      });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
+      kb.s, kb.e, jb.s, jb.e, ib.e+1, ib.e+1,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        flux.flux(d,crho,k,j,i) = flux.flux(d,crho,k,j,i) < 0 ? 0. : flux.flux(d,crho,k,j,i);
+      });
+  
+  d = 2;
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
+      0, NumConserved-1, kb.s, kb.e, jb.s, jb.s, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+        flux.flux(d,m,k,j,i) = 0.;
+      });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
+      0, NumConserved-1, kb.s, kb.e, jb.e+1, jb.e+1, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
+        flux.flux(d,m,k,j,i) = 0.;//flux.v.flux(d,crho,k,j,i) < 0 ? 0. : flux.v.flux(d,crho,k,j,i);
+      });
+  /*
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "FixFluxes", DevExecSpace(),
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e + 1,                                                      \
@@ -263,7 +339,7 @@ TaskStatus NothingEscapes(MeshBlockData<Real> *rc) {
             flux.flux(1,l,k,j,i) = std::min(flux.flux(1,l,k,j,i), 0.0);
           }
         }
-      });
+      });*/
 
   return TaskStatus::complete;
 }

@@ -93,6 +93,14 @@ class FluxState {
                     const Real rho_floor, const Real sie_floor, const Real sie_max,
                     const Real gam_max) const {
     const int dir = d-1;
+
+    /*Real rho = q(dir,prho,k,j,i);
+    Real u = q(dir,peng,k,j,i);
+    if (rho < rho_floor) {
+      rho = rho_floor;
+      u = 0.1*rho_floor;
+    }*/
+
     const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
     Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
     const Real &vel = vcon[dir];
@@ -181,6 +189,12 @@ class FluxState {
     const Real vpm = sqrt(robust::make_positive(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0)));
     vp = vcoff*(v0 + vpm) - g.beta[dir];
     vm = vcoff*(v0 - vpm) - g.beta[dir];
+
+    if (isnan(vp) || isnan(vm)) {
+      printf("Nan in waves! %e %e %e %e %e %e [%i]\n", vp, vm, vcoff, v0, vpm, g.beta[dir], dir);
+      printf("p: %e %e %e %e %e\n", rho, vel, u, P, gamma1);
+      printf("vsq: %e cmsq: %e vasq: %e cssq: %e\n", vsq, cmsq, vasq, cssq);
+    }
   }
 
   const VariableFluxPack<Real> v;
@@ -248,6 +262,10 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
 
   for (int m = 0; m < fs.NumConserved(); m++) {
     fs.v.flux(d,m,k,j,i) = 0.5*((Fl[m] + Fr[m])*g.gdet - cmax*((Ur[m] - Ul[m])*g.gammadet));
+    if (isnan(Fl[m]) || isnan(Fr[m]) || isnan(cmax) || isnan(Ur[m]) || isnan(Ul[m])) {
+      printf("A nan in a flux! %e %e %e %e %e\n", Fl[m], Fr[m], cmax, Ur[m], Ul[m]);
+      PARTHENON_FAIL("a nan in a flux :(");
+    }
   }
   return cmax;
 }

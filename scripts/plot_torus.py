@@ -160,7 +160,7 @@ myfd = fd[:,:,:,:,1]
 vmin = -1.e0
 vmax = -vmin
 idx = 0
-print(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]).max())
+#print(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]).max())
 fig, axes = plt.subplots(1, 3, figsize=(14,8))
 #myplot(fd[:,:,:,:,idx],0,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
 #myplot(st[:,:,:,:,idx],1,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')

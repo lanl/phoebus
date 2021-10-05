@@ -27,11 +27,11 @@ variables = p.density,  &
 	    p.bfield
 
 file_type   = hdf5      # Tabular data dump
-dt          = 0.5       # time increment between outputs
+dt          = 1.       # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 2000.0    # time limit
+tlim        = 200.0    # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1        # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -41,13 +41,13 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 128       # Number of zones in X1-direction
+nx1         = 512       # Number of zones in X1-direction
 x1min       = 0.59           # minimum value of X1; overwritten for the torus problem
 x1max       = 3.69           # maximum value of X1; set by <coordinates>/r_outer for the torus problem
 ix1_bc      = user  # Inner-X1 boundary condition flag
 ox1_bc      = user    # Outer-X1 boundary condition flag
 
-nx2         = 128             # Number of zones in X2-direction
+nx2         = 512             # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
 x2max       = 1 #3.14159265359 #1 # maximum value of X2. Pi
 ix2_bc      = reflecting    # Inner-X2 boundary condition flag
@@ -62,9 +62,15 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 64
-nx2 = 64
+nx1 = 512
+nx2 = 512
 nx3 = 1
+
+<phoebus/mesh>
+bc_vars = primitive
+#bc_vars = conserved
+ix1_bc = outflow
+ox1_bc = outflow
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -83,11 +89,12 @@ he = false
 rad = false
 
 <fluid>
-#bc_vars = primitive
+bc_vars = primitive
 xorder = 2
 cfl = 0.8
 riemann = llf
 recon = weno5
+#recon = linear
 c2p_max_iter = 100
 c2p_tol = 1.e-8
 c2p_method = robust
@@ -104,11 +111,13 @@ r_outer = 40.0
 <fixup>
 enable_floors = true
 enable_ceilings = true
-enable_flux_fixup = false
+enable_flux_fixup = true
 enable_c2p_fixup = true
 floor_type = ExpX1RhoSie
-rho0_floor = 1.0e-8
-sie0_floor = 1.0e-3
+#rho0_floor = 1.0e-8
+rho0_floor = 1.0e-6
+#sie0_floor = 1.0e0
+sie0_floor = 1.0e-4
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie

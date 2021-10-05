@@ -24,37 +24,45 @@ rmax = 40
 #rmax = None
 mblw = 0.5
 
-xmin=0
-xmax=40
-ymin=-40
-ymax=40
-#xmin = 6
-#xmax = 12
-#ymin = -5
-#ymax = 5
-
+#xmin=0
+#xmax=40
+#ymin=-40
+#ymax=40
 xmin = 0
-xmax = 5
+xmax = 12
+ymin = -10
+ymax = 10
+xmin = 6
+xmax = 10
 ymin = -5
 ymax = 5
+
+#xmin = 0
+#xmax = 5
+#ymin = -5
+#ymax = 5
 
 # Whether to plot meshblock boundaries
 plot_meshblocks = True
 h_ = 0.3
 
 # Plotting macro
-def myplot(myvar, n, vmin=-5, vmax=0, uselog=True, cmap='jet'):
+def myplot(myvar, n, vmin=-5, vmax=0, uselog=True, cmap='jet', half=False):
   from mpl_toolkits.axes_grid1 import make_axes_locatable
   ax = axes[n]
   #ax = axes
-  for n in range(nblocks):
+  for n in range(nblocks): # shadowing previous n
     if plot == "mks":
       im = ax.pcolormesh(xblock[n,:,:], yblock[n,:,:], np.log10(myvar[n,0].transpose()),
         vmin=vmin, vmax=vmax, cmap=cmap)
     elif plot == "cartesian":
       if uselog:
-        im = ax.pcolormesh(x[n,:,:], y[n,:,:], np.log10(myvar[n,0].transpose()),
-          vmin=vmin, vmax=vmax, cmap=cmap)
+        if half:
+          im = ax.pcolormesh(x[n,:,:128], y[n,:,:128], np.log10(myvar[n,0].transpose()[:,:128]),
+            vmin=vmin, vmax=vmax, cmap=cmap)
+        else:
+          im = ax.pcolormesh(x[n,:,:], y[n,:,:], np.log10(myvar[n,0].transpose()),
+            vmin=vmin, vmax=vmax, cmap=cmap)
       else:
         im = ax.pcolormesh(x[n,:,:], y[n,:,:], myvar[n,0].transpose(),
           vmin=vmin, vmax=vmax, cmap=cmap)
@@ -79,7 +87,8 @@ def myplot(myvar, n, vmin=-5, vmax=0, uselog=True, cmap='jet'):
   if plot == "cartesian":
     ax.set_aspect('equal')
   ax.set_xlabel('x')
-  ax.set_ylabel('y')
+  #if n == 0:
+  #  ax.set_ylabel('y')
   divider = make_axes_locatable(ax)
   cax = divider.append_axes('right', size='5%', pad=0.05)
   fig.colorbar(im, cax=cax, orientation='vertical')
@@ -114,6 +123,43 @@ th = np.pi*yblock + ((1. - h_)/2.)*np.sin(2.*np.pi*yblock)
 x = r*np.sin(th)
 y = r*np.cos(th)
 
+def calc_mass(dfile):
+  dx1 = dx
+  dx2 = dy
+  dx3 = 2.*np.pi
+  dV = dx1*dx2*dx3
+  crho = dfile.Get("c.density", flatten=True)
+  rhosum = np.sum(crho)
+  if np.isnan(rhosum):
+    print("NAN in c.density!")
+    crho = dfile.Get("c.density", flatten=False)
+    print(list(map(tuple, np.where(np.isnan(crho)))))
+    sys.exit()
+  detgam = dfile.Get("g.c.detgam", flatten=True)
+  mass = sum(crho*detgam*dV)
+  return mass
+
+mass = []
+for n, dfnam in enumerate(dfnams):
+  print(f"Frame {n+1} out of {len(dfnams)}")
+  dfile = phdf.phdf(dfnam)
+  mass.append(calc_mass(dfile))
+fig, axes = plt.subplots(1, 1, figsize=(10,10))
+axes.plot(mass/mass[0], color='k')
+axes.set_xlim([0,200])
+plt.show()
+sys.exit()
+
+dfile0 = phdf.phdf(dfnams[0])
+dfile0 = phdf.phdf(dfnams[50])
+print(calc_mass(dfile0))
+sys.exit()
+density0 = dfile0.Get("p.density", flatten=False)
+ug0 = dfile0.Get("p.energy", flatten=False)
+vel0 = dfile0.Get("p.velocity", flatten=False)
+v10 = np.clip(vel0[:,:,:,:,0], 1.e-100, 1.e100)
+v20 = np.clip(vel0[:,:,:,:,1], 1.e-100, 1.e100)
+v30 = np.clip(vel0[:,:,:,:,2], 1.e-100, 1.e100)
 for n, dfnam in enumerate(dfnams):
   print(f"Frame {n+1} out of {len(dfnams)}")
   dfile = phdf.phdf(dfnam)
@@ -130,5 +176,11 @@ for n, dfnam in enumerate(dfnams):
   myplot(np.fabs(v1), 2)
   myplot(np.fabs(v2), 3)
   myplot(np.fabs(v3), 4)
-  plt.savefig("frame_%08d.png" % n, bbox_inches='tight')
+
+  myplot(density0, 0, half=True)
+  myplot(ug0/density0, 1, half=True)
+  myplot(np.fabs(v10), 2, half=True)
+  myplot(np.fabs(v20), 3, half=True)
+  myplot(np.fabs(v30), 4, half=True)
+  plt.savefig("frame_%08d.png" % n, bbox_inches='tight', dpi=300)
   plt.close()
