@@ -119,11 +119,14 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
         if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
-        }, Kokkos::Sum<int>(nfail_total));
+          nf++;
+        }
+      }, Kokkos::Sum<int>(nfail_total));
   printf("total nfail: %i\n", nfail_total);
   
 
   //parthenon::par_for(
+  int nfixed_total = 0;
   int nfixed;
   parthenon::par_reduce(
       //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
