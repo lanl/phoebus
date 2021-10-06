@@ -100,11 +100,11 @@ Real phifunc(const Real mind, const Real maxd, const Real gx, const Real gy, con
   return 1.0;
 }
 
-template <typename T>
+template <typename T, typename Tq>
 KOKKOS_INLINE_FUNCTION
 void PiecewiseLinear(const int d, const int n,
                      const int k, const int j, const int i,
-                     const T &v, const ParArrayND<Real> &ql, const ParArrayND<Real> &qr) {
+                     const T &v, const Tq &ql, const Tq &qr) {
   const int dir = d-1;
   const int di = (d == X1DIR ? 1 : 0);
   const int dj = (d == X2DIR ? 1 : 0);
