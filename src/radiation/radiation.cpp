@@ -127,6 +127,46 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     RNGPool rng_pool(rng_seed);
     physics->AddParam<>("rng_pool", rng_pool);
   }
+  
+  if (method == "moments" || method == "M1") { 
+    Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
+                                              std::vector<int>{3, NumRadiationTypes}); 
+    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
+                                        std::vector<int>{NumRadiationTypes}); 
+
+    Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Conserved, Metadata::WithFluxes}, 
+                                                   std::vector<int>{3, NumRadiationTypes}); 
+    Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Conserved, Metadata::WithFluxes}, 
+                                             std::vector<int>{NumRadiationTypes}); 
+    
+    namespace p = radmoment_prim; 
+    namespace c = radmoment_cons; 
+    namespace i = radmoment_internal;
+
+    physics->AddField(c::E, mspecies_scalar_cons); 
+    physics->AddField(p::J, mspecies_scalar);
+
+    physics->AddField(c::F, mspecies_three_vector_cons); 
+    physics->AddField(p::H, mspecies_three_vector); 
+    
+    int ndim = 1;
+    if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
+    else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
+    
+
+    if (method == "M1") {
+      // Fields for saving guesses for NR iteration in the radiation Con2Prim type solve
+      physics->AddField(i::xi, mspecies_scalar);
+      physics->AddField(i::phi, mspecies_scalar);
+    }
+    
+    // Fields for cell edge reconstruction
+    /// TODO: The amount of storage can likely be reduced, but maybe at the expense of more dependency
+    Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     std::vector<int>{4, NumRadiationTypes, ndim});
+    physics->AddField(i::ql, mrecon);
+    physics->AddField(i::qr, mrecon);
+  }
 
   if (method != "cooling_function") {
     physics->EstimateTimestepBlock = EstimateTimestepBlock;
