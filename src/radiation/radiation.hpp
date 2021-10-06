@@ -94,6 +94,8 @@ TaskStatus ReconstructEdgeStates(T *rc);
 template <class T>
 TaskStatus CalculateFluxes(T *rc);
 
+template <class T>
+TaskStatus CalculateGeometricSource(T *rc, T *rc_src);
 //template <class T>
 //TaskStatus MomentSourceUpdate(T *rc);
 
