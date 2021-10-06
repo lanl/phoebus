@@ -582,12 +582,12 @@ class ConToPrim {
     //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+2)), "v(cmom_lo+2) = NaN");
     //PARTHENON_REQUIRE(!std::isnan(v(ceng)), "v(ceng) = NaN");
 
-    //if (res.used_density_floor() ||
-    //    res.used_energy_max() ||
-    //    res.used_energy_floor() ||
-    //    res.used_gamma_max() ||
-    //    num_nans > 0)
-    if (num_nans > 0)
+    if (res.used_density_floor() ||
+        res.used_energy_max() ||
+        res.used_energy_floor() ||
+        res.used_gamma_max() ||
+        num_nans > 0)
+    //if (num_nans > 0)
       return ConToPrimStatus::failure;
     return ConToPrimStatus::success;
   }

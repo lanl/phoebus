@@ -681,42 +681,6 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   }
 #undef FLUX
 
-  //printf("ib.s: %i ib.e: %i\n", ib.s, ib.e);
-
-  // Fix fluxes
-  //printf("prho: %i crho: %i\n", flux.prho, flux.crho);
-  /*int d = 1;
-  int crho = flux.crho;
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
-      kb.s, kb.e, jb.s, jb.e, ib.s, ib.s,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        flux.v.flux(d,crho,k,j,i) = flux.v.flux(d,crho,k,j,i) > 0 ? 0. : flux.v.flux(d,crho,k,j,i);
-      });
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
-      kb.s, kb.e, jb.s, jb.e, ib.e+1, ib.e+1,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        flux.v.flux(d,crho,k,j,i) = flux.v.flux(d,crho,k,j,i) < 0 ? 0. : flux.v.flux(d,crho,k,j,i);
-      });
-  
-  d = 2;
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
-      0, flux.NumConserved() - 1, kb.s, kb.e, jb.s, jb.s, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
-        flux.v.flux(d,m,k,j,i) = 0.;
-      });
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(),
-      0, flux.NumConserved() - 1, kb.s, kb.e, jb.e+1, jb.e+1, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int m, const int k, const int j, const int i) {
-        flux.v.flux(d,m,k,j,i) = 0.;//flux.v.flux(d,crho,k,j,i) < 0 ? 0. : flux.v.flux(d,crho,k,j,i);
-      });*/
-
-  //pmb->exec_space.fence(); exit(-1);
-
-
   return TaskStatus::complete;
 }
 

@@ -26,7 +26,7 @@ plot_meshblocks = True
 h_ = 0.3
 
 xmin = 0
-xmax = 10
+xmax = 12
 ymin = -10
 ymax = 10
 
