@@ -33,6 +33,23 @@ namespace fluid_cons {
   constexpr char ye[] = "c.ye";
 }
 
+namespace radmoment_prim {
+  constexpr char J[] = "pr.J";
+  constexpr char H[] = "pr.H";
+}
+
+namespace radmoment_cons {
+  constexpr char E[] = "pr.E";
+  constexpr char F[] = "pr.F";
+}
+
+namespace radmoment_internal { 
+  constexpr char xi[] = "rm.xi";
+  constexpr char phi[] = "rm.phi";
+  constexpr char ql[] = "rm.ql";
+  constexpr char qr[] = "rm.qr";
+}
+
 namespace internal_variables {
   constexpr char face_signal_speed[] = "face_signal_speed";
   constexpr char cell_signal_speed[] = "cell_signal_speed";
