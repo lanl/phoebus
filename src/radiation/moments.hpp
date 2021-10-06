@@ -1,307 +1,215 @@
-//========================================================================================
-// (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
-//
-// This program was produced under U.S. Government contract 89233218CNA000001
-// for Los Alamos National Laboratory (LANL), which is operated by Triad
-// National Security, LLC for the U.S. Department of Energy/National Nuclear
-// Security Administration. All rights in the program are reserved by Triad
-// National Security, LLC, and the U.S. Department of Energy/National Nuclear
-// Security Administration. The Government is granted for itself and others
-// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide license
-// in this material to reproduce, prepare derivative works, distribute copies to
-// the public, perform publicly and display publicly, and to permit others to do
-// so.
-//========================================================================================
+#ifndef RADIATION_MOMENTS_HPP_
+#define RADIATION_MOMENTS_HPP_
 
-#ifndef MOMENTS_HPP_
-#define MOMENTS_HPP_
+#include "radiation.hpp" 
+#include "reconstruction.hpp"
+#include <globals.hpp>
+#include <kokkos_abstraction.hpp>
+#include <utils/error_checking.hpp>
 
-#define NDSPACE 3
-#define KOKKOS_FORCEINLINE_FUNCTION inline 
+namespace radiation {
 
-#define SPACELOOP(i) for (int i = 0; i < NDSPACE; ++i) 
-
-#include <cmath>
-#include <iostream>
-
-/// TODO: Add parthenon includes
-
-/// TODO: Add Opacity includes 
-
-/// TODO: Add phoebus includes and switch to Phoebus geometry and variable arrays 
-
-/// TODO: Should this just be part of the radiation namespace? 
-
-namespace radiationMoments { 
-
-typedef double Real;
-
-// Taken from https://pharr.org/matt/blog/2019/11/03/difference-of-floats 
-// meant to reduce floating point rounding error in cancellations,
-// returns ab - cd
 template <class T> 
-inline 
-T DifferenceOfProducts(T a, T b, T c, T d) {
-    T cd = c * d;
-    T err = std::fma(-c, d, cd); // Round off error correction for cd
-    T dop = std::fma(a, b, -cd);
-    return dop + err;
-}
-
-template<class T> 
-inline 
-void matrixInverse3x3(T A[3][3], T Ainv[3][3]) {
-  Ainv[0][0] = DifferenceOfProducts(A[1][1], A[2][2], A[1][2], A[2][1]);
-  Ainv[1][0] =-DifferenceOfProducts(A[1][0], A[2][2], A[1][2], A[2][0]);
-  Ainv[2][0] = DifferenceOfProducts(A[1][0], A[2][1], A[1][1], A[2][0]);
-  Ainv[0][1] =-DifferenceOfProducts(A[0][1], A[2][2], A[0][2], A[2][1]);
-  Ainv[1][1] = DifferenceOfProducts(A[0][0], A[2][2], A[0][2], A[2][0]);
-  Ainv[2][1] =-DifferenceOfProducts(A[0][0], A[2][1], A[0][1], A[2][0]);
-  Ainv[0][2] = DifferenceOfProducts(A[0][1], A[1][2], A[0][2], A[1][1]);
-  Ainv[1][2] =-DifferenceOfProducts(A[0][0], A[1][2], A[0][2], A[1][0]);
-  Ainv[2][2] = DifferenceOfProducts(A[0][0], A[1][1], A[0][1], A[1][0]);
-  const T det = std::fma(A[0][0], Ainv[0][0], 
-      DifferenceOfProducts(A[2][0], Ainv[2][0], A[1][0], -Ainv[1][0])); 
-  const T invDet = 1.0/det; 
-  for (int i=0; i<3; ++i) {
-    for (int j=0; j<3; ++j) { 
-      Ainv[i][j] *= invDet;
-    }
-  }
-}
-
-enum class ClosureStatus { success=0, failure=1 }; 
-
-// Contains static information about the geometry and fluid state needed 
-// for the radiation moments 
-struct CellBackground {
-  CellBackground(const Real con_v_in[NDSPACE], const Real cov_gamma_in[NDSPACE][NDSPACE])
-  {
-    SPACELOOP(i) {
-      SPACELOOP(j) {
-        cov_gamma[i][j] = cov_gamma_in[i][j];
-      }
-    }
-    SPACELOOP(i) con_v[i] = con_v_in[i];
-    
-    matrixInverse3x3(cov_gamma, con_gamma); 
-
-    lower3Vector(con_v, cov_v);
-    Real v2 = 0.0; 
-    SPACELOOP(i) v2 += con_v[i]*cov_v[i]; 
-    W = 1/std::sqrt(1 - v2);  
-    W2 = W*W; 
-    W3 = W*W2; 
-    W4 = W*W3; 
-  }
-  Real W, W2, W3, W4;
-  Real cov_v[NDSPACE]; 
-  Real con_v[NDSPACE]; 
-  Real con_beta[NDSPACE];
-  Real cov_gamma[NDSPACE][NDSPACE]; 
-  Real con_gamma[NDSPACE][NDSPACE]; 
+  class ReconstructionWrapper  {
+ public:
+  KOKKOS_INLINE_FUNCTION
+  ReconstructionWrapper(const T& v, const int chunk_size, const int offset, const int block = 0) : 
+      v_(v), chunk_size_(chunk_size), offset_(offset), block_(block) {}  
   
-  void lower3Vector(const Real con_U[NDSPACE], Real cov_U[NDSPACE]) const {
-    SPACELOOP(i) {
-      cov_U[i] = 0.0;
-      SPACELOOP(j) { 
-        cov_U[i] += con_U[j]*cov_gamma[i][j];
-      }
-    }
+  KOKKOS_FORCEINLINE_FUNCTION
+  Real& operator()(const int idir, const int ivar, const int k, const int j, const int i) const {
+    const int idx = idir*chunk_size_ + ivar + offset_; 
+    return v_(block_, idx, k, j, i); 
   }
 
-  void raise3Vector(const Real cov_U[NDSPACE], Real con_U[NDSPACE]) const {
-    SPACELOOP(i) {
-      con_U[i] = 0.0;
-      SPACELOOP(j) { 
-        con_U[i] += cov_U[j]*con_gamma[i][j];
-      }
-    }
-  }
-
+ private: 
+  const T& v_;
+  const int ntot_ = 1;
+  const int chunk_size_; 
+  const int offset_; 
+  const int block_;
 };
 
-KOKKOS_FORCEINLINE_FUNCTION
-void GetTilPiContractions(const Real con_TilPi[NDSPACE][NDSPACE],
-                          const CellBackground &bg,
-                          Real cov_vPi[NDSPACE], Real* vvPi) {
-Real con_vPi[NDSPACE];
-*vvPi = 0.0;
-SPACELOOP(i) {
-    con_vPi[i] = 0.0;
-    SPACELOOP(j) {
-      con_vPi[i] += bg.cov_v[j]*con_TilPi[i][j]; 
-    }
-    *vvPi += bg.cov_v[i]*con_vPi[i];
-  }
-  bg.lower3Vector(con_vPi, cov_vPi);
+template <class T>
+TaskStatus MomentCon2Prim(T* rc) { 
   
+  namespace c = radmoment_cons;  
+  namespace p = radmoment_prim;  
+  namespace i = radmoment_internal;  
+  
+  auto *pm = rc->GetParentPointer().get(); 
+  
+  IndexRange ib = pm->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pm->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange kb = pm->cellbounds.GetBoundsI(IndexDomain::entire);
+
+  PackIndexMap imap;
+  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H}, imap);
+  
+  auto cE = imap.GetFlatIdx(c::E);  
+  auto cJ = imap.GetFlatIdx(p::J);  
+  auto cF = imap.GetFlatIdx(c::F);  
+  auto cH = imap.GetFlatIdx(p::H);  
+  auto specB = cE.GetBounds(1);
+  auto dirB = cH.GetBounds(1);
+  parthenon::par_for( 
+      DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 
+      0, v.GetDim(5)-1, // Loop over meshblocks
+      specB.s, specB.e, // Loop over species 
+      kb.s, kb.e, // z-loop  
+      jb.s, jb.e, // y-loop 
+      ib.s, ib.e, // x-loop
+      KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) { 
+        // TODO: Replace this placeholder zero velocity con2prim 
+        v(b, cJ(ispec), k, j, i) = v(b, cE(ispec), k, j, i);
+        for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
+          v(b, cH(idir, ispec), k, j, i) = v(b, cF(idir, ispec), k, j, i);
+        }
+      });
+
+  return TaskStatus::complete;
 }
 
-KOKKOS_FORCEINLINE_FUNCTION
-void RadPrim2Con(const Real J, const Real cov_H[NDSPACE], 
-                 const Real con_TilPi[NDSPACE][NDSPACE], 
-                 const CellBackground &bg, 
-                 Real *E, Real cov_F[NDSPACE]) {
-  
-  double vvPi, cov_vPi[NDSPACE]; 
-  GetTilPiContractions(con_TilPi, bg, cov_vPi, &vvPi); 
-  
-  double vH = 0.0; 
-  SPACELOOP(i) vH += bg.con_v[i]*cov_H[i];
+template <class T> 
+TaskStatus ReconstructEdgeStates(T* rc) {
 
-  *E = (4*bg.W2 - 1 + 3*bg.W2*vvPi)/3*J + 2*bg.W*vH;
-  SPACELOOP(i) cov_F[i] = 4*bg.W2/3*bg.cov_v[i]*J + bg.W*bg.cov_v[i]*vH 
-                          + bg.W*cov_H[i] + J*cov_vPi[i];
+  auto *pmb = rc->GetParentPointer().get();
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  const int di = ( pmb->pmy_mesh->ndim > 0 ? 1 : 0);
+  
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  const int dj = ( pmb->pmy_mesh->ndim > 1 ? 1 : 0);
+  
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  const int dk = ( pmb->pmy_mesh->ndim > 2 ? 1 : 0);
+  
+  namespace c = radmoment_cons;  
+  namespace p = radmoment_prim;  
+  namespace i = radmoment_internal;  
+  
+  PackIndexMap imap_ql, imap_qr, imap;
+  VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{i::ql}, imap_qr); 
+  VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{i::qr}, imap_ql); 
+  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{p::J, p::H}, imap) ;
+  
+  auto qIdx = imap_qr.GetFlatIdx(i::ql);
+  
+  const int nspec = qIdx.DimSize(2);
+  const int nrecon = 4*nspec;
+
+  const int offset = imap_ql[i::ql].first; 
+  
+  const int nblock = ql_base.GetDim(5); 
+  
+  PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
+
+  parthenon::par_for( 
+      DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), 
+      X1DIR, pmb->pmy_mesh->ndim, // Loop over directions for reconstruction
+      0, nblock-1, // Loop over reconstructed variables
+      kb.s - dk, kb.e + dk, // z-loop  
+      jb.s - dj, jb.e + dj, // y-loop 
+      ib.s - di, ib.e + di, // x-loop
+      KOKKOS_LAMBDA(const int idir, const int b, const int k, const int j, const int i) { 
+        ReconstructionWrapper<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
+        ReconstructionWrapper<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
+        for (int ivar = 0; ivar<nrecon; ++ivar) {
+          PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v, ql, qr);
+        }
+      });
+  return TaskStatus::complete;  
 }
 
- 
+// This really only works for MeshBlockData right now since fluxes don't have a block index 
+template <class T> 
+TaskStatus CalculateFluxes(T* rc) {
 
-KOKKOS_FORCEINLINE_FUNCTION 
-void RadCon2Prim(const Real E, const Real cov_F[NDSPACE], 
-                 const Real vvTilPi, const Real cov_vTilPi[NDSPACE],
-                 const CellBackground& bg, 
-                 Real* J, Real cov_tilH[NDSPACE]) { 
-  double vF = 0.0; 
-  SPACELOOP(i) vF += bg.con_v[i]*cov_F[i];
+  auto *pmb = rc->GetParentPointer().get();
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  const int di = ( pmb->pmy_mesh->ndim > 0 ? 1 : 0);
   
-  // lam is proportional to the determinant of the 2x2 linear system relating 
-  // E and v_i F^i to J and v_i H^i for fixed tilde pi^ij 
-  const Real lam = (2.0*bg.W2 + 1.0)/3.0 + (2*bg.W4 - 3*bg.W2)*vvTilPi; 
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  const int dj = ( pmb->pmy_mesh->ndim > 1 ? 1 : 0);
   
-  // zeta = v_i H^i
-  // const Real zeta = -bg.W/lam*(((4*bg.W2-4)/3 + vvPi)*E 
-  //                             -((4*bg.W2-1)/3 + bg.W2*vvPi)*vF);
-  // a = 4 W^2/3 J + W zeta  
-  const Real a = bg.W2/lam*((4*bg.W2/3 - vvTilPi)*E - ((4*bg.W2+1)/3 - bg.W2*vvTilPi)*vF); 
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  const int dk = ( pmb->pmy_mesh->ndim > 2 ? 1 : 0);
   
-  // Calculate fluid rest frame (i.e. primitive) quantities
-  *J = ((2*bg.W2 - 1)*E - 2*bg.W2*vF)/lam; 
-  SPACELOOP(i) cov_tilH[i] = (cov_F[i] - (*J)*cov_vTilPi[i] - bg.cov_v[i]*a)/bg.W; 
-   
+  namespace c = radmoment_cons;  
+  namespace p = radmoment_prim;  
+  namespace i = radmoment_internal;  
+  
+  PackIndexMap imap_ql, imap_qr, imap;
+  auto ql = rc->PackVariables(std::vector<std::string>{i::ql}, imap_qr); 
+  auto qr = rc->PackVariables(std::vector<std::string>{i::qr}, imap_ql); 
+  auto v = rc->PackVariablesAndFluxes(std::vector<std::string>{}, 
+          std::vector<std::string>{c::E, c::F}, imap) ;
+  
+  auto idx_q = imap_qr.GetFlatIdx(i::ql);
+  auto idx_Ef = imap.GetFlatIdx(c::E);
+  auto idx_Ff = imap.GetFlatIdx(c::F);
+  
+  const int nspec = idx_q.DimSize(2);
+  const int nrecon = 4*nspec;
+
+  const int offset = imap_ql[i::ql].first; 
+  
+  const int nblock = ql.GetDim(5); 
+  
+  PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
+  
+  parthenon::par_for( 
+      DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(), 
+      X1DIR, pmb->pmy_mesh->ndim, // Loop over directions 
+      //0, nblock-1, // Loop over reconstructed variables
+      kb.s - dk, kb.e + dk, // z-loop  
+      jb.s - dj, jb.e + dj, // y-loop 
+      ib.s - di, ib.e + di, // x-loop
+      KOKKOS_LAMBDA(const int idir_in, const int k, const int j, const int i) { 
+        for (int ispec = 0; ispec<nspec; ++ispec) { 
+          const int idir = idir_in - 1; // TODO (LFR): Fix indexing so everything starts on a consistent index
+        
+          const Real& Jl = ql(idx_q(0, ispec, idir), k, j, i);
+          const Real& Jr = qr(idx_q(0, ispec, idir), k, j, i);
+          const Real Hl[3] = {ql(idx_q(1, ispec, idir), k, j, i), 
+                              ql(idx_q(2, ispec, idir), k, j, i), 
+                              ql(idx_q(3, ispec, idir), k, j, i)};
+          const Real Hr[3] = {qr(idx_q(1, ispec, idir), k, j, i), 
+                              qr(idx_q(2, ispec, idir), k, j, i), 
+                              qr(idx_q(3, ispec, idir), k, j, i)}; 
+
+          // TODO (LFR): This should all get replaced with real flux calculation, be careful about densitization 
+          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(Hl[idir] + Hr[idir]) + (Jl - Jr); 
+        
+          v.flux(idir_in, idx_Ff(0, ispec), k, j, i) = (Hl[0] - Hr[0]); 
+          v.flux(idir_in, idx_Ff(1, ispec), k, j, i) = (Hl[1] - Hr[1]); 
+          v.flux(idir_in, idx_Ff(2, ispec), k, j, i) = (Hl[2] - Hr[2]);
+          v.flux(idir_in, idx_Ff(idir, ispec), k, j, i) += 0.5*(Jl/3.0 + Jr/3.0);
+        } 
+      });
+
+  return TaskStatus::complete;  
 }
 
-KOKKOS_FORCEINLINE_FUNCTION 
-void RadCon2Prim(const Real E, const Real cov_F[NDSPACE], 
-                 const Real con_TilPi[NDSPACE][NDSPACE], 
-                 const CellBackground& bg, 
-                 Real* J, Real cov_tilH[NDSPACE]) {
-  
-  // Calculate contractions of three velocity with projected fluid frame pressure tensor
-  double vvPi, cov_vPi[NDSPACE]; 
-  GetTilPiContractions(con_TilPi, bg, cov_vPi, &vvPi); 
+template <class T>
+TaskStatus CalculateGeometricSource(T *rc, T *rc_src) { 
 
-  RadCon2Prim(E, cov_F, vvPi, cov_vPi, bg, J, cov_tilH);
+  constexpr int ND = Geometry::NDFULL;
+  constexpr int NS = Geometry::NDSPACE;
+  auto *pmb = rc->GetParentPointer().get();
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  // TODO (LFR): Actually build the tasks   
+  return TaskStatus::complete;
 }
 
-KOKKOS_FORCEINLINE_FUNCTION 
-void getContravariantP(const Real J, const Real cov_tilH[NDSPACE], 
-                         const Real con_TilPi[NDSPACE][NDSPACE], 
-                         const CellBackground& bg, 
-                         Real con_P[NDSPACE][NDSPACE]) {
-  Real con_tilH[NDSPACE]; 
-  bg.raise3Vector(cov_tilH, con_tilH);
-  SPACELOOP(i) {
-    SPACELOOP(j) {
-      con_P[i][j] = (4/3*bg.W2*bg.con_v[i]*bg.con_v[j] + bg.con_gamma[i][j]/3)*J 
-          + bg.W*(bg.con_v[i]*con_tilH[j] + bg.con_v[j]*con_tilH[i])
-          + J*con_TilPi[i][j];
-    }
-  }
-}
+// TODO(LFR): Add implicit source term task (Trickiest, since there is no path to follow)
 
+} //namespace radiationMoments
 
-KOKKOS_FORCEINLINE_FUNCTION
-void getTilPiThin(const Real E, const Real cov_F[NDSPACE], 
-                  const CellBackground& bg,
-                  Real con_tilPi_thin[NDSPACE][NDSPACE]) { 
-  
-  Real con_F[NDSPACE]; 
-  bg.raise3Vector(cov_F, con_F); 
-  Real Fmag(0.0); 
-  SPACELOOP(i) Fmag += cov_F[i]*con_F[i]; 
-  Fmag = std::sqrt(Fmag); 
-  Real vl(0.0);
-  SPACELOOP(i) vl += bg.cov_v[i]*con_F[i];
-  vl /= Fmag;
-
-  Real con_tilf[NDSPACE];
-   
-  SPACELOOP(i) { 
-    con_tilf[i] = con_F[i]/(Fmag*bg.W*(1 - vl)) - bg.W*bg.con_v[i];
-  }
-
-  SPACELOOP(i) {
-    SPACELOOP(j) {
-      con_tilPi_thin[i][j] = con_tilf[i]*con_tilf[j] 
-                             - (bg.W2*bg.con_v[i]*bg.con_v[j] + bg.con_gamma[i][j])/3;
-    }
-  }
-}
-
-// MEFD Closure 
-KOKKOS_FORCEINLINE_FUNCTION 
-Real closure(double xi) {
-    //return (1.0 - 2*std::pow(xi, 2) + 4*std::pow(xi,3))/3.0;
-    return (1.0 + 2*xi*xi)/3; 
-}
-
-KOKKOS_FORCEINLINE_FUNCTION 
-Real findM1Xi(const Real E, const Real cov_F[NDSPACE],
-              const CellBackground& bg, Real xi_guess) { 
-
-  // Calculate the stationary observer frame projected fluid frame propagation direction
-  Real con_tilPi_thin[NDSPACE][NDSPACE]; 
-  getTilPiThin(E, cov_F, bg, con_tilPi_thin); 
-  double vvTilPi_thin, cov_vTilPi_thin[NDSPACE]; 
-  GetTilPiContractions(con_tilPi_thin, bg, cov_vTilPi_thin, &vvTilPi_thin); 
-
-  
-  auto calculateXiResidual = [=](Real xi) {
-    
-    // Calculate the Eddington tensor for xi_mid 
-    Real athin = 0.5*(3*closure(xi) - 1);
-    Real cov_vTilPi[NDSPACE]; 
-    SPACELOOP(i) { cov_vTilPi[i] = athin*cov_vTilPi_thin[i]; } 
-
-    // Find J and tilde H^alpha for xi_mid 
-    Real J, cov_tilH[NDSPACE];
-    //RadCon2Prim(E, cov_F, athin*vvTilPi_thin, cov_vTilPi, bg, &J, cov_tilH);
-    
-    Real con_tilPi[NDSPACE][NDSPACE]; 
-    SPACELOOP(i) { SPACELOOP(j) {con_tilPi[i][j] = athin*con_tilPi_thin[i][j];}}
-    RadCon2Prim(E, cov_F, con_tilPi, bg, &J, cov_tilH);
-    
-    // Calculate H_alpha H^alpha using tilde H^alpha and H_alpha u^\alpha = 0  
-    Real H2(0.0), vtilH(0.0);
-    SPACELOOP(i) { SPACELOOP(j) { H2 += cov_tilH[i]*cov_tilH[j]*bg.con_gamma[i][j]; } } 
-    SPACELOOP(i) vtilH += bg.con_v[i]*cov_tilH[i]; 
-    H2 -= vtilH*vtilH; 
-    
-    return xi - std::sqrt(H2/(J*J));
-  };
-  
-  printf("Guess (residual): %f %e \n", xi_guess, calculateXiResidual(xi_guess)); 
-
-  // First try bisection over the interval 
-  Real xi_low(0.0), xi_high(1.0);
-  Real f_low = calculateXiResidual(xi_low);
-  Real f_high = calculateXiResidual(xi_high);
-  printf("%e %e \n", f_low, f_high);
-  Real xi_mid, f_mid;
-  for (int iter=0; iter<35; ++iter) {
-    xi_mid = 0.5*(xi_high + xi_low);
-    f_mid = calculateXiResidual(xi_mid); 
-    if (f_mid*f_low >= 0.0) {
-      f_low = f_mid; 
-      xi_low = xi_mid;
-    } else {
-      f_high = f_mid; 
-      xi_high = xi_mid;
-    }
-  } 
-  return xi_mid;
-}
-} // namespace radiationMoments 
-
-#endif // MOMENTS_HPP_
+#endif //RADIATION_MOMENTS_HPP_
