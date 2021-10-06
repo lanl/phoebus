@@ -12,6 +12,7 @@
 // publicly, and to permit others to do so.
 
 #include "radiation.hpp"
+#include "moments.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
@@ -128,7 +129,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddParam<>("rng_pool", rng_pool);
   }
   
-  if (method == "moments" || method == "M1") { 
+  if (method == "moments" || "mocmc") { 
     Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
                                               std::vector<int>{3, NumRadiationTypes}); 
     Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
@@ -154,7 +155,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
     
 
-    if (method == "M1") {
+    if (method == "moments") {
       // Fields for saving guesses for NR iteration in the radiation Con2Prim type solve
       physics->AddField(i::xi, mspecies_scalar);
       physics->AddField(i::phi, mspecies_scalar);
@@ -166,6 +167,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 			     std::vector<int>{4, NumRadiationTypes, ndim});
     physics->AddField(i::ql, mrecon);
     physics->AddField(i::qr, mrecon);
+    
+    physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }
 
   if (method != "cooling_function") {
