@@ -39,8 +39,8 @@ namespace radmoment_prim {
 }
 
 namespace radmoment_cons {
-  constexpr char E[] = "pr.E";
-  constexpr char F[] = "pr.F";
+  constexpr char E[] = "cr.E";
+  constexpr char F[] = "cr.F";
 }
 
 namespace radmoment_internal { 
