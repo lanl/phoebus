@@ -67,10 +67,6 @@ TaskStatus MomentCon2Prim(T* rc) {
   return TaskStatus::complete;
 }
 
-// TODO(LFR): Add geometric source term task 
-
-// TODO(LFR): Add implicit source term task (Trickiest, since there is no path to follow)
-
 template <class T> 
 TaskStatus ReconstructEdgeStates(T* rc) {
 
@@ -96,9 +92,12 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   
   auto qIdx = imap_qr.GetFlatIdx(i::ql);
   
-  const int nrecon = qIdx.DimSize(1); 
+  const int nspec = qIdx.DimSize(2);
+  const int nrecon = 4*nspec;
+
+  const int offset = imap_ql[i::ql].first; 
+  
   const int nblock = ql_base.GetDim(5); 
-  const int offset = qIdx.DimSize(1)*qIdx.DimSize(2);
   
   PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
 
@@ -119,6 +118,77 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   return TaskStatus::complete;  
 }
 
-// TODO(LFR): Add calculate flux task 
+template <class T> 
+TaskStatus CalculateFluxes(T* rc) {
+
+  auto *pmb = rc->GetParentPointer().get();
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  const int di = ( pmb->pmy_mesh->ndim > 0 ? 1 : 0);
+  
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  const int dj = ( pmb->pmy_mesh->ndim > 1 ? 1 : 0);
+  
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  const int dk = ( pmb->pmy_mesh->ndim > 2 ? 1 : 0);
+  
+  namespace c = radmoment_cons;  
+  namespace p = radmoment_prim;  
+  namespace i = radmoment_internal;  
+  
+  PackIndexMap imap_ql, imap_qr, imap;
+  VariablePack<Real> ql = rc->PackVariables(std::vector<std::string>{i::ql}, imap_qr); 
+  VariablePack<Real> qr = rc->PackVariables(std::vector<std::string>{i::qr}, imap_ql); 
+  VariablePack<Real> v = rc->PackFluxes(std::vector<std::string>{c::E, c::F}, imap) ;
+  
+  auto idx_q = imap_qr.GetFlatIdx(i::ql);
+  auto idx_Ef = imap.GetFlatIdx(c::E);
+  auto idx_Ff = imap.GetFlatIdx(c::F);
+  
+  const int nspec = idx_q.DimSize(2);
+  const int nrecon = 4*nspec;
+
+  const int offset = imap_ql[i::ql].first; 
+  
+  const int nblock = ql.GetDim(5); 
+  
+  PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
+  
+  parthenon::par_for( 
+      DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(), 
+      X1DIR, pmb->pmy_mesh->ndim, // Loop over directions 
+      0, nblock-1, // Loop over reconstructed variables
+      kb.s - dk, kb.e + dk, // z-loop  
+      jb.s - dj, jb.e + dj, // y-loop 
+      ib.s - di, ib.e + di, // x-loop
+      KOKKOS_LAMBDA(const int idir_in, const int b, const int k, const int j, const int i) { 
+        for (int ispec = 0; ispec<nspec; ++ispec) { 
+          const int idir = idir - 1; // TODO (LFR): Fix indexing so everything starts on a consistent index
+        
+          const Real& Jl = ql(b, idx_q(0, ispec, idir), k, j, i);
+          const Real& Jr = qr(b, idx_q(0, ispec, idir), k, j, i);
+          const Real Hl[3] = {ql(b, idx_q(1, ispec, idir), k, j, i), 
+                              ql(b, idx_q(2, ispec, idir), k, j, i), 
+                              ql(b, idx_q(3, ispec, idir), k, j, i)};
+          const Real Hr[3] = {qr(b, idx_q(1, ispec, idir), k, j, i), 
+                              qr(b, idx_q(2, ispec, idir), k, j, i), 
+                              qr(b, idx_q(3, ispec, idir), k, j, i)}; 
+
+          // TODO (LFR): This should all get replaced with real flux calculation, be careful about densitization 
+          v(b, idx_Ef(ispec, idir), k, j, i) = 0.5*(Hl[idir] + Hr[idir]) + (Jl - Jr); 
+        
+          v(b, idx_Ff(0, ispec, idir), k, j, i) = (Hl[0] - Hr[0]); 
+          v(b, idx_Ff(1, ispec, idir), k, j, i) = (Hl[1] - Hr[1]); 
+          v(b, idx_Ff(2, ispec, idir), k, j, i) = (Hl[2] - Hr[2]);
+          v(b, idx_Ff(idir, ispec, idir), k, j, i) += 0.5*(Jl/3.0 + Jr/3.0);
+        } 
+      });
+
+  return TaskStatus::complete;  
+}
+
+// TODO(LFR): Add geometric source term task 
+
+// TODO(LFR): Add implicit source term task (Trickiest, since there is no path to follow)
 
 } //namespace radiationMoments

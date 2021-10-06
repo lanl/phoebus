@@ -85,14 +85,14 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
 // Moment transport 
-//template <class T> 
-//TaskStatus ConservedToPrimitive(T *rc);
+template <class T> 
+TaskStatus MomentCon2Prim(T *rc);
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc);
 
-//template <class T>
-//TaskStatus CalculateFluxes(T *rc);
+template <class T>
+TaskStatus CalculateFluxes(T *rc);
 
 //template <class T>
 //TaskStatus MomentSourceUpdate(T *rc);
