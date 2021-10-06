@@ -27,6 +27,7 @@
 #include "phoebus_driver.hpp"
 #include "phoebus_utils/debug_utils.hpp"
 #include "radiation/radiation.hpp"
+#include "radiation/moments.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 
 using namespace parthenon::driver::prelude;
@@ -67,12 +68,16 @@ TaskListStatus PhoebusDriver::Step() {
   tm.dt = dt_trial;
   integrator->dt = dt_trial;
 
+  // TODO (LFR): Maybe add radiation step pre for Strang splitting source terms 
+  
   for (int stage = 1; stage <= integrator->nstages; stage++) {
     TaskCollection tc = RungeKuttaStage(stage);
     status = tc.Execute();
     if (status != TaskListStatus::complete) break;
   }
 
+  // TODO (LFR): Add moment stuff to radiation step 
+  
   status = RadiationStep();
 
   return status;
@@ -125,11 +130,23 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
     auto geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
 
+    auto sndrcv_flux_depend = flux_ct; 
+
+    //TODO (LFR) : Add radiation flux and geometric source tasks here
+    {
+      using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+      auto moment_recon = tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get()); 
+      auto moment_flux = tl.AddTask(moment_recon, radiation::CalculateFluxes<MDT>, sc0.get());
+      auto moment_geom_src =  tl.AddTask(none, radiation::CalculateGeometricSource<MDT>, sc0.get(), gsrc.get());
+      sndrcv_flux_depend = flux_ct | moment_flux;
+      geom_src = moment_geom_src | geom_src; 
+    }
+
     auto send_flux =
-        tl.AddTask(flux_ct, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
+        tl.AddTask(sndrcv_flux_depend, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
 
     auto recv_flux = tl.AddTask(
-        flux_ct, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
+        sndrcv_flux_depend, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
 
     // compute the divergence of fluxes of conserved variables
     auto flux_div =
