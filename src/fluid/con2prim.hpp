@@ -243,6 +243,11 @@ private:
       }
     }
 
+    if (isnan(pvel_lo) || isnan(pvel_lo+1) || isnan(pvel_lo+2)) {
+      printf("NAN vel! %e %e %e %e %e\n", v(prho), v(peng), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2));
+      PARTHENON_FAIL("osidf");
+    }
+
     // cell-centered signal speeds
     Real vasq = BdotS / (H * W); // this is just bcon[0]*lapse
     vasq = (Bsq + vasq * vasq);  // this is now b^2 * W^2
@@ -369,6 +374,7 @@ private:
 #endif
       return ConToPrimStatus::failure;
     }
+
     return ConToPrimStatus::success;
   }
 

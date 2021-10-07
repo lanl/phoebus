@@ -112,6 +112,7 @@ class FluxState {
                       : rho*sie_floor);
     const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
+    PARTHENON_REQUIRE(!isnan(gamma1), "gamma1 is nan?");
 
     for (int m = pb_lo; m <= pb_hi; m++) {
       Bcon[m-pb_lo] = q(dir, m, k, j, i);
@@ -191,9 +192,10 @@ class FluxState {
     vm = vcoff*(v0 - vpm) - g.beta[dir];
 
     if (isnan(vp) || isnan(vm)) {
-      printf("Nan in waves! %e %e %e %e %e %e [%i]\n", vp, vm, vcoff, v0, vpm, g.beta[dir], dir);
+      printf("[%i %i %i] Nan in waves! %e %e %e %e %e %e [%i]\n", k,j,i,vp, vm, vcoff, v0, vpm, g.beta[dir], dir);
       printf("p: %e %e %e %e %e\n", rho, vel, u, P, gamma1);
       printf("vsq: %e cmsq: %e vasq: %e cssq: %e\n", vsq, cmsq, vasq, cssq);
+      PARTHENON_FAIL("stupid code");
     }
   }
 

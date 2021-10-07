@@ -112,8 +112,195 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
         
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
+  // Ben's second attempt
+  
+  int nfail_total;
+  parthenon::par_reduce(
+      //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),
+      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+        if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
+          nf++;
+          
+        }
+      }, Kokkos::Sum<int>(nfail_total));
+  printf("total nfail: %i\n", nfail_total);
+  
+  int nfixed_total = 0;
+  auto fail = rc->Get(impl::fail).data;
+  while (nfixed_total < nfail_total) {
+    // Copy ifail array
+    auto tmp_fail = fail.GetDeviceMirror();
+    tmp_fail.DeepCopy(fail);
+
+
+    int nfixed = 0;
+    parthenon::par_reduce(
+        //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+        parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),
+        0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+        auto fixup = [&](const int iv) {
+          //v(b,iv,k,j,i)  = v(b,ifail,k,j,i-1)*v(b,iv,k,j,i-1)
+          //               + v(b,ifail,k,j,i+1)*v(b,iv,k,j,i+1);
+          //v(b,iv,k,j,i) += v(b,ifail,k,j-1,i)*v(b,iv,k,j-1,i)
+          //               + v(b,ifail,k,j+1,i)*v(b,iv,k,j+1,i);
+          Real wsum = 0.;
+          Real sum = 0.;
+          for (int l = -1; l < 2; l++) {
+            for (int m = -1; m < 2; m++) {
+              for (int n = 0; n < 1; n++) {
+                Real w = 1./(abs(l) + abs(m) + abs(n) + 1)*v(b,ifail,k+n,j+m,i+l);
+                wsum += w;
+                sum += w*v(b,iv,k+n,j+m,i+l);
+              }
+            }
+          }
+          if (isnan(sum)) {
+            printf("SUM IS NAN! [%i] [%i %i %i]\n", iv, k, j, i);
+          }
+          return sum/wsum;
+        };
+        if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
+          Real wsum = 0.;
+          for (int l = -1; l < 2; l++) {
+            for (int m = -1; m < 2; m++) {
+              for (int n = 0; n < 1; n++) {
+                Real w = 1./(abs(l) + abs(m) + abs(n) + 1)*v(b,ifail,k+n,j+m,i+l);
+                wsum += w;
+              }
+            }
+          }
+          
+          if (wsum < 1.e-10) {
+            // No usable neighbors this iteration
+
+          } else {
+
+            v(b,prho,k,j,i) = fixup(prho);
+            v(b,peng,k,j,i) = fixup(peng);
+            for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
+              v(b,pv,k,j,i) = fixup(pv);
+            }
+
+            // Apply floors
+            double rho_floor, sie_floor;
+            bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i), rho_floor, sie_floor);
+            v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
+            double u_floor = v(b,prho,k,j,i)*sie_floor;
+            v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
+
+            // Apply ceilings
+            
+            // Limit gammasq
+            double gammacov[3][3];
+            geom.Metric(CellLocation::Cent, k, j, i, gammacov);
+            double vsq = 0.; 
+            // TODO(BRR) what about pvel_hi
+            SPACELOOP(m) {
+              SPACELOOP(n) {
+                vsq += gammacov[m][n] * v(b,pvel_lo+m,k,j,i) * v(b,pvel_lo+n,k,j,i);
+              }
+            }
+            double gammamax = 50.;
+            double vsqmax = 1. - 1./(gammamax*gammamax);
+            if (vsq > vsqmax) {
+              double vfac = sqrt(vsqmax/vsq); 
+              v(b,pvel_lo,k,j,i) *= vfac;
+              v(b,pvel_lo+1,k,j,i) *= vfac;
+              v(b,pvel_lo+2,k,j,i) *= vfac;
+            }
+
+              double vfac = sqrt(vsqmax/vsq); 
+            //if (vsq > vsqmax || isnan(vfac)) {
+            //  printf("v: %e %e %e vfac: %e vsqmax: %e vsqL %e\n", v(b,pvel_lo,k,j,i),
+            //    v(b,pvel_lo+1,k,j,i), v(b,pvel_lo+2,k,j,i), vfac, vsqmax, vsq);
+            //}
+            
+            // Set other primitives
+            v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
+                                v(b,peng,k,j,i)/v(b,prho,k,j,i));
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+            v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
+                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i); 
+              
+            // Reset conserved variables
+            const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+            const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+            Real beta[3];
+            geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+            Real gcov[4][4];
+            geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+            Real gcon[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+            Real S[3];
+            const Real vel[] = {v(b, pvel_lo, k, j, i),
+                                v(b, pvel_lo+1, k, j, i),
+                                v(b, pvel_hi, k, j, i)};
+            Real bcons[3];
+            Real bp[3] = {0.0, 0.0, 0.0};
+            if (pb_hi > 0) {
+              bp[0] = v(b, pb_lo, k, j, i);
+              bp[1] = v(b, pb_lo+1, k, j, i);
+              bp[2] = v(b, pb_hi, k, j, i);
+            }
+            Real ye_cons;
+            Real ye_prim = 0.0;
+            if (pye > 0) {
+              ye_prim = v(b, pye, k, j, i);
+            }
+            Real sig[3];
+            prim2con::p2c(v(b,prho,k,j,i), vel, bp, v(b,peng,k,j,i), ye_prim, v(b,prs,k,j,i), 
+                  v(b,gm1,k,j,i), gcov, gcon, beta, alpha, gdet,
+                  v(b,crho,k,j,i), S, bcons, v(b,ceng,k,j,i), ye_cons, sig);
+              v(b, cmom_lo, k, j, i) = S[0];
+              v(b, cmom_lo+1, k, j, i) = S[1];
+              v(b, cmom_hi, k, j, i) = S[2];
+              if (pye > 0) v(b, cye, k, j, i) = ye_cons;
+              for (int m = slo; m <= shi; m++) {
+                v(b,m,k,j,i) = sig[m-slo];
+              }
+
+            tmp_fail(k, j, i) = con2prim_robust::FailFlags::success;
+            nf++;
+          }
+        }
+      }, Kokkos::Sum<int>(nfixed));
+    printf("nfixed: %i\n", nfixed);
+    nfixed_total += nfixed;
+    fail.DeepCopy(tmp_fail);
+  }
+  
+  //parthenon::par_for(
+  //    DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+  //    0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+  //    KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+  //      PARTHENON_REQUIRE(!isnan(v(b,crho,k,j,i)), "crho still nan!");
+  //    });
+  
+  int nnan;
+  parthenon::par_reduce(
+      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),
+      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nn) {
+        if (isnan(v(b,prho,k,j,i))) {
+          nn++;
+          
+        }
+      }, Kokkos::Sum<int>(nnan));
+  pmb->exec_space.fence();
+  if (nnan > 0) {
+    printf("%i nans!\n", nnan);
+    exit(-1);
+  }
+  printf("total nfail: %i\n", nfail_total);
+  //exit(-1);
+
+  return TaskStatus::complete;
+
   // Ben's attempt
-  parthenon::par_for(
+  /*parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
@@ -197,23 +384,16 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
           v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
                                 v(b,tmp,k,j,i))/v(b,prs,k,j,i); 
+
+          PARTHENON_REQUIRE(!isnan(v(b,prho,k,j,i)), "A");
+          PARTHENON_REQUIRE(!isnan(v(b,peng,k,j,i)), "A");
+          PARTHENON_REQUIRE(!isnan(v(b,pvel_lo,k,j,i)), "A");
+          PARTHENON_REQUIRE(!isnan(v(b,pvel_lo+1,k,j,i)), "A");
+          PARTHENON_REQUIRE(!isnan(v(b,pvel_lo+2,k,j,i)), "A");
         }
       });
 
   return TaskStatus::complete;
-  
-  int nfail_total;
-  parthenon::par_reduce(
-      //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
-      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),
-      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
-        if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
-          nf++;
-          
-        }
-      }, Kokkos::Sum<int>(nfail_total));
-  printf("total nfail: %i\n", nfail_total);
   
 
   //parthenon::par_for(
@@ -342,7 +522,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
       }, Kokkos::Sum<int>(nfixed));
   printf("nfixed: %i\n", nfixed);
   nfixed_total += nfixed;
-  }
+  }*/
 
   //pmb->exec_space.fence();
   //exit(-1);
