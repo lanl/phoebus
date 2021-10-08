@@ -299,7 +299,7 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
-  auto force_static = params.Get<bool>("force_static");
+  const auto force_static = params.Get<bool>("force_static");
 
   auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
   auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
@@ -312,8 +312,8 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   // Fill device-side arrays
   auto npoints = params.Get<int>("npoints");
   auto radius = params.Get<MonopoleGR::Radius>("radius");
-  Real dr = radius.dx();
-  Real dr2 = dr * dr;
+  const Real dr = radius.dx();
+  const Real dr2 = dr * dr;
   auto matter = params.Get<Matter_t>("matter");
   auto beta = params.Get<Beta_t>("shift");
   auto gradients = params.Get<Gradients_t>("gradients");
