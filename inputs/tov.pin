@@ -38,7 +38,7 @@ dt          = 1         # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 100       # time limit
+tlim        = 10        # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -48,9 +48,9 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 2048         # Number of zones in X1-direction
-x1min       = 0        # minimum value of X1
-x1max       = 50         # maximum value of X1
+nx1         = 1024        # Number of zones in X1-direction
+x1min       = 0           # minimum value of X1
+x1max       = 250         # maximum value of X1
 ix1_bc      = user        # Inner-X1 boundary condition flag
 ox1_bc      = user        # Outer-X1 boundary condition flag
 
@@ -69,7 +69,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 512
+nx1 = 1024
 nx2 = 1
 nx3 = 1
 
@@ -80,7 +80,7 @@ max_level = 3
 
 <eos>
 type = IdealGas
-Gamma = 1.6666666666666666667
+Gamma = 2
 Cv = 1.0
 
 <physics>
@@ -103,8 +103,10 @@ npoints = 5000
 rout = 256
 force_static = true
 
-<TOV>
+<tov>
 enabled = true
 Pc = 1e-2
-Pmin = 1e-9
 entropy = 8
+Pmin = 1e-9
+rhomin = 1e-9
+epsmin = 1e-9
