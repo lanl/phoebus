@@ -30,7 +30,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
   const bool is_monopole_sph =
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
-  
+
   auto tov_pkg = pmb->packages.Get("tov");
   auto monopole_pkg = pmb->packages.Get("monopole_gr");
   auto eos_pkg = pmb->packages.Get("eos");
@@ -51,6 +51,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+
+  const auto pmin = tov_pkg->Param<Real>("pmin");
+  const Real rhomin = pin->GetOrAddReal("tov", "rhomin", 1e-12);
+  const Real epsmin = pin->GetOrAddReal("tov", "rhomin", 1e-12);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -86,16 +90,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           const Real x3 = coords.x3v(k, j, i);
           r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
         }
-	Real rho = MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::RHO0);
-	Real eps = MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::EPS);
-	Real P = eos.PressureFromDensityInternalEnergy(rho, eps);
+        Real rho =
+            std::max(rhomin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::RHO0));
+        Real eps =
+            std::max(epsmin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::EPS));
+        Real P = std::max(pmin, eos.PressureFromDensityInternalEnergy(rho, eps));
 
-	// TODO(JMM): Add lambdas, Ye, etc
-	v(irho, k, j, i) = rho;
-	v(iprs, k, j, i) = P;
-	v(ieng, k, j, i) = eps*rho;
-	v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps);
-	for (int d = 0; d < 3; ++d) v(ivlo+d, k, j, i) = 0.0;
+        // TODO(JMM): Add lambdas, Ye, etc
+        v(irho, k, j, i) = rho;
+        v(iprs, k, j, i) = P;
+        v(ieng, k, j, i) = eps * rho;
+        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps);
+        for (int d = 0; d < 3; ++d)
+          v(ivlo + d, k, j, i) = 0.0;
       });
 
   fluid::PrimitiveToConserved(rc.get());
