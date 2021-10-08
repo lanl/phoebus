@@ -108,86 +108,101 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
-      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        auto fixup = [&](const int iv, const Real inv_mask_sum) {
-          v(b,iv,k,j,i)  = v(b,ifail,k,j,i-1)*v(b,iv,k,j,i-1)
-                         + v(b,ifail,k,j,i+1)*v(b,iv,k,j,i+1);
-          if (ndim > 1) {
-            v(b,iv,k,j,i) += v(b,ifail,k,j-1,i)*v(b,iv,k,j-1,i)
-                           + v(b,ifail,k,j+1,i)*v(b,iv,k,j+1,i);
-            if (ndim == 3) {
-              v(b,iv,k,j,i) += v(b,ifail,k-1,j,i)*v(b,iv,k-1,j,i)
-                             + v(b,ifail,k+1,j,i)*v(b,iv,k+1,j,i);
-            }
-          }
-          return inv_mask_sum*v(b,iv,k,j,i);
-        };
-        if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
-          Real num_valid = v(b,ifail,k,j,i-1) + v(b,ifail,k,j,i+1);
-          if (ndim > 1) num_valid += v(b,ifail,k,j-1,i) + v(b,ifail,k,j+1,i);
-          if (ndim == 3) num_valid += v(b,ifail,k-1,j,i)  + v(b,ifail,k+1,j,i);
-          if (num_valid > 0.5) {
-            const Real norm = 1.0/num_valid;
-            v(b,prho,k,j,i) = fixup(prho, norm);
-            for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
-              v(b,pv,k,j,i) = fixup(pv, norm);
-            }
-            //v(b,tmp,k,j,i) = fixup(tmp, norm);
-            //v(b,peng,k,j,i) = v(b,prho,k,j,i)*eos.InternalEnergyFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
-            v(b,peng,k,j,i) = fixup(peng, norm);
-            if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
-            v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-                                v(b,peng,k,j,i)/v(b,prho,k,j,i));
-            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
-            v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i);
+ int nfail_total;
+ parthenon::par_reduce(
+     parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(), 0,
+     v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+       if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
+         nf++;
+       }
+     },
+     Kokkos::Sum<int>(nfail_total));
+ printf("total nfail: %i\n", nfail_total);
 
-            // TODO(jcd): make this work with MeshBlockPacks
-            // TODOO(jcd): don't forget Ye!!!
-            const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-            const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-            Real beta[3];
-            geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-            Real gcov[4][4];
-            geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-            Real gcon[3][3];
-            geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
-            Real S[3];
-            const Real vel[] = {v(b, pvel_lo, k, j, i),
-                                v(b, pvel_lo+1, k, j, i),
-                                v(b, pvel_hi, k, j, i)};
-            Real bcons[3];
-            Real bp[3] = {0.0, 0.0, 0.0};
-            if (pb_hi > 0) {
-              bp[0] = v(b, pb_lo, k, j, i);
-              bp[1] = v(b, pb_lo+1, k, j, i);
-              bp[2] = v(b, pb_hi, k, j, i);
-            }
-            Real ye_cons;
-            Real ye_prim = 0.0;
-            if (pye > 0) {
-              ye_prim = v(b, pye, k, j, i);
-            }
-            Real sig[3];
-            prim2con::p2c(v(b,prho,k,j,i), vel, bp, v(b,peng,k,j,i), ye_prim, v(b,prs,k,j,i), v(b,gm1,k,j,i),
-                gcov, gcon, beta, alpha, gdet,
-                v(b,crho,k,j,i), S, bcons, v(b,ceng,k,j,i), ye_cons, sig);
-            v(b, cmom_lo, k, j, i) = S[0];
-            v(b, cmom_lo+1, k, j, i) = S[1];
-            v(b, cmom_hi, k, j, i) = S[2];
-            if (pye > 0) v(b, cye, k, j, i) = ye_cons;
-            for (int m = slo; m <= shi; m++) {
-              v(b,m,k,j,i) = sig[m-slo];
-            }
-          } else {
-            //std::cout << "Found no valid neighbors" << std::endl;
-          }
-        }
-      });
-  return TaskStatus::complete;
+ parthenon::par_for(
+     DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
+     kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+       auto fixup = [&](const int iv, const Real inv_mask_sum) {
+         v(b, iv, k, j, i) = v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
+                             v(b, ifail, k, j, i + 1) * v(b, iv, k, j, i + 1);
+         if (ndim > 1) {
+           v(b, iv, k, j, i) += v(b, ifail, k, j - 1, i) * v(b, iv, k, j - 1, i) +
+                                v(b, ifail, k, j + 1, i) * v(b, iv, k, j + 1, i);
+           if (ndim == 3) {
+             v(b, iv, k, j, i) += v(b, ifail, k - 1, j, i) * v(b, iv, k - 1, j, i) +
+                                  v(b, ifail, k + 1, j, i) * v(b, iv, k + 1, j, i);
+           }
+         }
+         return inv_mask_sum * v(b, iv, k, j, i);
+       };
+       if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
+         Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
+         if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
+         if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+         if (num_valid > 0.5) {
+           const Real norm = 1.0 / num_valid;
+           v(b, prho, k, j, i) = fixup(prho, norm);
+           for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
+             v(b, pv, k, j, i) = fixup(pv, norm);
+           }
+           // v(b,tmp,k,j,i) = fixup(tmp, norm);
+           // v(b,peng,k,j,i) =
+           // v(b,prho,k,j,i)*eos.InternalEnergyFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+           v(b, peng, k, j, i) = fixup(peng, norm);
+           if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
+           v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+               v(b, prho, k, j, i), v(b, peng, k, j, i) / v(b, prho, k, j, i));
+           v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(v(b, prho, k, j, i),
+                                                                   v(b, tmp, k, j, i));
+           v(b, gm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+                                    v(b, prho, k, j, i), v(b, tmp, k, j, i)) /
+                                v(b, prs, k, j, i);
+
+           // TODO(jcd): make this work with MeshBlockPacks
+           // TODOO(jcd): don't forget Ye!!!
+           const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+           Real beta[3];
+           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+           Real gcov[4][4];
+           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+           Real gcon[3][3];
+           geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+           Real S[3];
+           const Real vel[] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
+                               v(b, pvel_hi, k, j, i)};
+           Real bcons[3];
+           Real bp[3] = {0.0, 0.0, 0.0};
+           if (pb_hi > 0) {
+             bp[0] = v(b, pb_lo, k, j, i);
+             bp[1] = v(b, pb_lo + 1, k, j, i);
+             bp[2] = v(b, pb_hi, k, j, i);
+           }
+           Real ye_cons;
+           Real ye_prim = 0.0;
+           if (pye > 0) {
+             ye_prim = v(b, pye, k, j, i);
+           }
+           Real sig[3];
+           prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
+                         v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gcon, beta, alpha,
+                         gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i),
+                         ye_cons, sig);
+           v(b, cmom_lo, k, j, i) = S[0];
+           v(b, cmom_lo + 1, k, j, i) = S[1];
+           v(b, cmom_hi, k, j, i) = S[2];
+           if (pye > 0) v(b, cye, k, j, i) = ye_cons;
+           for (int m = slo; m <= shi; m++) {
+             v(b, m, k, j, i) = sig[m - slo];
+           }
+         } else {
+           // std::cout << "Found no valid neighbors" << std::endl;
+         }
+       }
+     });
+ return TaskStatus::complete;
 }
 
 TaskStatus FixFailures(MeshBlockData<Real> *rc) {
