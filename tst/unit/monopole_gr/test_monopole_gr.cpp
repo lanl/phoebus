@@ -226,9 +226,9 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
     pin->SetReal("parthenon/mesh", "x2max", M_PI);
     pin->SetReal("parthenon/mesh", "x3max", 2*M_PI);
 
-    pin->SetBoolean("TOV", "enabled", true);
-    pin->SetReal("TOV", "Pc", 1e-2);
-    pin->SetReal("TOV", "entropy", 8);
+    pin->SetBoolean("tov", "enabled", true);
+    pin->SetReal("tov", "Pc", 1e-2);
+    pin->SetReal("tov", "entropy", 8);
 
     // P = (Gamma - 1) rho e = (Gamma - 1) rho (Cv T)
     // P = K rho^Gamma with e set to force it
