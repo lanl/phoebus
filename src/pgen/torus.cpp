@@ -335,7 +335,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // now normalize the b-field
   //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
-  auto fail = rc->Get(internal_variables::fail).data;
+  /*auto fail = rc->Get(internal_variables::fail).data;
     
     printf("Before inversion:\n");
     pmb->par_for(
@@ -350,8 +350,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->exec_space.fence();
   
   fluid::ConservedToPrimitive(rc);
-  //fluid::PrimitiveToConserved(rc);
-  //fluid::ConservedToPrimitive(rc);
   
     
     printf("After inversion:\n");
@@ -366,7 +364,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       });
 
   pmb->exec_space.fence();
-  exit(-1);
+  exit(-1);*/
   //}
 /*
   Real beta[3];

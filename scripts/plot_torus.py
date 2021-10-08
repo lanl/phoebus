@@ -33,7 +33,7 @@ ymin = -10
 ymax = 10
 
 nfinal = -1
-nfinal = 0
+nfinal = 15
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 #dfnam = dfnams[nfinal]

@@ -159,6 +159,18 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           }
           if (isnan(sum)) {
             printf("SUM IS NAN! [%i] [%i %i %i]\n", iv, k, j, i);
+            for (int l = -1; l < 2; l++) {
+              for (int m = -1; m < 2; m++) {
+                for (int n = 0; n < 1; n++) {
+                  Real w = 1./(abs(l) + abs(m) + abs(n) + 1)*v(b,ifail,k+n,j+m,i+l);
+                  //wsum += w;
+                  Real dsum = w*v(b,iv,k+n,j+m,i+l);
+                  printf("[%i %i %i] [%i %i %i %i] w = %e dsum = %e\n",
+                    l, m, n, iv,k+n,j+m,i+l,w, dsum);
+                }
+              }
+            }
+            PARTHENON_FAIL("nan sum");
           }
           return sum/wsum;
         };

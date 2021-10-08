@@ -338,7 +338,18 @@ class ConToPrim {
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
 
-    if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) || isnan(v(pvel_lo+2))) {
+    if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) || 
+        isnan(v(pvel_lo+2)) || isnan(v(prs)) || isnan(v(gm1))) {
+      // These will be averaged over, just make sure they aren't NAN
+      v(prho) = 0.;
+      v(peng) = 0.;
+      v(prs) = 0.;
+      v(pvel_lo) = 0.;
+      v(pvel_lo + 1) = 0.;
+      v(pvel_lo + 2) = 0.;
+      v(tmp) = 0.;
+      v(prs) = 0.;
+      v(gm1) = 0.;
       return ConToPrimStatus::failure;
     }
 
