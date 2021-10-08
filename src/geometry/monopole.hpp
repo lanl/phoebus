@@ -212,10 +212,10 @@ class MonopoleSph {
 
     Gamma[1][0][0] = alpha * dalphadr - beta * dbetadr + dbetadt;
     Gamma[1][2][2] = -r;
-    Gamma[1][2][2] = -r * sth * sth;
+    Gamma[1][3][3] = -r * sth * sth;
 
     Gamma[2][1][2] = Gamma[2][2][1] = r;
-    Gamma[2][3][3] = -r * cth * sth;
+    Gamma[2][3][3] = -r * r * cth * sth;
 
     Gamma[3][1][3] = Gamma[3][3][1] = r * sth * sth;
     Gamma[3][2][3] = Gamma[3][3][2] = r * r * cth * sth;
@@ -486,7 +486,7 @@ class MonopoleCart {
     const Real irho = Utils::ratio(1., rho);
     const Real irho3 = Utils::ratio(1., rho3);
     const Real irho4 = Utils::ratio(1., rho4);
-    const Real ir3 = Utils::ratio(1.,r3);
+    const Real ir3 = Utils::ratio(1., r3);
     const Real ir4 = Utils::ratio(1., r4);
 
     LinearAlgebra::SetZero(H, NDFULL, NDFULL, NDFULL);
