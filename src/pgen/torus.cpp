@@ -280,6 +280,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Bsq += gcov[m][n] * v(iblo+m,k,j,i) * v(iblo+n,k,j,i);
       }
       const Real W = 1.0/std::sqrt(1.0 - vsq);
+      if (i == 128 && j == 128) {
+        printf("original W: %e gam: %e\n", W, gam);
+      }
       Real b0 = W*Bdotv;
       Real bsq = (Bsq + b0*b0)/(W*W);
       Real beta = v(iprs,k,j,i)/(0.5*bsq + 1.e-10);
@@ -332,7 +335,38 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // now normalize the b-field
   //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
+  auto fail = rc->Get(internal_variables::fail).data;
+    
+    printf("Before inversion:\n");
+    pmb->par_for(
+      "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        if (i == 128 && j == 128) {
+          printf("p: %e %e %e %e %e %e %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i), v(itmp,k,j,i), 
+            v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
+          printf("fail: %i\n", fail(k,j,i));
+        }
+      });
+  pmb->exec_space.fence();
+  
+  fluid::ConservedToPrimitive(rc);
+  //fluid::PrimitiveToConserved(rc);
   //fluid::ConservedToPrimitive(rc);
+  
+    
+    printf("After inversion:\n");
+    pmb->par_for(
+      "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        if (i == 128 && j == 128) {
+          printf("p: %e %e %e %e %e %e %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i), v(itmp,k,j,i), 
+            v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
+          printf("fail: %i\n", fail(k,j,i));
+        }
+      });
+
+  pmb->exec_space.fence();
+  exit(-1);
   //}
 /*
   Real beta[3];

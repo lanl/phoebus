@@ -92,6 +92,75 @@ Real find_root(F &func, Real a, Real b, const Real tol, int maxiter, int line, b
   return 0.5*(a+b);
 }
 
+template <typename F>
+KOKKOS_INLINE_FUNCTION
+Real find_root_secant(F func, const Real x_guess, const Real tol, const int maxiter, bool &success) {
+  int niter = 0;
+ 
+  Real x0 = x_guess;
+  Real x1 = 1.01*x_guess;
+
+  while (fabs(x0 - x1)/fabs(x0) > tol) {
+    Real x2 = x1 - func(x1) * (x1 - x0) / (func(x1) - func(x0));
+    x0 = x1;
+    x1 = x2;
+    niter++;
+    if (niter == maxiter) {
+      success = false;
+      return x1;
+    }
+  }
+
+  success = true;
+  return x1;
+}
+
+template <typename F>
+KOKKOS_INLINE_FUNCTION
+Real find_root_bisect(F func, Real a, Real b, const Real tol, const int maxiter, int line, bool &success) {
+
+  Real ya = func(a);
+  Real yb = func(b);
+  if (ya*yb > 0.0) {
+    //printf("root failure: %g %g   %g %g\n", a, b, ya, yb);
+    success = false;
+    return (a+b)/2.;
+  }
+  //PARTHENON_REQUIRE(ya * yb <= 0.0, "Root not bracketed in find_root from");
+  Real sign = (ya < 0 ? 1.0 : -1.0);
+  ya *= sign;
+  yb *= sign;
+
+  int niter = 0;
+  while (fabs(b-a) > tol) {
+    const Real xh = 0.5*(a + b);
+    const Real yh = sign*func(xh);
+    if (yh > 0.0) {
+      b = xh;
+      yb = yh;
+    } else if (yh < 0.0) {
+      a = xh;
+      ya = yh;
+    } else {
+      a = xh;
+      b = xh;
+    }
+    niter++;
+
+    if (niter == maxiter) {
+      break;
+    }
+  }
+  
+  if (niter == maxiter) {
+    success = false;
+  } else {
+    success = true;
+  }
+
+  return 0.5*(a+b);
+}
+
 class Residual {
  public:
   KOKKOS_FUNCTION
@@ -123,9 +192,10 @@ class VarAccessor {
   Real &operator()(const int n) const {
     return var_(b_, n, k_, j_, i_);
   }
+  const int b_, i_, j_, k_;
  private:
   const T &var_;
-  const int b_, i_, j_, k_;
+  //const int b_, i_, j_, k_;
 };
 
 struct CellGeom {
@@ -233,7 +303,9 @@ class ConToPrim {
     Residual res(D,Ssq,tau,gamma);
 
     bool success;
-    const Real xi = find_root(res, 0.0, 10.*xi_guess, rel_tolerance, max_iter, __LINE__, success);
+    //const Real xi = find_root_bisect(res, 0.01*xi_guess, 10.*xi_guess, rel_tolerance, max_iter, __LINE__, success);
+    //Real find_root_secant(F func, const Real x_guess, const Real tol, const int maxiter, bool &success)
+    const Real xi = find_root_secant(res, xi_guess, rel_tolerance, max_iter, success);
 
     if (!success) {
       return ConToPrimStatus::failure;
@@ -244,6 +316,10 @@ class ConToPrim {
     Real rho = D/Gamma;
     Real P = (gamma - 1.)/gamma*(w - rho);
     Real ug = P/(gamma - 1.);
+
+    //if (v.i_ == 128 && v.j_ == 128) {
+    //  printf("xi: %e Gamma: %e res: %e res0: %e success: %i\n", xi, Gamma, res(xi), res(xi_guess), success);
+    //}
 
     Real vcov[3] = {S[0]/xi, S[1]/xi, S[2]/xi};
     Real vcon[3] = {0};

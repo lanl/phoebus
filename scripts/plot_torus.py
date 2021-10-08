@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
 DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
 
@@ -31,6 +33,7 @@ ymin = -10
 ymax = 10
 
 nfinal = -1
+nfinal = 0
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 #dfnam = dfnams[nfinal]
