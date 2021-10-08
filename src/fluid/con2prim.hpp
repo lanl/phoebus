@@ -179,12 +179,12 @@ public:
   }
 
   template <typename CoordinateSystem, class... Args>
-  KOKKOS_INLINE_FUNCTION void Finalize(const singularity::EOS &eos,
+  KOKKOS_INLINE_FUNCTION ConToPrimStatus Finalize(const singularity::EOS &eos,
                                        const CoordinateSystem &geom,
                                        Args &&... args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
-    finalize(v, g, eos);
+    return finalize(v, g, eos);
   }
 
   int NumBlocks() { return var.GetDim(5); }
@@ -208,7 +208,7 @@ private:
   constexpr static int iBdotS = 4;
 
   KOKKOS_INLINE_FUNCTION
-  void finalize(const VarAccessor<T> &v, const CellGeom &g,
+  ConToPrimStatus finalize(const VarAccessor<T> &v, const CellGeom &g,
                 const singularity::EOS &eos) const {
     const Real igdet = 1.0 / g.gdet;
     const Real &D = v(scr_lo + iD);
@@ -244,8 +244,9 @@ private:
     }
 
     if (isnan(pvel_lo) || isnan(pvel_lo+1) || isnan(pvel_lo+2)) {
-      printf("NAN vel! %e %e %e %e %e\n", v(prho), v(peng), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2));
-      PARTHENON_FAIL("osidf");
+      return ConToPrimStatus::failure;
+      //printf("NAN vel! %e %e %e %e %e\n", v(prho), v(peng), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2));
+      //PARTHENON_FAIL("osidf");
     }
 
     // cell-centered signal speeds
@@ -264,6 +265,8 @@ private:
       Real vm = vcoff * (v(pvel_lo + i) * (1.0 - cssq) - vpm) - g.beta[i];
       v(sig_lo + i) = std::max(std::fabs(vp), std::fabs(vm));
     }
+
+    return ConToPrimStatus::success;
   }
 
   KOKKOS_INLINE_FUNCTION

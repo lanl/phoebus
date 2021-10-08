@@ -129,9 +129,9 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   
   int nfixed_total = 0;
   auto fail = rc->Get(impl::fail).data;
+  auto tmp_fail = fail.GetDeviceMirror();
   while (nfixed_total < nfail_total) {
     // Copy ifail array
-    auto tmp_fail = fail.GetDeviceMirror();
     tmp_fail.DeepCopy(fail);
 
 
@@ -267,7 +267,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           }
         }
       }, Kokkos::Sum<int>(nfixed));
-    printf("nfixed: %i\n", nfixed);
+    //printf("nfixed: %i\n", nfixed);
     nfixed_total += nfixed;
     fail.DeepCopy(tmp_fail);
   }
@@ -294,7 +294,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
     printf("%i nans!\n", nnan);
     exit(-1);
   }
-  printf("total nfail: %i\n", nfail_total);
   //exit(-1);
 
   return TaskStatus::complete;

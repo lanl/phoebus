@@ -20,6 +20,7 @@ add_executable(phoebus
 
   fluid/con2prim.hpp
   fluid/con2prim_robust.hpp
+  fluid/con2prim_vanderholst.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
   fluid/riemann.hpp

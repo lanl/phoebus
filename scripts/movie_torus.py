@@ -123,37 +123,37 @@ th = np.pi*yblock + ((1. - h_)/2.)*np.sin(2.*np.pi*yblock)
 x = r*np.sin(th)
 y = r*np.cos(th)
 
-def calc_mass(dfile):
-  dx1 = dx
-  dx2 = dy
-  dx3 = 2.*np.pi
-  dV = dx1*dx2*dx3
-  crho = dfile.Get("c.density", flatten=True)
-  rhosum = np.sum(crho)
-  if np.isnan(rhosum):
-    print("NAN in c.density!")
-    crho = dfile.Get("c.density", flatten=False)
-    print(list(map(tuple, np.where(np.isnan(crho)))))
-    sys.exit()
-  detgam = dfile.Get("g.c.detgam", flatten=True)
-  mass = sum(crho*detgam*dV)
-  return mass
-
-mass = []
-for n, dfnam in enumerate(dfnams):
-  print(f"Frame {n+1} out of {len(dfnams)}")
-  dfile = phdf.phdf(dfnam)
-  mass.append(calc_mass(dfile))
-fig, axes = plt.subplots(1, 1, figsize=(10,10))
-axes.plot(mass/mass[0], color='k')
-axes.set_xlim([0,200])
-plt.show()
-sys.exit()
+#def calc_mass(dfile):
+#  dx1 = dx
+#  dx2 = dy
+#  dx3 = 2.*np.pi
+#  dV = dx1*dx2*dx3
+#  crho = dfile.Get("c.density", flatten=True)
+#  rhosum = np.sum(crho)
+#  if np.isnan(rhosum):
+#    print("NAN in c.density!")
+#    crho = dfile.Get("c.density", flatten=False)
+#    print(list(map(tuple, np.where(np.isnan(crho)))))
+#    sys.exit()
+#  detgam = dfile.Get("g.c.detgam", flatten=True)
+#  mass = sum(crho*detgam*dV)
+#  return mass
+#
+#mass = []
+#for n, dfnam in enumerate(dfnams):
+#  print(f"Frame {n+1} out of {len(dfnams)}")
+#  dfile = phdf.phdf(dfnam)
+#  mass.append(calc_mass(dfile))
+#fig, axes = plt.subplots(1, 1, figsize=(10,10))
+#axes.plot(mass/mass[0], color='k')
+#axes.set_xlim([0,200])
+#plt.show()
+#sys.exit()
 
 dfile0 = phdf.phdf(dfnams[0])
-dfile0 = phdf.phdf(dfnams[50])
-print(calc_mass(dfile0))
-sys.exit()
+#dfile0 = phdf.phdf(dfnams[50])
+#print(calc_mass(dfile0))
+#sys.exit()
 density0 = dfile0.Get("p.density", flatten=False)
 ug0 = dfile0.Get("p.energy", flatten=False)
 vel0 = dfile0.Get("p.velocity", flatten=False)

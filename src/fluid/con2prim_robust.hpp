@@ -588,6 +588,7 @@ class ConToPrim {
         res.used_gamma_max() ||
         num_nans > 0)
     //if (num_nans > 0)
+    //if (num_nans > 0 || res.used_gamma_max())
       return ConToPrimStatus::failure;
     return ConToPrimStatus::success;
   }
