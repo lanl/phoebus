@@ -80,6 +80,7 @@ Real find_root(F &func, Real a, Real b, const Real tol, int maxiter, int line, b
       b = xitp;
     }
     j++;
+    niter++;
   }
 
   if (niter == maxiter) {
@@ -217,10 +218,12 @@ class ConToPrim {
     vsq = (vsq > 0.9996) ? 0.9996 : vsq;
     Real Gamma = 1./sqrt(1. - vsq);
     Real xi_guess = Gamma*Gamma*w; 
+    
+    const Real igdet = 1.0/g.gdet;
 
-    const Real D = v(crho);
-    const Real tau = v(ceng);
-    Real S[3] = {v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2)};
+    const Real D = v(crho)*igdet;
+    const Real tau = v(ceng)*igdet;
+    Real S[3] = {v(cmom_lo)*igdet, v(cmom_lo+1)*igdet, v(cmom_lo+2)*igdet};
     Real Ssq = 0.;
     SPACELOOP2(ii, jj) {
       Ssq += g.gcon[ii][jj]*S[ii]*S[jj];
