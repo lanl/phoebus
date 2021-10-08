@@ -34,11 +34,11 @@ variables = p.density,  &
       	    g.n.coord
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1         # time increment between outputs
+dt          = 10        # time increment between outputs
 
 <parthenon/time>
-nlim        = -1        # cycle limit
-tlim        = 10        # time limit
+nlim        = 1         # cycle limit
+tlim        = 1000      # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -48,7 +48,7 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 1024        # Number of zones in X1-direction
+nx1         = 2048        # Number of zones in X1-direction
 x1min       = 0           # minimum value of X1
 x1max       = 250         # maximum value of X1
 ix1_bc      = user        # Inner-X1 boundary condition flag
@@ -69,7 +69,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 1024
+nx1 = 2048
 nx2 = 1
 nx3 = 1
 
@@ -92,15 +92,29 @@ rad = false
 <fluid>
 xorder = 2
 cfl = 0.025
-riemann = hll
-recon = linear
+riemann = llf
+recon = weno5
 c2p_max_iter = 1000
 Ye = false
 
+# <fixup>
+# enable_floors = true
+# enable_ceilings = true
+# enable_flux_fixup = false
+# enable_c2p_fixup = true
+# floor_type = ConstantRhoSie
+# rho0_floor = 1.0e-12
+# sie0_floor = 1.0e-12	
+# rho_exp_floor = -2.0
+# sie_exp_floor = -1.0
+# ceiling_type = ConstantGamSie
+# sie0_ceiling = 1.0;
+# gam0_ceiling = 10.0;
+
 <monopole_gr>
 enabled = true
-npoints = 5000
-rout = 256
+npoints = 10000
+rout = 1024
 force_static = true
 
 <tov>
@@ -108,5 +122,5 @@ enabled = true
 Pc = 1e-2
 entropy = 8
 Pmin = 1e-9
-rhomin = 1e-9
-epsmin = 1e-9
+rhomin = 1e-12
+epsmin = 1e-12
