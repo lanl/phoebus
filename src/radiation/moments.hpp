@@ -14,7 +14,6 @@
 #ifndef RADIATION_MOMENTS_HPP_
 #define RADIATION_MOMENTS_HPP_
 
-#include "radiation.hpp" 
 #include "reconstruction.hpp"
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
@@ -53,8 +52,8 @@ TaskStatus MomentCon2Prim(T* rc) {
   auto *pm = rc->GetParentPointer().get(); 
   
   IndexRange ib = pm->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pm->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange kb = pm->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
   PackIndexMap imap;
   auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H}, imap);
@@ -83,6 +82,46 @@ TaskStatus MomentCon2Prim(T* rc) {
   return TaskStatus::complete;
 }
 
+template <class T>
+TaskStatus MomentPrim2Con(T* rc, IndexDomain domain = IndexDomain::entire) { 
+  
+  namespace c = radmoment_cons;  
+  namespace p = radmoment_prim;  
+  namespace i = radmoment_internal;  
+  
+  auto *pm = rc->GetParentPointer().get(); 
+  
+  IndexRange ib = pm->cellbounds.GetBoundsI(domain);
+  IndexRange jb = pm->cellbounds.GetBoundsJ(domain);
+  IndexRange kb = pm->cellbounds.GetBoundsK(domain);
+
+  PackIndexMap imap;
+  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H}, imap);
+  
+  auto cE = imap.GetFlatIdx(c::E);  
+  auto cJ = imap.GetFlatIdx(p::J);  
+  auto cF = imap.GetFlatIdx(c::F);  
+  auto cH = imap.GetFlatIdx(p::H);  
+  auto specB = cE.GetBounds(1);
+  auto dirB = cH.GetBounds(1);
+  parthenon::par_for( 
+      DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 
+      0, v.GetDim(5)-1, // Loop over meshblocks
+      specB.s, specB.e, // Loop over species 
+      kb.s, kb.e, // z-loop  
+      jb.s, jb.e, // y-loop 
+      ib.s, ib.e, // x-loop
+      KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) { 
+        // TODO: Replace this placeholder zero velocity prim2con 
+        v(b, cE(ispec), k, j, i) = v(b, cJ(ispec), k, j, i);
+        for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
+          v(b, cF(idir, ispec), k, j, i) = v(b, cH(idir, ispec), k, j, i);
+        }
+      });
+
+  return TaskStatus::complete;
+}
+
 template <class T> 
 TaskStatus ReconstructEdgeStates(T* rc) {
 
@@ -102,11 +141,11 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   namespace i = radmoment_internal;  
   
   PackIndexMap imap_ql, imap_qr, imap;
-  VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{i::ql}, imap_qr); 
-  VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{i::qr}, imap_ql); 
+  VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{i::ql}, imap_ql); 
+  VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{i::qr}, imap_qr); 
   VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{p::J, p::H}, imap) ;
   
-  auto qIdx = imap_qr.GetFlatIdx(i::ql);
+  auto qIdx = imap_ql.GetFlatIdx(i::ql);
   
   const int nspec = qIdx.DimSize(2);
   const int nrecon = 4*nspec;
@@ -116,7 +155,6 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   const int nblock = ql_base.GetDim(5); 
   
   PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
-
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), 
       X1DIR, pmb->pmy_mesh->ndim, // Loop over directions for reconstruction
@@ -154,23 +192,18 @@ TaskStatus CalculateFluxes(T* rc) {
   namespace i = radmoment_internal;  
   
   PackIndexMap imap_ql, imap_qr, imap;
-  auto ql = rc->PackVariables(std::vector<std::string>{i::ql}, imap_qr); 
-  auto qr = rc->PackVariables(std::vector<std::string>{i::qr}, imap_ql); 
-  auto v = rc->PackVariablesAndFluxes(std::vector<std::string>{}, 
+  auto v = rc->PackVariablesAndFluxes(std::vector<std::string>{i::ql, i::qr}, 
           std::vector<std::string>{c::E, c::F}, imap) ;
   
-  auto idx_q = imap_qr.GetFlatIdx(i::ql);
-  auto idx_Ef = imap.GetFlatIdx(c::E);
+  auto idx_ql = imap.GetFlatIdx(i::ql);
+  auto idx_qr = imap.GetFlatIdx(i::qr);
   auto idx_Ff = imap.GetFlatIdx(c::F);
+  auto idx_Ef = imap.GetFlatIdx(c::E);
   
-  const int nspec = idx_q.DimSize(2);
+  const int nspec = idx_ql.DimSize(2);
   const int nrecon = 4*nspec;
 
-  const int offset = imap_ql[i::ql].first; 
-  
-  const int nblock = ql.GetDim(5); 
-  
-  PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
+  const int nblock = 1; //v.GetDim(5); 
   
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(), 
@@ -183,14 +216,14 @@ TaskStatus CalculateFluxes(T* rc) {
         for (int ispec = 0; ispec<nspec; ++ispec) { 
           const int idir = idir_in - 1; // TODO (LFR): Fix indexing so everything starts on a consistent index
         
-          const Real& Jl = ql(idx_q(0, ispec, idir), k, j, i);
-          const Real& Jr = qr(idx_q(0, ispec, idir), k, j, i);
-          const Real Hl[3] = {ql(idx_q(1, ispec, idir), k, j, i), 
-                              ql(idx_q(2, ispec, idir), k, j, i), 
-                              ql(idx_q(3, ispec, idir), k, j, i)};
-          const Real Hr[3] = {qr(idx_q(1, ispec, idir), k, j, i), 
-                              qr(idx_q(2, ispec, idir), k, j, i), 
-                              qr(idx_q(3, ispec, idir), k, j, i)}; 
+          const Real& Jl = v(idx_ql(0, ispec, idir), k, j, i);
+          const Real& Jr = v(idx_qr(0, ispec, idir), k, j, i);
+          const Real Hl[3] = {v(idx_ql(1, ispec, idir), k, j, i), 
+                              v(idx_ql(2, ispec, idir), k, j, i), 
+                              v(idx_ql(3, ispec, idir), k, j, i)};
+          const Real Hr[3] = {v(idx_qr(1, ispec, idir), k, j, i), 
+                              v(idx_qr(2, ispec, idir), k, j, i), 
+                              v(idx_qr(3, ispec, idir), k, j, i)}; 
 
           // TODO (LFR): This should all get replaced with real flux calculation, be careful about densitization 
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(Hl[idir] + Hr[idir]) + (Jl - Jr); 
