@@ -24,6 +24,7 @@ using namespace parthenon::package::prelude;
 
 // internal includes
 #include "fluid/fluid.hpp"
+#include "radiation/radiation.hpp"
 #include "phoebus_utils/variables.hpp"
 
 // add the name of a namespace that contains your new ProblemGenerator
@@ -38,7 +39,8 @@ using namespace parthenon::package::prelude;
   PROBLEM(rhs_tester)                                                                    \
   PROBLEM(sedov)                                                                         \
   PROBLEM(blandford_mckee)                                                               \
-  PROBLEM(bondi)
+  PROBLEM(bondi)                                                                         \
+  PROBLEM(radiation_advection)
 
 /*
 // DO NOT TOUCH THE MACROS BELOW
