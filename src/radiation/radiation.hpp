@@ -30,6 +30,8 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/variables.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 
+#include "radiation/moments.hpp" 
+
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 using namespace parthenon::driver::prelude;
@@ -46,7 +48,7 @@ using singularity::RadiationType;
 constexpr RadiationType species[3] = {RadiationType::NU_ELECTRON,
                                       RadiationType::NU_ELECTRON_ANTI,
                                       RadiationType::NU_HEAVY};
-constexpr int NumRadiationTypes = 3;
+constexpr int NumRadiationTypes = 2;
 
 KOKKOS_INLINE_FUNCTION
 Real LogLinearInterp(Real x, int sidx, int k, int j, int i,
@@ -83,21 +85,6 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks);
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
-
-// Moment transport 
-template <class T> 
-TaskStatus MomentCon2Prim(T *rc);
-
-template <class T>
-TaskStatus ReconstructEdgeStates(T *rc);
-
-template <class T>
-TaskStatus CalculateFluxes(T *rc);
-
-template <class T>
-TaskStatus CalculateGeometricSource(T *rc, T *rc_src);
-//template <class T>
-//TaskStatus MomentSourceUpdate(T *rc);
 
 } // namespace radiation
 
