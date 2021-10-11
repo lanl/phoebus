@@ -64,6 +64,7 @@ add_executable(phoebus
   pgen/kh.cpp
   pgen/leptoneq.cpp
   pgen/linear_modes.cpp
+  pgen/radiation_advection.cpp
   pgen/rhs_tester.cpp
   pgen/shock_tube.cpp
   pgen/thin_cooling.cpp
