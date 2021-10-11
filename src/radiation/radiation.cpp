@@ -28,7 +28,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   const bool active = pin->GetBoolean("physics", "rad");
   params.Add("active", active);
-
+  
   if (!active) {
     return physics;
   }
@@ -61,6 +61,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("do_nu_electron_anti", do_nu_electron_anti);
   bool do_nu_heavy = pin->GetOrAddBoolean("radiation", "do_nu_heavy", true);
   params.Add("do_nu_heavy", do_nu_heavy);
+  
+  // Set radiation cfl factor
+  Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.5);
+  params.Add("cfl", cfl);
 
   // Initialize frequency discretization
   Real nu_min = pin->GetReal("radiation", "nu_min");
@@ -128,8 +132,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     RNGPool rng_pool(rng_seed);
     physics->AddParam<>("rng_pool", rng_pool);
   }
-  
-  if (method == "moments" || "mocmc") { 
+  if (method == "moment" || "mocmc") { 
     Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
                                               std::vector<int>{3, NumRadiationTypes}); 
     Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
@@ -155,7 +158,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
     
 
-    if (method == "moments") {
+    if (method == "moment") {
       // Fields for saving guesses for NR iteration in the radiation Con2Prim type solve
       physics->AddField(i::xi, mspecies_scalar);
       physics->AddField(i::phi, mspecies_scalar);
@@ -224,7 +227,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
   // TODO(BRR) Can't just use dx^i/dx^0 = 1 for speed of light
   // TODO(BRR) add a cfl-like fudge factor to radiation
-  auto &pars = pmb->packages.Get("fluid")->AllParams();
+  auto &pars = pmb->packages.Get("radiation")->AllParams();
   Real min_dt;
   pmb->par_reduce(
       "Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
