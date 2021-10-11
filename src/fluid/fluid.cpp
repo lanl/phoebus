@@ -33,6 +33,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("fluid");
   Params &params = physics->AllParams();
 
+  // Check that we are actually evolving the fluid  
+  const bool active = pin->GetBoolean("physics", "hydro");
+  params.Add("active", active);
+  printf("Fluid active : %i", active);
+  if (!active) {
+    return physics;
+  }
+
   const bool hydro = pin->GetBoolean("physics", "hydro");
   params.Add("hydro", hydro);
 
@@ -630,6 +638,8 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
 
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetBlockPointer();
+  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
+    return TaskStatus::complete;
   if (!pmb->packages.Get("fluid")->Param<bool>("mhd"))
     return TaskStatus::complete;
 

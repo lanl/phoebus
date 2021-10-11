@@ -94,7 +94,20 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
 
-  std::vector<std::string> src_names({fluid_cons::momentum, fluid_cons::energy});
+  auto rad = pmesh->packages.Get("radiation");
+  auto fluid = pmesh->packages.Get("fluid");
+  const auto rad_active = rad->Param<bool>("active");  
+  const auto fluid_active = fluid->Param<bool>("active");
+
+  std::vector<std::string> src_names; 
+  if (fluid_active) { 
+    src_names.push_back(fluid_cons::momentum);
+    src_names.push_back(fluid_cons::energy);
+  } 
+  if (rad_active) { 
+    src_names.push_back(radmoment_cons::E);
+    src_names.push_back(radmoment_cons::F);
+  }
 
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
@@ -125,21 +138,24 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving,
                                  sc1.get(), BoundaryCommSubset::all);
+    TaskID geom_src(0); 
+    TaskID sndrcv_flux_depend(0); 
 
-    auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
-    auto flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
-    auto geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
+    if (fluid_active) { 
+      auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
+      auto hydro_flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
+      auto hydro_geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
+      sndrcv_flux_depend = sndrcv_flux_depend | hydro_flux_ct;
+      geom_src = geom_src | hydro_geom_src;
+    }
 
-    auto sndrcv_flux_depend = flux_ct; 
-
-    //TODO (LFR) : Add radiation flux and geometric source tasks here
-    {
+    if (rad_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       auto moment_recon = tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get()); 
       auto moment_flux = tl.AddTask(moment_recon, radiation::CalculateFluxes<MDT>, sc0.get());
       auto moment_geom_src =  tl.AddTask(none, radiation::CalculateGeometricSource<MDT>, sc0.get(), gsrc.get());
-      sndrcv_flux_depend = flux_ct | moment_flux;
-      geom_src = moment_geom_src | geom_src; 
+      sndrcv_flux_depend = sndrcv_flux_depend | moment_flux;
+      geom_src = geom_src | moment_geom_src; 
     }
 
     auto send_flux =
@@ -152,7 +168,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto flux_div =
         tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>, sc0.get(), dudt.get());
 
-    auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,
+    auto add_rhs = tl.AddTask(flux_div | geom_src, SumData<std::string,MeshBlockData<Real>>,
                               src_names, dudt.get(), gsrc.get(), dudt.get());
 
     #if PRINT_RHS
@@ -210,8 +226,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (stage == integrator->nstages) {
       auto new_dt = tl.AddTask(
           fill_derived, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
-
-      auto divb = tl.AddTask(set_bc, fluid::CalculateDivB, sc1.get());
+      
+      if (fluid_active) {
+        auto divb = tl.AddTask(set_bc, fluid::CalculateDivB, sc1.get());
+      }
 
       // Update refinement
       if (pmesh->adaptive) {
@@ -258,7 +276,8 @@ TaskListStatus PhoebusDriver::RadiationStep() {
           calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
     }
   } else if (rad_method == "moment") {
-    PARTHENON_FAIL("Moment method not implemented!");
+    //PARTHENON_FAIL("Moment method not implemented!");
+    // TODO (LFR): Apply radiation source update using operator split
   } else if (rad_method == "monte_carlo") {
     return MonteCarloStep();
   } else if (rad_method == "mocmc") {
