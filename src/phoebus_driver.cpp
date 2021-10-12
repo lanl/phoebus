@@ -259,6 +259,8 @@ TaskListStatus PhoebusDriver::RadiationStep() {
   if (!rad_active) {
     return TaskListStatus::complete;
   }
+  auto fluid = pmesh->packages.Get("fluid");
+  const auto fluid_active = fluid->Param<bool>("active");
 
   auto num_independent_task_lists = blocks.size();
 
@@ -275,8 +277,15 @@ TaskListStatus PhoebusDriver::RadiationStep() {
           calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
     }
   } else if (rad_method == "moment") {
-    //PARTHENON_FAIL("Moment method not implemented!");
-    // TODO (LFR): Apply radiation source update using operator split
+    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
+    for (int ib = 0; ib < num_independent_task_lists; ib++) {
+      auto pmb = blocks[ib].get();
+      auto &tl = async_region[ib];
+      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+      auto fluid_source_update = 
+          tl.AddTask(none, radiation::MomentFluidSource<MDT>, sc0.get(), dt, fluid_active);
+    }
   } else if (rad_method == "monte_carlo") {
     return MonteCarloStep();
   } else if (rad_method == "mocmc") {
