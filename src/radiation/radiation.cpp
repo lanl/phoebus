@@ -134,14 +134,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
   if (method == "moment" || "mocmc") { 
     Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
-                                              std::vector<int>{3, NumRadiationTypes}); 
+                                              std::vector<int>{NumRadiationTypes, 3}); 
     Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
                                         std::vector<int>{NumRadiationTypes}); 
 
-    Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Conserved, Metadata::WithFluxes}, 
-                                                   std::vector<int>{3, NumRadiationTypes}); 
-    Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Conserved, Metadata::WithFluxes}, 
-                                             std::vector<int>{NumRadiationTypes}); 
+    Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved, 
+                                                   Metadata::Intensive, Metadata::WithFluxes}, 
+                                                   std::vector<int>{NumRadiationTypes, 3}); 
+    Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved, 
+                                              Metadata::Intensive, Metadata::WithFluxes, Metadata::Vector}, 
+                                              std::vector<int>{NumRadiationTypes}); 
     
     namespace p = radmoment_prim; 
     namespace c = radmoment_cons; 
@@ -165,9 +167,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     
     // Fields for cell edge reconstruction
-    /// TODO: The amount of storage can likely be reduced, but maybe at the expense of more dependency
+    /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense of more dependency
     Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-			     std::vector<int>{4, NumRadiationTypes, ndim});
+			     std::vector<int>{NumRadiationTypes, 4, ndim});
     physics->AddField(i::ql, mrecon);
     physics->AddField(i::qr, mrecon);
     
