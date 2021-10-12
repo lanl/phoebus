@@ -12,7 +12,6 @@
 // publicly, and to permit others to do so.
 
 #include "radiation.hpp"
-#include "moments.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 

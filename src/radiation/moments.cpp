@@ -11,13 +11,13 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef RADIATION_MOMENTS_HPP_
-#define RADIATION_MOMENTS_HPP_
 
-#include "reconstruction.hpp"
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
+
+#include "radiation/radiation.hpp"
+#include "reconstruction.hpp"
 
 namespace radiation {
 
@@ -81,9 +81,11 @@ TaskStatus MomentCon2Prim(T* rc) {
 
   return TaskStatus::complete;
 }
+//template TaskStatus MomentCon2Prim<MeshData<Real>>(MeshData<Real> *);
+template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T>
-TaskStatus MomentPrim2Con(T* rc, IndexDomain domain = IndexDomain::entire) { 
+TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) { 
   
   namespace c = radmoment_cons;  
   namespace p = radmoment_prim;  
@@ -121,6 +123,8 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain = IndexDomain::entire) {
 
   return TaskStatus::complete;
 }
+//template TaskStatus MomentPrim2Con<MeshData<Real>>(MeshData<Real> *, IndexDomain);
+template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *, IndexDomain);
 
 template <class T> 
 TaskStatus ReconstructEdgeStates(T* rc) {
@@ -188,6 +192,7 @@ TaskStatus ReconstructEdgeStates(T* rc) {
       });
   return TaskStatus::complete;  
 }
+template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 // This really only works for MeshBlockData right now since fluxes don't have a block index 
 template <class T> 
@@ -253,6 +258,7 @@ TaskStatus CalculateFluxes(T* rc) {
 
   return TaskStatus::complete;  
 }
+template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T>
 TaskStatus CalculateGeometricSource(T *rc, T *rc_src) { 
@@ -269,9 +275,8 @@ TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
   // TODO (LFR): Actually build the tasks   
   return TaskStatus::complete;
 }
+template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<Real> *, MeshBlockData<Real> *);
 
 // TODO(LFR): Add implicit source term task (Trickiest, since there is no path to follow)
 
 } //namespace radiationMoments
-
-#endif //RADIATION_MOMENTS_HPP_

@@ -30,8 +30,6 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/variables.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 
-#include "radiation/moments.hpp" 
-
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 using namespace parthenon::driver::prelude;
@@ -85,6 +83,23 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks);
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
+
+
+// Moment tasks 
+template <class T>
+TaskStatus MomentCon2Prim(T* rc);
+
+template <class T>
+TaskStatus MomentPrim2Con(T* rc, IndexDomain domain = IndexDomain::entire);
+
+template <class T> 
+TaskStatus ReconstructEdgeStates(T* rc); 
+
+template <class T> 
+TaskStatus CalculateFluxes(T* rc);
+
+template <class T>
+TaskStatus CalculateGeometricSource(T *rc, T *rc_src);
 
 } // namespace radiation
 
