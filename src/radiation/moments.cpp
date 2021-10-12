@@ -101,11 +101,11 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H}, imap);
   
   auto cE = imap.GetFlatIdx(c::E);  
-  auto cJ = imap.GetFlatIdx(p::J);  
+  auto pJ = imap.GetFlatIdx(p::J);  
   auto cF = imap.GetFlatIdx(c::F);  
-  auto cH = imap.GetFlatIdx(p::H);  
+  auto pH = imap.GetFlatIdx(p::H);  
   auto specB = cE.GetBounds(1);
-  auto dirB = cH.GetBounds(1);
+  auto dirB = pH.GetBounds(1);
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 
       0, v.GetDim(5)-1, // Loop over meshblocks
@@ -115,9 +115,9 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) { 
         /// TODO: (LFR) Replace this placeholder zero velocity prim2con 
-        v(b, cE(ispec), k, j, i) = v(b, cJ(ispec), k, j, i);
+        v(b, cE(ispec), k, j, i) = v(b, pJ(ispec), k, j, i);
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
-          v(b, cF(ispec, idir), k, j, i) = v(b, cH(ispec, idir), k, j, i);
+          v(b, cF(ispec, idir), k, j, i) = v(b, pH(ispec, idir), k, j, i);
         }
       });
 
@@ -353,8 +353,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           const Real emis = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, species[ispec]); 
           Real B = emis/kappa; 
           if (use_B_fake) B = B_fake; 
-          kappa = 1.0;
-          B = 0.5; 
 
           // This will be replaced with the rest frame calculation
           const Real lam = (kappa*dt)/(1 + kappa*dt);
