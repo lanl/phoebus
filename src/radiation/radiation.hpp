@@ -101,6 +101,9 @@ TaskStatus CalculateFluxes(T* rc);
 template <class T>
 TaskStatus CalculateGeometricSource(T *rc, T *rc_src);
 
+template <class T>
+TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid);
+
 } // namespace radiation
 
 #endif // RADIATION_HPP_

@@ -72,7 +72,7 @@ TaskStatus MomentCon2Prim(T* rc) {
       jb.s, jb.e, // y-loop 
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) { 
-        // TODO: Replace this placeholder zero velocity con2prim 
+        /// TODO: (LFR) Replace this placeholder zero velocity con2prim 
         v(b, cJ(ispec), k, j, i) = v(b, cE(ispec), k, j, i);
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
           v(b, cH(ispec, idir), k, j, i) = v(b, cF(ispec, idir), k, j, i);
@@ -114,7 +114,7 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
       jb.s, jb.e, // y-loop 
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) { 
-        // TODO: Replace this placeholder zero velocity prim2con 
+        /// TODO: (LFR) Replace this placeholder zero velocity prim2con 
         v(b, cE(ispec), k, j, i) = v(b, cJ(ispec), k, j, i);
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
           v(b, cF(ispec, idir), k, j, i) = v(b, cH(ispec, idir), k, j, i);
@@ -235,7 +235,8 @@ TaskStatus CalculateFluxes(T* rc) {
       ib.s - di, ib.e + di, // x-loop
       KOKKOS_LAMBDA(const int idir_in, const int k, const int j, const int i) { 
         for (int ispec = 0; ispec<nspec; ++ispec) { 
-          const int idir = idir_in - 1; // TODO (LFR): Fix indexing so everything starts on a consistent index
+          /// TODO: (LFR) Fix indexing so everything starts on a consistent index
+          const int idir = idir_in - 1; 
         
           const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
           const Real& Jr = v(idx_qr(ispec, 0, idir), k, j, i);
@@ -246,7 +247,7 @@ TaskStatus CalculateFluxes(T* rc) {
                               v(idx_qr(ispec, 2, idir), k, j, i), 
                               v(idx_qr(ispec, 3, idir), k, j, i)}; 
 
-          // TODO (LFR): This should all get replaced with real flux calculation, be careful about densitization 
+          /// TODO: (LFR) This should all get replaced with real flux calculation, be careful about densitization 
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(Hl[idir] + Hr[idir]) + (Jl - Jr); 
         
           v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = (Hl[0] - Hr[0]); 
@@ -272,11 +273,88 @@ TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
-  // TODO (LFR): Actually build the tasks   
+  /// TODO: (LFR) Actually build the source 
   return TaskStatus::complete;
 }
 template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<Real> *, MeshBlockData<Real> *);
 
-// TODO(LFR): Add implicit source term task (Trickiest, since there is no path to follow)
+template <class T>
+TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) { 
 
+  constexpr int ND = Geometry::NDFULL;
+  constexpr int NS = Geometry::NDSPACE;
+  auto *pmb = rc->GetParentPointer().get();
+  
+  namespace cr = radmoment_cons;  
+  namespace pr = radmoment_prim;  
+  namespace c = fluid_cons;
+  std::vector<std::string> vars{cr::E, cr::F}; 
+  if (update_fluid) {
+    vars.push_back(c::energy);
+    vars.push_back(c::momentum);
+    vars.push_back(c::ye);
+  }
+
+  PackIndexMap imap;
+  auto v = rc->PackVariables(vars, imap);
+  auto idx_E = imap.GetFlatIdx(cr::E); 
+  auto idx_F = imap.GetFlatIdx(cr::F);
+  
+  int ceng(-1), cmom_lo(-1), cmom_hi(-1), cy(-1); 
+  if (update_fluid) { 
+    int ceng = imap[c::energy].first;
+    int cmom_lo = imap[c::momentum].first;
+    int cmom_hi = imap[c::momentum].second;
+    int cye = imap[c::ye].first;
+  }
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+
+  /// TODO: (LFR) Couple this to singularity-opac  
+  const Real B = 1.0;
+  const Real kappa = 1.e3;
+
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  
+  int nblock = v.GetDim(5); 
+  int nspec = idx_E.DimSize(1);
+
+  parthenon::par_for( 
+      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 
+      0, nblock-1, // Loop over blocks
+      kb.s, kb.e, // z-loop  
+      jb.s, jb.e, // y-loop 
+      ib.s, ib.e, // x-loop
+      KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) { 
+        for (int ispec = 0; ispec<nspec; ++ispec) { 
+          
+          // This will be replaced with the rest frame calculation
+          const Real lam = (kappa*dt)/(1 + kappa*dt);
+          const Real dE = (B - v(iblock, idx_E(ispec), k, j, i))*lam;
+          const Real dF[3] = {-v(iblock, idx_F(ispec, 0), k, j, i)*lam,
+                              -v(iblock, idx_F(ispec, 1), k, j, i)*lam,
+                              -v(iblock, idx_F(ispec, 2), k, j, i)*lam};
+
+          // Add source corrections to conserved radiation variables
+          v(iblock, idx_E(ispec), k, j, i) += dE; 
+          for (int idir=0; idir<3; ++idir) {
+            v(iblock, idx_F(ispec, idir), k, j, i) += dF[idir];
+          }
+          
+          // Add source corrections to conserved fluid variables 
+          if (update_fluid) {
+            v(iblock, ceng, k, j, i) -= dE; 
+            v(iblock, cmom_lo + 0, k, j, i) -= dF[0]; 
+            v(iblock, cmom_lo + 1, k, j, i) -= dF[1]; 
+            v(iblock, cmom_lo + 2, k, j, i) -= dF[2]; 
+          }
+
+        } 
+      });
+
+  return TaskStatus::complete;
+}
+template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real, bool);
 } //namespace radiationMoments
