@@ -67,7 +67,7 @@ TaskListStatus PhoebusDriver::Step() {
   tm.dt = dt_trial;
   integrator->dt = dt_trial;
 
-  /// TODO: (LFR) The status checking here seems to be broken
+  /// TODO: (LFR) The status checking here seems to be broken, since it is just overwritten
   status = RadiationPreStep(); 
 
   for (int stage = 1; stage <= integrator->nstages; stage++) {
