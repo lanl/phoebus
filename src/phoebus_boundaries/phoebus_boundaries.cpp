@@ -166,14 +166,6 @@ TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc) 
     }
   }
 
-  // Fill conserved radiation variables on the boundary 
-  // TODO(LFR) : Is this actually necessary? I don't think we are using the conserved variables on the boundary
-  auto &rad = rc->GetParentPointer()->packages.Get("radiation");
-  if (rad->Param<bool>("active")) {
-    for (auto &domain : domains) {
-      radiation::MomentPrim2Con(rc.get(), domain); 
-    }
-  }
 
   return TaskStatus::complete;
 }
