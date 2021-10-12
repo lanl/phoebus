@@ -60,7 +60,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real r = std::sqrt(x * x + y * y + z * z);
 
         for (int ispec = specB.s; ispec<=specB.e; ++ispec) {
-          v(idJ(ispec), k, j, i) = J;
+          v(idJ(ispec), k, j, i) = J*exp(-std::pow((r - 0.5)/0.25, 2));
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
           v(idH(2, ispec), k, j, i) = Hz;
