@@ -64,6 +64,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Set radiation cfl factor
   Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.5);
   params.Add("cfl", cfl);
+  
+  // Get fake value for integrated BB for testing  
+  Real B_fake = pin->GetOrAddReal("radiation", "B_fake", 1.0);
+  params.Add("B_fake", B_fake);
+  bool use_B_fake = pin->GetOrAddBoolean("radiation", "use_B_fake", false);
+  params.Add("use_B_fake", use_B_fake);
 
   // Initialize frequency discretization
   Real nu_min = pin->GetReal("radiation", "nu_min");
@@ -132,16 +138,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddParam<>("rng_pool", rng_pool);
   }
   if (method == "moment" || "mocmc") { 
-    Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
+    Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived, 
+                                              Metadata::Intensive, Metadata::FillGhost},
                                               std::vector<int>{NumRadiationTypes, 3}); 
-    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived}, 
-                                        std::vector<int>{NumRadiationTypes}); 
+    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived, 
+                                              Metadata::Intensive, Metadata::FillGhost},
+                                              std::vector<int>{NumRadiationTypes}); 
 
     Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved, 
-                                                   Metadata::Intensive, Metadata::WithFluxes}, 
+                                                   Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost}, 
                                                    std::vector<int>{NumRadiationTypes, 3}); 
     Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved, 
-                                              Metadata::Intensive, Metadata::WithFluxes, Metadata::Vector}, 
+                                              Metadata::Intensive, Metadata::WithFluxes, Metadata::Vector, Metadata::FillGhost}, 
                                               std::vector<int>{NumRadiationTypes}); 
     
     namespace p = radmoment_prim; 

@@ -46,7 +46,7 @@ using singularity::RadiationType;
 constexpr RadiationType species[3] = {RadiationType::NU_ELECTRON,
                                       RadiationType::NU_ELECTRON_ANTI,
                                       RadiationType::NU_HEAVY};
-constexpr int NumRadiationTypes = 2;
+constexpr int NumRadiationTypes = 3;
 
 KOKKOS_INLINE_FUNCTION
 Real LogLinearInterp(Real x, int sidx, int k, int j, int i,
