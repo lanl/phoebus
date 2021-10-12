@@ -27,12 +27,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PackIndexMap imap;
   auto v =
-      rc->PackVariables(std::vector<std::string>({radmoment_prim::J, radmoment_prim::H}),
+      rc->PackVariables(std::vector<std::string>({radmoment_prim::J, radmoment_prim::H, 
+                        fluid_prim::density, fluid_prim::temperature}),
                         imap);
   
   auto idJ = imap.GetFlatIdx(radmoment_prim::J);
   auto idH = imap.GetFlatIdx(radmoment_prim::H);
-  
+  const int prho = imap[fluid_prim::density].first; 
+  const int pT = imap[fluid_prim::temperature].first; 
+
   const auto specB = idJ.GetBounds(1);
   const Real J = pin->GetOrAddReal("radiation_advection", "J", 1.0);
   const Real Hx = pin->GetOrAddReal("radiation_advection", "Hx", 1.0);
@@ -58,6 +61,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real y = (ndim > 1 && shapedim > 1) ? coords.x2v(j) : 0;
         Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
+        
+        v(prho, k, j, i) = 1.0;
+        v(pT, k, j, i) = 1.0;
 
         for (int ispec = specB.s; ispec<=specB.e; ++ispec) {
           v(idJ(ispec), k, j, i) = J*exp(-std::pow((r - 0.5)/0.25, 2));
