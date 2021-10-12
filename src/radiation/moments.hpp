@@ -74,8 +74,8 @@ TaskStatus MomentCon2Prim(T* rc) {
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) { 
         // TODO: Replace this placeholder zero velocity con2prim 
         v(b, cJ(ispec), k, j, i) = v(b, cE(ispec), k, j, i);
-        for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
-          v(b, cH(idir, ispec), k, j, i) = v(b, cF(idir, ispec), k, j, i);
+        for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
+          v(b, cH(ispec, idir), k, j, i) = v(b, cF(ispec, idir), k, j, i);
         }
       });
 
@@ -115,7 +115,7 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain = IndexDomain::entire) {
         // TODO: Replace this placeholder zero velocity prim2con 
         v(b, cE(ispec), k, j, i) = v(b, cJ(ispec), k, j, i);
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
-          v(b, cF(idir, ispec), k, j, i) = v(b, cH(idir, ispec), k, j, i);
+          v(b, cF(ispec, idir), k, j, i) = v(b, cH(ispec, idir), k, j, i);
         }
       });
 
@@ -147,18 +147,18 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   
   auto qIdx = imap_ql.GetFlatIdx(i::ql);
   
-  const int nspec = qIdx.DimSize(2);
+  const int nspec = qIdx.DimSize(1);
   const int nrecon = 4*nspec;
 
   const int offset = imap_ql[i::ql].first; 
   
   const int nblock = ql_base.GetDim(5); 
   
-  PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
+  //PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), 
       X1DIR, pmb->pmy_mesh->ndim, // Loop over directions for reconstruction
-      0, nblock-1, // Loop over reconstructed variables
+      0, nblock-1, // Loop over blocks
       kb.s - dk, kb.e + dk, // z-loop  
       jb.s - dj, jb.e + dj, // y-loop 
       ib.s - di, ib.e + di, // x-loop
@@ -168,6 +168,23 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         for (int ivar = 0; ivar<nrecon; ++ivar) {
           PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v, ql, qr);
         }
+        /* Piecewise constant for simple tests
+        const int di = (idir == X1DIR ? 1 : 0);
+        const int dj = (idir == X2DIR ? 1 : 0);
+        const int dk = (idir == X3DIR ? 1 : 0);
+        
+        for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
+          ql_base(b, qIdx(0, ispec, idir-1), k+dk, j+dj, i+di) = v(b, idxJ(ispec), k, j, i); 
+          ql_base(b, qIdx(1, ispec, idir-1), k+dk, j+dj, i+di) = v(b, idxH(0, ispec), k, j, i); 
+          ql_base(b, qIdx(2, ispec, idir-1), k+dk, j+dj, i+di) = v(b, idxH(1, ispec), k, j, i); 
+          ql_base(b, qIdx(3, ispec, idir-1), k+dk, j+dj, i+di) = v(b, idxH(2, ispec), k, j, i); 
+          
+          qr_base(b, qIdx(0, ispec, idir-1), k, j, i) = v(b, idxJ(ispec), k, j, i); 
+          qr_base(b, qIdx(1, ispec, idir-1), k, j, i) = v(b, idxH(0, ispec), k, j, i); 
+          qr_base(b, qIdx(2, ispec, idir-1), k, j, i) = v(b, idxH(1, ispec), k, j, i); 
+          qr_base(b, qIdx(3, ispec, idir-1), k, j, i) = v(b, idxH(2, ispec), k, j, i); 
+        }
+        */
       });
   return TaskStatus::complete;  
 }
@@ -200,8 +217,7 @@ TaskStatus CalculateFluxes(T* rc) {
   auto idx_Ff = imap.GetFlatIdx(c::F);
   auto idx_Ef = imap.GetFlatIdx(c::E);
   
-  const int nspec = idx_ql.DimSize(2);
-  const int nrecon = 4*nspec;
+  const int nspec = idx_ql.DimSize(1);
 
   const int nblock = 1; //v.GetDim(5); 
   
@@ -216,22 +232,22 @@ TaskStatus CalculateFluxes(T* rc) {
         for (int ispec = 0; ispec<nspec; ++ispec) { 
           const int idir = idir_in - 1; // TODO (LFR): Fix indexing so everything starts on a consistent index
         
-          const Real& Jl = v(idx_ql(0, ispec, idir), k, j, i);
-          const Real& Jr = v(idx_qr(0, ispec, idir), k, j, i);
-          const Real Hl[3] = {v(idx_ql(1, ispec, idir), k, j, i), 
-                              v(idx_ql(2, ispec, idir), k, j, i), 
-                              v(idx_ql(3, ispec, idir), k, j, i)};
-          const Real Hr[3] = {v(idx_qr(1, ispec, idir), k, j, i), 
-                              v(idx_qr(2, ispec, idir), k, j, i), 
-                              v(idx_qr(3, ispec, idir), k, j, i)}; 
+          const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
+          const Real& Jr = v(idx_qr(ispec, 0, idir), k, j, i);
+          const Real Hl[3] = {v(idx_ql(ispec, 1, idir), k, j, i), 
+                              v(idx_ql(ispec, 2, idir), k, j, i), 
+                              v(idx_ql(ispec, 3, idir), k, j, i)};
+          const Real Hr[3] = {v(idx_qr(ispec, 1, idir), k, j, i), 
+                              v(idx_qr(ispec, 2, idir), k, j, i), 
+                              v(idx_qr(ispec, 3, idir), k, j, i)}; 
 
           // TODO (LFR): This should all get replaced with real flux calculation, be careful about densitization 
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(Hl[idir] + Hr[idir]) + (Jl - Jr); 
         
-          v.flux(idir_in, idx_Ff(0, ispec), k, j, i) = (Hl[0] - Hr[0]); 
-          v.flux(idir_in, idx_Ff(1, ispec), k, j, i) = (Hl[1] - Hr[1]); 
-          v.flux(idir_in, idx_Ff(2, ispec), k, j, i) = (Hl[2] - Hr[2]);
-          v.flux(idir_in, idx_Ff(idir, ispec), k, j, i) += 0.5*(Jl/3.0 + Jr/3.0);
+          v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = (Hl[0] - Hr[0]); 
+          v.flux(idir_in, idx_Ff(ispec, 1), k, j, i) = (Hl[1] - Hr[1]); 
+          v.flux(idir_in, idx_Ff(ispec, 2), k, j, i) = (Hl[2] - Hr[2]);
+          v.flux(idir_in, idx_Ff(ispec, idir), k, j, i) += 0.5*(Jl/3.0 + Jr/3.0);
         } 
       });
 
