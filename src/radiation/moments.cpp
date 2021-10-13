@@ -18,8 +18,25 @@
 
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
+#include "closure.hpp"
 
 namespace radiation {
+
+struct Vec { 
+  Real data[Geometry::NDSPACE]; 
+  KOKKOS_FORCEINLINE_FUNCTION
+  Real& operator()(const int idx){return data[idx];}
+  KOKKOS_FORCEINLINE_FUNCTION
+  const Real& operator()(const int idx) const {return data[idx];}
+};
+
+struct Tens2 { 
+  Real data[Geometry::NDSPACE][Geometry::NDSPACE]; 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Real& operator()(const int i, const int j){return data[i][j];} 
+  KOKKOS_FORCEINLINE_FUNCTION
+  const Real& operator()(const int i, const int j) const {return data[i][j];} 
+};
 
 template <class T> 
   class ReconstructionWrapper  {
@@ -240,20 +257,56 @@ TaskStatus CalculateFluxes(T* rc) {
         
           const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
           const Real& Jr = v(idx_qr(ispec, 0, idir), k, j, i);
-          const Real Hl[3] = {v(idx_ql(ispec, 1, idir), k, j, i), 
+          const Vec Hl = {v(idx_ql(ispec, 1, idir), k, j, i), 
                               v(idx_ql(ispec, 2, idir), k, j, i), 
                               v(idx_ql(ispec, 3, idir), k, j, i)};
-          const Real Hr[3] = {v(idx_qr(ispec, 1, idir), k, j, i), 
+          const Vec Hr = {v(idx_qr(ispec, 1, idir), k, j, i), 
                               v(idx_qr(ispec, 2, idir), k, j, i), 
                               v(idx_qr(ispec, 3, idir), k, j, i)}; 
-
+          
           /// TODO: (LFR) This should all get replaced with real flux calculation, be careful about densitization 
-          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(Hl[idir] + Hr[idir]) + (Jl - Jr); 
+          Real El = Jl;
+          Real Er = Jr; 
+          Vec covFl = Hl; 
+          Vec covFr = Hr; 
+          Vec conFl = Hl; 
+          Vec conFr = Hr; 
+          Tens2 Pl = {{{Jl/3.0, 0, 0},{0, Jl/3.0, 0},{0, 0, Jl/3.0}}}; 
+          Tens2 Pr = {{{Jr/3.0, 0, 0},{0, Jr/3.0, 0},{0, 0, Jr/3.0}}}; 
+          const Real speed = 1.0;
+          
+          Tens2 con_tilPi;
+          
+          Vec con_vr{{0,0,0}};
+          Vec con_vl{{0,0,0}};
+          Tens2 cov_gamma{{{1,0,0},{0,1,0},{0,0,1}}}; 
+          Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
+          Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
+
+          cl.Prim2ConM1(Jl, Hl, &El, &covFl, &con_tilPi);
+          cl.raise3Vector(covFl, &conFl);
+          cl.getConCovPFromPrim(Jl, Hl, con_tilPi, &Pl);
+
+          cr.Prim2ConM1(Jr, Hr, &Er, &covFr, &con_tilPi);
+          cr.raise3Vector(covFr, &conFr);
+          cr.getConCovPFromPrim(Jr, Hr, con_tilPi, &Pr);
+          
+          if (1==0) { 
+            printf("i: %i idir: %i Jl: %f Hl(0): %f \n", i, idir, Jl, Hl(0));
+            printf("i: %i idir: %i El: %f covFl(0): %f conFl(0): %f Pl(idir,0): %f\n", i, idir, El, covFl(0), conFl(0), Pl(idir,0));
+          }
+
+          // Everything below should be independent of the assumed closure  
+          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(conFl(idir) + conFr(idir)) + speed*(El - Er); 
         
-          v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = (Hl[0] - Hr[0]); 
-          v.flux(idir_in, idx_Ff(ispec, 1), k, j, i) = (Hl[1] - Hr[1]); 
-          v.flux(idir_in, idx_Ff(ispec, 2), k, j, i) = (Hl[2] - Hr[2]);
-          v.flux(idir_in, idx_Ff(ispec, idir), k, j, i) += 0.5*(Jl/3.0 + Jr/3.0);
+          v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = 0.5*(Pl(idir, 0) + Pr(idir, 0)) 
+                                                       + speed*(covFl(0) - covFr(0));
+
+          v.flux(idir_in, idx_Ff(ispec, 1), k, j, i) = 0.5*(Pl(idir, 1) + Pr(idir, 1)) 
+                                                       + speed*(covFl(1) - covFr(1)); 
+
+          v.flux(idir_in, idx_Ff(ispec, 2), k, j, i) = 0.5*(Pl(idir, 2) + Pr(idir, 2)) 
+                                                       + speed*(covFl(2) - covFr(2));
         } 
       });
 
