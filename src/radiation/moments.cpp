@@ -124,7 +124,7 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
   parthenon::par_for( 
-      DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 
+      DEFAULT_LOOP_PATTERN, "RadMoments::Prim2Con", DevExecSpace(), 
       0, v.GetDim(5)-1, // Loop over meshblocks
       specB.s, specB.e, // Loop over species 
       kb.s, kb.e, // z-loop  
@@ -189,23 +189,6 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         for (int ivar = 0; ivar<nrecon; ++ivar) {
           PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v, ql, qr);
         }
-        /* Piecewise constant for simple tests
-        const int di = (idir == X1DIR ? 1 : 0);
-        const int dj = (idir == X2DIR ? 1 : 0);
-        const int dk = (idir == X3DIR ? 1 : 0);
-        
-        for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
-          ql_base(b, qIdx(0, ispec, idir-1), k+dk, j+dj, i+di) = v(b, idxJ(ispec), k, j, i); 
-          ql_base(b, qIdx(1, ispec, idir-1), k+dk, j+dj, i+di) = v(b, idxH(0, ispec), k, j, i); 
-          ql_base(b, qIdx(2, ispec, idir-1), k+dk, j+dj, i+di) = v(b, idxH(1, ispec), k, j, i); 
-          ql_base(b, qIdx(3, ispec, idir-1), k+dk, j+dj, i+di) = v(b, idxH(2, ispec), k, j, i); 
-          
-          qr_base(b, qIdx(0, ispec, idir-1), k, j, i) = v(b, idxJ(ispec), k, j, i); 
-          qr_base(b, qIdx(1, ispec, idir-1), k, j, i) = v(b, idxH(0, ispec), k, j, i); 
-          qr_base(b, qIdx(2, ispec, idir-1), k, j, i) = v(b, idxH(1, ispec), k, j, i); 
-          qr_base(b, qIdx(3, ispec, idir-1), k, j, i) = v(b, idxH(2, ispec), k, j, i); 
-        }
-        */
       });
   return TaskStatus::complete;  
 }
@@ -264,39 +247,35 @@ TaskStatus CalculateFluxes(T* rc) {
                               v(idx_qr(ispec, 2, idir), k, j, i), 
                               v(idx_qr(ispec, 3, idir), k, j, i)}; 
           
-          /// TODO: (LFR) This should all get replaced with real flux calculation, be careful about densitization 
-          Real El = Jl;
-          Real Er = Jr; 
-          Vec covFl = Hl; 
-          Vec covFr = Hr; 
-          Vec conFl = Hl; 
-          Vec conFr = Hr; 
-          Tens2 Pl = {{{Jl/3.0, 0, 0},{0, Jl/3.0, 0},{0, 0, Jl/3.0}}}; 
-          Tens2 Pr = {{{Jr/3.0, 0, 0},{0, Jr/3.0, 0},{0, 0, Jr/3.0}}}; 
           const Real speed = 1.0;
-          
           Tens2 con_tilPi;
           
+          /// TODO: (LFR) need to pull out actual values for these 
           Vec con_vr{{0,0,0}};
           Vec con_vl{{0,0,0}};
-          Tens2 cov_gamma{{{1,0,0},{0,1,0},{0,0,1}}}; 
-          Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
-          Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
+          Tens2 cov_gamma{{{1,0,0},{0,1,0},{0,0,1}}};
 
+          
+          // Calculate the observer frame quantities on the left side of the interface  
+          Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
+          Real El; 
+          Vec covFl, conFl;
+          Tens2 Pl;
           cl.Prim2ConM1(Jl, Hl, &El, &covFl, &con_tilPi);
           cl.raise3Vector(covFl, &conFl);
           cl.getConCovPFromPrim(Jl, Hl, con_tilPi, &Pl);
-
+          
+          // Calculate the observer frame quantities on the right side of the interface  
+          Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
+          Real Er; 
+          Vec covFr, conFr;
+          Tens2 Pr;
           cr.Prim2ConM1(Jr, Hr, &Er, &covFr, &con_tilPi);
           cr.raise3Vector(covFr, &conFr);
           cr.getConCovPFromPrim(Jr, Hr, con_tilPi, &Pr);
-          
-          if (1==0) { 
-            printf("i: %i idir: %i Jl: %f Hl(0): %f \n", i, idir, Jl, Hl(0));
-            printf("i: %i idir: %i El: %f covFl(0): %f conFl(0): %f Pl(idir,0): %f\n", i, idir, El, covFl(0), conFl(0), Pl(idir,0));
-          }
 
-          // Everything below should be independent of the assumed closure  
+          // Everything below should be independent of the assumed closure, just calculating the LLF flux
+          /// TODO: (LFR) Include diffusion limit   
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(conFl(idir) + conFr(idir)) + speed*(El - Er); 
         
           v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = 0.5*(Pl(idir, 0) + Pr(idir, 0)) 
