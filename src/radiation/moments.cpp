@@ -130,11 +130,24 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
       kb.s, kb.e, // z-loop  
       jb.s, jb.e, // y-loop 
       ib.s, ib.e, // x-loop
-      KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) { 
-        /// TODO: (LFR) Replace this placeholder zero velocity prim2con 
-        v(b, cE(ispec), k, j, i) = v(b, pJ(ispec), k, j, i);
+      KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
+        /// TODO: (LFR) need to pull out actual values for these 
+        Vec con_v{{0,0,0}};
+        Tens2 cov_gamma{{{1,0,0},{0,1,0},{0,0,1}}};
+        Closure<Vec, Tens2> c(con_v, cov_gamma); 
+        
+        Real E; 
+        Vec covF;
+        Tens2 conTilPi;
+        Real J = v(b, pJ(ispec), k, j, i);
+        Vec covH ={{v(b, pH(ispec, 0), k, j, i), 
+                    v(b, pH(ispec, 1), k, j, i), 
+                    v(b, pH(ispec, 2), k, j, i)}}; 
+        c.Prim2ConM1(J, covH, &E, &covF, &conTilPi);
+
+        v(b, cE(ispec), k, j, i) = E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
-          v(b, cF(ispec, idir), k, j, i) = v(b, pH(ispec, idir), k, j, i);
+          v(b, cF(ispec, idir), k, j, i) = covF(idir);
         }
       });
 
