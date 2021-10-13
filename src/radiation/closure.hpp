@@ -14,34 +14,24 @@
 #ifndef CLOSURE_HPP_
 #define CLOSURE_HPP_
 
-#define NDSPACE 3
-#define KOKKOS_FORCEINLINE_FUNCTION inline 
-#define KOKKOS_INLINE_FUNCTION inline 
-
-#define SPACELOOP(i) for (int i = 0; i < NDSPACE; ++i) 
+#include <kokkos_abstraction.hpp>
+#include <parthenon/package.hpp>
+#include <utils/error_checking.hpp>
+#include "geometry/geometry_utils.hpp" 
 
 #include <cmath>
 #include <iostream>
 #include <type_traits>
 #include <limits>
 
-/// TODO: Add parthenon includes
 
-/// TODO: Add Opacity includes 
-
-/// TODO: Add phoebus includes and switch to Phoebus geometry and variable arrays 
-
-/// TODO: Should this just be part of the radiation namespace? 
-
-namespace radiationClosure { 
-
-typedef double Real;
+namespace radiation { 
 
 // Taken from https://pharr.org/matt/blog/2019/11/03/difference-of-floats 
 // meant to reduce floating point rounding error in cancellations,
 // returns ab - cd
 template <class T> 
-inline 
+KOKKOS_INLINE_FUNCTION
 T DifferenceOfProducts(T a, T b, T c, T d) {
     T cd = c * d;
     T err = std::fma(-c, d, cd); // Round off error correction for cd
@@ -50,7 +40,7 @@ T DifferenceOfProducts(T a, T b, T c, T d) {
 }
 
 template<class T> 
-inline 
+KOKKOS_INLINE_FUNCTION 
 auto matrixInverse3x3_dos(T A, T& Ainv) 
     -> typename std::remove_reference<decltype(A(0,0))>::type {
   Ainv(0,0) = DifferenceOfProducts(A(1,1), A(2,2), A(1,2), A(2,1));
@@ -74,11 +64,18 @@ auto matrixInverse3x3_dos(T A, T& Ainv)
 }
 
 template<class T>
-inline 
+KOKKOS_INLINE_FUNCTION 
 void SolveAxb2x2(T A[2][2], T b[2], T x[2]) {
   const auto invDet = 1.0/DifferenceOfProducts(A[0][0], A[1][1], A[0][1], A[1][0]); 
   x[0] = invDet*DifferenceOfProducts(A[1][1], b[0], A[0][1], b[1]);
   x[1] = invDet*DifferenceOfProducts(A[0][0], b[1], A[1][0], b[0]);
+}
+
+template<class T> 
+KOKKOS_FORCEINLINE_FUNCTION
+T ratio(T num, T denom) {
+  const T sgn = denom > 0 ? 1 : -1; 
+  return num/(denom + sgn*std::numeric_limits<T>::min());
 }
 
 enum class Status { success=0, failure=1 };
@@ -86,60 +83,42 @@ enum class Status { success=0, failure=1 };
 template <class Vec, class Tens2> 
 class Closure {
  public:
-  template<class V, class T2> 
+  template<class V, class T2>
+  KOKKOS_FUNCTION 
   Closure(const V con_v_in, const T2 cov_gamma_in);
   
   // Con2Prim for given rest frame stress tensor 
   template<class VA, class VB, class T2> 
+  KOKKOS_FUNCTION 
   Status Prim2Con(const Real J, const VA cov_H, const T2 con_tilPi, Real* E, VB* cov_F);
+  
   template<class VA, class VB, class T2> 
+  KOKKOS_FUNCTION 
   Status Con2Prim(const Real E, const VA cov_F, const T2 con_tilPi, Real* J, VB* cov_H);
   
  
   // Con2Prim and Prim2Con for closure
   template<class VA, class VB, class T2> 
+  KOKKOS_FUNCTION 
   Status Con2PrimM1(const Real E, const VA cov_F, Real xi_guess, Real phi_guess, 
                     Real* J, VB* cov_H, T2* con_tilPi);
   
   template<class VA, class VB, class T2>  
+  KOKKOS_FUNCTION 
   Status Con2PrimM1(const Real E, const VA cov_F, Real* J, VB* cov_H, T2* con_tilPi) {
     return Con2PrimM1(E, cov_F, 0.5, 3.14159, J, cov_H, con_tilPi);
   }
 
   template<class VA, class VB, class T2>  
-  Status Prim2ConM1(const Real J, const VA cov_H, Real* E, VB* cov_F, T2* con_tilPi);
+  KOKKOS_FUNCTION 
+  Status Prim2ConM1(const Real J, const VA cov_tilH, Real* E, VB* cov_F, T2* con_tilPi);
   
   // Calculate the momentum density flux
   template<class V, class T2A, class T2B> 
-  Status getContravariantPFromPrim(const Real J, const V cov_tilH, const T2A con_TilPi, 
-                            T2B* con_P);
-   
- protected:
-  Real W, W2, W3, W4;
-  Vec cov_v; 
-  Vec con_v; 
-  Real gdet, alpha;
-  Vec con_beta;
-  Tens2 cov_gamma; 
-  Tens2 con_gamma; 
-  
-  template<class V> 
-  Status M1Residuals(const Real E, const V cov_F, 
-                              const Real xi, const Real phi, 
-                              Real* fXi, Real* fPhi);
-  
-  template<class V> 
-  Status M1FluidPressureTensor(const Real J, const V cov_H, 
-                              Tens2* con_tilPi, Vec* con_tilf);
+  KOKKOS_FUNCTION 
+  Status getConCovPFromPrim(const Real J, const V cov_tilH, const T2A con_tilPi, 
+                            T2B* concov_P);
 
-  template<class V> 
-  Status M1FluidPressureTensor(const Real E, const V cov_F, 
-                              const Real xi, const Real phi, 
-                              Tens2* con_tilPi, Vec* con_tilf);
-  template<class V> 
-  Status SolveClosure(const Real E, const V cov_F, 
-                      Real* xi_out, Real* phi_out,
-                      const Real xi_guess = 0.5, const Real phi_guess = 3.14159);
   template<class VA, class VB>
   KOKKOS_FORCEINLINE_FUNCTION 
   void lower3Vector(const VA& con_U, VB* cov_U) const {
@@ -153,6 +132,39 @@ class Closure {
     SPACELOOP(i) (*con_U)(i) = 0.0;
     SPACELOOP(i) { SPACELOOP(j) { (*con_U)(i) += cov_U(j)*con_gamma(i,j); }}
   }
+
+ protected:
+  Real W, W2, W3, W4;
+  Vec cov_v; 
+  Vec con_v; 
+  Real gdet, alpha;
+  Vec con_beta;
+  Tens2 cov_gamma; 
+  Tens2 con_gamma; 
+  
+  template<class V> 
+  KOKKOS_FUNCTION 
+  Status M1Residuals(const Real E, const V cov_F, 
+                              const Real xi, const Real phi, 
+                              Real* fXi, Real* fPhi);
+  
+  template<class V> 
+  KOKKOS_FUNCTION 
+  Status M1FluidPressureTensor(const Real J, const V cov_H, 
+                              Tens2* con_tilPi, Vec* con_tilf);
+
+  template<class V> 
+  KOKKOS_FUNCTION 
+  Status M1FluidPressureTensor(const Real E, const V cov_F, 
+                              const Real xi, const Real phi, 
+                              Tens2* con_tilPi, Vec* con_tilf);
+  template<class V> 
+  KOKKOS_FUNCTION 
+  Status SolveClosure(const Real E, const V cov_F, 
+                      Real* xi_out, Real* phi_out,
+                      const Real xi_guess = 0.5, const Real phi_guess = 3.14159);
+  
+  
   
   template<class T2> 
   KOKKOS_FORCEINLINE_FUNCTION
@@ -181,6 +193,7 @@ class Closure {
 
 template<class Vec, class Tens2> 
 template<class V, class T2> 
+KOKKOS_FUNCTION 
 Closure<Vec, Tens2>::Closure(const V con_v_in, const T2 cov_gamma_in) { 
   SPACELOOP(i) {
     SPACELOOP(j) {
@@ -202,7 +215,8 @@ Closure<Vec, Tens2>::Closure(const V con_v_in, const T2 cov_gamma_in) {
 }
 
 template<class Vec, class Tens2> 
-template<class VA, class VB, class T2> 
+template<class VA, class VB, class T2>
+KOKKOS_FUNCTION 
 Status Closure<Vec, Tens2>::Prim2Con(const Real J, const VA cov_H, 
                                               const T2 con_tilPi, 
                                               Real* E, VB* cov_F) {
@@ -248,7 +262,8 @@ Status Closure<Vec, Tens2>::Con2Prim(const Real E, const VA cov_F,
 }
 
 template<class Vec, class Tens2> 
-template<class VA, class VB, class T2>  
+template<class VA, class VB, class T2> 
+KOKKOS_FUNCTION
 Status Closure<Vec, Tens2>::Prim2ConM1(const Real J, const VA cov_H, 
                                        Real* E, VB* cov_F, T2* con_tilPi) {
   Vec con_tilf;
@@ -260,6 +275,7 @@ Status Closure<Vec, Tens2>::Prim2ConM1(const Real J, const VA cov_H,
 
 template<class Vec, class Tens2> 
 template<class VA, class VB, class T2>  
+KOKKOS_FUNCTION
 Status Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F, 
                                        const Real xi_guess, const Real phi_guess,
                                        Real* J, VB* cov_H, T2* con_tilPi){
@@ -274,24 +290,35 @@ Status Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F,
 template<class Vec, class Tens2> 
 template<class V, class T2A, class T2B> 
 KOKKOS_FORCEINLINE_FUNCTION 
-Status Closure<Vec, Tens2>::getContravariantPFromPrim(const Real J, const V cov_tilH, 
-                                                      const T2A con_TilPi, 
-                                                      T2B* con_P) {
+Status Closure<Vec, Tens2>::getConCovPFromPrim(const Real J, const V cov_tilH, 
+                                               const T2A con_tilPi, 
+                                               T2B* concov_P) {
   Vec con_tilH; 
-  raise3Vector(cov_tilH, con_tilH);
+  Tens2 concov_tilPi; 
   SPACELOOP(i) {
     SPACELOOP(j) {
-      (*con_P)(i,j) = (4/3*W2*con_v(i)*con_v(j) + con_gamma(i,j)/3)*J 
-          + W*(con_v(i)*con_tilH(j) + con_v(j)*con_tilH(i))
-          + J*con_TilPi(i,j);
+      concov_tilPi(i,j) = 0.0;
+      SPACELOOP(k) {
+        concov_tilPi(i,j) += con_tilPi(i,k)*cov_gamma(k,j);
+      }
     }
+  }
+  raise3Vector(cov_tilH, &con_tilH);
+  SPACELOOP(i) {
+    SPACELOOP(j) {
+      (*concov_P)(i,j) = 4/3*W2*con_v(i)*cov_v(j)*J 
+          + W*(con_v(i)*cov_tilH(j) + cov_v(j)*con_tilH(i));
+          + J*concov_tilPi(i,j);
+    }
+    (*concov_P)(i,i) += J/3.0;
   }
   return Status::success;
 }
 
 
 template<class Vec, class Tens2> 
-template<class V> 
+template<class V>
+KOKKOS_FUNCTION
 Status Closure<Vec, Tens2>::SolveClosure(const Real E, const V cov_F, Real* xi_out, Real* phi_out,
                                          const Real xi_guess, const Real phi_guess) {
   
@@ -354,6 +381,7 @@ Status Closure<Vec, Tens2>::SolveClosure(const Real E, const V cov_F, Real* xi_o
 
 template<class Vec, class Tens2> 
 template<class V> 
+KOKKOS_FUNCTION
 Status Closure<Vec, Tens2>::M1Residuals(const Real E, const V cov_F, 
                                         const Real xi, const Real phi,
                                         Real* fXi, Real* fPhi) {
@@ -385,6 +413,7 @@ Status Closure<Vec, Tens2>::M1Residuals(const Real E, const V cov_F,
 
 template<class Vec, class Tens2> 
 template<class V> 
+KOKKOS_FUNCTION
 Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real J, const V cov_tilH, 
                                                 Tens2* con_tilPi, Vec* con_tilf) {
   Vec con_tilH;
@@ -393,9 +422,8 @@ Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real J, const V cov_tilH
   SPACELOOP(i) H += cov_tilH(i)*con_tilH(i);
   SPACELOOP(i) vH += cov_tilH(i)*con_v(i);
   H = std::sqrt(H - vH*vH);  
-  SPACELOOP(i) (*con_tilf)(i) = con_tilH(i)/H; 
-
-  const Real athin = 0.5*(3*closure(H/J) - 1); 
+  SPACELOOP(i) (*con_tilf)(i) = ratio(con_tilH(i), H); 
+  const Real athin = 0.5*(3*closure(ratio(H,J)) - 1); 
 
   // Calculate the projected rest frame radiation pressure tensor 
   SPACELOOP(i) {
@@ -411,6 +439,7 @@ Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real J, const V cov_tilH
 
 template<class Vec, class Tens2> 
 template<class V> 
+KOKKOS_FUNCTION
 Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real E, const V cov_F, 
                                                 const Real xi, const Real phi, 
                                                 Tens2* con_tilPi, Vec* con_tilf) {
@@ -429,11 +458,11 @@ Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real E, const V cov_F,
   const Real lam = 1/(W*(1-vl));
   const Real aa = std::sqrt(v2*(1 + std::numeric_limits<Real>::epsilon()) - vl*vl);
   //const Real aa = std::sqrt(v2 - vl*vl);
-  const Real invDenom = 1/(aa + std::numeric_limits<Real>::min());
+  //const Real invDenom = 1/(aa + std::numeric_limits<Real>::min());
   Vec con_tilg, con_tild; 
   SPACELOOP(i) {
-    con_tilg(i) = con_F(i)/Fmag*lam - W*con_v(i);
-    con_tild(i) = (con_F(i)/Fmag*(1-lam/W) + con_v(i))*invDenom;
+    con_tilg(i) = ratio(con_F(i)*lam, Fmag) - W*con_v(i);
+    con_tild(i) = ratio(con_F(i)/Fmag*(1-lam/W) + con_v(i), aa);
   }
   
   // Build projected flux direction from basis vectors and given angle 
