@@ -177,8 +177,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense of more dependency
     Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
 			     std::vector<int>{NumRadiationTypes, 4, ndim});
+    Metadata mrecon_v = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     std::vector<int>{3, ndim});
     physics->AddField(i::ql, mrecon);
     physics->AddField(i::qr, mrecon);
+    physics->AddField(i::ql_v, mrecon_v);
+    physics->AddField(i::qr_v, mrecon_v);
     
     physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }

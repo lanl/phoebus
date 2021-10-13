@@ -48,6 +48,8 @@ namespace radmoment_internal {
   constexpr char phi[] = "rm.phi";
   constexpr char ql[] = "rm.ql";
   constexpr char qr[] = "rm.qr";
+  constexpr char ql_v[] = "rm.ql_v";
+  constexpr char qr_v[] = "rm.qr_v";
 }
 
 namespace internal_variables {
