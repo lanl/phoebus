@@ -7,6 +7,9 @@
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
+// TODO(BRR) temp
+#include "fluid/fluid.hpp"
+
 namespace fixup {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
@@ -307,6 +310,65 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
     exit(-1);
   }
   //exit(-1);
+            
+            
+  // Apply floors everywhere
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+            // Apply floors
+            double rho_floor, sie_floor;
+            bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i), rho_floor, sie_floor);
+            
+            v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
+            double u_floor = v(b,prho,k,j,i)*sie_floor;
+            v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
+            v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
+                                v(b,peng,k,j,i)/v(b,prho,k,j,i));
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+            v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
+                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i); 
+            
+            // P -> C after floors
+            const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+            const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+            Real beta[3];
+            geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+            Real gcov[4][4];
+            geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+            Real gcon[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+            Real S[3];
+            const Real vel[] = {v(b, pvel_lo, k, j, i),
+                                v(b, pvel_lo+1, k, j, i),
+                                v(b, pvel_hi, k, j, i)};
+            Real bcons[3];
+            Real bp[3] = {0.0, 0.0, 0.0};
+            if (pb_hi > 0) {
+              bp[0] = v(b, pb_lo, k, j, i);
+              bp[1] = v(b, pb_lo+1, k, j, i);
+              bp[2] = v(b, pb_hi, k, j, i);
+            }
+            Real ye_cons;
+            Real ye_prim = 0.0;
+            if (pye > 0) {
+              ye_prim = v(b, pye, k, j, i);
+            }
+            Real sig[3];
+            prim2con::p2c(v(b,prho,k,j,i), vel, bp, v(b,peng,k,j,i), ye_prim, v(b,prs,k,j,i), v(b,gm1,k,j,i),
+                gcov, gcon, beta, alpha, gdet,
+                v(b,crho,k,j,i), S, bcons, v(b,ceng,k,j,i), ye_cons, sig);
+            v(b, cmom_lo, k, j, i) = S[0];
+            v(b, cmom_lo+1, k, j, i) = S[1];
+            v(b, cmom_hi, k, j, i) = S[2];
+            if (pye > 0) v(b, cye, k, j, i) = ye_cons;
+            for (int m = slo; m <= shi; m++) {
+              v(b,m,k,j,i) = sig[m-slo];
+            }
+      });
+
+  // TODO(BRR) only do this where necessary
 
   return TaskStatus::complete;
 

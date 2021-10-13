@@ -98,7 +98,7 @@ Real find_root_secant(F func, const Real x_guess, const Real tol, const int maxi
   int niter = 0;
  
   Real x0 = x_guess;
-  Real x1 = 1.01*x_guess;
+  Real x1 = (1. + 1.e-5)*x_guess;
 
   while (fabs(x0 - x1)/fabs(x0) > tol) {
     Real x2 = x1 - func(x1) * (x1 - x0) / (func(x1) - func(x0));
@@ -334,9 +334,15 @@ class ConToPrim {
     v(pvel_lo + 1) = vcon[1];
     v(pvel_lo + 2) = vcon[2];
     
-    v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
-    v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
+    //v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
+    //v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
+    v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng)/v(prho));
+    v(prs) = eos.PressureFromDensityInternalEnergy(v(prho), v(peng)/v(prho));
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
+                  //Real w = 1./(abs(l) + abs(m) + abs(n) + 1)*v(b,ifail,k+n,j+m,i+l);
+                  //eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
+                  //wsum += w;
+                  //sum += w*v(b,iv,k+n,j+m,i+l);
 
     if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) || 
         isnan(v(pvel_lo+2)) || isnan(v(prs)) || isnan(v(gm1))) {

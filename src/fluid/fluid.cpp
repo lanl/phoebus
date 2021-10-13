@@ -259,6 +259,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 //template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -398,6 +399,7 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -547,6 +549,7 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
 // template <typename T>
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -639,6 +642,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 
 // template <typename T>
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
     return TaskStatus::complete;
@@ -722,6 +726,26 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     PARTHENON_THROW("Invalid riemann solver option.");
   }
 #undef FLUX
+ 
+  /*printf("a\n");
+  ParArrayND<Real> myflux("ughhh", ib.e - ib.s + 3);
+  printf("a\n");
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
+    X1DIR, X1DIR, 0, nrecon, 0, 0, 127+parthenon::Globals::nghost, 127+parthenon::Globals::nghost,
+      ib.s - 1, ib.e + 1,
+      KOKKOS_LAMBDA(const int d, const int n, const int k, const int j, const int i) {
+        myflux(i - (ib.s - 1)) = flux.v.flux(X1DIR, 0, k, j, i);
+      });
+  printf("a\n");
+  pmb->exec_space.fence();
+  printf("a\n");
+  auto flux_h = myflux.GetHostMirrorAndCopy();
+  printf("a\n");
+  for (int i = 0; i < ib.e - ib.s + 3; i++) {
+    printf("flux(%i) = %e\n", i, flux_h(i));
+  }
+  exit(-1);*/
+  
 
   return TaskStatus::complete;
 }

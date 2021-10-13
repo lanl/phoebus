@@ -33,7 +33,8 @@ ymin = -10
 ymax = 10
 
 nfinal = -1
-nfinal = 15
+#nfinal = 1
+#nfinal = 15
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 #dfnam = dfnams[nfinal]
@@ -106,7 +107,7 @@ v3 = vel[:,:,:,:,2]
 #sys.exit()
 
 var = density
-vmin = -5
+vmin = -4
 vmax = 0
 
 var1 = dfile1.Get("p.density", flatten=False)
@@ -159,6 +160,15 @@ def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet'):
   fig.colorbar(im, cax=cax, orientation='vertical')
   #plt.colorbar(im, label='density')
 #myplot(var,0)
+
+
+#fig, axes = plt.subplots(1,5,figsize=(10,10))
+#for idx in range(5):
+#  myplot(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]), idx)
+#plt.show()
+#sys.exit()
+
+
 myfd = fd[:,:,:,:,1]
 vmin = -1.e0
 vmax = -vmin

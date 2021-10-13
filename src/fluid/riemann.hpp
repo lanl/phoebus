@@ -110,7 +110,9 @@ class FluxState {
                           ? rho*sie_max
                           : q(dir,peng,k,j,i))
                       : rho*sie_floor);
-    const Real P = std::max(q(dir,prs,k,j,i), 0.0);
+    // TODO(BRR) nasty hack to test consistent prs
+    const Real P = (5./3. - 1.)*u;
+    //const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
     PARTHENON_REQUIRE(!isnan(gamma1), "gamma1 is nan?");
 

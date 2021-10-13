@@ -24,18 +24,24 @@ rmax = 40
 #rmax = None
 mblw = 0.5
 
-#xmin=0
-#xmax=40
-#ymin=-40
-#ymax=40
-xmin = 0
-xmax = 12
-ymin = -10
-ymax = 10
-xmin = 6
-xmax = 10
-ymin = -5
-ymax = 5
+dpi = 150
+
+xmin=0
+xmax=40
+ymin=-40
+ymax=40
+#xmin = 0
+#xmax = 12
+#ymin = -10
+#ymax = 10
+#xmin = 6
+#xmax = 10
+#ymin = -5
+#ymax = 5
+xmin = 4
+xmax = 8
+ymin = -4
+ymax = 4
 
 #xmin = 0
 #xmax = 5
@@ -46,8 +52,10 @@ ymax = 5
 plot_meshblocks = True
 h_ = 0.3
 
+ndim = 256
+
 # Plotting macro
-def myplot(myvar, n, vmin=-5, vmax=0, uselog=True, cmap='jet', half=False):
+def myplot(myvar, n, vmin=-5, vmax=0, uselog=True, cmap='jet', half=False, cbar=True):
   from mpl_toolkits.axes_grid1 import make_axes_locatable
   ax = axes[n]
   #ax = axes
@@ -58,7 +66,7 @@ def myplot(myvar, n, vmin=-5, vmax=0, uselog=True, cmap='jet', half=False):
     elif plot == "cartesian":
       if uselog:
         if half:
-          im = ax.pcolormesh(x[n,:,:128], y[n,:,:128], np.log10(myvar[n,0].transpose()[:,:128]),
+          im = ax.pcolormesh(x[n,:,:ndim//2], y[n,:,:ndim//2], np.log10(myvar[n,0].transpose()[:,:ndim//2]),
             vmin=vmin, vmax=vmax, cmap=cmap)
         else:
           im = ax.pcolormesh(x[n,:,:], y[n,:,:], np.log10(myvar[n,0].transpose()),
@@ -89,10 +97,12 @@ def myplot(myvar, n, vmin=-5, vmax=0, uselog=True, cmap='jet', half=False):
   ax.set_xlabel('x')
   #if n == 0:
   #  ax.set_ylabel('y')
-  divider = make_axes_locatable(ax)
-  cax = divider.append_axes('right', size='5%', pad=0.05)
-  fig.colorbar(im, cax=cax, orientation='vertical')
+  if cbar:
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
   #plt.colorbar(im, label='density')
+  ax.set_yticklabels([])
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 
@@ -105,6 +115,9 @@ ny = meshblocksize[1]
 blockbounds = dfile.BlockBounds
 dx = (blockbounds[0][1] - blockbounds[0][0])/nx
 dy = (blockbounds[0][3] - blockbounds[0][2])/ny
+
+#print(blockbounds)
+#sys.exit()
 
 # Get pcolormesh grid for each block
 xblock = np.zeros([nblocks, nx+1, ny+1])
@@ -122,6 +135,20 @@ r = np.exp(xblock)
 th = np.pi*yblock + ((1. - h_)/2.)*np.sin(2.*np.pi*yblock)
 x = r*np.sin(th)
 y = r*np.cos(th)
+
+xblockc = np.zeros([nblocks, nx, ny])
+yblockc = np.zeros([nblocks, nx, ny])
+for n in range(nblocks):
+  for i in range(nx):
+    for j in range(ny):
+      dx = (blockbounds[n][1] - blockbounds[n][0])/nx
+      dy = (blockbounds[n][3] - blockbounds[n][2])/ny
+      xblockc[n,i,j] = blockbounds[n][0] + (i + 0.5)*dx
+      yblockc[n,i,j] = blockbounds[n][2] + (j + 0.5)*dy
+rc = np.exp(xblockc)
+thc = np.pi*yblockc + ((1. - h_)/2.)*np.sin(2.*np.pi*yblockc)
+xc = rc*np.sin(thc)
+yc = rc*np.cos(thc)
 
 #def calc_mass(dfile):
 #  dx1 = dx
@@ -169,18 +196,38 @@ for n, dfnam in enumerate(dfnams):
   v1 = vel[:,:,:,:,0]
   v2 = vel[:,:,:,:,1]
   v3 = vel[:,:,:,:,2]
+  mom = dfile.Get("c.momentum", flatten=False)
+  mass = dfile.Get("c.density", flatten=False)
+  ener = dfile.Get("c.energy", flatten=False)
+  cons = [mass, mom[:,:,:,:,0], mom[:,:,:,:,1], mom[:,:,:,:,2], ener]
+  fd = dfile.Get("flux_divergence", flatten=False)
+  st = dfile.Get("src_terms", flatten=False)
 
   fig, axes = plt.subplots(1, 5, figsize=(14,8))
-  myplot(density, 0)
-  myplot(ug/density, 1)
-  myplot(np.fabs(v1), 2)
-  myplot(np.fabs(v2), 3)
-  myplot(np.fabs(v3), 4)
+  
+  for idx in range(5):
+    #myplot(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]), idx)
+    myplot(np.fabs(cons[idx] / (fd[:,:,:,:,idx] + st[:,:,:,:,idx])), idx, vmin=-3, vmax=3)
+  myplot(density, 0, half=True, cbar=False)
+  myplot(np.fabs(v1), 1, half=True, cbar=False)
+  myplot(np.fabs(v2), 2, half=True, cbar=False)
+  myplot(np.fabs(v3), 3, half=True, cbar=False)
+  myplot(ug, 4, half=True, cbar=False)
 
-  myplot(density0, 0, half=True)
-  myplot(ug0/density0, 1, half=True)
-  myplot(np.fabs(v10), 2, half=True)
-  myplot(np.fabs(v20), 3, half=True)
-  myplot(np.fabs(v30), 4, half=True)
-  plt.savefig("frame_%08d.png" % n, bbox_inches='tight', dpi=300)
+  for idx in range(5):
+    axes[idx].contour(xc[0,:,:], yc[0,:,:], density0[0,0,:,:].transpose(), [1.e-3], colors='k',
+      linestyles='--')
+
+  #myplot(density, 0)
+  #myplot(ug/density, 1)
+  #myplot(np.fabs(v1), 2)
+  #myplot(np.fabs(v2), 3)
+  #myplot(np.fabs(v3), 4)
+
+  #myplot(density0, 0, half=True)
+  #myplot(ug0/density0, 1, half=True)
+  #myplot(np.fabs(v10), 2, half=True)
+  #myplot(np.fabs(v20), 3, half=True)
+  #myplot(np.fabs(v30), 4, half=True)
+  plt.savefig("frame_%08d.png" % n, bbox_inches='tight', dpi=dpi)
   plt.close()

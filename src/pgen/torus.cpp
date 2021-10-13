@@ -4,6 +4,10 @@
 #include "fluid/con2prim_robust.hpp"
 #include "Kokkos_Random.hpp"
 
+// Temporary
+#include <parthenon/driver.hpp>                                                                      
+using namespace parthenon::driver::prelude;
+
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 namespace torus {
@@ -133,6 +137,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Solution constants
   const Real angular_mom = lfish_calc(rmax,a);
 
+  //printf("rmax: %e a: %e angular_mom: %e\n", rmax, a, angular_mom);
+  //exit(-1);
+
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -175,6 +182,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real lnh = -1.0;
       Real uphi;
       if (r > rin) lnh = log_enthalpy(r,th,a,rin,angular_mom,uphi);
+
+
+      if (j == 128) {
+        printf("i: %i x1: %e r: %e lnh: %e\n", i, x1, r, lnh);
+      }
 
       Real beta[3];
       Real gcov[4][4];
@@ -309,6 +321,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     auto v_copy = v.GetMirrorAndCopy(Kokkos::DefaultExecutionSpace());
     auto t = pmb->meshblock_data.Get()->Get(fluid_prim::temperature).data;
     auto t_copy = t.GetMirrorAndCopy(Kokkos::DefaultExecutionSpace());
+    auto p = pmb->meshblock_data.Get()->Get(fluid_prim::pressure).data;
+    auto p_copy = p.GetMirrorAndCopy(Kokkos::DefaultExecutionSpace());
 
     pmb->par_for(
       "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -324,7 +338,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(ii,k,j,i) = (1./4.)*(v_copy(0,0,ii,k,j,i+1) + v_copy(0,0,ii,k,j,i-1) + 
                                   v_copy(0,0,ii,k,j+1,i) + v_copy(0,0,ii,k,j-1,i));
           }
-          t(k,j,i) = ug(k,j,i)/rho(k,j,i)/Cv;
+          t(k,j,i) = (1./4.)*(t_copy(0,0,0,k,j,i+1) + t_copy(0,0,0,k,j,i-1) + 
+                                t_copy(0,0,0,k,j+1,i) + t_copy(0,0,0,k,j-1,i));
+          p(k,j,i) = (1./4.)*(p_copy(0,0,0,k,j,i+1) + p_copy(0,0,0,k,j,i-1) + 
+                                p_copy(0,0,0,k,j+1,i) + p_copy(0,0,0,k,j-1,i));
+          //t(k,j,i) = ug(k,j,i)/rho(k,j,i)/Cv;
+          //p(k,j,i) = ug(k,j,i)/rho(k,j,i)/Cv;
         }
       });
 
@@ -335,6 +354,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // now normalize the b-field
   //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
+
+  /*fluid::CalculateFluidSourceTerms(rc, rc);
+  fluid::CalculateFluxes(rc);
+  parthenon::Update::FluxDivergence(rc, rc);
+  fluid::CopyFluxDivergence(rc);*/
+  
+  
   /*auto fail = rc->Get(internal_variables::fail).data;
     
     printf("Before inversion:\n");
@@ -392,7 +418,8 @@ void ProblemModifier(ParameterInput *pin) {
   int nx1 = pin->GetInteger("parthenon/mesh", "nx1");
   Real dx = (x1max - xh)/(nx1 - ninside);
   Real x1min = xh - ninside*dx;
-  pin->SetReal("parthenon/mesh", "x1min", x1min);\
+  /*pin->SetReal("parthenon/mesh", "x1min", x1min);\*/
+  pin->SetReal("parthenon/mesh", "x1min", x1min);
 }
 
 

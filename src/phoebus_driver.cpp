@@ -60,6 +60,7 @@ PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh
 }
 
 TaskListStatus PhoebusDriver::Step() {
+  printf("%s:%i\n", __FILE__, __LINE__);
   static bool first_call = true;
   TaskListStatus status;
   Real dt_trial = tm.dt;
@@ -69,6 +70,7 @@ TaskListStatus PhoebusDriver::Step() {
   if (tm.time + dt_trial > tm.tlim) dt_trial = tm.tlim - tm.time;
   tm.dt = dt_trial;
   integrator->dt = dt_trial;
+  printf("tm.dt: %e integrator->dt: %e\n", tm.dt, integrator->dt);
 
   for (int stage = 1; stage <= integrator->nstages; stage++) {
     TaskCollection tc = RungeKuttaStage(stage);
