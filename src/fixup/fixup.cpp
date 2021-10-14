@@ -251,9 +251,9 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             Real gcon[3][3];
             geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
             Real S[3];
-            const Real vel[] = {v(b, pvel_lo, k, j, i),
-                                v(b, pvel_lo+1, k, j, i),
-                                v(b, pvel_hi, k, j, i)};
+            const Real vel[] = {(v(b, pvel_lo, k, j, i) + beta[0])/alpha,
+                                (v(b, pvel_lo+1, k, j, i) + beta[1])/alpha,
+                                (v(b, pvel_hi, k, j, i) + beta[2])/alpha};
             Real bcons[3];
             Real bp[3] = {0.0, 0.0, 0.0};
             if (pb_hi > 0) {
@@ -341,9 +341,9 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             Real gcon[3][3];
             geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
             Real S[3];
-            const Real vel[] = {v(b, pvel_lo, k, j, i),
-                                v(b, pvel_lo+1, k, j, i),
-                                v(b, pvel_hi, k, j, i)};
+            const Real vel[] = {(v(b, pvel_lo, k, j, i) + beta[0])/alpha,
+                                (v(b, pvel_lo+1, k, j, i) + beta[1])/alpha,
+                                (v(b, pvel_hi, k, j, i) + beta[2])/alpha};
             Real bcons[3];
             Real bp[3] = {0.0, 0.0, 0.0};
             if (pb_hi > 0) {
@@ -555,9 +555,9 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             Real gcon[3][3];
             geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
             Real S[3];
-            const Real vel[] = {v(b, pvel_lo, k, j, i),
-                                v(b, pvel_lo+1, k, j, i),
-                                v(b, pvel_hi, k, j, i)};
+            const Real vel[] = {(v(b, pvel_lo, k, j, i) + beta[0])/alpha,
+                                (v(b, pvel_lo+1, k, j, i) + beta[1])/alpha,
+                                (v(b, pvel_hi, k, j, i) + beta[2])/alpha};
             Real bcons[3];
             Real bp[3] = {0.0, 0.0, 0.0};
             if (pb_hi > 0) {

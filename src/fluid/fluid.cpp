@@ -259,7 +259,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 //template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -317,9 +316,9 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
 
         Real S[3];
-        const Real vel[] = {v(b, pvel_lo, k, j, i),
-                            v(b, pvel_lo+1, k, j, i),
-                            v(b, pvel_hi, k, j, i)};
+        const Real vel[] = {(v(b, pvel_lo, k, j, i) + shift[0])/lapse,
+                            (v(b, pvel_lo+1, k, j, i) + shift[1])/lapse,
+                            (v(b, pvel_hi, k, j, i) + shift[2])/lapse};
         Real bcons[3];
         Real bp[3] = {0.0, 0.0, 0.0};
         if (pb_hi > 0) {
@@ -399,21 +398,18 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
-  printf("%s:%i\n", __FILE__, __LINE__);
   return c2p(rc, ib, jb, kb);
 }
 
 template <typename T>
 TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const IndexRange &jb,
                                            const IndexRange &kb) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   using namespace con2prim_vanderholst;
   auto *pmb = rc->GetParentPointer().get();
   
@@ -440,7 +436,6 @@ TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const In
         fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
                                                             : FailFlags::fail);
       });
-  printf("%s:%i\n", __FILE__, __LINE__);
 
   return TaskStatus::complete;
 }
@@ -552,7 +547,6 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
 // template <typename T>
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -645,7 +639,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 
 // template <typename T>
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
     return TaskStatus::complete;

@@ -103,6 +103,9 @@ class FluxState {
 
     const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
     Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
+    SPACELOOP(ii) {
+      vcon[ii] = (vcon[ii] + g.beta[ii])/g.alpha;
+    }
     const Real &vel = vcon[dir];
     Real Bcon[] = {0.0, 0.0, 0.0};
     const Real u = (q(dir,peng,k,j,i)/rho > sie_floor
@@ -110,9 +113,7 @@ class FluxState {
                           ? rho*sie_max
                           : q(dir,peng,k,j,i))
                       : rho*sie_floor);
-    // TODO(BRR) nasty hack to test consistent prs
-    const Real P = (5./3. - 1.)*u;
-    //const Real P = std::max(q(dir,prs,k,j,i), 0.0);
+    const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
     PARTHENON_REQUIRE(!isnan(gamma1), "gamma1 is nan?");
 

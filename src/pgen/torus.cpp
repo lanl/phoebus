@@ -232,7 +232,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         ucon[0] = ucon_norm(ucon, gcov);
         const Real W = lapse*ucon[0];
         for (int d = 0; d < 3; d++) {
-          v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
+          //v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
+          v(ivlo+d,k,j,i) = lapse*ucon[d+1]/W;
         }
         if (j == 127 + 4 && i > 180 && i < 190) {
           int d = 0;

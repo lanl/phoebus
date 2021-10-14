@@ -330,9 +330,12 @@ class ConToPrim {
     v(prho) = rho;
     v(peng) = ug;
     v(prs) = P;
-    v(pvel_lo) = vcon[0];
-    v(pvel_lo + 1) = vcon[1];
-    v(pvel_lo + 2) = vcon[2];
+    //v(pvel_lo) = vcon[0];
+    //v(pvel_lo + 1) = vcon[1];
+    //v(pvel_lo + 2) = vcon[2];
+    SPACELOOP(ii) {
+      v(pvel_lo + ii) = g.lapse*vcon[ii] - g.beta[ii];
+    }
     
     //v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
     //v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));

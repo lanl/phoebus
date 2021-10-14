@@ -105,11 +105,13 @@ private:
     Real Bsq = 0.0;
     auto gcov = reinterpret_cast<Real(*)[3]>(&gscratch[0][0]);
     system_.Metric(loc, std::forward<Args>(args)..., gcov);
+    Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
+    system_.ContravariantShift(loc, std::forward<Args>(args)..., beta);
     for (int l = 1; l < ND; ++l) {
       for (int m = 1; m < ND; ++m) {
         const Real gamma = gcov[l - 1][m - 1];
-        const Real &vl = v_(l, std::forward<Args>(args)...);
-        const Real &vm = v_(m, std::forward<Args>(args)...);
+        const Real &vl = (v_(l, std::forward<Args>(args)...) + beta[l-1])/alpha;
+        const Real &vm = (v_(m, std::forward<Args>(args)...) + beta[m-1])/alpha;
         W -= vl * vm * gamma;
         const Real &bl = b_(l, std::forward<Args>(args)...);
         const Real &bm = b_(m, std::forward<Args>(args)...);
@@ -120,12 +122,11 @@ private:
     const Real iW = std::sqrt(std::abs(W));
     W = 1. / (iW + SMALL);
 
-    Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
-    system_.ContravariantShift(loc, std::forward<Args>(args)..., beta);
     u[0] = W / (std::abs(alpha) + SMALL);
     b[0] = u[0] * Bdotv;
     for (int l = 1; l < ND; ++l) {
-      u[l] = W * v_(l, std::forward<Args>(args)...) - u[0] * beta[l - 1];
+      const Real vel = (v_(l, std::forward<Args>(args)...) + beta[l-1])/alpha;
+      u[l] = W * vel - u[0] * beta[l - 1];
       b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha * b[0] * u[l]);
     }
 
