@@ -64,8 +64,10 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
-          if (q(pv1, k, j, i) - beta[0]/alpha > 0.) {
-            q(pv1, k, j, i) = beta[0]/alpha;
+          //if (q(pv1, k, j, i) - beta[0]/alpha > 0.) {
+          if (q(pv1, k, j, i) > 0.) {
+            //q(pv1, k, j, i) = beta[0]/alpha;
+            q(pv1, k, j, i) = 0.;
           }
         });
   }
@@ -107,8 +109,10 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
-          if (q(pv1, k, j, i) - beta[0]/alpha < 0.) {
-            q(pv1, k, j, i) = beta[0]/alpha;
+          //if (q(pv1, k, j, i) - beta[0]/alpha < 0.) {
+          if (q(pv1, k, j, i) < 0.) {
+            //q(pv1, k, j, i) = beta[0]/alpha;
+            q(pv1, k, j, i) = 0.;
           }
         });
   }

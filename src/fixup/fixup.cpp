@@ -212,20 +212,32 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             // Limit gammasq
             double gammacov[3][3];
             geom.Metric(CellLocation::Cent, k, j, i, gammacov);
+            const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+            Real beta[3];
+            geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+            
             double vsq = 0.; 
             // TODO(BRR) what about pvel_hi
+            Real vel[3] = {(v(b,pvel_lo,k,j,i) + beta[0])/alpha,
+                              (v(b,pvel_lo,k,j,i) + beta[1])/alpha,
+                              (v(b,pvel_lo,k,j,i) + beta[2])/alpha};
             SPACELOOP(m) {
               SPACELOOP(n) {
-                vsq += gammacov[m][n] * v(b,pvel_lo+m,k,j,i) * v(b,pvel_lo+n,k,j,i);
+                //vsq += gammacov[m][n] * v(b,pvel_lo+m,k,j,i) * v(b,pvel_lo+n,k,j,i);
+                vsq += gammacov[m][n] * vel[m] * vel[n];
               }
             }
             double gammamax = 50.;
             double vsqmax = 1. - 1./(gammamax*gammamax);
             if (vsq > vsqmax) {
               double vfac = sqrt(vsqmax/vsq); 
-              v(b,pvel_lo,k,j,i) *= vfac;
-              v(b,pvel_lo+1,k,j,i) *= vfac;
-              v(b,pvel_lo+2,k,j,i) *= vfac;
+              SPACELOOP(m) {
+                vel[m] *= vfac;
+                v(b,pvel_lo+m,k,j,i) = alpha*vel[m] - beta[m];
+              }
+              //v(b,pvel_lo,k,j,i) *= vfac;
+              //v(b,pvel_lo+1,k,j,i) *= vfac;
+              //v(b,pvel_lo+2,k,j,i) *= vfac;
             }
 
               double vfac = sqrt(vsqmax/vsq); 
@@ -243,17 +255,14 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
               
             // Reset conserved variables
             const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-            const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-            Real beta[3];
-            geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
             Real gcov[4][4];
             geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
             Real gcon[3][3];
             geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
             Real S[3];
-            const Real vel[] = {(v(b, pvel_lo, k, j, i) + beta[0])/alpha,
-                                (v(b, pvel_lo+1, k, j, i) + beta[1])/alpha,
-                                (v(b, pvel_hi, k, j, i) + beta[2])/alpha};
+            //const Real vel[] = {(v(b, pvel_lo, k, j, i) + beta[0])/alpha,
+            //                    (v(b, pvel_lo+1, k, j, i) + beta[1])/alpha,
+            //                    (v(b, pvel_hi, k, j, i) + beta[2])/alpha};
             Real bcons[3];
             Real bp[3] = {0.0, 0.0, 0.0};
             if (pb_hi > 0) {
@@ -310,8 +319,8 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
     printf("%i nans!\n", nnan);
     exit(-1);
   }
-  //exit(-1);
             
+  // TODO(BRR) only do this where necessary
             
   // Apply floors everywhere
   parthenon::par_for(
@@ -368,9 +377,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
               v(b,m,k,j,i) = sig[m-slo];
             }
       });
-
-  // TODO(BRR) only do this where necessary
-  printf("%s:%i\n", __FILE__, __LINE__);
 
   return TaskStatus::complete;
 

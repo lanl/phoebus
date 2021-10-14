@@ -657,14 +657,14 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
       "Recon");
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
+  /*parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
     X1DIR, pmb->pmy_mesh->ndim, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.s + dj,
       ib.s - 1, ib.e + 1,
       KOKKOS_LAMBDA(const int d, const int n, const int k, const int j, const int i) {
         PARTHENON_REQUIRE(!isnan(flux.v(n,k,j,i)), "bad prim for recon");
         //flux.ql(d-1,n,k,j,i)
       });
-  pmb->exec_space.fence();
+  pmb->exec_space.fence();*/
 
 #define RECON(method)                                                          \
   parthenon::par_for(                                                          \
@@ -693,7 +693,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   }
 #undef RECON
   
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
+  /*parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
     X1DIR, pmb->pmy_mesh->ndim, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.s + dj,
       ib.s - 1, ib.e + 1,
       KOKKOS_LAMBDA(const int d, const int n, const int k, const int j, const int i) {
@@ -701,7 +701,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
         PARTHENON_REQUIRE(!isnan(flux.qr(d-1,n,k,j,i)), "bad qr after recon");
         //flux.ql(d-1,n,k,j,i)
       });
-  pmb->exec_space.fence();
+  pmb->exec_space.fence();*/
 
 #define FLUX(method)                                                           \
   parthenon::par_for(                                                          \
@@ -723,7 +723,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   }
 #undef FLUX
  
-  printf("a\n");
+  /*printf("a\n");
   ParArrayND<Real> myflux("ughhh", ib.e - ib.s + 3);
   printf("a\n");
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
@@ -749,7 +749,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   for (auto &v : rv) {
     printf("  %s\n", v.c_str());
   }
-  exit(-1);
+  exit(-1);*/
   
 
   return TaskStatus::complete;

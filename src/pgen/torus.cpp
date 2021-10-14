@@ -183,11 +183,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real uphi;
       if (r > rin) lnh = log_enthalpy(r,th,a,rin,angular_mom,uphi);
 
-
-      if (j == 128) {
-        printf("i: %i x1: %e r: %e lnh: %e\n", i, x1, r, lnh);
-      }
-
       Real beta[3];
       Real gcov[4][4];
       // regions outside torus
