@@ -66,6 +66,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -369,6 +370,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
       });
 
   // TODO(BRR) only do this where necessary
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   return TaskStatus::complete;
 

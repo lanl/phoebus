@@ -234,6 +234,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         for (int d = 0; d < 3; d++) {
           v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
         }
+        if (j == 127 + 4 && i > 180 && i < 190) {
+          int d = 0;
+          printf("[%i] v1: %e u^1: %e vtilde: %e beta/alpha = %e\n", i, v(ivlo+d,k,j,i),
+            ucon[d+1], lapse*ucon[d+1]/beta[d], beta[d]/lapse);
+        }
         //v(ivlo,k,j,i) = beta[0]/lapse;
         //v(ivlo+1,k,j,i) = beta[1]/lapse;
       }

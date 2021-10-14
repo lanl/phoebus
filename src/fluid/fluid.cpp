@@ -406,12 +406,14 @@ TaskStatus ConservedToPrimitive(T *rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
+  printf("%s:%i\n", __FILE__, __LINE__);
   return c2p(rc, ib, jb, kb);
 }
 
 template <typename T>
 TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const IndexRange &jb,
                                            const IndexRange &kb) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   using namespace con2prim_vanderholst;
   auto *pmb = rc->GetParentPointer().get();
   
@@ -438,6 +440,7 @@ TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const In
         fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
                                                             : FailFlags::fail);
       });
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   return TaskStatus::complete;
 }
@@ -727,7 +730,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   }
 #undef FLUX
  
-  /*printf("a\n");
+  printf("a\n");
   ParArrayND<Real> myflux("ughhh", ib.e - ib.s + 3);
   printf("a\n");
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
@@ -742,9 +745,18 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto flux_h = myflux.GetHostMirrorAndCopy();
   printf("a\n");
   for (int i = 0; i < ib.e - ib.s + 3; i++) {
-    printf("flux(%i) = %e\n", i, flux_h(i));
+    //printf("flux(%i) = %e\n", i, flux_h(i));
+    //printf("%e, ", flux_h(i));
+    if (i > 180 && i < 190) {
+      printf("flux(%i) = %e\n", i, flux_h(i));
+    }
   }
-  exit(-1);*/
+  printf("\n");
+  auto rv = flux.ReconVars();
+  for (auto &v : rv) {
+    printf("  %s\n", v.c_str());
+  }
+  exit(-1);
   
 
   return TaskStatus::complete;

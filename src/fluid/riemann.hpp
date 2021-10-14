@@ -145,6 +145,9 @@ class FluxState {
     // density
     U[crho] = rho*W;
     F[crho] = U[crho]*vtil;
+    if (j == 127 + 4 && d == 1 && i > 180 && i < 190) {
+      printf("[%i] vtil = %e vel = %e u^1 = %e F[RHO] = %e\n", i, vtil, vel, vtil*W/g.alpha, F[crho]);
+    }
 
     // composition
     if (cye>0) {
@@ -266,6 +269,11 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
 
   for (int m = 0; m < fs.NumConserved(); m++) {
     fs.v.flux(d,m,k,j,i) = 0.5*((Fl[m] + Fr[m])*g.gdet - cmax*((Ur[m] - Ul[m])*g.gammadet));
+    if (m == 0 && j == 127 + 4 && i > 180 && i < 190) {
+      printf("[%i] F: %e fl: %e fr: %e (%e) ur: %e ul: %e (%e)\n",
+        i, fs.v.flux(d,m,k,j,i), Fl[m], Fr[m], 0.5*(Fl[m] + Fr[m])*g.gdet,
+        Ur[m], Ul[m], cmax*(Ur[m] - Ul[m])*g.gammadet);
+    }
     if (isnan(Fl[m]) || isnan(Fr[m]) || isnan(cmax) || isnan(Ur[m]) || isnan(Ul[m])) {
       printf("A nan in a flux! %e %e %e %e %e\n", Fl[m], Fr[m], cmax, Ur[m], Ul[m]);
       PARTHENON_FAIL("a nan in a flux :(");
