@@ -200,7 +200,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         //ucon[0] = ucon_norm(ucon,gcov);
         const Real W = ucon[0]*lapse;
         for (int d = 0; d < 3; d++) {
-          v(ivlo+d,k,j,i) = 0.0;//beta[d]/lapse;
+          //v(ivlo+d,k,j,i) = 0.0;//beta[d]/lapse;
+          v(ivlo+d,k,j,i) = beta[d]/lapse;
         }
       }
       /* region inside magnetized torus; u^i is calculated in
@@ -287,9 +288,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real Bdotv = 0.0;
       Real gcov[3][3];
       geom.Metric(CellLocation::Cent,k,j,i,gcov);
+      const Real alpha = geom.Lapse(CellLocation::Cent,k,j,i);
+      Real shift[3];
+      geom.ContravariantShift(CellLocation::Cent,k,j,i,shift);
+      const Real vel[3] = {(v(ivlo,k,j,i) + shift[0])/alpha,
+                           (v(ivlo+1,k,j,i) + shift[1])/alpha,
+                           (v(ivlo+2,k,j,i) + shift[2])/alpha};
       SPACELOOP2(m,n) {
-        vsq += gcov[m][n] * v(ivlo+m,k,j,i) * v(ivlo+n,k,j,i);
-        Bdotv += gcov[m][n] * v(ivlo+m,k,j,i) * v(iblo+n,k,j,i);
+        //vsq += gcov[m][n] * v(ivlo+m,k,j,i) * v(ivlo+n,k,j,i);
+        vsq += gcov[m][n] * vel[m] * vel[n];
+        //Bdotv += gcov[m][n] * v(ivlo+m,k,j,i) * v(iblo+n,k,j,i);
+        Bdotv += gcov[m][n] * vel[m] * v(iblo+n,k,j,i);
         Bsq += gcov[m][n] * v(iblo+m,k,j,i) * v(iblo+n,k,j,i);
       }
       const Real W = 1.0/std::sqrt(1.0 - vsq);
@@ -360,6 +369,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   fluid::CalculateFluxes(rc);
   parthenon::Update::FluxDivergence(rc, rc);
   fluid::CopyFluxDivergence(rc);*/
+  
+  //fluid::ConservedToPrimitive(rc);
+  //fluid::PrimitiveToConserved(rc);
   
   
   /*auto fail = rc->Get(internal_variables::fail).data;

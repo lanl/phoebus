@@ -281,7 +281,9 @@ class ConToPrim {
     const Real h = 1. + v(peng)/v(prho) +  v(prs)/v(prho);
     Real w = v(prho)*h;
     Real vsq = 0.;
-    Real vel[3] = {v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2)};
+    Real vel[3] = {(v(pvel_lo) + g.beta[0])/g.lapse, 
+                   (v(pvel_lo+1) + g.beta[1])/g.lapse, 
+                   (v(pvel_lo+2) + g.beta[2])/g.lapse};
     SPACELOOP2(ii, jj) {
       vsq += g.gcov[ii][jj]*vel[ii]*vel[jj];
     }
@@ -298,6 +300,7 @@ class ConToPrim {
     SPACELOOP2(ii, jj) {
       Ssq += g.gcon[ii][jj]*S[ii]*S[jj];
     }
+    // TODO(BRR) force gamma = 5/3
     const Real gamma = 5./3.;
 
     Residual res(D,Ssq,tau,gamma);
@@ -349,6 +352,8 @@ class ConToPrim {
 
     if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) || 
         isnan(v(pvel_lo+2)) || isnan(v(prs)) || isnan(v(gm1))) {
+      printf("FAIL! %i %i %i xi: %e Gamma: %e rho: %e xig: %e res: %e D : %e Ssq: %e tau: %e\n", v.i_, v.j_, v.k_,
+        xi, Gamma, rho, xi_guess, res(xi_guess), D, Ssq, tau);
       // These will be averaged over, just make sure they aren't NAN
       v(prho) = 0.;
       v(peng) = 0.;

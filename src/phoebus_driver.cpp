@@ -61,6 +61,7 @@ PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh
 
 TaskListStatus PhoebusDriver::Step() {
   printf("%s:%i\n", __FILE__, __LINE__);
+  exit(-1);
   static bool first_call = true;
   TaskListStatus status;
   Real dt_trial = tm.dt;

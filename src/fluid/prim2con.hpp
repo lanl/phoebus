@@ -48,6 +48,10 @@ void p2c(const Real &rho, const Real v[], const Real b[], const Real &u,
 
   D = gdet * rho*W;
 
+  if (isnan(D)) {
+    printf("D: %e gdet: %e rho: %e W: %e vel: %e %e %e\n", D, gdet, rho, W, v[0], v[1], v[2]);
+  }
+
   const Real rho_rel = (rho + u + p + bsq)*W*W;
   SPACELOOP(m) {
     Real vcov = 0.0;
