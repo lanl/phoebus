@@ -145,9 +145,11 @@ class FluxState {
     // density
     U[crho] = rho*W;
     F[crho] = U[crho]*vtil;
-    if (j == 127 + 4 && d == 1 && i > 180 && i < 190) {
-      printf("[%i] vtil = %e vel = %e u^1 = %e F[RHO] = %e\n", i, vtil, vel, vtil*W/g.alpha, F[crho]);
-    }
+    /*if (j == 127 + 4 && d == 1 && i > 180 && i < 183) {
+      //printf("[%i] vtil = %e vel = %e u^1 = %e F[RHO] = %e\n", i, vtil, vel, vtil*W/g.alpha, F[crho]);
+      printf("[%i] v: %28.18e vtilde: %28.18e beta: %28.18e alpha: %28.18e\n", i, vel, vtil, g.beta[0], g.alpha);
+      printf("[%i] wanted v: %28.18e\n", i, g.beta[0]/g.alpha);
+    }*/
 
     // composition
     if (cye>0) {
@@ -195,6 +197,13 @@ class FluxState {
     const Real vpm = sqrt(robust::make_positive(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0)));
     vp = vcoff*(v0 + vpm) - g.beta[dir];
     vm = vcoff*(v0 - vpm) - g.beta[dir];
+
+    // TODO(BRR) break the code
+    F[crho] = 0.;
+    F[ceng] = 0.;
+    SPACELOOP(ii) {
+      F[cmom_lo + ii] = 0.;
+    }
 
     if (isnan(vp) || isnan(vm)) {
       printf("[%i %i %i] Nan in waves! %e %e %e %e %e %e [%i]\n", k,j,i,vp, vm, vcoff, v0, vpm, g.beta[dir], dir);
@@ -269,11 +278,13 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
 
   for (int m = 0; m < fs.NumConserved(); m++) {
     fs.v.flux(d,m,k,j,i) = 0.5*((Fl[m] + Fr[m])*g.gdet - cmax*((Ur[m] - Ul[m])*g.gammadet));
-    if (m == 0 && j == 127 + 4 && i > 180 && i < 190) {
+    // TODO(BRR) break code
+    fs.v.flux(d,m,k,j,i) = 0.5*(- cmax*((Ur[m] - Ul[m])*g.gammadet));;
+    /*if (m == 0 && j == 127 + 4 && i > 180 && i < 183) {
       printf("[%i] F: %e fl: %e fr: %e (%e) ur: %e ul: %e (%e)\n",
         i, fs.v.flux(d,m,k,j,i), Fl[m], Fr[m], 0.5*(Fl[m] + Fr[m])*g.gdet,
         Ur[m], Ul[m], cmax*(Ur[m] - Ul[m])*g.gammadet);
-    }
+    }*/
     if (isnan(Fl[m]) || isnan(Fr[m]) || isnan(cmax) || isnan(Ur[m]) || isnan(Ul[m])) {
       printf("A nan in a flux! %e %e %e %e %e\n", Fl[m], Fr[m], cmax, Ur[m], Ul[m]);
       PARTHENON_FAIL("a nan in a flux :(");

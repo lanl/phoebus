@@ -32,6 +32,11 @@ xmax = 12
 ymin = -10
 ymax = 10
 
+#xmin = 0
+#xmax = 40
+#ymin = -40
+#ymax = 40
+
 nfinal = -1
 #nfinal = 1
 #nfinal = 15
@@ -93,6 +98,7 @@ st = dfile1.Get("src_terms", flatten=False)
 v1 = vel[:,:,:,:,0]
 v2 = vel[:,:,:,:,1]
 v3 = vel[:,:,:,:,2]
+fail = dfile.Get("fail")
 #b1 = bfield[:,:,:,:,0]
 #b2 = bfield[:,:,:,:,1]
 #b3 = bfield[:,:,:,:,2]
@@ -107,10 +113,11 @@ v3 = vel[:,:,:,:,2]
 #sys.exit()
 
 var = density
-vmin = -4
+vmin = -8
 vmax = 0
 
 var1 = dfile1.Get("p.density", flatten=False)
+fail = dfile1.Get("fail", flatten=False)
 
 #var = np.fabs(v1)
 #vmin=-4
@@ -134,6 +141,7 @@ def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet'):
       if uselog:
         im = ax.pcolormesh(x[n,:,:], y[n,:,:], np.log10(myvar[n,0].transpose()),
           vmin=vmin, vmax=vmax, cmap=cmap)
+        #im = ax.pcolormesh(x[n,:,:], y[n,:,:], np.log10(1-fail[n,0]).transpose())
       else:
         im = ax.pcolormesh(x[n,:,:], y[n,:,:], myvar[n,0].transpose(),
           vmin=vmin, vmax=vmax, cmap=cmap)

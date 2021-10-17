@@ -83,7 +83,9 @@ Real find_root(F &func, Real a, Real b, const Real tol, int maxiter, int line, b
     niter++;
   }
 
-  if (niter == maxiter) {
+  Real ans = 0.5*(a + b);
+
+  if (niter == maxiter || isnan(ans)) {
     success = false;
   } else {
     success = true;
@@ -101,6 +103,7 @@ Real find_root_secant(F func, const Real x_guess, const Real tol, const int maxi
   Real x1 = (1. + 1.e-5)*x_guess;
 
   while (fabs(x0 - x1)/fabs(x0) > tol) {
+  //while (fabs(func(x1)) > tol) {
     Real x2 = x1 - func(x1) * (x1 - x0) / (func(x1) - func(x0));
     x0 = x1;
     x1 = x2;
@@ -112,6 +115,9 @@ Real find_root_secant(F func, const Real x_guess, const Real tol, const int maxi
   }
 
   success = true;
+  if (isnan(x1)) {
+    success = false;
+  }
   return x1;
 }
 
@@ -277,6 +283,9 @@ class ConToPrim {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
 
+    bool is_high_dens = v(prho) > 0.01 ? true : false;
+    is_high_dens = true;
+
     // Calculate initial guess
     const Real h = 1. + v(peng)/v(prho) +  v(prs)/v(prho);
     Real w = v(prho)*h;
@@ -290,6 +299,14 @@ class ConToPrim {
     Real xi_guess = Gamma*Gamma*w; 
     
     const Real igdet = 1.0/g.gdet;
+
+    //if (v.i_ == 121 && v.j_ == 145) {
+    if (v.i_ == 138 && v.j_ == 186) {
+      printf("cons: %e %e %e %e %e\n", v(crho), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),
+        v(ceng));
+      printf("prim: %e %e %e %e %e\n", v(prho), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2),
+        v(peng));
+    }
 
     const Real D = v(crho)*igdet;
     const Real tau = v(ceng)*igdet;
@@ -308,6 +325,10 @@ class ConToPrim {
     const Real xi = find_root_secant(res, xi_guess, rel_tolerance, max_iter, success);
 
     if (!success) {
+      if (is_high_dens) {
+        printf("rootfind failed! [%i %i] xi_guess: %e res_guess: %e\n", v.i_, v.j_, xi_guess, res(xi_guess));
+        //PARTHENON_FAIL("isudhf");
+      }
       return ConToPrimStatus::failure;
     }
 
@@ -346,6 +367,11 @@ class ConToPrim {
 
     if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) || 
         isnan(v(pvel_lo+2)) || isnan(v(prs)) || isnan(v(gm1))) {
+      if (is_high_dens) {
+        printf("A nan! [%i %i] %e %e %e %e %e %e %e %e xi: %e Gamma: %e\n", v.i_, v.j_, rho, ug, P, v(pvel_lo), v(pvel_lo+1),
+          v(pvel_lo+2), v(prs), v(gm1), xi, Gamma);
+        //PARTHENON_FAIL("suhdf");
+      }
       // These will be averaged over, just make sure they aren't NAN
       v(prho) = 0.;
       v(peng) = 0.;

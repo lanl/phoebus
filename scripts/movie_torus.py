@@ -205,29 +205,30 @@ for n, dfnam in enumerate(dfnams):
 
   fig, axes = plt.subplots(1, 5, figsize=(14,8))
   
-  for idx in range(5):
-    #myplot(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]), idx)
-    myplot(np.fabs(cons[idx] / (fd[:,:,:,:,idx] + st[:,:,:,:,idx])), idx, vmin=-3, vmax=3)
-  myplot(density, 0, half=True, cbar=False)
-  myplot(np.fabs(v1), 1, half=True, cbar=False)
-  myplot(np.fabs(v2), 2, half=True, cbar=False)
-  myplot(np.fabs(v3), 3, half=True, cbar=False)
-  myplot(ug, 4, half=True, cbar=False)
+  #for idx in range(5):
+  #  myplot(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]), idx)
+  #  myplot(np.fabs(cons[idx] / (fd[:,:,:,:,idx] + st[:,:,:,:,idx])), idx, vmin=-3, vmax=3)
+  #myplot(density, 0, half=True, cbar=False)
+  #myplot(np.fabs(v1), 1, half=True, cbar=False)
+  #myplot(np.fabs(v2), 2, half=True, cbar=False)
+  #myplot(np.fabs(v3), 3, half=True, cbar=False)
+  #myplot(ug, 4, half=True, cbar=False)
+
+  myplot(density, 0)
+  myplot(ug/density, 1)
+  myplot(np.fabs(v1), 2)
+  myplot(np.fabs(v2), 3)
+  myplot(np.fabs(v3), 4)
+
+  myplot(density0, 0, half=True)
+  myplot(ug0/density0, 1, half=True)
+  myplot(np.fabs(v10), 2, half=True)
+  myplot(np.fabs(v20), 3, half=True)
+  myplot(np.fabs(v30), 4, half=True)
 
   for idx in range(5):
     axes[idx].contour(xc[0,:,:], yc[0,:,:], density0[0,0,:,:].transpose(), [1.e-3], colors='k',
       linestyles='--')
-
-  #myplot(density, 0)
-  #myplot(ug/density, 1)
-  #myplot(np.fabs(v1), 2)
-  #myplot(np.fabs(v2), 3)
-  #myplot(np.fabs(v3), 4)
-
-  #myplot(density0, 0, half=True)
-  #myplot(ug0/density0, 1, half=True)
-  #myplot(np.fabs(v10), 2, half=True)
-  #myplot(np.fabs(v20), 3, half=True)
-  #myplot(np.fabs(v30), 4, half=True)
+  
   plt.savefig("frame_%08d.png" % n, bbox_inches='tight', dpi=dpi)
   plt.close()

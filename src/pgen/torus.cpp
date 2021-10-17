@@ -7,6 +7,7 @@
 // Temporary
 #include <parthenon/driver.hpp>                                                                      
 using namespace parthenon::driver::prelude;
+#include "fixup/fixup.hpp"
 
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
@@ -184,9 +185,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       if (r > rin) lnh = log_enthalpy(r,th,a,rin,angular_mom,uphi);
 
 
-      if (j == 128) {
-        printf("i: %i x1: %e r: %e lnh: %e\n", i, x1, r, lnh);
-      }
+      //if (j == 128) {
+      //  printf("i: %i x1: %e r: %e lnh: %e\n", i, x1, r, lnh);
+     // }
 
       Real beta[3];
       Real gcov[4][4];
@@ -236,8 +237,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
         if (j == 127 + 4 && i > 180 && i < 190) {
           int d = 0;
-          printf("[%i] v1: %e u^1: %e vtilde: %e beta/alpha = %e\n", i, v(ivlo+d,k,j,i),
-            ucon[d+1], lapse*ucon[d+1]/beta[d], beta[d]/lapse);
+          //printf("[%i] vtilde: %e beta: %e alpha: %e\n", i, lapse*ucon[d+1]/beta[d], beta[d], lapse);
+          printf("[%i] v1: %e u^1: %e u^e: %e vtilde: %e beta/alpha = %e\n", i, v(ivlo+d,k,j,i),
+            ucon[d+1], ucon[d+2], lapse*ucon[d+1]/beta[d], beta[d]/lapse);
         }
         //v(ivlo,k,j,i) = beta[0]/lapse;
         //v(ivlo+1,k,j,i) = beta[1]/lapse;
@@ -359,11 +361,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // now normalize the b-field
   //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
+  
+  fluid::ConservedToPrimitive(rc);
+  fixup::ConservedToPrimitiveFixup(rc);
+  fluid::PrimitiveToConserved(rc);
 
-  /*fluid::CalculateFluidSourceTerms(rc, rc);
-  fluid::CalculateFluxes(rc);
-  parthenon::Update::FluxDivergence(rc, rc);
-  fluid::CopyFluxDivergence(rc);*/
   
   
   /*auto fail = rc->Get(internal_variables::fail).data;
@@ -409,6 +411,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   std::cout << "rho, u = " << v(irho,kb.s,256,440) << " " << v(ieng, kb.s, 256, 440) << std::endl;
   std::cout << "v1_2 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
   */
+//exit(-1);
 }
 
 void ProblemModifier(ParameterInput *pin) {

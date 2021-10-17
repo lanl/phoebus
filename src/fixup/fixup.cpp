@@ -130,10 +130,16 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
         }
       }, Kokkos::Sum<int>(nfail_total));
   printf("total nfail: %i\n", nfail_total);
+  //if (nfail_total > 0) {
+  //  exit(-1);
+  //}
+
   
   int nfixed_total = 0;
   auto fail = rc->Get(impl::fail).data;
   auto tmp_fail = fail.GetDeviceMirror();
+  auto initial_fail = fail.GetDeviceMirror();
+  initial_fail.DeepCopy(fail);
   while (nfixed_total < nfail_total) {
     // Copy ifail array
     tmp_fail.DeepCopy(fail);
@@ -194,11 +200,11 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
           } else {
 
-            v(b,prho,k,j,i) = fixup(prho);
+            /*v(b,prho,k,j,i) = fixup(prho);
             v(b,peng,k,j,i) = fixup(peng);
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
               v(b,pv,k,j,i) = fixup(pv);
-            }
+            }*/
 
             // Apply floors
             double rho_floor, sie_floor;
@@ -206,6 +212,20 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
             double u_floor = v(b,prho,k,j,i)*sie_floor;
             v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
+
+            /*if (v(b,prho,k,j,i) > 0.01) {
+              printf("Failure in large density region! [%i %i] %e %e\n", j, i,
+                coords.x1v(k, j, i), coords.x2v(k,j,i));
+              PARTHENON_FAIL("isjdf");
+            }*/
+
+            // For now, force floors
+            v(b,prho,k,j,i) = rho_floor;
+            v(b,peng,k,j,i) = u_floor;
+            // and zero vel
+            for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
+              v(b,pv,k,j,i) = fixup(pv);
+            }
 
             // Apply ceilings
             
@@ -287,6 +307,8 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
     nfixed_total += nfixed;
     fail.DeepCopy(tmp_fail);
   }
+
+  fail.DeepCopy(initial_fail);
   
   //parthenon::par_for(
   //    DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
@@ -319,11 +341,13 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
             // Apply floors
-            double rho_floor, sie_floor;
+            double rho_floor, sie_floor, u_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i), rho_floor, sie_floor);
+            rho_floor = 1.e-5*exp(-2.*coords.x1v(k, j, i));
+            u_floor = 1.e-7*exp(-3.666*coords.x1v(k,j,i));
             
             v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
-            double u_floor = v(b,prho,k,j,i)*sie_floor;
+            //u_floor = v(b,prho,k,j,i)*sie_floor;
             v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
                                 v(b,peng,k,j,i)/v(b,prho,k,j,i));

@@ -440,7 +440,30 @@ TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const In
         fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
                                                             : FailFlags::fail);
       });
-  printf("%s:%i\n", __FILE__, __LINE__);
+  
+  /*std::vector<std::string> diag_var({fluid_cons::density});
+  IndexRange iib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jjb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kkb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  auto diag = rc->PackVariables(diag_var);
+  ParArrayND<Real> myflux("ughhh", iib.e - iib.s + 3);
+  printf("divF:\n");
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
+    0, 0, 127+parthenon::Globals::nghost, 127+parthenon::Globals::nghost,
+      iib.s - 1, iib.e + 1,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        myflux(i - (iib.s - 1)) = diag(0,k,j,i);
+      });
+  pmb->exec_space.fence();
+  auto flux_h = myflux.GetHostMirrorAndCopy();
+  for (int i = 0; i < iib.e - iib.s + 3; i++) {
+    //printf("flux(%i) = %e\n", i, flux_h(i));
+    printf("%e, ", flux_h(i));
+    //if (i > 180 && i < 190) {
+    //  printf("flux(%i) = %e\n", i, flux_h(i));
+    //}
+  }
+  printf("%s:%i\n", __FILE__, __LINE__);*/
 
   return TaskStatus::complete;
 }
@@ -538,6 +561,11 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
       DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        if (i == 121 && j == 145) {
+          printf("divF: %e %e %e %e %e\n", 
+            divf(crho,k,j,i), divf(cmom_lo,k,j,i), divf(cmom_lo+1,k,j,i),
+            divf(cmom_lo+2,k,j,i), divf(ceng,k,j,i));
+        }
         diag(0,k,j,i) = divf(crho,k,j,i);
         diag(1,k,j,i) = divf(cmom_lo,k,j,i);
         diag(2,k,j,i) = divf(cmom_lo+1,k,j,i);
@@ -545,6 +573,26 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
         diag(4,k,j,i) = divf(ceng,k,j,i);
       }
   );
+  
+  /*ParArrayND<Real> myflux("ughhh", ib.e - ib.s + 3);
+  printf("divF:\n");
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
+    0, 0, 127+parthenon::Globals::nghost, 127+parthenon::Globals::nghost,
+      ib.s - 1, ib.e + 1,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        myflux(i - (ib.s - 1)) = divf(crho,k,j,i);
+      });
+  pmb->exec_space.fence();
+  auto flux_h = myflux.GetHostMirrorAndCopy();
+  for (int i = 0; i < ib.e - ib.s + 3; i++) {
+    //printf("flux(%i) = %e\n", i, flux_h(i));
+    printf("%e, ", flux_h(i));
+    //if (i > 180 && i < 190) {
+    //  printf("flux(%i) = %e\n", i, flux_h(i));
+    //}
+  }
+  printf("\n");
+  exit(-1);*/
   return TaskStatus::complete;
 }
 
@@ -636,6 +684,17 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
           diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
+        }
+
+        if (i == 121 && j == 145) {
+          printf("src: %e %e %e %e %e\n", 0., src(cmom_lo,k,j,i),
+            src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i), src(ceng,k,j,i));
+        }
+
+        // TODO(BRR) break code
+        src(ceng, k, j, i) = 0.;
+        SPACELOOP(ii) {
+          src(cmom_lo+ii, k, j, i) = 0.;
         }
 
       });
@@ -730,7 +789,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   }
 #undef FLUX
  
-  printf("a\n");
+  /*printf("a\n");
   ParArrayND<Real> myflux("ughhh", ib.e - ib.s + 3);
   printf("a\n");
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
@@ -755,8 +814,8 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto rv = flux.ReconVars();
   for (auto &v : rv) {
     printf("  %s\n", v.c_str());
-  }
-  exit(-1);
+  }*/
+  //exit(-1);
   
 
   return TaskStatus::complete;
