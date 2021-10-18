@@ -127,12 +127,20 @@ class Residual {
   Residual(const Real D, const Real q, const Real bsq,
 	   const Real bsq_rpsq, const Real rsq,
 	   const Real rbsq, const Real v0sq, const singularity::EOS &eos,
-	   const Real rho_floor, const Real e_floor,
-     const Real gam_max, const Real e_max)
+     const fixup::Bounds &bnds, const Real x1, const Real x2, const Real x3)
+	   //const Real rho_floor, const Real e_floor,
+     //const Real gam_max, const Real e_max)
     : D_(D), q_(q), bsq_(bsq), bsq_rpsq_(bsq_rpsq), rsq_(rsq),
       rbsq_(rbsq), v0sq_(v0sq),
-      eos_(eos), rho_floor_(rho_floor), e_floor_(e_floor),
-      gam_max_(gam_max), e_max_(e_max) {}
+      eos_(eos), bounds_(bnds),
+      x1_(x1), x2_(x2), x3_(x3)
+      //rho_floor_(rho_floor), e_floor_(e_floor),
+      //gam_max_(gam_max), e_max_(e_max)
+      {
+    Real garbage = 0.0;
+    bounds_.GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
+    bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
+  }
 
   KOKKOS_FORCEINLINE_FUNCTION
   Real x_mu(const Real mu) {
@@ -178,6 +186,8 @@ class Residual {
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real ehat_mu(const Real mu, const Real qbar, const Real rbarsq, const Real vhatsq, const Real What) {
+    Real rho = rhohat_mu(1.0/What);
+    bounds_.GetFloors(x1_, x2_, x3_, rho, e_floor_);
     const Real ehat_trial = What*(qbar - mu*rbarsq) + vhatsq*What*What/(1.0 + What);
     used_energy_floor_ = false;
     used_energy_max_ = false;
@@ -241,7 +251,9 @@ class Residual {
  private:
   const Real D_, q_, bsq_, bsq_rpsq_, rsq_, rbsq_, v0sq_;
   const singularity::EOS &eos_;
-  const Real rho_floor_, e_floor_, gam_max_, e_max_;
+  const fixup::Bounds &bounds_;
+  const Real x1_, x2_, x3_;
+  Real rho_floor_, e_floor_, gam_max_, e_max_;
   bool used_density_floor_, used_energy_floor_, used_energy_max_, used_gamma_max_;
 
   KOKKOS_FORCEINLINE_FUNCTION
@@ -399,7 +411,8 @@ class ConToPrim {
     if (num_nans > 0) return ConToPrimStatus::failure;
     const Real igdet = 1.0/g.gdet;
 
-    Real rhoflr, epsflr;
+    Real rhoflr = 0.0;
+    Real epsflr;
     bounds.GetFloors(x1,x2,x3,rhoflr,epsflr);
     Real gam_max, eps_max;
     bounds.GetCeilings(x1,x2,x3,gam_max,eps_max);
@@ -494,7 +507,7 @@ class ConToPrim {
     //PARTHENON_REQUIRE(v0sq < 1, "v0sq >= 1: " + std::to_string(v0sq));
     //PARTHENON_REQUIRE(v0sq >= 0, "v0sq < 0: " + std::to_string(v0sq));
 
-    Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,rhoflr,epsflr,gam_max,eps_max);
+    Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,bounds,x1,x2,x3);//rhoflr,epsflr,gam_max,eps_max);
 
     // find the upper bound
     //const Real mu_r = res.compute_upper_bound(h0sq_);
@@ -519,13 +532,13 @@ class ConToPrim {
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
 
-    if (v(prho) < 0.99999*rhoflr ||
+    /*if (v(prho) < 0.99999*rhoflr ||
         v(peng)/v(prho) < 0.99999*epsflr ||
         v(peng)/v(prho) > 1.00001*eps_max ||
         W > 1.00001*gam_max) {
       printf("bounds violated %e %e %e %e\n", v(prho)/rhoflr, v(peng)/v(prho)/epsflr,
                                               v(peng)/v(prho)/eps_max, W/gam_max);
-    }
+    }*/
 
     //const Real vscale = (W > 10 ? 10.0/W : 1.0);
     Real vel[3];
