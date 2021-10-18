@@ -280,9 +280,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real W = 1.0/std::sqrt(1.0 - vsq);
       Real b0 = W*Bdotv;
       Real bsq = (Bsq + b0*b0)/(W*W);
-      if (bsq > 1.e-16) {
-        std::cout << "bsq > 0: " << bsq << " " << Bsq << " " << b0 << std::endl;
-      }
       Real beta = v(iprs,k,j,i)/(0.5*bsq + 1.e-100);
       if (v(irho,k,j,i) > 1.e-4 && beta < bmin) bmin = beta;
       //if (bsq > b2max) b2max = bsq;
