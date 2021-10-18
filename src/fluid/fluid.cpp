@@ -381,6 +381,9 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   auto coords = pmb->coords;
 
   auto fail = rc->Get(internal_variables::fail).data;
+  
+  std::vector<std::string> diag_var({fluid_prim::energy});
+  auto diag = rc->PackVariables(diag_var);
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
   // if we can combine them, we can get rid of the mesh sized scratch array
@@ -392,6 +395,9 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
         fail(k, j, i) = (status == con2prim_robust::ConToPrimStatus::success
                                  ? con2prim_robust::FailFlags::success
                                  : con2prim_robust::FailFlags::fail);
+        if (i == 138 && j == 186) {
+          printf("peng(%i %i) = %e\n", i, j, diag(0,k,j,i));
+        }
       });
 
   return TaskStatus::complete;
@@ -399,21 +405,19 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
-  printf("%s:%i\n", __FILE__, __LINE__);
   return c2p(rc, ib, jb, kb);
 }
 
 template <typename T>
 TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const IndexRange &jb,
                                            const IndexRange &kb) {
-  printf("%s:%i\n", __FILE__, __LINE__);
+  printf("C2P...\n");
   using namespace con2prim_vanderholst;
   auto *pmb = rc->GetParentPointer().get();
   
@@ -464,6 +468,7 @@ TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const In
     //}
   }
   printf("%s:%i\n", __FILE__, __LINE__);*/
+  pmb->exec_space.fence(); printf("C2P done!\n");
 
   return TaskStatus::complete;
 }
@@ -600,7 +605,7 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
 // template <typename T>
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src) {
-  printf("%s:%i\n", __FILE__, __LINE__);
+  printf("CALCULATE SOURCE...\n");
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -686,25 +691,53 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
         }
 
-        if (i == 121 && j == 145) {
+        /*if (i == 121 && j == 145) {
           printf("src: %e %e %e %e %e\n", 0., src(cmom_lo,k,j,i),
             src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i), src(ceng,k,j,i));
-        }
+        }*/
 
         // TODO(BRR) break code
         src(ceng, k, j, i) = 0.;
         SPACELOOP(ii) {
           src(cmom_lo+ii, k, j, i) = 0.;
         }
-
       });
+
+  {
+  pmb->exec_space.fence();
+  std::vector<std::string> diagpack_vars({fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
+  fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
+  PackIndexMap dimap;
+  auto diagpack = rc->PackVariables(diagpack_vars, dimap);
+  const int prho = dimap[fluid_prim::density].first;
+  const int pvel_lo = dimap[fluid_prim::velocity].first;
+  const int peng = dimap[fluid_prim::energy].first;
+  const int crho = dimap[fluid_cons::density].first;
+  const int cmom_lo = dimap[fluid_cons::momentum].first;
+  const int ceng = dimap[fluid_cons::energy].first;
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
+    0, 0,
+      KOKKOS_LAMBDA(const int n) {
+        int k = 0;
+        int j = 186;
+        int i = 138;
+        printf("src prim: %e %e %e %e %e\n",
+        diagpack(prho,k,j,i), diagpack(pvel_lo,k,j,i),
+        diagpack(pvel_lo+1,k,j,i), diagpack(pvel_lo+2,k,j,i),
+        diagpack(peng, k,j,i));
+        printf("src cons: %e %e %e %e %e\n",
+        diagpack(crho,k,j,i), diagpack(cmom_lo,k,j,i),
+        diagpack(cmom_lo+1,k,j,i), diagpack(cmom_lo+2,k,j,i),
+        diagpack(ceng,k,j,i));
+      });
+  pmb->exec_space.fence();
+  }
 
   return TaskStatus::complete;
 }
 
 // template <typename T>
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
     return TaskStatus::complete;

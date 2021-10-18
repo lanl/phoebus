@@ -298,15 +298,14 @@ class ConToPrim {
     Real Gamma = 1./sqrt(1. - vsq);
     Real xi_guess = Gamma*Gamma*w; 
     
-    const Real igdet = 1.0/g.gdet;
-
-    //if (v.i_ == 121 && v.j_ == 145) {
     if (v.i_ == 138 && v.j_ == 186) {
-      printf("cons: %e %e %e %e %e\n", v(crho), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),
-        v(ceng));
-      printf("prim: %e %e %e %e %e\n", v(prho), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2),
+      printf("c2p prim before: %e %e %e %e %e\n", v(prho), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2),
         v(peng));
+      printf("c2p cons before: %e %e %e %e %e\n", v(crho), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),
+        v(ceng));
     }
+    
+    const Real igdet = 1.0/g.gdet;
 
     const Real D = v(crho)*igdet;
     const Real tau = v(ceng)*igdet;
@@ -364,6 +363,28 @@ class ConToPrim {
                   //eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
                   //wsum += w;
                   //sum += w*v(b,iv,k+n,j+m,i+l);
+    
+    // TODO(BRR) Set signal speeds more efficiently than by a p2c call
+    Real ye_prim = 0.0;
+    if (pye > 0) ye_prim = v(pye);
+    Real ye_cons;
+    //Real S[3];
+    Real bcons[3];
+    Real sig[3];
+    Real bu[] = {0.0, 0.0, 0.0};
+    prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
+                  g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
+                  v(crho), S, bcons, v(ceng), ye_cons, sig);
+    for (int i = 0; i < sig_hi-sig_lo+1; i++) {
+      v(sig_lo+i) = sig[i];
+    }
+
+    if (v.i_ == 138 && v.j_ == 186) {
+      printf("c2p prim after: %e %e %e %e %e\n", v(prho), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2),
+        v(peng));
+      printf("c2p cons after: %e %e %e %e %e\n", v(crho), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),
+        v(ceng));
+    }
 
     if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) || 
         isnan(v(pvel_lo+2)) || isnan(v(prs)) || isnan(v(gm1))) {

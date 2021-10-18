@@ -43,6 +43,11 @@ xmax = 8
 ymin = -4
 ymax = 4
 
+xmin = 6.8
+xmax = 8.0
+ymin = -3.2
+ymax = -1.6
+
 #xmin = 0
 #xmax = 5
 #ymin = -5
@@ -55,7 +60,7 @@ h_ = 0.3
 ndim = 256
 
 # Plotting macro
-def myplot(myvar, n, vmin=-5, vmax=0, uselog=True, cmap='jet', half=False, cbar=True):
+def myplot(myvar, n, vmin=-12, vmax=0, uselog=True, cmap='jet', half=False, cbar=True):
   from mpl_toolkits.axes_grid1 import make_axes_locatable
   ax = axes[n]
   #ax = axes
@@ -87,6 +92,7 @@ def myplot(myvar, n, vmin=-5, vmax=0, uselog=True, cmap='jet', half=False, cbar=
       #ax.set_ylim([-5,5])
       #ax.set_xlim([0,40])
       #ax.set_ylim([-40,40])
+      ax.plot([7.38419], [-2.51564], marker='.', color='r')
       ax.set_xlim([xmin,xmax])
       ax.set_ylim([ymin,ymax])
     else:
@@ -215,10 +221,11 @@ for n, dfnam in enumerate(dfnams):
   #myplot(ug, 4, half=True, cbar=False)
 
   myplot(density, 0)
-  myplot(ug/density, 1)
-  myplot(np.fabs(v1), 2)
-  myplot(np.fabs(v2), 3)
-  myplot(np.fabs(v3), 4)
+  #myplot(ug/density, 1)
+  myplot(np.fabs(v1), 1)
+  myplot(np.fabs(v2), 2)
+  myplot(np.fabs(v3), 3)
+  myplot(ug, 4)
 
   myplot(density0, 0, half=True)
   myplot(ug0/density0, 1, half=True)

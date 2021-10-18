@@ -264,9 +264,9 @@ class VarAccessor {
   Real &operator()(const int n) const {
     return var_(b_, n, k_, j_, i_);
   }
+  const int b_, i_, j_, k_;
  private:
   const T &var_;
-  const int b_, i_, j_, k_;
 };
 
 struct CellGeom {
@@ -573,6 +573,10 @@ class ConToPrim {
 
     for (int i = 0; i < sig_hi-sig_lo+1; i++) {
       v(sig_lo+i) = sig[i];
+    }
+
+    if (v.i_ == 138 && v.j_ == 186) {
+      printf("prim: %e %e %e %e %e\n", v(prho), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2), v(peng));
     }
 
     num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);

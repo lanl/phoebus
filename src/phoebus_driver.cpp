@@ -60,7 +60,6 @@ PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh
 }
 
 TaskListStatus PhoebusDriver::Step() {
-  printf("%s:%i\n", __FILE__, __LINE__);
   static bool first_call = true;
   TaskListStatus status;
   Real dt_trial = tm.dt;
@@ -70,7 +69,6 @@ TaskListStatus PhoebusDriver::Step() {
   if (tm.time + dt_trial > tm.tlim) dt_trial = tm.tlim - tm.time;
   tm.dt = dt_trial;
   integrator->dt = dt_trial;
-  printf("tm.dt: %e integrator->dt: %e\n", tm.dt, integrator->dt);
 
   for (int stage = 1; stage <= integrator->nstages; stage++) {
     TaskCollection tc = RungeKuttaStage(stage);
@@ -93,6 +91,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const Real beta = integrator->beta[stage - 1];
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
+  printf(" --- STAGE %i --- (dt = %e beta = %e) \n", stage, dt, beta);
 
   std::vector<std::string> src_names({fluid_cons::momentum, fluid_cons::energy});
 
@@ -235,6 +234,9 @@ TaskListStatus PhoebusDriver::RadiationStep() {
   if (!rad_active) {
     return TaskListStatus::complete;
   }
+
+  printf("RAD NOT DISABLED!\n");
+  exit(-1);
 
   auto num_independent_task_lists = blocks.size();
 

@@ -66,7 +66,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
+  printf("CONSERVED TO PRIMITIVE FIXUP... \n");
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -200,11 +200,11 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
           } else {
 
-            /*v(b,prho,k,j,i) = fixup(prho);
+            v(b,prho,k,j,i) = fixup(prho);
             v(b,peng,k,j,i) = fixup(peng);
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
               v(b,pv,k,j,i) = fixup(pv);
-            }*/
+            }
 
             // Apply floors
             double rho_floor, sie_floor;
@@ -220,12 +220,12 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             }*/
 
             // For now, force floors
-            v(b,prho,k,j,i) = rho_floor;
+            /*v(b,prho,k,j,i) = rho_floor;
             v(b,peng,k,j,i) = u_floor;
             // and zero vel
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
               v(b,pv,k,j,i) = fixup(pv);
-            }
+            }*/
 
             // Apply ceilings
             
@@ -248,7 +248,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
               v(b,pvel_lo+2,k,j,i) *= vfac;
             }
 
-              double vfac = sqrt(vsqmax/vsq); 
+            //double vfac = sqrt(vsqmax/vsq); 
             //if (vsq > vsqmax || isnan(vfac)) {
             //  printf("v: %e %e %e vfac: %e vsqmax: %e vsqL %e\n", v(b,pvel_lo,k,j,i),
             //    v(b,pvel_lo+1,k,j,i), v(b,pvel_lo+2,k,j,i), vfac, vsqmax, vsq);
@@ -343,11 +343,11 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             // Apply floors
             double rho_floor, sie_floor, u_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i), rho_floor, sie_floor);
-            rho_floor = 1.e-5*exp(-2.*coords.x1v(k, j, i));
-            u_floor = 1.e-7*exp(-3.666*coords.x1v(k,j,i));
+            //rho_floor = 1.e-5*exp(-2.*coords.x1v(k, j, i));
+            //u_floor = 1.e-7*exp(-3.666*coords.x1v(k,j,i));
             
             v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
-            //u_floor = v(b,prho,k,j,i)*sie_floor;
+            u_floor = v(b,prho,k,j,i)*sie_floor;
             v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
                                 v(b,peng,k,j,i)/v(b,prho,k,j,i));
@@ -391,10 +391,16 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             for (int m = slo; m <= shi; m++) {
               v(b,m,k,j,i) = sig[m-slo];
             }
+            if (i == 138 && j == 186) {
+              printf("fixup prims: %e %e %e %e %e\n",
+                v(b,prho,k,j,i), v(b,pvel_lo,k,j,i), v(b,pvel_lo+1,k,j,i),
+                v(b,pvel_lo+2,k,j,i), v(b,peng,k,j,i));
+            }
       });
 
   // TODO(BRR) only do this where necessary
-  printf("%s:%i\n", __FILE__, __LINE__);
+  
+  pmb->exec_space.fence(); //printf("CONSERVED TO PRIMTIIVE FIXUP DONE!\n");
 
   return TaskStatus::complete;
 

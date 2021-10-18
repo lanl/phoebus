@@ -150,6 +150,7 @@ for n, dfnam in enumerate(dfnams):
   data['mom2'][n] = mom[0,0,jplt,iplt,1]
   data['mom3'][n] = mom[0,0,jplt,iplt,2]
   data['cener'][n] = dfile.Get("c.energy", flatten=False)[0,0,jplt,iplt]
+  t[n] = n
 
 print(data)
 print(t)
@@ -178,6 +179,7 @@ for axis in axes:
     ax.legend(loc=2)
     ax.set_xlim([t[0], t[-1]])
     ax.set_xticklabels([])
+    ax.set_yscale('log')
 
 plt.show()
 sys.exit()

@@ -199,11 +199,11 @@ class FluxState {
     vm = vcoff*(v0 - vpm) - g.beta[dir];
 
     // TODO(BRR) break the code
-    F[crho] = 0.;
+    /*F[crho] = 0.;
     F[ceng] = 0.;
     SPACELOOP(ii) {
       F[cmom_lo + ii] = 0.;
-    }
+    }*/
 
     if (isnan(vp) || isnan(vm)) {
       printf("[%i %i %i] Nan in waves! %e %e %e %e %e %e [%i]\n", k,j,i,vp, vm, vcoff, v0, vpm, g.beta[dir], dir);
