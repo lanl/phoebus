@@ -36,6 +36,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       Real rp = pin->GetOrAddReal("fixup", "rho_exp_floor", -2.0);
       Real sp = pin->GetOrAddReal("fixup", "sie_exp_floor", -1.0);
       params.Add("floor", Floors(exp_x1_rho_sie_floor_tag, rho0, sie0, rp, sp));
+    } else if (floor_type == "ExpX1RhoU") {
+      std::cout << "FOUND FLOOOR TYPE" << std::endl;
+      Real rho0 = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
+      Real sie0 = pin->GetOrAddReal("fixup", "u0_floor", 0.0);
+      Real rp = pin->GetOrAddReal("fixup", "rho_exp_floor", -2.0);
+      Real sp = pin->GetOrAddReal("fixup", "u_exp_floor", -3.0);
+      params.Add("floor", Floors(exp_x1_rho_u_floor_tag, rho0, sie0, rp, sp));
     } else {
       PARTHENON_FAIL("invalid <fixup>/floor_type input");
     }
