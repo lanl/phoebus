@@ -9,8 +9,8 @@ class ValenciaCowling {
 
 public:
   KOKKOS_INLINE_FUNCTION
-  ValenciaCowling(const Real alpha_, const Real betacon_[3], const Real gammacov_[3][3], 
-                  const Real gammacon_[3][3], const Real dgcov_[4][4][4], 
+  ValenciaCowling(const Real alpha_, const Real betacon_[3], const Real gammacov_[3][3],
+                  const Real gammacon_[3][3], const Real dgcov_[4][4][4],
                   const Real gradlnalpha_[4], const Real rho_, const Real u_, const Real P_,
                   const Real vcon_[3]) {
     alpha = alpha_;
@@ -34,9 +34,10 @@ public:
 
     SPACELOOP(ii) {
       vcov[ii] = 0.;
-      vtildecon[ii] = vcon[ii] - betacon[ii]/alpha;
+      vtildecon[ii] = alpha*vcon[ii] - betacon[ii];
     }
 
+    vsq = 0.;
     SPACELOOP2(ii, jj) {
       vsq += gammacov[ii][jj]*vcon[ii]*vcon[jj];
       vcov[ii] += gammacov[ii][jj]*vcon[jj];
@@ -44,7 +45,7 @@ public:
     Gamma = 1./(sqrt(1. - vsq));
 
     h = 1. + u/rho + P/rho;
-    
+
     D = rho*Gamma;
     SPACELOOP(ii) {
       Scov[ii] = rho*h*Gamma*Gamma*vcov[ii];

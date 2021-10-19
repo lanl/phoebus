@@ -381,7 +381,7 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   auto coords = pmb->coords;
 
   auto fail = rc->Get(internal_variables::fail).data;
-  
+
   std::vector<std::string> diag_var({fluid_prim::energy});
   auto diag = rc->PackVariables(diag_var);
 
@@ -420,7 +420,7 @@ TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const In
   printf("C2P...\n");
   using namespace con2prim_vanderholst;
   auto *pmb = rc->GetParentPointer().get();
-  
+
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
 
@@ -440,11 +440,11 @@ TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const In
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
       invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        auto status = invert.Solve(geom, eos, k, j, i);    
+        auto status = invert.Solve(geom, eos, k, j, i);
         fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
                                                             : FailFlags::fail);
       });
-  
+
   /*std::vector<std::string> diag_var({fluid_cons::density});
   IndexRange iib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jjb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -567,7 +567,7 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         if (i == 121 && j == 145) {
-          printf("divF: %e %e %e %e %e\n", 
+          printf("divF: %e %e %e %e %e\n",
             divf(crho,k,j,i), divf(cmom_lo,k,j,i), divf(cmom_lo+1,k,j,i),
             divf(cmom_lo+2,k,j,i), divf(ceng,k,j,i));
         }
@@ -578,7 +578,7 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
         diag(4,k,j,i) = divf(ceng,k,j,i);
       }
   );
-  
+
   /*ParArrayND<Real> myflux("ughhh", ib.e - ib.s + 3);
   printf("divF:\n");
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
@@ -703,7 +703,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
         }*/
       });
 
-  {
+  /*{
   pmb->exec_space.fence();
   std::vector<std::string> diagpack_vars({fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
   fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
@@ -731,7 +731,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
         diagpack(ceng,k,j,i));
       });
   pmb->exec_space.fence();
-  }
+  }*/
 
   return TaskStatus::complete;
 }
@@ -791,7 +791,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     PARTHENON_THROW("Invalid recon option.");
   }
 #undef RECON
-  
+
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
     X1DIR, pmb->pmy_mesh->ndim, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.s + dj,
       ib.s - 1, ib.e + 1,
@@ -821,7 +821,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     PARTHENON_THROW("Invalid riemann solver option.");
   }
 #undef FLUX
- 
+
   /*printf("a\n");
   ParArrayND<Real> myflux("ughhh", ib.e - ib.s + 3);
   printf("a\n");
@@ -849,7 +849,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     printf("  %s\n", v.c_str());
   }*/
   //exit(-1);
-  
+
 
   return TaskStatus::complete;
 }

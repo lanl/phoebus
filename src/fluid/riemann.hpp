@@ -223,7 +223,7 @@ class FluxState {
     }
 
     // TODO(BRR) use my own fluxes
-    auto vc = ValenciaCowling(g.alpha, g.beta, g.gammacov, g.gammacon, g.dgcov, 
+    auto vc = ValenciaCowling(g.alpha, g.beta, g.gammacov, g.gammacon, g.dgcov,
       g.gradlnalpha, rho, u, P, vcon);
     Real vcov[3] = {0};
     SPACELOOP2(ii, jj) {
@@ -262,7 +262,7 @@ class FluxState {
       NEWF[jj + 1] = Wconcov[dir][jj] - g.beta[dir]/g.alpha*Scov[jj];
     }//
 
-    NEWF[crho] = vc.F[dir][0]; 
+    NEWF[crho] = vc.F[dir][0];
     SPACELOOP(ii) {
       NEWF[cmom_lo + ii] = vc.F[dir][ii + 1];
     }
