@@ -89,7 +89,6 @@ add_executable(phoebus
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
-  phoebus_utils/debug_utils.hpp
   phoebus_utils/linear_algebra.hpp
   phoebus_utils/relativity_utils.hpp
   phoebus_utils/robust.hpp

@@ -172,11 +172,12 @@ class MonopoleSph {
 
     LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
     // d/dt
-    dg[0][0][0] = 2 a*beta*beta*dadt - 2*alpha*dalphadt + 2*a*a*beta*dbetadt;
-    dg[1][0][0] = dg[0][1][0] = 2*a*beta*dadt + a*a*dbetadt;
+    dg[0][0][0] =
+        2 * a * beta * beta * dadt - 2 * alpha * dalphadt + 2 * a * a * beta * dbetadt;
+    dg[1][0][0] = dg[0][1][0] = 2 * a * beta * dadt + a * a * dbetadt;
     dg[1][1][0] = 2 * a * dadt;
     // d/dr
-    dg[0][0][1] = -2*alpha*dalphadr + 2*a*beta*(beta*dadr + a*dbetadr);
+    dg[0][0][1] = -2 * alpha * dalphadr + 2 * a * beta * (beta * dadr + a * dbetadr);
     dg[1][0][1] = dg[0][1][1] = a * (2 * beta * dadr + a * dbetadr);
     dg[1][1][1] = 2 * a * dadr;
     dg[2][2][1] = 2 * r;
