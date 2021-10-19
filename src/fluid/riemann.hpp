@@ -25,6 +25,8 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
+#include "phoebus_utils/valencia_cowling.hpp"
+
 
 namespace riemann {
 
@@ -58,6 +60,8 @@ struct FaceGeom {
 
   Real gammacon[3][3];
   Real gammacov[3][3];
+  Real dgcov[4][4][4];
+  Real gradlnalpha[4];
 };
 
 class FluxState {
@@ -219,6 +223,8 @@ class FluxState {
     }
 
     // TODO(BRR) use my own fluxes
+    auto vc = ValenciaCowling(g.alpha, g.beta, g.gammacov, g.gammacon, g.dgcov, 
+      g.gradlnalpha, rho, u, P, vcon);
     Real vcov[3] = {0};
     SPACELOOP2(ii, jj) {
       vcov[ii] += g.gammacov[ii][jj]*vcon[jj];
@@ -246,15 +252,22 @@ class FluxState {
     Real D = U[crho];
     Real tau  = U[ceng];
     Real NEWF[5] = {0};
-    F[crho] = D*vtildecon[dir]/g.alpha;
+    //F[crho] = D*vtildecon[dir]/g.alpha;
     NEWF[0] = D*vtildecon[dir]/g.alpha;
-    F[ceng] = Scon[dir] - vcon[dir]*D - g.beta[dir]/g.alpha*tau;
+    //F[ceng] = Scon[dir] - vcon[dir]*D - g.beta[dir]/g.alpha*tau;
     NEWF[4] = Scon[dir] - vcon[dir]*D - g.beta[dir]/g.alpha*tau;
 
     SPACELOOP(jj) {
-      F[cmom_lo + jj] = Wconcov[dir][jj] - g.beta[dir]/g.alpha*Scov[jj];
+      //F[cmom_lo + jj] = Wconcov[dir][jj] - g.beta[dir]/g.alpha*Scov[jj];
       NEWF[jj + 1] = Wconcov[dir][jj] - g.beta[dir]/g.alpha*Scov[jj];
     }//
+
+    NEWF[crho] = vc.F[dir][0]; 
+    SPACELOOP(ii) {
+      NEWF[cmom_lo + ii] = vc.F[dir][ii + 1];
+    }
+    NEWF[ceng] = vc.F[dir][4];
+
     if (i == 120 && j == 120) {
       printf("NEW[%i]: %e %e %e %e %e\nOLD   : %e %e %e %e %e\n", dir, NEWF[0], NEWF[1], NEWF[2], NEWF[3], NEWF[4], F[crho], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2], F[ceng]);
     }
