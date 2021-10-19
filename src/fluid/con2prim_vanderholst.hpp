@@ -297,8 +297,15 @@ class ConToPrim {
     vsq = (vsq > 0.9996) ? 0.9996 : vsq;
     Real Gamma = 1./sqrt(1. - vsq);
     Real xi_guess = Gamma*Gamma*w; 
+
+    if (isnan(xi_guess)) {
+      printf("Nan guess! [%i %i] xi = %e Gamma = %e w = %e vsq = %e vel = %e %e %e\n",
+        v.i_, v.j_, xi_guess, gamma, w, vsq, vel[0], vel[1], vel[2]);
+      //PARTHENON_FAIL("no");
+    }
     
-    if (v.i_ == 138 && v.j_ == 186) {
+    //if (v.i_ == 138 && v.j_ == 186) {
+    if (v.i_ == 120 && v.j_ == 149) {
       printf("c2p prim before: %e %e %e %e %e\n", v(prho), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2),
         v(peng));
       printf("c2p cons before: %e %e %e %e %e\n", v(crho), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),
@@ -379,7 +386,8 @@ class ConToPrim {
       v(sig_lo+i) = sig[i];
     }
 
-    if (v.i_ == 138 && v.j_ == 186) {
+    //if (v.i_ == 138 && v.j_ == 186) {
+    if (v.i_ == 120 && v.j_ == 149) {
       printf("c2p prim after: %e %e %e %e %e\n", v(prho), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2),
         v(peng));
       printf("c2p cons after: %e %e %e %e %e\n", v(crho), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),

@@ -26,6 +26,9 @@ rmax = 40
 iplt = 138-4
 jplt = 186-4
 
+iplt = 120-4
+jplt = 149-4
+
 # Whether to plot meshblock boundaries
 plot_meshblocks = True
 h_ = 0.3
@@ -163,11 +166,17 @@ axes[0,0].plot(t, data['prho'], label='prho', marker='.')
 axes[1,0].plot(t, data['v1'], label='v1', marker='.')
 axes[2,0].plot(t, data['v2'], label='v2', marker='.')
 axes[3,0].plot(t, data['v3'], label='v3', marker='.')
+axes[1,0].plot(t, -data['v1'], marker='.', color='r')
+axes[2,0].plot(t, -data['v2'], marker='.', color='r')
+axes[3,0].plot(t, -data['v3'], marker='.', color='r')
 axes[4,0].plot(t, data['pener'], label='pener', marker='.')
 axes[0,1].plot(t, data['crho'], label='crho', marker='.')
 axes[1,1].plot(t, data['mom1'], label='mom1', marker='.')
 axes[2,1].plot(t, data['mom2'], label='mom2', marker='.')
 axes[3,1].plot(t, data['mom3'], label='mom3', marker='.')
+axes[1,1].plot(t, -data['mom1'], marker='.', color='r')
+axes[2,1].plot(t, -data['mom2'], marker='.', color='r')
+axes[3,1].plot(t, -data['mom3'], marker='.', color='r')
 axes[4,1].plot(t, data['cener'], label='cener', marker='.')
 axisrhs(axes[0,1])
 axisrhs(axes[1,1])

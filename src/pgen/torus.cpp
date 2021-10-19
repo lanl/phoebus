@@ -197,8 +197,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(irho,k,j,i) = 0.0;
         v(ieng,k,j,i) = 0.0;
         // Actually start out with a hot atmosphere
-        v(irho,k,j,i) = 1e-3*pow(r,-2.);
-        v(ieng,k,j,i) = v(irho,k,j,i)*pow(r,-1.);
+        v(irho,k,j,i) = 1e-5*pow(r,-2.);
+        v(ieng,k,j,i) = 1.e-1*v(irho,k,j,i)*pow(r,-1.);
         geom.SpacetimeMetric(CellLocation::Cent,k,j,i,gcov);
         geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
         const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
@@ -206,8 +206,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         //ucon[0] = ucon_norm(ucon,gcov);
         const Real W = ucon[0]*lapse;
         for (int d = 0; d < 3; d++) {
-          //v(ivlo+d,k,j,i) = 0.0;//beta[d]/lapse;
-          v(ivlo+d,k,j,i) = beta[d];
+          v(ivlo+d,k,j,i) = 0.0;//beta[d]/lapse;
+          //v(ivlo+d,k,j,i) = beta[d];
         }
         if (i == 138 && j == 186) {
           printf("ATMOS ZONE! [%i %i] rho = %e u = %e\n", i, j, v(irho,k,j,i), v(ieng,k,j,i));

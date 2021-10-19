@@ -697,10 +697,10 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
         }*/
 
         // TODO(BRR) break code
-        src(ceng, k, j, i) = 0.;
+        /*src(ceng, k, j, i) = 0.;
         SPACELOOP(ii) {
           src(cmom_lo+ii, k, j, i) = 0.;
-        }
+        }*/
       });
 
   {

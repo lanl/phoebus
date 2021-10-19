@@ -113,7 +113,7 @@ fail = dfile.Get("fail")
 #sys.exit()
 
 var = density
-vmin = -8
+vmin = -5
 vmax = 0
 
 var1 = dfile1.Get("p.density", flatten=False)

@@ -44,6 +44,9 @@ struct FaceGeom {
     X[1] = (loc == CellLocation::Face1 ? coords.x1f(k, j, i) : coords.x1v(k, j, i));
     X[2] = (loc == CellLocation::Face2 ? coords.x2f(k, j, i) : coords.x2v(k, j, i));
     X[2] = (loc == CellLocation::Face3 ? coords.x3f(k, j, i) : coords.x3v(k, j, i));
+
+    g.MetricInverse(loc, k, j, i, gammacon);
+    g.Metric(loc, k, j, i, gammacov);
   }
   const Real alpha;
   const Real gdet;
@@ -52,6 +55,9 @@ struct FaceGeom {
   Real beta[3];
   Real gdd;
   Real X[4];
+
+  Real gammacon[3][3];
+  Real gammacov[3][3];
 };
 
 class FluxState {
@@ -111,8 +117,8 @@ class FluxState {
                           : q(dir,peng,k,j,i))
                       : rho*sie_floor);
     // TODO(BRR) nasty hack to test consistent prs
-    const Real P = (5./3. - 1.)*u;
-    //const Real P = std::max(q(dir,prs,k,j,i), 0.0);
+    //const Real P = (5./3. - 1.)*u;
+    const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
     PARTHENON_REQUIRE(!isnan(gamma1), "gamma1 is nan?");
 
@@ -211,6 +217,48 @@ class FluxState {
       printf("vsq: %e cmsq: %e vasq: %e cssq: %e\n", vsq, cmsq, vasq, cssq);
       PARTHENON_FAIL("stupid code");
     }
+
+    // TODO(BRR) use my own fluxes
+    Real vcov[3] = {0};
+    SPACELOOP2(ii, jj) {
+      vcov[ii] += g.gammacov[ii][jj]*vcon[jj];
+    }
+    Real vtildecon[3] = {0};
+    SPACELOOP(ii) {
+      vtildecon[ii] = g.alpha*vcon[ii] - g.beta[ii];
+    }
+    Real Scov[3] = {0};
+    SPACELOOP(ii) {
+      Scov[ii] =  (rho + u + P)*W*W*vcov[ii];
+    }
+    Real Scon[3] = {0};
+    SPACELOOP2(ii, jj) {
+      Scon[ii] += g.gammacon[ii][jj]*Scov[jj];
+    }
+    Real Wconcon[3][3] = {0};
+    SPACELOOP2(ii, jj) {
+      Wconcon[ii][jj] = Scon[ii]*vcon[jj] + P*g.gammacon[ii][jj];
+    }
+    Real Wconcov[3][3] = {0};
+    SPACELOOP3(ii, jj, kk) {
+      Wconcov[ii][jj] += Wconcon[ii][jj]*g.gammacov[jj][kk];
+    }
+    Real D = U[crho];
+    Real tau  = U[ceng];
+    Real NEWF[5] = {0};
+    F[crho] = D*vtildecon[dir]/g.alpha;
+    NEWF[0] = D*vtildecon[dir]/g.alpha;
+    F[ceng] = Scon[dir] - vcon[dir]*D - g.beta[dir]/g.alpha*tau;
+    NEWF[4] = Scon[dir] - vcon[dir]*D - g.beta[dir]/g.alpha*tau;
+
+    SPACELOOP(jj) {
+      F[cmom_lo + jj] = Wconcov[dir][jj] - g.beta[dir]/g.alpha*Scov[jj];
+      NEWF[jj + 1] = Wconcov[dir][jj] - g.beta[dir]/g.alpha*Scov[jj];
+    }//
+    if (i == 120 && j == 120) {
+      printf("NEW[%i]: %e %e %e %e %e\nOLD   : %e %e %e %e %e\n", dir, NEWF[0], NEWF[1], NEWF[2], NEWF[3], NEWF[4], F[crho], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2], F[ceng]);
+    }
+
   }
 
   const VariableFluxPack<Real> v;
@@ -279,7 +327,7 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   for (int m = 0; m < fs.NumConserved(); m++) {
     fs.v.flux(d,m,k,j,i) = 0.5*((Fl[m] + Fr[m])*g.gdet - cmax*((Ur[m] - Ul[m])*g.gammadet));
     // TODO(BRR) break code
-    fs.v.flux(d,m,k,j,i) = 0.5*(- cmax*((Ur[m] - Ul[m])*g.gammadet));;
+    //fs.v.flux(d,m,k,j,i) = 0.5*(- cmax*((Ur[m] - Ul[m])*g.gammadet));;
     /*if (m == 0 && j == 127 + 4 && i > 180 && i < 183) {
       printf("[%i] F: %e fl: %e fr: %e (%e) ur: %e ul: %e (%e)\n",
         i, fs.v.flux(d,m,k,j,i), Fl[m], Fr[m], 0.5*(Fl[m] + Fr[m])*g.gdet,

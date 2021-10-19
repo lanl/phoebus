@@ -161,9 +161,15 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           for (int l = -1; l < 2; l++) {
             for (int m = -1; m < 2; m++) {
               for (int n = 0; n < 1; n++) {
+                // No ghost zones for interp
+                // TODO(BRR) eventually this should be only physical BCs
+                if (!(i+l < ib.s || i+l > ib.e ||
+                    j+m < jb.s || j+m > jb.e ||
+                    k+n < kb.s || k+n > kb.e)) {
                 Real w = 1./(abs(l) + abs(m) + abs(n) + 1)*v(b,ifail,k+n,j+m,i+l);
                 wsum += w;
                 sum += w*v(b,iv,k+n,j+m,i+l);
+                }
               }
             }
           }
@@ -189,14 +195,19 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           for (int l = -1; l < 2; l++) {
             for (int m = -1; m < 2; m++) {
               for (int n = 0; n < 1; n++) {
+                if (!(i+l < ib.s || i+l > ib.e ||
+                    j+m < jb.s || j+m > jb.e ||
+                    k+n < kb.s || k+n > kb.e)) {
                 Real w = 1./(abs(l) + abs(m) + abs(n) + 1)*v(b,ifail,k+n,j+m,i+l);
                 wsum += w;
+                }
               }
             }
           }
           
           if (wsum < 1.e-10) {
             // No usable neighbors this iteration
+            printf("No neighbors! %i %i %i\n", k, j, i);
 
           } else {
 
@@ -343,11 +354,12 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             // Apply floors
             double rho_floor, sie_floor, u_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i), rho_floor, sie_floor);
-            //rho_floor = 1.e-5*exp(-2.*coords.x1v(k, j, i));
+            rho_floor = 1.e-5*exp(-2.*coords.x1v(k, j, i));
+            u_floor = 1.e-1*rho_floor*exp(-1.*coords.x1v(k, j, i));
             //u_floor = 1.e-7*exp(-3.666*coords.x1v(k,j,i));
             
             v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
-            u_floor = v(b,prho,k,j,i)*sie_floor;
+            //u_floor = v(b,prho,k,j,i)*sie_floor;
             v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
                                 v(b,peng,k,j,i)/v(b,prho,k,j,i));
