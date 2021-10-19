@@ -30,7 +30,6 @@
 #include "monopole_gr/monopole_gr.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
-#include "phoebus_utils/debug_utils.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
 
@@ -149,14 +148,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto add_rhs =
         tl.AddTask(flux_div | geom_src, SumData<std::string, MeshBlockData<Real>>,
                    src_names, dudt.get(), gsrc.get(), dudt.get());
-
-#if PRINT_RHS
-    auto print_rhs =
-        tl.AddTask(add_rhs, Debug::PrintRHS<MeshBlockData<Real>>, dudt.get());
-    auto next = print_rhs;
-#else
-    auto next = add_rhs;
-#endif
   }
 
   const int num_partitions = pmesh->DefaultNumPartitions();
@@ -311,6 +302,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     MonopoleGR::IntegrateHypersurface(monopole_pkg.get());
     MonopoleGR::LinearSolveForAlpha(monopole_pkg.get());
     MonopoleGR::SpacetimeToDevice(monopole_pkg.get());
+    MonopoleGR::DumpToTxt("tov.dat", monopole_pkg.get());
   }
 
   return packages;
