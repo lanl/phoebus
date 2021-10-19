@@ -203,7 +203,7 @@ constexpr int NINTRINSIC = 2;
 
 constexpr int RHO0 = 0;
 constexpr int EPS = 1;
-  
+
 } // namespace TOV
 
 using Hypersurface_t = parthenon::ParArray2D<Real>;
@@ -249,19 +249,49 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
 template <typename Array_t>
 PORTABLE_INLINE_FUNCTION Real Interpolate(const Real r, const Array_t &A,
                                           const Radius &rgrid) {
-  int ix;
-  Spiner::weights_t w;
-  rgrid.weights(r, ix, w);
-  return w[0] * A(ix) + w[1] * A(ix + 1);
+  const int ix = rgrid.index(r);
+  const int npoints = rgrid.nPoints();
+  const Real min = rgrid.min();
+  const Real dx = rgrid.dx();
+  const Real floor = ix * dx + min;
+  Real c[3];
+  c[0] = A(ix);
+  if (ix == 0) {
+    c[1] = -(3 * A(ix) - 4. * A(ix + 1) + A(ix + 2)) / (2 * dx);
+    c[2] = (A(ix) - 2 * A(ix + 1) + A(ix + 2)) / (2 * dx * dx);
+  } else if (ix == npoints - 1) {
+    c[1] = (3 * A(ix - 2) - 4 * A(ix - 1) + 3 * A(ix)) / (2 * dx);
+    c[2] = (A(ix - 2) - 2 * A(ix - 1) + A(ix)) / (2 * dx * dx);
+  } else {
+    c[1] = (A(ix + 1) - A(ix - 1)) / (2 * dx);
+    c[2] = (A(ix + 1) - 2 * A(ix) + A(ix - 1)) / (2 * dx * dx);
+  }
+  Real xoffset = (r - floor);
+  return c[0] + c[1] * xoffset + c[2] * xoffset * xoffset;
 }
 
 template <typename Array_t>
 PORTABLE_INLINE_FUNCTION Real Interpolate(const Real r, const Array_t &A,
                                           const Radius &rgrid, const int ivar) {
-  int ix;
-  Spiner::weights_t w;
-  rgrid.weights(r, ix, w);
-  return w[0] * A(ivar, ix) + w[1] * A(ivar, ix + 1);
+  const int ix = rgrid.index(r);
+  const int npoints = rgrid.nPoints();
+  const Real min = rgrid.min();
+  const Real dx = rgrid.dx();
+  const Real floor = ix * dx + min;
+  Real c[3];
+  c[0] = A(ivar, ix);
+  if (ix == 0) {
+    c[1] = -(3 * A(ivar, ix) - 4. * A(ivar, ix + 1) + A(ivar, ix + 2)) / (2 * dx);
+    c[2] = (A(ivar, ix) - 2 * A(ivar, ix + 1) + A(ivar, ix + 2)) / (2 * dx * dx);
+  } else if (ix == npoints - 1) {
+    c[1] = (3 * A(ivar, ix - 2) - 4 * A(ivar, ix - 1) + 3 * A(ivar, ix)) / (2 * dx);
+    c[2] = (A(ivar, ix - 2) - 2 * A(ivar, ix - 1) + A(ivar, ix)) / (2 * dx * dx);
+  } else {
+    c[1] = (A(ivar, ix + 1) - A(ivar, ix - 1)) / (2 * dx);
+    c[2] = (A(ivar, ix + 1) - 2 * A(ivar, ix) + A(ivar, ix - 1)) / (2 * dx * dx);
+  }
+  Real xoffset = (r - floor);
+  return c[0] + c[1] * xoffset + c[2] * xoffset * xoffset;
 }
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
