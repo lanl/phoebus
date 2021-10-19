@@ -11,7 +11,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   ValenciaCowling(const Real alpha_, const Real betacon_[3], const Real gammacov_[3][3],
                   const Real gammacon_[3][3], const Real dgcov_[4][4][4],
-                  const Real gradlnalpha_[4], const Real rho_, const Real u_, const Real P_,
+                  const Real dlnalpha_[4], const Real rho_, const Real u_, const Real P_,
                   const Real vcon_[3]) {
     alpha = alpha_;
     rho = rho_;
@@ -26,10 +26,20 @@ public:
       }
     }
     SPACETIMELOOP(mu) {
-      gradlnalpha[mu] = gradlnalpha_[mu];
+      dlnalpha[mu] = dlnalpha_[mu];
       SPACETIMELOOP2(nu, lam) {
         dgcov[mu][nu][lam] = dgcov_[mu][nu][lam];
       }
+    }
+
+    Real dbetacov[3][3] = {0};
+    SPACELOOP2(ii, jj) {
+      dbetacon[ii][jj] = 0.;
+      dbetacov[ii][jj] = dgcov[ii+1][0][jj+1];
+    }
+
+    SPACELOOP3(ii, jj, kk) {
+      dbetacon[ii][jj] += dbetacov[kk][jj]*gammacon[kk][ii];
     }
 
     SPACELOOP(ii) {
@@ -80,6 +90,28 @@ public:
       }
       F[dir][4] = Scon[dir] - vcon[dir]*D - betacon[dir]*tau/alpha;
     }
+
+    for (int i = 0; i < 5; i++) {
+      S[i] = 0.;
+    }
+    SPACELOOP(jj) {
+      SPACELOOP2(ii, kk) {
+        S[jj + 1] += 0.5*Wconcon[ii][kk]*dgcov[ii+1][kk+1][jj+1];
+      }
+      SPACELOOP(ii) {
+        S[jj + 1] += Scov[ii]*dbetacon[ii][jj]/alpha;
+      }
+      S[jj + 1] -= (tau + D)*dlnalpha[jj+1];
+    }
+    SPACELOOP3(ii, jj, kk) {
+      S[4] += 0.5*Wconcon[ii][kk]*betacon[jj]*dgcov[ii+1][kk+1][jj+1];
+    }
+    SPACELOOP2(ii, jj) {
+      S[4] += Wconcov[jj][ii]*dbetacon[ii][jj]/alpha;
+    }
+    SPACELOOP(jj) {
+      S[4] -= Scon[jj]*dlnalpha[jj+1];
+    }
   }
 
   // Geometry
@@ -88,7 +120,8 @@ public:
   Real gammacov[3][3];
   Real gammacon[3][3];
   Real dgcov[4][4][4];
-  Real gradlnalpha[4];
+  Real dlnalpha[4];
+  Real dbetacon[3][3];
 
   // Fluid
   Real rho;
@@ -111,4 +144,6 @@ public:
   Real U[5];
   // F[dir][rho mom1 mom2 mom3 ener]
   Real F[3][5];
+  // order: rho mom1 mom2 mom3 ener
+  Real S[5];
 };

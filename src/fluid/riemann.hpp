@@ -262,15 +262,24 @@ class FluxState {
       NEWF[jj + 1] = Wconcov[dir][jj] - g.beta[dir]/g.alpha*Scov[jj];
     }//
 
-    NEWF[crho] = vc.F[dir][0];
+    /*NEWF[crho] = vc.F[dir][0];
     SPACELOOP(ii) {
       NEWF[cmom_lo + ii] = vc.F[dir][ii + 1];
     }
-    NEWF[ceng] = vc.F[dir][4];
+    NEWF[ceng] = vc.F[dir][4];*/
 
-    if (i == 120 && j == 120) {
-      printf("NEW[%i]: %e %e %e %e %e\nOLD   : %e %e %e %e %e\n", dir, NEWF[0], NEWF[1], NEWF[2], NEWF[3], NEWF[4], F[crho], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2], F[ceng]);
+    F[crho] = vc.F[dir][0];
+    SPACELOOP(ii) {
+      F[cmom_lo + ii] = vc.F[dir][ii + 1];
     }
+    F[ceng] = vc.F[dir][4];
+
+    /*if (i == 120 && j == 120) {
+      printf("NEWU: %e %e %e %e %e OLDU: %e %e %e %e %e\n",
+        vc.U[0], vc.U[1], vc.U[2], vc.U[3], vc.U[4],
+        U[crho], U[cmom_lo], U[cmom_lo+1], U[cmom_lo+2], U[ceng]);
+      printf("NEW[%i]: %e %e %e %e %e\nOLD   : %e %e %e %e %e\n", dir, NEWF[0], NEWF[1], NEWF[2], NEWF[3], NEWF[4], F[crho], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2], F[ceng]);
+    }*/
 
   }
 

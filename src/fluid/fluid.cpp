@@ -30,6 +30,8 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
+#include "phoebus_utils/valencia_cowling.hpp"
+
 // statically defined vars from riemann.hpp
 std::vector<std::string> riemann::FluxState::recon_vars,
     riemann::FluxState::flux_vars;
@@ -628,6 +630,15 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
 
+  std::vector<std::string> prim_vars({fluid_prim::density, fluid_prim::velocity,
+    fluid_prim::energy, fluid_prim::pressure});
+  PackIndexMap varmap;
+  auto pvars = rc->PackVariables(prim_vars, varmap);
+  const int prho = varmap[fluid_prim::density].first;
+  const int pvel = varmap[fluid_prim::velocity].first;
+  const int pener = varmap[fluid_prim::energy].first;
+  const int pprs = varmap[fluid_prim::pressure].first;
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
@@ -701,6 +712,30 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
         SPACELOOP(ii) {
           src(cmom_lo+ii, k, j, i) = 0.;
         }*/
+
+
+        const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+        Real beta[3], gammacov[3][3], gammacon[3][3], dgcov[4][4][4], dlnalpha[4];
+        geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+        geom.Metric(CellLocation::Cent, k, j, i, gammacov);
+        geom.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
+        geom.MetricDerivative(CellLocation::Cent, k, j, i, dgcov);
+        geom.GradLnAlpha(CellLocation::Cent, k, j, i, dlnalpha);
+        Real rho = pvars(prho, k, j, i);
+        Real u = pvars(pener, k, j, i);
+        Real P = pvars(pprs, k, j, i);
+        Real vcon[3] = {pvars(pvel, k, j, i), pvars(pvel+1,k,j,i), pvars(pvel+2,k,j,i)};
+        auto vc = ValenciaCowling(alpha, beta, gammacov, gammacon, dgcov, dlnalpha, rho, u, P, vcon);
+        if (i == 120 && j == 120) {
+          printf("S OLD: %e %e %e %e %e\n  NEW: %e %e %e %e %e\n",
+            0., src(cmom_lo, k, j, i), src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i),
+            src(ceng, k, j, i), gdet*vc.S[0], gdet*vc.S[1], gdet*vc.S[2], gdet*vc.S[3], gdet*vc.S[4]);
+        }
+
+        SPACELOOP(ii) {
+          src(cmom_lo + ii, k, j, i) = gdet*vc.S[ii + 1];
+        }
+        src(ceng, k, j, i) = gdet*vc.S[4];
       });
 
   /*{

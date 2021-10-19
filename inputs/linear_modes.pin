@@ -62,6 +62,10 @@ num_threads = 1         # maximum number of OMP threads
 
 <phoebus/mesh>
 #bc_vars = primitive
+ix1_bc = periodic
+ox1_bc = periodic
+ix2_bc = periodic
+ox2_bac = periodic
 
 <parthenon/meshblock>
 nx1 = 128
