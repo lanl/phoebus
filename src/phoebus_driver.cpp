@@ -125,7 +125,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                  sc1.get(), BoundaryCommSubset::all);
 
     auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
-    auto fix_flux = tl.AddTask(hydro_flux, fixup::NothingEscapes, sc0.get());
+    auto fix_flux = tl.AddTask(hydro_flux, fixup::FixFluxes, sc0.get());
     auto flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
     auto geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
 

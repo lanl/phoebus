@@ -186,11 +186,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         geom.SpacetimeMetric(CellLocation::Cent,k,j,i,gcov);
         geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
         const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
-        Real ucon[4] = {0.0, -beta[1]/lapse, 0.0, -beta[2]/lapse};
-        //ucon[0] = ucon_norm(ucon,gcov);
-        const Real W = ucon[0]*lapse;
         for (int d = 0; d < 3; d++) {
-          v(ivlo+d,k,j,i) = 0.0;//beta[d]/lapse;
+          v(ivlo+d,k,j,i) = beta[d]/lapse;
         }
       }
       /* region inside magnetized torus; u^i is calculated in
