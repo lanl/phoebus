@@ -103,15 +103,19 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
     Real XX1 = X1;
     Real XX2 = X2;
     Real XX3 = X3;
-    if (d == 1)
+    if (d == 1) {
       XX1 += dx;
-    if (d == 2)
+      X1 -= dx;
+    } else if (d == 2) {
       XX2 += dx;
-    if (d == 3)
+      X2 -= dx;
+    } else if (d == 3) {
       XX3 += dx;
+      X3 -= dx;
+    }
     Real alpha = s.Lapse(X0, X1, X2, X3);
     Real alphap = s.Lapse(X0, XX1, XX2, XX3);
-    da[d] = ratio(alphap - alpha, dx * alpha);
+    da[d] = ratio(alphap - alpha, 2.0 * dx * alpha);
   }
 }
 
