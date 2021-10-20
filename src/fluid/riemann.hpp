@@ -274,12 +274,12 @@ class FluxState {
     }
     F[ceng] = vc.F[dir][4];
 
-    /*if (i == 120 && j == 120) {
-      printf("NEWU: %e %e %e %e %e OLDU: %e %e %e %e %e\n",
-        vc.U[0], vc.U[1], vc.U[2], vc.U[3], vc.U[4],
-        U[crho], U[cmom_lo], U[cmom_lo+1], U[cmom_lo+2], U[ceng]);
-      printf("NEW[%i]: %e %e %e %e %e\nOLD   : %e %e %e %e %e\n", dir, NEWF[0], NEWF[1], NEWF[2], NEWF[3], NEWF[4], F[crho], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2], F[ceng]);
-    }*/
+    if (i == 120 && j == 120) {
+      //printf("NEWU: %e %e %e %e %e OLDU: %e %e %e %e %e\n",
+      //  vc.U[0], vc.U[1], vc.U[2], vc.U[3], vc.U[4],
+      //  U[crho], U[cmom_lo], U[cmom_lo+1], U[cmom_lo+2], U[ceng]);
+      printf("F NEW[%i]: %e %e %e %e %e\n  OLD   : %e %e %e %e %e\n", dir, NEWF[0], NEWF[1], NEWF[2], NEWF[3], NEWF[4], F[crho], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2], F[ceng]);
+    }
 
   }
 

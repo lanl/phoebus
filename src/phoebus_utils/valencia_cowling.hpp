@@ -68,7 +68,7 @@ public:
     }
 
     SPACELOOP2(ii, jj) {
-      Wconcon[ii][jj] = Scon[ii]*vcon[jj] + P*gammacov[ii][jj];
+      Wconcon[ii][jj] = Scon[ii]*vcon[jj] + P*gammacon[ii][jj];
     }
 
     SPACELOOP3(ii, jj, kk) {
@@ -104,7 +104,8 @@ public:
       S[jj + 1] -= (tau + D)*dlnalpha[jj+1];
     }
     SPACELOOP3(ii, jj, kk) {
-      S[4] += 0.5*Wconcon[ii][kk]*betacon[jj]*dgcov[ii+1][kk+1][jj+1];
+      //S[4] += 0.5*Wconcon[ii][kk]*betacon[jj]*dgcov[ii+1][kk+1][jj+1];
+      S[4] += 1./(2.*alpha)*Wconcon[ii][kk]*betacon[jj]*dgcov[ii+1][kk+1][jj+1];
     }
     SPACELOOP2(ii, jj) {
       S[4] += Wconcov[jj][ii]*dbetacon[ii][jj]/alpha;
