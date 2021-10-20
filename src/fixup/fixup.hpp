@@ -11,6 +11,7 @@ namespace fixup {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus NothingEscapes(MeshBlockData<Real> *rc);
+TaskStatus FixFluxes(MeshBlockData<Real> *rc);
 TaskStatus FixFailures(MeshBlockData<Real> *rc);
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc);

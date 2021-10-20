@@ -588,7 +588,7 @@ class ConToPrim {
       v(sig_lo+i) = sig[i];
     }
 
-    num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);
+    num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
     //PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
     //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo)), "v(cmom_lo) = NaN");
     //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
@@ -596,9 +596,9 @@ class ConToPrim {
     //PARTHENON_REQUIRE(!std::isnan(v(ceng)), "v(ceng) = NaN");
 
     if (res.used_density_floor() ||
-        res.used_energy_max() ||
-        res.used_energy_floor() ||
-        res.used_gamma_max() ||
+        //res.used_energy_max() ||
+        //res.used_energy_floor() ||
+        //res.used_gamma_max() ||
         num_nans > 0)
       return ConToPrimStatus::failure;
     return ConToPrimStatus::success;

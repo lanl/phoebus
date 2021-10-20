@@ -107,6 +107,10 @@ class FluxState {
     const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
+    /*if (std::abs(P - 2.0/3.0*u) > 1.e-14*u) {
+      std::cout << "Why do this disagree???? " << P << " " << 2.0/3.0*u << " " << std::abs(P-2.0/3.0*u) << std::endl;
+    }*/
+
     for (int m = pb_lo; m <= pb_hi; m++) {
       Bcon[m-pb_lo] = q(dir, m, k, j, i);
     }
