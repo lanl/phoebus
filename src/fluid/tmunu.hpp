@@ -65,6 +65,15 @@ public:
     Real rho = GetVar_(ir_, std::forward<Args>(args)...);
     Real uu = GetVar_(iu_, std::forward<Args>(args)...);
     Real P = GetVar_(ip_, std::forward<Args>(args)...);
+    int k = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
+    int j = std::get<1>(std::forward_as_tuple(std::forward<Args>(args)...));
+    int i = std::get<2>(std::forward_as_tuple(std::forward<Args>(args)...));
+    if (i == 120 && j == 120) {
+      printf("tmunu: %e %e %e vel: %e %e %e\n", rho, uu, P,
+        v_(1, std::forward<Args>(args)...),
+        v_(2, std::forward<Args>(args)...),
+        v_(3, std::forward<Args>(args)...));
+    }
     Real A = rho + uu + P + bsq;
     Real B = P + 0.5 * bsq;
     for (int mu = 0; mu < ND; ++mu) {

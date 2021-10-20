@@ -223,9 +223,7 @@ class FluxState {
     }
 
     // TODO(BRR) use my own fluxes
-    auto vc = ValenciaCowling(g.alpha, g.beta, g.gammacov, g.gammacon, g.dgcov,
-      g.gradlnalpha, rho, u, P, vcon);
-    Real vcov[3] = {0};
+    /*Real vcov[3] = {0};
     SPACELOOP2(ii, jj) {
       vcov[ii] += g.gammacov[ii][jj]*vcon[jj];
     }
@@ -261,18 +259,16 @@ class FluxState {
       //F[cmom_lo + jj] = Wconcov[dir][jj] - g.beta[dir]/g.alpha*Scov[jj];
       NEWF[jj + 1] = Wconcov[dir][jj] - g.beta[dir]/g.alpha*Scov[jj];
     }//
+    */
 
-    /*NEWF[crho] = vc.F[dir][0];
+    auto vc = ValenciaCowling(g.alpha, g.beta, g.gammacov, g.gammacon, g.dgcov,
+      g.gradlnalpha, rho, u, P, vcon);
+    Real NEWF[5] = {0};
+    NEWF[crho] = vc.F[dir][0];
     SPACELOOP(ii) {
       NEWF[cmom_lo + ii] = vc.F[dir][ii + 1];
     }
-    NEWF[ceng] = vc.F[dir][4];*/
-
-    F[crho] = vc.F[dir][0];
-    SPACELOOP(ii) {
-      F[cmom_lo + ii] = vc.F[dir][ii + 1];
-    }
-    F[ceng] = vc.F[dir][4];
+    NEWF[ceng] = vc.F[dir][4];
 
     if (i == 120 && j == 120) {
       //printf("NEWU: %e %e %e %e %e OLDU: %e %e %e %e %e\n",
@@ -280,6 +276,12 @@ class FluxState {
       //  U[crho], U[cmom_lo], U[cmom_lo+1], U[cmom_lo+2], U[ceng]);
       printf("F NEW[%i]: %e %e %e %e %e\n  OLD   : %e %e %e %e %e\n", dir, NEWF[0], NEWF[1], NEWF[2], NEWF[3], NEWF[4], F[crho], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2], F[ceng]);
     }
+
+    /*F[crho] = vc.F[dir][0];
+    SPACELOOP(ii) {
+      F[cmom_lo + ii] = vc.F[dir][ii + 1];
+    }
+    F[ceng] = vc.F[dir][4];*/
 
   }
 

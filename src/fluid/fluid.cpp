@@ -730,12 +730,17 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           printf("S OLD: %e %e %e %e %e\n  NEW: %e %e %e %e %e\n",
             0., src(cmom_lo, k, j, i), src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i),
             src(ceng, k, j, i), gdet*vc.S[0], gdet*vc.S[1], gdet*vc.S[2], gdet*vc.S[3], gdet*vc.S[4]);
+          printf("rat: %e %e %e %e %e\n", 0./0., gdet*vc.S[1]/src(cmom_lo, k, j, i),
+            gdet*vc.S[2]/src(cmom_lo+1, k, j, i),
+            gdet*vc.S[3]/src(cmom_lo+2, k, j, i),
+            gdet*vc.S[4]/src(ceng, k, j, i));
+          printf("S rho u P: %e %e %e vel: %e %e %e\n", rho, u, P, vcon[0], vcon[1], vcon[2]);
         }
 
-        SPACELOOP(ii) {
+        /*SPACELOOP(ii) {
           src(cmom_lo + ii, k, j, i) = gdet*vc.S[ii + 1];
         }
-        src(ceng, k, j, i) = gdet*vc.S[4];
+        src(ceng, k, j, i) = gdet*vc.S[4];*/
       });
 
   /*{
