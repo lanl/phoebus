@@ -63,13 +63,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real x3max = pin->GetReal("parthenon/mesh", "x3max");
 
   // Estimate r since we may not know if we're Spherical or Cartesian
-  Real r_fluid_est = std::sqrt(x1max*x1max + x2max*x2max + x3max*x3max);
+  Real r_fluid_est = std::sqrt(x1max * x1max + x2max * x2max + x3max * x3max);
   if (r_fluid_est < rout) {
     std::stringstream msg;
     msg << "Outer radius of fluid may be less than outer radius of of spacetime.\n"
-	<< "x1max, x2max, x3max, rout_spacetime = "
-	<< x1max << ", " << x2max << ", " << x3max << ", " << rout
-	<< std::endl;
+        << "x1max, x2max, x3max, rout_spacetime = " << x1max << ", " << x2max << ", "
+        << x3max << ", " << rout << std::endl;
     PARTHENON_WARN(msg);
   }
 
@@ -320,22 +319,23 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "monopole_gr gradients and shift",
       parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+        if (force_static) {
+          hypersurface(Hypersurface::K, i) = 0;
+        }
+
         Real r = radius.x(i);
         Real a = hypersurface(Hypersurface::A, i);
-        Real K = hypersurface(Hypersurface::K, i);
+        Real K = force_static ? 0 : hypersurface(Hypersurface::K, i);
         Real rho = matter(Matter::RHO, i);
         Real j = matter(Matter::J_R, i);
         Real S = matter(Matter::trcS, i);
         Real Srr = matter(Matter::Srr, i);
         Real dadr = ShootingMethod::GetARHS(a, K, r, rho);
-        Real dKdr = ShootingMethod::GetKRHS(a, K, r, j);
+        Real dKdr = force_static ? 0 : ShootingMethod::GetKRHS(a, K, r, j);
 
         Real a2 = a * a;
         Real a3 = a2 * a;
         Real K2 = K * K;
-        Real beta2 = beta(i) * beta(i);
-        Real beta3 = beta(i) * beta2;
-
         Real dalphadr, d2alphadr2;
         if (i == 0) {
           dalphadr = 0;
@@ -348,8 +348,12 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
           d2alphadr2 = (alpha(i - 1) + alpha(i + 1) - 2 * alpha(i)) / dr2;
         }
 
-        beta(i) = -0.5 * alpha(i) * r * K;
-        Real dbetadr = -0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr);
+        beta(i) = force_static ? 0 : -0.5 * alpha(i) * r * K;
+        Real dbetadr =
+            force_static ? 0
+                         : -0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr);
+        Real beta2 = beta(i) * beta(i);
+        Real beta3 = beta(i) * beta2;
 
         gradients(Gradients::DADR, i) = dadr;
         gradients(Gradients::DKDR, i) = dKdr;
@@ -364,11 +368,11 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
         Real dadror = (r > 1e-2) ? dadr / r : 1;
         Real dKdt = beta(i) * dKdr - (d2alphadr2 / a2) + (dadr / a3) * dalphadr +
                     alpha(i) * ((2 * dadror / a3) - 4 * K * K) +
-                    4 * M_PI * alpha(i) * (S - rho - 2*Srr);
+                    4 * M_PI * alpha(i) * (S - rho - 2 * Srr);
         if (i == 0) dKdt = 0;
         Real dbetadt = -0.5 * r * (alpha(i) * dKdt + K * dalphadt);
 
-	//printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
+        // printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
         gradients(Gradients::DADT, i) = force_static ? 0 : dadt;
         gradients(Gradients::DALPHADT, i) = force_static ? 0 : dalphadt;
         gradients(Gradients::DKDT, i) = force_static ? 0 : dKdt;
