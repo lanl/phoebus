@@ -528,24 +528,23 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e,
-      jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
+      ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real Tmunu[ND][ND], gam[ND][ND][ND];
         tmunu(Tmunu, k, j, i);
         geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
-	      Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
-        diag(0,k,j,i) = 0.0;
+        Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
+        diag(0, k, j, i) = 0.0;
         // momentum source terms
         for (int l = 0; l < NS; l++) {
           Real src_mom = 0.0;
           for (int m = 0; m < ND; m++) {
             for (int n = 0; n < ND; n++) {
               // gam is ALL INDICES DOWN
-              src_mom -= Tmunu[m][n] * gam[l+1][n][m];
+              src_mom -= Tmunu[m][n] * gam[l + 1][n][m];
             }
           }
-	        src(cmom_lo + l, k, j, i) = gdet*src_mom;
+          src(cmom_lo + l, k, j, i) = gdet * src_mom;
         }
 
         { // energy source term
@@ -564,17 +563,16 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           Real Ta = 0.0;
           Real da[ND];
-          //Real *da = &gam[1][0][0];
+          // Real *da = &gam[1][0][0];
           geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
           for (int m = 0; m < ND; m++) {
             Ta += Tmunu[m][0] * da[m];
           }
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
-          diag(4,k,j,i) = src(ceng,k,j,i);
-          diag(5,k,j,i) = gdet*alpha*Ta;
-          diag(6,k,j,i) = -gdet*alpha*TGam;
-          //std::cerr << Ta << " " << TGam << std::endl;
+          diag(4, k, j, i) = src(ceng, k, j, i);
+          diag(5, k, j, i) = gdet * alpha * Ta;
+          diag(6, k, j, i) = -gdet * alpha * TGam;
         }
 
         // re-use gam for metric derivative
@@ -583,13 +581,12 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           Real src_mom = 0.0;
           for (int m = 0; m < ND; m++) {
             for (int n = 0; n < ND; n++) {
-              src_mom += Tmunu[m][n] * gam[n][l+1][m];
+              src_mom += Tmunu[m][n] * gam[n][l + 1][m];
             }
           }
-          src(cmom_lo + l, k, j, i) += gdet*src_mom;
-          diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
+          src(cmom_lo + l, k, j, i) += gdet * src_mom;
+          diag(l + 1, k, j, i) = src(cmom_lo + l, k, j, i);
         }
-
       });
 
   return TaskStatus::complete;
