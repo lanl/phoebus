@@ -27,20 +27,27 @@ variables = p.density,  &
             c.momentum, &
             p.energy,   &
             c.energy,   &
-	          pressure,	&
+	    pressure,	&
       	    cs, &
       	    p.ye, &
       	    g.c.coord, &
-      	    g.n.coord
+     	    g.n.coord, &
+	    g.c.alpha, &
+	    g.c.detgam, &
+	    g.c.gcov, &
+	    g.c.dg, &
+	    g.c.dalpha, &
+	    flux_divergence, &
+	    src_terms
 
 file_type   = hdf5      # Tabular data dump
-dt          = 10        # time increment between outputs
+dt          = 5         # time increment between outputs
 
 <parthenon/time>
-nlim        = 1         # cycle limit
-tlim        = 1000      # time limit
+nlim        = -1        # cycle limit
+tlim        = 5000      # time limit
 integrator  = rk2       # time integration algorithm
-ncycle_out  = 1         # interval for stdout summary info
+ncycle_out  = 10        # interval for stdout summary info
 dt_init_fact = 1.e-6
 
 <parthenon/mesh>
@@ -113,8 +120,8 @@ Ye = false
 
 <monopole_gr>
 enabled = true
-npoints = 10000
-rout = 1024
+npoints = 204800
+rout = 250
 force_static = true
 
 <tov>
