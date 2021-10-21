@@ -189,37 +189,8 @@ class MonopoleSph {
 
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    const Real r = std::abs(X1);
-    const Real th = X2;
-    const Real cth = std::cos(th);
-    const Real sth = std::sin(th);
-    const Real alpha = MonopoleGR::Interpolate(r, alpha_, rgrid_);
-    const Real beta = MonopoleGR::Interpolate(r, beta_, rgrid_);
-    const Real a =
-        MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
-    const Real dalphadr =
-        MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DALPHADR);
-    const Real dbetadr =
-        MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DBETADR);
-    const Real dalphadt =
-        MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DALPHADT);
-    const Real dbetadt =
-        MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DBETADT);
-
-    LinearAlgebra::SetZero(Gamma, NDFULL, NDFULL, NDFULL);
-
-    Gamma[0][0][0] = -alpha * dalphadt;
-    Gamma[0][0][1] = Gamma[0][1][0] = -alpha * dalphadr;
-
-    Gamma[1][0][0] = alpha * dalphadr - beta * dbetadr + dbetadt;
-    Gamma[1][2][2] = -r;
-    Gamma[1][3][3] = -r * sth * sth;
-
-    Gamma[2][1][2] = Gamma[2][2][1] = r;
-    Gamma[2][3][3] = -r * r * cth * sth;
-
-    Gamma[3][1][3] = Gamma[3][3][1] = r * sth * sth;
-    Gamma[3][2][3] = Gamma[3][3][2] = r * r * cth * sth;
+    // This is less error prone than a hardcoded version.
+    Utils::SetConnectionCoeffByFD(*this, Gamma, X0, X1, X2, X3);
   }
 
   KOKKOS_INLINE_FUNCTION
