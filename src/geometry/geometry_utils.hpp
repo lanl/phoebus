@@ -99,7 +99,7 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
                                                Real X0, Real X1, Real X2,
                                                Real X3, Real da[NDFULL]) {
   LinearAlgebra::SetZero(da, NDFULL);
-  /*for (int d = 1; d < NDFULL; ++d) {
+  for (int d = 1; d < NDFULL; ++d) {
     Real XX1 = X1;
     Real XX2 = X2;
     Real XX3 = X3;
@@ -113,8 +113,8 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
     Real alphap = s.Lapse(X0, XX1, XX2, XX3);
     //da[d] = ratio(alphap - alpha, dx * alpha);
     da[d] = 1./alpha*ratio(alphap - alpha, dx);
-  }*/
-  for (int d = 1; d < NDFULL; ++d) {
+  }
+  /*for (int d = 1; d < NDFULL; ++d) {
     Real X1L = X1;
     Real X1R = X1;
     Real X2L = X2;
@@ -134,7 +134,7 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
     Real alphal = s.Lapse(X0, X1L, X2L, X3L);
     Real alphar = s.Lapse(X0, X1R, X2R, X3R);
     da[d] = 1./alpha*ratio(alphar - alphal, 2.*dx);
-  }
+  }*/
 }
 
 KOKKOS_INLINE_FUNCTION
