@@ -415,6 +415,39 @@ class MonopoleCart {
     }
   }
 
+  KOKKOS_INLINE_FUNCTION
+  void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
+    Real r, th, ph;
+    Cart2Sph(X1, X2, X3, r, th, ph);
+
+    const Real alpha = MonopoleGR::Interpolate(r, sph_.alpha_, sph_.rgrid_);
+    const Real dalphadr = MonopoleGR::Interpolate(r, sph_.gradients_, sph_.rgrid_,
+                                                  MonopoleGR::Gradients::DALPHADR);
+    const Real dalphadt = MonopoleGR::Interpolate(r, sph_.gradients_, sph_.rgrid_,
+                                                  MonopoleGR::Gradients::DALPHADT);
+
+    Real J[NDFULL][NDFULL];
+    C2S(X1, X2, X3, r, J);
+
+    Real da_sph[NDFULL];
+    LinearAlgebra::SetZero(da_sph, NDFULL);
+    LinearAlgebra::SetZero(da, NDFULL);
+    da[0] = dalphadt / alpha;
+    da[1] = dalphadr / alpha;
+
+    SPACETIMELOOP2(mup, mu) {
+      SPACELOOP2(i, j) { da[mup] += J[mu][mup] * da[mu]; }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void Coords(Real X0, Real X1, Real X2, Real X3, Real C[NDFULL]) const {
+    C[0] = X0;
+    C[1] = X1;
+    C[2] = X2;
+    C[3] = X3;
+  }
+
  private:
   MonopoleSph sph_;
 
@@ -531,5 +564,17 @@ template <>
 void Initialize<MplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 template <>
 void Initialize<MplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+
+// TODO(JMM): The cached machinery will need to be revisited
+using CMplSphMeshBlock = CachedOverMeshBlock<Analytic<MonopoleSph, IndexerMeshBlock>>;
+using CMplCartMeshBlock = CachedOverMeshBlock<Analytic<MonopoleCart, IndexerMeshBlock>>;
+
+using CMplSphMesh = CachedOverMesh<Analytic<MonopoleSph, IndexerMesh>>;
+using CMplCartMesh = CachedOverMesh<Analytic<MonopoleCart, IndexerMesh>>;
+
+template <>
+void Initialize<CMplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+template <>
+void Initialize<CMplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 
 } // namespace Geometry
