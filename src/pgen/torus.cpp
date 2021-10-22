@@ -216,17 +216,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         for (int d = 0; d < 3; d++) {
           v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
         }
-        //v(ivlo,k,j,i) = beta[0]/lapse;
-        //v(ivlo+1,k,j,i) = beta[1]/lapse;
       }
       // fixup
-      Real rhoflr, epsflr;
+      Real rhoflr = 0;
+      Real epsflr;
       floor.GetFloors(x1, x2, x3, rhoflr, epsflr);
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
-      v(iprs,k,j,i) = eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
+      v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
+      v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i));
       
-      v(itmp,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i)/Cv;
       //fprintf(stderr,"%g %g %g %g\n", r, th, v(irho,k,j,i), v(ieng,k,j,i));
       //if (i == ib.e) fprintf(stderr,"\n");
       rng_pool.free_state(rng_gen);
