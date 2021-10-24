@@ -55,6 +55,8 @@ plt.ylim(1e-9,1e-1)
 plt.xlabel(r'$r$')
 plt.ylabel('pressure')
 plt.savefig('tov_initial_final_comparison.png',bbox_inches='tight')
+plt.cla()
+plt.clf()
 
 times = []
 rho0s = []
@@ -70,6 +72,8 @@ plt.plot(times,drhos)
 plt.xlabel('Time')
 plt.ylabel(r'$(\rho_c - \rho_{c,0})/\rho_{c,0}$')
 plt.savefig('tov_quasinormal.png',bbox_inches='tight')
+plt.cla()
+plt.clf()
 
 drhos_fourier = fft(drhos)
 dt = times[1] - times[0]
@@ -79,3 +83,5 @@ plt.ylabel('power (DB)')
 plt.xlabel('freq (1/time)')
 plt.xlim(0,30)
 plt.savefig('power-spectrum.png',bbox_inches='tight')
+plt.cla()
+plt.clf()

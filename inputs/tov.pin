@@ -55,7 +55,7 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 2048        # Number of zones in X1-direction
+nx1         = 512         # Number of zones in X1-direction
 x1min       = 0           # minimum value of X1
 x1max       = 250         # maximum value of X1
 ix1_bc      = user        # Inner-X1 boundary condition flag
@@ -76,7 +76,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 2048
+nx1 = 512
 nx2 = 1
 nx3 = 1
 
@@ -120,7 +120,7 @@ Ye = false
 
 <monopole_gr>
 enabled = true
-npoints = 204800
+npoints = 2048
 rout = 250
 force_static = true
 
