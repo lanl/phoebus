@@ -26,10 +26,13 @@ using namespace parthenon::package::prelude;
 
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
+#include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
+
+#define CON2PRIM_ROBUST_PRINT_FAILURES 0
 
 namespace con2prim_robust {
 
@@ -54,7 +57,7 @@ Real find_root(F &func, Real a, Real b, const Real tol, int line) {
   Real ya = func(a);
   Real yb = func(b);
   if (ya * yb > 0.0) {
-    printf("Root not bracketed in find_root\n");
+    PARTHENON_DEBUG_WARN("Root not bracketed in find_root\n");
     return 0.5*(a+b);
   }
   Real sign = (ya < 0 ? 1.0 : -1.0);
@@ -343,11 +346,11 @@ class ConToPrim {
                                     internal_variables::cell_signal_speed, fluid_prim::gamma1});
   }
 
-  KOKKOS_INLINE_FUNCTION
-  bool my_cell(const Real x1, const Real x2) const {
-    //if (fabs(x1 - 3.24365) < 1.e-3 && fabs(x2 - 0.493164) < 1.e-3) return true;
-    return false;
-  }
+  // KOKKOS_INLINE_FUNCTION
+  // bool my_cell(const Real x1, const Real x2) const {
+  //   //if (fabs(x1 - 3.24365) < 1.e-3 && fabs(x2 - 0.493164) < 1.e-3) return true;
+  //   return false;
+  // }
 
   template <typename CoordinateSystem, class... Args>
   KOKKOS_INLINE_FUNCTION
@@ -396,7 +399,13 @@ class ConToPrim {
       PARTHENON_REQUIRE(!std::isnan(v(cb_lo+2)), "v(cb_lo+2) = NaN");
     }*/
     int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);
-    if (num_nans > 0) return ConToPrimStatus::failure;
+    if (num_nans > 0) {
+#if CON2PRIM_ROBUST_PRINT_FAILURES
+      printf("con2prim robust(%e): NaNs produced in rho, mom, enrgy = %d %d %d!\n",
+	     x1, std::isnan(v(crho)), std::isnan(v(cmom_lo)), std::isnan(ceng));
+#endif // CON2PRIM_ROBUST_PRINT_FAILURES
+      return ConToPrimStatus::failure;
+    }
     const Real igdet = 1.0/g.gdet;
 
     Real rhoflr, epsflr;
@@ -501,9 +510,9 @@ class ConToPrim {
     // solve
     const Real mu = find_root(res, 0.0, 1.0, rel_tolerance, __LINE__);
     //if(atm) printf("used atm\n");
-    if(my_cell(x1,x2)) {
-      printf("res = %e\n", res(mu));
-    }
+    // if(my_cell(x1,x2)) {
+    //   printf("res = %e\n", res(mu));
+    // }
 
     // now unwrap everything into primitive and conserved vars
     const Real x = res.x_mu(mu);
@@ -517,7 +526,9 @@ class ConToPrim {
     v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
     v(peng) *= v(prho);
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
-    v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
+    v(gm1) = Geometry::Utils::ratio(
+        eos.BulkModulusFromDensityTemperature(v(prho), v(tmp)), v(prs));
+    PARTHENON_DEBUG_REQUIRE(P > Geometry::SMALL, "Pressure must be positive");
 
     if (v(prho) < 0.99999*rhoflr ||
         v(peng)/v(prho) < 0.99999*epsflr ||
@@ -582,6 +593,20 @@ class ConToPrim {
     //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+2)), "v(cmom_lo+2) = NaN");
     //PARTHENON_REQUIRE(!std::isnan(v(ceng)), "v(ceng) = NaN");
 
+#if CON2PRIM_ROBUST_PRINT_FAILURES
+    if (res.used_density_floor()) {
+      printf("con2prim robust (%e): used density floor!\n", x1);
+    }
+    if (res.used_energy_max()) {
+      printf("con2prim robust (%e): used energy max!\n", x1);
+    }
+    if (res.used_energy_floor()) {
+      printf("con2prim robust (%e): used energy floor!\n", x1);
+    }
+    if (num_nans > 0) {
+      printf("con2prim robust (%e): NaNs produced (later)!\n", x1);
+    }
+#endif // CON2PRIM_ROBUST_PRINT_FAILURES
     if (res.used_density_floor() ||
         res.used_energy_max() ||
         res.used_energy_floor() ||
