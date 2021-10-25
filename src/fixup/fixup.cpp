@@ -7,6 +7,8 @@
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
+#define FIXUP_PRINT_TOTAL_NFAIL 0
+
 namespace fixup {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
@@ -108,6 +110,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
 
+#if FIXUP_PRINT_TOTAL_NFAIL
  int nfail_total;
  parthenon::par_reduce(
      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(), 0,
@@ -119,6 +122,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
      },
      Kokkos::Sum<int>(nfail_total));
  printf("total nfail: %i\n", nfail_total);
+#endif // FIXUP_PRINT_TOTAL_NFAIL
 
  parthenon::par_for(
      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
