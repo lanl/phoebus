@@ -532,6 +532,7 @@ TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
       DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        du(izero,k,j,i) = 0.0;
         du(crho,k,j,i) *= du(izero,k,j,i);
         du(cmom_lo,k,j,i) *= du(izero,k,j,i);
         du(cmom_lo+1,k,j,i) *= du(izero,k,j,i);
@@ -856,7 +857,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
                 std::max(fsig(d, k, j, i), fsig(d, k + dk, j + dj, i + di)));
             ldt += max_s / coords.Dx(X1DIR + d, k, j, i);
           }
-          lmin_dt = std::min(lmin_dt, 1.0 / ldt);
+          lmin_dt = std::min(lmin_dt, 1.0 / (ldt + 1.e-50));
         },
         Kokkos::Min<Real>(min_dt));
   } else {
@@ -867,7 +868,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
           for (int d = 0; d < ndim; d++) {
             ldt += csig(d, k, j, i) / coords.Dx(X1DIR + d, k, j, i);
           }
-          lmin_dt = std::min(lmin_dt, 1.0 / ldt);
+          lmin_dt = std::min(lmin_dt, 1.0 / (ldt + 1.e-50));
         },
         Kokkos::Min<Real>(min_dt));
     pars.Add("has_face_speeds", true);
