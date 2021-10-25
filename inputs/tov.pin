@@ -15,7 +15,8 @@
 <phoebus>
 problem = tov
 bc_ix1 = reflect
-bc_ox1 = outflow
+bc_ox1 = reflect  # reflecting outer boundary a bit better behaved
+#bc_ox1 = outflow # but outflow and reflecting both work fine
 
 <parthenon/job>
 problem_id  = tov # problem ID: basename of output filenames
@@ -47,7 +48,7 @@ dt          = 5         # time increment between outputs
 nlim        = -1        # cycle limit
 tlim        = 5000      # time limit
 integrator  = rk2       # time integration algorithm
-ncycle_out  = 10        # interval for stdout summary info
+ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
 
 <parthenon/mesh>
@@ -98,25 +99,29 @@ rad = false
 
 <fluid>
 xorder = 2
-cfl = 0.025
+cfl = 0.75
 riemann = llf
 recon = weno5
 c2p_max_iter = 1000
 Ye = false
 
-# <fixup>
-# enable_floors = true
-# enable_ceilings = true
-# enable_flux_fixup = false
-# enable_c2p_fixup = true
-# floor_type = ConstantRhoSie
-# rho0_floor = 1.0e-12
-# sie0_floor = 1.0e-12	
-# rho_exp_floor = -2.0
-# sie_exp_floor = -1.0
-# ceiling_type = ConstantGamSie
-# sie0_ceiling = 1.0;
-# gam0_ceiling = 10.0;
+# Fixups aren't necessary for this problem,
+# especially with the Cowling approximation
+# and reflecting outer boundary.
+# But they also don't do any harm.
+<fixup>
+enable_floors = true
+enable_ceilings = true
+enable_flux_fixup = false
+enable_c2p_fixup = true
+floor_type = ConstantRhoSie
+rho0_floor = 1.0e-9
+sie0_floor = 1.0e-9
+rho_exp_floor = -2.0
+sie_exp_floor = -1.0
+ceiling_type = ConstantGamSie
+sie0_ceiling = 10.0;
+gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
@@ -128,6 +133,8 @@ force_static = true
 enabled = true
 Pc = 1e-2
 entropy = 8
-Pmin = 1e-9
-rhomin = 1e-12
-epsmin = 1e-12
+# pressure below which we terminate the TOV solver and transition to atmosphere
+Pmin = 1e-9 
+# The atmosphere values in the problem generator for density and energy
+rhomin = 1e-9
+epsmin = 1e-9
