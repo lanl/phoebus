@@ -101,7 +101,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                               fluid_prim::bfield,
                               fluid_prim::ye,
                               fluid_prim::pressure,
-                              fluid_prim::temperature},
+                              fluid_prim::temperature,
+                              "zero_update"},
                               imap);
 
   const int irho = imap[fluid_prim::density].first;
@@ -113,6 +114,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iye  = imap[fluid_prim::ye].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
+  const int izero = imap["zero_update"].first;
 
   // this only works with ideal gases
   const std::string eos_type = pin->GetString("eos","type");
@@ -189,6 +191,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         for (int d = 0; d < 3; d++) {
           v(ivlo+d,k,j,i) = beta[d]/lapse;
         }
+        v(izero,k,j,i) = 0.0;
       }
       /* region inside magnetized torus; u^i is calculated in
        * Boyer-Lindquist coordinates, as per Fishbone & Moncrief,
@@ -216,6 +219,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         for (int d = 0; d < 3; d++) {
           v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
         }
+        v(izero,k,j,i) = 1.0;
       }
       // fixup
       Real rhoflr = 0;

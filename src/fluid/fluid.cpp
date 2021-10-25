@@ -168,6 +168,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
+  physics->AddField("zero_update", mprim_scalar);
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
   physics->AddField(impl::fail, mprim_scalar);
@@ -518,17 +519,24 @@ TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> vars({fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
+  std::vector<std::string> vars({fluid_cons::density, fluid_cons::momentum, fluid_cons::energy, "zero_update"});
   PackIndexMap imap;
   auto du = rc->PackVariables(vars, imap);
+  const int crho = imap[fluid_cons::density].first;
+  const int cmom_lo = imap[fluid_cons::momentum].first;
+  const int cmom_hi = imap[fluid_cons::momentum].second;
   const int ceng = imap[fluid_cons::energy].first;
+  const int izero = imap["zero_update"].first;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        for (int m = 0; m < 5; m++)
-          du(m,k,j,i) = 0.0;
+        du(crho,k,j,i) *= du(izero,k,j,i);
+        du(cmom_lo,k,j,i) *= du(izero,k,j,i);
+        du(cmom_lo+1,k,j,i) *= du(izero,k,j,i);
+        du(cmom_hi,k,j,i) *= du(izero,k,j,i);
+        du(ceng,k,j,i) *= du(izero,k,j,i);
       }
   );
   return TaskStatus::complete;
