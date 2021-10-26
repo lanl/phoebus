@@ -532,7 +532,6 @@ TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
       DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        du(izero,k,j,i) = 0.0;
         du(crho,k,j,i) *= du(izero,k,j,i);
         du(cmom_lo,k,j,i) *= du(izero,k,j,i);
         du(cmom_lo+1,k,j,i) *= du(izero,k,j,i);

@@ -180,17 +180,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       Real beta[3];
       Real gcov[4][4];
+      Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
       // regions outside torus
       if (lnh < 0. || r < rin) {
         // Nominal values; real value set by fixup
         v(irho,k,j,i) = 0.0;
         v(ieng,k,j,i) = 0.0;
-        geom.SpacetimeMetric(CellLocation::Cent,k,j,i,gcov);
-        geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
-        const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
-        for (int d = 0; d < 3; d++) {
-          v(ivlo+d,k,j,i) = beta[d]/lapse;
-        }
         v(izero,k,j,i) = 0.0;
       }
       /* region inside magnetized torus; u^i is calculated in
@@ -200,25 +195,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real hm1 = std::exp(lnh) - 1.;
         Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam),
                  1. / (gam - 1.));
-        Real u = kappa * std::pow(rho, gam) / (gam - 1.);
-
         v(irho,k,j,i) = rho / rho_rmax;
-        v(ieng,k,j,i) = u / rho_rmax;
+        Real u = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
+
         v(ieng,k,j,i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
 
-        Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
-        bl.SpacetimeMetric(0.0, r, th, x3, gcov);
-        ucon_bl[0] = ucon_norm(ucon_bl, gcov);
-        Real ucon[4];
-        tr.bl_to_fmks(x1,x2,x3,a,ucon_bl,ucon);
-        const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
-        geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
-        geom.SpacetimeMetric(CellLocation::Cent,k,j,i, gcov);
-        ucon[0] = ucon_norm(ucon, gcov);
-        const Real W = lapse*ucon[0];
-        for (int d = 0; d < 3; d++) {
-          v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
-        }
+        ucon_bl[3] = uphi;
         v(izero,k,j,i) = 1.0;
       }
       // fixup
@@ -226,12 +208,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real epsflr;
       floor.GetFloors(x1, x2, x3, rhoflr, epsflr);
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
+      //v(ieng,k,j,i) = kappa * std::pow(v(irho,k,j,i), gam)/(gam - 1.0);
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
       v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
       v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i));
       
-      //fprintf(stderr,"%g %g %g %g\n", r, th, v(irho,k,j,i), v(ieng,k,j,i));
-      //if (i == ib.e) fprintf(stderr,"\n");
+      bl.SpacetimeMetric(0.0, r, th, x3, gcov);
+      ucon_bl[0] = ucon_norm(ucon_bl, gcov);
+      Real ucon[4];
+      tr.bl_to_fmks(x1,x2,x3,a,ucon_bl,ucon);
+      const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
+      geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
+      geom.SpacetimeMetric(CellLocation::Cent,k,j,i, gcov);
+      ucon[0] = ucon_norm(ucon, gcov);
+      const Real W = lapse*ucon[0];
+      for (int d = 0; d < 3; d++) {
+        v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
+      }
       rng_pool.free_state(rng_gen);
     });
 

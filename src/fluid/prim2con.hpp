@@ -66,7 +66,7 @@ void p2c(const Real &rho, const Real v[], const Real b[], const Real &u,
   cssq += vasq - cssq*vasq;
   const Real vcoff = alpha/(1.0 - vsq*cssq);
   SPACELOOP(m) {
-    const Real vpm = std::sqrt(cssq*(1.0 - vsq)*(gcon[m][m]*(1.0 - vsq*cssq)) - v[m]*v[m]*(1.0 - cssq));
+    const Real vpm = std::sqrt(cssq*(1.0 - vsq)*(gcon[m][m]*(1.0 - vsq*cssq) - v[m]*v[m]*(1.0 - cssq)));
     const Real vp = vcoff*(v[m]*(1.0 - cssq) + vpm) - beta[m];
     const Real vm = vcoff*(v[m]*(1.0 - cssq) - vpm) - beta[m];
     sig[m] = std::max(std::fabs(vp), std::fabs(vm));
