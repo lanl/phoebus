@@ -35,7 +35,6 @@ namespace Geometry {
 constexpr int NDSPACE = 3;
 constexpr int NDFULL = NDSPACE + 1;
 constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
-constexpr Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0/3.0);
 } // namespace Geometry
 
 #define SPACELOOP(i) for (int i = 0; i < Geometry::NDSPACE; i++)
@@ -99,6 +98,7 @@ template <typename System>
 KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
                                                Real X0, Real X1, Real X2,
                                                Real X3, Real da[NDFULL]) {
+  Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0/3.0);
   LinearAlgebra::SetZero(da, NDFULL);
   for (int d = 1; d < NDFULL; ++d) {
     Real X1p = X1;
@@ -162,6 +162,7 @@ template <typename System>
 KOKKOS_INLINE_FUNCTION void
 SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
                       Real X3, Real dg[NDFULL][NDFULL][NDFULL]) {
+  Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0/3.0);
   LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
   Real gl[NDFULL][NDFULL];
   Real gr[NDFULL][NDFULL];
