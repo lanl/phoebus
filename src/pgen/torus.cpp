@@ -196,7 +196,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam),
                  1. / (gam - 1.));
         v(irho,k,j,i) = rho / rho_rmax;
-        Real u = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
+        v(ieng,k,j,i) = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
 
         v(ieng,k,j,i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
 
@@ -220,7 +220,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real epsflr;
       floor.GetFloors(x1, x2, x3, rhoflr, epsflr);
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
-      //v(ieng,k,j,i) = kappa * std::pow(v(irho,k,j,i), gam)/(gam - 1.0);
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
       v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
       v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i));
