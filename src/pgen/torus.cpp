@@ -163,62 +163,71 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                  1. / (gam - 1.));
   const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
 
+  const int nsub = 4;
+
   pmb->par_for(
     "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
       auto rng_gen = rng_pool.get_state();
-      const Real x1 = coords.x1v(k,j,i);
-      const Real x2 = coords.x2v(k,j,i);
+      const Real dx_sub = coords.Dx(X1DIR, k, j, i)/nsub;
+      const Real dy_sub = coords.Dx(X2DIR, k, j, i)/nsub;
+      v(irho,k,j,i) = 0.0;
+      v(ieng,k,j,i) = 0.0;
+      for (int d = 0; d < 3; d++) v(ivlo+d,k,j,i) = 0.0;
       const Real x3 = coords.x3v(k,j,i);
+      for (int m = 0; m < nsub; m++) {
+        for (int n = 0; n < nsub; n++) {
+          const Real x1 = coords.x1f(k, j, i) + (m + 0.5)*dx_sub;
+          const Real x2 = coords.x2f(k, j, i) + (n + 0.5)*dy_sub;
 
-      Real r = tr.bl_radius(x1);
-      Real th = tr.bl_theta(x1,x2);
+          Real r = tr.bl_radius(x1);
+          Real th = tr.bl_theta(x1,x2);
 
-      Real lnh = -1.0;
-      Real uphi;
-      if (r > rin) lnh = log_enthalpy(r,th,a,rin,angular_mom,uphi);
+          Real lnh = -1.0;
+          Real uphi;
+          if (r > rin) lnh = log_enthalpy(r,th,a,rin,angular_mom,uphi);
 
-      Real beta[3];
-      Real gcov[4][4];
-      // regions outside torus
-      if (lnh < 0. || r < rin) {
-        // Nominal values; real value set by fixup
-        v(irho,k,j,i) = 0.0;
-        v(ieng,k,j,i) = 0.0;
-        v(izero,k,j,i) = 0.0;
-        for (int d = ivlo; d <= ivhi; d++) v(d,k,j,i) = 0.0;
-      }
-      /* region inside magnetized torus; u^i is calculated in
-       * Boyer-Lindquist coordinates, as per Fishbone & Moncrief,
-       * so it needs to be transformed at the end */
-      else {
-        Real hm1 = std::exp(lnh) - 1.;
-        Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam),
-                 1. / (gam - 1.));
-        v(irho,k,j,i) = rho / rho_rmax;
-        v(ieng,k,j,i) = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
+          if (lnh > 0.0) {
+            Real hm1 = std::exp(lnh) - 1.;
+            Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam),
+                                1. / (gam - 1.));
+            Real u = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
+            rho /= rho_rmax;
 
-        v(ieng,k,j,i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
+            Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
+            Real gcov[4][4];
+            bl.SpacetimeMetric(0.0, r, th, x3, gcov);
+            ucon_bl[0] = ucon_norm(ucon_bl, gcov);
+            Real ucon[4];
+            tr.bl_to_fmks(x1,x2,x3,a,ucon_bl,ucon);
+            const Real lapse = geom.Lapse(0.0, x1, x2, x3);
+            Real beta[3];
+            geom.ContravariantShift(0.0, x1, x2, x3, beta);
+            geom.SpacetimeMetric(0.0, x1, x2, x3, gcov);
+            ucon[0] = ucon_norm(ucon, gcov);
+            const Real W = lapse*ucon[0];
+            Real vcon[] = {ucon[1]/W + beta[0]/lapse,
+                           ucon[2]/W + beta[1]/lapse,
+                           ucon[3]/W + beta[2]/lapse};
 
-        Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
-        bl.SpacetimeMetric(0.0, r, th, x3, gcov);
-        ucon_bl[0] = ucon_norm(ucon_bl, gcov);
-        Real ucon[4];
-        tr.bl_to_fmks(x1,x2,x3,a,ucon_bl,ucon);
-        const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
-        geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
-        geom.SpacetimeMetric(CellLocation::Cent,k,j,i, gcov);
-        ucon[0] = ucon_norm(ucon, gcov);
-        const Real W = lapse*ucon[0];
-        for (int d = 0; d < 3; d++) {
-          v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
+            v(irho,k,j,i) += rho/(nsub*nsub);
+            v(ieng,k,j,i) += u/(nsub*nsub);
+            for (int d = 0; d < 3; d++) {
+              v(ivlo+d,k,j,i) += vcon[d]/(nsub*nsub);
+            }
+          }
         }
-        v(izero,k,j,i) = 1.0;
       }
+      const Real x1v = coords.x1v(k, j, i);
+      const Real x2v = coords.x2v(k, j, i);
+
+      v(ieng,k,j,i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
+      v(izero,k,j,i) = 1.0*(v(irho,k,j,i) > 0.0);
+
       // fixup
       Real rhoflr = 0;
       Real epsflr;
-      floor.GetFloors(x1, x2, x3, rhoflr, epsflr);
+      floor.GetFloors(x1v, x2v, x3, rhoflr, epsflr);
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
       v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
