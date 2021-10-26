@@ -81,8 +81,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
-  if (!enable_c2p_fixup) return TaskStatus::complete;
 
   const std::vector<std::string> vars({p::density, c::density, p::velocity,
                                        c::momentum, p::energy, c::energy, p::bfield,
@@ -110,6 +108,22 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   int pye = imap[p::ye].second; // negative if not present
   int cye = imap[c::ye].second;
   int ifail = imap[impl::fail].first;
+
+  int nfail_total;                                                                                   
+  parthenon::par_reduce(                                                                             
+      //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),                              
+      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),                 
+      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,                                        
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {                   
+        if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {                                  
+          nf++;                                                                                      
+                                                                                                     
+        }                                                                                            
+      }, Kokkos::Sum<int>(nfail_total));                                                             
+  printf("total nfail: %i\n", nfail_total);
+
+  bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
+  if (!enable_c2p_fixup) return TaskStatus::complete;
 
   const int ndim = pmb->pmy_mesh->ndim;
 
