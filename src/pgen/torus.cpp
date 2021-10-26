@@ -128,6 +128,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real u_jitter = pin->GetOrAddReal("torus", "u_jitter", 1.e-2);
   const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
   const Real bnorm = pin->GetOrAddReal("torus", "Bnorm", 1.e-2);
+  const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
   
   const Real a = pin->GetReal("geometry","a");
   auto bl = Geometry::BoyerLindquist(a);
@@ -162,8 +163,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real rho_rmax = std::pow(hm1_rmax * (gam - 1.) / (kappa * gam),
                  1. / (gam - 1.));
   const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
-
-  const int nsub = 4;
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
