@@ -13,3 +13,4 @@
 
 add_subdirectory(geometry)
 add_subdirectory(phoebus_utils)
+add_subdirectory(radiation)

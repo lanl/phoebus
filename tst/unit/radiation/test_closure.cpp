@@ -13,9 +13,25 @@
 
 #include <stdio.h> 
 
-#include "closure.hpp"
+#include "catch2/catch.hpp"
+#include "radiation/closure.hpp"
 
-using namespace radiationClosure; 
+// parthenon includes
+#include <coordinates/coordinates.hpp>
+#include <defs.hpp>
+#include <kokkos_abstraction.hpp>
+#include <parameter_input.hpp>
+
+// phoebus includes
+#include "geometry/geometry_utils.hpp"
+#include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/linear_algebra.hpp"
+#include "geometry/tetrads.hpp"
+#include <geometry/minkowski.hpp>
+#include "../../test_utils.hpp"
+
+using namespace Geometry;
+using namespace radiation; 
 
 struct Vec { 
   Real data[NDSPACE]; 
@@ -29,8 +45,15 @@ struct Tens2 {
   inline const Real& operator()(const int i, const int j) const {return data[i][j];} 
 };
 
-int main(int /*nargin*/, char** /*args*/) {
-  
+TEST_CASE("M1 Closure", "[radiation][closure]") { 
+  GIVEN("A background fluid state and values for E and F_i") {
+    THEN("We can perform a Con2Prim followed by a Prim2Con and recover E and F_i") {
+      int n_wrong = 0; 
+      REQUIRE(n_wrong == 0); 
+    }
+  }
+}
+/*
   // Set up background state
   Vec con_v = {0.01, -0.7, 0.0}; 
   Tens2 cov_gamma = {{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}}; 
@@ -61,3 +84,4 @@ int main(int /*nargin*/, char** /*args*/) {
 
   return 0; 
 }
+*/
