@@ -25,6 +25,9 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
+#define CMAX_CALC_ORIG (0)
+#define CMAX_CALC_HARM (1)
+#define CMAX_CALC CMAX_CALC_HARM
 
 namespace riemann {
 
@@ -36,10 +39,11 @@ struct FaceGeom {
            const int d, const int k, const int j, const int i)
            : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetG(loc,k,j,i)),
              gammadet(g.DetGamma(loc,k,j,i)) {
-    auto gcon = reinterpret_cast<Real (*)[3]>(&gcov[0][0]);
-    g.MetricInverse(loc,k,j,i,gcon);
-    gdd = gcon[d-1][d-1];
+    auto gammacon = reinterpret_cast<Real (*)[3]>(&gcov[0][0]);
+    g.MetricInverse(loc,k,j,i,gammacon);
+    gdd = gammacon[d-1][d-1];
     g.SpacetimeMetric(loc,k,j,i,gcov);
+    g.SpacetimeMetricInverse(loc,k,j,i,gcon);
     g.ContravariantShift(loc,k,j,i,beta);
     X[1] = (loc == CellLocation::Face1 ? coords.x1f(k, j, i) : coords.x1v(k, j, i));
     X[2] = (loc == CellLocation::Face2 ? coords.x2f(k, j, i) : coords.x2v(k, j, i));
@@ -49,6 +53,7 @@ struct FaceGeom {
   const Real gdet;
   const Real gammadet;
   Real gcov[4][4];
+  Real gcon[4][4];
   Real beta[3];
   Real gdd;
   Real X[4];
@@ -91,6 +96,7 @@ class FluxState {
   void prim_to_flux(const int d, const int k, const int j, const int i, const FaceGeom &g,
                     const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F,
                     const Real sie_max, const Real gam_max) const {
+    static constexpr int NDFULL = Geometry::NDFULL;
     const int dir = d-1;
     Real rho_floor = q(dir,prho,k,j,i);
     Real sie_floor;
@@ -176,7 +182,49 @@ class FluxState {
       F[m] = U[m]*vtil - Bcon[dir]*(vcon[m-cb_lo] - g.beta[m-cb_lo]/g.alpha);
     }
 
-    const Real vasq = bsqWsq/robust::make_positive(rhohWsq+bsqWsq);
+    Real ucon[NDFULL] = {W/g.alpha,
+                         W*(vcon[0] - g.beta[0]/g.alpha),
+                         W*(vcon[1] - g.beta[1]/g.alpha),
+                         W*(vcon[2] - g.beta[2]/g.alpha)};
+    Real Acov[NDFULL] = {0};
+    Acov[d] = 1.;
+    Real Qcov[NDFULL] = {0};
+    Qcov[0] = 1.;
+    Real Acon[NDFULL] = {0};
+    Real Qcon[NDFULL] = {0};
+    SPACETIMELOOP2(mu, nu) {
+      Acon[mu] += g.gcon[mu][nu]*Acov[nu];
+      Qcon[mu] += g.gcon[mu][nu]*Qcov[nu];
+    }
+    //Real bsq = 0.; // b.b
+    Real va2 = 0.; // bsq/ee
+    Real cs2 = robust::make_bounded(gamma1*P*W*W/robust::make_positive(rhohWsq), 0.0, 1.0);
+    Real cms2 = robust::make_bounded(cs2 + va2*(1.0 - cs2), 0.0, 1.0);
+    Real Asq = 0.;
+    Real Qsq = 0.;
+    Real Au = 0.;
+    Real Qu = 0.;
+    Real AQ = 0.;
+    SPACETIMELOOP(mu) {
+      Asq += Acon[mu]*Acov[mu];
+      Qsq += Qcon[mu]*Qcov[mu];
+      Au += Acov[mu]*ucon[mu];
+      Qu += Qcov[mu]*ucon[mu];
+      AQ += Acon[mu]*Qcov[mu];
+    }
+    Real Au2 = Au*Au;
+    Real Qu2 = Qu*Qu;
+    Real AuQu = Au*Qu;
+
+    Real A = Qu2 - (Qsq + Qu2) * cms2;
+    Real B = 2. * (AuQu - (AQ + AuQu) * cms2);
+    Real C = Au2 - (Asq + Au2) * cms2;
+    Real discr = robust::make_bounded(B*B - 4.*A*C, 0., 1.e10);
+    discr = sqrt(discr);
+    vp = -(-B + discr)/(2.*A);
+    vm = -(-B - discr)/(2.*A);
+
+    /*const Real vasq = bsqWsq/robust::make_positive(rhohWsq+bsqWsq);
     const Real cssq = robust::make_bounded(gamma1*P*W*W/robust::make_positive(rhohWsq), 0.0, 1.0);
     Real cmsq = robust::make_bounded(cssq + vasq*(1.0 - cssq), 0.0, 1.0);
     //cmsq = (cmsq > 0.0 ? cmsq : 1.e-16); // TODO(JCD): what should this 1.e-16 be?
@@ -186,7 +234,7 @@ class FluxState {
     const Real v0 = vel*(1.0 - cmsq);
     const Real vpm = sqrt(robust::make_positive(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0)));
     vp = vcoff*(v0 + vpm) - g.beta[dir];
-    vm = vcoff*(v0 - vpm) - g.beta[dir];
+    vm = vcoff*(v0 - vpm) - g.beta[dir];*/
   }
 
   const VariableFluxPack<Real> v;
