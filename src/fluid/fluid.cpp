@@ -261,7 +261,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 //template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -397,9 +396,9 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
         fail(k, j, i) = (status == con2prim_robust::ConToPrimStatus::success
                                  ? con2prim_robust::FailFlags::success
                                  : con2prim_robust::FailFlags::fail);
-        if (i == 138 && j == 186) {
-          printf("peng(%i %i) = %e\n", i, j, diag(0,k,j,i));
-        }
+        //if (i == 138 && j == 186) {
+        //  printf("peng(%i %i) = %e\n", i, j, diag(0,k,j,i));
+       // }
       });
 
   return TaskStatus::complete;
@@ -419,7 +418,6 @@ TaskStatus ConservedToPrimitive(T *rc) {
 template <typename T>
 TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const IndexRange &jb,
                                            const IndexRange &kb) {
-  printf("C2P...\n");
   using namespace con2prim_vanderholst;
   auto *pmb = rc->GetParentPointer().get();
 
@@ -470,7 +468,6 @@ TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const In
     //}
   }
   printf("%s:%i\n", __FILE__, __LINE__);*/
-  pmb->exec_space.fence(); printf("C2P done!\n");
 
   return TaskStatus::complete;
 }
@@ -568,12 +565,12 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
       DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (i == 133 && j == 83) {
+        /*if (i == 133 && j == 83) {
         //if (i == 133 && j == 131) {
           printf("divF: %e %e %e %e %e\n",
             divf(crho,k,j,i), divf(cmom_lo,k,j,i), divf(cmom_lo+1,k,j,i),
             divf(cmom_lo+2,k,j,i), divf(ceng,k,j,i));
-        }
+        }*/
         diag(0,k,j,i) = divf(crho,k,j,i);
         diag(1,k,j,i) = divf(cmom_lo,k,j,i);
         diag(2,k,j,i) = divf(cmom_lo+1,k,j,i);
@@ -608,7 +605,6 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
 // template <typename T>
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src) {
-  printf("CALCULATE SOURCE...\n");
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -738,7 +734,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           printf("S rho u P: %e %e %e vel: %e %e %e\n", rho, u, P, vcon[0], vcon[1], vcon[2]);
         }*/
 
-        if (i == 133 && j == 83) {
+        /*if (i == 133 && j == 83) {
         //if (i == 133 && j == 131) {
           printf("[%i %i] S = %e %e %e %e %e\n", i, j, 0., src(ceng,k,j,i),
             src(cmom_lo,k,j,i), src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i));
@@ -749,7 +745,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
             }
             printf("\n");
           }
-        }
+        }*/
 
         /*SPACELOOP(ii) {
           src(cmom_lo + ii, k, j, i) = gdet*vc.S[ii + 1];
@@ -846,7 +842,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   }
 #undef RECON
 
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
+  /*parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
     X1DIR, pmb->pmy_mesh->ndim, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
       ib.s - 1, ib.e + 1,
       KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
@@ -857,7 +853,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
             flux.qr(d-1,0,k,j,i), flux.qr(d-1,4,k,j,i), flux.qr(d-1,8,k,j,i));
         }
       });
-  pmb->exec_space.fence();
+  pmb->exec_space.fence();*/
 
 #define FLUX(method)                                                           \
   parthenon::par_for(                                                          \
