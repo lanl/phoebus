@@ -113,6 +113,27 @@ void PiecewiseLinear(const int d, const int n,
   Real dq = v(n,k+dk,j+dj,i+di) - v(n,k,j,i);
   //dq = 0.5*(v(n,k+dk,j+dj,i+di)-v(n,k-dk,j-dj,i-di));
   dq = minmod(v(n,k,j,i)-v(n,k-dk,j-dj,i-di), dq)*dq;
+
+  // HARM MC
+  Real y1 = v(n,k-dk,j-dj,i-di);
+  Real y2 = v(n,k,j,i);
+  Real y3 = v(n,k+dk,j+dj,i+di);
+  Real Dqm = 2.*(y2 - y1);
+  Real Dqp = 2.*(y3 - y2);
+  Real Dqc = 0.5*(y3 - y1);
+  Real s = Dqm*Dqp;
+  if (s <= 0) {
+    dq = 0.;
+  } else {
+    if (fabs(Dqm) < fabs(Dqp) && fabs(Dqm) < fabs(Dqc)) {
+      dq = Dqm;
+    } else if (fabs(Dqp) < fabs(Dqc)) {
+      dq = Dqp;
+    } else {
+      dq = Dqc;
+    }
+  }
+
   ql(dir,n,k+dk,j+dj,i+di) = v(n,k,j,i) + 0.5*dq;
   qr(dir,n,k,j,i) = v(n,k,j,i) - 0.5*dq;
 }

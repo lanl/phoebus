@@ -229,7 +229,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ieng,k,j,i) = 0.0;
         // Actually start out with a hot atmosphere
         v(irho,k,j,i) = 1e-5*pow(r,-2.);
-        v(ieng,k,j,i) = 1.e-1*v(irho,k,j,i)*pow(r,-1.);
+        //v(ieng,k,j,i) = 1.e-1*v(irho,k,j,i)*pow(r,-1.);
+        v(ieng,k,j,i) = 1.e-7*pow(r,-(2.*5./3.));
         geom.SpacetimeMetric(CellLocation::Cent,k,j,i,gcov);
         geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
         const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
@@ -281,14 +282,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         //if (i == 138 && j == 186) {
         //  printf("DISK ZONE! [%i %i] rho = %e u = %e\n", i, j, v(irho,k,j,i), v(ieng,k,j,i));
         //}
-        if (i == 133 && j == 131) {
+        /*if (i == 133 && j == 83) {
           printf("init p: %e %e %e %e %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(ivlo,k,j,i),
             v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
           printf("x: %28.18e %28.18e %28.18e\n", x1, x2, x3);
           printf("r: %28.18e th: %28.18e\n", r, th);
           printf("rho: %e hm1: %28.18e gam: %28.18e kappa: %28.18e\n", rho, hm1, gam, kappa);
           //exit(-1);
-        }
+        }*/
       }
       // fixup
       Real rhoflr, epsflr;
@@ -296,6 +297,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
       v(iprs,k,j,i) = eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
+        if (i == 133 && j >= 81 && j <= 86) {
+          printf("[%i %i] rho: %e uu: %e P: %e\n", i, j, v(irho,k,j,i),
+            v(ieng,k,j,i), v(iprs,k,j,i));
+        }
 
       v(itmp,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i)/Cv;
       //fprintf(stderr,"%g %g %g %g\n", r, th, v(irho,k,j,i), v(ieng,k,j,i));

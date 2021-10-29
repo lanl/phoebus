@@ -207,6 +207,10 @@ class FluxState {
     const Real vpm = sqrt(robust::make_positive(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0)));
     vp = vcoff*(v0 + vpm) - g.beta[dir];
     vm = vcoff*(v0 - vpm) - g.beta[dir];
+    if (i == 133 && j == 84 && d == 2) {
+      printf("prim_to_flux [%i %i] d = %i: rho: %e u: %e P: %e cssq: %e vp: %e vm: %e\n",
+        i,j,d,rho,u,P,cssq,vp,vm);
+    }
 
     // TODO(BRR) break the code
     /*F[crho] = 0.;
@@ -359,8 +363,8 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
     }*/
 
     if (m == 0 && d == 2 && i == 133 && j == 84) {
-      printf("rhol = %e rhor = %e Ul = %e Ur = %e Fl = %e Fr = %e Flux = %e cmax = %e\n",
-        fs.ql(d-1,0,k,j,i), fs.qr(d-1,0,k,j,i), Ul[0], Ur[0], Fl[0], Fr[0], fs.v.flux(d,m,k,j,i), cmax);
+      printf("[%i %i] d = %i rhol = %e rhor = %e Ul = %e Ur = %e Fl = %e Fr = %e Flux = %e cmax = %e\n\n", i, j, d,
+        fs.ql(d-1,0,k,j,i), fs.qr(d-1,0,k,j,i), g.gammadet*Ul[0], g.gammadet*Ur[0], g.gdet*Fl[0], g.gdet*Fr[0], fs.v.flux(d,m,k,j,i), cmax);
     }
     if (isnan(Fl[m]) || isnan(Fr[m]) || isnan(cmax) || isnan(Ur[m]) || isnan(Ul[m])) {
       printf("A nan in a flux! %e %e %e %e %e\n", Fl[m], Fr[m], cmax, Ur[m], Ul[m]);

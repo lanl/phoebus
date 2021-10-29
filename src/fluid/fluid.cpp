@@ -811,7 +811,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
-    X1DIR, pmb->pmy_mesh->ndim, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.s + dj,
+    X1DIR, pmb->pmy_mesh->ndim, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
       ib.s - 1, ib.e + 1,
       KOKKOS_LAMBDA(const int d, const int n, const int k, const int j, const int i) {
         PARTHENON_REQUIRE(!isnan(flux.v(n,k,j,i)), "bad prim for recon");
@@ -847,12 +847,15 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 #undef RECON
 
   parthenon::par_for(DEFAULT_LOOP_PATTERN, "test", DevExecSpace(),
-    X1DIR, pmb->pmy_mesh->ndim, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.s + dj,
+    X1DIR, pmb->pmy_mesh->ndim, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
       ib.s - 1, ib.e + 1,
-      KOKKOS_LAMBDA(const int d, const int n, const int k, const int j, const int i) {
-        PARTHENON_REQUIRE(!isnan(flux.ql(d-1,n,k,j,i)), "bad ql after recon");
-        PARTHENON_REQUIRE(!isnan(flux.qr(d-1,n,k,j,i)), "bad qr after recon");
-        //flux.ql(d-1,n,k,j,i)
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
+        if (i == 133 && j >= 81 && j <= 86 && d == 2) {
+          printf("RECON [%i %i] d = %i : L rho = %e uu = %e P = %e \n     R rho = %e uu = %e P = %e\n",
+            i,j,d,
+            flux.ql(d-1,0,k,j,i), flux.ql(d-1,4,k,j,i), flux.ql(d-1,8,k,j,i),
+            flux.qr(d-1,0,k,j,i), flux.qr(d-1,4,k,j,i), flux.qr(d-1,8,k,j,i));
+        }
       });
   pmb->exec_space.fence();
 
