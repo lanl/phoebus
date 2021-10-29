@@ -568,7 +568,8 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
       DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (i == 121 && j == 145) {
+        if (i == 133 && j == 83) {
+        //if (i == 133 && j == 131) {
           printf("divF: %e %e %e %e %e\n",
             divf(crho,k,j,i), divf(cmom_lo,k,j,i), divf(cmom_lo+1,k,j,i),
             divf(cmom_lo+2,k,j,i), divf(ceng,k,j,i));
@@ -714,7 +715,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
         }*/
 
 
-        const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+        /*const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
         Real beta[3], gammacov[3][3], gammacon[3][3], dgcov[4][4][4], dlnalpha[4];
         geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
         geom.Metric(CellLocation::Cent, k, j, i, gammacov);
@@ -735,6 +736,19 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
             gdet*vc.S[3]/src(cmom_lo+2, k, j, i),
             gdet*vc.S[4]/src(ceng, k, j, i));
           printf("S rho u P: %e %e %e vel: %e %e %e\n", rho, u, P, vcon[0], vcon[1], vcon[2]);
+        }*/
+
+        if (i == 133 && j == 83) {
+        //if (i == 133 && j == 131) {
+          printf("[%i %i] S = %e %e %e %e %e\n", i, j, 0., src(ceng,k,j,i),
+            src(cmom_lo,k,j,i), src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i));
+          printf("Tmunu:\n");
+          SPACETIMELOOP(mu) {
+            SPACETIMELOOP(nu) {
+              printf("  %e", Tmunu[mu][nu]);
+            }
+            printf("\n");
+          }
         }
 
         /*SPACELOOP(ii) {

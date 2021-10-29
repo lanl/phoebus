@@ -5,7 +5,7 @@
 #include "Kokkos_Random.hpp"
 
 // Temporary
-#include <parthenon/driver.hpp>                                                                      
+#include <parthenon/driver.hpp>
 using namespace parthenon::driver::prelude;
 #include "fixup/fixup.hpp"
 
@@ -131,7 +131,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real u_jitter = pin->GetOrAddReal("torus", "u_jitter", 1.e-2);
   const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
   const Real bnorm = pin->GetOrAddReal("torus", "Bnorm", 1.e-2);
-  
+
   const Real a = pin->GetReal("geometry","a");
   auto bl = Geometry::BoyerLindquist(a);
 
@@ -169,6 +169,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                  1. / (gam - 1.));
   const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
 
+  printf("rho_rmax: %28.18e\n", rho_rmax);
+  printf("u_rmax: %28.18e\n", u_rmax);
+
+  printf("xmin: %28.18e %28.18e %28.18e\n", coords.x1f(0,4,4), coords.x2f(0,4,4),
+    coords.x3f(0,4,4));
+  printf("dx: %28.18e %28.18e %28.18e\n", coords.dx1v(0,4,4), coords.dx1v(0,4,4),
+    coords.dx1v(0,4,4));
+  printf("dx: %28.18e %28.18e %28.18e\n", coords.dx1f(0,4,4), coords.dx1f(0,4,4),
+    coords.dx1f(0,4,4));
+  printf("[NG NG 0] X: %28.18e %28.18e %28.18e\n",
+    coords.x1v(0,4,4), coords.x2v(0,4,4), coords.x3v(0,4,4));
+  printf("[133 131 0] X: %28.18e %28.18e %28.18e\n",
+    coords.x1v(0,131,133), coords.x2v(0,131,133), coords.x3v(0,131,133));
+
   pmb->par_for(
     "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -188,6 +202,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       //if (j == 128) {
       //  printf("i: %i x1: %e r: %e lnh: %e\n", i, x1, r, lnh);
      // }
+     /*{
+       if (i == 120 && j == 120) {
+         printf("[%i %i] X = %28.18e %28.18e %28.18e\n", i, j, x1, x2, x3);
+         const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
+         printf("alpha: %e\n", lapse);
+         Real dgcov[4][4][4] = {0};
+         geom.MetricDerivative(CellLocation::Cent, k, j, i, dgcov);
+         Real dlnalpha[4] = {0};
+         geom.GradLnAlpha(CellLocation::Cent, k, j, i, dlnalpha);
+         printf("dlnalpha: %e %e %e %e\n",
+           dlnalpha[0], dlnalpha[1], dlnalpha[2], dlnalpha[3]);
+         printf("dgcov:\n");
+         SPACETIMELOOP3(mu, nu, lam) {
+           printf("[%i %i %i] %e\n", mu, nu, lam, dgcov[mu][nu][lam]);
+         }
+       }
+     }*/
 
       Real beta[3];
       Real gcov[4][4];
@@ -209,9 +240,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(ivlo+d,k,j,i) = 0.0;//beta[d]/lapse;
           //v(ivlo+d,k,j,i) = beta[d];
         }
-        if (i == 138 && j == 186) {
-          printf("ATMOS ZONE! [%i %i] rho = %e u = %e\n", i, j, v(irho,k,j,i), v(ieng,k,j,i));
-        }
+        //if (i == 138 && j == 186) {
+        //  printf("ATMOS ZONE! [%i %i] rho = %e u = %e\n", i, j, v(irho,k,j,i), v(ieng,k,j,i));
+        //}
       }
       /* region inside magnetized torus; u^i is calculated in
        * Boyer-Lindquist coordinates, as per Fishbone & Moncrief,
@@ -239,16 +270,24 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         for (int d = 0; d < 3; d++) {
           v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
         }
-        if (j == 127 + 4 && i > 180 && i < 190) {
-          int d = 0;
-          //printf("[%i] vtilde: %e beta: %e alpha: %e\n", i, lapse*ucon[d+1]/beta[d], beta[d], lapse);
-          printf("[%i] v1: %e u^1: %e u^e: %e vtilde: %e beta/alpha = %e\n", i, v(ivlo+d,k,j,i),
-            ucon[d+1], ucon[d+2], lapse*ucon[d+1]/beta[d], beta[d]/lapse);
-        }
+        //if (j == 127 + 4 && i > 180 && i < 190) {
+        //  int d = 0;
+        //  //printf("[%i] vtilde: %e beta: %e alpha: %e\n", i, lapse*ucon[d+1]/beta[d], beta[d], lapse);
+        //  printf("[%i] v1: %e u^1: %e u^e: %e vtilde: %e beta/alpha = %e\n", i, v(ivlo+d,k,j,i),
+        //    ucon[d+1], ucon[d+2], lapse*ucon[d+1]/beta[d], beta[d]/lapse);
+        //}
         //v(ivlo,k,j,i) = beta[0]/lapse;
-        //v(ivlo+1,k,j,i) = beta[1]/lapse;
-        if (i == 138 && j == 186) {
-          printf("DISK ZONE! [%i %i] rho = %e u = %e\n", i, j, v(irho,k,j,i), v(ieng,k,j,i));
+        ///v(ivlo+1,k,j,i) = beta[1]/lapse;
+        //if (i == 138 && j == 186) {
+        //  printf("DISK ZONE! [%i %i] rho = %e u = %e\n", i, j, v(irho,k,j,i), v(ieng,k,j,i));
+        //}
+        if (i == 133 && j == 131) {
+          printf("init p: %e %e %e %e %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(ivlo,k,j,i),
+            v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
+          printf("x: %28.18e %28.18e %28.18e\n", x1, x2, x3);
+          printf("r: %28.18e th: %28.18e\n", r, th);
+          printf("rho: %e hm1: %28.18e gam: %28.18e kappa: %28.18e\n", rho, hm1, gam, kappa);
+          //exit(-1);
         }
       }
       // fixup
@@ -257,15 +296,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
       v(iprs,k,j,i) = eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
-      
+
       v(itmp,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i)/Cv;
-      if (i == 138 && j == 186) {
-        printf("AFTER FIXUP ZONE! [%i %i] rho = %e u = %e\n", i, j, v(irho,k,j,i), v(ieng,k,j,i));
-      }
       //fprintf(stderr,"%g %g %g %g\n", r, th, v(irho,k,j,i), v(ieng,k,j,i));
       //if (i == ib.e) fprintf(stderr,"\n");
       rng_pool.free_state(rng_gen);
     });
+
+  //exit(-1);
+
+  //pmb->exec_space.fence();
+  //exit(-1);
 
   // get vector potential
   ParArrayND<Real> A("vector potential", jb.e+1, ib.e+1);
@@ -286,7 +327,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bmin) {
       const Real gdet = geom.DetGamma(CellLocation::Cent,k,j,i);
       v(iblo,k,j,i) = - ( A(j,i) - A(j+1,i)
-                         + A(j,i+1) - A(j+1,i+1) ) 
+                         + A(j,i+1) - A(j+1,i+1) )
                          / (2.0 * coords.Dx(X2DIR,k,j,i) * gdet);
       v(iblo+1,k,j,i) = ( A(j,i) + A(j+1,i)
                          - A(j,i+1) - A(j+1,i+1) )
@@ -328,7 +369,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
   for (int n = 0; n < nsmooth; n++) {
-    //auto rho_copy = 
+    //auto rho_copy =
     auto pkg = pmb->packages.Get("fluid");
     auto rho = pmb->meshblock_data.Get()->Get(fluid_prim::density).data;
     auto rho_copy = rho.GetMirrorAndCopy(Kokkos::DefaultExecutionSpace());
@@ -345,19 +386,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         double ref = rho(k,j,i);
-        if (rho_copy(0,0,0,k,j,i+1) > 10.*ref || rho_copy(0,0,0,k,j,i-1) > 10.*ref || 
+        if (rho_copy(0,0,0,k,j,i+1) > 10.*ref || rho_copy(0,0,0,k,j,i-1) > 10.*ref ||
             rho_copy(0,0,0,k,j+1,i) > 10.*ref || rho_copy(0,0,0,k,j-1,i) > 10.*ref) {
-          rho(k,j,i) = (1./4.)*(rho_copy(0,0,0,k,j,i+1) + rho_copy(0,0,0,k,j,i-1) + 
+          rho(k,j,i) = (1./4.)*(rho_copy(0,0,0,k,j,i+1) + rho_copy(0,0,0,k,j,i-1) +
                                 rho_copy(0,0,0,k,j+1,i) + rho_copy(0,0,0,k,j-1,i));
-          ug(k,j,i) = (1./4.)*(ug_copy(0,0,0,k,j,i+1) + ug_copy(0,0,0,k,j,i-1) + 
+          ug(k,j,i) = (1./4.)*(ug_copy(0,0,0,k,j,i+1) + ug_copy(0,0,0,k,j,i-1) +
                                 ug_copy(0,0,0,k,j+1,i) + ug_copy(0,0,0,k,j-1,i));
           for (int ii = 0; ii < 3; ii++) {
-            v(ii,k,j,i) = (1./4.)*(v_copy(0,0,ii,k,j,i+1) + v_copy(0,0,ii,k,j,i-1) + 
+            v(ii,k,j,i) = (1./4.)*(v_copy(0,0,ii,k,j,i+1) + v_copy(0,0,ii,k,j,i-1) +
                                   v_copy(0,0,ii,k,j+1,i) + v_copy(0,0,ii,k,j-1,i));
           }
-          t(k,j,i) = (1./4.)*(t_copy(0,0,0,k,j,i+1) + t_copy(0,0,0,k,j,i-1) + 
+          t(k,j,i) = (1./4.)*(t_copy(0,0,0,k,j,i+1) + t_copy(0,0,0,k,j,i-1) +
                                 t_copy(0,0,0,k,j+1,i) + t_copy(0,0,0,k,j-1,i));
-          p(k,j,i) = (1./4.)*(p_copy(0,0,0,k,j,i+1) + p_copy(0,0,0,k,j,i-1) + 
+          p(k,j,i) = (1./4.)*(p_copy(0,0,0,k,j,i+1) + p_copy(0,0,0,k,j,i-1) +
                                 p_copy(0,0,0,k,j+1,i) + p_copy(0,0,0,k,j-1,i));
           //t(k,j,i) = ug(k,j,i)/rho(k,j,i)/Cv;
           //p(k,j,i) = ug(k,j,i)/rho(k,j,i)/Cv;
@@ -371,36 +412,36 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // now normalize the b-field
   //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
-  
-  fluid::ConservedToPrimitive(rc);
-  fixup::ConservedToPrimitiveFixup(rc);
-  fluid::PrimitiveToConserved(rc);
 
-  
-  
+  //fluid::ConservedToPrimitive(rc);
+  //fixup::ConservedToPrimitiveFixup(rc);
+  //fluid::PrimitiveToConserved(rc);
+
+
+
   /*auto fail = rc->Get(internal_variables::fail).data;
-    
+
     printf("Before inversion:\n");
     pmb->par_for(
       "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         if (i == 128 && j == 128) {
-          printf("p: %e %e %e %e %e %e %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i), v(itmp,k,j,i), 
+          printf("p: %e %e %e %e %e %e %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i), v(itmp,k,j,i),
             v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
           printf("fail: %i\n", fail(k,j,i));
         }
       });
   pmb->exec_space.fence();
-  
+
   fluid::ConservedToPrimitive(rc);
-  
-    
+
+
     printf("After inversion:\n");
     pmb->par_for(
       "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         if (i == 128 && j == 128) {
-          printf("p: %e %e %e %e %e %e %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i), v(itmp,k,j,i), 
+          printf("p: %e %e %e %e %e %e %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i), v(itmp,k,j,i),
             v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
           printf("fail: %i\n", fail(k,j,i));
         }
@@ -427,7 +468,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 void ProblemModifier(ParameterInput *pin) {
   Real router = pin->GetOrAddReal("coordinates", "r_outer", 40.0);
   Real x1max = log(router);
-  pin->SetReal("parthenon/mesh", "x1max", x1max);
+  //pin->SetReal("parthenon/mesh", "x1max", x1max);
+  //printf("x1max: %28.18e\n", x1max);
 
   Real a = pin->GetReal("geometry","a");
   Real Rh = 1.0 + sqrt(1.0 - a*a);
@@ -436,8 +478,13 @@ void ProblemModifier(ParameterInput *pin) {
   int nx1 = pin->GetInteger("parthenon/mesh", "nx1");
   Real dx = (x1max - xh)/(nx1 - ninside);
   Real x1min = xh - ninside*dx;
+  // TODO(BRR) harm val:
+  x1min = 2.147441732474514309e-01;
+  //Real x1max = log(40.);
+
   /*pin->SetReal("parthenon/mesh", "x1min", x1min);\*/
-  pin->SetReal("parthenon/mesh", "x1min", x1min);
+  //pin->SetReal("parthenon/mesh", "x1min", x1min);
+  //pin->SetReal("parthenon/mesh", "x1max", x1max);
 }
 
 

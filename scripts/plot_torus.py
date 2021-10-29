@@ -119,6 +119,10 @@ vmax = 0
 var1 = dfile1.Get("p.density", flatten=False)
 fail = dfile1.Get("fail", flatten=False)
 
+var1 = np.fabs(dfile.Get("cell_signal_speed", flatten=False)[:,:,:,:,0])
+print(var1.min())
+print(var1.max())
+
 #var = np.fabs(v1)
 #vmin=-4
 #vmax=0

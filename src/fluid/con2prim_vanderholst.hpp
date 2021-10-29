@@ -98,7 +98,7 @@ template <typename F>
 KOKKOS_INLINE_FUNCTION
 Real find_root_secant(F func, const Real x_guess, const Real tol, const int maxiter, bool &success) {
   int niter = 0;
- 
+
   Real x0 = x_guess;
   Real x1 = (1. + 1.e-5)*x_guess;
 
@@ -157,7 +157,7 @@ Real find_root_bisect(F func, Real a, Real b, const Real tol, const int maxiter,
       break;
     }
   }
-  
+
   if (niter == maxiter) {
     success = false;
   } else {
@@ -172,7 +172,7 @@ class Residual {
   KOKKOS_FUNCTION
   Residual(const Real D, const Real Ssq, const Real tau, const Real gamma) :
     D_(D), Ssq_(Ssq), tau_(tau), gamma_(gamma) {}
-  
+
   KOKKOS_INLINE_FUNCTION
   Real operator()(const Real xi) {
     const Real Gamma = sqrt(1./(1. - Ssq_/(xi*xi)));
@@ -265,7 +265,7 @@ class ConToPrim {
       rel_tolerance(tol),
       max_iter(max_iterations),
       h0sq_(1.0) { }
-  
+
   std::vector<std::string> Vars() {
     return std::vector<std::string>({fluid_prim::density, fluid_cons::density,
                                     fluid_prim::velocity, fluid_cons::momentum,
@@ -275,7 +275,7 @@ class ConToPrim {
                                     fluid_prim::pressure, fluid_prim::temperature,
                                     internal_variables::cell_signal_speed, fluid_prim::gamma1});
   }
-  
+
   template <typename CoordinateSystem, class... Args>
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus Solve(const CoordinateSystem &geom, const singularity::EOS &eos,
@@ -296,22 +296,22 @@ class ConToPrim {
     }
     vsq = (vsq > 0.9996) ? 0.9996 : vsq;
     Real Gamma = 1./sqrt(1. - vsq);
-    Real xi_guess = Gamma*Gamma*w; 
+    Real xi_guess = Gamma*Gamma*w;
 
     if (isnan(xi_guess)) {
       printf("Nan guess! [%i %i] xi = %e Gamma = %e w = %e vsq = %e vel = %e %e %e\n",
         v.i_, v.j_, xi_guess, gamma, w, vsq, vel[0], vel[1], vel[2]);
       //PARTHENON_FAIL("no");
     }
-    
+
     //if (v.i_ == 138 && v.j_ == 186) {
-    if (v.i_ == 120 && v.j_ == 149) {
+    /*if (v.i_ == 120 && v.j_ == 149) {
       printf("c2p prim before: %e %e %e %e %e\n", v(prho), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2),
         v(peng));
       printf("c2p cons before: %e %e %e %e %e\n", v(crho), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),
         v(ceng));
-    }
-    
+    }*/
+
     const Real igdet = 1.0/g.gdet;
 
     const Real D = v(crho)*igdet;
@@ -360,7 +360,7 @@ class ConToPrim {
     v(pvel_lo) = vcon[0];
     v(pvel_lo + 1) = vcon[1];
     v(pvel_lo + 2) = vcon[2];
-    
+
     //v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
     //v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
     v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng)/v(prho));
@@ -370,7 +370,7 @@ class ConToPrim {
                   //eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
                   //wsum += w;
                   //sum += w*v(b,iv,k+n,j+m,i+l);
-    
+
     // TODO(BRR) Set signal speeds more efficiently than by a p2c call
     Real ye_prim = 0.0;
     if (pye > 0) ye_prim = v(pye);
@@ -387,14 +387,14 @@ class ConToPrim {
     }
 
     //if (v.i_ == 138 && v.j_ == 186) {
-    if (v.i_ == 120 && v.j_ == 149) {
+    /*if (v.i_ == 120 && v.j_ == 149) {
       printf("c2p prim after: %e %e %e %e %e\n", v(prho), v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2),
         v(peng));
       printf("c2p cons after: %e %e %e %e %e\n", v(crho), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2),
         v(ceng));
-    }
+    }*/
 
-    if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) || 
+    if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) ||
         isnan(v(pvel_lo+2)) || isnan(v(prs)) || isnan(v(gm1))) {
       if (is_high_dens) {
         printf("A nan! [%i %i] %e %e %e %e %e %e %e %e xi: %e Gamma: %e\n", v.i_, v.j_, rho, ug, P, v(pvel_lo), v(pvel_lo+1),

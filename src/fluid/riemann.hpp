@@ -270,12 +270,12 @@ class FluxState {
     }
     NEWF[ceng] = vc.F[dir][4];
 
-    if (i == 120 && j == 120) {
+    /*if (i == 120 && j == 120) {
       //printf("NEWU: %e %e %e %e %e OLDU: %e %e %e %e %e\n",
       //  vc.U[0], vc.U[1], vc.U[2], vc.U[3], vc.U[4],
       //  U[crho], U[cmom_lo], U[cmom_lo+1], U[cmom_lo+2], U[ceng]);
       printf("F NEW[%i]: %e %e %e %e %e\n  OLD   : %e %e %e %e %e\n", dir, NEWF[0], NEWF[1], NEWF[2], NEWF[3], NEWF[4], F[crho], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2], F[ceng]);
-    }
+    }*/
 
     /*F[crho] = vc.F[dir][0];
     SPACELOOP(ii) {
@@ -357,6 +357,11 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
         i, fs.v.flux(d,m,k,j,i), Fl[m], Fr[m], 0.5*(Fl[m] + Fr[m])*g.gdet,
         Ur[m], Ul[m], cmax*(Ur[m] - Ul[m])*g.gammadet);
     }*/
+
+    if (m == 0 && d == 2 && i == 133 && j == 84) {
+      printf("rhol = %e rhor = %e Ul = %e Ur = %e Fl = %e Fr = %e Flux = %e cmax = %e\n",
+        fs.ql(d-1,0,k,j,i), fs.qr(d-1,0,k,j,i), Ul[0], Ur[0], Fl[0], Fr[0], fs.v.flux(d,m,k,j,i), cmax);
+    }
     if (isnan(Fl[m]) || isnan(Fr[m]) || isnan(cmax) || isnan(Ur[m]) || isnan(Ul[m])) {
       printf("A nan in a flux! %e %e %e %e %e\n", Fl[m], Fr[m], cmax, Ur[m], Ul[m]);
       PARTHENON_FAIL("a nan in a flux :(");
