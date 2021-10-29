@@ -48,10 +48,10 @@ xmax = 8.0
 ymin = -3.2
 ymax = -1.6
 
-xmin = 5.9
-xmax = 6.3
-ymin = -.65
-ymax = -.3
+xmin = 5.7
+xmax = 6.5
+ymin = -.75
+ymax = -.2
 
 #xmin = 0
 #xmax = 5
@@ -66,9 +66,9 @@ ndim = 256
 
 # Plotting macro
 #def myplot(myvar, n, vmin=-12, vmax=0, uselog=True, cmap='jet', half=False, cbar=True):
-def myplot(myvar, n, vmin=-8, vmax=0, uselog=True, cmap='jet', half=False, cbar=True):
+def myplot(myvar, nr, nc, vmin=-8, vmax=0, uselog=True, cmap='jet', half=False, cbar=True):
   from mpl_toolkits.axes_grid1 import make_axes_locatable
-  ax = axes[n]
+  ax = axes[nc, nr]
   #ax = axes
   for n in range(nblocks): # shadowing previous n
     if plot == "mks":
@@ -190,6 +190,85 @@ yc = rc*np.cos(thc)
 #plt.show()
 #sys.exit()
 
+dfile256_0 = '/home/brryan/builds/phoebus/torus256_0.phdf'
+dfile256_1 = '/home/brryan/builds/phoebus/torus256_1.phdf'
+dfile512_0 = '/home/brryan/builds/phoebus/torus512_0.phdf'
+dfile512_1 = '/home/brryan/builds/phoebus/torus512_1.phdf'
+
+# Also plot slices
+fig, axes = plt.subplots(3,5,figsize=(14,8))
+def get_vals(dfnam0, dfnam1):
+  dfile0 = phdf.phdf(dfnam0)
+  dfile1 = phdf.phdf(dfnam1)
+  vel = dfile0.Get("p.velocity", flatten=False)
+  density = dfile0.Get("p.density", flatten=False)
+  ug = dfile0.Get("p.energy", flatten=False)
+  mom = dfile0.Get("c.momentum", flatten=False)
+  mass = dfile0.Get("c.density", flatten=False)
+  ener = dfile0.Get("c.energy", flatten=False)
+  fd0 = dfile0.Get("flux_divergence", flatten=False)
+  st0 = dfile0.Get("src_terms", flatten=False)
+  prim0 = [density, vel[:,:,:,:,0], vel[:,:,:,:,1], vel[:,:,:,:,2], ug]
+  cons0 = [mass, mom[:,:,:,:,0], mom[:,:,:,:,1], mom[:,:,:,:,2], ener]
+  vel = dfile1.Get("p.velocity", flatten=False)
+  density = dfile1.Get("p.density", flatten=False)
+  ug = dfile1.Get("p.energy", flatten=False)
+  mom = dfile1.Get("c.momentum", flatten=False)
+  mass = dfile1.Get("c.density", flatten=False)
+  ener = dfile1.Get("c.energy", flatten=False)
+  prim1 = [density, vel[:,:,:,:,0], vel[:,:,:,:,1], vel[:,:,:,:,2], ug]
+  cons1 = [mass, mom[:,:,:,:,0], mom[:,:,:,:,1], mom[:,:,:,:,2], ener]
+  fd1 = dfile1.Get("flux_divergence", flatten=False)
+  st1 = dfile1.Get("src_terms", flatten=False)
+  dt = dfile1.Time - dfile0.Time
+  vals = {}
+  vals['prim'] = prim1
+  vals['cons'] = cons1
+  vals['dcons'] = []
+  vals['dprim'] = []
+  for idx in range(5):
+    vals['dcons'].append(cons1[idx]/(fd1[:,:,:,:,idx] + st1[:,:,:,:,idx]))
+    vals['dprim'].append(prim1[idx]/((prim1[idx] - prim0[idx]) / dt))
+  vals['x'] = dfile1.x[0,:]
+  vals['r'] = np.exp(vals['x'])
+  return vals
+
+vals256 = get_vals(dfile256_0, dfile256_1)
+vals512 = get_vals(dfile512_0, dfile512_1)
+
+fig, axes = plt.subplots(3, 5, figsize=(14,8))
+
+print(len(vals512['r']))
+
+ndim256 = 256
+ndim512 = 512
+
+for idx in range(5):
+  axes[0,idx].plot(vals256['r'], vals256['prim'][idx][0,0,ndim256//2,:], marker='.')
+  axes[0,idx].plot(vals512['r'], vals512['prim'][idx][0,0,ndim512//2,:], marker='.', color='r')
+  axes[0,idx].set_yscale('log')
+  axes[0,idx].set_ylim([1.e-5, 1])
+  axes[0,idx].set_xlim([5, 7])
+
+for idx in range(5):
+  axes[1,idx].plot(vals256['r'], np.fabs(vals256['dcons'][idx][0,0,ndim256//2,:]), marker='.')
+  axes[1,idx].plot(vals512['r'], np.fabs(vals512['dcons'][idx][0,0,ndim512//2,:]), marker='.', color='r')
+  axes[1,idx].set_yscale('log')
+  axes[1,idx].set_ylim([1.e-3, 1.e3])
+  axes[1,idx].set_xlim([5, 7])
+
+for idx in range(5):
+  axes[2,idx].plot(vals256['r'], np.fabs(vals256['dprim'][idx][0,0,ndim256//2,:]), marker='.')
+  axes[2,idx].plot(vals512['r'], np.fabs(vals512['dprim'][idx][0,0,ndim512//2,:]), marker='.', color='r')
+  axes[2,idx].set_yscale('log')
+  axes[2,idx].set_ylim([1.e-3, 1.e3])
+  axes[2,idx].set_xlim([5, 7])
+
+plt.savefig("/home/brryan/github/phoebus/scripts/linecompare.png", bbox_inches='tight', dpi=dpi)
+plt.close()
+
+sys.exit()
+
 dfile0 = phdf.phdf(dfnams[0])
 #dfile0 = phdf.phdf(dfnams[50])
 #print(calc_mass(dfile0))
@@ -202,8 +281,8 @@ v20 = np.clip(vel0[:,:,:,:,1], 1.e-100, 1.e100)
 v30 = np.clip(vel0[:,:,:,:,2], 1.e-100, 1.e100)
 for n, dfnam in enumerate(dfnams):
   print(f"Frame {n+1} out of {len(dfnams)}")
-  if n < 35:
-    continue
+  #if n < 90:
+  #  continue
   dfile = phdf.phdf(dfnam)
   vel = dfile.Get("p.velocity", flatten=False)
   density = dfile.Get("p.density", flatten=False)
@@ -218,7 +297,7 @@ for n, dfnam in enumerate(dfnams):
   fd = dfile.Get("flux_divergence", flatten=False)
   st = dfile.Get("src_terms", flatten=False)
 
-  fig, axes = plt.subplots(1, 5, figsize=(14,8))
+  fig, axes = plt.subplots(3, 5, figsize=(14,8))
   
   #for idx in range(5):
   #  myplot(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]), idx)
@@ -229,22 +308,51 @@ for n, dfnam in enumerate(dfnams):
   #myplot(np.fabs(v3), 3, half=True, cbar=False)
   #myplot(ug, 4, half=True, cbar=False)
 
-  myplot(density, 0)
+  myplot(density, 0, 0)
   #myplot(ug/density, 1)
-  myplot(np.fabs(v1), 1)
-  myplot(np.fabs(v2), 2)
-  myplot(np.fabs(v3), 3)
-  myplot(ug, 4)
-
-  myplot(density0, 0, half=True)
-  myplot(ug0/density0, 1, half=True)
-  myplot(np.fabs(v10), 2, half=True)
-  myplot(np.fabs(v20), 3, half=True)
-  myplot(np.fabs(v30), 4, half=True)
-
+  myplot(np.fabs(v1), 1, 0)
+  myplot(np.fabs(v2), 2, 0)
+  myplot(np.fabs(v3), 3, 0)
+  myplot(ug, 4, 0)
+  
   for idx in range(5):
-    axes[idx].contour(xc[0,:,:], yc[0,:,:], density0[0,0,:,:].transpose(), [1.e-3], colors='k',
-      linestyles='--')
+    myplot(np.fabs(cons[idx]/(fd[:,:,:,:,idx] + st[:,:,:,:,idx])), idx, 1, vmin=-3, vmax = 3, cmap='RdBu_r')
+
+  if (n > 0):
+    dfilem = phdf.phdf(dfnams[n-1])
+    densitym = dfilem.Get("p.density", flatten=False)
+    ugm = dfilem.Get("p.energy", flatten=False)
+    velm = dfilem.Get("p.velocity", flatten=False)
+    v1m = velm[:,:,:,:,0]
+    v2m = velm[:,:,:,:,1]
+    v3m = velm[:,:,:,:,2]
+    prim = [density, v1, v2, v3, ug]
+    primm = [densitym, v1m, v2m, v3m, ugm]
+    dt = dfile.Time - dfilem.Time
+    for idx in range(5):
+      myplot(np.fabs(prim[idx])/(np.fabs(prim[idx] - primm[idx])/dt), idx, 2, vmin=-3, vmax=3, cmap='RdBu_r')
+
+  axes[0,0].set_ylabel('prim')
+  axes[1,0].set_ylabel('dt_cons')
+  axes[2,0].set_ylabel('dt_prim')
+
+  axes[0,0].set_title('rho')
+  axes[0,1].set_title('v1')
+  axes[0,2].set_title('v2')
+  axes[0,3].set_title('v3')
+  axes[0,4].set_title('ug')
+
+
+  #myplot(density0, 0, 1, half=True)
+  #myplot(ug0/density0, 1, 1, half=True)
+  #myplot(np.fabs(v10), 2, 1, half=True)
+  #myplot(np.fabs(v20), 3, 1, half=True)
+  #myplot(np.fabs(v30), 4, 1, half=True)
+
+  #for idx in range(5):
+  #  axes[idx, 1].contour(xc[0,:,:], yc[0,:,:], density0[0,0,:,:].transpose(), [1.e-3], colors='k',
+  #    linestyles='--')
   
   plt.savefig("frame_%08d.png" % n, bbox_inches='tight', dpi=dpi)
   plt.close()
+

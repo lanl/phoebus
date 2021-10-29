@@ -168,6 +168,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real rho_rmax = std::pow(hm1_rmax * (gam - 1.) / (kappa * gam),
                  1. / (gam - 1.));
   const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
+  pmb->par_for(
+    "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, 256/2 + jb.s, 256/2 + jb.s, ib.s, ib.e,
+    KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      auto rng_gen = rng_pool.get_state();
+      const Real x1 = coords.x1v(k,j,i);
+      const Real x2 = coords.x2v(k,j,i);
+      const Real x3 = coords.x3v(k,j,i);
+
+      Real r = tr.bl_radius(x1);
+      Real th = tr.bl_theta(x1,x2);
+      printf("[%i %i %i] X = %e %e %e r = %e th = %e\n", i,j,k,x1,x2,x3,r,th);
+    });
+  pmb->exec_space.fence();
+  exit(-1);
 
   printf("rho_rmax: %28.18e\n", rho_rmax);
   printf("u_rmax: %28.18e\n", u_rmax);
