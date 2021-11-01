@@ -423,7 +423,20 @@ class ConToPrim {
       negative_crho = true;
     }*/
     const Real D = v(crho)*igdet;
+    #if PHOEBUS_VALENCIA
     const Real tau = v(ceng)*igdet;
+    #else
+    Real Qcov[4] = {(v(ceng) - v(crho))*igdet,
+                      v(cmom_lo)*igdet,
+                      v(cmom_lo+1)*igdet,
+                      v(cmom_lo+2)*igdet};
+    Real ncon[4] = {1./g.lapse, -g.beta[0]/g.lapse, -g.beta[1]/g.lapse, -g.beta[2]/g.lapse};
+    Real tau = 0.;
+    SPACETIMELOOP(mu) {
+      tau -= Qcov[mu]*ncon[mu];
+    }
+    tau -= D;
+    #endif // PHOEBUS_VALENCIA
     const Real q = tau/D;
     //PARTHENON_REQUIRE(D > 0, "D < 0");
 

@@ -59,7 +59,20 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
     bcons[m] = gdet * b[m];
   }
 
+  #if PHOEBUS_VALENCIA
   tau = gdet * (rho_rel - (p + 0.5*bsq) - alpha*alpha*bcon[0]*bcon[0]) - D;
+  #else
+  Real ucon[4] = {W/alpha,
+                  vp[0] - beta[0]*W/alpha,
+                  vp[1] - beta[1]*W/alpha,
+                  vp[2] - beta[2]*W/alpha};
+  Real ucov[4] = {0};
+  SPACETIMELOOP2(mu, nu) {
+    ucov[mu] += gcov[mu][nu]*ucon[nu];
+  }
+  tau = gdet*((rho + u + p)*ucon[0]*ucov[0] - p) - D;
+  #endif
+
   ye_cons = D * ye_prim;
 
   const Real vasq = bsq*W*W/rho_rel;
