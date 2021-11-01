@@ -25,7 +25,7 @@ rmax = 40
 plot_meshblocks = True
 h_ = 0.3
 
-nfinal = -1
+nfinal = 1
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 #dfnam = dfnams[nfinal]
