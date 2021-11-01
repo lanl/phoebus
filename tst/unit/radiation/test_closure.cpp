@@ -45,43 +45,64 @@ struct Tens2 {
   inline const Real& operator()(const int i, const int j) const {return data[i][j];} 
 };
 
+const Real pi = acos(-1);
+
 TEST_CASE("M1 Closure", "[radiation][closure]") { 
-  GIVEN("A background fluid state and values for E and F_i") {
-    THEN("We can perform a Con2Prim followed by a Prim2Con and recover E and F_i") {
-      int n_wrong = 0; 
+  GIVEN("A background fluid state and values for J and tilde H_i") {
+    THEN("We can perform a Prim2Con followed by a Con2Prim and recover J and tilde H_i") {
+      int n_wrong = 0;
+      int n_total = 0;
+      FILE *fptr;
+      fptr = fopen("Closure_error.out","w");
+
+      for (double phiv = 0; phiv < pi; phiv += pi*1.e-2) {
+        for (double vmag = 0.0; vmag < 0.7; vmag += 1.e-2) { 
+          for (double xi = 1.e-10; xi<=1.0; xi +=1.e-2) {
+         
+            // Set up background state
+            Vec con_v = {vmag*cos(phiv), vmag*sin(phiv), 0.0}; 
+            Tens2 cov_gamma = {{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}}; 
+  
+            Closure<Vec, Tens2> cl(con_v, cov_gamma); 
+  
+  
+            // Assume a fluid frame state  
+            Real J = 1.0;
+            Vec cov_tilH = {{xi*J/sqrt(cl.con_gamma(0,0) - con_v(0)*con_v(0)), 0.0, 0.0}}; 
+            Tens2 con_tilPi;
+
+            // Calculate comoving frame state 
+            Real E;
+            Vec F;
+            cl.Prim2ConM1(J, cov_tilH, &E, &F, &con_tilPi); 
+              
+            
+            // re-Calculate rest frame quantities using closure 
+            // to check for self-consistency
+            Real J_out; 
+            Vec H_out;
+            auto status = cl.Con2PrimM1(E, F, &J_out, &H_out, &con_tilPi);
+            
+            
+            //if (status == radiation::Status::failure) throw 2;
+            bool bad_solution = true;
+            if ((fabs(J - J_out)/J < 1.e-5) && (fabs(cov_tilH(0) - H_out(0))/J < 1.e-5)) bad_solution = false; 
+            
+            if (bad_solution) {
+              fprintf(fptr, " \033[1;31m[FAILURE]\033[0m\n");
+              fprintf(fptr, " \033[1;32mvmag: %e v^i : (%e, %e, %e) xi : %e \033[0m\n", vmag, con_v(0), con_v(1), con_v(2), xi);
+              fprintf(fptr, "    E : %e     F_i : (%e, %e, %e) \n", E, F(0), F(1), F(2));
+              fprintf(fptr, "    J : %e  tilH_i : (%e, %e, %e) \n", J, cov_tilH(0), cov_tilH(1), cov_tilH(2));
+              fprintf(fptr, "J_out : %e H_out_i : (%e, %e, %e) \n\n", J_out, H_out(0), H_out(1), H_out(2));
+              ++n_wrong;
+            }
+            ++n_total;
+          }
+        }
+      }
+      fclose(fptr);
+      printf("Total points : %i  Points wrong : %i \% wrong: %e\n", n_total, n_wrong, (double)n_wrong/ n_total);
       REQUIRE(n_wrong == 0); 
     }
   }
 }
-/*
-  // Set up background state
-  Vec con_v = {0.01, -0.7, 0.0}; 
-  Tens2 cov_gamma = {{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}}; 
-  
-  Closure<Vec, Tens2> cl(con_v, cov_gamma); 
-  
-  const Real pi = 3.14159;
-  
-  // Assume a fluid frame state  
-  Real J = 1.0;
-  Vec cov_tilH = {{0.8, 0.0, 0.1}}; 
-  Tens2 con_tilPi;
-
-  // Calculate comoving frame state 
-  Real E;
-  Vec F;
-  cl.Prim2ConM1(J, cov_tilH, &E, &F, &con_tilPi); 
-    
-  // re-Calculate rest frame quantities using closure 
-  // to check for self-consistency
-  Real J_out; 
-  Vec H_out;
-  cl.Con2PrimM1(E, F, &J_out, &H_out, &con_tilPi);
-  
-  printf("    E : %e     F_i : (%e, %e, %e) \n", E, F(0), F(1), F(2));
-  printf("    J : %e  tilH_i : (%e, %e, %e) \n", J, cov_tilH(0), cov_tilH(1), cov_tilH(2));
-  printf("J_out : %e H_out_i : (%e, %e, %e) \n", J_out, H_out(0), H_out(1), H_out(2));
-
-  return 0; 
-}
-*/
