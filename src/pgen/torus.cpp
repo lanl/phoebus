@@ -129,7 +129,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
   const Real bnorm = pin->GetOrAddReal("torus", "Bnorm", 1.e-2);
   const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
-  
+
   const Real a = pin->GetReal("geometry","a");
   auto bl = Geometry::BoyerLindquist(a);
 
@@ -172,7 +172,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real dy_sub = coords.Dx(X2DIR, k, j, i)/nsub;
       v(irho,k,j,i) = 0.0;
       v(ieng,k,j,i) = 0.0;
-      for (int d = 0; d < 3; d++) v(ivlo+d,k,j,i) = 0.0;
+      SPACELOOP(d) {
+        v(ivlo+d,k,j,i) = 0.0;
+      }
       const Real x3 = coords.x3v(k,j,i);
       for (int m = 0; m < nsub; m++) {
         for (int n = 0; n < nsub; n++) {
@@ -212,7 +214,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(irho,k,j,i) += rho/(nsub*nsub);
             v(ieng,k,j,i) += u/(nsub*nsub);
             for (int d = 0; d < 3; d++) {
-              v(ivlo+d,k,j,i) += vcon[d]/(nsub*nsub);
+              v(ivlo+d,k,j,i) += W*vcon[d]/(nsub*nsub);
             }
           }
         }
@@ -231,7 +233,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
       v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
       v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i));
-      
+
       rng_pool.free_state(rng_gen);
     });
 
@@ -255,7 +257,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bmin) {
       const Real gdet = geom.DetGamma(CellLocation::Cent,k,j,i);
       v(iblo,k,j,i) = - ( A(j,i) - A(j+1,i)
-                         + A(j,i+1) - A(j+1,i+1) ) 
+                         + A(j,i+1) - A(j+1,i+1) )
                          / (2.0 * coords.Dx(X2DIR,k,j,i) * gdet);
       v(iblo+1,k,j,i) = ( A(j,i) + A(j+1,i)
                          - A(j,i+1) - A(j+1,i+1) )
@@ -272,12 +274,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real Bdotv = 0.0;
       Real gcov[3][3];
       geom.Metric(CellLocation::Cent,k,j,i,gcov);
+      Real vp[3] = {v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i)};
+      const Real W = phoebus::GetLorentzFactor(vp, gcov);
       SPACELOOP2(m,n) {
-        vsq += gcov[m][n] * v(ivlo+m,k,j,i) * v(ivlo+n,k,j,i);
-        Bdotv += gcov[m][n] * v(ivlo+m,k,j,i) * v(iblo+n,k,j,i);
+        vsq += gcov[m][n] * v(ivlo+m,k,j,i) / W * v(ivlo+n,k,j,i) / W;
+        Bdotv += gcov[m][n] * v(ivlo+m,k,j,i) / W * v(iblo+n,k,j,i);
         Bsq += gcov[m][n] * v(iblo+m,k,j,i) * v(iblo+n,k,j,i);
       }
-      const Real W = 1.0/std::sqrt(1.0 - vsq);
       Real b0 = W*Bdotv;
       Real bsq = (Bsq + b0*b0)/(W*W);
       Real beta = v(iprs,k,j,i)/(0.5*bsq + 1.e-100);
