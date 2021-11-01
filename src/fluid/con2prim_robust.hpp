@@ -544,8 +544,8 @@ class ConToPrim {
     Real vel[3];
     SPACELOOP(i) {
       //v(pvel_lo+i) = atm ? 0 : mu*x*(rcon[i] + mu*bdotr*bu[i]);
-      v(pvel_lo+i) = mu*x*(rcon[i] + mu*bdotr*bu[i]);
-      vel[i] = v(pvel_lo+i);
+      vel[i] = mu*x*(rcon[i] + mu*bdotr*bu[i]);
+      v(pvel_lo+i) = W*vel[i];
     }
     if (pb_hi > 0) {
       SPACELOOP(i) {
