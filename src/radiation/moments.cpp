@@ -73,14 +73,18 @@ TaskStatus MomentCon2Prim(T* rc) {
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H}, imap);
+  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H, fluid_prim::velocity}, imap);
   
   auto cE = imap.GetFlatIdx(c::E);  
-  auto cJ = imap.GetFlatIdx(p::J);  
+  auto pJ = imap.GetFlatIdx(p::J);  
   auto cF = imap.GetFlatIdx(c::F);  
-  auto cH = imap.GetFlatIdx(p::H);  
+  auto pH = imap.GetFlatIdx(p::H); 
+  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
   auto specB = cE.GetBounds(1);
-  auto dirB = cH.GetBounds(1);
+  auto dirB = pH.GetBounds(1);
+  
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 
       0, v.GetDim(5)-1, // Loop over meshblocks
@@ -90,9 +94,25 @@ TaskStatus MomentCon2Prim(T* rc) {
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) { 
         /// TODO: (LFR) Replace this placeholder zero velocity con2prim 
-        v(b, cJ(ispec), k, j, i) = v(b, cE(ispec), k, j, i);
+        Vec con_v{{v(b, pv(0), k, j, i),
+                   v(b, pv(1), k, j, i),
+                   v(b, pv(2), k, j, i)}};
+        Tens2 cov_gamma; 
+        geom.Metric(CellLocation::Cent, k, j, i, cov_gamma.data);
+        Closure<Vec, Tens2> c(con_v, cov_gamma); 
+        
+        Real J; 
+        Vec covH;
+        Tens2 conTilPi;
+        Real E = v(b, cE(ispec), k, j, i);
+        Vec covF ={{v(b, cF(ispec, 0), k, j, i), 
+                    v(b, cF(ispec, 1), k, j, i), 
+                    v(b, cF(ispec, 2), k, j, i)}}; 
+        c.Con2PrimM1(E, covF, &J, &covH, &conTilPi);
+
+        v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
-          v(b, cH(ispec, idir), k, j, i) = v(b, cF(ispec, idir), k, j, i);
+          v(b, pH(ispec, idir), k, j, i) = covH(idir);
         }
       });
 
@@ -115,14 +135,19 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   IndexRange kb = pm->cellbounds.GetBoundsK(domain);
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H}, imap);
+  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H, fluid_prim::velocity}, imap);
   
   auto cE = imap.GetFlatIdx(c::E);  
   auto pJ = imap.GetFlatIdx(p::J);  
   auto cF = imap.GetFlatIdx(c::F);  
   auto pH = imap.GetFlatIdx(p::H);  
+  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
+
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
+
+  auto geom = Geometry::GetCoordinateSystem(rc); 
+
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Prim2Con", DevExecSpace(), 
       0, v.GetDim(5)-1, // Loop over meshblocks
@@ -131,9 +156,12 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
       jb.s, jb.e, // y-loop 
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
-        /// TODO: (LFR) need to pull out actual values for these 
-        Vec con_v{{0,0,0}};
-        Tens2 cov_gamma{{{1,0,0},{0,1,0},{0,0,1}}};
+        // Set up the background 
+        Vec con_v{{v(b, pv(0), k, j, i),
+                   v(b, pv(1), k, j, i),
+                   v(b, pv(2), k, j, i)}};
+        Tens2 cov_gamma; 
+        geom.Metric(CellLocation::Cent, k, j, i, cov_gamma.data);
         Closure<Vec, Tens2> c(con_v, cov_gamma); 
         
         Real E; 
@@ -177,8 +205,11 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   PackIndexMap imap_ql, imap_qr, imap;
   VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{i::ql}, imap_ql); 
   VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{i::qr}, imap_qr); 
-  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{p::J, p::H}, imap) ;
+  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{p::J, p::H}, imap);
   
+  ParArrayND<Real> ql_v = rc->Get(i::ql_v).data; 
+  ParArrayND<Real> qr_v = rc->Get(i::qr_v).data; 
+  VariablePack<Real> v_vel = rc->PackVariables(std::vector<std::string>{fluid_prim::velocity});
   auto qIdx = imap_ql.GetFlatIdx(i::ql);
   
   const int nspec = qIdx.DimSize(1);
@@ -199,8 +230,13 @@ TaskStatus ReconstructEdgeStates(T* rc) {
       KOKKOS_LAMBDA(const int idir, const int b, const int k, const int j, const int i) { 
         ReconstructionWrapper<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
         ReconstructionWrapper<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
+        // Reconstruct radiation
         for (int ivar = 0; ivar<nrecon; ++ivar) {
           PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v, ql, qr);
+        }
+        // Reconstruct velocity for radiation 
+        for (int ivar = 0; ivar<3; ++ivar) {
+          PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v_vel, ql_v, qr_v);
         }
       });
   return TaskStatus::complete;  
@@ -227,9 +263,11 @@ TaskStatus CalculateFluxes(T* rc) {
   namespace i = radmoment_internal;  
   
   PackIndexMap imap_ql, imap_qr, imap;
-  auto v = rc->PackVariablesAndFluxes(std::vector<std::string>{i::ql, i::qr}, 
+  auto v = rc->PackVariablesAndFluxes(std::vector<std::string>{i::ql, i::qr, i::ql_v, i::qr_v}, 
           std::vector<std::string>{c::E, c::F}, imap) ;
   
+  auto idx_qlv = imap.GetFlatIdx(i::ql_v);
+  auto idx_qrv = imap.GetFlatIdx(i::qr_v);
   auto idx_ql = imap.GetFlatIdx(i::ql);
   auto idx_qr = imap.GetFlatIdx(i::qr);
   auto idx_Ff = imap.GetFlatIdx(c::F);
@@ -239,6 +277,8 @@ TaskStatus CalculateFluxes(T* rc) {
 
   const int nblock = 1; //v.GetDim(5); 
   
+  auto geom = Geometry::GetCoordinateSystem(rc); 
+
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(), 
       X1DIR, pmb->pmy_mesh->ndim, // Loop over directions 
@@ -260,20 +300,38 @@ TaskStatus CalculateFluxes(T* rc) {
                               v(idx_qr(ispec, 2, idir), k, j, i), 
                               v(idx_qr(ispec, 3, idir), k, j, i)}; 
           
-          const Real speed = 1.0;
+          const Real speed = 1.0/sqrt(3.0);
           Tens2 con_tilPi;
           
-          /// TODO: (LFR) need to pull out actual values for these 
-          Vec con_vr{{0,0,0}};
-          Vec con_vl{{0,0,0}};
-          Tens2 cov_gamma{{{1,0,0},{0,1,0},{0,0,1}}};
+          Vec con_vl{{v(idx_qlv(0, idir), k, j, i), 
+                      v(idx_qlv(1, idir), k, j, i),
+                      v(idx_qlv(2, idir), k, j, i)}};
+          Vec con_vr{{v(idx_qrv(0, idir), k, j, i), 
+                      v(idx_qrv(1, idir), k, j, i),
+                      v(idx_qrv(2, idir), k, j, i)}};
 
-          
+          CellLocation face;  
+          switch (idir) {
+            case(0):
+              face = CellLocation::Face1;
+              break;
+            case(1):
+              face = CellLocation::Face2;
+              break;
+            case(2):
+              face = CellLocation::Face3;
+              break;
+          }
+          Vec con_beta; 
+          Tens2 cov_gamma;
+          geom.Metric(face, k, j, i, cov_gamma.data); 
+          geom.ContravariantShift(face, k, j, i, con_beta.data);
+
           // Calculate the observer frame quantities on the left side of the interface  
           Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
           Real El; 
           Vec covFl, conFl;
-          Tens2 Pl;
+          Tens2 Pl; // P^i_j on the left side of the interface
           cl.Prim2ConM1(Jl, Hl, &El, &covFl, &con_tilPi);
           cl.raise3Vector(covFl, &conFl);
           cl.getConCovPFromPrim(Jl, Hl, con_tilPi, &Pl);
@@ -282,13 +340,25 @@ TaskStatus CalculateFluxes(T* rc) {
           Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
           Real Er; 
           Vec covFr, conFr;
-          Tens2 Pr;
+          Tens2 Pr; // P^i_j on the right side of the interface
           cr.Prim2ConM1(Jr, Hr, &Er, &covFr, &con_tilPi);
           cr.raise3Vector(covFr, &conFr);
           cr.getConCovPFromPrim(Jr, Hr, con_tilPi, &Pr);
+          
+          // Correct the fluxes with the shift terms 
+          conFl(idir) -= con_beta(idir)*El;
+          conFr(idir) -= con_beta(idir)*Er;
+          
+          Pl(idir, 0) -= con_beta(idir)*covFl(0);
+          Pl(idir, 1) -= con_beta(idir)*covFl(1);
+          Pl(idir, 2) -= con_beta(idir)*covFl(2);
+
+          Pr(idir, 0) -= con_beta(idir)*covFr(0);
+          Pr(idir, 1) -= con_beta(idir)*covFr(1);
+          Pr(idir, 2) -= con_beta(idir)*covFr(2);
 
           // Everything below should be independent of the assumed closure, just calculating the LLF flux
-          /// TODO: (LFR) Include diffusion limit   
+          /// TODO: (LFR) Include diffusion limit  
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(conFl(idir) + conFr(idir)) + speed*(El - Er); 
         
           v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = 0.5*(Pl(idir, 0) + Pr(idir, 0)) 
