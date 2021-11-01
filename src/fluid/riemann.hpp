@@ -96,7 +96,9 @@ class FluxState {
     Real sie_floor;
     bounds.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
     const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
-    Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
+    Real vpcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
+    Real W = phoebus::GetLorentzFactor(vpcon, g.gcov);
+    Real vcon[] = {vpcon[0]/W, vpcon[1]/W, vpcon[2]/W};
     const Real &vel = vcon[dir];
     Real Bcon[] = {0.0, 0.0, 0.0};
     const Real u = (q(dir,peng,k,j,i)/rho > sie_floor
@@ -133,7 +135,7 @@ class FluxState {
       Bdotv *= scale;
       for (int m = 0; m < 3; m++) vcon[m] *= scale;
     }
-    const Real W = 1.0/sqrt(1-vsq);
+    W = 1.0/sqrt(1-vsq);
 
     const Real vtil = vel - g.beta[dir]/g.alpha;
 
