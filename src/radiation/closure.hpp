@@ -78,6 +78,12 @@ T ratio(T num, T denom) {
   return num/(denom + sgn*std::numeric_limits<T>::min());
 }
 
+template <class T> 
+KOKKOS_FORCEINLINE_FUNCTION
+int sgn(T val) {
+    return (T(0) <= val) - (val < T(0));
+}
+
 enum class Status { success=0, failure=1 };
 
 template <class Vec, class Tens2> 
@@ -105,9 +111,7 @@ class Closure {
   
   template<class VA, class VB, class T2>  
   KOKKOS_FUNCTION 
-  Status Con2PrimM1(const Real E, const VA cov_F, Real* J, VB* cov_H, T2* con_tilPi) {
-    return Con2PrimM1(E, cov_F, 0.5, 3.14159, J, cov_H, con_tilPi);
-  }
+  Status Con2PrimM1(const Real E, const VA cov_F, Real* J, VB* cov_H, T2* con_tilPi);
 
   template<class VA, class VB, class T2>  
   KOKKOS_FUNCTION 
@@ -132,8 +136,31 @@ class Closure {
     SPACELOOP(i) (*con_U)(i) = 0.0;
     SPACELOOP(i) { SPACELOOP(j) { (*con_U)(i) += cov_U(j)*con_gamma(i,j); }}
   }
+  
+  template<class VA, class VB>
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Real contractCon3Vectors(const VA& con_A, const VB& con_B) const {
+    Real s(0.0);
+    SPACELOOP(i) { SPACELOOP(j) { s += cov_gamma(i,j)*con_A(i)*con_B(j); }}
+    return s;
+  }
+  
+  template<class VA, class VB>
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Real contractCov3Vectors(const VA& cov_A, const VB& cov_B) const {
+    Real s(0.0);
+    SPACELOOP(i) { SPACELOOP(j) { s += con_gamma(i,j)*cov_A(i)*cov_B(j); }}
+    return s;
+  }
 
- protected:
+  template<class VA, class VB>
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Real contractConCov3Vectors(const VA& con_A, const VB& cov_B) const {
+    Real s(0.0);
+    SPACELOOP(i) { s += con_A(i)*cov_B(i); }
+    return s;
+  }
+ 
   Real W, W2, W3, W4;
   Vec cov_v; 
   Vec con_v; 
@@ -142,30 +169,46 @@ class Closure {
   Tens2 cov_gamma; 
   Tens2 con_gamma; 
   
+ protected:
+ 
   template<class V> 
   KOKKOS_FUNCTION 
   Status M1Residuals(const Real E, const V cov_F, 
-                              const Real xi, const Real phi, 
+                              const Real xi, const Real phi,
+                              const Vec con_tilg, const Vec con_tild,
                               Real* fXi, Real* fPhi);
   
   template<class V> 
   KOKKOS_FUNCTION 
   Status M1FluidPressureTensor(const Real J, const V cov_H, 
                               Tens2* con_tilPi, Vec* con_tilf);
+  template<class V> 
+  KOKKOS_FUNCTION 
+  Status M1FluidPressureTensor(const Real E, const V cov_F, 
+                              const Real xi, const Real phi, 
+                              Tens2* con_tilPi, Vec* con_tilf){
+     Vec con_tilg, con_tild; 
+     GetBasisVectors(E, cov_F, &con_tilg, &con_tild);
+     return M1FluidPressureTensor(E, cov_F, xi, phi, con_tilg, con_tild, con_tilPi, con_tilf);
+  }
 
   template<class V> 
   KOKKOS_FUNCTION 
   Status M1FluidPressureTensor(const Real E, const V cov_F, 
                               const Real xi, const Real phi, 
+                              const Vec con_tilg, const Vec con_tild,
                               Tens2* con_tilPi, Vec* con_tilf);
   template<class V> 
   KOKKOS_FUNCTION 
-  Status SolveClosure(const Real E, const V cov_F, 
+  Status SolveClosure(Real E, V cov_F, 
                       Real* xi_out, Real* phi_out,
                       const Real xi_guess = 0.5, const Real phi_guess = 3.14159);
   
-  
-  
+  template<class V> 
+  KOKKOS_FUNCTION
+  Status GetBasisVectors(const Real E, const V cov_F, 
+                         Vec* con_tilg, Vec* con_tild);
+
   template<class T2> 
   KOKKOS_FORCEINLINE_FUNCTION
   void GetTilPiContractions(const T2& con_tilPi, Vec* cov_vTilPi, Real* vvTilPi) {
@@ -253,10 +296,10 @@ Status Closure<Vec, Tens2>::Con2Prim(const Real E, const VA cov_F,
   // const Real zeta = -W/lam*(((4*W2-4)/3 + vvPi)*E 
   //                   -((4*W2-1)/3 + W2*vvPi)*vF);
   // a = 4 W^2/3 J + W zeta  
-  const Real a = W2/lam*((4*W2/3 - vvTilPi)*E - ((4*W2+1)/3 - W2*vvTilPi)*vF); 
+  const Real a = ratio(W2, lam)*((4*W2/3 - vvTilPi)*E - ((4*W2+1)/3 - W2*vvTilPi)*vF); 
   
   // Calculate fluid rest frame (i.e. primitive) quantities
-  *J = ((2*W2 - 1)*E - 2*W2*vF)/lam; 
+  *J = ratio((2*W2 - 1)*E - 2*W2*vF,lam); 
   SPACELOOP(i) (*cov_tilH)(i) = (cov_F(i) - (*J)*cov_vTilPi(i) - cov_v(i)*a)/W; 
   return Status::success;
 }
@@ -271,6 +314,40 @@ Status Closure<Vec, Tens2>::Prim2ConM1(const Real J, const VA cov_H,
   Prim2Con(J, cov_H, *con_tilPi, E, cov_F);
   
   return Status::success;
+}
+
+template<class Vec, class Tens2> 
+template<class VA, class VB, class T2>  
+KOKKOS_FUNCTION
+Status Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F, 
+                                       Real* J, VB* cov_H, T2* con_tilPi){
+  Real xi, phi;
+  Vec con_tilf;
+  
+  // Get the basis vectors for the search 
+  Vec con_tilg, con_tild; 
+  GetBasisVectors(E, cov_F, &con_tilg, &con_tild);
+
+  // Perform an Eddington approximation Con2Prim to get initial guesses
+  Tens2 con_PiEdd{{{0.0,0.0,0.0},{0.0,0.0,0.0},{0.0,0.0,0.0}}}; 
+  Real JEdd; 
+  Vec cov_HEdd; 
+  Con2Prim(E, cov_F, con_PiEdd, &JEdd, &cov_HEdd);
+  Real vHEdd = contractConCov3Vectors(con_v, cov_HEdd);
+  Real HEdd = sqrt(contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd*vHEdd);
+  
+  xi = std::min(ratio(HEdd, JEdd), 0.99);
+  phi = 1.000001*acos(-1);
+
+  //xi = 0.99; 
+  //Real gf = contractConCov3Vectors(con_tilg, cov_HEdd) - vHEdd*contractConCov3Vectors(con_tilg, cov_v); 
+  //printf("gf = %e HEdd = %e \n", gf, HEdd);
+  // gf = std::max(std::min(ratio(gf, HEdd), 1.0), -1.0);
+  //phi = 1.000001*acos(-gf);
+  //if (xi > 0.8 || xi < 1.e-5) phi = acos(-1.0)*1.000001; 
+  //printf("Initial guess: xi = %e phi = %e \n", xi, phi);
+
+  return Con2PrimM1(E, cov_F, xi, phi, J, cov_H, con_tilPi);
 }
 
 template<class Vec, class Tens2> 
@@ -319,61 +396,80 @@ Status Closure<Vec, Tens2>::getConCovPFromPrim(const Real J, const V cov_tilH,
 template<class Vec, class Tens2> 
 template<class V>
 KOKKOS_FUNCTION
-Status Closure<Vec, Tens2>::SolveClosure(const Real E, const V cov_F, Real* xi_out, Real* phi_out,
+Status Closure<Vec, Tens2>::SolveClosure(Real E, V cov_F, Real* xi_out, Real* phi_out,
                                          const Real xi_guess, const Real phi_guess) {
-  
-  const int max_iter = 50; 
-  const Real tol = 1.e3*std::numeric_limits<Real>::epsilon();
+  const int max_iter = 30; 
+  const Real tol = 1.e6*std::numeric_limits<Real>::epsilon();
+  const Real eps = std::sqrt(10*std::numeric_limits<Real>::epsilon()); 
+  const Real delta = 200*std::numeric_limits<Real>::epsilon();
 
-  Real zeta = std::log(1/xi_guess-1.0);
+  // Normalize input and make sure we are slightly away from zero  
+  cov_F(0) = ratio(cov_F(0), E) + 1.e3*sgn(cov_F(0))*std::numeric_limits<Real>::min(); 
+  cov_F(1) = ratio(cov_F(1), E) + 1.e3*sgn(cov_F(1))*std::numeric_limits<Real>::min(); 
+  cov_F(2) = ratio(cov_F(2), E) + 1.e3*sgn(cov_F(2))*std::numeric_limits<Real>::min(); 
+  E = 1.0; 
+ 
+  // Get the basis vectors for the search 
+  Vec con_tilg, con_tild; 
+  GetBasisVectors(E, cov_F, &con_tilg, &con_tild);
+
+  int iter = 0; 
+  Real fXi = 1.e3;
+  Real fPhi = 1.e3;
+  Real Jac[2][2], f[2], dx[2];
+  Real err_phi, err_xi;
   Real xi = xi_guess; 
   Real phi = phi_guess; 
-
-  int iter = 0;
-  const Real eps = std::sqrt(3.0*std::numeric_limits<Real>::epsilon()); 
-  const Real delta = 3.0*std::numeric_limits<Real>::epsilon();
-  Real err_zeta, err_phi;
-  Real Jac[2][2], f[2], dx[2];
   do {
-    Real fPhi, fPhi_up, fPhi_lo;
-    Real fXi, fXi_up, fXi_lo;
+    Real fPhi_up, fPhi_lo;
+    Real fXi_up, fXi_lo;
     
-    const Real zeta_up = zeta*(1.0 + eps) + delta;
-    const Real zeta_lo = zeta*(1.0 - eps) - delta;
-    xi = 1/(1 + std::exp(zeta));
-    Real xi_up = 1/(1 + std::exp(zeta_up)); 
-    Real xi_lo = 1/(1 + std::exp(zeta_lo));
-    M1Residuals(E, cov_F, xi_up, phi, &fXi_up, &fPhi_up);
-    M1Residuals(E, cov_F, xi_lo, phi, &fXi_lo, &fPhi_lo);
-    Jac[0][0] =  (fXi_up - fXi_lo)/(zeta_up - zeta_lo);
-    Jac[1][0] =  (fPhi_up - fPhi_lo)/(zeta_up - zeta_lo);
+    const Real xi_up = std::min(xi*(1.0 + eps) + delta, 1.0);
+    const Real xi_lo = std::max(xi*(1.0 - eps) - delta, 0.0);
+    M1Residuals(E, cov_F, xi_up, phi, con_tilg, con_tild, &fXi_up, &fPhi_up);
+    M1Residuals(E, cov_F, xi_lo, phi, con_tilg, con_tild, &fXi_lo, &fPhi_lo);
+    Jac[0][0] =  (fXi_up - fXi_lo)/(xi_up - xi_lo);
+    Jac[1][0] =  (fPhi_up - fPhi_lo)/(xi_up - xi_lo);
     
     const Real phi_up = phi*(1.0 + eps) + delta;
     const Real phi_lo = phi*(1.0 - eps) - delta;
-    M1Residuals(E, cov_F, xi, phi_up, &fXi_up, &fPhi_up);
-    M1Residuals(E, cov_F, xi, phi_lo, &fXi_lo, &fPhi_lo);
+    M1Residuals(E, cov_F, xi, phi_up, con_tilg, con_tild, &fXi_up, &fPhi_up);
+    M1Residuals(E, cov_F, xi, phi_lo, con_tilg, con_tild, &fXi_lo, &fPhi_lo);
     Jac[0][1] =  (fXi_up - fXi_lo)/(phi_up - phi_lo);
     Jac[1][1] =  (fPhi_up - fPhi_lo)/(phi_up - phi_lo);
     
-    M1Residuals(E, cov_F, xi, phi, &fXi, &fPhi);
+    M1Residuals(E, cov_F, xi, phi, con_tilg, con_tild, &fXi, &fPhi);
     f[0] = fXi; 
     f[1] = fPhi; 
     
     SolveAxb2x2(Jac, f, dx); 
     
-    zeta -= dx[0];  
-    phi -= dx[1];  
-    
-    err_zeta = std::abs(dx[0])/(std::abs(zeta) + delta);
+    // Keep phi fixed for the first two updates
+    if (iter < 2) {
+      dx[0] = fXi/Jac[0][0]; 
+      dx[1] = 0.0;
+    } 
+
+    Real corrected_delta_xi = std::min(dx[0], xi-delta*xi);
+    corrected_delta_xi = std::max(corrected_delta_xi, xi - (1 - delta*(1-xi)));
+    Real alpha = ratio(corrected_delta_xi, dx[0]);
+    alpha = std::min(alpha, 0.5*3.14159/fabs(dx[1]));
+    xi -= alpha * dx[0];  
+    phi -= alpha * dx[1];  
+     
+    err_xi = std::abs(dx[0])/(std::abs(xi) + delta);
     err_phi = std::abs(dx[1])/(std::abs(phi) + delta); 
-    
+    //printf("iter: %i xi = %e phi = %e alpha = %e\n", iter, xi, phi, alpha); 
+    //printf("..... % e % e | % e = % e\n", Jac[0][0], Jac[0][1], dx[0], f[0]);  
+    //printf("..... % e % e | % e = % e\n", Jac[1][0], Jac[1][1], dx[1], f[1]);  
     ++iter;
   
-  } while ( iter < max_iter &&  (err_zeta > tol || err_phi > tol) );
+  } while ( iter < max_iter &&  (fabs(fXi) > tol || fabs(fPhi) > tol) );
   
-  *xi_out = 1/(1+std::exp(zeta)); 
+  *xi_out = xi; 
   *phi_out = phi; 
-
+  //printf("iter: %i xi: %e cos(phi): %f fXi: %e fPhi: %e \n", iter, *xi_out, cos(*phi_out), fXi, fPhi); 
+  if (std::isnan(xi)) return Status::failure; 
   if (iter < max_iter) return Status::success;
   return Status::failure; 
 
@@ -384,13 +480,13 @@ template<class V>
 KOKKOS_FUNCTION
 Status Closure<Vec, Tens2>::M1Residuals(const Real E, const V cov_F, 
                                         const Real xi, const Real phi,
+                                        const Vec con_tilg, const Vec con_tild,
                                         Real* fXi, Real* fPhi) {
 
   // Calculate rest frame fluid variables
   Tens2 con_tilPi; 
   Vec con_tilf; 
-  M1FluidPressureTensor(E, cov_F, xi, phi, &con_tilPi, &con_tilf); 
-  
+  M1FluidPressureTensor(E, cov_F, xi, phi, con_tilg, con_tild, &con_tilPi, &con_tilf); 
   Real J; 
   Vec cov_tilH;
   Con2Prim(E, cov_F, con_tilPi, &J, &cov_tilH); 
@@ -404,9 +500,10 @@ Status Closure<Vec, Tens2>::M1Residuals(const Real E, const V cov_F,
   Hf -= vTilf*vTilH; 
   H = std::sqrt(H - vTilH*vTilH); 
   //printf("tilH = (%f, %f, %f) \n", cov_tilH(0), cov_tilH(1), cov_tilH(2));
-  //printf("Hf = %e H = %e \n", Hf, H); 
-  *fXi = xi*J - H;  
+  *fXi = xi - ratio(H, J);  
   *fPhi = Hf - H;
+  //printf("xi = %e phi = %e Hf = %e H = %e J = %e fXi = %e fPhi = %e\n", xi, phi, Hf, H, J, *fXi, *fPhi); 
+  //printf("3: %f %f %f %f %f\n", xi, phi, con_tilPi(0,0), *fXi, *fPhi); 
   
   return Status::success;
 }
@@ -424,7 +521,6 @@ Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real J, const V cov_tilH
   H = std::sqrt(H - vH*vH);  
   SPACELOOP(i) (*con_tilf)(i) = ratio(con_tilH(i), H); 
   const Real athin = 0.5*(3*closure(ratio(H,J)) - 1); 
-
   // Calculate the projected rest frame radiation pressure tensor 
   SPACELOOP(i) {
     SPACELOOP(j) {
@@ -433,6 +529,7 @@ Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real J, const V cov_tilH
       (*con_tilPi)(i,j) *= athin;  
     }
   }  
+  
   return Status::success;  
 
 }
@@ -440,10 +537,8 @@ Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real J, const V cov_tilH
 template<class Vec, class Tens2> 
 template<class V> 
 KOKKOS_FUNCTION
-Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real E, const V cov_F, 
-                                                const Real xi, const Real phi, 
-                                                Tens2* con_tilPi, Vec* con_tilf) {
-  
+Status Closure<Vec, Tens2>::GetBasisVectors(const Real E, const V cov_F, 
+                                            Vec* con_tilg, Vec* con_tild) {
   // Build projected basis vectors for flux direction 
   // These vectors are actually fixed, so there is no need to recalculate 
   // them every time this function is called in the root find
@@ -453,26 +548,40 @@ Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real E, const V cov_F,
   SPACELOOP(i) Fmag += cov_F(i)*con_F(i); 
   Fmag = std::sqrt(Fmag); 
   SPACELOOP(i) vl += cov_F(i)*con_v(i); 
-  vl /= Fmag; 
+  vl = ratio(vl, Fmag); 
   SPACELOOP(i) v2 += cov_v(i)*con_v(i); 
-  const Real lam = 1/(W*(1-vl));
-  const Real aa = std::sqrt(v2*(1 + std::numeric_limits<Real>::epsilon()) - vl*vl);
-  //const Real aa = std::sqrt(v2 - vl*vl);
-  //const Real invDenom = 1/(aa + std::numeric_limits<Real>::min());
-  Vec con_tilg, con_tild; 
+  const Real lam = ratio(1.0, W*(1-vl));
+
+  // This goes to zero if F and v lie along one another and can create problems, probably should be 
+  // checking elsewhere that they are not along one another 
+  const Real aa = std::sqrt(v2*(1 + 10*std::numeric_limits<Real>::epsilon()) - vl*vl);
   SPACELOOP(i) {
-    con_tilg(i) = ratio(con_F(i)*lam, Fmag) - W*con_v(i);
-    con_tild(i) = ratio(con_F(i)/Fmag*(1-lam/W) + con_v(i), aa);
+    (*con_tilg)(i) = ratio(con_F(i)*lam, Fmag) - W*con_v(i);
+    (*con_tild)(i) = ratio(ratio(con_F(i), Fmag)*(1-lam/W) + con_v(i), aa);
   }
-  
+  //if (aa < 1.e-6) (*con_tild) = {{0,0,0}}; 
+
+  //printf("lam = %e W = %e Fmag = %e aa = %e v2 - vl*vl = %e \n", lam, W, Fmag, aa, v2 - vl*vl);
+  return Status::success; 
+}
+ 
+template<class Vec, class Tens2> 
+template<class V> 
+KOKKOS_FUNCTION
+Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real E, const V cov_F, 
+                                                const Real xi, const Real phi,
+                                                const Vec con_tilg, const Vec con_tild, 
+                                                Tens2* con_tilPi, Vec* con_tilf) {
+    
+
   // Build projected flux direction from basis vectors and given angle 
   const Real s = sin(phi); 
   const Real c = cos(phi); 
   SPACELOOP(i) (*con_tilf)(i) = -c*con_tilg(i) + s*con_tild(i);
   //printf("v2 = %e vl*vl = %e lam = %e invDenom = %e \n", v2, vl*vl, lam, invDenom); 
-  //printf("tilg = (%f, %f, %f) \n", con_tilg(0), con_tilg(1), con_tilg(2));
+  //printf("tilg = (%e, %e, %e) \n", con_tilg(0), con_tilg(1), con_tilg(2));
   //printf("tild = (%e, %e, %e) \n", con_tild(0), con_tild(1), con_tild(2));
-  //printf("tilf = (%f, %f, %f) \n", (*con_tilf)(0), (*con_tilf)(1), (*con_tilf)(2));
+  //printf("tilf = (%e, %e, %e) \n", (*con_tilf)(0), (*con_tilf)(1), (*con_tilf)(2));
 
   // Calculate the closure interpolation 
   const Real athin = 0.5*(3*closure(xi) - 1);
@@ -485,6 +594,9 @@ Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real E, const V cov_F,
       (*con_tilPi)(i,j) *= athin;  
     }
   }  
+  
+  //printf("2b: %f %f %f %f %f\n", E, cov_F(0), xi, phi, athin);
+  //printf("    %f %f %f %f %f\n", (*con_tilf)(0), con_tilg(0), con_tild(0), con_v(0), (*con_tilPi)(0,0)); 
   return Status::success; 
 }
 
