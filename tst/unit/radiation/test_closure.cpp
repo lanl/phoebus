@@ -81,10 +81,10 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             // to check for self-consistency
             Real J_out; 
             Vec H_out;
-            auto status = cl.Con2PrimM1(E, F, &J_out, &H_out, &con_tilPi);
+            auto result = cl.Con2PrimM1(E, F, &J_out, &H_out, &con_tilPi);
             
             
-            //if (status == radiation::Status::failure) throw 2;
+            //if (result.status == radiation::Status::failure) throw 2;
             bool bad_solution = true;
             if ((fabs(J - J_out)/J < 1.e-5) && (fabs(cov_tilH(0) - H_out(0))/J < 1.e-5)) bad_solution = false; 
             
