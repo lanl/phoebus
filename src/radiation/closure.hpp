@@ -87,7 +87,8 @@ int sgn(T val) {
 enum class Status { success=0, failure=1 };
 
 struct M1Result { 
-  Status status; 
+  Status status;
+  int iter; 
   Real xi; 
   Real phi; 
   Real fPhi; 
@@ -482,7 +483,8 @@ M1Result Closure<Vec, Tens2>::SolveClosure(Real E, V cov_F, Real* xi_out, Real* 
   result.xi = xi;
   result.phi = phi; 
   result.fPhi = fPhi; 
-  result.fXi = fXi; 
+  result.fXi = fXi;
+  result.iter = iter; 
 
   if (std::isnan(xi)) result.status = Status::failure; 
   if (iter == max_iter) result.status = Status::failure;
