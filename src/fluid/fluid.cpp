@@ -589,6 +589,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 	        src(cmom_lo + l, k, j, i) = gdet*src_mom;
         }
 
+        #ifdef PHOEBUS_VALENCIA
         { // energy source term
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
           Real gcon[4][4];
@@ -617,6 +618,12 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           diag(6,k,j,i) = -gdet*alpha*TGam;
           //std::cerr << Ta << " " << TGam << std::endl;
         }
+        #else
+        src(ceng,k,j,i) = 0.;
+        diag(4,k,j,i) = 0.;
+        diag(5,k,j,i) = 0.;
+        diag(6,k,j,i) = 0.;
+        #endif // PHOEBUS_VALENCIA
 
         // re-use gam for metric derivative
         geom.MetricDerivative(CellLocation::Cent, k, j, i, gam);
