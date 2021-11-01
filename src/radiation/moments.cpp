@@ -73,12 +73,14 @@ TaskStatus MomentCon2Prim(T* rc) {
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H, fluid_prim::velocity}, imap);
+  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H, fluid_prim::velocity, i::xi, i::phi}, imap);
   
   auto cE = imap.GetFlatIdx(c::E);  
   auto pJ = imap.GetFlatIdx(p::J);  
   auto cF = imap.GetFlatIdx(c::F);  
   auto pH = imap.GetFlatIdx(p::H); 
+  auto iXi = imap.GetFlatIdx(i::xi); 
+  auto iPhi = imap.GetFlatIdx(i::phi); 
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
@@ -93,7 +95,6 @@ TaskStatus MomentCon2Prim(T* rc) {
       jb.s, jb.e, // y-loop 
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) { 
-        /// TODO: (LFR) Replace this placeholder zero velocity con2prim 
         Vec con_v{{v(b, pv(0), k, j, i),
                    v(b, pv(1), k, j, i),
                    v(b, pv(2), k, j, i)}};
@@ -107,8 +108,15 @@ TaskStatus MomentCon2Prim(T* rc) {
         Real E = v(b, cE(ispec), k, j, i);
         Vec covF ={{v(b, cF(ispec, 0), k, j, i), 
                     v(b, cF(ispec, 1), k, j, i), 
-                    v(b, cF(ispec, 2), k, j, i)}}; 
-        c.Con2PrimM1(E, covF, &J, &covH, &conTilPi);
+                    v(b, cF(ispec, 2), k, j, i)}};
+        
+        Real xi = v(b, iXi(), k, j, i);
+        Real phi = 1.0001*v(b, iPhi(), k, j, i);
+
+        auto result = c.Con2PrimM1(E, covF, xi, phi, &J, &covH, &conTilPi);
+        
+        v(b, iXi(), k, j, i) = result.xi;
+        v(b, iPhi(), k, j, i) = result.phi;
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions

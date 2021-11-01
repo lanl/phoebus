@@ -86,6 +86,14 @@ int sgn(T val) {
 
 enum class Status { success=0, failure=1 };
 
+struct M1Result { 
+  Status status; 
+  Real xi; 
+  Real phi; 
+  Real fPhi; 
+  Real fXi; 
+};
+
 template <class Vec, class Tens2> 
 class Closure {
  public:
@@ -106,12 +114,12 @@ class Closure {
   // Con2Prim and Prim2Con for closure
   template<class VA, class VB, class T2> 
   KOKKOS_FUNCTION 
-  Status Con2PrimM1(const Real E, const VA cov_F, Real xi_guess, Real phi_guess, 
+  M1Result Con2PrimM1(const Real E, const VA cov_F, Real xi_guess, Real phi_guess, 
                     Real* J, VB* cov_H, T2* con_tilPi);
   
   template<class VA, class VB, class T2>  
   KOKKOS_FUNCTION 
-  Status Con2PrimM1(const Real E, const VA cov_F, Real* J, VB* cov_H, T2* con_tilPi);
+  M1Result Con2PrimM1(const Real E, const VA cov_F, Real* J, VB* cov_H, T2* con_tilPi);
 
   template<class VA, class VB, class T2>  
   KOKKOS_FUNCTION 
@@ -200,7 +208,7 @@ class Closure {
                               Tens2* con_tilPi, Vec* con_tilf);
   template<class V> 
   KOKKOS_FUNCTION 
-  Status SolveClosure(Real E, V cov_F, 
+  M1Result SolveClosure(Real E, V cov_F, 
                       Real* xi_out, Real* phi_out,
                       const Real xi_guess = 0.5, const Real phi_guess = 3.14159);
   
@@ -319,7 +327,7 @@ Status Closure<Vec, Tens2>::Prim2ConM1(const Real J, const VA cov_H,
 template<class Vec, class Tens2> 
 template<class VA, class VB, class T2>  
 KOKKOS_FUNCTION
-Status Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F, 
+M1Result Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F, 
                                        Real* J, VB* cov_H, T2* con_tilPi){
   Real xi, phi;
   Vec con_tilf;
@@ -353,7 +361,7 @@ Status Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F,
 template<class Vec, class Tens2> 
 template<class VA, class VB, class T2>  
 KOKKOS_FUNCTION
-Status Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F, 
+M1Result Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F, 
                                        const Real xi_guess, const Real phi_guess,
                                        Real* J, VB* cov_H, T2* con_tilPi){
   Real xi, phi;
@@ -396,7 +404,7 @@ Status Closure<Vec, Tens2>::getConCovPFromPrim(const Real J, const V cov_tilH,
 template<class Vec, class Tens2> 
 template<class V>
 KOKKOS_FUNCTION
-Status Closure<Vec, Tens2>::SolveClosure(Real E, V cov_F, Real* xi_out, Real* phi_out,
+M1Result Closure<Vec, Tens2>::SolveClosure(Real E, V cov_F, Real* xi_out, Real* phi_out,
                                          const Real xi_guess, const Real phi_guess) {
   const int max_iter = 30; 
   const Real tol = 1.e6*std::numeric_limits<Real>::epsilon();
@@ -469,10 +477,16 @@ Status Closure<Vec, Tens2>::SolveClosure(Real E, V cov_F, Real* xi_out, Real* ph
   *xi_out = xi; 
   *phi_out = phi; 
   //printf("iter: %i xi: %e cos(phi): %f fXi: %e fPhi: %e \n", iter, *xi_out, cos(*phi_out), fXi, fPhi); 
-  if (std::isnan(xi)) return Status::failure; 
-  if (iter < max_iter) return Status::success;
-  return Status::failure; 
+  M1Result result;
+  result.status = Status::success;
+  result.xi = xi;
+  result.phi = phi; 
+  result.fPhi = fPhi; 
+  result.fXi = fXi; 
 
+  if (std::isnan(xi)) result.status = Status::failure; 
+  if (iter == max_iter) result.status = Status::failure;
+  return result; 
 }
 
 template<class Vec, class Tens2> 
