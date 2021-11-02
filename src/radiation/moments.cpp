@@ -39,10 +39,10 @@ struct Tens2 {
 };
 
 template <class T> 
-  class ReconstructionWrapper  {
+  class ReconstructionIndexer  {
  public:
   KOKKOS_INLINE_FUNCTION
-  ReconstructionWrapper(const T& v, const int chunk_size, const int offset, const int block = 0) : 
+  ReconstructionIndexer(const T& v, const int chunk_size, const int offset, const int block = 0) : 
       v_(v), chunk_size_(chunk_size), offset_(offset), block_(block) {}  
   
   KOKKOS_FORCEINLINE_FUNCTION
@@ -236,8 +236,8 @@ TaskStatus ReconstructEdgeStates(T* rc) {
       jb.s - dj, jb.e + dj, // y-loop 
       ib.s - di, ib.e + di, // x-loop
       KOKKOS_LAMBDA(const int idir, const int b, const int k, const int j, const int i) { 
-        ReconstructionWrapper<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
-        ReconstructionWrapper<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
+        ReconstructionIndexer<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
+        ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
         // Reconstruct radiation
         for (int ivar = 0; ivar<nrecon; ++ivar) {
           PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v, ql, qr);
