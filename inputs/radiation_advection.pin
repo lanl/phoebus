@@ -14,20 +14,20 @@
 problem = radiation_advection
 
 <parthenon/job>
-problem_id  = rad_adv      # problem ID: basename of output filenames
+problem_id  = rad_adv   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = cr.E, &
             cr.F 
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1.e-1      # time increment between outputs
+dt          = 1.e-1     # time increment between outputs
 
 <parthenon/time>
-nlim        = 10000       # cycle limit
-tlim        = 5.e0       # time limit
-integrator  = rk2       # time integration algorithm
-ncycle_out  = 1        # interval for stdout summary info
+nlim        = -1      # cycle limit
+tlim        = 1.e0    # time limit
+integrator  = rk2     # time integration algorithm
+ncycle_out  = 1       # interval for stdout summary info
 dt_init_fact = 1.e-6
 
 <parthenon/mesh>
@@ -35,13 +35,13 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 512       # Number of zones in X1-direction
+nx1         = 512      # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
-x1max       = 1         # maximum value of X1
+x1max       = 1        # maximum value of X1
 ix1_bc      = outflow  # Inner-X1 boundary condition flag
 ox1_bc      = outflow  # Outer-X1 boundary condition flag
 
-nx2         = 1       # Number of zones in X2-direction
+nx2         = 1         # Number of zones in X2-direction
 x2min       = -1        # minimum value of X2
 x2max       = 1         # maximum value of X2
 ix2_bc      = periodic  # Inner-X2 boundary condition flag
