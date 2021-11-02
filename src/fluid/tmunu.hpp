@@ -109,10 +109,14 @@ private:
                   v_(2, std::forward<Args>(args)...),
                   v_(3, std::forward<Args>(args)...)};
     const Real W = phoebus::GetLorentzFactor(vp, gcov);
+  if (vp[0] > 5.4802e-2 && vp[0] < 5.480238e-2 && vp[2] > 9.219e-2 && vp[2] < 9.2191e-2) {
+    printf("tmunu W: %e vp: %e %e %e\n",
+      W, vp[0], vp[1], vp[2]);
+  }
     SPACELOOP2(ii, jj) {
         const Real &bi = b_(ii+1, std::forward<Args>(args)...);
         const Real &bj = b_(jj+1, std::forward<Args>(args)...);
-        Bdotv += bi * vp[jj] * gcov[ii][jj];
+        Bdotv += bi * vp[jj] / W * gcov[ii][jj];
         Bsq += bi * bj * gcov[ii][jj];
     }
     const Real iW = 1. / W;
@@ -122,9 +126,12 @@ private:
     u[0] = W / (std::abs(alpha) + SMALL);
     b[0] = u[0] * Bdotv;
     for (int l = 1; l < ND; ++l) {
-      u[l] = W * v_(l, std::forward<Args>(args)...) - u[0] * beta[l - 1];
+      u[l] = v_(l, std::forward<Args>(args)...) - u[0] * beta[l - 1];
       b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha * b[0] * u[l]);
     }
+  if (vp[0] > 5.4802e-2 && vp[0] < 5.480238e-2 && vp[2] > 9.219e-2 && vp[2] < 9.2191e-2) {
+    printf("tmunu u: %e %e %e %e\n", u[0], u[1], u[2], u[3]);
+  }
 
     b[0] *= alpha;
     bsq = (Bsq + b[0] * b[0]) * iW * iW;

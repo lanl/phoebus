@@ -276,9 +276,9 @@ class VarAccessor {
   Real &operator()(const int n) const {
     return var_(b_, n, k_, j_, i_);
   }
+  const int b_, i_, j_, k_;
  private:
   const T &var_;
-  const int b_, i_, j_, k_;
 };
 
 struct CellGeom {
@@ -423,7 +423,7 @@ class ConToPrim {
       negative_crho = true;
     }*/
     const Real D = v(crho)*igdet;
-    #if PHOEBUS_VALENCIA
+    #if USE_VALENCIA
     const Real tau = v(ceng)*igdet;
     #else
     Real Qcov[4] = {(v(ceng) - v(crho))*igdet,
@@ -436,7 +436,7 @@ class ConToPrim {
       tau -= Qcov[mu]*ncon[mu];
     }
     tau -= D;
-    #endif // PHOEBUS_VALENCIA
+    #endif // USE_VALENCIA
     const Real q = tau/D;
     //PARTHENON_REQUIRE(D > 0, "D < 0");
 
@@ -559,6 +559,10 @@ class ConToPrim {
       //v(pvel_lo+i) = atm ? 0 : mu*x*(rcon[i] + mu*bdotr*bu[i]);
       vel[i] = mu*x*(rcon[i] + mu*bdotr*bu[i]);
       v(pvel_lo+i) = W*vel[i];
+    }
+    if (v.i_ == 120 && v.j_ == 120)
+    {
+      printf("c2p: W: %e vp: %e %e %e v: %e %e %e\n", W, v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2), vel[0],vel[1],vel[2]);
     }
     if (pb_hi > 0) {
       SPACELOOP(i) {

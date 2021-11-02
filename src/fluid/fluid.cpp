@@ -316,6 +316,9 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         const Real vel[] = {v(b, pvel_lo, k, j, i),
                             v(b, pvel_lo+1, k, j, i),
                             v(b, pvel_hi, k, j, i)};
+                            if ( i == 120 && j == 120) {
+                                printf("p2c: vel: %e %e %e\n", vel[0], vel[1], vel[2]);
+                              }
         Real bcons[3];
         Real bp[3] = {0.0, 0.0, 0.0};
         if (pb_hi > 0) {
@@ -589,7 +592,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 	        src(cmom_lo + l, k, j, i) = gdet*src_mom;
         }
 
-        #ifdef PHOEBUS_VALENCIA
+        #ifdef USE_VALENCIA
         { // energy source term
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
           Real gcon[4][4];
@@ -623,7 +626,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
         diag(4,k,j,i) = 0.;
         diag(5,k,j,i) = 0.;
         diag(6,k,j,i) = 0.;
-        #endif // PHOEBUS_VALENCIA
+        #endif // USE_VALENCIA
 
         // re-use gam for metric derivative
         geom.MetricDerivative(CellLocation::Cent, k, j, i, gam);
