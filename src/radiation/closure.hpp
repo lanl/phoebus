@@ -18,6 +18,7 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 #include "geometry/geometry_utils.hpp" 
+#include "phoebus_utils/linear_algebra.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -25,51 +26,9 @@
 #include <limits>
 
 
+using namespace LinearAlgebra; 
+
 namespace radiation { 
-
-// Taken from https://pharr.org/matt/blog/2019/11/03/difference-of-floats 
-// meant to reduce floating point rounding error in cancellations,
-// returns ab - cd
-template <class T> 
-KOKKOS_INLINE_FUNCTION
-T DifferenceOfProducts(T a, T b, T c, T d) {
-    T cd = c * d;
-    T err = std::fma(-c, d, cd); // Round off error correction for cd
-    T dop = std::fma(a, b, -cd);
-    return dop + err;
-}
-
-template<class T> 
-KOKKOS_INLINE_FUNCTION 
-auto matrixInverse3x3_dos(T A, T& Ainv) 
-    -> typename std::remove_reference<decltype(A(0,0))>::type {
-  Ainv(0,0) = DifferenceOfProducts(A(1,1), A(2,2), A(1,2), A(2,1));
-  Ainv(1,0) =-DifferenceOfProducts(A(1,0), A(2,2), A(1,2), A(2,0));
-  Ainv(2,0) = DifferenceOfProducts(A(1,0), A(2,1), A(1,1), A(2,0));
-  Ainv(0,1) =-DifferenceOfProducts(A(0,1), A(2,2), A(0,2), A(2,1));
-  Ainv(1,1) = DifferenceOfProducts(A(0,0), A(2,2), A(0,2), A(2,0));
-  Ainv(2,1) =-DifferenceOfProducts(A(0,0), A(2,1), A(0,1), A(2,0));
-  Ainv(0,2) = DifferenceOfProducts(A(0,1), A(1,2), A(0,2), A(1,1));
-  Ainv(1,2) =-DifferenceOfProducts(A(0,0), A(1,2), A(0,2), A(1,0));
-  Ainv(2,2) = DifferenceOfProducts(A(0,0), A(1,1), A(0,1), A(1,0));
-  const auto det = std::fma(A(0,0), Ainv(0,0), 
-      DifferenceOfProducts(A(2,0), Ainv(2,0), A(1,0), -Ainv(1,0))); 
-  const auto invDet = 1.0/det; 
-  for (int i=0; i<3; ++i) {
-    for (int j=0; j<3; ++j) { 
-      Ainv(i,j) *= invDet;
-    }
-  }
-  return det;
-}
-
-template<class T>
-KOKKOS_INLINE_FUNCTION 
-void SolveAxb2x2(T A[2][2], T b[2], T x[2]) {
-  const auto invDet = 1.0/DifferenceOfProducts(A[0][0], A[1][1], A[0][1], A[1][0]); 
-  x[0] = invDet*DifferenceOfProducts(A[1][1], b[0], A[0][1], b[1]);
-  x[1] = invDet*DifferenceOfProducts(A[0][0], b[1], A[1][0], b[0]);
-}
 
 template<class T> 
 KOKKOS_FORCEINLINE_FUNCTION
@@ -255,7 +214,7 @@ Closure<Vec, Tens2>::Closure(const V con_v_in, const T2 cov_gamma_in) {
   
   SPACELOOP(i) con_v(i) = con_v_in(i);
 
-  gdet = matrixInverse3x3_dos(cov_gamma, con_gamma); 
+  gdet = matrixInverse3x3(cov_gamma, con_gamma); 
 
   lower3Vector(con_v, &cov_v);
   Real v2 = 0.0; 
