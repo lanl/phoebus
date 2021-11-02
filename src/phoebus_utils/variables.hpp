@@ -34,22 +34,22 @@ namespace fluid_cons {
 }
 
 namespace radmoment_prim {
-  constexpr char J[] = "pr.J";
-  constexpr char H[] = "pr.H";
+  constexpr char J[] = "r.p.J";
+  constexpr char H[] = "r.p.H";
 }
 
 namespace radmoment_cons {
-  constexpr char E[] = "cr.E";
-  constexpr char F[] = "cr.F";
+  constexpr char E[] = "r.c.E";
+  constexpr char F[] = "r.c.F";
 }
 
 namespace radmoment_internal { 
-  constexpr char xi[] = "rm.xi";
-  constexpr char phi[] = "rm.phi";
-  constexpr char ql[] = "rm.ql";
-  constexpr char qr[] = "rm.qr";
-  constexpr char ql_v[] = "rm.ql_v";
-  constexpr char qr_v[] = "rm.qr_v";
+  constexpr char xi[] = "r.i.xi";
+  constexpr char phi[] = "r.i.phi";
+  constexpr char ql[] = "r.i.ql";
+  constexpr char qr[] = "r.i.qr";
+  constexpr char ql_v[] = "r.i.ql_v";
+  constexpr char qr_v[] = "r.i.qr_v";
 }
 
 namespace internal_variables {
