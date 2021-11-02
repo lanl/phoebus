@@ -3,3 +3,6 @@ BIN
 build
 BUILD
 results
+.devcontainer 
+.vscode 
+.DS_Store 
