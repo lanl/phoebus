@@ -17,8 +17,10 @@ problem = radiation_advection
 problem_id  = rad_adv   # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = cr.E, &
-            cr.F 
+variables = r.c.E, &
+            r.c.F, &
+            r.p.J, &
+            r.p.H 
 
 file_type   = hdf5      # Tabular data dump
 dt          = 1.e-1     # time increment between outputs
