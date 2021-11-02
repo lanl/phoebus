@@ -418,7 +418,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   namespace pr = radmoment_prim;  
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E, cr::F, p::density, p::temperature, p::ye}; 
+  std::vector<std::string> vars{cr::E, cr::F, p::density, p::temperature, p::ye, p::velocity}; 
   if (update_fluid) {
     vars.push_back(c::energy);
     vars.push_back(c::momentum);
@@ -429,6 +429,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto v = rc->PackVariables(vars, imap);
   auto idx_E = imap.GetFlatIdx(cr::E); 
   auto idx_F = imap.GetFlatIdx(cr::F);
+  auto pv = imap.GetFlatIdx(p::velocity);
 
   int prho = imap[p::density].first; 
   int pT = imap[p::temperature].first; 
@@ -453,7 +454,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // Get the device opacity object
   using namespace singularity::neutrinos; 
   const auto d_opacity = opac->Param<Opacity>("d.opacity");
-  
+
+  // Get the background geometry 
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
   int nblock = v.GetDim(5); 
   int nspec = idx_E.DimSize(1);
 
@@ -476,26 +480,53 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           const Real emis = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, species[ispec]); 
           Real B = emis/kappa; 
           if (use_B_fake) B = B_fake; 
+          
+          // Set up the background state 
+          Vec con_v{{v(iblock, pv(0), k, j, i),
+                     v(iblock, pv(1), k, j, i),
+                     v(iblock, pv(2), k, j, i)}};
+          Tens2 cov_gamma; 
+          geom.Metric(CellLocation::Cent, k, j, i, cov_gamma.data);
+          Real alpha = geom.Lapse(CellLocation::Cent, k, j, i); 
+          Closure<Vec, Tens2> c(con_v, cov_gamma); 
+          
+          Real Estar = v(iblock, idx_E(ispec), k, j, i); 
+          Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i),
+                        v(iblock, idx_F(ispec, 1), k, j, i),
+                        v(iblock, idx_F(ispec, 2), k, j, i)};
+          
+          Real dE;
+          Vec cov_dF;
 
-          // This will be replaced with the rest frame calculation
-          const Real lam = (kappa*dt)/(1 + kappa*dt);
-          const Real dE = (B - v(iblock, idx_E(ispec), k, j, i))*lam;
-          const Real dF[3] = {-v(iblock, idx_F(ispec, 0), k, j, i)*lam,
-                              -v(iblock, idx_F(ispec, 1), k, j, i)*lam,
-                              -v(iblock, idx_F(ispec, 2), k, j, i)*lam};
+          /// TODO: (LFR) Move beyond Eddington for this update
+          Tens2 con_tilPi{{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}};  
+          
+          Real tauJ = alpha*kappa*dt;  
+          Real tauH = alpha*kappa*dt; 
+        
+          c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, 
+                               tauJ, tauH, &dE, &cov_dF); 
+          //printf("dE (new) = %e ", dE); 
+          // This is the zero velocity limit for testing
+          //const Real lam = (kappa*dt)/(1 + kappa*dt);
+          //dE = (B - v(iblock, idx_E(ispec), k, j, i))*lam;
+          //cov_dF(0) = -v(iblock, idx_F(ispec, 0), k, j, i)*lam;
+          //cov_dF(0) = -v(iblock, idx_F(ispec, 1), k, j, i)*lam;
+          //cov_dF(0) = -v(iblock, idx_F(ispec, 2), k, j, i)*lam;
 
+          //printf("dE (old) = %e Estar = %e tau = %e\n", dE, Estar, kappa*dt); 
           // Add source corrections to conserved radiation variables
           v(iblock, idx_E(ispec), k, j, i) += dE; 
           for (int idir=0; idir<3; ++idir) {
-            v(iblock, idx_F(ispec, idir), k, j, i) += dF[idir];
+            v(iblock, idx_F(ispec, idir), k, j, i) += cov_dF(idir);
           }
           
           // Add source corrections to conserved fluid variables 
           if (update_fluid) {
             v(iblock, ceng, k, j, i) -= dE; 
-            v(iblock, cmom_lo + 0, k, j, i) -= dF[0]; 
-            v(iblock, cmom_lo + 1, k, j, i) -= dF[1]; 
-            v(iblock, cmom_lo + 2, k, j, i) -= dF[2]; 
+            v(iblock, cmom_lo + 0, k, j, i) -= cov_dF(0); 
+            v(iblock, cmom_lo + 1, k, j, i) -= cov_dF(1); 
+            v(iblock, cmom_lo + 2, k, j, i) -= cov_dF(2); 
           }
 
         } 

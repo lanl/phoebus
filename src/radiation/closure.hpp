@@ -73,6 +73,18 @@ namespace radiation
     template <class V, class T2>
     KOKKOS_FUNCTION
     Closure(const V con_v_in, const T2 cov_gamma_in);
+    
+    //-------------------------------------------------------------------------------------
+    /// Calculate the update values dE and cov_dF for a linear, implicit source term update
+    /// from the starred state using the optical depths tauJ = lapse kappa_a dt and 
+    /// tauH = lapse (kappa_a + kappa_s) dt 
+    template <class VA, class VB, class T2>
+    KOKKOS_FUNCTION
+      Status
+      LinearSourceUpdate(const Real Estar, const VA cov_Fstar,
+               const T2 con_tilPi, const Real JBB,  
+               const Real tauJ, const Real tauH,
+               Real *dE, VB *cov_dF);
 
     //-------------------------------------------------------------------------------------
     /// Calculate the momentum density flux P^i_j from J, \tilde H_i, and \tilde pi^{ij}.
@@ -311,7 +323,47 @@ namespace radiation
     W3 = W * W2;
     W4 = W * W3;
   }
+   
+  template <class Vec, class Tens2>
+  template <class VA, class VB, class T2>
+  KOKKOS_FUNCTION
+      Status
+      Closure<Vec, Tens2>::LinearSourceUpdate(const Real Estar, const VA cov_Fstar,
+                                    const T2 con_tilPi, const Real JBB,  
+                                    const Real tauJ, const Real tauH,
+                                    Real *dE, VB *cov_dF) {
+    
+    Real vvTilPi; 
+    Vec cov_vTilPi; 
+    GetTilPiContractions(con_tilPi, &cov_vTilPi, &vvTilPi);
+    
+    Real A[2][2], x[2], b[2]; 
+    A[0][0] = (4*W2-1)/3 + W2*vvTilPi + W*tauJ; 
+    A[0][1] = 2*W + tauH;  
+    A[1][0] = A[0][0] - 1 - tauJ/W;
+    A[1][1] = A[0][1] - 1/W; 
+    
+    Real vFstar = contractConCov3Vectors(con_v, cov_Fstar); 
+    b[0] = Estar + W*tauJ*JBB; 
+    b[1] = vFstar + (W2-1)/W*tauJ*JBB;
 
+    SolveAxb2x2(A, b, x);
+    //printf("\n tauJ = %e tauH = %e \n", tauJ, tauH);
+    //printf("(%e  %e) (%e) = (%e)\n", A[0][0], A[0][1], x[0], b[0]);
+    //printf("(%e  %e) (%e) = (%e)\n", A[1][0], A[1][1], x[1], b[1]);
+    //if (std::isnan(b[0])) throw 1; 
+
+    Real &J = x[0];
+    Real &zeta = x[1]; //v^i \tilde H_i  
+
+    *dE = (4*W2/3 - 1.0/3.0 + W2*vvTilPi)*J + 2*W*zeta - Estar;      
+    SPACELOOP(i)
+      (*cov_dF)(i) = (cov_v(i)*tauH*(4*W2/3*J + W*zeta) + tauH*cov_vTilPi(i) 
+                   + tauJ*W2*cov_v(i)*(JBB-J) + W*cov_Fstar(i))/(W+tauH) - cov_Fstar(i); 
+    
+    return Status::success;  
+  }
+  
   template <class Vec, class Tens2>
   template <class VA, class VB, class T2>
   KOKKOS_FUNCTION
@@ -699,6 +751,6 @@ namespace radiation
     //printf("lam = %e W = %e Fmag = %e aa = %e v2 - vl*vl = %e \n", lam, W, Fmag, aa, v2 - vl*vl);
     return Status::success;
   }
-} // namespace radiationMoments
+} // namespace radiation
 
-#endif // MOMENTS_HPP_
+#endif // CLOSURE_HPP_
