@@ -609,7 +609,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 	        src(cmom_lo + l, k, j, i) = gdet*src_mom;
         }
 
-        #ifdef USE_VALENCIA
+        #if USE_VALENCIA
         { // energy source term
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
           Real gcon[4][4];

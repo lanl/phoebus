@@ -397,6 +397,9 @@ class ConToPrim {
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos,
                         const Real x1, const Real x2, const Real x3) const {
+    if (v.i_ == 140 && v.j_ == 120) {
+      printf("c2p C: %e %e %e %e %e\n", v(crho), v(ceng), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2));
+    }
     /*PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo)), "v(cmom_lo) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
@@ -426,6 +429,9 @@ class ConToPrim {
     #if USE_VALENCIA
     const Real tau = v(ceng)*igdet;
     #else
+    //if (v.i_ == 140 && v.j_ == 120) {
+    //printf("c2p C: %e %e %e %e %e\n", v(crho), v(ceng), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2));
+    //}
     Real Qcov[4] = {(v(ceng) - v(crho))*igdet,
                       v(cmom_lo)*igdet,
                       v(cmom_lo+1)*igdet,
@@ -435,8 +441,17 @@ class ConToPrim {
     SPACETIMELOOP(mu) {
       tau -= Qcov[mu]*ncon[mu];
     }
+    //if (v.i_ == 140 && v.j_ == 120) {
+    //printf("pretau: %e\n", tau);
+    //printf("ncon: %e %e %e %e\n", ncon[0], ncon[1], ncon[2], ncon[3]);
+    //printf("Qcov: %e %e %e %e\n", Qcov[0], Qcov[1], Qcov[2], Qcov[3]);
+    //}
     tau -= D;
     #endif // USE_VALENCIA
+    if (v.i_ == 140 && v.j_ == 120) {
+    printf("tau: %e (tau 3+1: %e)\n", tau, 4.855544e+01*igdet);
+    //exit(-1);
+    }
     const Real q = tau/D;
     //PARTHENON_REQUIRE(D > 0, "D < 0");
 
@@ -560,9 +575,9 @@ class ConToPrim {
       vel[i] = mu*x*(rcon[i] + mu*bdotr*bu[i]);
       v(pvel_lo+i) = W*vel[i];
     }
-    if (v.i_ == 120 && v.j_ == 120)
+    if (v.i_ == 140 && v.j_ == 120)
     {
-      printf("c2p: W: %e vp: %e %e %e v: %e %e %e\n", W, v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2), vel[0],vel[1],vel[2]);
+      printf("c2p: W: %e vp: %e %e %e v: %e %e %e rho: %e u: %e\n", W, v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2), vel[0],vel[1],vel[2], v(prho), v(peng));
     }
     if (pb_hi > 0) {
       SPACELOOP(i) {

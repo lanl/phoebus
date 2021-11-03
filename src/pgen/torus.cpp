@@ -220,6 +220,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               printf("pgen gamma: %e vpcon: %e %e %e vcon: %e %e %e\n", W,
                 v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i),
                 vcon[0], vcon[1], vcon[2]);
+              printf("rho: %e u: %e\n", v(irho,k,j,i), v(ieng,k,j,i));
               printf("u: %e %e %e %e\n", ucon[0], ucon[1], ucon[2], ucon[3]);
             }
           }
