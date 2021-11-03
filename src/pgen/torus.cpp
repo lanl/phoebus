@@ -216,7 +216,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             for (int d = 0; d < 3; d++) {
               v(ivlo+d,k,j,i) += W*vcon[d]/(nsub*nsub);
             }
-            if (i == 120 && j == 120) {
+            if (i == 140 && j == 120) {
               printf("pgen gamma: %e vpcon: %e %e %e vcon: %e %e %e\n", W,
                 v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i),
                 vcon[0], vcon[1], vcon[2]);
