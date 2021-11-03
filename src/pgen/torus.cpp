@@ -296,6 +296,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
   fluid::ConservedToPrimitive(rc);
+  pmb->exec_space.fence();
   PARTHENON_FAIL("fsoidjf");
   //}
 /*
