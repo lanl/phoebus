@@ -535,12 +535,19 @@ class ConToPrim {
     //PARTHENON_REQUIRE(v0sq < 1, "v0sq >= 1: " + std::to_string(v0sq));
     //PARTHENON_REQUIRE(v0sq >= 0, "v0sq < 0: " + std::to_string(v0sq));
 
+    if (v.i_ == 140 && v.j_ == 120) {
+      printf("D: %e q: %e bsq: %e bsq_rpsq: %e rsq: %e rbsq: %e v0sq: %e\n",
+        D, q, bsq, bsq_rpsq, rsq, rbsq, v0sq);
+    }
     Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,bounds,x1,x2,x3);//rhoflr,epsflr,gam_max,eps_max);
 
     // find the upper bound
     //const Real mu_r = res.compute_upper_bound(h0sq_);
     // solve
     const Real mu = find_root(res, 0.0, 1.0, rel_tolerance, __LINE__);
+    if (v.i_ == 140 && v.j_ == 120) {
+      printf("mu: %e\n", mu);
+    }
     //if(atm) printf("used atm\n");
     if(my_cell(x1,x2)) {
       printf("res = %e\n", res(mu));
