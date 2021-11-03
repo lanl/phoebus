@@ -300,8 +300,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // now normalize the b-field
   //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
-  fluid::ConservedToPrimitive(rc);
-  PARTHENON_FAIL("siudf");
+  //fluid::ConservedToPrimitive(rc);
   //}
 /*
   Real beta[3];
