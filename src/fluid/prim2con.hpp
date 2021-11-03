@@ -30,10 +30,10 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
   const Real W = phoebus::GetLorentzFactor(vp, gcov);
   const Real iW = 1.0/W;
   Real v[3] = {vp[0]*iW, vp[1]*iW, vp[2]*iW};
-  if (vp[0] > 5.4802e-2 && vp[0] < 5.480238e-2 && vp[2] > 9.219e-2 && vp[2] < 9.2191e-2) {
+  /*if (vp[0] > 5.4802e-2 && vp[0] < 5.480238e-2 && vp[2] > 9.219e-2 && vp[2] < 9.2191e-2) {
     printf("W: %e vp: %e %e %e v: %e %e %e\n",
       W, vp[0], vp[1], vp[2], v[0], v[1], v[2]);
-  }
+  }*/
   SPACELOOP2(ii, jj) {
     vsq += gcov[ii+1][jj+1] * v[ii] * v[jj];
     Bsq += gcov[ii+1][jj+1] * b[ii] * b[jj];
