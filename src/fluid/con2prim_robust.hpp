@@ -616,6 +616,13 @@ class ConToPrim {
     if (v.i_ == 140 && v.j_ == 120) {
     printf("rho: %e vel: %e %e %e bu: %e %e %e peng: %e ye: %e prs: %e gm1: %e\n",
       v(prho), vel[0], vel[1], vel[2], bu[0], bu[1], bu[2], v(peng), ye_prim, v(prs), v(gm1));
+    printf("gdet: %e lapse: %e beta: %e %e %e\n", g.gdet, g.lapse, g.beta[0], g.beta[1], g.beta[2]);
+    SPACETIMELOOP2(mu, nu) {
+      printf("gcov4[%i %i] = %e\n", mu,nu,g.gcov4[mu][nu]);
+    }
+    SPACELOOP2(ii,jj) {
+      printf("gcon[%i %i] = %e\n", ii,jj,g.gcon[ii][jj]);
+    }
     }
     prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
                   g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
