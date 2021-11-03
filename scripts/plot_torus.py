@@ -9,8 +9,9 @@ import shutil
 import os
 from subprocess import call, DEVNULL
 import glob
-sys.path.append(PHDF_PATH)
-import phdf
+#sys.path.append(PHDF_PATH)
+#import phdf
+from parthenon_tools import phdf
 import time
 from enum import Enum
 
