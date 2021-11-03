@@ -176,8 +176,21 @@ class FluxState {
     }
 
     // energy
+    #if USE_VALENCIA
     U[ceng] = rhohWsq + bsqWsq - (P + 0.5*bsq) - b0*b0 - U[crho];
     F[ceng] = U[ceng]*vtil + (P + 0.5*bsq)*vel - Bdotv*Bcon[dir];
+    #else
+    Real ucon[4] = {W/g.alpha,
+                    vpcon[0] - g.beta[0]*W/g.alpha,
+                    vpcon[1] - g.beta[1]*W/g.alpha,
+                    vpcon[2] - g.beta[2]*W/g.alpha};
+    Real ucov[4] = {0};
+    SPACETIMELOOP2(mu, nu) {
+      ucov[mu] += g.gcov[mu][nu]*ucon[nu];
+    }
+    U[ceng] = (rho + u + P)*ucon[0]*ucov[0] + P;
+    F[ceng] = (rho + u + P)*ucon[d]*ucov[0];
+    #endif // USE_VALENCIA
 
     // magnetic fields
     for (int m = cb_lo; m <= cb_hi; m++) {
