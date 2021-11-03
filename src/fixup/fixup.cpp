@@ -8,6 +8,7 @@
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
+#include "phoebus_utils/relativity_utils.hpp"
 
 namespace fixup {
 
@@ -109,17 +110,17 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   int cye = imap[c::ye].second;
   int ifail = imap[impl::fail].first;
 
-  int nfail_total;                                                                                   
-  parthenon::par_reduce(                                                                             
-      //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),                              
-      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),                 
-      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,                                        
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {                   
-        if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {                                  
-          nf++;                                                                                      
-                                                                                                     
-        }                                                                                            
-      }, Kokkos::Sum<int>(nfail_total));                                                             
+  int nfail_total;
+  parthenon::par_reduce(
+      //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),
+      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+        if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
+          nf++;
+
+        }
+      }, Kokkos::Sum<int>(nfail_total));
   printf("total nfail: %i\n", nfail_total);
 
   bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
@@ -179,9 +180,13 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             Real gcon[3][3];
             geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
             Real S[3];
-            const Real vel[] = {v(b, pvel_lo, k, j, i),
-                                v(b, pvel_lo+1, k, j, i),
-                                v(b, pvel_hi, k, j, i)};
+            Real vel[] = {v(b, pvel_lo, k, j, i),
+                          v(b, pvel_lo+1, k, j, i),
+                          v(b, pvel_hi, k, j, i)};
+            Real W = phoebus::GetLorentzFactor(vel, gcov);
+            SPACELOOP(ii) {
+              vel[ii] /= W;
+            }
             Real bcons[3];
             Real bp[3] = {0.0, 0.0, 0.0};
             if (pb_hi > 0) {
