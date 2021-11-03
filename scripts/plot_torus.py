@@ -1,4 +1,5 @@
-PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
+#PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
+#PHDF_PATH = '/home/brryan/github/phoebus/external/parthenon/scripts/python/'
 DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
 
 import numpy as np
@@ -26,7 +27,7 @@ rmax = 40
 plot_meshblocks = True
 h_ = 0.3
 
-nfinal = 1
+nfinal = -1
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 #dfnam = dfnams[nfinal]
