@@ -176,6 +176,11 @@ class FluxState {
       F[m] = U[m]*vtil - Bcon[dir]*(vcon[m-cb_lo] - g.beta[m-cb_lo]/g.alpha);
     }
 
+    if (i == 140 && j == 120) {
+      printf("flux [%i]: %e %e %e %e %e\n", d, F[crho], F[ceng], F[cmom_lo], F[cmom_lo+1], F[cmom_lo+2]);
+      printf("cons [%i]: %e %e %e %e %e\n", d, U[crho], U[ceng], U[cmom_lo], U[cmom_lo+1], U[cmom_lo+2]);
+    }
+
     const Real vasq = bsqWsq/robust::make_positive(rhohWsq+bsqWsq);
     const Real cssq = robust::make_bounded(gamma1*P*W*W/robust::make_positive(rhohWsq), 0.0, 1.0);
     Real cmsq = robust::make_bounded(cssq + vasq*(1.0 - cssq), 0.0, 1.0);
@@ -250,6 +255,10 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
 
   for (int m = 0; m < fs.NumConserved(); m++) {
     fs.v.flux(d,m,k,j,i) = 0.5*((Fl[m] + Fr[m])*g.gdet - cmax*((Ur[m] - Ul[m])*g.gammadet));
+  }
+  if (i == 140 && j == 120) {
+    printf("FLUX [%i]: %e %e %e %e %e\n", d, fs.v.flux(d,0,k,j,i), fs.v.flux(d,4,k,j,i),
+      fs.v.flux(d,1,k,j,i), fs.v.flux(d,2,k,j,i), fs.v.flux(d,3,k,j,i));
   }
   return cmax;
 }

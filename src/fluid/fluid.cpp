@@ -352,6 +352,11 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         for (int m = sig_lo; m <= sig_hi; m++) {
           v(b, m, k, j, i) = sig[m-sig_lo];
         }
+
+        if (i == 140 && j == 120) {
+          printf("C: %e %e %e %e %e\n", v(b, crho,k,j,i), v(b,ceng,k,j,i),
+            v(b,cmom_lo,k,j,i), v(b,cmom_lo+1,k,j,i), v(b,cmom_lo+2,k,j,i));
+        }
       });
 
   return TaskStatus::complete;
@@ -508,6 +513,10 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
         diag(2,k,j,i) = divf(cmom_lo+1,k,j,i);
         diag(3,k,j,i) = divf(cmom_lo+2,k,j,i);
         diag(4,k,j,i) = divf(ceng,k,j,i);
+        if (i == 140 && j == 120) {
+          printf("divF: %e %e %e %e %e\n", divf(crho,k,j,i), divf(ceng,k,j,i),
+            divf(cmom_lo,k,j,i), divf(cmom_lo+1,k,j,i), divf(cmom_lo+2,k,j,i));
+        }
       }
   );
   return TaskStatus::complete;
@@ -574,6 +583,14 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real Tmunu[ND][ND], gam[ND][ND][ND];
         tmunu(Tmunu, k, j, i);
+        if (i == 140 && j == 120) {
+          SPACETIMELOOP(mu) {
+            SPACETIMELOOP(nu) {
+            printf("  %e", Tmunu[mu][nu]);
+            }
+            printf("\n");
+          }
+        }
         geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
 	      Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
         diag(0,k,j,i) = 0.0;
@@ -629,6 +646,11 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
           diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
+        }
+
+        if (i == 140 && j == 120) {
+          printf("src: %e %e %e %e %e\n", 0., src(ceng,k,j,i), src(cmom_lo,k,j,i),
+            src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i));
         }
 
       });

@@ -129,7 +129,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
   const Real bnorm = pin->GetOrAddReal("torus", "Bnorm", 1.e-2);
   const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
-  
+
   const Real a = pin->GetReal("geometry","a");
   auto bl = Geometry::BoyerLindquist(a);
 
@@ -231,7 +231,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
       v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
       v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i));
-      
+
+      if (i == 140 && j == 120) {
+        printf("P: %e %e %e %e %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(ivlo,k,j,i),
+          v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
+      }
+
       rng_pool.free_state(rng_gen);
     });
 
@@ -255,7 +260,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bmin) {
       const Real gdet = geom.DetGamma(CellLocation::Cent,k,j,i);
       v(iblo,k,j,i) = - ( A(j,i) - A(j+1,i)
-                         + A(j,i+1) - A(j+1,i+1) ) 
+                         + A(j,i+1) - A(j+1,i+1) )
                          / (2.0 * coords.Dx(X2DIR,k,j,i) * gdet);
       v(iblo+1,k,j,i) = ( A(j,i) + A(j+1,i)
                          - A(j,i+1) - A(j+1,i+1) )
