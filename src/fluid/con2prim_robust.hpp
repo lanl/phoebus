@@ -613,6 +613,10 @@ class ConToPrim {
     Real S[3];
     Real bcons[3];
     Real sig[3];
+    if (v.i_ == 140 && v.j_ == 120) {
+    printf("rho: %e vel: %e %e %e bu: %e %e %e peng: %e ye: %e prs: %e gm1: %e\n",
+      v(prho), vel[0], vel[1], vel[2], bu[0], bu[1], bu[2], v(peng), ye_prim, v(prs), v(gm1));
+    }
     prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
                   g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
                   v(crho), S, bcons, v(ceng), ye_cons, sig);
@@ -625,6 +629,11 @@ class ConToPrim {
 
     for (int i = 0; i < sig_hi-sig_lo+1; i++) {
       v(sig_lo+i) = sig[i];
+    }
+
+    if (v.i_ == 140 && v.j_ == 120) {
+    printf("c2p aftermath: C: %e %e %e %e %e\n",
+      v(crho), v(ceng), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2));
     }
 
     num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
