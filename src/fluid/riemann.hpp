@@ -188,7 +188,7 @@ class FluxState {
     SPACETIMELOOP2(mu, nu) {
       ucov[mu] += g.gcov[mu][nu]*ucon[nu];
     }
-    U[ceng] = (rho + u + P)*ucon[0]*ucov[0] + P;
+    U[ceng] = g.alpha*((rho + u + P)*ucon[0]*ucov[0] + P);
     F[ceng] = (rho + u + P)*ucon[d]*ucov[0];
     #endif // USE_VALENCIA
 
