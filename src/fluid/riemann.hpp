@@ -99,10 +99,10 @@ class FluxState {
     Real vpcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
     Real W = phoebus::GetLorentzFactor(vpcon, g.gcov);
     Real vcon[] = {vpcon[0]/W, vpcon[1]/W, vpcon[2]/W};
-    if (i == 140 && j == 120) {
+    /*if (i == 140 && j == 120) {
       printf("p2f: W: %e vp: %e %e %e v: %e %e %e\n", W, vpcon[0], vpcon[1] ,vpcon[2],
         vcon[0], vcon[1], vcon[2]);
-    }
+    }*/
     const Real &vel = vcon[dir];
     Real Bcon[] = {0.0, 0.0, 0.0};
     const Real u = (q(dir,peng,k,j,i)/rho > sie_floor
@@ -140,9 +140,9 @@ class FluxState {
       for (int m = 0; m < 3; m++) vcon[m] *= scale;
     }
     W = 1.0/sqrt(1-vsq);
-    if (i == 140 && j == 120) {
-      printf("flux gamma: %e vp: %e %e %e v: %e %e %e\n", W, vpcon[0], vpcon[1], vpcon[2], vcon[0], vcon[1], vcon[2]);
-    }
+    //if (i == 140 && j == 120) {
+    //  printf("flux gamma: %e vp: %e %e %e v: %e %e %e\n", W, vpcon[0], vpcon[1], vpcon[2], vcon[0], vcon[1], vcon[2]);
+    //}
 
     const Real vtil = vel - g.beta[dir]/g.alpha;
 
