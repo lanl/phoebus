@@ -68,12 +68,12 @@ public:
     Real P = GetVar_(ip_, std::forward<Args>(args)...);
     Real A = rho + uu + P + bsq;
     Real B = P + 0.5 * bsq;
-    int k = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
+    /*int k = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
     int j = std::get<1>(std::forward_as_tuple(std::forward<Args>(args)...));
     int i = std::get<2>(std::forward_as_tuple(std::forward<Args>(args)...));
     if (i == 140 && j == 120) {
       printf("tmunu rho: %e u: %e\n", rho, uu);
-    }
+    }*/
     for (int mu = 0; mu < ND; ++mu) {
       for (int nu = 0; nu < ND; ++nu) {
         T[mu][nu] = A * u[mu] * u[nu] + B * g[mu][nu] - b[mu] * b[nu];
@@ -119,12 +119,12 @@ private:
   //  printf("tmunu W: %e vp: %e %e %e\n",
   //    W, vp[0], vp[1], vp[2]);
   //}
-    int k = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
-    int j = std::get<1>(std::forward_as_tuple(std::forward<Args>(args)...));
-    int i = std::get<2>(std::forward_as_tuple(std::forward<Args>(args)...));
-    if (i == 140 && j == 120) {
-      printf("tmunu vp: %e %e %e W: %e\n", vp[0], vp[1], vp[2], W);
-    }
+    //int k = std::get<0>(std::forward_as_tuple(std::forward<Args>(args)...));
+    //int j = std::get<1>(std::forward_as_tuple(std::forward<Args>(args)...));
+    //int i = std::get<2>(std::forward_as_tuple(std::forward<Args>(args)...));
+    //if (i == 140 && j == 120) {
+    //  printf("tmunu vp: %e %e %e W: %e\n", vp[0], vp[1], vp[2], W);
+    //}
 
     SPACELOOP2(ii, jj) {
         const Real &bi = b_(ii+1, std::forward<Args>(args)...);
