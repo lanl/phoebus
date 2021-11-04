@@ -183,10 +183,10 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             Real vel[] = {v(b, pvel_lo, k, j, i),
                           v(b, pvel_lo+1, k, j, i),
                           v(b, pvel_hi, k, j, i)};
-            Real W = phoebus::GetLorentzFactor(vel, gcov);
-            SPACELOOP(ii) {
-              vel[ii] /= W;
-            }
+            //Real W = phoebus::GetLorentzFactor(vel, gcov);
+            //SPACELOOP(ii) {
+            //  vel[ii] /= W;
+            //}
             Real bcons[3];
             Real bp[3] = {0.0, 0.0, 0.0};
             if (pb_hi > 0) {
