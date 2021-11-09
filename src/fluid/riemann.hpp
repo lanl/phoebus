@@ -188,8 +188,19 @@ class FluxState {
     SPACETIMELOOP2(mu, nu) {
       ucov[mu] += g.gcov[mu][nu]*ucon[nu];
     }
-    U[ceng] = g.alpha*((rho + u + P)*ucon[0]*ucov[0] + P);
-    F[ceng] = (rho + u + P)*ucon[d]*ucov[0];
+    Real bcon[4] = {0., 0., 0., 0.};
+    Real bcov0 = 0.;
+    SPACELOOP(ii) SPACETIMELOOP(mu) {
+      bcon[0] += Bcon[ii]*ucon[mu]*g.gcov[ii][mu];
+    }
+    SPACELOOP(ii) {
+      bcon[ii] = (Bcon[ii] + bcon[0]*ucon[ii])/ucon[0];
+    }
+    SPACETIMELOOP(mu) {
+      bcov0 += g.gcov[0][mu]*bcon[mu];
+    }
+    U[ceng] = g.alpha*((rho + u + P + bsq)*ucon[0]*ucov[0] + (P + 0.5*bsq) - bcon[0]*bcov0);
+    F[ceng] = (rho + u + P + bsq)*ucon[d]*ucov[0] - bcon[d]*bcov0;
     #endif // USE_VALENCIA
 
     // magnetic fields
