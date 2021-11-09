@@ -516,8 +516,9 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
         diag(2,k,j,i) = divf(cmom_lo+1,k,j,i);
         diag(3,k,j,i) = divf(cmom_lo+2,k,j,i);
         diag(4,k,j,i) = divf(ceng,k,j,i);
-        if (i == 140 && j == 120) {
-          printf("divf: %e %e %e %e %e\n", divf(crho,k,j,i), divf(ceng,k,j,i), divf(cmom_lo,k,j,i),
+        //if (i == 140 && j == 120) {
+        if (i >= 100 && j == 131) {
+          printf("divf [%i %i]: %e %e %e %e %e\n", i,j,divf(crho,k,j,i), divf(ceng,k,j,i), divf(cmom_lo,k,j,i),
             divf(cmom_lo+1,k,j,i), divf(cmom_lo+2,k,j,i));
         }
       }
@@ -657,8 +658,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
           diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
         }
-        if (i == 140 && j == 120) {
-          printf("src: %e %e %e %e %e\n", 0., src(ceng,k,j,i), src(cmom_lo,k,j,i),
+        if (i >= 100 && j == 131) {
+          printf("src[%i %i]: %e %e %e %e %e\n", i,j,0., src(ceng,k,j,i), src(cmom_lo,k,j,i),
             src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i));
         }
 

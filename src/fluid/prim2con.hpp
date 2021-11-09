@@ -74,7 +74,12 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
   SPACETIMELOOP2(mu, nu) {
     ucov[mu] += gcov[mu][nu]*ucon[nu];
   }
-  tau = gdet*alpha*((rho + u + p)*ucon[0]*ucov[0] + p) + D;
+  Real bcov0 = 0.;
+  SPACETIMELOOP(mu) {
+    bcov0 += gcov[0][mu]*bcon[mu];
+  }
+  // This isn't actually tau it's alpha*T^0_0
+  tau = gdet*alpha*((rho + u + p + bsq)*ucon[0]*ucov[0] + (p + 0.5*bsq) - bcon[0]*bcov0) + D;
   #endif
 
   ye_cons = D * ye_prim;
