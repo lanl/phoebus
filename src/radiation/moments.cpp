@@ -249,10 +249,13 @@ TaskStatus ReconstructEdgeStates(T* rc) {
           PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v_vel, ql_v, qr_v);
         }
         // Calculate spatial derivative of J at zone edges for diffusion limit  
+        const int off_k = (idir == 3 ? 1 : 0);
+        const int off_j = (idir == 2 ? 1 : 0);
+        const int off_i = (idir == 1 ? 1 : 0);
+        const Real dx = pmb->coords.Dx(idir, k, j, i);
         for (int ispec=0; ispec<nspec; ++ispec) {
-          v(b, idx_dJ(ispec, 0), k, j, i) = (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k, j, i-1))/pmb->coords.dx1f(k, j, i); 
-          v(b, idx_dJ(ispec, 1), k, j, i) = (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k, j-1, i))/pmb->coords.dx2f(k, j, i); 
-          v(b, idx_dJ(ispec, 2), k, j, i) = (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k-1, j, i))/pmb->coords.dx3f(k, j, i); 
+          v(b, idx_dJ(ispec, idir-1), k, j, i) = (v(b, idx_J(ispec), k, j, i) 
+                                                - v(b, idx_J(ispec), k-off_k, j-off_j, i-off_i))/dx; 
         }
       });
   return TaskStatus::complete;  
@@ -426,9 +429,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   
   namespace cr = radmoment_cons;  
   namespace pr = radmoment_prim;  
+  namespace ir = radmoment_internal;  
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E, cr::F, p::density, p::temperature, p::ye, p::velocity}; 
+  std::vector<std::string> vars{cr::E, cr::F, p::density, p::temperature, p::ye, p::velocity, 
+                                ir::kappaJ, ir::kappaH, ir::JBB}; 
   if (update_fluid) {
     vars.push_back(c::energy);
     vars.push_back(c::momentum);
@@ -439,6 +444,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto v = rc->PackVariables(vars, imap);
   auto idx_E = imap.GetFlatIdx(cr::E); 
   auto idx_F = imap.GetFlatIdx(cr::F);
+
+  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
+  auto idx_JBB = imap.GetFlatIdx(ir::JBB);
+  
   auto pv = imap.GetFlatIdx(p::velocity);
 
   int prho = imap[p::density].first; 
@@ -479,6 +489,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) { 
         for (int ispec = 0; ispec<nspec; ++ispec) { 
+          /*
           /// TODO: (LFR) Need to make a grid variable holding the energy integrated opacity so that we can 
           ///             create a task to fill the opacity based on MoCMC or some other rule.
           const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity at enu = 10 MeV 
@@ -490,7 +501,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           const Real emis = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, species[ispec]); 
           Real B = emis/kappa; 
           if (use_B_fake) B = B_fake; 
-          
+          */          
+
           // Set up the background state 
           Vec con_v{{v(iblock, pv(0), k, j, i),
                      v(iblock, pv(1), k, j, i),
@@ -511,8 +523,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           /// TODO: (LFR) Move beyond Eddington for this update
           Tens2 con_tilPi{{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}};  
           
-          Real tauJ = alpha*kappa*dt;  
-          Real tauH = alpha*kappa*dt; 
+          Real B = v(iblock, idx_JBB(ispec), k, j, i); 
+          Real tauJ = alpha*dt*v(iblock, idx_kappaJ(ispec), k, j, i);  
+          Real tauH = alpha*dt*v(iblock, idx_kappaH(ispec), k, j, i);  
         
           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, 
                                tauJ, tauH, &dE, &cov_dF); 
