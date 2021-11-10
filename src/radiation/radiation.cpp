@@ -188,6 +188,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata mdJ = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
 			     std::vector<int>{NumRadiationTypes, ndim});
     physics->AddField(i::dJ, mdJ);
+
+    // Add variables for source functions 
+    Metadata mSourceVar = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     std::vector<int>{NumRadiationTypes});
+    physics->AddField(i::kappaJ, mSourceVar);
+    physics->AddField(i::kappaH, mSourceVar);
+    physics->AddField(i::JBB, mSourceVar);
     
     physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }

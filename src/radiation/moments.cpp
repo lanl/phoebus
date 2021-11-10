@@ -445,12 +445,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   int pT = imap[p::temperature].first; 
   int pYe = imap[p::ye].first; 
 
-  int ceng(-1), cmom_lo(-1), cmom_hi(-1), cy(-1); 
+  int ceng(-1), cmom_lo(-1), cmom_hi(-1), cye(-1); 
   if (update_fluid) { 
-    int ceng = imap[c::energy].first;
-    int cmom_lo = imap[c::momentum].first;
-    int cmom_hi = imap[c::momentum].second;
-    int cye = imap[c::ye].first;
+    ceng = imap[c::energy].first;
+    cmom_lo = imap[c::momentum].first;
+    cmom_hi = imap[c::momentum].second;
+    cye = imap[c::ye].first;
   }
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -545,4 +545,85 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   return TaskStatus::complete;
 }
 template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real, bool);
+
+template <class T>
+TaskStatus MomentCalculateOpacities(T *rc) { 
+  
+  auto *pmb = rc->GetParentPointer().get();
+   
+  StateDescriptor *eos = pmb->packages.Get("eos").get();
+  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
+  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
+
+  StateDescriptor *opac = pmb->packages.Get("opacity").get();
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  
+  namespace cr = radmoment_cons;  
+  namespace pr = radmoment_prim;  
+  namespace ir = radmoment_internal;  
+  namespace c = fluid_cons;
+  namespace p = fluid_prim;
+  std::vector<std::string> vars{p::density, p::temperature, p::ye, p::velocity, ir::kappaJ, ir::kappaH, ir::JBB}; 
+
+  PackIndexMap imap;
+  auto v = rc->PackVariables(vars, imap);
+  auto pv = imap.GetFlatIdx(p::velocity);
+  
+  int prho = imap[p::density].first; 
+  int pT = imap[p::temperature].first; 
+  int pYe = imap[p::ye].first; 
+  
+  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ); 
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH); 
+  auto idx_JBB = imap.GetFlatIdx(ir::JBB); 
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+
+  // Mainly for testing purposes, probably should be able to do this with the opacity code itself
+  const auto B_fake = rad->Param<Real>("B_fake");
+  const auto use_B_fake = rad->Param<bool>("use_B_fake");
+
+  // Get the device opacity object
+  using namespace singularity::neutrinos; 
+  const auto d_opacity = opac->Param<Opacity>("d.opacity");
+
+  // Get the background geometry 
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
+  int nblock = v.GetDim(5); 
+  int nspec = idx_kappaJ.DimSize(1);
+
+  parthenon::par_for( 
+      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 
+      0, nblock-1, // Loop over blocks
+      kb.s, kb.e, // z-loop  
+      jb.s, jb.e, // y-loop 
+      ib.s, ib.e, // x-loop
+      KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) { 
+        for (int ispec = 0; ispec<nspec; ++ispec) { 
+          /// TODO: (LFR) Need to make a grid variable holding the energy integrated opacity so that we can 
+          ///             create a task to fill the opacity based on MoCMC or some other rule.
+          const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity at enu = 10 MeV 
+          const Real rho_cgs =  v(iblock, prho, k, j, i) * DENSITY;
+          const Real T_cgs =  v(iblock, pT, k, j, i) * TEMPERATURE;
+          const Real Ye = v(iblock, pYe, k, j, i);
+
+          Real kappa = d_opacity.AbsorptionCoefficientPerNu(rho_cgs, T_cgs, Ye, species[ispec], enu);
+          const Real emis = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, species[ispec]); 
+          Real B = emis/kappa; 
+          if (use_B_fake) B = B_fake; 
+
+          v(iblock, idx_JBB(ispec), k, j, i) = B;  
+          v(iblock, idx_kappaJ(ispec), k, j, i) = kappa;  
+          v(iblock, idx_kappaH(ispec), k, j, i) = kappa;  
+          
+        } 
+      });
+
+  return TaskStatus::complete;
+}
+template TaskStatus MomentCalculateOpacities<MeshBlockData<Real>>(MeshBlockData<Real> *);
 } //namespace radiationMoments
