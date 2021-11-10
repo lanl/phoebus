@@ -150,7 +150,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (rad_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       auto moment_recon = tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get()); 
-      auto moment_flux = tl.AddTask(moment_recon, radiation::CalculateFluxes<MDT>, sc0.get());
+      auto get_opacities = tl.AddTask(none, radiation::MomentCalculateOpacities<MDT>, sc0.get());  
+      auto moment_flux = tl.AddTask(moment_recon | get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());
       auto moment_geom_src =  tl.AddTask(none, radiation::CalculateGeometricSource<MDT>, sc0.get(), gsrc.get());
       sndrcv_flux_depend = sndrcv_flux_depend | moment_flux;
       geom_src = geom_src | moment_geom_src; 
@@ -271,8 +272,9 @@ TaskListStatus PhoebusDriver::RadiationPreStep() {
       auto &tl = async_region[ib];
       auto &sc0 = pmb->meshblock_data.Get(stage_name[0]); // This should be equivalent to base
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+      auto get_opacities = tl.AddTask(none, radiation::MomentCalculateOpacities<MDT>, sc0.get());  
       auto fluid_source_update = 
-          tl.AddTask(none, radiation::MomentFluidSource<MDT>, sc0.get(), 0.5*dt, fluid_active);
+          tl.AddTask(get_opacities, radiation::MomentFluidSource<MDT>, sc0.get(), 0.5*dt, fluid_active);
     }
   } else if (rad_method == "mocmc") {
     PARTHENON_FAIL("MOCMC not implemented!");
@@ -320,8 +322,9 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
       auto &tl = async_region[ib];
       auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+      auto get_opacities = tl.AddTask(none, radiation::MomentCalculateOpacities<MDT>, sc0.get());  
       auto fluid_source_update = 
-          tl.AddTask(none, radiation::MomentFluidSource<MDT>, sc0.get(), 0.5*dt, fluid_active);
+          tl.AddTask(get_opacities, radiation::MomentFluidSource<MDT>, sc0.get(), 0.5*dt, fluid_active);
     }
   } else if (rad_method == "monte_carlo") {
     return MonteCarloStep();
