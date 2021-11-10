@@ -50,6 +50,7 @@ namespace radmoment_internal {
   constexpr char qr[] = "r.i.qr";
   constexpr char ql_v[] = "r.i.ql_v";
   constexpr char qr_v[] = "r.i.qr_v";
+  constexpr char dJ[] = "r.i.dJ";
 }
 
 namespace internal_variables {

@@ -184,6 +184,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(i::ql_v, mrecon_v);
     physics->AddField(i::qr_v, mrecon_v);
     
+    // Add variable for calculating gradients of rest frame energy density 
+    Metadata mdJ = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     std::vector<int>{NumRadiationTypes, ndim});
+    physics->AddField(i::dJ, mdJ);
+    
     physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }
 

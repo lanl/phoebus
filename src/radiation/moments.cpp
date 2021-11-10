@@ -213,8 +213,10 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   PackIndexMap imap_ql, imap_qr, imap;
   VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{i::ql}, imap_ql); 
   VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{i::qr}, imap_qr); 
-  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{p::J, p::H}, imap);
-  
+  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{p::J, p::H, i::dJ}, imap);
+  auto idx_J = imap.GetFlatIdx(p::J);
+  auto idx_dJ = imap.GetFlatIdx(i::dJ);
+
   ParArrayND<Real> ql_v = rc->Get(i::ql_v).data; 
   ParArrayND<Real> qr_v = rc->Get(i::qr_v).data; 
   VariablePack<Real> v_vel = rc->PackVariables(std::vector<std::string>{fluid_prim::velocity});
@@ -246,6 +248,12 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         for (int ivar = 0; ivar<3; ++ivar) {
           PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v_vel, ql_v, qr_v);
         }
+        // Calculate spatial derivative of J at zone edges for diffusion limit  
+        for (int ispec=0; ispec<nspec; ++ispec) {
+          v(b, idx_dJ(ispec, 0), k, j, i) = (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k, j, i-1))/pmb->coords.dx1f(k, j, i); 
+          v(b, idx_dJ(ispec, 1), k, j, i) = (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k, j-1, i))/pmb->coords.dx2f(k, j, i); 
+          v(b, idx_dJ(ispec, 2), k, j, i) = (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k-1, j, i))/pmb->coords.dx3f(k, j, i); 
+        }
       });
   return TaskStatus::complete;  
 }
@@ -271,7 +279,7 @@ TaskStatus CalculateFluxes(T* rc) {
   namespace i = radmoment_internal;  
   
   PackIndexMap imap_ql, imap_qr, imap;
-  auto v = rc->PackVariablesAndFluxes(std::vector<std::string>{i::ql, i::qr, i::ql_v, i::qr_v}, 
+  auto v = rc->PackVariablesAndFluxes(std::vector<std::string>{i::ql, i::qr, i::ql_v, i::qr_v, i::dJ}, 
           std::vector<std::string>{c::E, c::F}, imap) ;
   
   auto idx_qlv = imap.GetFlatIdx(i::ql_v);
@@ -280,6 +288,7 @@ TaskStatus CalculateFluxes(T* rc) {
   auto idx_qr = imap.GetFlatIdx(i::qr);
   auto idx_Ff = imap.GetFlatIdx(c::F);
   auto idx_Ef = imap.GetFlatIdx(c::E);
+  auto idx_dJ = imap.GetFlatIdx(i::dJ);
   
   const int nspec = idx_ql.DimSize(1);
 
@@ -366,7 +375,6 @@ TaskStatus CalculateFluxes(T* rc) {
           Pr(idir, 2) -= con_beta(idir)*covFr(2);
 
           // Everything below should be independent of the assumed closure, just calculating the LLF flux
-          /// TODO: (LFR) Include diffusion limit  
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(conFl(idir) + conFr(idir)) + speed*(El - Er); 
         
           v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = 0.5*(Pl(idir, 0) + Pr(idir, 0)) 
@@ -377,6 +385,8 @@ TaskStatus CalculateFluxes(T* rc) {
 
           v.flux(idir_in, idx_Ff(ispec, 2), k, j, i) = 0.5*(Pl(idir, 2) + Pr(idir, 2)) 
                                                        + speed*(covFl(2) - covFr(2));
+        
+          /// TODO: (LFR) Include diffusion limit  
         } 
       });
 
