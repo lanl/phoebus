@@ -173,6 +173,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   if (is_snake || is_inchworm) {
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
+  }
+  if (is_snake) {
     alpha = gpkg->Param<Real>("alpha");
     betay = gpkg->Param<Real>("vy");
     PARTHENON_REQUIRE_THROWS(alpha > 0, "lapse must be positive");
