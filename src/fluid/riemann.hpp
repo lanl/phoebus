@@ -188,21 +188,9 @@ class FluxState {
     SPACETIMELOOP2(mu, nu) {
       ucov[mu] += g.gcov[mu][nu]*ucon[nu];
     }
-    double udu = 0.;
-    SPACETIMELOOP(mu) {
-      udu += ucon[mu]*ucov[mu];
-    }
-    if (i == 64 && j == 64)
-    {
-    printf("udu: %e\n", udu);
-    printf("rho: %e u: %e P: %e ucon0: %e ucov0: %e\n",
-      rho, u, P, ucon[0], ucov[0]);}
     U[ceng] = g.alpha*((rho + u + P)*ucon[0]*ucov[0] + P) + U[crho];
     F[ceng] = (rho + u + P)*ucon[d]*ucov[0] + rho*ucon[d];
     #endif // USE_VALENCIA
-    if (i == 64 && j == 64)
-    printf("dir: %i k j i: %i %i %i F[ceng] = %e U[ceng] = %e\n",
-      dir, k, j, i, F[ceng], U[ceng]);
 
     // magnetic fields
     for (int m = cb_lo; m <= cb_hi; m++) {
