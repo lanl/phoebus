@@ -91,6 +91,9 @@ Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
 }
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
+                    "Problem \"torus\" requires FMKS geometry!");
 
   auto rc = pmb->meshblock_data.Get().get();
 

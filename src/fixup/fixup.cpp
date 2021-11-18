@@ -187,7 +187,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             //SPACELOOP(ii) {
             //  vel[ii] /= W;
             //}
-            PARTHENON_FAIL("here");
             Real bcons[3];
             Real bp[3] = {0.0, 0.0, 0.0};
             if (pb_hi > 0) {
