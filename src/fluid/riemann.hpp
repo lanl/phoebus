@@ -96,7 +96,9 @@ class FluxState {
     Real sie_floor;
     bounds.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
     const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
-    Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
+    Real vpcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
+    Real W = phoebus::GetLorentzFactor(vpcon, g.gcov);
+    Real vcon[] = {vpcon[0]/W, vpcon[1]/W, vpcon[2]/W};
     const Real &vel = vcon[dir];
     Real Bcon[] = {0.0, 0.0, 0.0};
     const Real u = (q(dir,peng,k,j,i)/rho > sie_floor
@@ -133,7 +135,7 @@ class FluxState {
       Bdotv *= scale;
       for (int m = 0; m < 3; m++) vcon[m] *= scale;
     }
-    const Real W = 1.0/sqrt(1-vsq);
+    W = 1.0/sqrt(1-vsq);
 
     const Real vtil = vel - g.beta[dir]/g.alpha;
 
@@ -167,8 +169,33 @@ class FluxState {
     }
 
     // energy
+    #if USE_VALENCIA
     U[ceng] = rhohWsq + bsqWsq - (P + 0.5*bsq) - b0*b0 - U[crho];
     F[ceng] = U[ceng]*vtil + (P + 0.5*bsq)*vel - Bdotv*Bcon[dir];
+    #else
+    // TODO(BRR) share calculated quantities for ucon, ucov, bcon, bcov with above
+    Real ucon[4] = {W/g.alpha,
+                    vpcon[0] - g.beta[0]*W/g.alpha,
+                    vpcon[1] - g.beta[1]*W/g.alpha,
+                    vpcon[2] - g.beta[2]*W/g.alpha};
+    Real ucov[4] = {0};
+    SPACETIMELOOP2(mu, nu) {
+      ucov[mu] += g.gcov[mu][nu]*ucon[nu];
+    }
+    Real bcon[4] = {0., 0., 0., 0.};
+    Real bcov0 = 0.;
+    SPACELOOP(ii) SPACETIMELOOP(mu) {
+      bcon[0] += Bcon[ii]*ucon[mu]*g.gcov[ii][mu];
+    }
+    SPACELOOP(ii) {
+      bcon[ii] = (Bcon[ii] + bcon[0]*ucon[ii])/ucon[0];
+    }
+    SPACETIMELOOP(mu) {
+      bcov0 += g.gcov[0][mu]*bcon[mu];
+    }
+    U[ceng] = g.alpha*((rho + u + P + bsq)*ucon[0]*ucov[0] + P + 0.5*bsq) - bcon[0]*bcov0 + U[crho];
+    F[ceng] = (rho + u + P + bsq)*ucon[d]*ucov[0] -bcon[d]*bcov0 + rho*ucon[d];
+    #endif // USE_VALENCIA
 
     // magnetic fields
     for (int m = cb_lo; m <= cb_hi; m++) {
