@@ -86,9 +86,9 @@ template <class T>
 template <class T>
 TaskStatus MomentCon2Prim(T* rc) { 
   
-  namespace c = radmoment_cons;  
-  namespace p = radmoment_prim;  
-  namespace i = radmoment_internal;  
+  namespace cr = radmoment_cons;  
+  namespace pr = radmoment_prim;  
+  namespace ir = radmoment_internal;  
   
   auto *pm = rc->GetParentPointer().get(); 
   
@@ -97,14 +97,14 @@ TaskStatus MomentCon2Prim(T* rc) {
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H, fluid_prim::velocity, i::xi, i::phi}, imap);
+  auto v = rc->PackVariables(std::vector<std::string>{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi}, imap);
   
-  auto cE = imap.GetFlatIdx(c::E);  
-  auto pJ = imap.GetFlatIdx(p::J);  
-  auto cF = imap.GetFlatIdx(c::F);  
-  auto pH = imap.GetFlatIdx(p::H); 
-  auto iXi = imap.GetFlatIdx(i::xi); 
-  auto iPhi = imap.GetFlatIdx(i::phi); 
+  auto cE = imap.GetFlatIdx(cr::E);  
+  auto pJ = imap.GetFlatIdx(pr::J);  
+  auto cF = imap.GetFlatIdx(cr::F);  
+  auto pH = imap.GetFlatIdx(pr::H); 
+  auto iXi = imap.GetFlatIdx(ir::xi); 
+  auto iPhi = imap.GetFlatIdx(ir::phi); 
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
@@ -156,9 +156,9 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template <class T>
 TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) { 
   
-  namespace c = radmoment_cons;  
-  namespace p = radmoment_prim;  
-  namespace i = radmoment_internal;  
+  namespace cr = radmoment_cons;  
+  namespace pr = radmoment_prim;  
+  namespace ir = radmoment_internal;  
   
   auto *pm = rc->GetParentPointer().get(); 
   
@@ -167,12 +167,12 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   IndexRange kb = pm->cellbounds.GetBoundsK(domain);
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(std::vector<std::string>{c::E, c::F, p::J, p::H, fluid_prim::velocity}, imap);
+  auto v = rc->PackVariables(std::vector<std::string>{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity}, imap);
   
-  auto cE = imap.GetFlatIdx(c::E);  
-  auto pJ = imap.GetFlatIdx(p::J);  
-  auto cF = imap.GetFlatIdx(c::F);  
-  auto pH = imap.GetFlatIdx(p::H);  
+  auto cE = imap.GetFlatIdx(cr::E);  
+  auto pJ = imap.GetFlatIdx(pr::J);  
+  auto cF = imap.GetFlatIdx(cr::F);  
+  auto pH = imap.GetFlatIdx(pr::H);  
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
 
   auto specB = cE.GetBounds(1);
@@ -230,26 +230,26 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
   const int dk = ( pmb->pmy_mesh->ndim > 2 ? 1 : 0);
   
-  namespace c = radmoment_cons;  
-  namespace p = radmoment_prim;  
-  namespace i = radmoment_internal;  
+  namespace cr = radmoment_cons;  
+  namespace pr = radmoment_prim;  
+  namespace ir = radmoment_internal;  
   
   PackIndexMap imap_ql, imap_qr, imap;
-  VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{i::ql}, imap_ql); 
-  VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{i::qr}, imap_qr); 
-  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{p::J, p::H, i::dJ}, imap);
-  auto idx_J = imap.GetFlatIdx(p::J);
-  auto idx_dJ = imap.GetFlatIdx(i::dJ);
+  VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql); 
+  VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr); 
+  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{pr::J, pr::H, ir::dJ}, imap);
+  auto idx_J = imap.GetFlatIdx(pr::J);
+  auto idx_dJ = imap.GetFlatIdx(ir::dJ);
 
-  ParArrayND<Real> ql_v = rc->Get(i::ql_v).data; 
-  ParArrayND<Real> qr_v = rc->Get(i::qr_v).data; 
+  ParArrayND<Real> ql_v = rc->Get(ir::ql_v).data; 
+  ParArrayND<Real> qr_v = rc->Get(ir::qr_v).data; 
   VariablePack<Real> v_vel = rc->PackVariables(std::vector<std::string>{fluid_prim::velocity});
-  auto qIdx = imap_ql.GetFlatIdx(i::ql);
+  auto qIdx = imap_ql.GetFlatIdx(ir::ql);
   
   const int nspec = qIdx.DimSize(1);
   const int nrecon = 4*nspec;
 
-  const int offset = imap_ql[i::ql].first; 
+  const int offset = imap_ql[ir::ql].first; 
   
   const int nblock = ql_base.GetDim(5); 
   
@@ -325,25 +325,25 @@ TaskStatus CalculateFluxes(T* rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
   const int dk = ( pmb->pmy_mesh->ndim > 2 ? 1 : 0);
   
-  namespace radc = radmoment_cons;  
-  namespace radp = radmoment_prim;  
-  namespace radi = radmoment_internal;  
+  namespace cr = radmoment_cons;  
+  namespace pr = radmoment_prim;  
+  namespace ir = radmoment_internal;  
   
   PackIndexMap imap_ql, imap_qr, imap;
-  std::vector<std::string> vars {radi::ql, radi::qr, radi::ql_v, radi::qr_v, radi::dJ, radi::kappaH};
-  std::vector<std::string> flxs {radc::E, radc::F};
+  std::vector<std::string> vars {ir::ql, ir::qr, ir::ql_v, ir::qr_v, ir::dJ, ir::kappaH};
+  std::vector<std::string> flxs {cr::E, cr::F};
 
   auto v = rc->PackVariablesAndFluxes(vars, flxs, imap); 
   
-  auto idx_qlv = imap.GetFlatIdx(radi::ql_v);
-  auto idx_qrv = imap.GetFlatIdx(radi::qr_v);
-  auto idx_ql = imap.GetFlatIdx(radi::ql);
-  auto idx_qr = imap.GetFlatIdx(radi::qr);
-  auto idx_dJ = imap.GetFlatIdx(radi::dJ);
-  auto idx_kappaH = imap.GetFlatIdx(radi::kappaH);
+  auto idx_qlv = imap.GetFlatIdx(ir::ql_v);
+  auto idx_qrv = imap.GetFlatIdx(ir::qr_v);
+  auto idx_ql = imap.GetFlatIdx(ir::ql);
+  auto idx_qr = imap.GetFlatIdx(ir::qr);
+  auto idx_dJ = imap.GetFlatIdx(ir::dJ);
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   
-  auto idx_Ff = imap.GetFlatIdx(radc::F);
-  auto idx_Ef = imap.GetFlatIdx(radc::E);
+  auto idx_Ff = imap.GetFlatIdx(cr::F);
+  auto idx_Ef = imap.GetFlatIdx(cr::E);
   
   const int nspec = idx_ql.DimSize(1);
 
@@ -630,7 +630,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           //cov_dF(0) = -v(iblock, idx_F(ispec, 2), k, j, i)*lam;
 
           //printf("dE (old) = %e Estar = %e tau = %e\n", dE, Estar, kappa*dt); 
-          // Add source corrections to conserved radiation variables
+          // Add source corrections to conserved iration variables
           v(iblock, idx_E(ispec), k, j, i) += dE; 
           for (int idir=0; idir<3; ++idir) {
             v(iblock, idx_F(ispec, idir), k, j, i) += cov_dF(idir);
@@ -731,4 +731,4 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   return TaskStatus::complete;
 }
 template TaskStatus MomentCalculateOpacities<MeshBlockData<Real>>(MeshBlockData<Real> *);
-} //namespace radiationMoments
+} //namespace irationMoments
