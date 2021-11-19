@@ -30,6 +30,19 @@ struct Vec {
   const Real& operator()(const int idx) const {return data[idx];}
 };
 
+KOKKOS_FORCEINLINE_FUNCTION 
+Vec operator+(Vec a, Vec b) {Vec out; SPACELOOP(i) out(i) = a(i) + b(i); return out;} 
+KOKKOS_FORCEINLINE_FUNCTION 
+Vec operator-(Vec a, Vec b) {Vec out; SPACELOOP(i) out(i) = a(i) - b(i); return out;} 
+KOKKOS_FORCEINLINE_FUNCTION 
+Vec operator-(Vec a) {Vec out; SPACELOOP(i) out(i) = -a(i); return out;} 
+KOKKOS_FORCEINLINE_FUNCTION 
+Vec operator*(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = a(i)*b; return out;} 
+KOKKOS_FORCEINLINE_FUNCTION 
+Vec operator*(Real a, Vec b) {Vec out; SPACELOOP(i) out(i) = a*b(i); return out;} 
+KOKKOS_FORCEINLINE_FUNCTION 
+Vec operator/(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = a(i)/b; return out;} 
+
 struct Tens2 { 
   Real data[Geometry::NDSPACE][Geometry::NDSPACE]; 
   KOKKOS_FORCEINLINE_FUNCTION 
@@ -37,6 +50,17 @@ struct Tens2 {
   KOKKOS_FORCEINLINE_FUNCTION
   const Real& operator()(const int i, const int j) const {return data[i][j];} 
 };
+
+KOKKOS_FORCEINLINE_FUNCTION 
+Tens2 operator+(Tens2 a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j) + b(i,j);} return out;} 
+KOKKOS_FORCEINLINE_FUNCTION 
+Tens2 operator-(Tens2 a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j) - b(i,j);} return out;} 
+KOKKOS_FORCEINLINE_FUNCTION 
+Tens2 operator*(Real a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a*b(i,j);} return out;} 
+KOKKOS_FORCEINLINE_FUNCTION 
+Tens2 operator*(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j)*b;} return out;} 
+KOKKOS_FORCEINLINE_FUNCTION 
+Tens2 operator/(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j)/b;} return out;}
 
 template <class T> 
   class ReconstructionIndexer  {
@@ -237,25 +261,49 @@ TaskStatus ReconstructEdgeStates(T* rc) {
       kb.s - dk, kb.e + dk, // z-loop  
       jb.s - dj, jb.e + dj, // y-loop 
       ib.s - di, ib.e + di, // x-loop
-      KOKKOS_LAMBDA(const int idir, const int b, const int k, const int j, const int i) { 
+      KOKKOS_LAMBDA(const int iface, const int b, const int k, const int j, const int i) { 
         ReconstructionIndexer<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
         ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
         // Reconstruct radiation
         for (int ivar = 0; ivar<nrecon; ++ivar) {
-          PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v, ql, qr);
+          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v, ql, qr);
         }
         // Reconstruct velocity for radiation 
         for (int ivar = 0; ivar<3; ++ivar) {
-          PhoebusReconstruction::PiecewiseLinear(idir, ivar, k, j, i, v_vel, ql_v, qr_v);
+          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
         }
-        // Calculate spatial derivative of J at zone edges for diffusion limit  
-        const int off_k = (idir == 3 ? 1 : 0);
-        const int off_j = (idir == 2 ? 1 : 0);
-        const int off_i = (idir == 1 ? 1 : 0);
-        const Real dx = pmb->coords.Dx(idir, k, j, i);
+        
+        // Calculate spatial derivatives of J at zone faces for diffusion limit
+        //    x-->
+        //    +---+---+
+        //    | a | b |
+        //    +---+---+
+        //    | c Q d |
+        //  ^ +---+---+
+        //  | | e | f |
+        //  y +---+---+
+        //
+        //  dJ/dx (@ Q) = (d - c)/dx
+        //  dJ/dy (@ Q) = (a + b - e - f)/(4*dy)    
+        
+        const int off_k = (iface == 3 ? 1 : 0);  
+        const int off_j = (iface == 2 ? 1 : 0);  
+        const int off_i = (iface == 1 ? 1 : 0);  
+        const int st_k[3] = {0, 0, 1};
+        const int st_j[3] = {0, 1, 0};
+        const int st_i[3] = {1, 0, 0};
         for (int ispec=0; ispec<nspec; ++ispec) {
-          v(b, idx_dJ(ispec, idir-1), k, j, i) = (v(b, idx_J(ispec), k, j, i) 
-                                                - v(b, idx_J(ispec), k-off_k, j-off_j, i-off_i))/dx; 
+          for (int idir = X1DIR; idir <= pmb->pmy_mesh->ndim; ++idir) {
+            // Calculate the derivatives in the plane of the face (and put junk in the derivative perpendicular to the face) 
+            const Real dy = pmb->coords.Dx(idir, k, j, i); 
+            v(b, idx_dJ(ispec, idir-1, iface-1), k, j, i) = (v(b, idx_J(ispec), k+st_k[idir-1], j+st_j[idir-1], i+st_i[idir-1])  
+                                                            -v(b, idx_J(ispec), k-st_k[idir-1], j-st_j[idir-1], i-st_i[idir-1])
+                                                            +v(b, idx_J(ispec), k+st_k[idir-1]-off_k, j+st_j[idir-1]-off_j, i+st_i[idir-1]-off_i)
+                                                            -v(b, idx_J(ispec), k-st_k[idir-1]-off_k, j-st_j[idir-1]-off_j, i-st_i[idir-1]-off_i))/(4*dy);
+          }
+          // Overwrite the derivative perpendicular to the face
+          const Real dx = pmb->coords.Dx(iface, k, j, i); 
+          v(b, idx_dJ(ispec, iface-1, iface-1), k, j, i) =  (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k-off_k, j-off_j, i-off_i))/dx; 
         }
       });
   return TaskStatus::complete;  
@@ -277,21 +325,25 @@ TaskStatus CalculateFluxes(T* rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
   const int dk = ( pmb->pmy_mesh->ndim > 2 ? 1 : 0);
   
-  namespace c = radmoment_cons;  
-  namespace p = radmoment_prim;  
-  namespace i = radmoment_internal;  
+  namespace radc = radmoment_cons;  
+  namespace radp = radmoment_prim;  
+  namespace radi = radmoment_internal;  
   
   PackIndexMap imap_ql, imap_qr, imap;
-  auto v = rc->PackVariablesAndFluxes(std::vector<std::string>{i::ql, i::qr, i::ql_v, i::qr_v, i::dJ}, 
-          std::vector<std::string>{c::E, c::F}, imap) ;
+  std::vector<std::string> vars {radi::ql, radi::qr, radi::ql_v, radi::qr_v, radi::dJ, radi::kappaH};
+  std::vector<std::string> flxs {radc::E, radc::F};
+
+  auto v = rc->PackVariablesAndFluxes(vars, flxs, imap); 
   
-  auto idx_qlv = imap.GetFlatIdx(i::ql_v);
-  auto idx_qrv = imap.GetFlatIdx(i::qr_v);
-  auto idx_ql = imap.GetFlatIdx(i::ql);
-  auto idx_qr = imap.GetFlatIdx(i::qr);
-  auto idx_Ff = imap.GetFlatIdx(c::F);
-  auto idx_Ef = imap.GetFlatIdx(c::E);
-  auto idx_dJ = imap.GetFlatIdx(i::dJ);
+  auto idx_qlv = imap.GetFlatIdx(radi::ql_v);
+  auto idx_qrv = imap.GetFlatIdx(radi::qr_v);
+  auto idx_ql = imap.GetFlatIdx(radi::ql);
+  auto idx_qr = imap.GetFlatIdx(radi::qr);
+  auto idx_dJ = imap.GetFlatIdx(radi::dJ);
+  auto idx_kappaH = imap.GetFlatIdx(radi::kappaH);
+  
+  auto idx_Ff = imap.GetFlatIdx(radc::F);
+  auto idx_Ef = imap.GetFlatIdx(radc::E);
   
   const int nspec = idx_ql.DimSize(1);
 
@@ -306,31 +358,15 @@ TaskStatus CalculateFluxes(T* rc) {
       kb.s - dk, kb.e + dk, // z-loop  
       jb.s - dj, jb.e + dj, // y-loop 
       ib.s - di, ib.e + di, // x-loop
-      KOKKOS_LAMBDA(const int idir_in, const int k, const int j, const int i) { 
-        for (int ispec = 0; ispec<nspec; ++ispec) { 
-          /// TODO: (LFR) Fix indexing so everything starts on a consistent index
-          const int idir = idir_in - 1; 
+      KOKKOS_LAMBDA(const int idir_in, const int k, const int j, const int i) {
         
-          const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
-          const Real& Jr = v(idx_qr(ispec, 0, idir), k, j, i);
-          const Vec Hl = {v(idx_ql(ispec, 1, idir), k, j, i), 
-                              v(idx_ql(ispec, 2, idir), k, j, i), 
-                              v(idx_ql(ispec, 3, idir), k, j, i)};
-          const Vec Hr = {v(idx_qr(ispec, 1, idir), k, j, i), 
-                              v(idx_qr(ispec, 2, idir), k, j, i), 
-                              v(idx_qr(ispec, 3, idir), k, j, i)}; 
-          
-          const Real speed = 1.0/sqrt(3.0);
-          Tens2 con_tilPi;
-          
-          Vec con_vl{{v(idx_qlv(0, idir), k, j, i), 
-                      v(idx_qlv(1, idir), k, j, i),
-                      v(idx_qlv(2, idir), k, j, i)}};
-          Vec con_vr{{v(idx_qrv(0, idir), k, j, i), 
-                      v(idx_qrv(1, idir), k, j, i),
-                      v(idx_qrv(2, idir), k, j, i)}};
-
-          CellLocation face;  
+        const int idir = idir_in - 1; 
+        
+        const int koff = (idir_in == 3 ? 1 : 0); 
+        const int joff = (idir_in == 2 ? 1 : 0); 
+        const int ioff = (idir_in == 1 ? 1 : 0); 
+        
+        CellLocation face;  
           switch (idir) {
             case(0):
               face = CellLocation::Face1;
@@ -342,29 +378,86 @@ TaskStatus CalculateFluxes(T* rc) {
               face = CellLocation::Face3;
               break;
           }
+        
+        for (int ispec = 0; ispec<nspec; ++ispec) { 
+          /// TODO: (LFR) Fix indexing so everything starts on a consistent index
+        
+          const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
+          const Real& Jr = v(idx_qr(ispec, 0, idir), k, j, i);
+          const Vec Hl = {v(idx_ql(ispec, 1, idir), k, j, i), 
+                              v(idx_ql(ispec, 2, idir), k, j, i), 
+                              v(idx_ql(ispec, 3, idir), k, j, i)};
+          const Vec Hr = {v(idx_qr(ispec, 1, idir), k, j, i), 
+                              v(idx_qr(ispec, 2, idir), k, j, i), 
+                              v(idx_qr(ispec, 3, idir), k, j, i)}; 
+          
+          Tens2 con_tilPi;
+          
+          Vec con_vl{{v(idx_qlv(0, idir), k, j, i), 
+                      v(idx_qlv(1, idir), k, j, i),
+                      v(idx_qlv(2, idir), k, j, i)}};
+          Vec con_vr{{v(idx_qrv(0, idir), k, j, i), 
+                      v(idx_qrv(1, idir), k, j, i),
+                      v(idx_qrv(2, idir), k, j, i)}};
+          
+          Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i), 
+                      v(idx_dJ(ispec, 1, idir), k, j, i),
+                      v(idx_dJ(ispec, 2, idir), k, j, i)}};
+
+          Real kappaH = 0.5*(v(idx_kappaH(ispec), k, j, i) + v(idx_kappaH(ispec), k - koff, j - joff, i - ioff));
+          
           Vec con_beta; 
           Tens2 cov_gamma;
           geom.Metric(face, k, j, i, cov_gamma.data); 
           geom.ContravariantShift(face, k, j, i, con_beta.data);
+          
+          const Real dx = pmb->coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
+          const Real a = tanh(1/std::max(kappaH*dx, 1.e-20));
+          //printf ("a : %e dJ/dx^i = (%e %e %e) \n", a, cov_dJ(0), cov_dJ(1), cov_dJ(2));
 
           // Calculate the observer frame quantities on the left side of the interface  
+          /// TODO: (LFR) Add other contributions to the asymptotic flux 
+          Vec HasymL = -cov_dJ/(3*kappaH);   
           Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
           Real El; 
-          Vec covFl, conFl;
-          Tens2 Pl; // P^i_j on the left side of the interface
+          Vec covFl, conFl, conFl_asym;
+          Tens2 Pl, Pl_asym; // P^i_j on the left side of the interface
+          
+          // Fluxes in the asymptotic limit 
+          cl.Prim2ConM1(Jl, HasymL, &El, &covFl, &con_tilPi); 
+          cl.raise3Vector(covFl, &conFl_asym); 
+          cl.getConCovPFromPrim(Jl, HasymL, con_tilPi, &Pl_asym);
+
+          // Regular fluxes          
           cl.Prim2ConM1(Jl, Hl, &El, &covFl, &con_tilPi);
           cl.raise3Vector(covFl, &conFl);
           cl.getConCovPFromPrim(Jl, Hl, con_tilPi, &Pl);
           
           // Calculate the observer frame quantities on the right side of the interface  
+          /// TODO: (LFR) Add other contributions to the asymptotic flux 
+          Vec HasymR = -cov_dJ/(3*kappaH); 
           Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
           Real Er; 
-          Vec covFr, conFr;
-          Tens2 Pr; // P^i_j on the right side of the interface
+          Vec covFr, conFr, conFr_asym;
+          Tens2 Pr, Pr_asym; // P^i_j on the right side of the interface
+          
+          // Fluxes in the asymptotic limit 
+          cr.Prim2ConM1(Jr, HasymR, &Er, &covFr, &con_tilPi); 
+          cr.raise3Vector(covFr, &conFr_asym); 
+          cr.getConCovPFromPrim(Jr, HasymR, con_tilPi, &Pr_asym);
+          
+          // Regular fluxes 
           cr.Prim2ConM1(Jr, Hr, &Er, &covFr, &con_tilPi);
           cr.raise3Vector(covFr, &conFr);
           cr.getConCovPFromPrim(Jr, Hr, con_tilPi, &Pr);
           
+          // Mix the fluxes by the Peclet number 
+          const Real speed = a*1.0/sqrt(3.0) + (1-a)*std::max(sqrt(cl.v2), sqrt(cr.v2));  
+          conFl = a*conFl + (1-a)*conFl_asym; 
+          conFr = a*conFr + (1-a)*conFr_asym; 
+          Pl = a*Pl + (1-a)*Pl_asym;
+          Pr = a*Pr + (1-a)*Pr_asym; 
+
           // Correct the fluxes with the shift terms 
           conFl(idir) -= con_beta(idir)*El;
           conFr(idir) -= con_beta(idir)*Er;
@@ -389,7 +482,6 @@ TaskStatus CalculateFluxes(T* rc) {
           v.flux(idir_in, idx_Ff(ispec, 2), k, j, i) = 0.5*(Pl(idir, 2) + Pr(idir, 2)) 
                                                        + speed*(covFl(2) - covFr(2));
         
-          /// TODO: (LFR) Include diffusion limit  
         } 
       });
 
