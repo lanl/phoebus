@@ -108,6 +108,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
   params.Add("mhd", mhd);
 
+  bool zero_update = pin->GetOrAddBoolean("fluid", "zero_update", false);
+  params.Add("zero_update", zero_update);
+
   Metadata m;
   std::vector<int> three_vec(1, 3);
 
@@ -514,6 +517,12 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
 }
 TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  const bool zero_update = pkg->Param<bool>("zero_update");
+
+  if (!zero_update) {
+    return TaskStatus::complete;
+  }
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -529,7 +538,7 @@ TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
   const int izero = imap["zero_update"].first;
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
+      DEFAULT_LOOP_PATTERN, "Zero Update", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         du(crho,k,j,i) *= du(izero,k,j,i);
@@ -589,11 +598,13 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 	        src(cmom_lo + l, k, j, i) = gdet*src_mom;
         }
 
-        { // energy source term
+        // energy source term
+        {
+          Real TGam = 0.0;
+          #if USE_VALENCIA
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
           Real gcon[4][4];
           geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon);
-          Real TGam = 0.0;
           for (int m = 0; m < ND; m++) {
             for (int n = 0; n < ND; n++) {
               Real gam0 = 0;
@@ -615,7 +626,15 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           diag(4,k,j,i) = src(ceng,k,j,i);
           diag(5,k,j,i) = gdet*alpha*Ta;
           diag(6,k,j,i) = -gdet*alpha*TGam;
-          //std::cerr << Ta << " " << TGam << std::endl;
+          #else
+          SPACETIMELOOP2(mu, nu) {
+            TGam += Tmunu[mu][nu] * gam[nu][0][mu];
+          }
+          src(ceng,k,j,i) = gdet * TGam;
+          diag(4,k,j,i) = src(ceng, k, j, i);
+          diag(5,k,j,i) = 0.;
+          diag(6,k,j,i) = 0.;
+          #endif // USE_VALENCIA
         }
 
         // re-use gam for metric derivative
@@ -630,7 +649,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
           diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
         }
-
       });
 
   return TaskStatus::complete;

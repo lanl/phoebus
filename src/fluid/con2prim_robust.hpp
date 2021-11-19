@@ -276,9 +276,9 @@ class VarAccessor {
   Real &operator()(const int n) const {
     return var_(b_, n, k_, j_, i_);
   }
+  const int b_, i_, j_, k_;
  private:
   const T &var_;
-  const int b_, i_, j_, k_;
 };
 
 struct CellGeom {
@@ -417,13 +417,21 @@ class ConToPrim {
     Real gam_max, eps_max;
     bounds.GetCeilings(x1,x2,x3,gam_max,eps_max);
     bool negative_crho = false;
-    /*if (v(crho) <= 0.0) {
-      printf("v(crho) < 0: %g    %g %g\n", v(crho)*igdet, x1, x2);
-      v(crho) = 1.e-50;
-      negative_crho = true;
-    }*/
     const Real D = v(crho)*igdet;
+    #if USE_VALENCIA
     const Real tau = v(ceng)*igdet;
+    #else
+    Real Qcov[4] = {(v(ceng) - v(crho))*igdet,
+                      v(cmom_lo)*igdet,
+                      v(cmom_lo+1)*igdet,
+                      v(cmom_lo+2)*igdet};
+    Real ncon[4] = {1./g.lapse, -g.beta[0]/g.lapse, -g.beta[1]/g.lapse, -g.beta[2]/g.lapse};
+    Real tau = 0.;
+    SPACETIMELOOP(mu) {
+      tau -= Qcov[mu]*ncon[mu];
+    }
+    tau -= D;
+    #endif // USE_VALENCIA
     const Real q = tau/D;
     //PARTHENON_REQUIRE(D > 0, "D < 0");
 
@@ -544,8 +552,8 @@ class ConToPrim {
     Real vel[3];
     SPACELOOP(i) {
       //v(pvel_lo+i) = atm ? 0 : mu*x*(rcon[i] + mu*bdotr*bu[i]);
-      v(pvel_lo+i) = mu*x*(rcon[i] + mu*bdotr*bu[i]);
-      vel[i] = v(pvel_lo+i);
+      vel[i] = W*mu*x*(rcon[i] + mu*bdotr*bu[i]);
+      v(pvel_lo+i) = vel[i];
     }
     if (pb_hi > 0) {
       SPACELOOP(i) {

@@ -14,10 +14,12 @@
 #ifndef FLUID_PRIM2CON_HPP_
 #define FLUID_PRIM2CON_HPP_
 
+#include "phoebus_utils/relativity_utils.hpp"
+
 namespace prim2con {
 
 KOKKOS_INLINE_FUNCTION
-void p2c(const Real &rho, const Real v[], const Real b[], const Real &u,
+void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
          const Real &ye_prim, const Real &p, const Real gam1,
          const Real gcov[4][4], const Real gcon[3][3], const Real beta[],
          const Real &alpha, const Real &gdet,
@@ -25,15 +27,14 @@ void p2c(const Real &rho, const Real v[], const Real b[], const Real &u,
   Real vsq = 0.0;
   Real Bsq = 0.0;
   Real Bdotv = 0.0;
-  SPACELOOP(m) {
-    SPACELOOP(n) {
-      vsq += gcov[m+1][n+1] * v[m] * v[n];
-      Bsq += gcov[m+1][n+1] * b[m] * b[n];
-      Bdotv += gcov[m+1][n+1] * b[m] * v[n];
-    }
+  const Real W = phoebus::GetLorentzFactor(vp, gcov);
+  const Real iW = 1.0/W;
+  Real v[3] = {vp[0]*iW, vp[1]*iW, vp[2]*iW};
+  SPACELOOP2(ii, jj) {
+    vsq += gcov[ii+1][jj+1] * v[ii] * v[jj];
+    Bsq += gcov[ii+1][jj+1] * b[ii] * b[jj];
+    Bdotv += gcov[ii+1][jj+1] * b[ii] * v[jj];
   }
-  const Real iW = sqrt(1.0 - vsq);
-  const Real W = 1.0/iW;
   Real bcon[] = {W * Bdotv / alpha, 0.0, 0.0, 0.0};
   SPACELOOP(m) {
     bcon[m+1] = b[m]*iW + bcon[0] * (v[m] - beta[m]/alpha);
@@ -58,7 +59,25 @@ void p2c(const Real &rho, const Real v[], const Real b[], const Real &u,
     bcons[m] = gdet * b[m];
   }
 
+  #if USE_VALENCIA
   tau = gdet * (rho_rel - (p + 0.5*bsq) - alpha*alpha*bcon[0]*bcon[0]) - D;
+  #else
+  Real ucon[4] = {W/alpha,
+                  vp[0] - beta[0]*W/alpha,
+                  vp[1] - beta[1]*W/alpha,
+                  vp[2] - beta[2]*W/alpha};
+  Real ucov[4] = {0};
+  SPACETIMELOOP2(mu, nu) {
+    ucov[mu] += gcov[mu][nu]*ucon[nu];
+  }
+  Real bcov0 = 0.;
+  SPACETIMELOOP(mu) {
+    bcov0 += gcov[0][mu]*bcon[mu];
+  }
+  // This isn't actually tau it's alpha*T^0_0
+  tau = gdet*alpha*((rho + u + p + bsq)*ucon[0]*ucov[0] + (p + 0.5*bsq) - bcon[0]*bcov0) + D;
+  #endif
+
   ye_cons = D * ye_prim;
 
   const Real vasq = bsq*W*W/rho_rel;
