@@ -194,7 +194,7 @@ class FluxState {
       bcov0 += g.gcov[0][mu]*bcon[mu];
     }
     U[ceng] = g.alpha*((rho + u + P + bsq)*ucon[0]*ucov[0] + P + 0.5*bsq) - bcon[0]*bcov0 + U[crho];
-    F[ceng] = (rho + u + P + bsq)*ucon[d]*ucov[0] -bcon[d]*bcov[0] + rho*ucon[d];
+    F[ceng] = (rho + u + P + bsq)*ucon[d]*ucov[0] -bcon[d]*bcov0 + rho*ucon[d];
     #endif // USE_VALENCIA
 
     // magnetic fields
