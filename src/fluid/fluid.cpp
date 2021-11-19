@@ -598,12 +598,13 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 	        src(cmom_lo + l, k, j, i) = gdet*src_mom;
         }
 
-        #if USE_VALENCIA
-        { // energy source term
+        // energy source term
+        {
+          Real TGam = 0.0;
+          #if USE_VALENCIA
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
           Real gcon[4][4];
           geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon);
-          Real TGam = 0.0;
           for (int m = 0; m < ND; m++) {
             for (int n = 0; n < ND; n++) {
               Real gam0 = 0;
@@ -625,14 +626,16 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           diag(4,k,j,i) = src(ceng,k,j,i);
           diag(5,k,j,i) = gdet*alpha*Ta;
           diag(6,k,j,i) = -gdet*alpha*TGam;
-          //std::cerr << Ta << " " << TGam << std::endl;
+          #else
+          SPACETIMELOOP2(mu, nu) {
+            TGam += Tmunu[mu][nu] * gam[nu][0][mu];
+          }
+          src(ceng,k,j,i) = gdet * TGam;
+          diag(4,k,j,i) = src(ceng, k, j, i);
+          diag(5,k,j,i) = 0.;
+          diag(6,k,j,i) = 0.;
+          #endif // USE_VALENCIA
         }
-        #else
-        src(ceng,k,j,i) = 0.;
-        diag(4,k,j,i) = 0.;
-        diag(5,k,j,i) = 0.;
-        diag(6,k,j,i) = 0.;
-        #endif // USE_VALENCIA
 
         // re-use gam for metric derivative
         geom.MetricDerivative(CellLocation::Cent, k, j, i, gam);
