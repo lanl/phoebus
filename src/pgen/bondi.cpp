@@ -214,7 +214,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
       Real W = lapse * ucon[0];
       for (int d = 0; d < 3; d++) {
-        v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
+        v(ivlo+d,k,j,i) = ucon[d+1] + W*beta[d]/lapse;
       }
     });
 
