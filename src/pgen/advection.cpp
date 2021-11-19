@@ -76,9 +76,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(iprs, k, j, i) = P;
         v(ieng, k, j, i) = u;
         v(itmp, k, j, i) = T;
-        v(ivlo + 0, k, j, i) = vx;
-        v(ivlo + 1, k, j, i) = vy;
-        v(ivlo + 2, k, j, i) = vz;
+        Real vsq = 0.;
+        const Real vcon[3] = {vx, vy, vz};
+        SPACELOOP2(ii, jj) {
+          vsq += vcon[ii]*vcon[jj];
+        }
+        const Real W = 1./sqrt(1. - vsq);
+
+        v(ivlo + 0, k, j, i) = W*vx;
+        v(ivlo + 1, k, j, i) = W*vy;
+        v(ivlo + 2, k, j, i) = W*vz;
 
         if (iye > 0)
           v(iye, k, j, i) = (r * r <= rin * rin) ? 1.0 : 0.0;

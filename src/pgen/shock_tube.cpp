@@ -12,6 +12,7 @@
 // publicly, and to permit others to do so.
 
 #include "pgen/pgen.hpp"
+#include "phoebus_utils/relativity_utils.hpp"
 
 // Single-material blast wave.
 // As descriged in the Athena test suite
@@ -70,6 +71,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::Sod", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -84,6 +86,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
       v(ivlo, k, j, i) = vel;
+      Real gammacov[3][3] = {0};
+      Real vcon[3] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo + 2, k, j, i)};
+      geom.Metric(CellLocation::Cent, k, j, i, gammacov);
+      Real Gamma = phoebus::GetLorentzFactor(vcon, gammacov);
+      v(ivlo, k, j, i) *= Gamma;
       if (ib_hi > 0) {
         const Real Bx = x < 0.5 ? Bxl : Bxr;
         const Real By = x < 0.5 ? Byl : Byr;
