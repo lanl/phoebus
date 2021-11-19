@@ -408,6 +408,7 @@ TaskStatus NothingEscapes(MeshBlockData<Real> *rc) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         if (coords.x1f(i) <= x1eh+1.e-8) {
           for (int l = 0; l < 2; l++) {
+            // TODO(BRR) flip sign of T^0_0 flux for torus
             flux.flux(1,l,k,j,i) = std::min(flux.flux(1,l,k,j,i), 0.0);
           }
         }

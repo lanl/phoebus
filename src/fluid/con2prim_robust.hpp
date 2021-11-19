@@ -397,9 +397,6 @@ class ConToPrim {
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos,
                         const Real x1, const Real x2, const Real x3) const {
-    //if (v.i_ == 140 && v.j_ == 120) {
-    //  printf("c2p C: %e %e %e %e %e\n", v(crho), v(ceng), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2));
-    //}
     /*PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo)), "v(cmom_lo) = NaN");
     PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
@@ -420,18 +417,10 @@ class ConToPrim {
     Real gam_max, eps_max;
     bounds.GetCeilings(x1,x2,x3,gam_max,eps_max);
     bool negative_crho = false;
-    /*if (v(crho) <= 0.0) {
-      printf("v(crho) < 0: %g    %g %g\n", v(crho)*igdet, x1, x2);
-      v(crho) = 1.e-50;
-      negative_crho = true;
-    }*/
     const Real D = v(crho)*igdet;
     #if USE_VALENCIA
     const Real tau = v(ceng)*igdet;
     #else
-    //if (v.i_ == 140 && v.j_ == 120) {
-    //printf("c2p C: %e %e %e %e %e\n", v(crho), v(ceng), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2));
-    //}
     Real Qcov[4] = {(v(ceng) - v(crho))*igdet,
                       v(cmom_lo)*igdet,
                       v(cmom_lo+1)*igdet,
@@ -441,17 +430,8 @@ class ConToPrim {
     SPACETIMELOOP(mu) {
       tau -= Qcov[mu]*ncon[mu];
     }
-    //if (v.i_ == 140 && v.j_ == 120) {
-    //printf("pretau: %e\n", tau);
-    //printf("ncon: %e %e %e %e\n", ncon[0], ncon[1], ncon[2], ncon[3]);
-    //printf("Qcov: %e %e %e %e\n", Qcov[0], Qcov[1], Qcov[2], Qcov[3]);
-    //}
     tau -= D;
     #endif // USE_VALENCIA
-    //if (v.i_ == 140 && v.j_ == 120) {
-    //printf("tau: %e (tau 3+1: %e)\n", tau, 4.855544e+01*igdet);
-    ////exit(-1);
-    //}
     const Real q = tau/D;
     //PARTHENON_REQUIRE(D > 0, "D < 0");
 
@@ -535,19 +515,12 @@ class ConToPrim {
     //PARTHENON_REQUIRE(v0sq < 1, "v0sq >= 1: " + std::to_string(v0sq));
     //PARTHENON_REQUIRE(v0sq >= 0, "v0sq < 0: " + std::to_string(v0sq));
 
-    /*if (v.i_ == 140 && v.j_ == 120) {
-      printf("D: %e q: %e bsq: %e bsq_rpsq: %e rsq: %e rbsq: %e v0sq: %e\n",
-        D, q, bsq, bsq_rpsq, rsq, rbsq, v0sq);
-    }*/
     Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,bounds,x1,x2,x3);//rhoflr,epsflr,gam_max,eps_max);
 
     // find the upper bound
     //const Real mu_r = res.compute_upper_bound(h0sq_);
     // solve
     const Real mu = find_root(res, 0.0, 1.0, rel_tolerance, __LINE__);
-    //if (v.i_ == 140 && v.j_ == 120) {
-    //  printf("mu: %e\n", mu);
-    //}
     //if(atm) printf("used atm\n");
     if(my_cell(x1,x2)) {
       printf("res = %e\n", res(mu));
@@ -582,10 +555,6 @@ class ConToPrim {
       vel[i] = W*mu*x*(rcon[i] + mu*bdotr*bu[i]);
       v(pvel_lo+i) = vel[i];
     }
-    if (v.i_ == 140 && v.j_ == 120)
-    {
-      printf("c2p: W: %e vp: %e %e %e v: %e %e %e rho: %e u: %e\n", W, v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2), vel[0],vel[1],vel[2], v(prho), v(peng));
-    }
     if (pb_hi > 0) {
       SPACELOOP(i) {
         bu[i] = v(pb_lo+i);
@@ -613,17 +582,6 @@ class ConToPrim {
     Real S[3];
     Real bcons[3];
     Real sig[3];
-    /*if (v.i_ == 140 && v.j_ == 120) {
-    printf("rho: %e vel: %e %e %e bu: %e %e %e peng: %e ye: %e prs: %e gm1: %e\n",
-      v(prho), vel[0], vel[1], vel[2], bu[0], bu[1], bu[2], v(peng), ye_prim, v(prs), v(gm1));
-    printf("gdet: %e lapse: %e beta: %e %e %e\n", g.gdet, g.lapse, g.beta[0], g.beta[1], g.beta[2]);
-    SPACETIMELOOP2(mu, nu) {
-      printf("gcov4[%i %i] = %e\n", mu,nu,g.gcov4[mu][nu]);
-    }
-    SPACELOOP2(ii,jj) {
-      printf("gcon[%i %i] = %e\n", ii,jj,g.gcon[ii][jj]);
-    }
-    }*/
     prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
                   g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
                   v(crho), S, bcons, v(ceng), ye_cons, sig);
@@ -637,11 +595,6 @@ class ConToPrim {
     for (int i = 0; i < sig_hi-sig_lo+1; i++) {
       v(sig_lo+i) = sig[i];
     }
-
-    //if (v.i_ == 140 && v.j_ == 120) {
-    //printf("c2p aftermath: C: %e %e %e %e %e\n",
-    //  v(crho), v(ceng), v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2));
-    //}
 
     num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
     //PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
