@@ -195,7 +195,7 @@ namespace radiation
       return s;
     }
 
-    Real W, W2, W3, W4;
+    Real v2, W, W2, W3, W4;
     Vec cov_v;
     Vec con_v;
     Real gdet, alpha;
@@ -315,7 +315,7 @@ namespace radiation
     gdet = matrixInverse3x3(cov_gamma, con_gamma);
 
     lower3Vector(con_v, &cov_v);
-    Real v2 = 0.0;
+    v2 = 0.0;
     SPACELOOP(i)
     v2 += con_v(i) * cov_v(i);
     W = 1 / std::sqrt(1 - v2);
