@@ -162,9 +162,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(c::F, mspecies_three_vector_cons); 
     physics->AddField(p::H, mspecies_three_vector); 
     
-    int ndim = 1;
-    if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
-    else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
+    int ndim = 3;
+    //if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
+    //else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
     
 
     if (method == "moment") {
@@ -186,7 +186,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     
     // Add variable for calculating gradients of rest frame energy density 
     Metadata mdJ = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-			     std::vector<int>{NumRadiationTypes, ndim});
+			     std::vector<int>{NumRadiationTypes, ndim, ndim});
     physics->AddField(i::dJ, mdJ);
 
     // Add variables for source functions 
