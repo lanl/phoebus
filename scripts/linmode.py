@@ -243,10 +243,8 @@ for n, N in enumerate(res):
   dumps = np.sort(glob.glob('hydro_modes.out1*.phdf'))
 
   dump = phdf.phdf(dumps[-1])
-  print(f"dump name: {dumps[-1]}")
   tf_soln = mode['tf']
   t = dump.Time
-  print(f't: {t}')
   if (np.fabs(t - tf_soln)/tf_soln) > 0.05:
     print("Mismatch in expected solution times!")
     print("  Code: ", t)
@@ -329,7 +327,6 @@ for var in mode['vars']:
 
 plt.figure()
 ax = plt.gca()
-print(L1)
 for n, var in enumerate(mode['vars']):
   plt.plot(res, L1[var], color=colors[n], label='$\\delta$' + var, linestyle='', marker='s')
   plt.plot(mode[var + '_fitx'], mode[var + '_fity'], color=colors[n], linestyle='--', label='$N^{%g}$' % mode[var + '_fit_slope'])

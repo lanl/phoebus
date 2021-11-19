@@ -1,3 +1,16 @@
+// © 2021. Triad National Security, LLC. All rights reserved.  This
+// program was produced under U.S. Government contract
+// 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
+// is operated by Triad National Security, LLC for the U.S.
+// Department of Energy/National Nuclear Security Administration. All
+// rights in the program are reserved by Triad National Security, LLC,
+// and the U.S. Department of Energy/National Nuclear Security
+// Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works,
+// distribute copies to the public, perform publicly and display
+// publicly, and to permit others to do so.
+
 #include "fixup.hpp"
 
 #include <bvals/bvals_interfaces.hpp>
@@ -26,6 +39,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("enable_c2p_fixup", enable_c2p_fixup);
   bool enable_ceilings = pin->GetOrAddBoolean("fixup", "enable_ceilings", false);
   params.Add("enable_ceilings", enable_ceilings);
+  bool report_c2p_fails = pin->GetOrAddBoolean("fixup", "report_c2p_fails", false);
+  params.Add("report_c2p_fails", report_c2p_fails);
 
   if (enable_floors) {
     const std::string floor_type = pin->GetString("fixup", "floor_type");
@@ -110,18 +125,19 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   int cye = imap[c::ye].second;
   int ifail = imap[impl::fail].first;
 
-  int nfail_total;
-  parthenon::par_reduce(
-      //DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
-      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup", DevExecSpace(),
-      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
-        if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
-          nf++;
-
-        }
-      }, Kokkos::Sum<int>(nfail_total));
-  printf("total nfail: %i\n", nfail_total);
+  bool report_c2p_fails = fix_pkg->Param<bool>("report_c2p_fails");
+  if (report_c2p_fails) {
+    int nfail_total;
+    parthenon::par_reduce(
+        parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup failures", DevExecSpace(),
+        0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+          if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
+            nf++;
+          }
+        }, Kokkos::Sum<int>(nfail_total));
+    printf("total nfail: %i\n", nfail_total);
+  }
 
   bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
   if (!enable_c2p_fixup) return TaskStatus::complete;
@@ -159,8 +175,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
               v(b,pv,k,j,i) = fixup(pv, norm);
             }
-            //v(b,tmp,k,j,i) = fixup(tmp, norm);
-            //v(b,peng,k,j,i) = v(b,prho,k,j,i)*eos.InternalEnergyFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
             v(b,peng,k,j,i) = fixup(peng, norm);
             if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
@@ -214,7 +228,8 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   return TaskStatus::complete;
 }
 
-TaskStatus FixFailures(MeshBlockData<Real> *rc) {
+// TODO(BRR) Remove (deprecated by ConservedToPrimitiveFixup)?
+/*TaskStatus FixFailures(MeshBlockData<Real> *rc) {
 
   namespace p = fluid_prim;
   namespace c = fluid_cons;
@@ -257,7 +272,7 @@ TaskStatus FixFailures(MeshBlockData<Real> *rc) {
   );
 
   return TaskStatus::complete;
-}
+}*/
 
 TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   using parthenon::BoundaryFace;
@@ -379,7 +394,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-TaskStatus NothingEscapes(MeshBlockData<Real> *rc) {
+// TODO(BRR) Remove (deprecated by FixFluxes)?
+/*TaskStatus NothingEscapes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
   if (!pmb->packages.Get("fixup")->Param<bool>("enable_flux_fixup")) return TaskStatus::complete;
 
@@ -411,7 +427,7 @@ TaskStatus NothingEscapes(MeshBlockData<Real> *rc) {
       });
 
   return TaskStatus::complete;
-}
+}*/
 
 template TaskStatus ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
