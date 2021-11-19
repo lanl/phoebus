@@ -59,7 +59,19 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
             "get n wrong", 1,
             KOKKOS_LAMBDA(const int i, int &update) {
               Real Gamma = GetLorentzFactor(v, system, loc, k, j, i);
+              Real gammacov[3][3] = {0};
+              system.Metric(loc, k, j, i, gammacov);
+              Real Gamma1 = GetLorentzFactor(v, gammacov);
+              Real gcov[4][4] = {0};
+              system.SpacetimeMetric(loc, k, j, i, gcov);
+              Real Gamma2 = GetLorentzFactor(v, gcov);
               if (!SoftEquiv(Gamma, Gamma_ref)) {
+                update += 1;
+              }
+              if (!SoftEquiv(Gamma1, Gamma_ref)) {
+                update += 1;
+              }
+              if (!SoftEquiv(Gamma2, Gamma_ref)) {
                 update += 1;
               }
               Real ucon[4];
@@ -86,7 +98,19 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
             "get n wrong", 1,
             KOKKOS_LAMBDA(const int i, int &update) {
               Real Gamma = GetLorentzFactor(v, system, loc, k, j, i);
+              Real gammacov[3][3] = {0};
+              system.Metric(loc, k, j, i, gammacov);
+              Real Gamma1 = GetLorentzFactor(v, gammacov);
+              Real gcov[4][4] = {0};
+              system.SpacetimeMetric(loc, k, j, i, gcov);
+              Real Gamma2 = GetLorentzFactor(v, gcov);
               if (!SoftEquiv(Gamma, Gamma_ref)) {
+                update += 1;
+              }
+              if (!SoftEquiv(Gamma1, Gamma_ref)) {
+                update += 1;
+              }
+              if (!SoftEquiv(Gamma2, Gamma_ref)) {
                 update += 1;
               }
               Real ucon[4];
