@@ -511,14 +511,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   
   auto *pmb = rc->GetParentPointer().get();
    
-  StateDescriptor *eos = pmb->packages.Get("eos").get();
-  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
-  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
-
-  StateDescriptor *opac = pmb->packages.Get("opacity").get();
-  StateDescriptor *rad = pmb->packages.Get("radiation").get();
-  
   namespace cr = radmoment_cons;  
   namespace pr = radmoment_prim;  
   namespace ir = radmoment_internal;  
@@ -558,15 +550,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-
-  /// TODO: (LFR) Couple this to singularity-opac  
-  const auto B_fake = rad->Param<Real>("B_fake");
-  const auto use_B_fake = rad->Param<bool>("use_B_fake");
-
-  // Get the device opacity object
-  using namespace singularity::neutrinos; 
-  const auto d_opacity = opac->Param<Opacity>("d.opacity");
-
+ 
   // Get the background geometry 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -581,20 +565,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) { 
         for (int ispec = 0; ispec<nspec; ++ispec) { 
-          /*
-          /// TODO: (LFR) Need to make a grid variable holding the energy integrated opacity so that we can 
-          ///             create a task to fill the opacity based on MoCMC or some other rule.
-          const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity at enu = 10 MeV 
-          const Real rho_cgs =  v(iblock, prho, k, j, i) * DENSITY;
-          const Real T_cgs =  v(iblock, pT, k, j, i) * TEMPERATURE;
-          const Real Ye = v(iblock, pYe, k, j, i);
-
-          Real kappa = d_opacity.AbsorptionCoefficientPerNu(rho_cgs, T_cgs, Ye, species[ispec], enu);
-          const Real emis = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, species[ispec]); 
-          Real B = emis/kappa; 
-          if (use_B_fake) B = B_fake; 
-          */          
-
+                    
           // Set up the background state 
           Vec con_v{{v(iblock, pv(0), k, j, i),
                      v(iblock, pv(1), k, j, i),
