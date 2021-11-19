@@ -319,9 +319,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         const Real vel[] = {v(b, pvel_lo, k, j, i),
                             v(b, pvel_lo+1, k, j, i),
                             v(b, pvel_hi, k, j, i)};
-        //                    if ( i == 140 && j == 120) {
-        //                        printf("p2c: vel: %e %e %e\n", vel[0], vel[1], vel[2]);
-        //                      }
         Real bcons[3];
         Real bp[3] = {0.0, 0.0, 0.0};
         if (pb_hi > 0) {
@@ -344,18 +341,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         v(b, cmom_lo, k, j, i) = S[0];
         v(b, cmom_lo+1, k, j, i) = S[1];
         v(b, cmom_hi, k, j, i) = S[2];
-
-        if (i == 64 && j == 64) {
-          printf("rho: %e u: %e p: %e\n", v(b,prho,k,j,i), v(b,peng,k,j,i),
-            v(b,prs,k,j,i));
-          printf("cons: %e %e %e %e %e\n", v(b,crho,k,j,i), v(b,ceng,k,j,i),
-            v(b,cmom_lo,k,j,i), v(b,cmom_lo+1,k,j,i), v(b,cmom_lo+2,k,j,i));
-        }
-
-        //if (i == 140 && j == 120) {
-         // printf("C: %e %e %e %e %e\n", v(b,crho,k,j,i), v(b,ceng,k,j,i),
-         //   v(cmom_lo,k,j,i), v(cmom_lo+1,k,j,i), v(cmom_lo+2,k,j,i));
-        //}
 
         if (pb_hi > 0) {
           v(b, cb_lo, k, j, i) = bcons[0];
@@ -598,14 +583,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real Tmunu[ND][ND], gam[ND][ND][ND];
         tmunu(Tmunu, k, j, i);
-        /*if (i == 140 && j == 120) {
-          SPACETIMELOOP(mu) {
-            SPACETIMELOOP(nu) {
-              printf("  %e", Tmunu[mu][nu]);
-            }
-            printf("\n");
-          }
-        }*/
         geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
 	      Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
         diag(0,k,j,i) = 0.0;
