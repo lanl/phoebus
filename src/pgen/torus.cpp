@@ -91,7 +91,7 @@ Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
 }
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
-  
+
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
                     "Problem \"torus\" requires FMKS geometry!");
 
@@ -219,13 +219,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             for (int d = 0; d < 3; d++) {
               v(ivlo+d,k,j,i) += W*vcon[d]/(nsub*nsub);
             }
-            if (i == 140 && j == 120) {
-              printf("pgen gamma: %e vpcon: %e %e %e vcon: %e %e %e\n", W,
-                v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i),
-                vcon[0], vcon[1], vcon[2]);
-              printf("rho: %e u: %e\n", v(irho,k,j,i), v(ieng,k,j,i));
-              printf("u: %e %e %e %e\n", ucon[0], ucon[1], ucon[2], ucon[3]);
-            }
           }
         }
       }
@@ -301,22 +294,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       std::cout << "beta_min = " << beta_min << std::endl;
   }
   // now normalize the b-field
-  //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
-  //fluid::ConservedToPrimitive(rc);
-  //}
-/*
-  Real beta[3];
-  geom.ContravariantShift(CellLocation::Cent,kb.s,jb.s+256,ib.s+440, beta);
-  alpha = geom.Lapse(CellLocation::Cent,kb.s,jb.s+256,ib.s+440);
-  std::cout << "rho, u = " << v(irho,kb.s,256,440) << " " << v(ieng, kb.s, 256, 440) << std::endl;
-  std::cout << "v1_0 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
-  fluid::PrimitiveToConserved(rc);
-  std::cout << "v1_1 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
-  fluid::ConservedToPrimitive(rc);
-  std::cout << "rho, u = " << v(irho,kb.s,256,440) << " " << v(ieng, kb.s, 256, 440) << std::endl;
-  std::cout << "v1_2 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
-  */
 }
 
 void ProblemModifier(ParameterInput *pin) {
@@ -334,6 +312,4 @@ void ProblemModifier(ParameterInput *pin) {
   pin->SetReal("parthenon/mesh", "x1min", x1min);\
 }
 
-
 }
-
