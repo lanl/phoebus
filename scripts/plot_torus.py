@@ -80,6 +80,7 @@ Pg = dfile.Get("pressure", flatten=False)
 #bfield = dfile.Get("p.bfield", flatten=False)
 vel = dfile.Get("p.velocity", flatten=False)
 density = dfile.Get("p.density", flatten=False)
+crho = dfile.Get("c.density", flatten=False)
 ug = dfile.Get("p.energy", flatten=False)
 fd = dfile1.Get("flux_divergence", flatten=False)
 st = dfile1.Get("src_terms", flatten=False)
@@ -100,10 +101,12 @@ v3 = vel[:,:,:,:,2]
 #sys.exit()
 
 var = density
+#var = ug
 vmin = -5
 vmax = 0
 
 var1 = dfile1.Get("p.density", flatten=False)
+#var1 = dfile1.Get("p.energy", flatten=False)
 
 #var = np.fabs(v1)
 #vmin=-4
@@ -139,8 +142,10 @@ def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet'):
       if rmax is not None:
         ax.set_xlim([0,rmax])
         ax.set_ylim([-rmax,rmax])
-      ax.set_xlim([6,20])
+      ax.set_xlim([5,20])
       ax.set_ylim([-12,12])
+      ax.set_xlim([0,40])
+      ax.set_ylim([-40,40])
     else:
       print("Plotting coordinates \"" + plot + "\" unknown")
       sys.exit()
@@ -161,9 +166,11 @@ print(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]).max())
 fig, axes = plt.subplots(1, 3, figsize=(14,8))
 #myplot(fd[:,:,:,:,idx],0,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
 #myplot(st[:,:,:,:,idx],1,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
-myplot(var1[:,:,:,:],0)
-myplot(fd[:,:,:,:,idx]+st[:,:,:,:,idx],1,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
-#myplot(var1,1)
+#myplot(var1[:,:,:,:],0)
+myplot(var[:,:,:,:],0)
+#myplot(fd[:,:,:,:,idx]+st[:,:,:,:,idx],1,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
+#myplot(np.fabs(crho/(fd[:,:,:,:,idx]+st[:,:,:,:,idx])),1,vmin=-4,vmax=4,uselog=True,cmap='RdBu')
+myplot(var1,1)
 #varmax = var.max()
 myplot(2*(var1-var)/(var1+var),2,vmin=-1,vmax=1,uselog=False,cmap='RdBu')
 #print((2*(var1-var)/(var1+var))[0,0,64,100])

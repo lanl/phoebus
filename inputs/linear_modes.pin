@@ -77,8 +77,8 @@ max_level = 3
 <coordinates>
 # vx = 0.308606699924204
 # vy = 0.308606699924204
-vx = 0.436436
-vy = 0.436436
+vx = 0. # 0.436436
+vy = 0. # 0.436436
 
 # Uses this one for boosted snake coordinates
 # TODO(JMM): Should we unify this interface
@@ -86,8 +86,8 @@ vy = 0.436436
 # k = 25.1327 # wave number. Default is 2*pi
 kmult = 4     # Multiply k by this factor
 a = 0.3       # amplitude of wiggle
-alpha = 0.85    # lapse
-vy = 0.524631
+alpha = 1. # 0.85    # lapse
+vy = 0. # 0.524631
 # vy = 0.81     # shift. Default is 0.
 # vy = 0.617213 # shift. Default is 0.
 # vy = 0      # shift. Default is 0.

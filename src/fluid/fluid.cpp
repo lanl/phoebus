@@ -108,6 +108,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
   params.Add("mhd", mhd);
 
+  bool zero_update = pin->GetOrAddBoolean("fluid", "zero_update", false);
+  params.Add("zero_update", zero_update);
+
   Metadata m;
   std::vector<int> three_vec(1, 3);
 
@@ -342,6 +345,13 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         v(b, cmom_lo+1, k, j, i) = S[1];
         v(b, cmom_hi, k, j, i) = S[2];
 
+        if (i == 64 && j == 64) {
+          printf("rho: %e u: %e p: %e\n", v(b,prho,k,j,i), v(b,peng,k,j,i),
+            v(b,prs,k,j,i));
+          printf("cons: %e %e %e %e %e\n", v(b,crho,k,j,i), v(b,ceng,k,j,i),
+            v(b,cmom_lo,k,j,i), v(b,cmom_lo+1,k,j,i), v(b,cmom_lo+2,k,j,i));
+        }
+
         //if (i == 140 && j == 120) {
          // printf("C: %e %e %e %e %e\n", v(b,crho,k,j,i), v(b,ceng,k,j,i),
          //   v(cmom_lo,k,j,i), v(cmom_lo+1,k,j,i), v(cmom_lo+2,k,j,i));
@@ -516,17 +526,18 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
         diag(2,k,j,i) = divf(cmom_lo+1,k,j,i);
         diag(3,k,j,i) = divf(cmom_lo+2,k,j,i);
         diag(4,k,j,i) = divf(ceng,k,j,i);
-        //if (i == 140 && j == 120) {
-        if (i >= 100 && j == 131) {
-          printf("divf [%i %i]: %e %e %e %e %e\n", i,j,divf(crho,k,j,i), divf(ceng,k,j,i), divf(cmom_lo,k,j,i),
-            divf(cmom_lo+1,k,j,i), divf(cmom_lo+2,k,j,i));
-        }
       }
   );
   return TaskStatus::complete;
 }
 TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  const bool zero_update = pkg->Param<bool>("zero_update");
+
+  if (!zero_update) {
+    return TaskStatus::complete;
+  }
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -542,7 +553,7 @@ TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
   const int izero = imap["zero_update"].first;
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
+      DEFAULT_LOOP_PATTERN, "Zero Update", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         du(crho,k,j,i) *= du(izero,k,j,i);
@@ -658,11 +669,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
           diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
         }
-        if (i >= 100 && j == 131) {
-          printf("src[%i %i]: %e %e %e %e %e\n", i,j,0., src(ceng,k,j,i), src(cmom_lo,k,j,i),
-            src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i));
-        }
-
       });
 
   return TaskStatus::complete;

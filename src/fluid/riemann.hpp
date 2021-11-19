@@ -180,6 +180,7 @@ class FluxState {
     U[ceng] = rhohWsq + bsqWsq - (P + 0.5*bsq) - b0*b0 - U[crho];
     F[ceng] = U[ceng]*vtil + (P + 0.5*bsq)*vel - Bdotv*Bcon[dir];
     #else
+    // TODO(BRR) share calculated quantities for ucon, ucov, bcon, bcov with above
     Real ucon[4] = {W/g.alpha,
                     vpcon[0] - g.beta[0]*W/g.alpha,
                     vpcon[1] - g.beta[1]*W/g.alpha,
@@ -199,8 +200,8 @@ class FluxState {
     SPACETIMELOOP(mu) {
       bcov0 += g.gcov[0][mu]*bcon[mu];
     }
-    U[ceng] = g.alpha*((rho + u + P + bsq)*ucon[0]*ucov[0] + (P + 0.5*bsq) - bcon[0]*bcov0);
-    F[ceng] = (rho + u + P + bsq)*ucon[d]*ucov[0] - bcon[d]*bcov0;
+    U[ceng] = g.alpha*((rho + u + P + bsq)*ucon[0]*ucov[0] + P + 0.5*bsq) - bcon[0]*bcov0 + U[crho];
+    F[ceng] = (rho + u + P + bsq)*ucon[d]*ucov[0] -bcon[d]*bcov[0] + rho*ucon[d];
     #endif // USE_VALENCIA
 
     // magnetic fields
