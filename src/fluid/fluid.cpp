@@ -421,7 +421,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto coords = pmb->coords;
+  //auto coords = pmb->coords;
 
   auto fail = rc->Get(internal_variables::fail).data;
 

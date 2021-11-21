@@ -187,6 +187,7 @@ class MonopoleSph {
     // d/dph = 0
   }
 
+  KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
     // This is less error prone than a hardcoded version.
