@@ -44,7 +44,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 
   auto &rc = pmb->meshblock_data.Get();
-  const int ndim = pmb->pmy_mesh->ndim;
 
   auto rgrid = monopole_pkg->Param<MonopoleGR::Radius>("radius");
   auto intrinsic = tov_pkg->Param<TOV::State_t>("tov_intrinsic");

@@ -412,12 +412,14 @@ class ConToPrim {
     bounds.GetFloors(x1,x2,x3,rhoflr,epsflr);
     Real gam_max, eps_max;
     bounds.GetCeilings(x1,x2,x3,gam_max,eps_max);
+    /*
     bool negative_crho = false;
-    /*if (v(crho) <= 0.0) {
+    if (v(crho) <= 0.0) {
       printf("v(crho) < 0: %g    %g %g\n", v(crho)*igdet, x1, x2);
       v(crho) = 1.e-50;
       negative_crho = true;
-    }*/
+    }
+    */
     const Real D = v(crho)*igdet;
     const Real tau = v(ceng)*igdet;
     const Real q = tau/D;
