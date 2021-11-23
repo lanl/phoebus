@@ -62,7 +62,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("do_nu_heavy", do_nu_heavy);
   
   // Set radiation cfl factor
-  Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.5);
+  Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.8);
   params.Add("cfl", cfl);
   
   // Get fake value for integrated BB for testing  
