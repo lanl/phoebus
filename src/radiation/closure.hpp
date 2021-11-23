@@ -203,6 +203,15 @@ namespace radiation
     Tens2 cov_gamma;
     Tens2 con_gamma;
 
+    //-------------------------------------------------------------------------------------
+    /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
+    /// J and \tilde H_i.
+    template <class V>
+    KOKKOS_FUNCTION
+        Status
+        M1FluidPressureTensor(const Real J, const V cov_H,
+                              Tens2 *con_tilPi, Vec *con_tilf);
+  
   protected:
     //-------------------------------------------------------------------------------------
     /// Calculate the residuals of the M1 root equations
@@ -214,14 +223,6 @@ namespace radiation
                     const Vec con_tilg, const Vec con_tild,
                     Real *fXi, Real *fPhi);
 
-    //-------------------------------------------------------------------------------------
-    /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
-    /// J and \tilde H_i.
-    template <class V>
-    KOKKOS_FUNCTION
-        Status
-        M1FluidPressureTensor(const Real J, const V cov_H,
-                              Tens2 *con_tilPi, Vec *con_tilf);
 
     //-------------------------------------------------------------------------------------
     /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
