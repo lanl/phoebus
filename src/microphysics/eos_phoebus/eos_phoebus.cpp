@@ -49,6 +49,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   EOSBuilder::modifiers_t modifiers;
   EOSBuilder::params_t base_params;
   EOSBuilder::params_t relativity_params;
+  EOSBuilder::params_t units_params;
   // EOSBuilder::params_t shifted_params, scaled_params;
 
   const std::vector<std::string> valid_eos_names = {
@@ -62,8 +63,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (eos_type.compare(IdealGas::EosType()) == 0) {
     type = EOSBuilder::EOSType::IdealGas;
     names = {"Cv"};
-    base_params["gm1"].emplace<Real>(
-        pin->GetReal(block_name, std::string("Gamma")) - 1.0);
+    Real gm1 = pin->GetReal(block_name, std::string("Gamma")) - 1.0;
+    params.Add("gm1", gm1);
+    base_params["gm1"].emplace<Real>(gm1);
     /*
       // TODO(JMM): Disabling these for now
   } else if (eos_type.compare(Gruneisen::EosType()) == 0) {
@@ -99,6 +101,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
           << block_name << std::endl;
       PARTHENON_THROW(msg);
     }
+  } else if (eos_type == StellarCollapse::EosType()) {
+    type = EOSBuilder::EOSType::StellarCollapse;
+    base_params["filename"].emplace<std::string>(
+        pin->GetString(block_name, "filename"));
+    base_params["use_sp5"].emplace<bool>(
+        pin->GetOrAddBoolean(block_name, "use_sp5", true));
+    auto use_ye = pin->GetOrAddBoolean("fluid", "Ye", false);
+    PARTHENON_REQUIRE_THROWS(use_ye, "\"StellarCollapse\" EOS requires that Ye be enabled!");
 #endif
   } else {
     std::stringstream error_mesg;
@@ -112,6 +122,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_THROW(error_mesg);
   }
   FillRealParams(pin, base_params, names);
+
+  params.Add("unit_conv", phoebus::UnitConversions(pin));
+  auto &unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
 
   // modifiers
   /*
@@ -127,6 +140,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     modifiers[EOSBuilder::EOSModifier::Scaled] = scaled_params;
   }
   */
+  units_params["use_length_time"].emplace<bool>(true);
+  units_params["time_unit"].emplace<Real>(unit_conv.GetTimeCodeToCGS());
+  units_params["length_unit"].emplace<Real>(unit_conv.GetLengthCodeToCGS());
+  units_params["mass_unit"].emplace<Real>(unit_conv.GetMassCodeToCGS());
+  units_params["temp_unit"].emplace<Real>(unit_conv.GetTemperatureCodeToCGS());
+  modifiers[EOSBuilder::EOSModifier::UnitSystem] = units_params;
 
   // Build the EOS
   singularity::EOS eos_host =
@@ -136,7 +155,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("h.EOS", eos_host);
   params.Add("needs_ye", needs_ye);
 
-  params.Add("unit_conv", phoebus::UnitConversions(pin));
+  // Store eos params in case they're needed
+  for (auto &name : names) {
+    params.Add(name, (pin->GetReal(block_name, name)));
+  }
 
   return pkg;
 }

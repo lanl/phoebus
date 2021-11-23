@@ -231,6 +231,18 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s,
       kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        printf("U: %e %e %e %e (%e)\n",
+          v(ceng, k, j, i),
+          v(cmom_lo, k, j, i),
+          v(cmom_lo + 1, k, j, i),
+          v(cmom_lo + 2, k, j, i),
+          v(cye, k, j, i));
+        printf("dU: %e %e %e %e (%e)\n",
+          v(Gcov_lo, k, j, i) * dt,
+          v(Gcov_lo + 1, k, j, i) * dt,
+          v(Gcov_lo + 2, k, j, i) * dt,
+          v(Gcov_lo + 3, k, j, i) * dt,
+          v(Gye, k, j, i) * dt);
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
@@ -257,7 +269,6 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   pmb->par_reduce(
       "Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
-        Real ldt = 0.0;
         Real csig = 1.0;
         for (int d = 0; d < ndim; d++) {
           lmin_dt =
