@@ -97,6 +97,8 @@ def plot_dump(filename, varname,
     plt.colorbar(mesh, label=cbar_label)
 
     plt.savefig(savename, dpi=300, bbox_inches='tight')
+    plt.clf()
+    plt.cla()
     plt.close()
     return
 
