@@ -2,6 +2,7 @@
 #PHDF_PATH = '/home/brryan/github/phoebus/external/parthenon/scripts/python/'
 DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
 
+import argparse
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
@@ -23,11 +24,20 @@ plot = "cartesian"
 rmax = 40
 #rmax = None
 
+parser = argparse.ArgumentParser(description='Plot torus')
+parser.add_argument('--nfinal', type=int, default=-1, help='dump to plot')
+parser.add_argument('--savefig', type=bool, default=False, help='Whether to save figure')
+args = parser.parse_args()
+#print(args.nfinal)
+#sys.exit()
+
 # Whether to plot meshblock boundaries
 plot_meshblocks = True
 h_ = 0.3
+a = 0.9375
+rh = 1. + np.sqrt(1. - a*a)
 
-nfinal = -1
+nfinal = args.nfinal
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 #dfnam = dfnams[nfinal]
@@ -37,8 +47,10 @@ dfile1 = phdf.phdf(dfnams[nfinal])
 nblocks = dfile.NumBlocks
 
 meshblocksize = dfile.MeshBlockSize
+nb = nblocks
 nx = meshblocksize[0]
 ny = meshblocksize[1]
+nz = meshblocksize[2]
 
 print("File: ", dfnams[nfinal], end="\n\n")
 
@@ -76,17 +88,52 @@ for var in dfile.Variables:
 print("")
 
 # Numblocks, nz, ny, nx
-Pg = dfile.Get("pressure", flatten=False)
+Pg = dfile1.Get("pressure", flatten=False)
 #bfield = dfile.Get("p.bfield", flatten=False)
-vel = dfile.Get("p.velocity", flatten=False)
-density = dfile.Get("p.density", flatten=False)
-crho = dfile.Get("c.density", flatten=False)
-ug = dfile.Get("p.energy", flatten=False)
+vcon = dfile.Get("p.velocity", flatten=False)
+density = dfile1.Get("p.density", flatten=False)
+crho = dfile1.Get("c.density", flatten=False)
+ug = dfile1.Get("p.energy", flatten=False)
 fd = dfile1.Get("flux_divergence", flatten=False)
 st = dfile1.Get("src_terms", flatten=False)
-v1 = vel[:,:,:,:,0]
-v2 = vel[:,:,:,:,1]
-v3 = vel[:,:,:,:,2]
+v1 = vcon[:,:,:,:,0]
+v2 = vcon[:,:,:,:,1]
+v3 = vcon[:,:,:,:,2]
+Bcon = dfile1.Get("p.bfield", flatten=False)
+flatgcov = dfile1.Get("g.c.gcov", flatten=False)
+alpha = dfile1.Get("g.c.alpha", flatten=False)
+gcov = np.zeros([nb,nz,ny,nx,4,4])
+for mu in range(4):
+  gcov[:,:,:,:,mu,0] = flatgcov[:,:,:,:,mu]
+  gcov[:,:,:,:,0,mu] = flatgcov[:,:,:,:,mu]
+for mu in range(1,4):
+  gcov[:,:,:,:,mu,1] = flatgcov[:,:,:,:,3+mu]
+  gcov[:,:,:,:,1,mu] = flatgcov[:,:,:,:,3+mu]
+for mu in range(2,4):
+  gcov[:,:,:,:,mu,2] = flatgcov[:,:,:,:,3+2+mu]
+  gcov[:,:,:,:,2,mu] = flatgcov[:,:,:,:,3+2+mu]
+gcov[:,:,:,:,3,3] = flatgcov[:,:,:,:,9]
+
+Bcov = np.zeros([nb,nz,ny,nx,3])
+vcov = np.zeros([nb,nz,ny,nx,3])
+for ii in range(3):
+  for jj in range(3):
+    Bcov[:,:,:,:,ii] += gcov[:,:,:,:,ii+1,jj+1]*Bcon[:,:,:,:,jj]
+    vcov[:,:,:,:,ii] += gcov[:,:,:,:,ii+1,jj+1]*vcon[:,:,:,:,jj]
+
+Bsq = np.zeros([nb,nz,ny,nx])
+Bdv = np.zeros([nb,nz,ny,nx])
+vsq = np.zeros([nb,nz,ny,nx])
+Gamma = np.zeros([nb,nz,ny,nx])
+for ii in range(3):
+  Bsq[:,:,:,:] += Bcon[:,:,:,:,ii]*Bcov[:,:,:,:,ii]
+  Bdv[:,:,:,:] += Bcon[:,:,:,:,ii]*vcov[:,:,:,:,ii]
+  vsq[:,:,:,:] += vcon[:,:,:,:,ii]*vcov[:,:,:,:,ii]
+Gamma[:,:,:,:] = 1./np.sqrt(1 - vsq[:,:,:,:])
+b0 = Gamma*Bdv/alpha
+bsq = (Bsq + alpha**2*b0**2)/Gamma**2
+beta = 2.*Pg/(bsq + 1.e-20)
+
 #b1 = bfield[:,:,:,:,0]
 #b2 = bfield[:,:,:,:,1]
 #b3 = bfield[:,:,:,:,2]
@@ -118,27 +165,27 @@ var1 = dfile1.Get("p.density", flatten=False)
 
 mblw = 0.5
 
-def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet'):
+def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet',label=None):
   from mpl_toolkits.axes_grid1 import make_axes_locatable
   ax = axes[n]
   #ax = axes
-  for n in range(nblocks):
+  for nb in range(nblocks):
     if plot == "mks":
-      im = ax.pcolormesh(xblock[n,:,:], yblock[n,:,:], np.log10(myvar[n,0].transpose()),
+      im = ax.pcolormesh(xblock[nb,:,:], yblock[nb,:,:], np.log10(myvar[nb,0].transpose()),
         vmin=vmin, vmax=vmax, cmap=cmap)
     elif plot == "cartesian":
       if uselog:
-        im = ax.pcolormesh(x[n,:,:], y[n,:,:], np.log10(myvar[n,0].transpose()),
+        im = ax.pcolormesh(x[nb,:,:], y[nb,:,:], np.log10(myvar[nb,0].transpose()),
           vmin=vmin, vmax=vmax, cmap=cmap)
       else:
-        im = ax.pcolormesh(x[n,:,:], y[n,:,:], myvar[n,0].transpose(),
+        im = ax.pcolormesh(x[nb,:,:], y[nb,:,:], myvar[nb,0].transpose(),
           vmin=vmin, vmax=vmax, cmap=cmap)
 
       if plot_meshblocks:
-        ax.plot(x[n,0,:], y[n,0,:], color='k', linewidth=mblw, linestyle='--')
-        ax.plot(x[n,-1,:], y[n,-1,:], color='k', linewidth=mblw, linestyle='--')
-        ax.plot(x[n,:,0], y[n,:,0], color='k', linewidth=mblw, linestyle='--')
-        ax.plot(x[n,:,-1], y[n,:,-1], color='k', linewidth=mblw, linestyle='--')
+        ax.plot(x[nb,0,:], y[nb,0,:], color='k', linewidth=mblw, linestyle='--')
+        ax.plot(x[nb,-1,:], y[nb,-1,:], color='k', linewidth=mblw, linestyle='--')
+        ax.plot(x[nb,:,0], y[nb,:,0], color='k', linewidth=mblw, linestyle='--')
+        ax.plot(x[nb,:,-1], y[nb,:,-1], color='k', linewidth=mblw, linestyle='--')
       if rmax is not None:
         ax.set_xlim([0,rmax])
         ax.set_ylim([-rmax,rmax])
@@ -153,6 +200,17 @@ def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet'):
     ax.set_aspect('equal')
   ax.set_xlabel('x')
   ax.set_ylabel('y')
+
+  # Draw black hole
+  bh = plt.Circle((0, 0), rh, color='k')
+  ax.add_patch(bh)
+
+  if label is not None:
+    ax.set_title(label)
+
+  if n > 0:
+    ax.set_yticklabels([])
+
   divider = make_axes_locatable(ax)
   cax = divider.append_axes('right', size='5%', pad=0.05)
   fig.colorbar(im, cax=cax, orientation='vertical')
@@ -163,15 +221,20 @@ vmin = -1.e0
 vmax = -vmin
 idx = 0
 print(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]).max())
-fig, axes = plt.subplots(1, 3, figsize=(14,8))
+fig, axes = plt.subplots(1, 2, figsize=(8,8))
 #myplot(fd[:,:,:,:,idx],0,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
 #myplot(st[:,:,:,:,idx],1,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
 #myplot(var1[:,:,:,:],0)
-myplot(var[:,:,:,:],0)
+#myplot(var[:,:,:,:],0)
 #myplot(fd[:,:,:,:,idx]+st[:,:,:,:,idx],1,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
 #myplot(np.fabs(crho/(fd[:,:,:,:,idx]+st[:,:,:,:,idx])),1,vmin=-4,vmax=4,uselog=True,cmap='RdBu')
-myplot(var1,1)
+myplot(var1,0,label='density')
 #varmax = var.max()
-myplot(2*(var1-var)/(var1+var),2,vmin=-1,vmax=1,uselog=False,cmap='RdBu')
+#myplot(2*(var1-var)/(var1+var),2,vmin=-1,vmax=1,uselog=False,cmap='RdBu')
+myplot(beta,1,vmin=-3,vmax=3,uselog=True,cmap='RdBu',label='plasma beta')
 #print((2*(var1-var)/(var1+var))[0,0,64,100])
-plt.show()
+
+if args.savefig:
+  plt.savefig('frame_%08d.png' % args.nfinal, bbox_inches='tight')
+else:
+  plt.show()
