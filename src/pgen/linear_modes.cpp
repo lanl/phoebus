@@ -31,11 +31,13 @@ namespace linear_modes {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
-  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski) ||
-    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski) ||
-    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
-    typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm),
-    "Problem \"linear_modes\" requires \"Minkowski\" geometry!");
+  const bool is_minkowski = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski));
+  const bool is_boosted_minkowski =
+      (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski));
+  const bool is_snake = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake));
+  const bool is_inchworm = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm));
+  PARTHENON_REQUIRE(is_minkowski || is_boosted_minkowski || is_snake || is_inchworm,
+                    "Problem \"linear_modes\" requires \"Minkowski\" geometry!");
 
   auto &rc = pmb->meshblock_data.Get();
   const int ndim = pmb->pmy_mesh->ndim;
@@ -168,17 +170,18 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real a_snake, k_snake, alpha, betax, betay, betaz;
   alpha = 1;
   a_snake = k_snake = betax = betay = betaz = 0;
-  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
-      typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+  if (is_snake || is_inchworm) {
     a_snake = gpkg->Param<Real>("a");
     k_snake = gpkg->Param<Real>("k");
+  }
+  if (is_snake) {
     alpha = gpkg->Param<Real>("alpha");
     betay = gpkg->Param<Real>("vy");
     PARTHENON_REQUIRE_THROWS(alpha > 0, "lapse must be positive");
 
     tf /= alpha;
   }
-  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+  if (is_boosted_minkowski) {
     betax = gpkg->Param<Real>("vx");
     betay = gpkg->Param<Real>("vy");
     betaz = gpkg->Param<Real>("vz");
@@ -203,10 +206,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real x = coords.x1v(i);
       Real y = coords.x2v(j);
 
-      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+      if (is_snake) {
         y = y - a_snake*sin(k_snake*x);
       }
-      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+      if (is_inchworm) {
         x = x - a_snake*sin(k_snake*x);
       }
 
@@ -240,9 +243,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ib_lo + 2, k, j, i) = B30 + (dB3*mode).real();
       }
 
-      if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake) ||
-          typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm) ||
-	        typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+      if (is_snake ||is_inchworm || is_boosted_minkowski) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
         Real vsq = 0.;
@@ -263,17 +264,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                              Gamma*v(ivlo+1, k, j, i),
                              Gamma*v(ivlo+2, k, j, i)};
         Real J[NDFULL][NDFULL] = {0};
-        if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+        if (is_snake) {
           J[0][0] = 1/alpha;
 	        J[2][0] = -betay/alpha;
           J[2][1] = a_snake*k_snake*cos(k_snake*x);
 	        J[1][1] = J[2][2] = J[3][3] = 1;
-	      } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+	      } else if (is_boosted_minkowski) {
 	        J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
 	        J[1][0] = -betax;
 	        J[2][0] = -betay;
 	        J[3][0] = -betaz;
-        } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+        } else if (is_inchworm) {
           PARTHENON_FAIL("This geometry isn't supported with a J!");
         }
         Real ucon_transformed[NDFULL] = {0, 0, 0, 0};

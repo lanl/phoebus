@@ -124,62 +124,63 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         v(Gye, k, j, i) = 0.;
       });
 
-  pmb->par_for(
-      "MonteCarlodNdlnu", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
-        if (do_species[sidx]) {
-          auto s = species[sidx];
+  for (int sidx = 0; sidx < 3; sidx++) {
+    if (do_species[sidx]) {
+      auto s = species[sidx];
+      pmb->par_for(
+          "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            auto rng_gen = rng_pool.get_state();
+            Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+            Real ye = v(iye, k, j, i);
 
-          auto rng_gen = rng_pool.get_state();
-          Real detG = geom.DetG(CellLocation::Cent, k, j, i);
-          Real ye = v(iye, k, j, i);
+            const Real rho_cgs = v(pdens, k, j, i) * DENSITY;
+            const Real T_cgs = v(ptemp, k, j, i) * TEMPERATURE;
 
-          const Real rho_cgs = v(pdens, k, j, i) * DENSITY;
-          const Real T_cgs = v(ptemp, k, j, i) * TEMPERATURE;
+            Real dN = 0.;
+            Real dNdlnu_max = 0.;
+            for (int n = 0; n <= nu_bins; n++) {
+              Real nu = nusamp(n);
+              Real wgt = GetWeight(wgtC, nu);
+              Real Jnu = d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu);
 
-          Real dN = 0.;
-          Real dNdlnu_max = 0.;
-          for (int n = 0; n <= nu_bins; n++) {
-            Real nu = nusamp(n);
-            Real wgt = GetWeight(wgtC, nu);
-            Real Jnu = d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu);
+              dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
 
-            dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
-
-            // Factors of nu in numerator and denominator cancel
-            Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
-            v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) = dNdlnu;
-            if (dNdlnu > dNdlnu_max) {
-              dNdlnu_max = dNdlnu;
+              // Factors of nu in numerator and denominator cancel
+              Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
+              v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) = dNdlnu;
+              if (dNdlnu > dNdlnu_max) {
+                dNdlnu_max = dNdlnu;
+              }
             }
-          }
 
-          for (int n = 0; n <= nu_bins; n++) {
-            v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) /= dNdlnu_max;
-          }
+            for (int n = 0; n <= nu_bins; n++) {
+              v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) /= dNdlnu_max;
+            }
 
-          // Trapezoidal rule
-          Real nu0 = nusamp[0];
-          Real nu1 = nusamp[nu_bins];
-          dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu0) *
-                nu0 / (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
-          dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu1) *
-                nu1 / (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
-          dN *= d3x_cgs * detG * dt * TIME;
+            // Trapezoidal rule
+            Real nu0 = nusamp[0];
+            Real nu1 = nusamp[nu_bins];
+            dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu0) *
+                  nu0 / (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
+            dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu1) *
+                  nu1 / (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
+            dN *= d3x_cgs * detG * dt * TIME;
 
-          v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
+            v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
 
-          int Ns = static_cast<int>(dN);
-          if (dN - Ns > rng_gen.drand()) {
-            Ns++;
-          }
+            int Ns = static_cast<int>(dN);
+            if (dN - Ns > rng_gen.drand()) {
+              Ns++;
+            }
 
-          // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
-          v(idN + sidx, k, j, i) = dN;
-          v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
-          rng_pool.free_state(rng_gen);
-        }
-      });
+            // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
+            v(idN + sidx, k, j, i) = dN;
+            v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
+            rng_pool.free_state(rng_gen);
+          });
+    }
+  }
 
   // Reduce dN over zones for calibrating weights (requires w ~ wgtC)
   Real dNtot = 0;
@@ -269,6 +270,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   // Loop over zones and generate appropriate number of particles in each zone
   for (int sidx = 0; sidx < 3; sidx++) {
     if (do_species[sidx]) {
+      auto s = species[sidx];
+
       pmb->par_for(
           "MonteCarloSourceParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
           KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -283,8 +286,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Geometry::Tetrads Tetrads(Ucon, Gcov);
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
             int dNs = v(iNs + sidx, k, j, i);
-
-            auto s = species[sidx];
 
             // Loop over particles to create in this zone
             for (int n = 0; n < static_cast<int>(dNs); n++) {
@@ -474,9 +475,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           const Real T_cgs = v(itemp, k, j, i) * TEMPERATURE;
           const Real Ye = v(iye, k, j, i);
 
-          // TODO(BRR) Add AbsorptionCoefficientPerNuOmega to singularity-opac
           Real alphanu =
-              d_opacity.AbsorptionCoefficientPerNu(rho_cgs, T_cgs, Ye, s, nu) /
+              d_opacity.AbsorptionCoefficient(rho_cgs, T_cgs, Ye, s, nu) /
               (4. * M_PI);
 
           Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
@@ -534,6 +534,7 @@ TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks) {
   // Boundary transfers on same MPI proc are blocking
+#ifdef MPI_PARALLEL
   for (auto &block : blocks) {
     auto swarm = block->swarm_data.Get()->Get(swarmName);
     for (int n = 0; n < block->pbval->nneighbor; n++) {
@@ -543,6 +544,7 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
       #endif
     }
   }
+#endif // MPI_PARALLEL
 
   for (auto &block : blocks) {
     auto &pmb = block;
