@@ -451,7 +451,8 @@ TaskStatus CalculateFluxes(T* rc) {
           cr.raise3Vector(covFr, &conFr);
           cr.getConCovPFromPrim(Jr, Hr, con_tilPi, &Pr);
           
-          // Mix the fluxes by the Peclet number 
+          // Mix the fluxes by the Peclet number
+          // TODO: (LFR) Make better choices  
           const Real speed = a*1.0/sqrt(3.0) + (1-a)*std::max(sqrt(cl.v2), sqrt(cr.v2));  
           conFl = a*conFl + (1-a)*conFl_asym; 
           conFr = a*conFr + (1-a)*conFr_asym; 
@@ -516,7 +517,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;  
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E, cr::F, p::density, p::temperature, p::ye, p::velocity, 
+  std::vector<std::string> vars{cr::E, cr::F, p::density, p::temperature, p::ye, p::velocity,
+                                pr::J, pr::H, 
                                 ir::kappaJ, ir::kappaH, ir::JBB}; 
   if (update_fluid) {
     vars.push_back(c::energy);
@@ -528,6 +530,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto v = rc->PackVariables(vars, imap);
   auto idx_E = imap.GetFlatIdx(cr::E); 
   auto idx_F = imap.GetFlatIdx(cr::F);
+  auto idx_J = imap.GetFlatIdx(pr::J); 
+  auto idx_H = imap.GetFlatIdx(pr::H);
 
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
@@ -584,8 +588,17 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Vec cov_dF;
 
           /// TODO: (LFR) Move beyond Eddington for this update
+          Vec con_tilf;
           Tens2 con_tilPi{{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}};  
-          
+
+          // Treat the Eddington tensor explicitly  
+          Real& J = v(iblock, idx_J(ispec), k, j, i); 
+          Vec cov_H{{v(iblock, idx_H(ispec, 0), k, j, i), 
+                     v(iblock, idx_H(ispec, 1), k, j, i),
+                     v(iblock, idx_H(ispec, 2), k, j, i),
+                    }}; 
+          c.M1FluidPressureTensor(J, cov_H, &con_tilPi, &con_tilf); 
+
           Real B = v(iblock, idx_JBB(ispec), k, j, i); 
           Real tauJ = alpha*dt*v(iblock, idx_kappaJ(ispec), k, j, i);  
           Real tauH = alpha*dt*v(iblock, idx_kappaH(ispec), k, j, i);  
