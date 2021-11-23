@@ -309,7 +309,7 @@ void ProblemModifier(ParameterInput *pin) {
   int nx1 = pin->GetInteger("parthenon/mesh", "nx1");
   Real dx = (x1max - xh)/(nx1 - ninside);
   Real x1min = xh - ninside*dx;
-  pin->SetReal("parthenon/mesh", "x1min", x1min);\
+  pin->SetReal("parthenon/mesh", "x1min", x1min);
 }
 
 }

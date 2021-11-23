@@ -290,10 +290,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 
   const int ndim = pmb->pmy_mesh->ndim;
 
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
+
   // x1-direction
   //if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::outflow) {
   if (bc_ix1 == "outflow") {
-    printf("a\n");
     auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density}),
                                            std::vector<std::string>({fluid_cons::density}));
     parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(),
@@ -309,8 +311,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
         flux.flux(X1DIR,0,k,j,i) = 0.0;
         flux.flux(X1DIR,1,k,j,i) = 0.0;
       });
-    printf("b\n");
-  } else { printf("c\n"); }
+  }
   //if (pmb->boundary_flag[BoundaryFace::outer_x1] == BoundaryFlag::outflow) {
   if (bc_ox1 == "outflow") {
     auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density}),
@@ -340,12 +341,20 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
         flux.flux(X2DIR,0,k,j,i) = std::min(flux(X2DIR,0,k,j,i), 0.0);
       });
   } else if (pmb->boundary_flag[BoundaryFace::inner_x2] == BoundaryFlag::reflect) {
-    auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, fluid_cons::energy}),
-                                           std::vector<std::string>({fluid_cons::density, fluid_cons::energy}));
+    PackIndexMap imap;
+    auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, fluid_cons::energy, fluid_cons::momentum}),
+                                           std::vector<std::string>({fluid_cons::density, fluid_cons::energy, fluid_cons::momentum}), imap);
+    const int cmom_lo = imap[c::momentum].first;
+    const int cmom_hi = imap[c::momentum].second;
+    const int pb_lo = imap[c::bfield].first;
+    const int pb_hi = imap[c::bfield].second;
     parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(),
       kb.s, kb.e, jb.s, jb.s, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         flux.flux(X2DIR,0,k,j,i) = 0.0;
         flux.flux(X2DIR,1,k,j,i) = 0.0;
+        SPACELOOP(ii) {
+          flux.flux(X2DIR,cmom_lo+ii,k,j,i) = 0.0;
+        }
       });
   }
   if (pmb->boundary_flag[BoundaryFace::outer_x2] == BoundaryFlag::outflow) {
@@ -356,12 +365,23 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
         flux.flux(X2DIR,0,k,j,i) = std::max(flux(X2DIR,0,k,j,i), 0.0);
       });
   } else if (pmb->boundary_flag[BoundaryFace::outer_x2] == BoundaryFlag::reflect) {
-    auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, fluid_cons::energy}),
-                                           std::vector<std::string>({fluid_cons::density, fluid_cons::energy}));
+    PackIndexMap imap;
+    auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, fluid_cons::energy, fluid_cons::momentum}),
+                                           std::vector<std::string>({fluid_cons::density, fluid_cons::energy, fluid_cons::momentum}), imap);
+    const int cmom_lo = imap[c::momentum].first;
+    const int cmom_hi = imap[c::momentum].second;
+    const int pb_lo = imap[c::bfield].first;
+    const int pb_hi = imap[c::bfield].second;
     parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(),
       kb.s, kb.e, jb.e+1, jb.e+1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         flux.flux(X2DIR,0,k,j,i) = 0.0;
         flux.flux(X2DIR,1,k,j,i) = 0.0;
+        SPACELOOP(ii) {
+          flux.flux(X2DIR,cmom_lo+ii,k,j,i) = 0.0;
+        }
+        //flux.flux[X1DIR,pb_lo+1,k,j,i) = 
+    // F1 [-1+NG][B2] = -F1[0+NG][B2]
+    // F3 [-1+NG][B2] = -F1[0+NG][B2]
       });
   }
 
