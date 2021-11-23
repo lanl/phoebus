@@ -134,13 +134,13 @@ TaskStatus MomentCon2Prim(T* rc) {
                     v(b, cF(ispec, 1), k, j, i), 
                     v(b, cF(ispec, 2), k, j, i)}};
         
-        Real xi = v(b, iXi(), k, j, i);
-        Real phi = 1.0001*v(b, iPhi(), k, j, i);
+        Real xi = v(b, iXi(ispec), k, j, i);
+        Real phi = 1.0001*v(b, iPhi(ispec), k, j, i);
 
         auto result = c.Con2PrimM1(E, covF, xi, phi, &J, &covH, &conTilPi);
         
-        v(b, iXi(), k, j, i) = result.xi;
-        v(b, iPhi(), k, j, i) = result.phi;
+        v(b, iXi(ispec), k, j, i) = result.xi;
+        v(b, iPhi(ispec), k, j, i) = result.phi;
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -700,7 +700,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           const Real T_cgs =  v(iblock, pT, k, j, i) * TEMPERATURE;
           const Real Ye = v(iblock, pYe, k, j, i);
 
-          Real kappa = d_opacity.AbsorptionCoefficientPerNu(rho_cgs, T_cgs, Ye, species[ispec], enu);
+          Real kappa = d_opacity.AbsorptionCoefficient(rho_cgs, T_cgs, Ye, species[ispec], enu);
           const Real emis = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, species[ispec]); 
           Real B = emis/kappa; 
           if (use_B_fake) B = B_fake; 
