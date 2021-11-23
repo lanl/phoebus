@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
 
   // TODO(JMM): Move this into another function somewhere?
   const std::string bc_ix1 =
-      pman.pinput->GetOrAddString("phoebus", "bc_ix1", "reflect");
+      pman.pinput->GetOrAddString("phoebus", "bc_ix1", "outflow");
   const std::string bc_ox1 =
       pman.pinput->GetOrAddString("phoebus", "bc_ox1", "outflow");
 

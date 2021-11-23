@@ -146,6 +146,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
 
+  // TODO(BRR) Should these go in a "phoebus" package?
+  const std::string bc_ix1 = pin->GetString("phoebus", "bc_ix1");
+  params.Add("bc_ix1", bc_ix1);
+  const std::string bc_ox1 = pin->GetString("phoebus", "bc_ox1");
+  params.Add("bc_ox1", bc_ox1);
+
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
     ndim = 3;
