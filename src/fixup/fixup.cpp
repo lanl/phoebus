@@ -187,8 +187,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             double u_floor = v(b,prho,k,j,i)*sie_floor;
             v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
 
-            if (isnan(v(b, prho, k, j, i))) { PARTHENON_FAIL("nan prho!\n"); }
-
             if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
                                 v(b,peng,k,j,i)/v(b,prho,k,j,i));
@@ -198,7 +196,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
             // TODO(jcd): make this work with MeshBlockPacks
             // TODOO(jcd): don't forget Ye!!!
-            const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+            /*const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
             const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
             Real beta[3];
             geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
@@ -232,7 +230,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             if (pye > 0) v(b, cye, k, j, i) = ye_cons;
             for (int m = slo; m <= shi; m++) {
               v(b,m,k,j,i) = sig[m-slo];
-            }
+            }*/
           } else {
             //std::cout << "Found no valid neighbors" << std::endl;
             // No valid neighbors; set fluid mass/energy to floors and set primitive velocities to zero
@@ -243,8 +241,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             v(b,prho,k,j,i) = rho_floor;
             double u_floor = v(b,prho,k,j,i)*sie_floor;
             v(b,peng,k,j,i) = u_floor;
-
-            if (isnan(v(b, prho, k, j, i))) { PARTHENON_FAIL("nan prho!\n"); }
 
             // Safe value for ye
             if (pye > 0) v(b, pye, k, j, i) = 0.5;
@@ -261,7 +257,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             }
             
             // Update conserved variables
-            const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+            /*const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
             const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
             Real beta[3];
             geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
@@ -295,7 +291,43 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             if (pye > 0) v(b, cye, k, j, i) = ye_cons;
             for (int m = slo; m <= shi; m++) {
               v(b,m,k,j,i) = sig[m-slo];
-            }
+            }*/
+          }
+          // Update conserved variables
+          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real beta[3];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+          Real gcov[4][4];
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          Real gcon[3][3];
+          geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+          Real S[3];
+          const Real vel[] = {v(b, pvel_lo, k, j, i),
+                        v(b, pvel_lo+1, k, j, i),
+                        v(b, pvel_hi, k, j, i)};
+          Real bcons[3];
+          Real bp[3] = {0.0, 0.0, 0.0};
+          if (pb_hi > 0) {
+            bp[0] = v(b, pb_lo, k, j, i);
+            bp[1] = v(b, pb_lo+1, k, j, i);
+            bp[2] = v(b, pb_hi, k, j, i);
+          }
+          Real ye_cons;
+          Real ye_prim = 0.0;
+          if (pye > 0) {
+            ye_prim = v(b, pye, k, j, i);
+          }
+          Real sig[3];
+          prim2con::p2c(v(b,prho,k,j,i), vel, bp, v(b,peng,k,j,i), ye_prim, v(b,prs,k,j,i), v(b,gm1,k,j,i),
+              gcov, gcon, beta, alpha, gdet,
+              v(b,crho,k,j,i), S, bcons, v(b,ceng,k,j,i), ye_cons, sig);
+          v(b, cmom_lo, k, j, i) = S[0];
+          v(b, cmom_lo+1, k, j, i) = S[1];
+          v(b, cmom_hi, k, j, i) = S[2];
+          if (pye > 0) v(b, cye, k, j, i) = ye_cons;
+          for (int m = slo; m <= shi; m++) {
+            v(b,m,k,j,i) = sig[m-slo];
           }
         }
       });
