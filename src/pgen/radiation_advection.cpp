@@ -42,10 +42,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const auto specB = idJ.GetBounds(1);
   const Real J = pin->GetOrAddReal("radiation_advection", "J", 1.0);
-  const Real Hx = pin->GetOrAddReal("radiation_advection", "Hx", 1.0);
+  const Real Hx = pin->GetOrAddReal("radiation_advection", "Hx", 0.0);
   const Real Hy = pin->GetOrAddReal("radiation_advection", "Hy", 0.0);
   const Real Hz = pin->GetOrAddReal("radiation_advection", "Hz", 0.0);
   const Real vx = pin->GetOrAddReal("radiation_advection", "vx", 0.0);
+  const Real width = pin->GetOrAddReal("radiation_advection", "width", sqrt(2.0));
   const int shapedim = pin->GetOrAddInteger("radiation_advection", "shapedim", 2);
 
   auto &coords = pmb->coords;
@@ -78,7 +79,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(idv(2), k, j, i) = 0.0; 
 
         for (int ispec = specB.s; ispec<=specB.e; ++ispec) {
-          v(idJ(ispec), k, j, i) = J*exp(-std::pow((r - 0.5)/0.25, 2));
+          v(idJ(ispec), k, j, i) = J*exp(-std::pow((r - 0.5)/(0.5*(width*width)), 2));
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
           v(idH(2, ispec), k, j, i) = Hz;
