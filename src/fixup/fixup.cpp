@@ -97,6 +97,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
 
   const std::vector<std::string> vars({p::density, c::density, p::velocity,
                                        c::momentum, p::energy, c::energy, p::bfield,
@@ -144,9 +145,11 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
   const int ndim = pmb->pmy_mesh->ndim;
 
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
+  auto bounds = fix_pkg->Param<Bounds>("bounds");
+
+  Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
@@ -176,6 +179,16 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
               v(b,pv,k,j,i) = fixup(pv, norm);
             }
             v(b,peng,k,j,i) = fixup(peng, norm);
+
+            // Apply floors
+            double rho_floor, sie_floor;
+            bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
+            v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
+            double u_floor = v(b,prho,k,j,i)*sie_floor;
+            v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
+
+            if (isnan(v(b, prho, k, j, i))) { PARTHENON_FAIL("nan prho!\n"); }
+
             if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
                                 v(b,peng,k,j,i)/v(b,prho,k,j,i));
@@ -222,6 +235,67 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             }
           } else {
             //std::cout << "Found no valid neighbors" << std::endl;
+            // No valid neighbors; set fluid mass/energy to floors and set primitive velocities to zero
+            
+            // Apply floors
+            double rho_floor, sie_floor;
+            bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
+            v(b,prho,k,j,i) = rho_floor;
+            double u_floor = v(b,prho,k,j,i)*sie_floor;
+            v(b,peng,k,j,i) = u_floor;
+
+            if (isnan(v(b, prho, k, j, i))) { PARTHENON_FAIL("nan prho!\n"); }
+
+            // Safe value for ye
+            if (pye > 0) v(b, pye, k, j, i) = 0.5;
+
+            v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
+                                v(b,peng,k,j,i)/v(b,prho,k,j,i));
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+            v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
+                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i);
+
+            // Zero primitive velocities
+            SPACELOOP(ii) {
+              v(b, pvel_lo+ii, k, j, i) = 0.;
+            }
+            
+            // Update conserved variables
+            const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+            const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+            Real beta[3];
+            geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+            Real gcov[4][4];
+            geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+            Real gcon[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+            Real S[3];
+            const Real vel[] = {v(b, pvel_lo, k, j, i),
+                          v(b, pvel_lo+1, k, j, i),
+                          v(b, pvel_hi, k, j, i)};
+            Real bcons[3];
+            Real bp[3] = {0.0, 0.0, 0.0};
+            if (pb_hi > 0) {
+              bp[0] = v(b, pb_lo, k, j, i);
+              bp[1] = v(b, pb_lo+1, k, j, i);
+              bp[2] = v(b, pb_hi, k, j, i);
+            }
+            Real ye_cons;
+            Real ye_prim = 0.0;
+            if (pye > 0) {
+              ye_prim = v(b, pye, k, j, i);
+            }
+            Real sig[3];
+            prim2con::p2c(v(b,prho,k,j,i), vel, bp, v(b,peng,k,j,i), ye_prim, v(b,prs,k,j,i), v(b,gm1,k,j,i),
+                gcov, gcon, beta, alpha, gdet,
+                v(b,crho,k,j,i), S, bcons, v(b,ceng,k,j,i), ye_cons, sig);
+            v(b, cmom_lo, k, j, i) = S[0];
+            v(b, cmom_lo+1, k, j, i) = S[1];
+            v(b, cmom_hi, k, j, i) = S[2];
+            if (pye > 0) v(b, cye, k, j, i) = ye_cons;
+            for (int m = slo; m <= shi; m++) {
+              v(b,m,k,j,i) = sig[m-slo];
+            }
           }
         }
       });
