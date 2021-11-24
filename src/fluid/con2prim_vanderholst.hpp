@@ -182,16 +182,18 @@ class ConToPrim {
     // Calculate initial guess
     const Real h = 1. + v(peng)/v(prho) +  v(prs)/v(prho);
     Real w = v(prho)*h;
-    Real vsq = 0.;
+    //Real vsq = 0.;
     Real vel[3] = {v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2)};
-    SPACELOOP2(ii, jj) {
-      vsq += g.gcov[ii][jj]*vel[ii]*vel[jj];
-    }
-    vsq = (vsq > 0.9996) ? 0.9996 : vsq;
-    Real Gamma = 1./sqrt(1. - vsq);
+    Real Gamma = phoebus::GetLorentzFactor(vel, g.gcov);
+    //SPACELOOP2(ii, jj) {
+    //  vsq += g.gcov[ii][jj]*vel[ii]*vel[jj];
+    //}
+    //vsq = (vsq > 0.9996) ? 0.9996 : vsq;
+    //Real Gamma = 1./sqrt(1. - vsq);
     Real xi_guess = Gamma*Gamma*w;
 
     if (isnan(xi_guess)) {
+      printf("%s:%i\n", __FILE__, __LINE__);
       return ConToPrimStatus::failure;
     }
 
@@ -217,6 +219,7 @@ class ConToPrim {
     SPACELOOP2(ii, jj) {
       Ssq += g.gcon[ii][jj]*S[ii]*S[jj];
     }
+    // TODO(BRR) use real eos call
     const Real gamma = 5./3.;
 
     Residual res(D,Ssq,tau,gamma);
@@ -225,6 +228,7 @@ class ConToPrim {
     const Real xi = find_root_secant(res, xi_guess, rel_tolerance, max_iter, success);
 
     if (!success) {
+      printf("%s:%i\n", __FILE__, __LINE__);
       return ConToPrimStatus::failure;
     }
 
@@ -271,6 +275,9 @@ class ConToPrim {
 
     if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) ||
         isnan(v(pvel_lo+2)) || isnan(v(prs)) || isnan(v(gm1))) {
+      printf("%s:%i\n", __FILE__, __LINE__);
+      printf("%e %e %e %e %e %e %e %e %e\n",
+        rho, ug, P, v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2), v(prs), v(gm1));
       return ConToPrimStatus::failure;
     }
 
