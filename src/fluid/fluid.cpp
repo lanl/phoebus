@@ -36,11 +36,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Check that we are actually evolving the fluid  
   const bool active = pin->GetBoolean("physics", "hydro");
   params.Add("active", active);
-  //printf("Fluid active : %i", active);
   if (active) { // Only set up these parameters if the fluid is evolved
-  
-    const bool hydro = pin->GetBoolean("physics", "hydro");
-    params.Add("hydro", hydro);
 
     Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
     params.Add("cfl", cfl);
@@ -425,7 +421,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
     return TaskStatus::complete;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -508,7 +504,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 // template <typename T>
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
     return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
