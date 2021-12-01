@@ -70,6 +70,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("B_fake", B_fake);
   bool use_B_fake = pin->GetOrAddBoolean("radiation", "use_B_fake", false);
   params.Add("use_B_fake", use_B_fake);
+  Real scattering_fraction = pin->GetOrAddReal("radiation", "scattering_fraction", 0.0);
+  params.Add("scattering_fraction", scattering_fraction);
 
   // Initialize frequency discretization
   Real nu_min = pin->GetReal("radiation", "nu_min");
