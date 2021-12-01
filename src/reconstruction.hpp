@@ -102,6 +102,19 @@ Real phifunc(const Real mind, const Real maxd, const Real gx, const Real gy, con
 
 template <typename T, typename Tq>
 KOKKOS_INLINE_FUNCTION
+void PiecewiseConstant(const int d, const int n,
+                       const int k, const int j, const int i,
+                       const T &v, const Tq &ql, const Tq &qr) {
+  const int dir = d-1;
+  const int di = (d == X1DIR ? 1 : 0);
+  const int dj = (d == X2DIR ? 1 : 0);
+  const int dk = (d == X3DIR ? 1 : 0);
+  ql(dir,n,k+dk,j+dj,i+di) = v(n,k,j,i);
+  qr(dir,n,k,j,i) = v(n,k,j,i);
+}
+
+template <typename T, typename Tq>
+KOKKOS_INLINE_FUNCTION
 void PiecewiseLinear(const int d, const int n,
                      const int k, const int j, const int i,
                      const T &v, const Tq &ql, const Tq &qr) {
