@@ -357,7 +357,7 @@ namespace radiation
     Real &J = x[0];
     Real &zeta = x[1]; //v^i \tilde H_i  
 
-    *dE = (4*W2/3 - 1.0/3.0 + W2*vvTilPi)*J + 2*W*zeta - Estar;      
+    *dE = (4*W2 - 1 + 3*W2*vvTilPi) / 3 * J + 2*W*zeta - Estar;      
     SPACELOOP(i)
       (*cov_dF)(i) = (cov_v(i)*tauH*(4*W2/3*J + W*zeta) + tauH*cov_vTilPi(i) 
                    + tauJ*W2*cov_v(i)*(JBB-J) + W*cov_Fstar(i))/(W+tauH) - cov_Fstar(i); 
@@ -380,7 +380,6 @@ namespace radiation
     Real vH = 0.0;
     SPACELOOP(i)
     vH += con_v(i) * cov_H(i);
-
     *E = (4 * W2 - 1 + 3 * W2 * vvPi) / 3 * J + 2 * W * vH;
     SPACELOOP(i)
     (*cov_F)(i) = 4 * W2 / 3 * cov_v(i) * J + W * cov_v(i) * vH + W * cov_H(i) + J * cov_vPi(i);
@@ -510,8 +509,8 @@ namespace radiation
     {
       SPACELOOP(j)
       {
-        (*concov_P)(i, j) = 4 / 3 * W2 * con_v(i) * cov_v(j) * J + W * (con_v(i) * cov_tilH(j) + cov_v(j) * con_tilH(i));
-        +J *concov_tilPi(i, j);
+        (*concov_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * cov_v(j) * J 
+            + W * (con_v(i) * cov_tilH(j) + cov_v(j) * con_tilH(i)) + J * concov_tilPi(i, j);
       }
       (*concov_P)(i, i) += J / 3.0;
     }
@@ -525,6 +524,12 @@ namespace radiation
       Closure<Vec, Tens2>::SolveClosure(Real E, V cov_F, Real *xi_out, Real *phi_out,
                                         const Real xi_guess, const Real phi_guess)
   {
+    // Temporary Eddington closure
+    //*xi_out = 0.0;
+    //*phi_out = 3.14159;
+    //M1Result resultEdd{Status::success, 0, *xi_out, *phi_out, 0.0, 0.0};
+    //return resultEdd;
+
     const int max_iter = 30;
     const Real tol = 1.e6 * std::numeric_limits<Real>::epsilon();
     const Real eps = std::sqrt(10 * std::numeric_limits<Real>::epsilon());
