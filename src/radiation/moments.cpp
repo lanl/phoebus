@@ -266,11 +266,11 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
         // Reconstruct radiation
         for (int ivar = 0; ivar<nrecon; ++ivar) {
-          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v, ql, qr);
+          PhoebusReconstruction::MP5(iface, ivar, k, j, i, v, ql, qr);
         }
         // Reconstruct velocity for radiation 
         for (int ivar = 0; ivar<3; ++ivar) {
-          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
+          PhoebusReconstruction::MP5(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
         }
         
         // Calculate spatial derivatives of J at zone faces for diffusion limit
@@ -303,7 +303,7 @@ TaskStatus ReconstructEdgeStates(T* rc) {
           }
           // Overwrite the derivative perpendicular to the face
           const Real dx = pmb->coords.Dx(iface, k, j, i); 
-          v(b, idx_dJ(ispec, iface-1, iface-1), k, j, i) =  (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k-off_k, j-off_j, i-off_i))/dx; 
+          v(b, idx_dJ(ispec, iface-1, iface-1), k, j, i) =  (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k-off_k, j-off_j, i-off_i))/dx;
         }
       });
   return TaskStatus::complete;  
@@ -412,8 +412,7 @@ TaskStatus CalculateFluxes(T* rc) {
           geom.ContravariantShift(face, k, j, i, con_beta.data);
           
           const Real dx = pmb->coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
-          const Real a = tanh(1/std::max(kappaH*dx, 1.e-20));
-          //printf ("a : %e dJ/dx^i = (%e %e %e) \n", a, cov_dJ(0), cov_dJ(1), cov_dJ(2));
+          const Real a = tanh(1/std::pow(std::max(kappaH*dx, 1.e-20), 1));
 
           // Calculate the observer frame quantities on the left side of the interface  
           /// TODO: (LFR) Add other contributions to the asymptotic flux 
@@ -472,16 +471,16 @@ TaskStatus CalculateFluxes(T* rc) {
           Pr(idir, 2) -= con_beta(idir)*covFr(2);
 
           // Everything below should be independent of the assumed closure, just calculating the LLF flux
-          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(conFl(idir) + conFr(idir)) + speed*(El - Er); 
+          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(conFl(idir) + conFr(idir)) + 0.5*speed*(El - Er); 
         
           v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = 0.5*(Pl(idir, 0) + Pr(idir, 0)) 
-                                                       + speed*(covFl(0) - covFr(0));
+                                                       + 0.5*speed*(covFl(0) - covFr(0));
 
           v.flux(idir_in, idx_Ff(ispec, 1), k, j, i) = 0.5*(Pl(idir, 1) + Pr(idir, 1)) 
-                                                       + speed*(covFl(1) - covFr(1)); 
+                                                       + 0.5*speed*(covFl(1) - covFr(1)); 
 
           v.flux(idir_in, idx_Ff(ispec, 2), k, j, i) = 0.5*(Pl(idir, 2) + Pr(idir, 2)) 
-                                                       + speed*(covFl(2) - covFr(2));
+                                                       + 0.5*speed*(covFl(2) - covFr(2));
         
         } 
       });
@@ -510,16 +509,13 @@ template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) { 
   
-  auto *pmb = rc->GetParentPointer().get();
-   
   namespace cr = radmoment_cons;  
   namespace pr = radmoment_prim;  
   namespace ir = radmoment_internal;  
   namespace c = fluid_cons;
   namespace p = fluid_prim;
   std::vector<std::string> vars{cr::E, cr::F, p::density, p::temperature, p::ye, p::velocity,
-                                pr::J, pr::H, 
-                                ir::kappaJ, ir::kappaH, ir::JBB}; 
+                                pr::J, pr::H, ir::kappaJ, ir::kappaH, ir::JBB}; 
   if (update_fluid) {
     vars.push_back(c::energy);
     vars.push_back(c::momentum);
@@ -536,7 +532,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
-  
   auto pv = imap.GetFlatIdx(p::velocity);
 
   int prho = imap[p::density].first; 
@@ -551,9 +546,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
     cye = imap[c::ye].first;
   }
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
  
   // Get the background geometry 
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -575,8 +570,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                      v(iblock, pv(1), k, j, i),
                      v(iblock, pv(2), k, j, i)}};
           Tens2 cov_gamma; 
-          geom.Metric(CellLocation::Cent, k, j, i, cov_gamma.data);
-          Real alpha = geom.Lapse(CellLocation::Cent, k, j, i); 
+          geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+          Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i); 
           Closure<Vec, Tens2> c(con_v, cov_gamma); 
           
           Real Estar = v(iblock, idx_E(ispec), k, j, i); 
@@ -591,29 +586,21 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Vec con_tilf;
           Tens2 con_tilPi{{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}};  
 
-          // Treat the Eddington tensor explicitly  
+          // Treat the Eddington tensor explicitly for now
           Real& J = v(iblock, idx_J(ispec), k, j, i); 
           Vec cov_H{{v(iblock, idx_H(ispec, 0), k, j, i), 
                      v(iblock, idx_H(ispec, 1), k, j, i),
                      v(iblock, idx_H(ispec, 2), k, j, i),
                     }}; 
-          c.M1FluidPressureTensor(J, cov_H, &con_tilPi, &con_tilf); 
+          //c.M1FluidPressureTensor(J, cov_H, &con_tilPi, &con_tilf); 
 
           Real B = v(iblock, idx_JBB(ispec), k, j, i); 
           Real tauJ = alpha*dt*v(iblock, idx_kappaJ(ispec), k, j, i);  
           Real tauH = alpha*dt*v(iblock, idx_kappaH(ispec), k, j, i);  
-        
+          Real kappaH =  v(iblock, idx_kappaH(ispec), k, j, i);
           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, 
                                tauJ, tauH, &dE, &cov_dF); 
-          //printf("dE (new) = %e ", dE); 
-          // This is the zero velocity limit for testing
-          //const Real lam = (kappa*dt)/(1 + kappa*dt);
-          //dE = (B - v(iblock, idx_E(ispec), k, j, i))*lam;
-          //cov_dF(0) = -v(iblock, idx_F(ispec, 0), k, j, i)*lam;
-          //cov_dF(0) = -v(iblock, idx_F(ispec, 1), k, j, i)*lam;
-          //cov_dF(0) = -v(iblock, idx_F(ispec, 2), k, j, i)*lam;
-
-          //printf("dE (old) = %e Estar = %e tau = %e\n", dE, Estar, kappa*dt); 
+          
           // Add source corrections to conserved iration variables
           v(iblock, idx_E(ispec), k, j, i) += dE; 
           for (int idir=0; idir<3; ++idir) {
@@ -633,6 +620,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
   return TaskStatus::complete;
 }
+template TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *, Real, bool);
 template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real, bool);
 
 template <class T>
@@ -674,6 +662,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   // Mainly for testing purposes, probably should be able to do this with the opacity code itself
   const auto B_fake = rad->Param<Real>("B_fake");
   const auto use_B_fake = rad->Param<bool>("use_B_fake");
+  const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
   // Get the device opacity object
   using namespace singularity::neutrinos; 
@@ -709,7 +698,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           if (use_B_fake) B = B_fake; 
 
           v(iblock, idx_JBB(ispec), k, j, i) = B;  
-          v(iblock, idx_kappaJ(ispec), k, j, i) = kappa;  
+          v(iblock, idx_kappaJ(ispec), k, j, i) = kappa*(1.0 - scattering_fraction);  
           v(iblock, idx_kappaH(ispec), k, j, i) = kappa;  
           
         } 
