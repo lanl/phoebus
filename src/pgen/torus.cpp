@@ -237,6 +237,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
       v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i));
 
+      if (i == 0 && j == 0) {
+        printf("[%i %i] pgen prho: %e\n", i,j,v(irho,k,j,i));
+      }
+
       rng_pool.free_state(rng_gen);
     });
 
@@ -288,6 +292,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real bsq = (Bsq + b0*b0)/(W*W);
       Real beta = v(iprs,k,j,i)/(0.5*bsq + 1.e-100);
       if (v(irho,k,j,i) > 1.e-4 && beta < bmin) bmin = beta;
+      if (i == 0 && j == 0) {
+        printf("[%i %i] pgen prho: %e\n", i,j,v(irho,k,j,i));
+      }
       //if (bsq > b2max) b2max = bsq;
     }, Kokkos::Min<Real>(beta_min));
     if (parthenon::Globals::my_rank == 0)
@@ -295,6 +302,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
   // now normalize the b-field
   fluid::PrimitiveToConserved(rc);
+  printf("Problem initialized!\n");
 }
 
 void ProblemModifier(ParameterInput *pin) {
