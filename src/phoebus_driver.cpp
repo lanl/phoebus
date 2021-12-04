@@ -152,8 +152,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (rad_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       auto moment_recon = tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get()); 
-      auto get_opacities = tl.AddTask(none, radiation::MomentCalculateOpacities<MDT>, sc0.get());  
-      auto moment_flux = tl.AddTask(moment_recon | get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());
+      auto get_opacities = tl.AddTask(moment_recon, radiation::MomentCalculateOpacities<MDT>, sc0.get());  
+      auto moment_flux = tl.AddTask(get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());
       auto moment_geom_src =  tl.AddTask(none, radiation::CalculateGeometricSource<MDT>, sc0.get(), gsrc.get());
       sndrcv_flux_depend = sndrcv_flux_depend | moment_flux;
       geom_src = geom_src | moment_geom_src; 
@@ -195,8 +195,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto update = tl.AddTask(avg_data, UpdateIndependentData<MeshData<Real>>, sc0.get(),
                              dudt.get(), beta*dt, sc1.get());
 
+    // Implicit source update  
+    auto impl_update = tl.AddTask(update, radiation::MomentFluidSource<MeshData<Real>>, 
+                                  sc1.get(), beta*dt, fluid_active);
+
     // update ghost cells
-    auto send = tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
+    auto send = tl.AddTask(impl_update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
     auto recv = tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
     auto fill_from_bufs = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, sc1);
   }
@@ -267,7 +271,7 @@ TaskListStatus PhoebusDriver::RadiationPreStep() {
   auto num_independent_task_lists = blocks.size();
 
   const auto rad_method = rad->Param<std::string>("method");
-  if (rad_method == "moment") {
+  if (false /*rad_method == "moment"*/) {
     TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
     for (int ib = 0; ib < num_independent_task_lists; ib++) {
       auto pmb = blocks[ib].get();
@@ -317,7 +321,7 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
       auto apply_four_force = tl.AddTask(
           calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
     }
-  } else if (rad_method == "moment") {
+  } else if (false /*rad_method == "moment"*/) {
     TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
     for (int ib = 0; ib < num_independent_task_lists; ib++) {
       auto pmb = blocks[ib].get();
