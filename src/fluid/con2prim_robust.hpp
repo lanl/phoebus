@@ -414,8 +414,6 @@ class ConToPrim {
     if (num_nans > 0) return ConToPrimStatus::failure;
     const Real igdet = 1.0/g.gdet;
 
-    printf("[%i %i] prho: %e crho: %e\n", v.i_, v.j_, v(prho), v(crho));
-
     Real rhoflr = 0.0;
     Real epsflr;
     bounds.GetFloors(x1,x2,x3,rhoflr,epsflr);
@@ -438,7 +436,6 @@ class ConToPrim {
     tau -= D;
     #endif // USE_VALENCIA
     const Real q = tau/D;
-    printf("tau: %e D: %e\n", tau, D);
     //PARTHENON_REQUIRE(D > 0, "D < 0");
 
     if (pye > 0) v(pye) = v(cye)/v(crho);
@@ -540,7 +537,6 @@ class ConToPrim {
     v(prho) = res.rhohat_mu(iW);
     const Real qbar = res.qbar_mu(mu,x);
     Real W = 1.0/iW;
-    printf("W: %e\n", W);
     v(peng) = res.ehat_mu(mu, qbar, rbarsq, vsq, W);
     v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
     v(peng) *= v(prho);
@@ -567,9 +563,6 @@ class ConToPrim {
         bu[i] = v(pb_lo+i);
       }
     }
-
-    printf("[%i %i] rho: %e u: %e v: %e %e %e\n", v.i_, v.j_, v(prho), v(peng),
-      v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2)); exit(-1);
 
     /*if (res.used_density_floor() ||
         res.used_energy_floor() ||
