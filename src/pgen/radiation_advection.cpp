@@ -47,7 +47,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real Hz = pin->GetOrAddReal("radiation_advection", "Hz", 0.0);
   const Real vx = pin->GetOrAddReal("radiation_advection", "vx", 0.0);
   const Real width = pin->GetOrAddReal("radiation_advection", "width", sqrt(2.0));
-  const int shapedim = pin->GetOrAddInteger("radiation_advection", "shapedim", 2);
+  const Real kappa = pin->GetOrAddReal("radiation_advection", "kappas_init", 1.e3);
+  const int shapedim = pin->GetOrAddInteger("radiation_advection", "shapedim", 1);
 
   auto &coords = pmb->coords;
   auto pmesh = pmb->pmy_mesh;
@@ -58,7 +59,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   //auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
-
+  const Real gamma = 1/sqrt(1-vx*vx); 
+  const Real t0p = 1.5*kappa*width*width;
+  const Real t0 = t0p; 
+  const Real x0p = (0.5 - vx*t0)*gamma;
+  printf("t0 = %e kappa = %e width = %e gamma = %e \n", t0, kappa, width); 
   pmb->par_for(
       "Phoebus::ProblemGenerator::radiation_advection", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -77,9 +82,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(idv(0), k, j, i) = vx; 
         v(idv(1), k, j, i) = 0.0; 
         v(idv(2), k, j, i) = 0.0; 
-
+        
+        // Write down boosted diffusion initial condition
+        Real tp = gamma*(t0 - vx*x); 
+        Real xp = gamma*(x - vx*t0);  
         for (int ispec = specB.s; ispec<=specB.e; ++ispec) {
-          v(idJ(ispec), k, j, i) = J*exp(-std::pow((r - 0.5)/width, 2)/2);
+          v(idJ(ispec), k, j, i) = J*sqrt(t0p/tp)*exp(-3*kappa*std::pow(xp - x0p, 2)/(4*tp));
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
           v(idH(2, ispec), k, j, i) = Hz;
