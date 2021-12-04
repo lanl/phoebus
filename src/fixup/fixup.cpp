@@ -257,6 +257,112 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           }
         }
       });
+
+  // Apply floors to primitives
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+      0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+            
+          double rho_floor, sie_floor;
+          bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
+
+          // Temporary hack
+          rho_floor *= 5.;
+          sie_floor *= 5.;
+          
+          bool floor_applied = false;
+          if (v(b,prho,k,j,i) < rho_floor) {
+            floor_applied = true;
+            v(b,prho,k,j,i) = rho_floor;
+          }
+          if (v(b,peng,k,j,i)/v(b,prho,k,j,i) < sie_floor) {
+            floor_applied = true;
+            v(b,peng,k,j,i) = sie_floor*v(b,prho,k,j,i);
+          }
+          
+          Real gcov[4][4];
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+
+          Real Bsq = 0.0;
+          Real Bdotv = 0.0;
+          const Real vp[3] = {v(b,pvel_lo,k,j,i), v(b,pvel_lo+1,k,j,i), v(b,pvel_lo+2,k,j,i)};
+          const Real bp[3] = {v(b,pb_lo,k,j,i), v(pb_lo+1,k,j,i), v(pb_lo+2,k,j,i)};
+          const Real W = phoebus::GetLorentzFactor(vp, gcov);
+          const Real iW = 1.0/W;
+          SPACELOOP2(ii, jj) {
+            Bsq += gcov[ii+1][jj+1] * bp[ii] * bp[jj];
+            Bdotv += gcov[ii+1][jj+1] * bp[ii] * vp[jj];
+          }
+          Real bcon0 = W * Bdotv / alpha;
+          const Real bsq = (Bsq + alpha*alpha * bcon0*bcon0)*iW*iW;
+
+          if (bsq/v(b,prho,k,j,i) > 50.) {
+            floor_applied = true;
+            v(b,prho,k,j,i) = bsq/50.;
+          }
+          if (bsq/v(b,peng,k,j,i) > 2500.) {
+            floor_applied = true;
+            v(b,peng,k,j,i) = bsq/2500.;
+          }
+          if (v(b,peng,k,j,i)/v(b,prho,k,j,i) > 50.) {
+            floor_applied = true;
+            v(b,peng,k,j,i) = 50.*v(b,prho,k,j,i);
+          }
+  
+  /*Real vsq = 0.0;
+  Real Bsq = 0.0;
+  Real Bdotv = 0.0;
+  Real v[3] = {vp[0]*iW, vp[1]*iW, vp[2]*iW};
+  SPACELOOP2(ii, jj) {
+    vsq += gcov[ii+1][jj+1] * v[ii] * v[jj];
+    Bsq += gcov[ii+1][jj+1] * b[ii] * b[jj];
+    Bdotv += gcov[ii+1][jj+1] * b[ii] * v[jj];
+  }
+  Real bcon[] = {W * Bdotv / alpha, 0.0, 0.0, 0.0};
+  SPACELOOP(m) {
+    bcon[m+1] = b[m]*iW + bcon[0] * (v[m] - beta[m]/alpha);
+  }
+  const Real bsq = (Bsq + alpha*alpha * bcon[0]*bcon[0])*iW*iW;*/
+
+          if (floor_applied) {
+            // Update conserved variables
+            const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+            Real gcon[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+            Real beta[3];
+            geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+            Real S[3];
+            const Real vel[] = {v(b, pvel_lo, k, j, i),
+                          v(b, pvel_lo+1, k, j, i),
+                          v(b, pvel_hi, k, j, i)};
+            Real bcons[3];
+            Real bp[3] = {0.0, 0.0, 0.0};
+            if (pb_hi > 0) {
+              bp[0] = v(b, pb_lo, k, j, i);
+              bp[1] = v(b, pb_lo+1, k, j, i);
+              bp[2] = v(b, pb_hi, k, j, i);
+            }
+            Real ye_cons;
+            Real ye_prim = 0.0;
+            if (pye > 0) {
+              ye_prim = v(b, pye, k, j, i);
+            }
+            Real sig[3];
+            prim2con::p2c(v(b,prho,k,j,i), vel, bp, v(b,peng,k,j,i), ye_prim, v(b,prs,k,j,i), v(b,gm1,k,j,i),
+                gcov, gcon, beta, alpha, gdet,
+                v(b,crho,k,j,i), S, bcons, v(b,ceng,k,j,i), ye_cons, sig);
+            v(b, cmom_lo, k, j, i) = S[0];
+            v(b, cmom_lo+1, k, j, i) = S[1];
+            v(b, cmom_hi, k, j, i) = S[2];
+            if (pye > 0) v(b, cye, k, j, i) = ye_cons;
+            for (int m = slo; m <= shi; m++) {
+              v(b,m,k,j,i) = sig[m-slo];
+            }
+          }
+        });
+
   return TaskStatus::complete;
 }
 
