@@ -140,6 +140,9 @@ class Residual {
     Real garbage = 0.0;
     bounds_.GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
     bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
+
+    // TODO(BRR) Kludge to separate c2p_robust floor from the floors enforced separately
+    rho_floor_ /= 1.e2;
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
@@ -603,11 +606,11 @@ class ConToPrim {
     //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+2)), "v(cmom_lo+2) = NaN");
     //PARTHENON_REQUIRE(!std::isnan(v(ceng)), "v(ceng) = NaN");
 
-    if (res.used_density_floor())// ||
+    if (//res.used_density_floor() ||
         //res.used_energy_max() ||
         //res.used_energy_floor() ||
-        //res.used_gamma_max() ||
-        //num_nans > 0)
+        res.used_gamma_max() ||
+        num_nans > 0)
       return ConToPrimStatus::failure;
     return ConToPrimStatus::success;
   }

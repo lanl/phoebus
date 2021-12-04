@@ -23,11 +23,9 @@ using namespace parthenon::package::prelude;
 namespace fixup {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-// TODO(BRR) Remove (deprecated by FixFluxes)?
-//TaskStatus NothingEscapes(MeshBlockData<Real> *rc);
 TaskStatus FixFluxes(MeshBlockData<Real> *rc);
-// TODO(BRR) Remove (deprecated by ConservedToPrimitiveFixup)?
-//TaskStatus FixFailures(MeshBlockData<Real> *rc);
+template <typename T>
+TaskStatus ApplyFloors(T *rc);
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc);
 
