@@ -39,8 +39,8 @@ struct FailFlags {
 
 template <typename F>
 KOKKOS_INLINE_FUNCTION
-Real find_root_secant(F func, const Real x_guess, const Real tol, const int maxiter, bool &success, 
-  const int eps = 1.e-5) {
+Real find_root_secant(F func, const Real x_guess, const Real tol, const int maxiter, bool &success,
+  const Real eps = 1.e-5) {
   int niter = 0;
 
   Real x0 = x_guess;
@@ -62,6 +62,75 @@ Real find_root_secant(F func, const Real x_guess, const Real tol, const int maxi
     success = false;
   }
   return x1;
+}
+
+KOKKOS_INLINE_FUNCTION
+Real xi_to_Gamma(const Real &xi, const Real &SdB, const Real &Bsq, const Real Scov[3],
+                 const Real Bcov[3], const Real gcon[3][3]) {
+  Real threev[3] = {0};
+  SPACELOOP(ii) {
+    threev[ii] = Scov[ii] + 1./xi*SdB*Bcov[ii];
+  }
+  Real ans = 0.;
+  SPACELOOP2(ii, jj) {
+    ans += gcon[ii][jj]*threev[ii]*threev[jj];
+  }
+  ans /= std::pow(xi + Bsq,2);
+  ans = 1. - ans;
+  return 1./std::sqrt(ans);
+}
+
+KOKKOS_INLINE_FUNCTION
+Real Gamma_to_sie(const Real &Gamma, const Real &xi, const Real vcon[3], const Real &D, const Real &tau,
+                  const Real Scov[3], const Real Bcon[3], const Real gcov4[4][4],
+                  const Real gcon[3][3], const Real &Bsq, const Real &SdB) {
+    Real rho = D/Gamma;
+    Real h = xi/(Gamma*Gamma);
+    const Real muK = 1./(h*Gamma);
+    Real bKcon[3] = {0};
+
+    const Real sD = 1.0/std::sqrt(D);
+    SPACELOOP(ii) {
+      bKcon[ii] = Bcon[ii]/sD;
+      printf("Bcon[%i]: %e\n", ii, Bcon[ii]);
+    }
+    Real bKsq = 0.;
+    SPACELOOP2(ii, jj) {
+      bKsq += gcov4[ii+1][jj+1]*bKcon[ii]*bKcon[jj];
+    }
+    printf("bKsq: %e\n", bKsq);
+    Real rKperpcon[3] = {0.};
+    SPACELOOP(ii) {
+      SPACELOOP(jj) {
+        rKperpcon[ii] -= bKcon[jj]*Scov[jj];
+      }
+      rKperpcon[ii] *= bKcon[ii]/(bKsq*D + 1.e-100);
+      Real Sconii = 0.;
+      SPACELOOP(jj) {
+        Sconii += gcon[ii][jj]*Scov[jj];
+      }
+      rKperpcon[ii] += Sconii/D;
+      printf("rKperpcon[%i]: %e\n", ii, rKperpcon[ii]);
+      printf("[%i] bKcon: %e Scov: %e\n", ii, bKcon[ii], Scov[ii]);
+    }
+    Real rKperpsq = 0.;
+    SPACELOOP2(ii, jj) {
+      rKperpsq += gcov4[ii+1][jj+1]*rKperpcon[ii]*rKperpcon[jj];
+    }
+    Real rbarKsq = 0.;
+    SPACELOOP2(ii, jj) {
+      rbarKsq += vcon[ii]*vcon[jj]*gcov4[ii][jj];
+    }
+    rbarKsq *= D*Gamma*Gamma*h*h;
+    printf("rbarKsq: %e\n", rbarKsq);
+
+    const Real qK = tau/D;
+    const Real xK = 1./(1. + muK*bKsq);
+    const Real qKbar = qK - 0.5*bKsq - 0.5*muK*muK*xK*xK*bKsq*rKperpsq;
+
+    printf("qK: %e xK: %e qKbar: %e muK: %e rKperpsq: %e\n", qK, xK, qKbar, muK, rKperpsq);
+
+    return Gamma*(qKbar - muK*rbarKsq) + Gamma - 1.;
 }
 
 class Residual {
@@ -126,7 +195,7 @@ struct CellGeom {
     geom.MetricInverse(CellLocation::Cent, b, k, j, i, gcon);
     geom.ContravariantShift(CellLocation::Cent, b, k, j, i, beta);
   }
-  Real gcov[3][3];
+  Real gcov[3][3]; // TODO(BRR) remove
   Real gcov4[4][4];
   Real gcon[3][3];
   Real beta[3];
@@ -179,8 +248,18 @@ class ConToPrim {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
 
+    const Real igdet = 1.0/g.gdet;
+
+    // First update magnetic field
+    if (pb_hi > 0) {
+      // first set the primitive b-fields
+      SPACELOOP(ii) {
+        v(pb_lo+ii) = v(cb_lo+ii)*igdet;
+      }
+    }
+
     // Calculate initial guess
-    const Real h = 1. + v(peng)/v(prho) +  v(prs)/v(prho);
+    Real h = 1. + v(peng)/v(prho) +  v(prs)/v(prho);
     Real w = v(prho)*h;
     //Real vsq = 0.;
     Real vel[3] = {v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2)};
@@ -192,16 +271,21 @@ class ConToPrim {
     //Real Gamma = 1./sqrt(1. - vsq);
     Real xi_guess = Gamma*Gamma*w;
 
+    printf("Initial: rho: %e ug: %e P: %e\n", v(prho), v(peng), v(prs));
+
+    //if (v.i_ == 128 && v.j_ == 128) {
+    //  printf("h: %e w: %e vel: %e %e %e Gamma: %e\n", h,w,vel[0],vel[1],vel[2],Gamma);
+    //}
+
     if (isnan(xi_guess)) {
-      printf("%s:%i\n", __FILE__, __LINE__);
       return ConToPrimStatus::failure;
     }
 
-    const Real igdet = 1.0/g.gdet;
-
     const Real D = v(crho)*igdet;
+    //  printf("D: %e\n", D);
     #if USE_VALENCIA
     const Real tau = v(ceng)*igdet;
+    //printf("tau: %e\n", tau);
     #else
     Real Qcov[4] = {(v(ceng) - v(crho))*igdet,
                       v(cmom_lo)*igdet,
@@ -214,35 +298,118 @@ class ConToPrim {
     }
     tau -= D;
     #endif // USE_VALENCIA
-    Real S[3] = {v(cmom_lo)*igdet, v(cmom_lo+1)*igdet, v(cmom_lo+2)*igdet};
+    Real Scov[3] = {v(cmom_lo)*igdet, v(cmom_lo+1)*igdet, v(cmom_lo+2)*igdet};
     Real Ssq = 0.;
     SPACELOOP2(ii, jj) {
-      Ssq += g.gcon[ii][jj]*S[ii]*S[jj];
+      Ssq += g.gcon[ii][jj]*Scov[ii]*Scov[jj];
     }
-    // TODO(BRR) use real eos call
-    const Real gamma = 5./3.;
 
+    Real Bcon[3] = {0.};
+    Real Bcov[3] = {0.};
+    Real Bsq = 0.;
+    Real SdB = 0.;
+    if (pb_hi > 0) {
+      SPACELOOP(ii) {
+        Bcon[ii] = v(pb_lo+ii);
+      }
+      SPACELOOP2(ii, jj) {
+        Bcov[ii] += g.gcov4[ii+1][jj+1]*Bcon[jj];
+      }
+      SPACELOOP(ii) {
+        Bsq += Bcon[ii]*Bcov[ii];
+        SdB += Scov[ii]*Bcon[ii];
+      }
+    }
+
+
+    Real gamma = 5./3.;
     Residual res(D,Ssq,tau,gamma);
 
     bool success;
     const Real xi = find_root_secant(res, xi_guess, rel_tolerance, max_iter, success);
 
     if (!success) {
-      printf("%s:%i\n", __FILE__, __LINE__);
       return ConToPrimStatus::failure;
     }
 
-    Gamma = sqrt(1./(1. - Ssq/(xi*xi)));
+    Gamma = xi_to_Gamma(xi, SdB, Bsq, Scov, Bcov, g.gcon);
+
+    printf("Gamma: %e\n", Gamma);
+    {
+      Real vcov[3] = {Scov[0]/xi, Scov[1]/xi, Scov[2]/xi};
+      Real vcon[3] = {0};
+      SPACELOOP2(ii, jj) {
+        vcon[ii] += g.gcon[ii][jj]*vcov[jj];
+      }
+      Real sie = Gamma_to_sie(Gamma, xi, vcon, D, tau, Scov, Bcon, g.gcov4, g.gcon, Bsq, SdB);
+      printf("sie: %e ug: %e\n", sie, v(prho)*sie);
+    }
+    exit(-1);
+
+   // Gamma = sqrt(1./(1. - Ssq/(xi*xi)));
+
+    //if (v.i_ == 128 && v.j_ == 128) {
+    //  printf("xi = %e Gamma = %e\n",xi, Gamma);
+    //  printf("[%i %i %i]\n", v.i_, v.j_, v.k_);
+    //}
     w = xi/(Gamma*Gamma);
     Real rho = D/Gamma;
-    Real P = (gamma - 1.)/gamma*(w - rho);
-    Real ug = P/(gamma - 1.);
-
-    Real vcov[3] = {S[0]/xi, S[1]/xi, S[2]/xi};
+    Real vcov[3] = {Scov[0]/xi, Scov[1]/xi, Scov[2]/xi};
     Real vcon[3] = {0};
     SPACELOOP2(ii, jj) {
       vcon[ii] += g.gcon[ii][jj]*vcov[jj];
     }
+
+    // Follow Kastaun et al. 2021 to calculate internal energy density
+    /*h = w/rho;
+    const Real muK = 1./(h*Gamma);
+    Real bKcon[3] = {0};
+
+    const Real sD = 1.0/std::sqrt(D);
+    SPACELOOP(ii) {
+      bKcon[ii] = v(pb_lo+ii)/sD;
+    }
+    Real bKsq = 0.;
+    SPACELOOP2(ii, jj) {
+      bKsq += g.gcov4[ii+1][jj+1]*bKcon[ii]*bKcon[jj];
+    }
+    Real rKperpcon[3] = {0.};
+    SPACELOOP(ii) {
+      SPACELOOP(jj) {
+        rKperpcon[ii] -= bKcon[jj]*S[jj];
+      }
+      rKperpcon[ii] *= bKcon[ii]/(bKsq*D);
+      Real Sconii = 0.;
+      SPACELOOP(jj) {
+        Sconii += g.gcon[ii][jj]*S[jj];
+      }
+      rKperpcon[ii] += Sconii/D;
+    }
+    Real rKperpsq = 0.;
+    SPACELOOP2(ii, jj) {
+      rKperpsq += g.gcov4[ii+1][jj+1]*rKperpcon[ii]*rKperpcon[jj];
+    }
+    Real rbarKsq = 0.;
+    SPACELOOP(ii) {
+      rbarKsq += vcon[ii]*vcov[ii];
+    }
+    rbarKsq *= D*Gamma*Gamma*h*h;
+
+    const Real qK = tau/D;
+    const Real xK = 1./(1. + muK*bKsq);
+    const Real qKbar = qK - 0.5*bKsq - 0.5*muK*muK*xK*xK*bKsq*rKperpsq;
+
+    Real sie = Gamma*(qKbar - muK*rbarKsq) + Gamma - 1.;
+    printf("ug: %e\n", ug);
+    exit(-1);*/
+    const Real sie = 0.;
+    Real ug = 1.;
+
+    //Real P = (gamma - 1.)/gamma*(w - rho);
+    //Real P = (gamma - 1.)/gamma*(w - rho);
+    //Real ug = P/(gamma - 1.);
+    Real P = eos.PressureFromDensityInternalEnergy(rho, sie);
+
 
     v(prho) = rho;
     v(peng) = ug;
@@ -250,6 +417,10 @@ class ConToPrim {
     v(pvel_lo) = Gamma*vcon[0];
     v(pvel_lo + 1) = Gamma*vcon[1];
     v(pvel_lo + 2) = Gamma*vcon[2];
+    //if (v.i_ == 128 && v.j_ == 128) {
+    //  printf("rho: %e ug: %e P: %e vel: %e %e %e\n", rho, ug, P, v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2));
+      //exit(-1);
+   // }
 
     v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng)/v(prho));
     v(prs) = eos.PressureFromDensityInternalEnergy(v(prho), v(peng)/v(prho));
@@ -265,7 +436,7 @@ class ConToPrim {
     Real bu[] = {0.0, 0.0, 0.0};
     prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
                   g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
-                  v(crho), S, bcons, v(ceng), ye_cons, sig);
+                  v(crho), Scov, bcons, v(ceng), ye_cons, sig);
     for (int i = 0; i < sig_hi-sig_lo+1; i++) {
       v(sig_lo+i) = sig[i];
     }
@@ -275,9 +446,10 @@ class ConToPrim {
 
     if (isnan(rho) || isnan(ug) || isnan(P) || isnan(v(pvel_lo)) || isnan(v(pvel_lo+1)) ||
         isnan(v(pvel_lo+2)) || isnan(v(prs)) || isnan(v(gm1))) {
-      printf("%s:%i\n", __FILE__, __LINE__);
-      printf("%e %e %e %e %e %e %e %e %e\n",
-        rho, ug, P, v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2), v(prs), v(gm1));
+      //printf("%s:%i\n", __FILE__, __LINE__);
+      //printf("%e %e %e %e %e %e %e %e %e\n",
+      //  rho, ug, P, v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2), v(prs), v(gm1));
+      //exit(-1);
       return ConToPrimStatus::failure;
     }
 
