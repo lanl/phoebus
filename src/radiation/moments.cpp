@@ -141,7 +141,17 @@ TaskStatus MomentCon2Prim(T* rc) {
         
         v(b, iXi(ispec), k, j, i) = result.xi;
         v(b, iPhi(ispec), k, j, i) = result.phi;
+        
+        if (result.status == Status::failure && !(result.xi < 1.e-4)) {
+          printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) \n "
+                 "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e)\n", i, ispec, 
+                E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), result.xi, result.phi, result.fXi, result.fPhi, 
+                con_v(0), con_v(1), con_v(2));
+          if (std::isnan(J) || std::isnan(covH(0))) throw 0;
+        }
 
+        //if (i==250 && ispec == 0) printf("Con2Prim : i = %i E = %e F = %e J = %e H = %e \n", i, E, covF(0), J, covH(0));
+        
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
           v(b, pH(ispec, idir), k, j, i) = covH(idir);
@@ -205,6 +215,7 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
                     v(b, pH(ispec, 2), k, j, i)}}; 
         c.Prim2ConM1(J, covH, &E, &covF, &conTilPi);
 
+        //if (i==250 && ispec == 0) printf("Prim2Con : i = %i E = %e F = %e J = %e H = %e \n", i, E, covF(0), J, covH(0));
         v(b, cE(ispec), k, j, i) = E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
           v(b, cF(ispec, idir), k, j, i) = covF(idir);
@@ -266,11 +277,11 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
         // Reconstruct radiation
         for (int ivar = 0; ivar<nrecon; ++ivar) {
-          PhoebusReconstruction::MP5(iface, ivar, k, j, i, v, ql, qr);
+          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v, ql, qr);
         }
         // Reconstruct velocity for radiation 
         for (int ivar = 0; ivar<3; ++ivar) {
-          PhoebusReconstruction::MP5(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
+          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
         }
         
         // Calculate spatial derivatives of J at zone faces for diffusion limit
@@ -412,11 +423,11 @@ TaskStatus CalculateFluxes(T* rc) {
           geom.ContravariantShift(face, k, j, i, con_beta.data);
           
           const Real dx = pmb->coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
-          const Real a = tanh(1/std::pow(std::max(kappaH*dx, 1.e-20), 1));
+          const Real a = tanh(ratio(1.0, std::pow(kappaH*dx, 1)));
 
           // Calculate the observer frame quantities on the left side of the interface  
           /// TODO: (LFR) Add other contributions to the asymptotic flux 
-          Vec HasymL = -cov_dJ/(3*kappaH);   
+          Vec HasymL = -ratio(cov_dJ, 3*kappaH);   
           Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
           Real El; 
           Vec covFl, conFl, conFl_asym;
@@ -434,7 +445,7 @@ TaskStatus CalculateFluxes(T* rc) {
           
           // Calculate the observer frame quantities on the right side of the interface  
           /// TODO: (LFR) Add other contributions to the asymptotic flux 
-          Vec HasymR = -cov_dJ/(3*kappaH); 
+          Vec HasymR = -ratio(cov_dJ, 3*kappaH); 
           Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
           Real Er; 
           Vec covFr, conFr, conFr_asym;
@@ -452,7 +463,7 @@ TaskStatus CalculateFluxes(T* rc) {
           
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices  
-          const Real speed = a*1.0/sqrt(3.0) + (1-a)*std::max(sqrt(cl.v2), sqrt(cr.v2));  
+          const Real speed = a*1.0 + (1-a)*std::max(sqrt(cl.v2), sqrt(cr.v2));  
           conFl = a*conFl + (1-a)*conFl_asym; 
           conFr = a*conFr + (1-a)*conFr_asym; 
           Pl = a*Pl + (1-a)*Pl_asym;
