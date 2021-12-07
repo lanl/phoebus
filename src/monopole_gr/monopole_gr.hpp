@@ -23,6 +23,7 @@
 #include <utils/error_checking.hpp>
 
 // Phoebus
+#include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "monopole_gr/monopole_gr_base.hpp"
 

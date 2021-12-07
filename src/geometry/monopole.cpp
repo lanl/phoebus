@@ -25,7 +25,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/cached_system.hpp"
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
-#include "monopole_gr/monopole_gr.hpp"
+#include "monopole_gr/monopole_gr_base.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 
 #include "geometry/monopole.hpp"
