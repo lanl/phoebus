@@ -589,11 +589,6 @@ class ConToPrim {
                   g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
                   v(crho), S, bcons, v(ceng), ye_cons, sig);
 
-    //if (v.i_ > 252 && v.j_ == 128) {
-    //  printf("[%i %i] prim: %e %e %e %e %e\n", v.i_, v.j_, v(prho),
-    //    vel[0],vel[1],vel[2],v(peng));
-    //}
-
     SPACELOOP(i) {
       v(cmom_lo+i) = S[i];
     }

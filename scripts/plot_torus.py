@@ -28,8 +28,6 @@ parser = argparse.ArgumentParser(description='Plot torus')
 parser.add_argument('--nfinal', type=int, default=-1, help='dump to plot')
 parser.add_argument('--savefig', type=bool, default=False, help='Whether to save figure')
 args = parser.parse_args()
-#print(args.nfinal)
-#sys.exit()
 
 # Whether to plot meshblock boundaries
 plot_meshblocks = True
@@ -189,12 +187,6 @@ def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet',label=None):
       if rmax is not None:
         ax.set_xlim([0,rmax])
         ax.set_ylim([-rmax,rmax])
-      ax.set_xlim([5,20])
-      ax.set_ylim([-12,12])
-      ax.set_xlim([0,20])
-      ax.set_ylim([-20,20])
-      ax.set_xlim([0,40])
-      ax.set_ylim([-40,40])
     else:
       print("Plotting coordinates \"" + plot + "\" unknown")
       sys.exit()
@@ -216,25 +208,10 @@ def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet',label=None):
   divider = make_axes_locatable(ax)
   cax = divider.append_axes('right', size='5%', pad=0.05)
   fig.colorbar(im, cax=cax, orientation='vertical')
-  #plt.colorbar(im, label='density')
-#myplot(var,0)
-myfd = fd[:,:,:,:,1]
-vmin = -1.e0
-vmax = -vmin
-idx = 0
-print(np.fabs(fd[:,:,:,:,idx] + st[:,:,:,:,idx]).max())
+
 fig, axes = plt.subplots(1, 2, figsize=(8,8))
-#myplot(fd[:,:,:,:,idx],0,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
-#myplot(st[:,:,:,:,idx],1,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
-#myplot(var1[:,:,:,:],0)
-#myplot(var[:,:,:,:],0)
-#myplot(fd[:,:,:,:,idx]+st[:,:,:,:,idx],1,vmin=vmin,vmax=vmax,uselog=False,cmap='RdBu')
-#myplot(np.fabs(crho/(fd[:,:,:,:,idx]+st[:,:,:,:,idx])),1,vmin=-4,vmax=4,uselog=True,cmap='RdBu')
 myplot(var1,0,label='density')
-#varmax = var.max()
-#myplot(2*(var1-var)/(var1+var),2,vmin=-1,vmax=1,uselog=False,cmap='RdBu')
 myplot(beta,1,vmin=-3,vmax=3,uselog=True,cmap='RdBu',label='plasma beta')
-#print((2*(var1-var)/(var1+var))[0,0,64,100])
 
 if args.savefig:
   plt.savefig('frame_%08d.png' % args.nfinal, bbox_inches='tight')
