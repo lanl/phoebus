@@ -23,6 +23,7 @@ add_executable(phoebus
   fluid/fluid.cpp
   fluid/fluid.hpp
   fluid/riemann.hpp
+  fluid/tmunu.cpp
   fluid/tmunu.hpp
 
   geometry/analytic_system.hpp
