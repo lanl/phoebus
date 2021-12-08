@@ -517,10 +517,6 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
         diag(2,k,j,i) = divf(cmom_lo+1,k,j,i);
         diag(3,k,j,i) = divf(cmom_lo+2,k,j,i);
         diag(4,k,j,i) = divf(ceng,k,j,i);
-        //if (i > 252 && j == 128) {
-        //  printf("divf(%i %i) = %e %e %e %e %e\n", i,j,diag(0,k,j,i),diag(1,k,j,i),
-        //    diag(2,k,j,i), diag(3,k,j,i), diag(4,k,j,i));
-       // }
       }
   );
   return TaskStatus::complete;
@@ -659,12 +655,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
           diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
         }
-
-        /*if (j == 128 && i > 252) {
-          printf("src(%i,%i) = %e %e %e %e %e\n",
-            i,j,0.,src(cmom_lo,k,j,i), src(cmom_lo+1,k,j,i), src(cmom_lo+2,k,j,i),
-            src(ceng,k,j,i));
-        }*/
       });
 
   return TaskStatus::complete;
