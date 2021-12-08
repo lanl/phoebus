@@ -15,7 +15,6 @@
 
 #include "con2prim.hpp"
 #include "con2prim_robust.hpp"
-#include "con2prim_vanderholst.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -56,8 +55,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("c2p_func", ConservedToPrimitiveRobust<MeshBlockData<Real>>);
   } else if (c2p_method == "classic") {
     params.Add("c2p_func", ConservedToPrimitiveClassic<MeshBlockData<Real>>);
-  } else if (c2p_method == "vanderholst") {
-    params.Add("c2p_func", ConservedToPrimitiveVanDerHolst<MeshBlockData<Real>>);
   } else {
     PARTHENON_THROW("Invalid c2p_method.");
   }
@@ -489,39 +486,6 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
         //}
       });
 
-
-  return TaskStatus::complete;
-}
-
-template <typename T>
-TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const IndexRange &jb,
-                                           const IndexRange &kb) {
-  using namespace con2prim_vanderholst;
-  auto *pmb = rc->GetParentPointer().get();
-
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
-
-  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
-  const Real c2p_tol = pkg->Param<Real>("c2p_tol");
-  const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
-  auto invert = ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
-
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
-  auto geom = Geometry::GetCoordinateSystem(rc);
-  auto coords = pmb->coords;
-
-  auto fail = rc->Get(internal_variables::fail).data;
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
-      invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        auto status = invert.Solve(geom, eos, k, j, i);
-        fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
-                                                            : FailFlags::fail);
-      });
 
   return TaskStatus::complete;
 }
