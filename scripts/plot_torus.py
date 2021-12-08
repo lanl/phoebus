@@ -193,6 +193,8 @@ def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet',label=None):
       ax.set_ylim([-12,12])
       ax.set_xlim([0,20])
       ax.set_ylim([-20,20])
+      ax.set_xlim([0,40])
+      ax.set_ylim([-40,40])
     else:
       print("Plotting coordinates \"" + plot + "\" unknown")
       sys.exit()
