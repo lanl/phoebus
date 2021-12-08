@@ -60,7 +60,7 @@ Tens2 operator*(Real a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a*b(i,j
 KOKKOS_FORCEINLINE_FUNCTION 
 Tens2 operator*(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j)*b;} return out;} 
 KOKKOS_FORCEINLINE_FUNCTION 
-Tens2 operator/(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j)/b;} return out;}
+Tens2 operator/(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = ratio(a(i,j), b);} return out;}
 
 template <class T> 
   class ReconstructionIndexer  {
@@ -427,7 +427,7 @@ TaskStatus CalculateFluxes(T* rc) {
 
           // Calculate the observer frame quantities on the left side of the interface  
           /// TODO: (LFR) Add other contributions to the asymptotic flux 
-          Vec HasymL = -ratio(cov_dJ, 3*kappaH);   
+          Vec HasymL = -cov_dJ/3*kappaH;   
           Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
           Real El; 
           Vec covFl, conFl, conFl_asym;
@@ -445,7 +445,7 @@ TaskStatus CalculateFluxes(T* rc) {
           
           // Calculate the observer frame quantities on the right side of the interface  
           /// TODO: (LFR) Add other contributions to the asymptotic flux 
-          Vec HasymR = -ratio(cov_dJ, 3*kappaH); 
+          Vec HasymR = -cov_dJ/3*kappaH; 
           Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
           Real Er; 
           Vec covFr, conFr, conFr_asym;
