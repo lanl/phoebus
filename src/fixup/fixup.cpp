@@ -103,9 +103,6 @@ TaskStatus ApplyFloors(T *rc) {
   namespace c = fluid_cons;
   namespace impl = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
-  //IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  //IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  //IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);

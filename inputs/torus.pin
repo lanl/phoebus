@@ -13,9 +13,9 @@ problem_id  = torus       # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = p.density,       &
-	          c.density,       &
+            c.density,       &
             p.velocity,      &
-	          c.momentum,      &
+            c.momentum,      &
             p.energy,        &
             c.energy,        &
             pressure,      	 &
@@ -52,7 +52,7 @@ ox1_bc      = user          # Outer-X1 boundary condition flag
 
 nx2         = 256           # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
-x2max       = 1             # maximum value of X2. Pi
+x2max       = 1             # maximum value of X2. X2 = 1 -> theta = pi
 ix2_bc      = reflecting    # Inner-X2 boundary condition flag
 ox2_bc      = reflecting    # Outer-X2 boundary condition flag
 
