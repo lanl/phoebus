@@ -36,8 +36,10 @@ void Initialize<InchwormMeshBlock>(ParameterInput *pin,
                                       StateDescriptor *geometry) {
   Params &params = geometry->AllParams();
   Real a = pin->GetOrAddReal("geometry", "a", 0.3);
-  Real k = pin->GetOrAddReal("geometry", "k", M_PI/2.);
-  params.Add("a", a);
+  Real k = pin->GetOrAddReal("geometry", "k", 2.*M_PI);
+  Real kmult = pin->GetOrAddReal("geometry", "kmult", 1);
+  k *= kmult;
+  params.Add("a", a);  
   params.Add("k", k);
 }
 
