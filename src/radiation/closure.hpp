@@ -52,6 +52,8 @@ namespace radiation
     failure = 1
   };
 
+  enum class ClosureType {Eddington, M1, MOCMC};
+
   /// Store results of M1 closure root find
   struct M1Result
   {
