@@ -23,6 +23,7 @@
 #include <utils/error_checking.hpp>
 
 // Phoebus
+#include "fluid/tmunu.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "monopole_gr/monopole_gr_base.hpp"
@@ -181,11 +182,11 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 
-  /*
-template<Container>
-TaskStatus InterpolateMatterTo1D(Container *rc) {
-  auto pparent = rc->GetParentPointer(); // Either a mesh or meshblock object
-  auto pkg = pparent->packages.Get("monopole_gr"); // Available in both mesh and meshblock
+template <typename Data>
+TaskStatus InterpolateMatterTo1D(Data *rc) {
+  // Available in both mesh and meshblock
+  std::shared_ptr<StateDescriptor> const &pkg =
+      rc->GetParentPointer()->packages.Get("monopole_gr");
   auto &params = pkg->AllParams();
 
   auto enabled = params.Get<bool>("enable_monopole_gr");
@@ -193,9 +194,57 @@ TaskStatus InterpolateMatterTo1D(Container *rc) {
 
   auto matter = params.Get<Matter_t>("matter");
 
-  std::vector<std::string> fluid_vars({
-}
+  // Templated on container type
+  auto tmunu = fluid::BuildStressEnergyTensor(rc);
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
+  std::vector<std::string> vars(
+      {fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
+
+  // Available in all Container types
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
+  PackIndexMap imap;
+  auto pack = rc->PackVariables(vars, imap);
+
+  const int crho = imap[fluid_cons::density].first;
+  const int cmom_lo = imap[fluid_cons::momentum].first;
+  const int ceng = imap[fluid_cons::energy].first;
+
+  constexpr int ND = Geometry::NDFULL;
+  constexpr int NS = Geometry::NDSPACE;
+  const int nblocks = pack.GetDim(5);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MonpoleGR::InterpolateMatterTo1D", DevExecSpace(), 0,
+      nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        // First compute the relevant conserved/prim vars
+        Real Tmunu[ND][ND];
+        tmunu(Tmunu, b, k, j, i);
+        const Real D = pack(b, crho, k, j, i);
+        const Real S[] = {pack(b, cmom_lo, k, j, i), pack(b, cmom_lo + 1, k, j, i),
+                          pack(b, cmom_lo + 2, k, j, i)};
+        const Real tau = pack(b, ceng, k, j, i);
+        const Real rho0 = tau + D;
+      });
+  /*
+  // TODO(JMM): Try this vs just a big 4d loop vs whatever
+  const int scratch_level = 1; // 0 is actual scratch (tiny); 1 is HBM
+  const int nx1 = ib.e - ib.s + 1;
+  size_t scratch_size_in_bytes = parthenon::ScratchPad2D<Real>::shmem_size(NMAT, nx1);
+  pmb->par_for_outer(
+      "InterpolateMatterTo1D", scratch_size_in_bytes, scratch_level, 0, nblocks - 1, kb.s,
+      kb.e, jb.s, jb.e,
+      KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int b, const int k, const int j) {
+        parthenon::ScratchPad2D<Real> vars3p1(member.team_scratch(scratch_level), NMAT,
+                                              nx1);
+        par_for_inner(member, ib.s, ib.e, [&](const int i) {
+
+        });
+      });
   */
+}
 
 } // namespace MonopoleGR
 
