@@ -138,15 +138,13 @@ private:
   int ir_, iv_, iu_, ip_, ib_;
 };
 
-// using TmunuMesh = StressEnergyTensorCon<MeshBlockPack<VariablePack<Real>>>;
+using TmunuMesh =
+    StressEnergyTensorCon<Geometry::CoordSysMesh, MeshBlockPack<VariablePack<Real>>>;
 using TmunuMeshBlock =
     StressEnergyTensorCon<Geometry::CoordSysMeshBlock, VariablePack<Real>>;
 
-// TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) { return TmunuMesh(rc);
-// }
-TmunuMeshBlock BuildStressEnergyTensor(MeshBlockData<Real> *rc) {
-  return TmunuMeshBlock(rc);
-}
+TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc);
+TmunuMeshBlock BuildStressEnergyTensor(MeshBlockData<Real> *rc);
 
 } // namespace fluid
 
