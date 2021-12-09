@@ -140,6 +140,10 @@ class Residual {
     Real garbage = 0.0;
     bounds_.GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
     bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
+
+#if !USE_C2P_ROBUST_FLOORS
+    rho_floor_ = 1.e-20;
+#endif
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
@@ -607,8 +611,9 @@ class ConToPrim {
         //res.used_energy_max() ||
         //res.used_energy_floor() ||
         //res.used_gamma_max() ||
-        num_nans > 0)
+        num_nans > 0) {
       return ConToPrimStatus::failure;
+    }
     return ConToPrimStatus::success;
   }
 };

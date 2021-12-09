@@ -146,6 +146,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
 
+  // TODO(BRR) Should these go in a "phoebus" package?
+  const std::string bc_ix1 = pin->GetString("phoebus", "bc_ix1");
+  params.Add("bc_ix1", bc_ix1);
+  const std::string bc_ox1 = pin->GetString("phoebus", "bc_ox1");
+  params.Add("bc_ox1", bc_ox1);
+
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
     ndim = 3;
@@ -306,6 +312,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
       DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(), 0, v.GetDim(5) - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+
         Real gcov4[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
         Real gcon[3][3];
@@ -360,6 +367,16 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   return TaskStatus::complete;
 }
 
+template <typename T>
+TaskStatus ConservedToPrimitive(T *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
+  return c2p(rc, ib, jb, kb);
+}
 
 template <typename T>
 TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRange &jb,
@@ -394,17 +411,6 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
       });
 
   return TaskStatus::complete;
-}
-
-template <typename T>
-TaskStatus ConservedToPrimitive(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
-  auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
-  return c2p(rc, ib, jb, kb);
 }
 
 template <typename T>
