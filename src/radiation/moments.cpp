@@ -125,16 +125,17 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
                    v(b, pv(1), k, j, i),
                    v(b, pv(2), k, j, i)}};
         Tens2 cov_gamma; 
-        geom.Metric(CellLocation::Cent, k, j, i, cov_gamma.data);
+        geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
+        const Real isdetgam = 1.0/sqrt(geom.DetGamma(CellLocation::Cent, b, k, j, i));
         Closure<Vec, Tens2> c(con_v, cov_gamma); 
         
         Real J; 
         Vec covH;
         Tens2 conTilPi;
-        Real E = v(b, cE(ispec), k, j, i);
-        Vec covF ={{v(b, cF(ispec, 0), k, j, i), 
-                    v(b, cF(ispec, 1), k, j, i), 
-                    v(b, cF(ispec, 2), k, j, i)}};
+        Real E = v(b, cE(ispec), k, j, i) * isdetgam;
+        Vec covF ={{v(b, cF(ispec, 0), k, j, i) * isdetgam, 
+                    v(b, cF(ispec, 1), k, j, i) * isdetgam, 
+                    v(b, cF(ispec, 2), k, j, i) * isdetgam}};
         
         if (CLOSURE_TYPE == ClosureType::M1) {  
           Real xi = v(b, iXi(ispec), k, j, i);
@@ -226,7 +227,8 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
                    v(b, pv(1), k, j, i),
                    v(b, pv(2), k, j, i)}};
         Tens2 cov_gamma; 
-        geom.Metric(CellLocation::Cent, k, j, i, cov_gamma.data);
+        geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
+        const Real sdetgam = sqrt(geom.DetGamma(CellLocation::Cent, b, k, j, i));
         Closure<Vec, Tens2> c(con_v, cov_gamma); 
         
         Real E; 
@@ -245,9 +247,9 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
         }
 
         //if (i==250 && ispec == 0) printf("Prim2Con : i = %i E = %e F = %e J = %e H = %e \n", i, E, covF(0), J, covH(0));
-        v(b, cE(ispec), k, j, i) = E;
+        v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
-          v(b, cF(ispec, idir), k, j, i) = covF(idir);
+          v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
         }
       });
 
@@ -467,6 +469,7 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           Tens2 cov_gamma;
           geom.Metric(face, k, j, i, cov_gamma.data); 
           geom.ContravariantShift(face, k, j, i, con_beta.data);
+          const Real sdetgam = sqrt(geom.DetGamma(face, k, j, i));
           
           const Real dx = pmb->coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH*dx), 1)));
@@ -541,16 +544,11 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           if (ispec==0 && i==250) printf("        i = %i a = %e speed = %e \n", i, a, speed, Jr); 
 
           // Everything below should be independent of the assumed closure, just calculating the LLF flux
-          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(conFl(idir) + conFr(idir)) + 0.5*speed*(El - Er); 
+          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*sdetgam*(conFl(idir) + conFr(idir) + speed*(El - Er)); 
         
-          v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = 0.5*(Pl(idir, 0) + Pr(idir, 0)) 
-                                                       + 0.5*speed*(covFl(0) - covFr(0));
-
-          v.flux(idir_in, idx_Ff(ispec, 1), k, j, i) = 0.5*(Pl(idir, 1) + Pr(idir, 1)) 
-                                                       + 0.5*speed*(covFl(1) - covFr(1)); 
-
-          v.flux(idir_in, idx_Ff(ispec, 2), k, j, i) = 0.5*(Pl(idir, 2) + Pr(idir, 2)) 
-                                                       + 0.5*speed*(covFl(2) - covFr(2));
+          v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = 0.5*sdetgam*(Pl(idir, 0) + Pr(idir, 0) + speed*(covFl(0) - covFr(0)));
+          v.flux(idir_in, idx_Ff(ispec, 1), k, j, i) = 0.5*sdetgam*(Pl(idir, 1) + Pr(idir, 1) + speed*(covFl(1) - covFr(1))); 
+          v.flux(idir_in, idx_Ff(ispec, 2), k, j, i) = 0.5*sdetgam*(Pl(idir, 2) + Pr(idir, 2) + speed*(covFl(2) - covFr(2))); 
         
         } 
       });
@@ -655,13 +653,14 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                      v(iblock, pv(2), k, j, i)}};
           Tens2 cov_gamma; 
           geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
-          Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i); 
+          Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
+          Real sdetgam = sqrt(geom.DetGamma(CellLocation::Cent, iblock, k, j, i));
           Closure<Vec, Tens2> c(con_v, cov_gamma); 
           
-          Real Estar = v(iblock, idx_E(ispec), k, j, i); 
-          Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i),
-                        v(iblock, idx_F(ispec, 1), k, j, i),
-                        v(iblock, idx_F(ispec, 2), k, j, i)};
+          Real Estar = v(iblock, idx_E(ispec), k, j, i)/sdetgam; 
+          Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i)/sdetgam,
+                        v(iblock, idx_F(ispec, 1), k, j, i)/sdetgam,
+                        v(iblock, idx_F(ispec, 2), k, j, i)/sdetgam};
           
           Real dE;
           Vec cov_dF;
@@ -686,17 +685,17 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                                tauJ, tauH, &dE, &cov_dF); 
           
           // Add source corrections to conserved iration variables
-          v(iblock, idx_E(ispec), k, j, i) += dE; 
+          v(iblock, idx_E(ispec), k, j, i) += sdetgam*dE; 
           for (int idir=0; idir<3; ++idir) {
-            v(iblock, idx_F(ispec, idir), k, j, i) += cov_dF(idir);
+            v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam*cov_dF(idir);
           }
           
           // Add source corrections to conserved fluid variables 
           if (update_fluid) {
-            v(iblock, ceng, k, j, i) -= dE; 
-            v(iblock, cmom_lo + 0, k, j, i) -= cov_dF(0); 
-            v(iblock, cmom_lo + 1, k, j, i) -= cov_dF(1); 
-            v(iblock, cmom_lo + 2, k, j, i) -= cov_dF(2); 
+            v(iblock, ceng, k, j, i) -= sdetgam*dE; 
+            v(iblock, cmom_lo + 0, k, j, i) -= sdetgam*cov_dF(0); 
+            v(iblock, cmom_lo + 1, k, j, i) -= sdetgam*cov_dF(1); 
+            v(iblock, cmom_lo + 2, k, j, i) -= sdetgam*cov_dF(2); 
           }
 
         } 
