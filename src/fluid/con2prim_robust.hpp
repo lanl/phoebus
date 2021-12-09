@@ -141,8 +141,9 @@ class Residual {
     bounds_.GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
     bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
 
-    // TODO(BRR) Kludge to separate c2p_robust floor from the floors enforced separately
-    rho_floor_ /= 1.e2;
+#if !USE_C2P_ROBUST_FLOORS
+    rho_floor_ = 1.e-20;
+#endif
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
