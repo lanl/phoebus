@@ -317,7 +317,7 @@ void GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom,
         ssph[ip][jp] += c2s[i+1][ip+1]*s2c[j+1][jp+1]*TConCov[ip+1][jp+1];
       }
     }
-    srr = ssph[1][1];
+    srr = ssph[0][0];
     SPACELOOP(i) {
       trcs += ssph[i][i];
     }
