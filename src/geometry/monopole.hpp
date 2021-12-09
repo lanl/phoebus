@@ -420,9 +420,6 @@ class MonopoleCart {
     C[3] = X3;
   }
 
- private:
-  MonopoleSph sph_;
-
   KOKKOS_INLINE_FUNCTION
   void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph) const {
     r = std::sqrt(X1 * X1 + X2 * X2 + X3 * X3);
@@ -524,6 +521,10 @@ class MonopoleCart {
     H[2][3][3] = 2 * rho * z * ir4;
     // H[3][*][3] = 0;
   }
+
+ private:
+  MonopoleSph sph_;
+
 };
 
 using MplSphMeshBlock = Analytic<MonopoleSph, IndexerMeshBlock>;

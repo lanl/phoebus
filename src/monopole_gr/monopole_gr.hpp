@@ -16,6 +16,7 @@
 
 // stdlib
 #include <memory>
+#include <typeinfo>
 
 // Parthenon
 #include <kokkos_abstraction.hpp>
@@ -27,6 +28,8 @@
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "monopole_gr/monopole_gr_base.hpp"
+#include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/variables.hpp"
 
 using namespace parthenon::package::prelude;
 
@@ -182,6 +185,15 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 
+namespace impl {
+template <bool IS_CART, typename EnergyMomentum, typename Geometry, typename Pack>
+void GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom,
+                           const Pack &p, const int b, const int k, const int j,
+                           const int i, const int crho, const int cmom_lo, const int ceng,
+                           Real &rho0, Real &jr, Real &srr, Real &trcs);
+} // namespace impl
+
+// TODO(JMM): Try hierarchical parallelism too
 template <typename Data>
 TaskStatus InterpolateMatterTo1D(Data *rc) {
   // Available in both mesh and meshblock
@@ -191,6 +203,13 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
 
   auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
+
+  constexpr bool is_monopole_sph =
+      std::is_same<PHOEBUS_GEOMETRY, Geometry::MonopoleSph>::value;
+  constexpr bool is_monopole_cart =
+      std::is_same<PHOEBUS_GEOMETRY, Geometry::MonopoleCart>::value;
+  PARTHENON_DEBUG_REQUIRE(is_monopole_sph || is_monopole_cart,
+                          "Monopole solver requires monopole geometry");
 
   auto matter = params.Get<Matter_t>("matter");
 
@@ -212,39 +231,105 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   const int cmom_lo = imap[fluid_cons::momentum].first;
   const int ceng = imap[fluid_cons::energy].first;
 
-  constexpr int ND = Geometry::NDFULL;
-  constexpr int NS = Geometry::NDSPACE;
   const int nblocks = pack.GetDim(5);
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MonpoleGR::InterpolateMatterTo1D", DevExecSpace(), 0,
       nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         // First compute the relevant conserved/prim vars
-        Real Tmunu[ND][ND];
-        tmunu(Tmunu, b, k, j, i);
+
         const Real D = pack(b, crho, k, j, i);
         const Real S[] = {pack(b, cmom_lo, k, j, i), pack(b, cmom_lo + 1, k, j, i),
                           pack(b, cmom_lo + 2, k, j, i)};
         const Real tau = pack(b, ceng, k, j, i);
         const Real rho0 = tau + D;
       });
-  /*
-  // TODO(JMM): Try this vs just a big 4d loop vs whatever
-  const int scratch_level = 1; // 0 is actual scratch (tiny); 1 is HBM
-  const int nx1 = ib.e - ib.s + 1;
-  size_t scratch_size_in_bytes = parthenon::ScratchPad2D<Real>::shmem_size(NMAT, nx1);
-  pmb->par_for_outer(
-      "InterpolateMatterTo1D", scratch_size_in_bytes, scratch_level, 0, nblocks - 1, kb.s,
-      kb.e, jb.s, jb.e,
-      KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int b, const int k, const int j) {
-        parthenon::ScratchPad2D<Real> vars3p1(member.team_scratch(scratch_level), NMAT,
-                                              nx1);
-        par_for_inner(member, ib.s, ib.e, [&](const int i) {
-
-        });
-      });
-  */
 }
+
+// TODO(JMM): This doesn't really work with the hierarchical parallelism model,
+// at least not without some changes? Is memory locality shot?
+// Can we vectorize this better?
+// Technically IS_CART is not necessary. This could be resolved
+// with type resolution and a constexpr if based on other templated types
+namespace impl {
+template <bool IS_CART, typename EnergyMomentum, typename Geometry, typename Pack>
+void GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom,
+                           const Pack &p, const int b, const int k, const int j,
+                           const int i, const int crho, const int cmom_lo, const int ceng,
+                           Real &rho0, Real &jr, Real &srr, Real &trcs) {
+  // Tmunu and gcov
+  constexpr int ND = Geometry::NDFULL;
+  constexpr int NS = Geometry::NDSPACE;
+  constexpr auto loc = CellLocation::Cent;
+  Real Tcon[ND][ND];
+  tmunu(Tcon, b, k, j, i);
+  Real gcov[ND][ND];
+  geom.SpacetimeMetric(loc, b, k, j, i, gcov);
+  Real gamcon[NS][NS];
+  geom.MetricInverse(loc, b, k, j, i, gamcon);
+
+  // D, S, tau in base coordinates
+  const Real D = p(b, crho, k, j, i);
+  const Real Scov[] = {p(b, cmom_lo, k, j, i), p(b, cmom_lo + 1, k, j, i),
+    p(b, cmom_lo + 2, k, j, i)};
+  const Real tau = p(b, ceng, k, j, i);
+
+  // Lower Tmunu
+  Real TConCov[ND][ND] = {0};
+  SPACETIMELOOP(mu) {
+    SPACETIMELOOP2(nu, nup) {
+      TConCov[mu][nu] += gcov[nu][nup]*Tcon[mu][nup];
+    }
+  }
+  // Raise S
+  Real Scon[NS] = {0};
+  SPACELOOP2(i, ip) {
+    Scon[i] += gamcon[i,ip]*Scov[ip];
+  }
+
+  trcs = 0; // initialize for summing
+  rho0 = tau + D; // scalar so coord indep
+
+  // Only one branch is resolved at compile time  
+  // Thanks to the magic of templates and C++11.
+  // constexpr if would be better though
+  if (IS_CART) {
+    Real ssph[NS][NS] = {0};
+    Real s2c[ND][ND], c2s[ND][ND];
+    Real r, th, ph;
+
+    parthenon::Coordinates_t coords = p.GetCoords(b);
+    Real X1 = coords.x1v(i);
+    Real X2 = coords.x1v(j);
+    Real X3 = coords.x1v(k);
+    geom.Cart2Sph(X1, X2, X3, r, th, ph);
+    geom.S2C(r, th, ph, s2c);
+    geom.C2S(X1, X2, X3, c2s);
+
+    // J
+    jr = 0;
+    SPACELOOP(i) {
+      jr += c2s[1][i+1]*Scon[i];
+    }
+    // S
+    SPACELOOP2(i,ip) {
+      SPACELOOP2(j, jp) {
+        ssph[ip][jp] += c2s[i+1][ip+1]*s2c[j+1][jp+1]*TConCov[ip+1][jp+1];
+      }
+    }
+    srr = ssph[1][1];
+    SPACELOOP(i) {
+      trcs += ssph[i][i];
+    }
+  } else {
+    jr = Scon[0];
+    srr = TConCov[1][1];
+    SPACELOOP(i) {
+      trcs += TConCov[i+1][i+1];
+    }
+  }
+}
+} // namespace impl
 
 } // namespace MonopoleGR
 
