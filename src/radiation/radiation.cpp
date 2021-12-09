@@ -42,7 +42,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
-  std::vector<std::string> known_methods = {"cooling_function", "moment",
+  std::vector<std::string> known_methods = {"cooling_function", "moment", "moment_eddington",
                                             "monte_carlo", "mocmc"};
   if (std::find(known_methods.begin(), known_methods.end(), method) ==
       known_methods.end()) {
@@ -139,7 +139,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     RNGPool rng_pool(rng_seed);
     physics->AddParam<>("rng_pool", rng_pool);
   }
-  if (method == "moment" || "mocmc") { 
+  if ((method == "moment") || (method == "mocmc") || (method == "moment_eddington")) { 
     Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived, 
                                               Metadata::Intensive, Metadata::FillGhost},
                                               std::vector<int>{NumRadiationTypes, 3}); 
@@ -169,11 +169,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     //else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
     
 
-    if (method == "moment") {
-      // Fields for saving guesses for NR iteration in the radiation Con2Prim type solve
-      physics->AddField(i::xi, mspecies_scalar);
-      physics->AddField(i::phi, mspecies_scalar);
-    }
+    // Fields for saving guesses for NR iteration in the radiation Con2Prim type solve
+    physics->AddField(i::xi, mspecies_scalar);
+    physics->AddField(i::phi, mspecies_scalar);
     
     // Fields for cell edge reconstruction
     /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense of more dependency
