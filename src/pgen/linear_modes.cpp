@@ -263,28 +263,28 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                              Gamma*v(ivlo, k, j, i),
                              Gamma*v(ivlo+1, k, j, i),
                              Gamma*v(ivlo+2, k, j, i)};
-	Real Bdotu = 0.0;
-	for(int d = 0; d < 3; d++){
-		Bdotu += v(ib_lo+d, k, j, i) * ucon[d+1];
-	}
-	Real bcon[NDFULL] = {Bdotu, 0.0,0.0,0.0};
-	for(int d =1; d < 4; d++){
-		bcon[d] = (v(ib_lo+d-1, k, j, i) + alpha*bcon[0]*ucon[d]) / Gamma;
-	}
+        Real Bdotu = 0.0;
+        for(int d = ib_lo; d <= ib_hi; d++){
+          Bdotu += v(d, k, j, i) * ucon[d-ib_lo+1];
+        }
+        Real bcon[NDFULL] = {Bdotu, 0.0,0.0,0.0};
+        for(int d =ib_lo; d <= ib_hi; d++){
+          bcon[d-ib_lo+1] = (v(d, k, j, i) + alpha*bcon[0]*ucon[d-ib_lo+1]) / Gamma;
+        }
         Real J[NDFULL][NDFULL] = {0};
         if (is_snake) {
           J[0][0] = 1/alpha;
-	        J[2][0] = -betay/alpha;
+          J[2][0] = -betay/alpha;
           J[2][1] = a_snake*k_snake*cos(k_snake*x);
-	        J[1][1] = J[2][2] = J[3][3] = 1;
-	      } else if (is_boosted_minkowski) {
-	        J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
-	        J[1][0] = -betax;
-	        J[2][0] = -betay;
-	        J[3][0] = -betaz;
+          J[1][1] = J[2][2] = J[3][3] = 1;
+        } else if (is_boosted_minkowski) {
+          J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
+          J[1][0] = -betax;
+          J[2][0] = -betay;
+          J[3][0] = -betaz;
         } else if (is_inchworm) {
           J[0][0] = J[2][2] = J[3][3] = 1;
-	  J[1][1] = 1 + a_snake*k_snake*cos(k_snake*x);
+          J[1][1] = 1 + a_snake*k_snake*cos(k_snake*x);
         }
         Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
@@ -294,7 +294,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
           bcon_transformed[mu] += J[mu][nu]*bcon[nu];
         }
-		
+
         const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
         Gamma = lapse * ucon_transformed[0];
         Real shift[NDSPACE];
@@ -303,9 +303,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo+1, k, j, i) = ucon_transformed[2]/Gamma + shift[1]/lapse;
         v(ivlo+2, k, j, i) = ucon_transformed[3]/Gamma + shift[2]/lapse;
 
-        for(int d = 0; d < 3; d++){
-		v(ib_lo+d, k, j, i) = bcon_transformed[d+1]*Gamma - lapse*bcon_transformed[0]*ucon_transformed[d+1];
-	}
+        for(int d = ib_lo; d <= ib_hi; d++){
+          v(d, k, j, i) = bcon_transformed[d-ib_lo+1]*Gamma - lapse*bcon_transformed[0]*ucon_transformed[d-ib_lo+1];
+        }
       }
     });
 
