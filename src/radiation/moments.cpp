@@ -84,7 +84,7 @@ template <class T>
 };
 
 template <class T, ClosureType CLOSURE_TYPE>
-static TaskStatus MomentCon2PrimImpl(T* rc) { 
+TaskStatus MomentCon2PrimImpl(T* rc) { 
   
   namespace cr = radmoment_cons;  
   namespace pr = radmoment_prim;  
@@ -146,15 +146,11 @@ static TaskStatus MomentCon2PrimImpl(T* rc) {
           v(b, iPhi(ispec), k, j, i) = result.phi;
         
         
-          if (result.status == Status::failure && !(result.xi < 1.e-4)) {
+          if (result.status == Status::failure && !(result.xi < 1.e-4) && !(std::fabs(result.fXi) < 1.e-6)) {
             printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) \n "
-                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e)\n", i, ispec, 
-                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e)\n", i, ispec, 
-                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e)\n", i, ispec, 
+                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n", i, ispec, 
                    E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), result.xi, result.phi, result.fXi, result.fPhi, 
-                   E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), result.xi, result.phi, result.fXi, result.fPhi, 
-                   E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), result.xi, result.phi, result.fXi, result.fPhi, 
-                   con_v(0), con_v(1), con_v(2));
+                   con_v(0), con_v(1), con_v(2), xi, phi);
             if (std::isnan(J) || std::isnan(covH(0))) throw 0;
           }
         } 
@@ -326,11 +322,11 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
         // Reconstruct radiation
         for (int ivar = 0; ivar<nrecon; ++ivar) {
-          PhoebusReconstruction::MP5(iface, ivar, k, j, i, v, ql, qr);
+          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v, ql, qr);
         }
         // Reconstruct velocity for radiation 
         for (int ivar = 0; ivar<3; ++ivar) {
-          PhoebusReconstruction::MP5(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
+          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
         }
         
         // Calculate spatial derivatives of J at zone faces for diffusion limit
@@ -410,6 +406,8 @@ TaskStatus CalculateFluxesImpl(T* rc) {
   const int nblock = 1; //v.GetDim(5); 
   
   auto geom = Geometry::GetCoordinateSystem(rc); 
+  
+  const Real kappaH_min = 1.e-20; 
 
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(), 
@@ -471,12 +469,12 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           geom.ContravariantShift(face, k, j, i, con_beta.data);
           
           const Real dx = pmb->coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
-          const Real a = tanh(ratio(1.0, std::pow(kappaH*dx, 1)));
-
+          const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH*dx), 1)));
+          
           // Calculate the observer frame quantities on either side of the interface  
           /// TODO: (LFR) Add other contributions to the asymptotic flux 
-          Vec HasymL = -cov_dJ/(3*kappaH);   
-          Vec HasymR = -cov_dJ/(3*kappaH); 
+          Vec HasymL = -cov_dJ/(3*kappaH + 3*kappaH_min);   
+          Vec HasymR = HasymL; 
           Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
           Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
           Real El, Er;
