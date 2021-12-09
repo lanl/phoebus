@@ -34,7 +34,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool enable_fixup = pin->GetOrAddBoolean("fixup", "enable_fixup", false);
   params.Add("enable_fixup", enable_fixup);
   bool enable_floors = pin->GetOrAddBoolean("fixup", "enable_floors", false);
-  params.Add("enable_floors", enable_floors);
   bool enable_c2p_fixup = pin->GetOrAddBoolean("fixup", "enable_c2p_fixup", false);
   params.Add("enable_c2p_fixup", enable_c2p_fixup);
   bool enable_ceilings = pin->GetOrAddBoolean("fixup", "enable_ceilings", false);
@@ -43,6 +42,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("report_c2p_fails", report_c2p_fails);
   bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
   params.Add("enable_mhd_floors", enable_mhd_floors);
+
+  if (enable_c2p_fixup && !enable_floors) {
+    enable_floors = true;
+    PARTHENON_WARN("WARNING Forcing enable_floors to \"true\" because enable_c2p_fixup = true");
+  }
+  if (enable_mhd_floors && !enable_floors) {
+    enable_floors = true;
+    PARTHENON_WARN("WARNING Forcing enable_floors to \"true\" because enable_mhd_floors = true");
+  }
+  params.Add("enable_floors", enable_floors);
 
   if (enable_floors) {
     const std::string floor_type = pin->GetString("fixup", "floor_type");
@@ -145,9 +154,13 @@ TaskStatus ApplyFloors(T *rc) {
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
+
+  const Real bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
+  const Real bsqou_max = fix_pkg->Param<Real>("bsqou_max");
+  const Real uorho_max = fix_pkg->Param<Real>("uorho_max");
   
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
+      DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(),
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
             
@@ -182,17 +195,17 @@ TaskStatus ApplyFloors(T *rc) {
             Real bcon0 = W * Bdotv / alpha;
             const Real bsq = (Bsq + alpha*alpha * bcon0*bcon0)*iW*iW;
 
-            if (bsq/v(b,prho,k,j,i) > 50.) {
+            if (bsq/v(b,prho,k,j,i) > bsqorho_max) {
               floor_applied = true;
-              v(b,prho,k,j,i) = bsq/50.;
+              v(b,prho,k,j,i) = bsq/bsqorho_max;
             }
-            if (bsq/v(b,peng,k,j,i) > 2500.) {
+            if (bsq/v(b,peng,k,j,i) > bsqou_max) {
               floor_applied = true;
-              v(b,peng,k,j,i) = bsq/2500.;
+              v(b,peng,k,j,i) = bsq/bsqou_max;
             }
-            if (v(b,peng,k,j,i)/v(b,prho,k,j,i) > 50.) {
+            if (v(b,peng,k,j,i)/v(b,prho,k,j,i) > uorho_max) {
               floor_applied = true;
-              v(b,peng,k,j,i) = 50.*v(b,prho,k,j,i);
+              v(b,peng,k,j,i) = uorho_max*v(b,prho,k,j,i);
             }
           }
 
@@ -337,9 +350,18 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
               v(b,pv,k,j,i) = fixup(pv, norm);
             }
             v(b,peng,k,j,i) = fixup(peng, norm);
+            
+            if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
+            v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
+                                Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)));
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+            v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
+                                  Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
+
+
 
             // Apply floors
-            double rho_floor, sie_floor;
+            /*double rho_floor, sie_floor;
             bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
             v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
             double u_floor = v(b,prho,k,j,i)*sie_floor;
@@ -350,16 +372,19 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
                                 v(b,peng,k,j,i)/v(b,prho,k,j,i));
             v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i);
+                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i);*/
           } else {
             // No valid neighbors; set fluid mass/energy to floors and set primitive velocities to zero
             
             // Apply floors
-            double rho_floor, sie_floor;
-            bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
-            v(b,prho,k,j,i) = rho_floor;
-            double u_floor = v(b,prho,k,j,i)*sie_floor;
-            v(b,peng,k,j,i) = u_floor;
+            //double rho_floor, sie_floor;
+            //bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
+            //v(b,prho,k,j,i) = rho_floor;
+            //double u_floor = v(b,prho,k,j,i)*sie_floor;
+            //v(b,peng,k,j,i) = u_floor;
+            
+            v(b,prho,k,j,i) = 1.e-20;
+            v(b,peng,k,j,i) = 1.e-20;
 
             // Safe value for ye
             if (pye > 0) {
@@ -367,10 +392,10 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             }
 
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-                                v(b,peng,k,j,i)/v(b,prho,k,j,i));
+                                Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)));
             v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i);
+                                  Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
 
             // Zero primitive velocities
             SPACELOOP(ii) {
