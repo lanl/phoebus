@@ -35,7 +35,7 @@ namespace radiation
       T
       ratio(T num, T denom)
   {
-    const T sgn = denom > 0 ? 1 : -1;
+    const T sgn = denom >= 0 ? 1 : -1;
     return num / (denom + sgn * std::numeric_limits<T>::min());
   }
 
@@ -292,8 +292,8 @@ namespace radiation
     Real closure(Real xi)
     {
       // MEFD Closure
-      //return (1.0 - 2*std::pow(xi, 2) + 4*std::pow(xi,3))/3.0;
-      return (1.0 + 2 * xi * xi) / 3;
+      return (1.0 - 2*std::pow(xi, 2) + 4*std::pow(xi,3))/3.0;
+      //return (1.0 + 2 * xi * xi) / 3;
     }
 
   private:
@@ -535,7 +535,7 @@ namespace radiation
     const int max_iter = 30;
     const Real tol = 1.e6 * std::numeric_limits<Real>::epsilon();
     const Real eps = std::sqrt(10 * std::numeric_limits<Real>::epsilon());
-    const Real delta = 200 * std::numeric_limits<Real>::epsilon();
+    const Real delta = 20 * std::numeric_limits<Real>::epsilon();
 
     // Normalize input and make sure we are slightly away from zero
     cov_F(0) = ratio(cov_F(0), E) + 1.e3 * sgn(cov_F(0)) * std::numeric_limits<Real>::min();
@@ -554,6 +554,7 @@ namespace radiation
     Real err_phi, err_xi;
     Real xi = xi_guess;
     Real phi = phi_guess;
+    phi = acos(-1.0);
     do
     {
       Real fPhi_up, fPhi_lo;
@@ -580,10 +581,11 @@ namespace radiation
       SolveAxb2x2(Jac, f, dx);
 
       // Keep phi fixed for the first two updates
-      if (iter < 2)
+      if (iter < max_iter)
       {
         dx[0] = fXi / Jac[0][0];
         dx[1] = 0.0;
+        fPhi = 0.0;
       }
 
       Real corrected_delta_xi = std::min(dx[0], xi - delta * xi);
