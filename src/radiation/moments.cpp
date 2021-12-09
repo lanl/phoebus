@@ -41,7 +41,7 @@ Vec operator*(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = a(i)*b; return out;
 KOKKOS_FORCEINLINE_FUNCTION 
 Vec operator*(Real a, Vec b) {Vec out; SPACELOOP(i) out(i) = a*b(i); return out;} 
 KOKKOS_FORCEINLINE_FUNCTION 
-Vec operator/(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = a(i)/b; return out;} 
+Vec operator/(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = ratio(a(i), b); return out;} 
 
 struct Tens2 { 
   Real data[Geometry::NDSPACE][Geometry::NDSPACE]; 
@@ -83,8 +83,8 @@ template <class T>
   const int block_;
 };
 
-template <class T>
-TaskStatus MomentCon2Prim(T* rc) { 
+template <class T, ClosureType CLOSURE_TYPE>
+static TaskStatus MomentCon2PrimImpl(T* rc) { 
   
   namespace cr = radmoment_cons;  
   namespace pr = radmoment_prim;  
@@ -95,22 +95,24 @@ TaskStatus MomentCon2Prim(T* rc) {
   IndexRange ib = pm->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
-
+  
+  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi};
   PackIndexMap imap;
-  auto v = rc->PackVariables(std::vector<std::string>{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi}, imap);
+  auto v = rc->PackVariables(variables, imap);
   
   auto cE = imap.GetFlatIdx(cr::E);  
   auto pJ = imap.GetFlatIdx(pr::J);  
   auto cF = imap.GetFlatIdx(cr::F);  
   auto pH = imap.GetFlatIdx(pr::H); 
-  auto iXi = imap.GetFlatIdx(ir::xi); 
-  auto iPhi = imap.GetFlatIdx(ir::phi); 
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
-  
-  auto geom = Geometry::GetCoordinateSystem(rc);
 
+  auto iXi = imap.GetFlatIdx(ir::xi); 
+  auto iPhi = imap.GetFlatIdx(ir::phi);
+
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 
       0, v.GetDim(5)-1, // Loop over meshblocks
@@ -134,23 +136,33 @@ TaskStatus MomentCon2Prim(T* rc) {
                     v(b, cF(ispec, 1), k, j, i), 
                     v(b, cF(ispec, 2), k, j, i)}};
         
-        Real xi = v(b, iXi(ispec), k, j, i);
-        Real phi = 1.0001*v(b, iPhi(ispec), k, j, i);
+        if (CLOSURE_TYPE == ClosureType::M1) {  
+          Real xi = v(b, iXi(ispec), k, j, i);
+          Real phi = 1.0001*v(b, iPhi(ispec), k, j, i);
 
-        auto result = c.Con2PrimM1(E, covF, xi, phi, &J, &covH, &conTilPi);
+          auto result = c.Con2PrimM1(E, covF, xi, phi, &J, &covH, &conTilPi);
+          
+          v(b, iXi(ispec), k, j, i) = result.xi;
+          v(b, iPhi(ispec), k, j, i) = result.phi;
         
-        v(b, iXi(ispec), k, j, i) = result.xi;
-        v(b, iPhi(ispec), k, j, i) = result.phi;
         
-        if (result.status == Status::failure && !(result.xi < 1.e-4)) {
-          printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) \n "
-                 "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e)\n", i, ispec, 
-                E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), result.xi, result.phi, result.fXi, result.fPhi, 
-                con_v(0), con_v(1), con_v(2));
-          if (std::isnan(J) || std::isnan(covH(0))) throw 0;
+          if (result.status == Status::failure && !(result.xi < 1.e-4)) {
+            printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) \n "
+                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e)\n", i, ispec, 
+                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e)\n", i, ispec, 
+                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e)\n", i, ispec, 
+                   E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), result.xi, result.phi, result.fXi, result.fPhi, 
+                   E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), result.xi, result.phi, result.fXi, result.fPhi, 
+                   E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), result.xi, result.phi, result.fXi, result.fPhi, 
+                   con_v(0), con_v(1), con_v(2));
+            if (std::isnan(J) || std::isnan(covH(0))) throw 0;
+          }
+        } 
+        else if (CLOSURE_TYPE == ClosureType::Eddington) {
+          SPACELOOP2(ii, jj) conTilPi(ii, jj) = 0.0;
+          c.Con2Prim(E, covF, conTilPi, &J, &covH); 
         }
-
-        //if (i==250 && ispec == 0) printf("Con2Prim : i = %i E = %e F = %e J = %e H = %e \n", i, E, covF(0), J, covH(0));
+        if (i==250 && ispec == 0) printf("Con2Prim : i = %i E = %e F = %e J = %e H = %e \n", i, E, covF(0), J, covH(0));
         
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -160,11 +172,25 @@ TaskStatus MomentCon2Prim(T* rc) {
 
   return TaskStatus::complete;
 }
+
+template<class T> 
+TaskStatus MomentCon2Prim(T* rc) {
+  auto *pm = rc->GetParentPointer().get(); 
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
+  auto method = rad->Param<std::string>("method"); 
+  if (method == "moment") { 
+    return MomentCon2PrimImpl<T, ClosureType::M1>(rc);
+  }
+  else if (method == "moment_eddington") {
+    return MomentCon2PrimImpl<T, ClosureType::Eddington>(rc);
+  }
+  return TaskStatus::fail;
+}
 //template TaskStatus MomentCon2Prim<MeshData<Real>>(MeshData<Real> *);
 template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
-template <class T>
-TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) { 
+template <class T, ClosureType CLOSURE_TYPE>
+TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) { 
   
   namespace cr = radmoment_cons;  
   namespace pr = radmoment_prim;  
@@ -175,10 +201,11 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   IndexRange ib = pm->cellbounds.GetBoundsI(domain);
   IndexRange jb = pm->cellbounds.GetBoundsJ(domain);
   IndexRange kb = pm->cellbounds.GetBoundsK(domain);
-
-  PackIndexMap imap;
-  auto v = rc->PackVariables(std::vector<std::string>{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity}, imap);
   
+  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity};
+  PackIndexMap imap;
+  auto v = rc->PackVariables(variables, imap);
+   
   auto cE = imap.GetFlatIdx(cr::E);  
   auto pJ = imap.GetFlatIdx(pr::J);  
   auto cF = imap.GetFlatIdx(cr::F);  
@@ -212,8 +239,14 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
         Real J = v(b, pJ(ispec), k, j, i);
         Vec covH ={{v(b, pH(ispec, 0), k, j, i), 
                     v(b, pH(ispec, 1), k, j, i), 
-                    v(b, pH(ispec, 2), k, j, i)}}; 
-        c.Prim2ConM1(J, covH, &E, &covF, &conTilPi);
+                    v(b, pH(ispec, 2), k, j, i)}};
+        if (CLOSURE_TYPE == ClosureType::M1) { 
+          c.Prim2ConM1(J, covH, &E, &covF, &conTilPi);
+        } 
+        else if (CLOSURE_TYPE == ClosureType::Eddington) {
+          SPACELOOP2(ii, jj) conTilPi(ii,jj) = 0.0;
+          c.Prim2Con(J, covH, conTilPi, &E, &covF);
+        }
 
         //if (i==250 && ispec == 0) printf("Prim2Con : i = %i E = %e F = %e J = %e H = %e \n", i, E, covF(0), J, covH(0));
         v(b, cE(ispec), k, j, i) = E;
@@ -224,6 +257,22 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
 
   return TaskStatus::complete;
 }
+
+
+template<class T> 
+TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
+  auto *pm = rc->GetParentPointer().get(); 
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
+  auto method = rad->Param<std::string>("method"); 
+  if (method == "moment") { 
+    return MomentPrim2ConImpl<T, ClosureType::M1>(rc, domain);
+  }
+  else if (method == "moment_eddington") {
+    return MomentPrim2ConImpl<T, ClosureType::Eddington>(rc, domain);
+  }
+  return TaskStatus::fail;
+}
+
 //template TaskStatus MomentPrim2Con<MeshData<Real>>(MeshData<Real> *, IndexDomain);
 template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *, IndexDomain);
 
@@ -277,11 +326,11 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
         // Reconstruct radiation
         for (int ivar = 0; ivar<nrecon; ++ivar) {
-          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v, ql, qr);
+          PhoebusReconstruction::MP5(iface, ivar, k, j, i, v, ql, qr);
         }
         // Reconstruct velocity for radiation 
         for (int ivar = 0; ivar<3; ++ivar) {
-          PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
+          PhoebusReconstruction::MP5(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
         }
         
         // Calculate spatial derivatives of J at zone faces for diffusion limit
@@ -322,8 +371,8 @@ TaskStatus ReconstructEdgeStates(T* rc) {
 template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 // This really only works for MeshBlockData right now since fluxes don't have a block index 
-template <class T> 
-TaskStatus CalculateFluxes(T* rc) {
+template <class T, ClosureType CLOSURE_TYPE> 
+TaskStatus CalculateFluxesImpl(T* rc) {
 
   auto *pmb = rc->GetParentPointer().get();
 
@@ -402,7 +451,6 @@ TaskStatus CalculateFluxes(T* rc) {
                               v(idx_qr(ispec, 2, idir), k, j, i), 
                               v(idx_qr(ispec, 3, idir), k, j, i)}; 
           
-          Tens2 con_tilPi;
           
           Vec con_vl{{v(idx_qlv(0, idir), k, j, i), 
                       v(idx_qlv(1, idir), k, j, i),
@@ -425,41 +473,50 @@ TaskStatus CalculateFluxes(T* rc) {
           const Real dx = pmb->coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
           const Real a = tanh(ratio(1.0, std::pow(kappaH*dx, 1)));
 
-          // Calculate the observer frame quantities on the left side of the interface  
+          // Calculate the observer frame quantities on either side of the interface  
           /// TODO: (LFR) Add other contributions to the asymptotic flux 
-          Vec HasymL = -cov_dJ/3*kappaH;   
+          Vec HasymL = -cov_dJ/(3*kappaH);   
+          Vec HasymR = -cov_dJ/(3*kappaH); 
           Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
-          Real El; 
-          Vec covFl, conFl, conFl_asym;
-          Tens2 Pl, Pl_asym; // P^i_j on the left side of the interface
-          
-          // Fluxes in the asymptotic limit 
-          cl.Prim2ConM1(Jl, HasymL, &El, &covFl, &con_tilPi); 
-          cl.raise3Vector(covFl, &conFl_asym); 
-          cl.getConCovPFromPrim(Jl, HasymL, con_tilPi, &Pl_asym);
-
-          // Regular fluxes          
-          cl.Prim2ConM1(Jl, Hl, &El, &covFl, &con_tilPi);
-          cl.raise3Vector(covFl, &conFl);
-          cl.getConCovPFromPrim(Jl, Hl, con_tilPi, &Pl);
-          
-          // Calculate the observer frame quantities on the right side of the interface  
-          /// TODO: (LFR) Add other contributions to the asymptotic flux 
-          Vec HasymR = -cov_dJ/3*kappaH; 
           Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
-          Real Er; 
+          Real El, Er;
+          Tens2 con_tilPil, con_tilPir; 
+          Vec covFl, conFl, conFl_asym;
           Vec covFr, conFr, conFr_asym;
+          Tens2 Pl, Pl_asym; // P^i_j on the left side of the interface
           Tens2 Pr, Pr_asym; // P^i_j on the right side of the interface
           
-          // Fluxes in the asymptotic limit 
-          cr.Prim2ConM1(Jr, HasymR, &Er, &covFr, &con_tilPi); 
+          // Fluxes in the asymptotic limit
+          if (CLOSURE_TYPE == ClosureType::M1) { 
+            cl.Prim2ConM1(Jl, HasymL, &El, &covFl, &con_tilPil); 
+            cr.Prim2ConM1(Jr, HasymR, &Er, &covFr, &con_tilPir);
+          }
+          else if (CLOSURE_TYPE == ClosureType::Eddington) { 
+            SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
+            SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
+            cl.Prim2Con(Jl, HasymL, con_tilPil, &El, &covFl); 
+            cr.Prim2Con(Jr, HasymR, con_tilPir, &Er, &covFr);
+          } 
+          cl.raise3Vector(covFl, &conFl_asym); 
           cr.raise3Vector(covFr, &conFr_asym); 
-          cr.getConCovPFromPrim(Jr, HasymR, con_tilPi, &Pr_asym);
-          
-          // Regular fluxes 
-          cr.Prim2ConM1(Jr, Hr, &Er, &covFr, &con_tilPi);
+          cl.getConCovPFromPrim(Jl, HasymL, con_tilPil, &Pl_asym);
+          cr.getConCovPFromPrim(Jr, HasymR, con_tilPir, &Pr_asym);
+
+          // Regular fluxes          
+          if (CLOSURE_TYPE == ClosureType::M1) { 
+            cl.Prim2ConM1(Jl, Hl, &El, &covFl, &con_tilPil); 
+            cr.Prim2ConM1(Jr, Hr, &Er, &covFr, &con_tilPir);
+          }
+          else if (CLOSURE_TYPE == ClosureType::Eddington) { 
+            SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
+            SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
+            cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl); 
+            cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
+          }
+          cl.raise3Vector(covFl, &conFl);
           cr.raise3Vector(covFr, &conFr);
-          cr.getConCovPFromPrim(Jr, Hr, con_tilPi, &Pr);
+          cl.getConCovPFromPrim(Jl, Hl, con_tilPil, &Pl);
+          cr.getConCovPFromPrim(Jr, Hr, con_tilPir, &Pr);
           
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices  
@@ -480,6 +537,10 @@ TaskStatus CalculateFluxes(T* rc) {
           Pr(idir, 0) -= con_beta(idir)*covFr(0);
           Pr(idir, 1) -= con_beta(idir)*covFr(1);
           Pr(idir, 2) -= con_beta(idir)*covFr(2);
+          
+          if (ispec==0 && i==250) printf("Fluxes: i = %i El = %e Fl = %e Jl = %e Hl = %e Pl = %e\n", i, El, conFl(0), Jl, Hl(0), Pl(0,0)); 
+          if (ispec==0 && i==250) printf("        i = %i Er = %e Fr = %e Jr = %e Hr = %e Pr = %e\n", i, Er, conFr(0), Jr, Hr(0), Pr(0,0)); 
+          if (ispec==0 && i==250) printf("        i = %i a = %e speed = %e \n", i, a, speed, Jr); 
 
           // Everything below should be independent of the assumed closure, just calculating the LLF flux
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*(conFl(idir) + conFr(idir)) + 0.5*speed*(El - Er); 
@@ -497,6 +558,20 @@ TaskStatus CalculateFluxes(T* rc) {
       });
 
   return TaskStatus::complete;  
+}
+
+template<class T> 
+TaskStatus CalculateFluxes(T* rc) {
+  auto *pm = rc->GetParentPointer().get(); 
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
+  auto method = rad->Param<std::string>("method"); 
+  if (method == "moment") { 
+    return CalculateFluxesImpl<T, ClosureType::M1>(rc);
+  }
+  else if (method == "moment_eddington") {
+    return CalculateFluxesImpl<T, ClosureType::Eddington>(rc);
+  }
+  return TaskStatus::fail;
 }
 template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
