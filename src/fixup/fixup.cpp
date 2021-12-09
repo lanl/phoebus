@@ -357,31 +357,8 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
                                   Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
-
-
-
-            // Apply floors
-            /*double rho_floor, sie_floor;
-            bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
-            v(b,prho,k,j,i) = v(b,prho,k,j,i) > rho_floor ? v(b,prho,k,j,i) : rho_floor;
-            double u_floor = v(b,prho,k,j,i)*sie_floor;
-            v(b,peng,k,j,i) = v(b,peng,k,j,i) > u_floor ? v(b,peng,k,j,i) : u_floor; 
-
-            if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
-            v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-                                v(b,peng,k,j,i)/v(b,prho,k,j,i));
-            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
-            v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i);*/
           } else {
-            // No valid neighbors; set fluid mass/energy to floors and set primitive velocities to zero
-            
-            // Apply floors
-            //double rho_floor, sie_floor;
-            //bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
-            //v(b,prho,k,j,i) = rho_floor;
-            //double u_floor = v(b,prho,k,j,i)*sie_floor;
-            //v(b,peng,k,j,i) = u_floor;
+            // No valid neighbors; set fluid mass/energy to near-zero and set primitive velocities to zero
             
             v(b,prho,k,j,i) = 1.e-20;
             v(b,peng,k,j,i) = 1.e-20;
