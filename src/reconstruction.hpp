@@ -111,7 +111,6 @@ void PiecewiseLinear(const int d, const int n,
   const int dj = (d == X2DIR ? 1 : 0);
   const int dk = (d == X3DIR ? 1 : 0);
   Real dq = v(n,k+dk,j+dj,i+di) - v(n,k,j,i);
-  //dq = 0.5*(v(n,k+dk,j+dj,i+di)-v(n,k-dk,j-dj,i-di));
   dq = minmod(v(n,k,j,i)-v(n,k-dk,j-dj,i-di), dq)*dq;
   ql(dir,n,k+dk,j+dj,i+di) = v(n,k,j,i) + 0.5*dq;
   qr(dir,n,k,j,i) = v(n,k,j,i) - 0.5*dq;
