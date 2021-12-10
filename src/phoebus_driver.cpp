@@ -139,7 +139,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto flux_div =
         tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>, sc0.get(), dudt.get());
 
+#if SET_FLUX_SRC_DIAGS
     auto copy_flux_div = tl.AddTask(flux_div|geom_src, fluid::CopyFluxDivergence, dudt.get());
+#endif
 
     auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,
                               src_names, dudt.get(), gsrc.get(), dudt.get());
