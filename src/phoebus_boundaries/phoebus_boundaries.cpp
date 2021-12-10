@@ -166,6 +166,15 @@ TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc) 
     }
   }
 
+  auto &pkg_rad = rc->GetParentPointer()->packages.Get("radiation");
+  if (pkg_rad->Param<bool>("active")) {
+    std::string bc_vars = pkg_rad->Param<std::string>("bc_vars");
+    if (bc_vars == "primitive") {
+      for (auto &domain : domains) {
+        radiation::MomentPrim2Con(rc.get(), domain);
+      }
+    }
+  }
 
   return TaskStatus::complete;
 }
