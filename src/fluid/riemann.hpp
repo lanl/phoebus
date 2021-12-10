@@ -109,10 +109,6 @@ class FluxState {
     const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
-    /*if (std::abs(P - 2.0/3.0*u) > 1.e-14*u) {
-      std::cout << "Why do this disagree???? " << P << " " << 2.0/3.0*u << " " << std::abs(P-2.0/3.0*u) << std::endl;
-    }*/
-
     for (int m = pb_lo; m <= pb_hi; m++) {
       Bcon[m-pb_lo] = q(dir, m, k, j, i);
     }
@@ -203,11 +199,10 @@ class FluxState {
       F[m] = U[m]*vtil - Bcon[dir]*(vcon[m-cb_lo] - g.beta[m-cb_lo]/g.alpha);
     }
 
+    // TODO(JCD): are all these make_positive/make_bounded calls really necessary?
     const Real vasq = bsqWsq/robust::make_positive(rhohWsq+bsqWsq);
     const Real cssq = robust::make_bounded(gamma1*P*W*W/robust::make_positive(rhohWsq), 0.0, 1.0);
     Real cmsq = robust::make_bounded(cssq + vasq*(1.0 - cssq), 0.0, 1.0);
-    //cmsq = (cmsq > 0.0 ? cmsq : 1.e-16); // TODO(JCD): what should this 1.e-16 be?
-    //cmsq = (cmsq > 1.0 ? 1.0 : cmsq);
 
     const Real vcoff = g.alpha/(1.0 - vsq*cmsq);
     const Real v0 = vel*(1.0 - cmsq);
@@ -249,9 +244,6 @@ class FluxState {
       cye(imap[fluid_cons::ye].first),
       ncons(5 + (pb_hi-pb_lo+1) + (cye>0)) {
     PARTHENON_REQUIRE_THROWS(ncons <= NCONS_MAX, "ncons exceeds NCONS_MAX.  Reconfigure to increase NCONS_MAX.");
-    //auto *pmb = rc->GetParentPointer().get();
-    //StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-    //floor_ = fix_pkg->Param<fixup::Floors>("floor");
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
