@@ -108,9 +108,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
   params.Add("mhd", mhd);
 
-  bool zero_update = pin->GetOrAddBoolean("fluid", "zero_update", false);
-  params.Add("zero_update", zero_update);
-
   Metadata m;
   std::vector<int> three_vec(1, 3);
 
@@ -177,7 +174,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
-  physics->AddField("zero_update", mprim_scalar);
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
   physics->AddField(impl::fail, mprim_scalar);
@@ -193,18 +189,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(c::ye, mcons_scalar);
   }
 
+#if SET_FLUX_SRC_DIAGS
   // DIAGNOSTIC STUFF FOR DEBUGGING
   std::vector<int> five_vec(1,5);
   Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                              Metadata::Derived, Metadata::OneCopy},
                              five_vec);
-  physics->AddField("flux_divergence", mdiv);
-  std::vector<int> seven_vec(1,7);
+  physics->AddField(diag::divf, mdiv);
+  std::vector<int> seven_vec(1,5);
   Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                              Metadata::Derived, Metadata::OneCopy},
                              seven_vec);
-  physics->AddField("src_terms", mdiag);
-
+  physics->AddField(diag::src_terms, mdiag);
+#endif
 
   // set up the arrays for left and right states
   // add the base state for reconstruction/fluxes
@@ -490,6 +487,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   return TaskStatus::complete;
 }
 
+#if SET_FLUX_SRC_DIAGS
 // template <typename T>
 TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
@@ -505,7 +503,7 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   const int cmom_lo = imap[fluid_cons::momentum].first;
   const int cmom_hi = imap[fluid_cons::momentum].second;
   const int ceng = imap[fluid_cons::energy].first;
-  std::vector<std::string> diag_vars({"flux_divergence"});
+  std::vector<std::string> diag_vars({diagnostic_variables::divf});
   auto diag = rc->PackVariables(diag_vars);
 
   parthenon::par_for(
@@ -521,42 +519,7 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   );
   return TaskStatus::complete;
 }
-TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
-  auto *pmb = rc->GetParentPointer().get();
-  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
-  const bool zero_update = pkg->Param<bool>("zero_update");
-
-  if (!zero_update) {
-    return TaskStatus::complete;
-  }
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-
-  std::vector<std::string> vars({fluid_cons::density, fluid_cons::momentum, fluid_cons::energy, "zero_update"});
-  PackIndexMap imap;
-  auto du = rc->PackVariables(vars, imap);
-  const int crho = imap[fluid_cons::density].first;
-  const int cmom_lo = imap[fluid_cons::momentum].first;
-  const int cmom_hi = imap[fluid_cons::momentum].second;
-  const int ceng = imap[fluid_cons::energy].first;
-  const int izero = imap["zero_update"].first;
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "Zero Update", DevExecSpace(), kb.s, kb.e,
-      jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        du(crho,k,j,i) *= du(izero,k,j,i);
-        du(cmom_lo,k,j,i) *= du(izero,k,j,i);
-        du(cmom_lo+1,k,j,i) *= du(izero,k,j,i);
-        du(cmom_hi,k,j,i) *= du(izero,k,j,i);
-        du(ceng,k,j,i) *= du(izero,k,j,i);
-      }
-  );
-  return TaskStatus::complete;
-}
-
+#endif
 
 // template <typename T>
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
@@ -572,13 +535,15 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   std::vector<std::string> vars({fluid_cons::momentum, fluid_cons::energy});
+#if SET_FLUX_SRC_DIAGS
+  vars.push_back(diagnostic_variables::src_terms);
+#endif
   PackIndexMap imap;
   auto src = rc_src->PackVariables(vars, imap);
   const int cmom_lo = imap[fluid_cons::momentum].first;
   const int cmom_hi = imap[fluid_cons::momentum].second;
   const int ceng = imap[fluid_cons::energy].first;
-  std::vector<std::string> diag_vars({"src_terms"});
-  auto diag = rc->PackVariables(diag_vars);
+  const int idiag = imap[diagnostic_variables::src_terms].first;
 
   auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -591,7 +556,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
         tmunu(Tmunu, k, j, i);
         geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
 	      Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
-        diag(0,k,j,i) = 0.0;
         // momentum source terms
         for (int l = 0; l < NS; l++) {
           Real src_mom = 0.0;
@@ -629,17 +593,11 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
-          diag(4,k,j,i) = src(ceng,k,j,i);
-          diag(5,k,j,i) = gdet*alpha*Ta;
-          diag(6,k,j,i) = -gdet*alpha*TGam;
           #else
           SPACETIMELOOP2(mu, nu) {
             TGam += Tmunu[mu][nu] * gam[nu][0][mu];
           }
           src(ceng,k,j,i) = gdet * TGam;
-          diag(4,k,j,i) = src(ceng, k, j, i);
-          diag(5,k,j,i) = 0.;
-          diag(6,k,j,i) = 0.;
           #endif // USE_VALENCIA
         }
 
@@ -653,8 +611,15 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
             }
           }
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
-          diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
         }
+
+#if SET_FLUX_SRC_DIAGS
+        src(idiag, k, j, i) = 0.0;
+        src(idiag+1, k, j, i) = src(cmom_lo, k, j, i);
+        src(idiag+2, k, j, i) = src(cmom_lo+1, k, j, i);
+        src(idiag+3, k, j, i) = src(cmom_lo+2, k, j, i);
+        src(idiag+4, k, j, i) = src(ceng, k, j, i);
+#endif
       });
 
   return TaskStatus::complete;
