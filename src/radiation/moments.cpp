@@ -622,9 +622,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
     cye = imap[c::ye].first;
   }
 
-  IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
-  IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
  
   // Get the background geometry 
   auto geom = Geometry::GetCoordinateSystem(rc);
