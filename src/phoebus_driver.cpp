@@ -145,7 +145,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,
                               src_names, dudt.get(), gsrc.get(), dudt.get());
-    auto zero = tl.AddTask(add_rhs, fluid::ZeroUpdate, dudt.get());
 
     #if PRINT_RHS
     auto print_rhs = tl.AddTask(add_rhs, Debug::PrintRHS<MeshBlockData<Real>>, dudt.get());
