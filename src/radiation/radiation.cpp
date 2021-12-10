@@ -60,7 +60,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("do_nu_electron_anti", do_nu_electron_anti);
   bool do_nu_heavy = pin->GetOrAddBoolean("radiation", "do_nu_heavy", true);
   params.Add("do_nu_heavy", do_nu_heavy);
-  
+
+  // Boundary conditions
+  const std::string bc_vars = pin->GetOrAddString("phoebus/mesh", "bc_vars", "conserved");
+  params.Add("bc_vars", bc_vars);
+
   // Set radiation cfl factor
   Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.8);
   params.Add("cfl", cfl);
