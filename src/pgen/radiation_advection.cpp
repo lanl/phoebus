@@ -104,4 +104,4 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   radiation::MomentPrim2Con(rc.get());
 }
 
-} // namespace advection
+} // namespace radiation_advection
