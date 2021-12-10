@@ -541,7 +541,7 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           
           if (ispec==0 && i==250) printf("Fluxes: i = %i El = %e Fl = %e Jl = %e Hl = %e Pl = %e\n", i, El, conFl(0), Jl, Hl(0), Pl(0,0)); 
           if (ispec==0 && i==250) printf("        i = %i Er = %e Fr = %e Jr = %e Hr = %e Pr = %e\n", i, Er, conFr(0), Jr, Hr(0), Pr(0,0)); 
-          if (ispec==0 && i==250) printf("        i = %i a = %e speed = %e \n", i, a, speed, Jr); 
+          if (ispec==0 && i==250) printf("        i = %i a = %e speed = %e \n", i, a, speed); 
 
           // Everything below should be independent of the assumed closure, just calculating the LLF flux
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*sdetgam*(conFl(idir) + conFr(idir) + speed*(El - Er)); 
