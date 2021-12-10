@@ -309,7 +309,6 @@ class ConToPrim {
     bounds.GetFloors(x1,x2,x3,rhoflr,epsflr);
     Real gam_max, eps_max;
     bounds.GetCeilings(x1,x2,x3,gam_max,eps_max);
-    bool negative_crho = false;
     const Real D = v(crho)*igdet;
     #if USE_VALENCIA
     const Real tau = v(ceng)*igdet;
