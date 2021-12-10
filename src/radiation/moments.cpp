@@ -159,7 +159,6 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
           SPACELOOP2(ii, jj) conTilPi(ii, jj) = 0.0;
           c.Con2Prim(E, covF, conTilPi, &J, &covH); 
         }
-        if (i==250 && ispec == 0) printf("Con2Prim : i = %i E = %e F = %e J = %e H = %e \n", i, E, covF(0), J, covH(0));
         
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -246,7 +245,6 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
           c.Prim2Con(J, covH, conTilPi, &E, &covF);
         }
 
-        //if (i==250 && ispec == 0) printf("Prim2Con : i = %i E = %e F = %e J = %e H = %e \n", i, E, covF(0), J, covH(0));
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
@@ -539,10 +537,6 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           Pr(idir, 1) -= con_beta(idir)*covFr(1);
           Pr(idir, 2) -= con_beta(idir)*covFr(2);
           
-          if (ispec==0 && i==250) printf("Fluxes: i = %i El = %e Fl = %e Jl = %e Hl = %e Pl = %e\n", i, El, conFl(0), Jl, Hl(0), Pl(0,0)); 
-          if (ispec==0 && i==250) printf("        i = %i Er = %e Fr = %e Jr = %e Hr = %e Pr = %e\n", i, Er, conFr(0), Jr, Hr(0), Pr(0,0)); 
-          if (ispec==0 && i==250) printf("        i = %i a = %e speed = %e \n", i, a, speed); 
-
           // Everything below should be independent of the assumed closure, just calculating the LLF flux
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*sdetgam*(conFl(idir) + conFr(idir) + speed*(El - Er)); 
         
