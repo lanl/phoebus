@@ -104,8 +104,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                               fluid_prim::bfield,
                               fluid_prim::ye,
                               fluid_prim::pressure,
-                              fluid_prim::temperature,
-                              "zero_update"},
+                              fluid_prim::temperature},
                               imap);
 
   const int irho = imap[fluid_prim::density].first;
@@ -117,7 +116,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iye  = imap[fluid_prim::ye].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
-  const int izero = imap["zero_update"].first;
 
   // this only works with ideal gases
   const std::string eos_type = pin->GetString("eos","type");
@@ -159,7 +157,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real smooth = gpkg->Param<Real>("smooth");
   auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
-  RNGPool rng_pool(pin->GetOrAddInteger("kelvin_helmholtz", "seed", seed));
+  RNGPool rng_pool(seed);
 
   Real uphi_rmax;
   const Real hm1_rmax = std::exp(log_enthalpy(rmax,0.5*M_PI,a,rin,angular_mom,uphi_rmax)) - 1.0;
@@ -226,7 +224,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real x2v = coords.x2v(k, j, i);
 
       v(ieng,k,j,i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
-      v(izero,k,j,i) = 1.0*(v(irho,k,j,i) > 0.0);
 
       // fixup
       Real rhoflr = 0;
