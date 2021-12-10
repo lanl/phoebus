@@ -36,7 +36,6 @@ template <typename T>
 TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib, const IndexRange &jb, const IndexRange &kb);
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc, MeshBlockData<Real> *rc_src);
 TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc);
-TaskStatus ZeroUpdate(MeshBlockData<Real> *rc);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
 TaskStatus FluxCT(MeshBlockData<Real> *rc);
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc);
