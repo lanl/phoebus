@@ -186,16 +186,39 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 
 namespace impl {
+// Gets ADM mass rho0, adm momentum in r, jr, the rr component of S^i_j, and the trace
+// of the spatial stress tensor. Applies coordinate transforms if necessary.
 template <bool IS_CART, typename EnergyMomentum, typename Geometry, typename Pack>
-void GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom,
-                           const Pack &p, const int b, const int k, const int j,
-                           const int i, const int crho, const int cmom_lo, const int ceng,
-                           Real &rho0, Real &jr, Real &srr, Real &trcs);
+KOKKOS_INLINE_FUNCTION void
+GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom, const Pack &p,
+                      const int b, const int k, const int j, const int i, const int crho,
+                      const int cmom_lo, const int ceng, Real &rho0, Real &jr, Real &srr,
+                      Real &trcs);
+// Gets the radius r of a cell, as well as its width in radius dr, and
+// its volume element dv. Computes this for both Cartesian and
+// spherical coords.
+template <bool IS_CART, typename Geometry, typename Pack>
+PORTABLE_INLINE_FUNCTION void
+GetCoordsAndCellWidthsHelper(const Geometry &geom, const Pack &p, const int b,
+                             const int k, const int j, const int i, Real &r, Real &th,
+                             Real &ph, Real &dr, Real &dth, Real &dph, Real &dv);
+// Get volume intersect for integration weight
+PORTABLE_INLINE_FUNCTION
+Real GetVolIntersectHelper(const Real rsmall, const Real drsmall, const Real rbig,
+                           const Real drbig);
+PORTABLE_INLINE_FUNCTION
+bool InBoundsHelper(Real a, Real r, Real dr) {
+  return ((a >= (r - 0.5*dr)) && (a < (r + 0.5*dr)));
+}
 } // namespace impl
 
-// TODO(JMM): Try hierarchical parallelism too
+// TODO(JMM): Try hierarchical parallelism too. Not sure how to write
+// it, but the most performant version of this function is DEFINITELY
+// not what I've written here.
 template <typename Data>
 TaskStatus InterpolateMatterTo1D(Data *rc) {
+  using namespace impl;
+
   // Available in both mesh and meshblock
   std::shared_ptr<StateDescriptor> const &pkg =
       rc->GetParentPointer()->packages.Get("monopole_gr");
@@ -212,6 +235,19 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
                           "Monopole solver requires monopole geometry");
 
   auto matter = params.Get<Matter_t>("matter");
+  auto vols = params.Get<Volumes_t>("integration_volumes");
+  auto radius1d = params.Get<Radius>("radius");
+  auto npoints = params.Get<Real>("npoints");
+
+  // Initialize 1D arrays to zero
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "monopole_gr prepare for interp",
+      parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+        for (int v = 0; v < NMAT; ++v) {
+          matter(v, i) = 0;
+        }
+        vols(i) = 0;
+      });
 
   // Templated on container type
   auto tmunu = fluid::BuildStressEnergyTensor(rc);
@@ -236,13 +272,40 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
       DEFAULT_LOOP_PATTERN, "MonpoleGR::InterpolateMatterTo1D", DevExecSpace(), 0,
       nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        // First compute the relevant conserved/prim vars
+        // TODO(JMM): Should some of this be precomputed? Or should it be computed here?
 
-        const Real D = pack(b, crho, k, j, i);
-        const Real S[] = {pack(b, cmom_lo, k, j, i), pack(b, cmom_lo + 1, k, j, i),
-                          pack(b, cmom_lo + 2, k, j, i)};
-        const Real tau = pack(b, ceng, k, j, i);
-        const Real rho0 = tau + D;
+        // First compute the relevant conserved/prim vars
+        Real matter_loc[4];
+        GetMonopoleVarsHelper<is_monopole_cart>(tmunu, geom, pack, b, k, j, i, crho,
+                                                cmom_lo, ceng,
+                                                matter_loc[Matter::RHO],
+                                                matter_loc[Matter::J_R],
+                                                matter_loc[Matter::Srr],
+                                                matter_loc[Matter::trcS]);
+        // Next get coords and grid spacing
+        Real r, th, ph, dr, dth, dph, dv;
+        GetCoordsAndCellWidthsHelper<is_monopole_cart>(geom, pack, b, k, j, i, r, th, ph,
+                                                       dr, dth, dph, dv);
+
+        // Bounds in the 1d grid We're wasteful here because I'm
+        // paranoid. Need to make sure we don't need miss any cells in
+        // the 1d grid.
+        // No correctness issue from making this too big, 
+        int i1dleft = radius1d.index(r - dr) - 1;
+        int i1dright = radius1d.index(r + dr) + 1;
+
+        // Loop through the 1d grid, and do the thing
+        // TODO(JMM): Thanks I hate it.
+        Real dr1d = radius1d.dx();
+        for (int i1d = i1dleft; i1d <= i1dright; ++i1d) {
+          Real r1d = radius1d.x(i1d);
+          Real weight = GetVolIntersectHelper(r1d, dr1d, r, dr)*dv;
+          // Yucky atomics
+          Kokkos::atomic_add(&vols(i1d), weight);
+          for (int v = 0; v < NMAT; ++v) {
+            Kokkos::atomic_add(&matter(v,i1d), matter_loc[v]*weight);
+          }
+        }
       });
 }
 
@@ -253,10 +316,11 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
 // with type resolution and a constexpr if based on other templated types
 namespace impl {
 template <bool IS_CART, typename EnergyMomentum, typename Geometry, typename Pack>
-void GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom,
-                           const Pack &p, const int b, const int k, const int j,
-                           const int i, const int crho, const int cmom_lo, const int ceng,
-                           Real &rho0, Real &jr, Real &srr, Real &trcs) {
+KOKKOS_INLINE_FUNCTION void
+GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom, const Pack &p,
+                      const int b, const int k, const int j, const int i, const int crho,
+                      const int cmom_lo, const int ceng, Real &rho0, Real &jr, Real &srr,
+                      Real &trcs) {
   // Tmunu and gcov
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
@@ -271,26 +335,22 @@ void GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom,
   // D, S, tau in base coordinates
   const Real D = p(b, crho, k, j, i);
   const Real Scov[] = {p(b, cmom_lo, k, j, i), p(b, cmom_lo + 1, k, j, i),
-    p(b, cmom_lo + 2, k, j, i)};
+                       p(b, cmom_lo + 2, k, j, i)};
   const Real tau = p(b, ceng, k, j, i);
 
   // Lower Tmunu
   Real TConCov[ND][ND] = {0};
   SPACETIMELOOP(mu) {
-    SPACETIMELOOP2(nu, nup) {
-      TConCov[mu][nu] += gcov[nu][nup]*Tcon[mu][nup];
-    }
+    SPACETIMELOOP2(nu, nup) { TConCov[mu][nu] += gcov[nu][nup] * Tcon[mu][nup]; }
   }
   // Raise S
   Real Scon[NS] = {0};
-  SPACELOOP2(i, ip) {
-    Scon[i] += gamcon[i,ip]*Scov[ip];
-  }
+  SPACELOOP2(i, ip) { Scon[i] += gamcon[i, ip] * Scov[ip]; }
 
-  trcs = 0; // initialize for summing
+  trcs = 0;       // initialize for summing
   rho0 = tau + D; // scalar so coord indep
 
-  // Only one branch is resolved at compile time  
+  // Only one branch is resolved at compile time
   // Thanks to the magic of templates and C++11.
   // constexpr if would be better though
   if (IS_CART) {
@@ -308,29 +368,65 @@ void GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom,
 
     // J
     jr = 0;
-    SPACELOOP(i) {
-      jr += c2s[1][i+1]*Scon[i];
-    }
+    SPACELOOP(i) { jr += c2s[1][i + 1] * Scon[i]; }
     // S
-    SPACELOOP2(i,ip) {
+    SPACELOOP2(i, ip) {
       SPACELOOP2(j, jp) {
-        ssph[ip][jp] += c2s[i+1][ip+1]*s2c[j+1][jp+1]*TConCov[ip+1][jp+1];
+        ssph[ip][jp] += c2s[i + 1][ip + 1] * s2c[j + 1][jp + 1] * TConCov[ip + 1][jp + 1];
       }
     }
     srr = ssph[0][0];
-    SPACELOOP(i) {
-      trcs += ssph[i][i];
-    }
+    SPACELOOP(i) { trcs += ssph[i][i]; }
   } else {
     jr = Scon[0];
     srr = TConCov[1][1];
-    SPACELOOP(i) {
-      trcs += TConCov[i+1][i+1];
-    }
+    SPACELOOP(i) { trcs += TConCov[i + 1][i + 1]; }
   }
 }
+
+template <bool IS_CART, typename Geometry, typename Pack>
+PORTABLE_INLINE_FUNCTION void
+GetCoordsAndCellWidthsHelper(const Geometry &geom, const Pack &p, const int b,
+                             const int k, const int j, const int i, Real &r, Real &th,
+                             Real &ph, Real &dr, Real &dth, Real &dph, Real &dv) {
+  const parthenon::Coordinates_t &coords = p.GetCoords(b);
+  if (IS_CART) {
+    geom.Cart2Sph(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+                  coords.Dx(1, k, j, i), coords.Dx(2, k, j, i), coords.Dx(3, k, j, i), r,
+                  th, ph, dr, dth, dph);
+    dv = coords.Volume(k, j, i);
+  } else {
+    r = coords.x1v(k, j, i);
+    th = coords.x2v(k, j, i);
+    ph = coords.x3v(k, j, i);
+    dr = coords.Dx(1, k, j, i);
+    dth = coords.Dx(2, k, j, i);
+    dph = coords.Dx(3, k, j, i);
+    Real idr = (1./12.)*(dr*dr*dr) + dr*(r*r);
+    dv = std::sin(th)*dth*dph*idr;
+  }
+}
+
+PORTABLE_INLINE_FUNCTION
+Real GetVolIntersectHelper(const Real rsmall, const Real drsmall, const Real rbig,
+                           const Real drbig) {
+  if (drsmall > drbig) { // evaluates only once but the compiler may
+                         // not be smart enough to realize that.
+    return GetVolIntersectHelper(rbig, drbig, rsmall, drsmall);
+  }
+  bool left_in_bnds = InBoundsHelper(rsmall - 0.5 * drsmall, rbig, drbig);
+  bool right_in_bnds = InBoundsHelper(rsmall + 0.5 * drsmall, rbig, drbig);
+  // TODO(JMM): This vectorizes thanks to using masking. But is it
+  // actually a good idea?  We already have branching, because of the
+  // above if statement, so...
+  bool interior_mask = left_in_bnds || right_in_bnds;
+  bool left_mask = right_in_bnds && !left_in_bnds;
+  bool right_mask = left_in_bnds && !right_in_bnds;
+  // divide by zero impossible because these are grid deltas
+  return interior_mask * (drsmall / drbig) +
+         left_mask * (rsmall + 0.5 * drsmall - (rbig - 0.5 * rbig) / drbig) +
+         right_mask * (rbig + 0.5 * rbig - (rsmall - 0.5 * rsmall) / drbig);
+}
 } // namespace impl
-
 } // namespace MonopoleGR
-
 #endif // MONOPOLE_GR_MONOPOLE_GR_HPP_
