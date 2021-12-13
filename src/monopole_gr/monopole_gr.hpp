@@ -149,16 +149,16 @@ using namespace parthenon::package::prelude;
   j^i    = CONSERVED 3-momentum vector
   S_{ij} = 3-stress tensor
   ---------------------------------------
-  rho    = n^mu n^nu T_{mu nu} = tau + D
-  j^i    = - P^{i mu} n^nu T_{mu nu} = S^i
+  rho    = n^mu n^nu T_{mu nu}
+  j^i    = - P^{i mu} n^nu T_{mu nu}
   S_{ij} = P^mu_i P^nu_i T_{munu}
 
   where n^mu is unit normal of hypersurface, P^{i mu} is projector
 
   Translates to (in Valencia variables):
 
-  rho    = tau + D
-  j^i    = S^i
+  sqrt(g) rho    = tau + D
+  sqrt(g) j^i    = S^i
   Trc(S) = (rho_0 h + b^2)W^2 + 3(P + b^2/2) - b^i b_i
 
   In case of no B fields,
@@ -167,8 +167,17 @@ using namespace parthenon::package::prelude;
 
   where rho_0 here is primitive density and h is enthalpy.
 
-  We also need S^r_r = T^r_r for the Christoffel symbols:
-  T^r_r = (rho + u + P + b^2) u^r u_r + (P + (1/2) b^2) - b^r b_r
+  We also need S^r_r for the Christoffel symbols
+  -------
+  Note that if you construct T^mu_nu, then:
+  rho = alpha^2 T^{00}
+  j^i = -alpha*T^{0i} + beta^i T^{00}
+  S^i_j = T^i_j + beta^i T^0_j
+
+  because
+  n_mu = (-alpha, 0)
+  n^mu = (1/alpha, -beta/alpha)
+  P^mu_nu = delta^mu_nu + n^mu n_nu
  */
 
 namespace MonopoleGR {
@@ -178,9 +187,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus MatterToHost(StateDescriptor *pkg, bool do_vols);
 // use dispatch instead of default arguments to make task framework
 // happy
-inline TaskStatus MatterToHost(StateDescriptor *pkg) {
-  return MatterToHost(pkg, false);
-}
+inline TaskStatus MatterToHost(StateDescriptor *pkg) { return MatterToHost(pkg, false); }
 
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 
@@ -196,9 +203,8 @@ namespace impl {
 template <bool IS_CART, typename EnergyMomentum, typename Geometry, typename Pack>
 KOKKOS_INLINE_FUNCTION void
 GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom, const Pack &p,
-                      const int b, const int k, const int j, const int i, const int crho,
-                      const int cmom_lo, const int ceng, Real &rho0, Real &jr, Real &srr,
-                      Real &trcs);
+                      const int b, const int k, const int j, const int i, Real &rho0,
+                      Real &jr, Real &srr, Real &trcs);
 // Gets the radius r of a cell, as well as its width in radius dr, and
 // its volume element dv. Computes this for both Cartesian and
 // spherical coords.
@@ -213,7 +219,7 @@ Real GetVolIntersectHelper(const Real rsmall, const Real drsmall, const Real rbi
                            const Real drbig);
 PORTABLE_INLINE_FUNCTION
 bool InBoundsHelper(Real a, Real r, Real dr) {
-  return ((a >= (r - 0.5*dr)) && (a < (r + 0.5*dr)));
+  return ((a >= (r - 0.5 * dr)) && (a < (r + 0.5 * dr)));
 }
 } // namespace impl
 
@@ -258,19 +264,15 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   auto tmunu = fluid::BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  std::vector<std::string> vars(
-      {fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
+  // I just need the pack for the coords object, so I choose something
+  // arbitrary here
+  std::vector<std::string> vars({fluid_cons::density});
+  auto pack = rc->PackVariables();
 
   // Available in all Container types
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
-  PackIndexMap imap;
-  auto pack = rc->PackVariables(vars, imap);
-
-  const int crho = imap[fluid_cons::density].first;
-  const int cmom_lo = imap[fluid_cons::momentum].first;
-  const int ceng = imap[fluid_cons::energy].first;
 
   const int nblocks = pack.GetDim(5);
   parthenon::par_for(
@@ -285,12 +287,9 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
 
         // First compute the relevant conserved/prim vars
         Real matter_loc[4];
-        GetMonopoleVarsHelper<is_monopole_cart>(tmunu, geom, pack, b, k, j, i, crho,
-                                                cmom_lo, ceng,
-                                                matter_loc[Matter::RHO],
-                                                matter_loc[Matter::J_R],
-                                                matter_loc[Matter::Srr],
-                                                matter_loc[Matter::trcS]);
+        GetMonopoleVarsHelper<is_monopole_cart>(
+            tmunu, geom, pack, b, k, j, i, matter_loc[Matter::RHO],
+            matter_loc[Matter::J_R], matter_loc[Matter::Srr], matter_loc[Matter::trcS]);
         // Next get coords and grid spacing
         Real r, th, ph, dr, dth, dph, dv;
         GetCoordsAndCellWidthsHelper<is_monopole_cart>(geom, pack, b, k, j, i, r, th, ph,
@@ -299,7 +298,7 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
         // Bounds in the 1d grid We're wasteful here because I'm
         // paranoid. Need to make sure we don't need miss any cells in
         // the 1d grid.
-        // No correctness issue from making this too big, 
+        // No correctness issue from making this too big,
         int i1dleft = radius1d.index(r - dr) - 1;
         int i1dright = radius1d.index(r + dr) + 1;
 
@@ -308,11 +307,11 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
         Real dr1d = radius1d.dx();
         for (int i1d = i1dleft; i1d <= i1dright; ++i1d) {
           Real r1d = radius1d.x(i1d);
-          Real weight = GetVolIntersectHelper(r1d, dr1d, r, dr)*dv;
+          Real weight = GetVolIntersectHelper(r1d, dr1d, r, dr) * dv;
           // Yucky atomics
           Kokkos::atomic_add(&vols(i1d), weight);
           for (int v = 0; v < NMAT; ++v) {
-            Kokkos::atomic_add(&matter(v,i1d), matter_loc[v]*weight);
+            Kokkos::atomic_add(&matter(v, i1d), matter_loc[v] * weight);
           }
         }
       });
@@ -327,9 +326,8 @@ namespace impl {
 template <bool IS_CART, typename EnergyMomentum, typename Geometry, typename Pack>
 KOKKOS_INLINE_FUNCTION void
 GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom, const Pack &p,
-                      const int b, const int k, const int j, const int i, const int crho,
-                      const int cmom_lo, const int ceng, Real &rho0, Real &jr, Real &srr,
-                      Real &trcs) {
+                      const int b, const int k, const int j, const int i, Real &rho0,
+                      Real &jr, Real &srr, Real &trcs) {
   // Tmunu and gcov
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
@@ -340,24 +338,22 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom, const P
   geom.SpacetimeMetric(loc, b, k, j, i, gcov);
   Real gamcon[NS][NS];
   geom.MetricInverse(loc, b, k, j, i, gamcon);
+  Real beta[NS];
+  geom.ContravariantShift(loc, b, k, j, i, beta);
+  const Real alpha = geom.Lapse(loc, b, k, j, i);
 
-  // D, S, tau in base coordinates
-  const Real D = p(b, crho, k, j, i);
-  const Real Scov[] = {p(b, cmom_lo, k, j, i), p(b, cmom_lo + 1, k, j, i),
-                       p(b, cmom_lo + 2, k, j, i)};
-  const Real tau = p(b, ceng, k, j, i);
+  // Get rho and S before lowering T
+  Real Scon[NS];
+  rho0 = alpha * alpha * Tcon[0][0];
+  SPACELOOP(d) { Scon[d] = -alpha * Tcon[0][d] + beta[d] * Tcon[0][0]; }
 
   // Lower Tmunu
   Real TConCov[ND][ND] = {0};
   SPACETIMELOOP(mu) {
     SPACETIMELOOP2(nu, nup) { TConCov[mu][nu] += gcov[nu][nup] * Tcon[mu][nup]; }
   }
-  // Raise S
-  Real Scon[NS] = {0};
-  SPACELOOP2(i, ip) { Scon[i] += gamcon[i, ip] * Scov[ip]; }
 
-  trcs = 0;       // initialize for summing
-  rho0 = tau + D; // scalar so coord indep
+  trcs = 0; // initialize for summing
 
   // Only one branch is resolved at compile time
   // Thanks to the magic of templates and C++11.
@@ -377,19 +373,20 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom, const P
 
     // J
     jr = 0;
-    SPACELOOP(i) { jr += c2s[1][i + 1] * Scon[i]; }
+    SPACELOOP(d) { jr += c2s[1][d + 1] * Scon[d]; }
     // S
-    SPACELOOP2(i, ip) {
-      SPACELOOP2(j, jp) {
-        ssph[ip][jp] += c2s[i + 1][ip + 1] * s2c[j + 1][jp + 1] * TConCov[ip + 1][jp + 1];
+    SPACELOOP2(l, ip) {
+      SPACELOOP2(m, jp) {
+        ssph[ip][jp] += c2s[l + 1][ip + 1] * s2c[m + 1][jp + 1] *
+                        (TConCov[ip + 1][jp + 1] + beta[ip] * TConCov[0][jp + 1]);
       }
     }
     srr = ssph[0][0];
-    SPACELOOP(i) { trcs += ssph[i][i]; }
+    SPACELOOP(d) { trcs += ssph[d][d]; }
   } else {
     jr = Scon[0];
-    srr = TConCov[1][1];
-    SPACELOOP(i) { trcs += TConCov[i + 1][i + 1]; }
+    srr = TConCov[1][1] + beta[0] * TConCov[0][1];
+    SPACELOOP(d) { trcs += (TConCov[d + 1][d + 1] + beta[d] * TConCov[0][d + 1]); }
   }
 }
 
@@ -411,8 +408,8 @@ GetCoordsAndCellWidthsHelper(const Geometry &geom, const Pack &p, const int b,
     dr = coords.Dx(1, k, j, i);
     dth = coords.Dx(2, k, j, i);
     dph = coords.Dx(3, k, j, i);
-    Real idr = (1./12.)*(dr*dr*dr) + dr*(r*r);
-    dv = std::sin(th)*dth*dph*idr;
+    Real idr = (1. / 12.) * (dr * dr * dr) + dr * (r * r);
+    dv = std::sin(th) * dth * dph * idr;
   }
 }
 
