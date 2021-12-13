@@ -138,7 +138,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return monopole_gr;
 }
 
-TaskStatus MatterToHost(StateDescriptor *pkg) {
+TaskStatus MatterToHost(StateDescriptor *pkg, bool do_vols) {
   PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
                            "Requires the monopole_gr package");
   auto &params = pkg->AllParams();
@@ -148,6 +148,12 @@ TaskStatus MatterToHost(StateDescriptor *pkg) {
   auto matter = params.Get<Matter_t>("matter");
   auto matter_h = params.Get<Matter_host_t>("matter_h");
   Kokkos::deep_copy(matter_h, matter);
+
+  if (do_vols) {
+    auto vols = params.Get<Volumes_t>("integration_volumes");
+    auto vols_h = params.Get<Volumes_host_t>("integration_volumes_h");
+    Kokkos::deep_copy(vols_h, vols);
+  }
 
   return TaskStatus::complete;
 }

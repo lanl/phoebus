@@ -175,7 +175,12 @@ namespace MonopoleGR {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
-TaskStatus MatterToHost(StateDescriptor *pkg);
+TaskStatus MatterToHost(StateDescriptor *pkg, bool do_vols);
+// use dispatch instead of default arguments to make task framework
+// happy
+inline TaskStatus MatterToHost(StateDescriptor *pkg) {
+  return MatterToHost(pkg, false);
+}
 
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 
@@ -272,7 +277,11 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
       DEFAULT_LOOP_PATTERN, "MonpoleGR::InterpolateMatterTo1D", DevExecSpace(), 0,
       nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        // TODO(JMM): Should some of this be precomputed? Or should it be computed here?
+        // TODO(JMM): Should some of this be precomputed? Or should it
+        // be computed here?  With liberal use of scratch arrays this
+        // kernel could be broken up and maybe written in a way that
+        // vectorizes better. I don't know what the right thing is
+        // though. Just gotta try stuff.
 
         // First compute the relevant conserved/prim vars
         Real matter_loc[4];
