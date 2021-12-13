@@ -34,13 +34,15 @@ using Matter_t = parthenon::ParArray2D<Real>;
 using Matter_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
 constexpr int NMAT = 4;
-constexpr int NMAT_H = NMAT - 2;
+constexpr int NMAT_H = NMAT - 2; // used for integration on CPU
 enum Matter {
   RHO = 0,  // Primitive density... (0,0)-component of Tmunu
   J_R = 1,  // Radial momentum, (r,t)-component of Tmunu
   trcS = 2, // Trace of the stress tensor: S = S^i_i
   Srr = 3   // The r-r component of the stress tensor
 };
+using Volumes_t = parthenon::ParArray1D<Real>;
+using Volumes_host_t = typename parthenon::ParArray1D<Real>::HostMirror;
 
 using Hypersurface_t = parthenon::ParArray2D<Real>;
 using Hypersurface_host_t = typename parthenon::ParArray2D<Real>::HostMirror;

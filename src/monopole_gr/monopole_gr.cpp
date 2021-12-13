@@ -82,6 +82,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
   Matter_t matter("monopole_gr matter grid", NMAT, npoints);
+  Volumes_t integration_volumes("monopole_gr matter integration volumes", npoints);
   Hypersurface_t hypersurface("monopole_gr hypersurface grid", NHYPER, npoints);
   Alpha_t alpha("monopole_gr lapse grid", npoints);
 
@@ -93,11 +94,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         }
         hypersurface(Hypersurface::A, i) = 1;
         hypersurface(Hypersurface::K, i) = 0;
+        integration_volumes(i) = 0;
         alpha(i) = 1;
       });
 
   // Host mirrors
   auto matter_h = Kokkos::create_mirror_view(matter);
+  auto integration_vols_h = Kokkos::create_mirror_view(integration_volumes);
   auto hypersurface_h = Kokkos::create_mirror_view(hypersurface);
   auto alpha_h = Kokkos::create_mirror_view(alpha);
 
@@ -113,6 +116,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("matter", matter);
   params.Add("matter_h", matter_h);
+  params.Add("integration_volumes", integration_volumes);
+  params.Add("integration_volumes_h", integration_vols_h);
   params.Add("hypersurface", hypersurface);
   params.Add("hypersurface_h", hypersurface_h);
   params.Add("lapse", alpha);
