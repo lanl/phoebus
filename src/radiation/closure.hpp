@@ -95,6 +95,14 @@ namespace radiation
         Status
         getConCovPFromPrim(const Real J, const V cov_tilH, const T2A con_tilPi,
                            T2B *concov_P);
+    
+    //-------------------------------------------------------------------------------------
+    /// Calculate the momentum density flux P^i_j from J, \tilde H_i, and \tilde pi^{ij}.
+    template <class V, class T2A, class T2B>
+    KOKKOS_FUNCTION
+        Status
+        getConPFromPrim(const Real J, const V cov_tilH, const T2A con_tilPi,
+                           T2B *con_P);
 
     //-------------------------------------------------------------------------------------
     /// Transform from J, \tilde H_i, and \tilde \pi_{ij} to E and F_i. Should be used for
@@ -483,6 +491,23 @@ namespace radiation
     M1FluidPressureTensor(E, cov_F, xi, phi, con_tilPi, &con_tilf);
     Con2Prim(E, cov_F, *con_tilPi, J, cov_H);
     return status;
+  }
+  
+  template <class Vec, class Tens2>
+  template <class V, class T2A, class T2B>
+  KOKKOS_FORCEINLINE_FUNCTION
+      Status
+      Closure<Vec, Tens2>::getConPFromPrim(const Real J, const V cov_tilH,
+                                              const T2A con_tilPi,
+                                              T2B *con_P)
+  {
+    Vec con_tilH;
+    raise3Vector(cov_tilH, &con_tilH);
+    SPACELOOP2(i,j) (*con_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * con_v(j) * J 
+            + W * (con_v(i) * con_tilH(j) + con_v(j) * con_tilH(i)) + J * con_tilPi(i, j) 
+            + J/3.0*con_gamma(i,j);
+    
+    return Status::success;
   }
 
   template <class Vec, class Tens2>
