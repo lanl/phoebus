@@ -167,6 +167,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
     matter_h(MonopoleGR::Matter::Srr, i) = press;
   }
+  printf("TOV star constructed. Total mass = %.14e\n", state_h(TOV::M, npoints - 1));
 
   // Copy to device
   auto matter_d = monopolepkg->Param<MonopoleGR::Matter_t>("matter");
