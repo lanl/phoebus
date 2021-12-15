@@ -148,9 +148,9 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         
         
           if (result.status == Status::failure && !(result.xi < 1.e-4) && !(std::fabs(result.fXi) < 1.e-6)) {
-            printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) \n "
+            printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) 1/sqrt(gammma) = %e \n "
                    "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n", i, ispec, 
-                   E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), result.xi, result.phi, result.fXi, result.fPhi, 
+                   E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), isdetgam, result.xi, result.phi, result.fXi, result.fPhi, 
                    con_v(0), con_v(1), con_v(2), xi, phi);
             if (std::isnan(J) || std::isnan(covH(0))) throw 0;
           }
@@ -244,7 +244,7 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
           SPACELOOP2(ii, jj) conTilPi(ii,jj) = 0.0;
           c.Prim2Con(J, covH, conTilPi, &E, &covF);
         }
-
+        printf("i = %i J = %e E = %e H = %e F = %e sdetgam = %e \n", i, J, E, covH(0), covF(0), sdetgam);
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
@@ -565,20 +565,123 @@ TaskStatus CalculateFluxes(T* rc) {
 }
 template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
-template <class T>
-TaskStatus CalculateGeometricSource(T *rc, T *rc_src) { 
+template <class T, ClosureType CLOSURE_TYPE>
+TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) { 
 
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
+  
+  namespace cr = radmoment_cons;  
+  namespace pr = radmoment_prim;  
+  namespace ir = radmoment_internal;
+  namespace p = fluid_prim;
+  PackIndexMap imap;
+  std::vector<std::string> vars{cr::E, cr::F, pr::J, pr::H, p::velocity};
+  auto v = rc->PackVariables(vars, imap);
+  auto idx_E = imap.GetFlatIdx(cr::E); 
+  auto idx_F = imap.GetFlatIdx(cr::F);
+  auto idx_J = imap.GetFlatIdx(pr::J); 
+  auto idx_H = imap.GetFlatIdx(pr::H);
+  auto pv = imap.GetFlatIdx(p::velocity);
+
+  PackIndexMap imap_src;
+  std::vector<std::string> vars_src{cr::E, cr::F}; 
+  auto v_src = rc_src->PackVariables(vars_src, imap_src);
+  auto idx_E_src = imap_src.GetFlatIdx(cr::E); 
+  auto idx_F_src = imap_src.GetFlatIdx(cr::F);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
+  // Get the background geometry 
   auto geom = Geometry::GetCoordinateSystem(rc);
-  /// TODO: (LFR) Actually build the source 
+
+  int nblock = v.GetDim(5); 
+  int nspec = idx_E.DimSize(1);
+  
+  parthenon::par_for( 
+      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 
+      0, nblock-1, // Loop over blocks
+      kb.s, kb.e, // z-loop  
+      jb.s, jb.e, // y-loop 
+      ib.s, ib.e, // x-loop
+      KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
+        // Set up the background state 
+        Vec con_v{{v(iblock, pv(0), k, j, i),
+                   v(iblock, pv(1), k, j, i),
+                   v(iblock, pv(2), k, j, i)}};
+        Tens2 cov_gamma; 
+        geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+        Real alp = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
+        Real sdetgam = sqrt(geom.DetGamma(CellLocation::Cent, iblock, k, j, i));
+        
+        Real dg[ND][ND][ND]; 
+        Real dlnalp[ND];
+        Real Gamma[ND][ND][ND];
+        Tens2 dbeta{{{0,0,0},{0,0,0},{0,0,0}}}; 
+        Tens2 K{{{0,0,0},{0,0,0},{0,0,0}}}; 
+        geom.MetricDerivative(CellLocation::Cent, iblock, k, j, i, dg); 
+        geom.GradLnAlpha(CellLocation::Cent, iblock, k, j, i, dlnalp); 
+        geom.ConnectionCoefficient(CellLocation::Cent, iblock, k, j, i, Gamma);
+        SPACELOOP2(ii, jj) K(ii,jj) = -alp*Gamma[0][ii+1][jj+1];
+        
+        /// TODO: (LFR) Fill in the gradient of beta^i, probably should be derivable from Gamma
+
+        Closure<Vec, Tens2> c(con_v, cov_gamma); 
+  
+        for (int ispec = 0; ispec<nspec; ++ispec) {
+          Real J = v(iblock, idx_J(ispec), k, j, i); 
+          Real E = v(iblock, idx_E(ispec), k, j, i); 
+          Vec covF{{v(iblock, idx_F(ispec, 0), k, j, i),
+                     v(iblock, idx_F(ispec, 1), k, j, i),
+                     v(iblock, idx_F(ispec, 2), k, j, i)}};
+          Vec covH{{v(iblock, idx_H(ispec, 0), k, j, i),
+                     v(iblock, idx_H(ispec, 1), k, j, i),
+                     v(iblock, idx_H(ispec, 2), k, j, i)}};
+          Vec conF;
+          c.raise3Vector(covF, &conF);           
+          Tens2 conP, con_tilPi; 
+          if (CLOSURE_TYPE == ClosureType::M1) {
+            Real tempE;
+            Vec tempF; 
+            c.Prim2ConM1(J, covH, &tempE, &tempF, &con_tilPi); 
+          }
+          else if (CLOSURE_TYPE == ClosureType::Eddington) { 
+            SPACELOOP2(ii,jj) con_tilPi(ii,jj) = 0.0;
+          }
+          c.getConPFromPrim(J, covH, con_tilPi, &conP); 
+          
+          Real srcE = 0.0; 
+          SPACELOOP2(ii, jj) srcE += K(ii,jj)*conP(ii, jj);  
+          SPACELOOP(ii) srcE -= dlnalp[ii+1]*conF(ii);
+          srcE *= alp; 
+          
+          Vec srcF{0,0,0};
+          SPACELOOP(ii) {
+            SPACELOOP(jj) srcF(ii) += covF(jj)*dbeta(ii,jj);
+            srcF(ii) -= alp*E*dlnalp[ii+1];
+            SPACELOOP2(jj, kk) srcF(ii) += 0.5*alp*conP(jj,kk)*dg[jj+1][kk+1][ii+1];
+          }
+          v_src(iblock, idx_E_src(ispec), k, j, i) = srcE; 
+          SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = srcF(ii); 
+        }
+  });
   return TaskStatus::complete;
+}
+template<class T> 
+TaskStatus CalculateGeometricSource(T* rc, T* rc_src) {
+  auto *pm = rc->GetParentPointer().get(); 
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
+  auto method = rad->Param<std::string>("method"); 
+  if (method == "moment") { 
+    return CalculateGeometricSourceImpl<T, ClosureType::M1>(rc, rc_src);
+  }
+  else if (method == "moment_eddington") {
+    return CalculateGeometricSourceImpl<T, ClosureType::Eddington>(rc, rc_src);
+  }
+  return TaskStatus::fail;
 }
 template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<Real> *, MeshBlockData<Real> *);
 
