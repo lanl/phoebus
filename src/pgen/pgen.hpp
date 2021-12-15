@@ -40,7 +40,8 @@ using namespace parthenon::package::prelude;
   PROBLEM(sedov)                                                                         \
   PROBLEM(blandford_mckee)                                                               \
   PROBLEM(bondi)                                                                         \
-  PROBLEM(radiation_advection)
+  PROBLEM(radiation_advection)                                                           \
+  PROBLEM(homogeneous_sphere)
 
 /*
 // DO NOT TOUCH THE MACROS BELOW
