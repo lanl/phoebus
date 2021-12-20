@@ -528,21 +528,17 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           // Correct the fluxes with the shift terms 
           conFl(idir) -= con_beta(idir)*El;
           conFr(idir) -= con_beta(idir)*Er;
-          
-          Pl(idir, 0) -= con_beta(idir)*covFl(0);
-          Pl(idir, 1) -= con_beta(idir)*covFl(1);
-          Pl(idir, 2) -= con_beta(idir)*covFl(2);
 
-          Pr(idir, 0) -= con_beta(idir)*covFr(0);
-          Pr(idir, 1) -= con_beta(idir)*covFr(1);
-          Pr(idir, 2) -= con_beta(idir)*covFr(2);
-          
-          // Everything below should be independent of the assumed closure, just calculating the LLF flux
+          SPACELOOP(ii) {  
+            Pl(idir, ii) -= con_beta(idir)*covFl(ii);
+            Pr(idir, ii) -= con_beta(idir)*covFr(ii);
+          }
+
+          // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*sdetgam*(conFl(idir) + conFr(idir) + speed*(El - Er)); 
-        
-          v.flux(idir_in, idx_Ff(ispec, 0), k, j, i) = 0.5*sdetgam*(Pl(idir, 0) + Pr(idir, 0) + speed*(covFl(0) - covFr(0)));
-          v.flux(idir_in, idx_Ff(ispec, 1), k, j, i) = 0.5*sdetgam*(Pl(idir, 1) + Pr(idir, 1) + speed*(covFl(1) - covFr(1))); 
-          v.flux(idir_in, idx_Ff(ispec, 2), k, j, i) = 0.5*sdetgam*(Pl(idir, 2) + Pr(idir, 2) + speed*(covFl(2) - covFr(2))); 
+
+          SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.5*sdetgam*(Pl(idir, ii) + Pr(idir, ii) 
+                                                                                + speed*(covFl(ii) - covFr(ii)));
         
         } 
       });
@@ -614,22 +610,34 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                    v(iblock, pv(2), k, j, i)}};
         Tens2 cov_gamma; 
         geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+        
+        Closure<Vec, Tens2> c(con_v, cov_gamma); 
+        
         Real alp = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
         Real sdetgam = sqrt(geom.DetGamma(CellLocation::Cent, iblock, k, j, i));
-        
-        Real dg[ND][ND][ND]; 
+        Vec con_beta; 
+        geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
+        Real beta2 = 0.0;
+        SPACELOOP2(ii,jj) beta2 += con_beta(ii)*con_beta(jj)*cov_gamma(ii,jj); 
+
         Real dlnalp[ND];
         Real Gamma[ND][ND][ND];
-        Tens2 dbeta{{{0,0,0},{0,0,0},{0,0,0}}}; 
-        Tens2 K{{{0,0,0},{0,0,0},{0,0,0}}}; 
-        geom.MetricDerivative(CellLocation::Cent, iblock, k, j, i, dg); 
         geom.GradLnAlpha(CellLocation::Cent, iblock, k, j, i, dlnalp); 
         geom.ConnectionCoefficient(CellLocation::Cent, iblock, k, j, i, Gamma);
-        SPACELOOP2(ii, jj) K(ii,jj) = -alp*Gamma[0][ii+1][jj+1];
-        
-        /// TODO: (LFR) Fill in the gradient of beta^i, probably should be derivable from Gamma
 
-        Closure<Vec, Tens2> c(con_v, cov_gamma); 
+        // Get the gradient of the shift from the Christoffel symbols of the first kind
+        // Get the extrinsic curvature from the Christoffel symbols of the first kind 
+        // All indices are covariant
+        Tens2 dbeta, K; 
+        const Real iFac = 1.0/(alp + beta2/alp); 
+        SPACELOOP2(ii, jj) {
+          dbeta(ii,jj) = Gamma[ii+1][jj+1][0] + Gamma[ii+1][0][jj+1];
+          K(ii,jj) = Gamma[ii+1][0][jj+1];
+          SPACELOOP(kk) K(ii,jj) -= Gamma[ii+1][kk+1][jj+1]*con_beta(kk);
+          K(ii,jj) *= iFac; 
+        }
+
+
   
         for (int ispec = 0; ispec<nspec; ++ispec) {
           Real J = v(iblock, idx_J(ispec), k, j, i); 
@@ -662,7 +670,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           SPACELOOP(ii) {
             SPACELOOP(jj) srcF(ii) += covF(jj)*dbeta(ii,jj);
             srcF(ii) -= alp*E*dlnalp[ii+1];
-            SPACELOOP2(jj, kk) srcF(ii) += 0.5*alp*conP(jj,kk)*dg[jj+1][kk+1][ii+1];
+            SPACELOOP2(jj, kk) srcF(ii) += alp*conP(jj,kk)*Gamma[jj+1][kk+1][ii+1];
           }
           v_src(iblock, idx_E_src(ispec), k, j, i) = srcE; 
           SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = srcF(ii); 
