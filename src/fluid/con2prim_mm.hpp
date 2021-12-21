@@ -29,16 +29,17 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
+#include "con2prim.hpp"
 
 namespace con2prim_mm {
+
+using namespace con2prim;
 
 class Residual {
  public:
   KOKKOS_FUNCTION
-  Residual(const Real D, const Real Ssq, const Real tau, const Real Bsq,
-           const Real SdB)
-      : D_(D), Ssq_(Ssq), tau_(tau), Bsq_(Bsq), SdB_(SdB) {
-  }
+  Residual(const Real D, const Real Ssq, const Real tau, const Real Bsq, const Real SdB)
+      : D_(D), Ssq_(Ssq), tau_(tau), Bsq_(Bsq), SdB_(SdB) {}
 
   KOKKOS_INLINE_FUNCTION
   Real GetPressure() { return P_; }
@@ -48,9 +49,10 @@ class Residual {
 
   KOKKOS_INLINE_FUNCTION
   Real operator()(const Real Wp) {
-    SetLorentzFactorEnthalpy();
+    SetLorentzFactorEnthalpy(Wp);
     SetPressure();
-    Real resid = Wp - tau_ - P_ + Bsq_/2. + (Bsq_*Ssq_ - SdB_*SdB_)/(2.*pow(Bsq_ + Wp + D, 2.));
+    Real resid = Wp - tau_ - P_ + Bsq_ / 2. +
+                 (Bsq_ * Ssq_ - SdB_ * SdB_) / (2. * pow(Bsq_ + Wp + D_, 2.));
     return resid;
   }
 
@@ -64,18 +66,18 @@ class Residual {
   KOKKOS_INLINE_FUNCTION
   void SetLorentzFactorEnthalpy(const Real Wp) {
     const Real W = Wp + D_;
-    const Real WpB = pow(W + Bsq_,2);
-    const Real A = Ssq_/WpB + SdB_*SdB_/(W*W*WpB)*(2.*W + Bsq_);
+    const Real WpB = pow(W + Bsq_, 2);
+    const Real A = Ssq_ / WpB + SdB_ * SdB_ / (W * W * WpB) * (2. * W + Bsq_);
     const Real xsq = A / (1. - A);
     gamma_ = sqrt(1. + xsq);
-    wp_ = 1./(gamma_*gamma_)*(Wp - D_*xsq/(1. + gamma_));
+    wp_ = 1. / (gamma_ * gamma_) * (Wp - D_ * xsq / (1. + gamma_));
   }
 
   KOKKOS_INLINE_FUNCTION
   void SetPressure() {
     // TODO(BRR) Use singularity calls for this, right now 5/3 gamma law only
-    const Real gam = 5./3.;
-    P_ = wp_*(gam - 1.)/gam;
+    const Real gam = 5. / 3.;
+    P_ = wp_ * (gam - 1.) / gam;
   }
 };
 
@@ -85,9 +87,8 @@ struct CellGeom {
                            const int i)
       : gdet(geom.DetGamma(CellLocation::Cent, k, j, i)),
         lapse(geom.Lapse(CellLocation::Cent, k, j, i)) {
-    geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
-    SPACELOOP2(m, n) { gcov[m][n] = gcov4[m + 1][n + 1]; }
-    geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+    geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+    geom.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
     geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
   }
   template <typename CoordinateSystem>
@@ -95,9 +96,8 @@ struct CellGeom {
            const int i)
       : gdet(geom.DetGamma(CellLocation::Cent, b, k, j, i)),
         lapse(geom.Lapse(CellLocation::Cent, b, k, j, i)) {
-    geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, gcov4);
-    SPACELOOP2(m, n) { gcov[m][n] = gcov4[m + 1][n + 1]; }
-    geom.MetricInverse(CellLocation::Cent, b, k, j, i, gcon);
+    geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, gcov);
+    geom.MetricInverse(CellLocation::Cent, b, k, j, i, gammacon);
     geom.ContravariantShift(CellLocation::Cent, b, k, j, i, beta);
   }
   Real gcov[4][4];
@@ -111,7 +111,7 @@ template <typename Data_t, typename T>
 class ConToPrim {
  public:
   ConToPrim(Data_t *rc, const Real tol, const int max_iterations)
-      : bounds(bnds), var(rc->PackVariables(Vars(), imap)),
+      : var(rc->PackVariables(Vars(), imap)),
         prho(imap[fluid_prim::density].first), crho(imap[fluid_cons::density].first),
         pvel_lo(imap[fluid_prim::velocity].first),
         pvel_hi(imap[fluid_prim::velocity].second),
@@ -152,7 +152,6 @@ class ConToPrim {
   int NumBlocks() { return var.GetDim(5); }
 
  private:
-  fixup::Bounds bounds;
   PackIndexMap imap;
   const T var;
   const int prho, crho;
@@ -183,7 +182,7 @@ class ConToPrim {
 
     // Update Ye if available
     if (pye > 0) {
-      v(pye) = v(cye)/v(crho);
+      v(pye) = v(cye) / v(crho);
     }
 
     // Constants
@@ -227,36 +226,30 @@ class ConToPrim {
     const Real gamma = res.GetLorentzFactor();
     const Real P = res.GetPressure();
 
-    v(prho) = D/gamma;
+    v(prho) = D / gamma;
     v(prs) = P;
-    v(peng) = v(prho)*eos.InternalEnergyFromDensityPressure(v(prho), P);
+    v(peng) = v(prho) * eos.InternalEnergyFromDensityPressure(v(prho), P);
     v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
-    v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
+    v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp)) / v(prs);
 
     Real vcov[3];
     SPACELOOP(ii) {
-      vel[ii] = 1./(Wp + D + Bsq)*(Scov[ii] + SdB/(Wp + D)*Bcov[ii]);
+      vel[ii] = 1. / (Wp + D + Bsq) * (Scov[ii] + SdB / (Wp + D) * Bcov[ii]);
     }
     Real vcon[3] = {0.};
-    SPACELOOP2(ii, jj) {
-      vcon[ii] += g.gammacon[ii][jj]*vcon[jj];
-    }
-    SPACELOOP(ii) {
-      v(pvel_lo + ii) = gamma*vcon[ii];
-    }
+    SPACELOOP2(ii, jj) { vcon[ii] += g.gammacon[ii][jj] * vcon[jj]; }
+    SPACELOOP(ii) { v(pvel_lo + ii) = gamma * vcon[ii]; }
 
     // Set signal speed
     Real Bdv = 0.;
-    SPACELOOP(ii) {
-      Bdv += Bcov[ii]*vcon[ii];
-    }
+    SPACELOOP(ii) { Bdv += Bcov[ii] * vcon[ii]; }
     Real bcon[] = {W * Bdv / alpha, 0.0, 0.0, 0.0};
     const Real bsq = (Bsq + alpha * alpha * bcon[0] * bcon[0]) / gamma / gamma;
     Real sig[3] = {0.};
     CalculateSignalSpeed(v(prho), v(peng), v(prs), vcon, bsq, gamma, gm1, g.gcon,
                          g.gammacov, g.beta, g.alpha, sig);
-    for (int i = 0; i < sig_hi-sig_lo+1; i++) {
-      v(sig_lo+i) = sig[i];
+    for (int i = 0; i < sig_hi - sig_lo + 1; i++) {
+      v(sig_lo + i) = sig[i];
     }
   }
 };

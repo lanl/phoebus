@@ -31,6 +31,7 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
+#include "con2prim.hpp"
 
 namespace con2prim_robust {
 

@@ -86,22 +86,22 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
 
 KOKKOS_INLINE_FUNCTION
 void CalculateSignalSpeed(const Real rho, const Real u, const Real P, const Real vcon[3],
-                          const Real bsq, const Real W, const Real gm1,
+                          const Real bsq, const Real W, const Real gam1,
                           const Real gcon[4][4], const Real gammacov[3][3],
                           const Real beta[3], const Real alpha, Real sig[3]) {
   Real vsq = 0.;
-  SPACELOOP(ii) { vsq += vcon[ii] * vcon[ii] * gammacov[ii][jj]; }
-  const Real rho_rel = (rho + u + p + bsq) * W * W;
+  SPACELOOP2(ii, jj) { vsq += vcon[ii] * vcon[ii] * gammacov[ii][jj]; }
+  const Real rho_rel = (rho + u + P + bsq) * W * W;
   const Real vasq = bsq * W * W / rho_rel;
-  Real cssq = gam1 * p / (rho + u + p);
+  Real cssq = gam1 * P / (rho + u + P);
   cssq += vasq - cssq * vasq;
   const Real vcoff = alpha / (1.0 - vsq * cssq);
   SPACELOOP(m) {
     const Real vpm =
         std::sqrt(cssq * (1.0 - vsq) *
-                  (gcon[m][m] * (1.0 - vsq * cssq) - v[m] * v[m] * (1.0 - cssq)));
-    const Real vp = vcoff * (v[m] * (1.0 - cssq) + vpm) - beta[m];
-    const Real vm = vcoff * (v[m] * (1.0 - cssq) - vpm) - beta[m];
+                  (gcon[m][m] * (1.0 - vsq * cssq) - vcon[m] * vcon[m] * (1.0 - cssq)));
+    const Real vp = vcoff * (vcon[m] * (1.0 - cssq) + vpm) - beta[m];
+    const Real vm = vcoff * (vcon[m] * (1.0 - cssq) - vpm) - beta[m];
     sig[m] = std::max(std::fabs(vp), std::fabs(vm));
   }
 }

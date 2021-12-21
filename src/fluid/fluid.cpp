@@ -14,7 +14,9 @@
 #include "fluid.hpp"
 
 #include "con2prim.hpp"
+#include "con2prim_classic.hpp"
 #include "con2prim_robust.hpp"
+#include "con2prim_mm.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -376,6 +378,40 @@ TaskStatus ConservedToPrimitive(T *rc) {
 }
 
 template <typename T>
+TaskStatus ConservedToPrimitiveMM(T *rc, const IndexRange &ib, const IndexRange &jb,
+                                      const IndexRange &kb) {
+  auto *pmb = rc->GetParentPointer().get();
+
+  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+  auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
+
+  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  const Real c2p_tol = pkg->Param<Real>("c2p_tol");
+  const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
+  auto invert = con2prim_mm::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
+
+  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  auto coords = pmb->coords;
+
+  // TODO(JCD): move the setting of this into the solver so we can call this on MeshData
+  auto fail = rc->Get(internal_variables::fail).data;
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
+      invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        auto status = invert(geom, eos, coords, k, j, i);
+        fail(k, j, i) = (status == con2prim::ConToPrimStatus::success
+                                 ? con2prim::FailFlags::success
+                                 : con2prim::FailFlags::fail);
+      });
+
+  return TaskStatus::complete;
+}
+
+template <typename T>
 TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRange &jb,
                                       const IndexRange &kb) {
   auto *pmb = rc->GetParentPointer().get();
@@ -401,9 +437,9 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
       invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         auto status = invert(geom, eos, coords, k, j, i);
-        fail(k, j, i) = (status == con2prim_robust::ConToPrimStatus::success
-                                 ? con2prim_robust::FailFlags::success
-                                 : con2prim_robust::FailFlags::fail);
+        fail(k, j, i) = (status == con2prim::ConToPrimStatus::success
+                                 ? con2prim::FailFlags::success
+                                 : con2prim::FailFlags::fail);
       });
 
   return TaskStatus::complete;
@@ -421,8 +457,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
-  auto invert = con2prim::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
-  auto invert_robust = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
+  auto invert = con2prim_classic::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
