@@ -33,6 +33,9 @@ using namespace parthenon::package::prelude;
 
 namespace con2prim_mm {
 
+  // TODO(BRR) Use singularity-eos
+  constexpr Real gam = 5./3.;
+
 using namespace con2prim;
 using namespace root_find;
 
@@ -77,7 +80,6 @@ class Residual {
   KOKKOS_INLINE_FUNCTION
   void SetPressure() {
     // TODO(BRR) Use singularity calls for this, right now 5/3 gamma law only
-    const Real gam = 5. / 3.;
     P_ = wp_ * (gam - 1.) / gam;
   }
 };
@@ -86,7 +88,7 @@ struct CellGeom {
   template <typename CoordinateSystem>
   KOKKOS_FUNCTION CellGeom(const CoordinateSystem &geom, const int k, const int j,
                            const int i)
-      : gdet(geom.DetGamma(CellLocation::Cent, k, j, i)),
+      : gammadet(geom.DetGamma(CellLocation::Cent, k, j, i)),
         lapse(geom.Lapse(CellLocation::Cent, k, j, i)) {
     geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
@@ -95,7 +97,7 @@ struct CellGeom {
   template <typename CoordinateSystem>
   CellGeom(const CoordinateSystem &geom, const int b, const int k, const int j,
            const int i)
-      : gdet(geom.DetGamma(CellLocation::Cent, b, k, j, i)),
+      : gammadet(geom.DetGamma(CellLocation::Cent, b, k, j, i)),
         lapse(geom.Lapse(CellLocation::Cent, b, k, j, i)) {
     geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, gcov);
     geom.MetricInverse(CellLocation::Cent, b, k, j, i, gammacon);
@@ -104,7 +106,7 @@ struct CellGeom {
   Real gcov[4][4];
   Real gammacon[3][3];
   Real beta[3];
-  const Real gdet;
+  const Real gammadet;
   const Real lapse;
 };
 
@@ -172,7 +174,7 @@ class ConToPrim {
                         const Real x3) const {
     // Update primitive B fields first if available
     if (pb_hi > 0) {
-      SPACELOOP(i) { v(pb_lo + i) = v(cb_lo + i) / g.gdet; }
+      SPACELOOP(i) { v(pb_lo + i) = v(cb_lo + i) / g.gammadet; }
     }
 
     // Catch negative density
@@ -186,9 +188,9 @@ class ConToPrim {
     }
 
     // Constants
-    const Real D = v(crho);
-    const Real Scov[3] = {v(cmom_lo) / g.gdet, v(cmom_lo + 1) / g.gdet,
-                          v(cmom_lo + 2) / g.gdet};
+    const Real D = v(crho) / g.gammadet;
+    const Real Scov[3] = {v(cmom_lo) / g.gammadet, v(cmom_lo + 1) / g.gammadet,
+                          v(cmom_lo + 2) / g.gammadet};
     Real Bcon[3] = {0.};
     for (int ii = pb_lo; ii <= pb_hi; ii++) {
       Bcon[ii - pb_lo] = v(ii);
@@ -212,10 +214,10 @@ class ConToPrim {
 
 // Calculate Eulerian frame non-rest-mass energy density tau
 #if USE_VALENCIA
-    const Real tau = v(ceng) / g.gdet;
+    const Real tau = v(ceng) / g.gammadet;
 #else
-    Real Qcov[4] = {(v(ceng) - v(crho)) / g.gdet, v(cmom_lo) / g.gdet,
-                    v(cmom_lo + 1) / g.gdet, v(cmom_lo + 2) / g.gdet};
+    Real Qcov[4] = {(v(ceng) - v(crho)) / g.gammadet, v(cmom_lo) / g.gammadet,
+                    v(cmom_lo + 1) / g.gammadet, v(cmom_lo + 2) / g.gammadet};
     Real tau = 0.;
     SPACETIMELOOP(mu) { tau -= Qcov[mu] * ncon[mu]; }
     tau -= D;
@@ -224,17 +226,32 @@ class ConToPrim {
     Residual res(D, Ssq, tau, Bsq, SdB);
 
     RootfindStatus status;
-    const Real Wp = root_find::itp(res, 0.0, 10.*D, rel_tolerance, max_iter, &status);
+    Real Wp = root_find::itp(res, 0.0, 10.*D, rel_tolerance, max_iter, &status);
+    if (v.i_ == 128 && v.j_ == 128) {
+      printf("Wp: %e status: %i\n", Wp, static_cast<int>(status));
+      Real Wp_real = 1.13024;
+      Wp = Wp_real;
+      const Real W = Wp + D;
+      const Real WpB = pow(W + Bsq, 2);
+      const Real A = Ssq / WpB + SdB * SdB / (W * W * WpB) * (2. * W + Bsq);
+      const Real xsq = A / (1. - A);
+      printf("W: %e WpB: %e Ssq: %e SdB: %e\n",
+        W, WpB, Ssq, SdB);
+      const Real gamma = sqrt(1. + xsq);
+      const Real wp = 1. / (gamma * gamma) * (Wp - D * xsq / (1. + gamma));
+      printf("xsq: %e gamma: %e wp: %e\n", xsq, gamma, wp);
+    }
     if (status == RootfindStatus::failure) {
       return ConToPrimStatus::failure;
     }
     const Real gamma = res.GetLorentzFactor();
     const Real P = res.GetPressure();
+    if (v.i_ == 128 && v.j_ == 128) printf("gamma: %e P: %e\n", gamma, P);
 
     v(prho) = D / gamma;
     v(prs) = P;
     // TODO(BRR) use singularity for this
-    v(peng) = P / (5. / 3. - 1.);
+    v(peng) = P / (gam - 1.);
     // v(peng) = v(prho) * eos.InternalEnergyFromDensityPressure(v(prho), P);
     v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp)) / v(prs);

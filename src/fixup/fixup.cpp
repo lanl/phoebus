@@ -115,7 +115,7 @@ TaskStatus ApplyFloors(T *rc) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  
+
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
 
@@ -144,7 +144,7 @@ TaskStatus ApplyFloors(T *rc) {
   const int pb_hi = imap[p::bfield].second;
   int pye = imap[p::ye].second; // negative if not present
   int cye = imap[c::ye].second;
- 
+
   bool enable_floors = fix_pkg->Param<bool>("enable_floors");
   if (!enable_floors) return TaskStatus::complete;
   bool enable_mhd_floors = fix_pkg->Param<bool>("enable_mhd_floors");
@@ -158,15 +158,15 @@ TaskStatus ApplyFloors(T *rc) {
   const Real bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
   const Real bsqou_max = fix_pkg->Param<Real>("bsqou_max");
   const Real uorho_max = fix_pkg->Param<Real>("uorho_max");
-  
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(),
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-            
+
           double rho_floor, sie_floor;
           bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
-          
+
           bool floor_applied = false;
           if (v(b,prho,k,j,i) < rho_floor) {
             floor_applied = true;
@@ -176,7 +176,7 @@ TaskStatus ApplyFloors(T *rc) {
             floor_applied = true;
             v(b,peng,k,j,i) = sie_floor*v(b,prho,k,j,i);
           }
-          
+
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
@@ -339,7 +339,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           return inv_mask_sum*v(b,iv,k,j,i);
         };
         if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
-          printf("fail! %i %i %i\n", k, j, i);
           Real num_valid = v(b,ifail,k,j,i-1) + v(b,ifail,k,j,i+1);
           if (ndim > 1) num_valid += v(b,ifail,k,j-1,i) + v(b,ifail,k,j+1,i);
           if (ndim == 3) num_valid += v(b,ifail,k-1,j,i)  + v(b,ifail,k+1,j,i);
@@ -350,7 +349,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
               v(b,pv,k,j,i) = fixup(pv, norm);
             }
             v(b,peng,k,j,i) = fixup(peng, norm);
-            
+
             if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
                                 Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)));
@@ -359,7 +358,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
                                   Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
           } else {
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive velocities to zero
-            
+
             v(b,prho,k,j,i) = 1.e-20;
             v(b,peng,k,j,i) = 1.e-20;
 
@@ -426,7 +425,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   using parthenon::BoundaryFlag;
   auto *pmb = rc->GetParentPointer().get();
   if (!pmb->packages.Get("fixup")->Param<bool>("enable_flux_fixup")) return TaskStatus::complete;
-  
+
   auto fluid = pmb->packages.Get("fluid");
   const std::string bc_ix1 = fluid->Param<std::string>("bc_ix1");
   const std::string bc_ox1 = fluid->Param<std::string>("bc_ox1");
@@ -489,7 +488,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
       });
   } else if (pmb->boundary_flag[BoundaryFace::inner_x2] == BoundaryFlag::reflect) {
     PackIndexMap imap;
-    auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, 
+    auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density,
                                              fluid_cons::energy, fluid_cons::momentum}),
                                            std::vector<std::string>({fluid_cons::density,
                                              fluid_cons::energy, fluid_cons::momentum}), imap);
@@ -512,9 +511,9 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
       });
   } else if (pmb->boundary_flag[BoundaryFace::outer_x2] == BoundaryFlag::reflect) {
     PackIndexMap imap;
-    auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, 
+    auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density,
                                              fluid_cons::energy, fluid_cons::momentum}),
-                                           std::vector<std::string>({fluid_cons::density, 
+                                           std::vector<std::string>({fluid_cons::density,
                                              fluid_cons::energy, fluid_cons::momentum}), imap);
     const int cmom_lo = imap[c::momentum].first;
     const int cmom_hi = imap[c::momentum].second;
