@@ -35,12 +35,7 @@ using namespace parthenon::package::prelude;
 namespace con2prim_robust {
 
 using namespace robust;
-
-enum class ConToPrimStatus {success, failure};
-struct FailFlags {
-  static constexpr Real success = 1.0;
-  static constexpr Real fail = 0.0;
-};
+using namespace con2prim;
 
 class Residual {
  public:
@@ -173,23 +168,6 @@ class Residual {
     const Real rbarsq = x*(rsq_ * x + mu*(1.0 + x)*rbsq_);
     return mu*std::sqrt(h0sq + rbarsq) - 1.0;
   }
-};
-
-template <typename T>
-class VarAccessor {
- public:
-  KOKKOS_FUNCTION
-  VarAccessor(const T &var, const int k, const int j, const int i)
-              : var_(var), b_(0), k_(k), j_(j), i_(i) {}
-  VarAccessor(const T &var, const int b, const int k, const int j, const int i)
-              : var_(var), b_(b), k_(k), j_(j), i_(i) {}
-  KOKKOS_FORCEINLINE_FUNCTION
-  Real &operator()(const int n) const {
-    return var_(b_, n, k_, j_, i_);
-  }
-  const int b_, i_, j_, k_;
- private:
-  const T &var_;
 };
 
 struct CellGeom {

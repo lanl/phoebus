@@ -51,10 +51,10 @@ int main(int argc, char *argv[]) {
 
   // Ensure only allowed parthenon boundary conditions are used
   const std::string ix1_bc = pman.pinput->GetString("parthenon/mesh", "ix1_bc");
-  PARTHENON_REQUIRE(ix1_bc == "user" || ix1_bc == "periodic", 
+  PARTHENON_REQUIRE(ix1_bc == "user" || ix1_bc == "periodic",
     "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ix1_bc");
   const std::string ox1_bc = pman.pinput->GetString("parthenon/mesh", "ox1_bc");
-  PARTHENON_REQUIRE(ox1_bc == "user" || ox1_bc == "periodic", 
+  PARTHENON_REQUIRE(ox1_bc == "user" || ox1_bc == "periodic",
     "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ox1_bc");
 
   if (bc_ix1 == "reflect") {
