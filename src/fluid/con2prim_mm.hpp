@@ -22,6 +22,7 @@ using namespace parthenon::package::prelude;
 // singulaarity
 #include <singularity-eos/eos/eos.hpp>
 
+#include "con2prim.hpp"
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
@@ -29,11 +30,11 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
-#include "con2prim.hpp"
 
 namespace con2prim_mm {
 
 using namespace con2prim;
+using namespace root_find;
 
 class Residual {
  public:
@@ -111,9 +112,8 @@ template <typename Data_t, typename T>
 class ConToPrim {
  public:
   ConToPrim(Data_t *rc, const Real tol, const int max_iterations)
-      : var(rc->PackVariables(Vars(), imap)),
-        prho(imap[fluid_prim::density].first), crho(imap[fluid_cons::density].first),
-        pvel_lo(imap[fluid_prim::velocity].first),
+      : var(rc->PackVariables(Vars(), imap)), prho(imap[fluid_prim::density].first),
+        crho(imap[fluid_cons::density].first), pvel_lo(imap[fluid_prim::velocity].first),
         pvel_hi(imap[fluid_prim::velocity].second),
         cmom_lo(imap[fluid_cons::momentum].first),
         cmom_hi(imap[fluid_cons::momentum].second), peng(imap[fluid_prim::energy].first),
@@ -186,6 +186,7 @@ class ConToPrim {
     }
 
     // Constants
+    const Real D = v(crho);
     const Real Scov[3] = {v(cmom_lo) / g.gdet, v(cmom_lo + 1) / g.gdet,
                           v(cmom_lo + 2) / g.gdet};
     Real Bcon[3] = {0.};
@@ -195,7 +196,7 @@ class ConToPrim {
     Real Ssq = 0.;
     Real Bsq = 0.;
     Real SdB = 0.;
-    Real Bcov[ii] = {0.};
+    Real Bcov[3] = {0.};
     SPACELOOP(ii) {
       SdB += Scov[ii] * Bcon[ii];
       SPACELOOP(jj) {
@@ -222,44 +223,52 @@ class ConToPrim {
 
     Residual res(D, Ssq, tau, Bsq, SdB);
 
-    const Real Wp = root_find::itp(res, 0.0, 1.0, rel_tolerance);
+    RootfindStatus status;
+    const Real Wp = root_find::itp(res, 0.0, 10.*D, rel_tolerance, max_iter, &status);
+    if (status == RootfindStatus::failure) {
+      return ConToPrimStatus::failure;
+    }
     const Real gamma = res.GetLorentzFactor();
     const Real P = res.GetPressure();
 
     v(prho) = D / gamma;
     v(prs) = P;
-    v(peng) = v(prho) * eos.InternalEnergyFromDensityPressure(v(prho), P);
+    // TODO(BRR) use singularity for this
+    v(peng) = P / (5. / 3. - 1.);
+    // v(peng) = v(prho) * eos.InternalEnergyFromDensityPressure(v(prho), P);
     v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp)) / v(prs);
 
     Real vcov[3];
     SPACELOOP(ii) {
-      vel[ii] = 1. / (Wp + D + Bsq) * (Scov[ii] + SdB / (Wp + D) * Bcov[ii]);
+      vcov[ii] = 1. / (Wp + D + Bsq) * (Scov[ii] + SdB / (Wp + D) * Bcov[ii]);
     }
     Real vcon[3] = {0.};
-    SPACELOOP2(ii, jj) { vcon[ii] += g.gammacon[ii][jj] * vcon[jj]; }
+    SPACELOOP2(ii, jj) { vcon[ii] += g.gammacon[ii][jj] * vcov[jj]; }
     SPACELOOP(ii) { v(pvel_lo + ii) = gamma * vcon[ii]; }
 
     // Set signal speed
     Real Bdv = 0.;
     SPACELOOP(ii) { Bdv += Bcov[ii] * vcon[ii]; }
-    Real bcon[] = {W * Bdv / alpha, 0.0, 0.0, 0.0};
-    const Real bsq = (Bsq + alpha * alpha * bcon[0] * bcon[0]) / gamma / gamma;
+    Real bcon[] = {gamma * Bdv / g.lapse, 0.0, 0.0, 0.0};
+    const Real bsq = (Bsq + g.lapse * g.lapse * bcon[0] * bcon[0]) / gamma / gamma;
     Real sig[3] = {0.};
-    CalculateSignalSpeed(v(prho), v(peng), v(prs), vcon, bsq, gamma, gm1, g.gcon,
-                         g.gammacov, g.beta, g.alpha, sig);
+    prim2con::CalculateSignalSpeed(v(prho), v(peng), v(prs), vcon, bsq, gamma, gm1,
+                                   g.gcov, g.gammacon, g.beta, g.lapse, sig);
     for (int i = 0; i < sig_hi - sig_lo + 1; i++) {
       v(sig_lo + i) = sig[i];
     }
+
+    return ConToPrimStatus::success;
   }
 };
 
 using C2P_Block_t = ConToPrim<MeshBlockData<Real>, VariablePack<Real>>;
 using C2P_Mesh_t = ConToPrim<MeshData<Real>, MeshBlockPack<Real>>;
 
-inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, fixup::Bounds bounds,
-                                  const Real tol, const int max_iter) {
-  return C2P_Block_t(rc, bounds, tol, max_iter);
+inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, const Real tol,
+                                  const int max_iter) {
+  return C2P_Block_t(rc, tol, max_iter);
 }
 
 } // namespace con2prim_mm

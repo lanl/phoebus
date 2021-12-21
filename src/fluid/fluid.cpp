@@ -57,6 +57,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("c2p_func", ConservedToPrimitiveRobust<MeshBlockData<Real>>);
   } else if (c2p_method == "classic") {
     params.Add("c2p_func", ConservedToPrimitiveClassic<MeshBlockData<Real>>);
+  } else if (c2p_method == "mm") {
+    params.Add("c2p_func", ConservedToPrimitiveMM<MeshBlockData<Real>>);
   } else {
     PARTHENON_THROW("Invalid c2p_method.");
   }
@@ -382,13 +384,10 @@ TaskStatus ConservedToPrimitiveMM(T *rc, const IndexRange &ib, const IndexRange 
                                       const IndexRange &kb) {
   auto *pmb = rc->GetParentPointer().get();
 
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
-
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
-  auto invert = con2prim_mm::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
+  auto invert = con2prim_mm::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
