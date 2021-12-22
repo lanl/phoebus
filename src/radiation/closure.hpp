@@ -212,7 +212,6 @@ namespace radiation
     Vec con_beta;
     Tens2 cov_gamma;
     Tens2 con_gamma;
-
     //-------------------------------------------------------------------------------------
     /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
     /// J and \tilde H_i.
@@ -698,7 +697,8 @@ namespace radiation
     H = std::sqrt(H - vH * vH);
     SPACELOOP(i)
     (*con_tilf)(i) = ratio(con_tilH(i), H);
-    const Real athin = 0.5 * (3 * closure(ratio(H, J)) - 1);
+    const Real xi = std::max(std::min(1.0, ratio(H, J)), 0.0);
+    const Real athin = 0.5 * (3 * closure(xi) - 1);
     // Calculate the projected rest frame radiation pressure tensor
     SPACELOOP(i)
     {
