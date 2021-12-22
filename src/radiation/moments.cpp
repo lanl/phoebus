@@ -688,8 +688,10 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             srcF(ii) -= alp*E*dlnalp[ii+1];
             SPACELOOP2(jj, kk) srcF(ii) += alp*conP(jj,kk)*Gamma[jj+1][kk+1][ii+1];
           }
-          v_src(iblock, idx_E_src(ispec), k, j, i) = srcE; 
-          SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = srcF(ii); 
+          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam*srcE; 
+          SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam*srcF(ii);
+          //if (i<10 && ispec == 0) printf("i = %i ispec = %i srE = %e srcF = (%e, %e, %e) J = %e conP/J = %e\n", 
+          //                               i, ispec, srcE, srcF(0), srcF(1), srcF(2), J, conP(0,0)/J); 
         }
   });
   return TaskStatus::complete;
