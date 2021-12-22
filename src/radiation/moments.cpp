@@ -162,7 +162,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
-          v(b, pH(ispec, idir), k, j, i) = covH(idir);
+          v(b, pH(ispec, idir), k, j, i) = covH(idir)/J;
         }
       });
 
@@ -234,9 +234,9 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
         Vec covF;
         Tens2 conTilPi;
         Real J = v(b, pJ(ispec), k, j, i);
-        Vec covH ={{v(b, pH(ispec, 0), k, j, i), 
-                    v(b, pH(ispec, 1), k, j, i), 
-                    v(b, pH(ispec, 2), k, j, i)}};
+        Vec covH ={{v(b, pH(ispec, 0), k, j, i)*J, 
+                    v(b, pH(ispec, 1), k, j, i)*J, 
+                    v(b, pH(ispec, 2), k, j, i)*J}};
         if (CLOSURE_TYPE == ClosureType::M1) { 
           c.Prim2ConM1(J, covH, &E, &covF, &conTilPi);
         } 
@@ -442,12 +442,12 @@ TaskStatus CalculateFluxesImpl(T* rc) {
         
           const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
           const Real& Jr = v(idx_qr(ispec, 0, idir), k, j, i);
-          const Vec Hl = {v(idx_ql(ispec, 1, idir), k, j, i), 
-                              v(idx_ql(ispec, 2, idir), k, j, i), 
-                              v(idx_ql(ispec, 3, idir), k, j, i)};
-          const Vec Hr = {v(idx_qr(ispec, 1, idir), k, j, i), 
-                              v(idx_qr(ispec, 2, idir), k, j, i), 
-                              v(idx_qr(ispec, 3, idir), k, j, i)}; 
+          const Vec Hl = {Jl*v(idx_ql(ispec, 1, idir), k, j, i), 
+                          Jl*v(idx_ql(ispec, 2, idir), k, j, i), 
+                          Jl*v(idx_ql(ispec, 3, idir), k, j, i)};
+          const Vec Hr = {Jr*v(idx_qr(ispec, 1, idir), k, j, i), 
+                          Jr*v(idx_qr(ispec, 2, idir), k, j, i), 
+                          Jr*v(idx_qr(ispec, 3, idir), k, j, i)}; 
           
           
           Vec con_vl{{v(idx_qlv(0, idir), k, j, i), 
@@ -776,9 +776,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
           // Treat the Eddington tensor explicitly for now
           Real& J = v(iblock, idx_J(ispec), k, j, i); 
-          Vec cov_H{{v(iblock, idx_H(ispec, 0), k, j, i), 
-                     v(iblock, idx_H(ispec, 1), k, j, i),
-                     v(iblock, idx_H(ispec, 2), k, j, i),
+          Vec cov_H{{J*v(iblock, idx_H(ispec, 0), k, j, i), 
+                     J*v(iblock, idx_H(ispec, 1), k, j, i),
+                     J*v(iblock, idx_H(ispec, 2), k, j, i),
                     }}; 
           //c.M1FluidPressureTensor(J, cov_H, &con_tilPi, &con_tilf); 
 
