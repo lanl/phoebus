@@ -20,8 +20,9 @@ namespace homogeneous_sphere {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
-  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::SphericalMinkowski),
-    "Problem \"homogeneous_sphere\" requires \"SphericalMinkowski\" geometry!");
+  PARTHENON_REQUIRE((typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::SphericalMinkowski))
+    || (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski)),
+    "Problem \"homogeneous_sphere\" requires \"SphericalMinkowski\" or \"Minkowski\" geometry!");
 
   auto &rc = pmb->meshblock_data.Get();
 
@@ -79,7 +80,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(ixi(ispec), k, j, i) = 0.0;  
           v(iphi(ispec), k, j, i) = acos(-1.0)*1.000001;  
           
-          v(idJ(ispec), k, j, i) = 1.0e-5;
+          v(idJ(ispec), k, j, i) = J;
           printf("i = %i r = %e J = %e rho = %e\n", i, r, v(idJ(ispec), k, j, i), v(prho, k, j, i));  
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
@@ -87,7 +88,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
       });
 
-  radiation::MomentPrim2Con(rc.get());
+  radiation::MomentPrim2Con(rc.get(), IndexDomain::entire);
 }
 
 } // namespace homogeneous_sphere
