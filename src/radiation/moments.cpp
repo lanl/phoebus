@@ -461,7 +461,9 @@ TaskStatus CalculateFluxesImpl(T* rc) {
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
-          Real kappaH = 0.5*(v(idx_kappaH(ispec), k, j, i) + v(idx_kappaH(ispec), k - koff, j - joff, i - ioff));
+          // Calculate the geometric mean of the opacity on either side of the interface, this 
+          // is necessary for handling the asymptotic limit near sharp surfaces
+          Real kappaH = sqrt((v(idx_kappaH(ispec), k, j, i)*v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
           
           Vec con_beta; 
           Tens2 cov_gamma;
