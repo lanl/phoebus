@@ -107,7 +107,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 }
 
 template <typename T>
-TaskStatus ApplyFloors(T *rc) {
+TaskStatus ApplyFloorsAndCeilings(T *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -208,6 +208,8 @@ TaskStatus ApplyFloors(T *rc) {
               v(b,peng,k,j,i) = uorho_max*v(b,prho,k,j,i);
             }
           }
+
+          // TODO(BRR) apply ceilings
 
           if (floor_applied) {
             // Update dependent primitives
@@ -565,7 +567,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+template TaskStatus ApplyFloorsAndCeilings<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 template TaskStatus ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 

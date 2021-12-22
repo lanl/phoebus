@@ -103,6 +103,14 @@ void CalculateSignalSpeed(const Real rho, const Real u, const Real P, const Real
     const Real vp = vcoff * (vcon[m] * (1.0 - cssq) + vpm) - beta[m];
     const Real vm = vcoff * (vcon[m] * (1.0 - cssq) - vpm) - beta[m];
     sig[m] = std::max(std::fabs(vp), std::fabs(vm));
+    if (sig[m] > 1.e8) {
+      printf("sig[%i] = %e\n", m, sig[m]);
+      printf("rho: %e u: %e P: %e vcon: %e %e %e\n", rho, u, P, vcon[0], vcon[1], vcon[2]);
+      printf("bsq: %e W: %e gam1: %e\n", bsq, W, gam1);
+      printf("cssq: %e vasq: %e\n", cssq, vasq);
+      printf("vpm: %e vp: %e vm: %e\n", vpm, vp, vm);
+      PARTHENON_FAIL("nonsense speed");
+    }
   }
 }
 

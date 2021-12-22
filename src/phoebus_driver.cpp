@@ -199,12 +199,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto fixup = tl.AddTask(fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
-    auto floors = tl.AddTask(fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+    auto clamps = tl.AddTask(fixup, fixup::ApplyFloorsAndCeilings<MeshBlockData<Real>>, sc1.get());
 
     // estimate next time step
     if (stage == integrator->nstages) {
       auto new_dt = tl.AddTask(
-          floors, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
+          clamps, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
 
       auto divb = tl.AddTask(set_bc, fluid::CalculateDivB, sc1.get());
 
@@ -212,7 +212,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       if (pmesh->adaptive) {
         //using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
         auto tag_refine = tl.AddTask(
-            floors, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
+            clamps, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
       }
     }
   }

@@ -29,7 +29,17 @@ KOKKOS_INLINE_FUNCTION Real secant(F &func, const Real x_guess, const Real tol,
   Real x1 = (1. + eps) * x_guess;
 
   while (fabs(x0 - x1) / fabs(x0) > tol) {
-    Real x2 = x1 - func(x1) * (x1 - x0) / (func(x1) - func(x0));
+    Real dx = - (x1 - x0) * func(x1) / (func(x1) - func(x0));
+    dx = std::max<Real>(std::min<Real>(dx, 2.0*x0), -0.5*x0);
+    Real x2 = x1 + dx;
+
+    //Real x2 = x1 - func(x1) * (x1 - x0) / (func(x1) - func(x0));
+    if (isnan(x2)) {
+      printf("[%i] x2: %e x1: %e x0: %e f1: %e f0: %e\n",
+        niter, x2, x1, x0, func(x1), func(x0));
+
+      PARTHENON_FAIL("rootfind failure");
+    }
     x0 = x1;
     x1 = x2;
     niter++;

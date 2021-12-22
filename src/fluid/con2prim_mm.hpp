@@ -57,6 +57,11 @@ class Residual {
     SetPressure();
     Real resid = Wp - tau_ - P_ + Bsq_ / 2. +
                  (Bsq_ * Ssq_ - SdB_ * SdB_) / (2. * pow(Bsq_ + Wp + D_, 2.));
+                 if (isnan(resid)) {
+                   printf("D_: %e Ssq_: %e tau_: %e Bsq_: %e SdB_: %e\n",
+                     D_, Ssq_, tau_, Bsq_, SdB_);
+                   printf("Wp: %e gamma: %e wp: %e P: %e\n", Wp, gamma_, wp_, P_);
+                 }
     return resid;
   }
 
@@ -74,6 +79,9 @@ class Residual {
     const Real A = Ssq_ / WpB + SdB_ * SdB_ / (W * W * WpB) * (2. * W + Bsq_);
     const Real xsq = A / (1. - A);
     gamma_ = sqrt(1. + xsq);
+    if (isnan(gamma_)) {
+      printf("W: %e WpB: %e A: %e xsq: %e\n", W, WpB, A, xsq);
+    }
     wp_ = 1. / (gamma_ * gamma_) * (Wp - D_ * xsq / (1. + gamma_));
   }
 
@@ -226,15 +234,39 @@ class ConToPrim {
 
     Residual res(D, Ssq, tau, Bsq, SdB);
 
-    RootfindStatus status;
-    //Real Wp = root_find::itp(res, 0.0, 10.*D, rel_tolerance, max_iter, &status);
-
     // Evaluate guess based on primitives
     const Real vcon_orig[3] = {v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2)};
     const Real gamma_guess = phoebus::GetLorentzFactor(vcon_orig, g.gcov);
     const Real Wp_guess = v(prho)*(1. + v(peng) + v(prs))*gamma_guess*gamma_guess;
 
-    Real Wp = root_find::secant(res, Wp_guess, rel_tolerance, max_iter, &status);
+    // Pre-rootfind setup
+    constexpr Real EPS = 1.e-5;
+    const Real Wpm = (1. - EPS)*Wp_guess;
+    Real Wp = Wp_guess;
+    const Real Wpp = (1. + EPS)*Wp_guess;
+    const Real h = Wp - Wpm;
+    const Real errm = res(Wpm);
+    Real err = res(Wp);
+    const Real errp = res(Wpp);
+
+    // Halley/Muller/Bailey/Press
+    Real dedW = (errp - errm) / (Wpp - Wpm);
+    Real dedW2 = (errp - 2. * err + errm) / (h * h);
+    Real f = 0.5*err * dedW2 / (dedW * dedW);
+    Real dW = -err / dedW / (1. - std::min<Real>(std::max<Real>(-0.3, f), 0.3));
+    Real Wp1 = Wp;
+    Real err1 = err;
+    Wp += std::max<Real>(std::min<Real>(dW, 2.0 * Wp), -0.5 * Wp);
+    err = res(Wp);
+
+    RootfindStatus status;
+    //Real Wp = root_find::itp(res, 0.0, 10.*D, rel_tolerance, max_iter, &status);
+
+    // Secant method if initial step not good enough
+    if (fabs(err / Wp) > rel_tolerance) {
+      //Wp = root_find::secant(res, Wp_guess, rel_tolerance, max_iter, &status);
+      Wp = root_find::secant(res, Wp, rel_tolerance, max_iter, &status);
+    }
     /*if (v.i_ == 128 && v.j_ == 128) {
       printf("Wp: %e status: %i\n", Wp, static_cast<int>(status));
       Real Wp_real = 1.13024;
@@ -250,11 +282,18 @@ class ConToPrim {
       printf("xsq: %e gamma: %e wp: %e\n", xsq, gamma, wp);
     }*/
     if (status == RootfindStatus::failure) {
-      //if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
+      if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i Wp_guess: %e Wp: %e tol: %e max_iter: %i\n", __LINE__, Wp_guess, Wp, rel_tolerance, max_iter);}
       return ConToPrimStatus::failure;
     }
     const Real gamma = res.GetLorentzFactor();
     const Real P = res.GetPressure();
+
+    // TODO(BRR) don't hardcode this
+    if (gamma < 1. || gamma > 50.) {
+      // TODO(BRR) actually fix this up by reducing speed, don't mark the zone a failure
+      if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
+      return ConToPrimStatus::failure;
+    }
     //if (v.i_ == 128 && v.j_ == 128) printf("gamma: %e P: %e\n", gamma, P);
 
     v(prho) = D / gamma;
@@ -262,8 +301,14 @@ class ConToPrim {
     // TODO(BRR) use singularity for this
     v(peng) = P / (gam - 1.);
     // v(peng) = v(prho) * eos.InternalEnergyFromDensityPressure(v(prho), P);
-    v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
+    v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng)/v(prho));
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp)) / v(prs);
+
+    if (v(prs) < 0 || isnan(v(prs)) || v(peng) < 0. || isnan(v(peng)) ||
+        v(tmp) < 0. || isnan(v(tmp))) {
+      if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
+      return ConToPrimStatus::failure; 
+    }
 
     Real vcov[3];
     SPACELOOP(ii) {
@@ -279,10 +324,14 @@ class ConToPrim {
     Real bcon[] = {gamma * Bdv / g.lapse, 0.0, 0.0, 0.0};
     const Real bsq = (Bsq + g.lapse * g.lapse * bcon[0] * bcon[0]) / gamma / gamma;
     Real sig[3] = {0.};
-    prim2con::CalculateSignalSpeed(v(prho), v(peng), v(prs), vcon, bsq, gamma, gm1,
+    prim2con::CalculateSignalSpeed(v(prho), v(peng), v(prs), vcon, bsq, gamma, v(gm1),
                                    g.gcov, g.gammacon, g.beta, g.lapse, sig);
     for (int i = 0; i < sig_hi - sig_lo + 1; i++) {
       v(sig_lo + i) = sig[i];
+    }
+
+    if (sig[0] > 1.e3 || sig[1] > 1.e3 || sig[2] > 1.e3) {
+      printf("[%i %i] sig: %e %e %e\n", v.i_, v.j_, sig[0], sig[1], sig[2]);
     }
 
     /*if (v.i_ == 128 && v.j_ == 128) {

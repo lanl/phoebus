@@ -25,7 +25,7 @@ namespace fixup {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus FixFluxes(MeshBlockData<Real> *rc);
 template <typename T>
-TaskStatus ApplyFloors(T *rc);
+TaskStatus ApplyFloorsAndCeilings(T *rc);
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc);
 
