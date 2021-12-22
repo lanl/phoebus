@@ -211,11 +211,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             Real vcon[] = {ucon[1]/W + beta[0]/lapse,
                            ucon[2]/W + beta[1]/lapse,
                            ucon[3]/W + beta[2]/lapse};
-      if (i == 128 && j == 128) {
+      /*if (i == 128 && j == 128) {
         printf("W: %e vcon: %e %e %e\n", W, vcon[0], vcon[1], vcon[2]);
         Real P = eos.PressureFromDensityInternalEnergy(rho, u/rho);
         printf("Wp real: %e\n", rho*(1. + u + P)*W*W);
-      }
+      }*/
 
             v(irho,k,j,i) += rho/(nsub*nsub);
             v(ieng,k,j,i) += u/(nsub*nsub);
@@ -241,6 +241,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       if (i == 128 && j == 128) {
         printf("rho: %e u: %e P: %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i));
+        printf("v: %e %e %e\n", v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
       }
 
       rng_pool.free_state(rng_gen);
@@ -294,6 +295,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real bsq = (Bsq + b0*b0)/(W*W);
       Real beta = v(iprs,k,j,i)/(0.5*bsq + 1.e-100);
       if (v(irho,k,j,i) > 1.e-4 && beta < bmin) bmin = beta;
+      if (i == 128 && j == 128) {
+        printf("b: %e %e %e\n", v(iblo,k,j,i), v(iblo+1,k,j,i), v(iblo+2,k,j,i));
+      }
       //if (bsq > b2max) b2max = bsq;
     }, Kokkos::Min<Real>(beta_min));
     if (parthenon::Globals::my_rank == 0)
@@ -301,17 +305,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
   // now normalize the b-field
   fluid::PrimitiveToConserved(rc);
-  fluid::ConservedToPrimitive(rc);
   printf("Problem initialized!\n");
 
+  fluid::ConservedToPrimitive(rc);
   pmb->par_for(
     "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e-1, ib.s, ib.e-1,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
       if (i == 128 && j == 128) {
+        printf("AFTER\n");
         printf("rho: %e u: %e P: %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i));
+        printf("v: %e %e %e\n", v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
+        printf("b: %e %e %e\n", v(iblo,k,j,i), v(iblo+1,k,j,i), v(iblo+2,k,j,i));
       }
       });
-      exit(-1);
+      //exit(-1);
 }
 
 void ProblemModifier(ParameterInput *pin) {

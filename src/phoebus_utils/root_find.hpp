@@ -19,6 +19,34 @@ namespace root_find {
 enum class RootfindStatus { success, failure };
 
 template <typename F>
+KOKKOS_INLINE_FUNCTION Real secant(F &func, const Real x_guess, const Real tol,
+                                   const int maxiter = 100,
+                                   RootfindStatus *status = nullptr,
+                                   const Real eps = 1.e-5) {
+  int niter = 0;
+
+  Real x0 = x_guess;
+  Real x1 = (1. + eps) * x_guess;
+
+  while (fabs(x0 - x1) / fabs(x0) > tol) {
+    Real x2 = x1 - func(x1) * (x1 - x0) / (func(x1) - func(x0));
+    x0 = x1;
+    x1 = x2;
+    niter++;
+    if (niter == maxiter) {
+      *status = RootfindStatus::failure;
+      return x1;
+    }
+  }
+
+  *status = RootfindStatus::success;
+  if (isnan(x1)) {
+    *status = RootfindStatus::failure;
+  }
+  return x1;
+}
+
+template <typename F>
 KOKKOS_INLINE_FUNCTION Real itp(F &func, Real a, Real b, const Real tol,
                                 const int maxiter = 100,
                                 RootfindStatus *status = nullptr) {
@@ -88,9 +116,9 @@ KOKKOS_INLINE_FUNCTION Real bisect(F func, Real a, Real b, const Real tol,
       *status = RootfindStatus::failure;
     }
     return (a + b) / 2.;
-    //printf("root failure: %g %g   %g %g\n", a, b, ya, yb);
+    // printf("root failure: %g %g   %g %g\n", a, b, ya, yb);
   }
-  //PARTHENON_REQUIRE(ya * yb <= 0.0, "Root not bracketed in find_root from\n" +
+  // PARTHENON_REQUIRE(ya * yb <= 0.0, "Root not bracketed in find_root from\n" +
   //                                      std::to_string(a) + "\n" + std::to_string(b) +
   //                                      "\n" + std::to_string(ya) + "\n" +
   //                                      std::to_string(yb) + "\n");

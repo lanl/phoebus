@@ -179,6 +179,7 @@ class ConToPrim {
 
     // Catch negative density
     if (v(crho) < 0.) {
+      if (/*v.i_ == 128 &&*/ v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
       return ConToPrimStatus::failure;
     }
 
@@ -226,11 +227,18 @@ class ConToPrim {
     Residual res(D, Ssq, tau, Bsq, SdB);
 
     RootfindStatus status;
-    Real Wp = root_find::itp(res, 0.0, 10.*D, rel_tolerance, max_iter, &status);
-    if (v.i_ == 128 && v.j_ == 128) {
+    //Real Wp = root_find::itp(res, 0.0, 10.*D, rel_tolerance, max_iter, &status);
+
+    // Evaluate guess based on primitives
+    const Real vcon_orig[3] = {v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2)};
+    const Real gamma_guess = phoebus::GetLorentzFactor(vcon_orig, g.gcov);
+    const Real Wp_guess = v(prho)*(1. + v(peng) + v(prs))*gamma_guess*gamma_guess;
+
+    Real Wp = root_find::secant(res, Wp_guess, rel_tolerance, max_iter, &status);
+    /*if (v.i_ == 128 && v.j_ == 128) {
       printf("Wp: %e status: %i\n", Wp, static_cast<int>(status));
       Real Wp_real = 1.13024;
-      Wp = Wp_real;
+      //Wp = Wp_real;
       const Real W = Wp + D;
       const Real WpB = pow(W + Bsq, 2);
       const Real A = Ssq / WpB + SdB * SdB / (W * W * WpB) * (2. * W + Bsq);
@@ -240,13 +248,14 @@ class ConToPrim {
       const Real gamma = sqrt(1. + xsq);
       const Real wp = 1. / (gamma * gamma) * (Wp - D * xsq / (1. + gamma));
       printf("xsq: %e gamma: %e wp: %e\n", xsq, gamma, wp);
-    }
+    }*/
     if (status == RootfindStatus::failure) {
+      if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
       return ConToPrimStatus::failure;
     }
     const Real gamma = res.GetLorentzFactor();
     const Real P = res.GetPressure();
-    if (v.i_ == 128 && v.j_ == 128) printf("gamma: %e P: %e\n", gamma, P);
+    //if (v.i_ == 128 && v.j_ == 128) printf("gamma: %e P: %e\n", gamma, P);
 
     v(prho) = D / gamma;
     v(prs) = P;
@@ -276,6 +285,13 @@ class ConToPrim {
       v(sig_lo + i) = sig[i];
     }
 
+    if (v.i_ == 128 && v.j_ == 128) {
+      printf("  rho: %e u: %e P: %e\n", v(prho), v(peng), v(prs));
+      printf("  vel: %e %e %e\n", v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2));
+      printf("  b:   %e %e %e\n", v(pb_lo), v(pb_lo+1), v(pb_lo+2));
+    }
+
+    if (v.i_ == 128 && v.j_ == 128) {printf("SUCCESS LINE %i\n", __LINE__);}
     return ConToPrimStatus::success;
   }
 };
