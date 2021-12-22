@@ -541,6 +541,20 @@ TaskStatus CalculateFluxesImpl(T* rc) {
 
           SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.5*sdetgam*(Pl(idir, ii) + Pr(idir, ii) 
                                                                                 + speed*(covFl(ii) - covFr(ii)));
+          if (sdetgam < std::numeric_limits<Real>::min()*10) {
+            v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
+            SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
+          }
+          /*if (i<5) printf("i = %i ispec = %i fluxE = %10e fluxF = %10e sdetgam = %10e speed = %10e\n" 
+                                         "                   El = %10e    Er = %10e   covFl = %10e covFr = %10e\n"
+                                         "                conFl = %10e conFr = %10e      Pl = %10e    Pr = %10e\n" 
+                                         "                   Jl = %10e    Jr = %10e      Hl = %10e    Hr = %10e\n", 
+                                         i, ispec, 
+                                         v.flux(idir_in, idx_Ef(ispec), k, j, i),
+                                         v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
+                                         sdetgam, speed, El, Er, covFl(0), covFr(0),
+                                         conFl(0), conFr(0), Pl(idir, 0), Pr(idir, 0),
+                                         Jl, Jr, Hl(0), Hr(0)); */
         
         } 
       });
