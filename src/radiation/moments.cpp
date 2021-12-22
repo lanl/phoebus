@@ -126,7 +126,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
                    v(b, pv(2), k, j, i)}};
         Tens2 cov_gamma; 
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
-        const Real isdetgam = 1.0/sqrt(geom.DetGamma(CellLocation::Cent, b, k, j, i));
+        const Real isdetgam = 1.0/geom.DetGamma(CellLocation::Cent, b, k, j, i);
         Closure<Vec, Tens2> c(con_v, cov_gamma); 
         
         Real J; 
@@ -227,7 +227,7 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
                    v(b, pv(2), k, j, i)}};
         Tens2 cov_gamma; 
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
-        const Real sdetgam = sqrt(geom.DetGamma(CellLocation::Cent, b, k, j, i));
+        const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
         Closure<Vec, Tens2> c(con_v, cov_gamma); 
         
         Real E; 
@@ -467,7 +467,7 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           Tens2 cov_gamma;
           geom.Metric(face, k, j, i, cov_gamma.data); 
           geom.ContravariantShift(face, k, j, i, con_beta.data);
-          const Real sdetgam = sqrt(geom.DetGamma(face, k, j, i));
+          const Real sdetgam = geom.DetGamma(face, k, j, i);
           
           const Real dx = pmb->coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH*dx), 1)));
@@ -614,7 +614,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Closure<Vec, Tens2> c(con_v, cov_gamma); 
         
         Real alp = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
-        Real sdetgam = sqrt(geom.DetGamma(CellLocation::Cent, iblock, k, j, i));
+        Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
         Vec con_beta; 
         geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
         Real beta2 = 0.0;
@@ -759,7 +759,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Tens2 cov_gamma; 
           geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
           Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
-          Real sdetgam = sqrt(geom.DetGamma(CellLocation::Cent, iblock, k, j, i));
+          Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
           Closure<Vec, Tens2> c(con_v, cov_gamma); 
           
           Real Estar = v(iblock, idx_E(ispec), k, j, i)/sdetgam; 
