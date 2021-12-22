@@ -642,14 +642,14 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
   
         for (int ispec = 0; ispec<nspec; ++ispec) {
+          Real E = v(iblock, idx_E(ispec), k, j, i)/sdetgam; 
           Real J = v(iblock, idx_J(ispec), k, j, i); 
-          Real E = v(iblock, idx_E(ispec), k, j, i); 
-          Vec covF{{v(iblock, idx_F(ispec, 0), k, j, i),
-                     v(iblock, idx_F(ispec, 1), k, j, i),
-                     v(iblock, idx_F(ispec, 2), k, j, i)}};
-          Vec covH{{v(iblock, idx_H(ispec, 0), k, j, i),
-                     v(iblock, idx_H(ispec, 1), k, j, i),
-                     v(iblock, idx_H(ispec, 2), k, j, i)}};
+          Vec covF{{v(iblock, idx_F(ispec, 0), k, j, i)/sdetgam,
+                     v(iblock, idx_F(ispec, 1), k, j, i)/sdetgam,
+                     v(iblock, idx_F(ispec, 2), k, j, i)/sdetgam}};
+          Vec covH{{J*v(iblock, idx_H(ispec, 0), k, j, i),
+                    J*v(iblock, idx_H(ispec, 1), k, j, i),
+                    J*v(iblock, idx_H(ispec, 2), k, j, i)}};
           Vec conF;
           c.raise3Vector(covF, &conF);           
           Tens2 conP, con_tilPi; 
