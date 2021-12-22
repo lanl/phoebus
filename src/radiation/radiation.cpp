@@ -145,17 +145,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
   if ((method == "moment") || (method == "mocmc") || (method == "moment_eddington")) { 
     Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived, 
-                                              Metadata::Intensive, Metadata::FillGhost},
+                                              Metadata::Intensive, Metadata::FillGhost, Metadata::Vector},
                                               std::vector<int>{NumRadiationTypes, 3}); 
     Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived, 
                                               Metadata::Intensive, Metadata::FillGhost},
                                               std::vector<int>{NumRadiationTypes}); 
 
     Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved, 
-                                                   Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost}, 
+                                                   Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost, Metadata::Vector}, 
                                                    std::vector<int>{NumRadiationTypes, 3}); 
     Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved, 
-                                              Metadata::Intensive, Metadata::WithFluxes, Metadata::Vector, Metadata::FillGhost}, 
+                                              Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost}, 
                                               std::vector<int>{NumRadiationTypes}); 
     
     namespace p = radmoment_prim; 
