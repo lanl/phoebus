@@ -179,7 +179,7 @@ class ConToPrim {
 
     // Catch negative density
     if (v(crho) < 0.) {
-      if (/*v.i_ == 128 &&*/ v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
+      //if (/*v.i_ == 128 &&*/ v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
       return ConToPrimStatus::failure;
     }
 
@@ -250,7 +250,7 @@ class ConToPrim {
       printf("xsq: %e gamma: %e wp: %e\n", xsq, gamma, wp);
     }*/
     if (status == RootfindStatus::failure) {
-      if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
+      //if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
       return ConToPrimStatus::failure;
     }
     const Real gamma = res.GetLorentzFactor();
@@ -285,13 +285,13 @@ class ConToPrim {
       v(sig_lo + i) = sig[i];
     }
 
-    if (v.i_ == 128 && v.j_ == 128) {
+    /*if (v.i_ == 128 && v.j_ == 128) {
       printf("  rho: %e u: %e P: %e\n", v(prho), v(peng), v(prs));
       printf("  vel: %e %e %e\n", v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2));
       printf("  b:   %e %e %e\n", v(pb_lo), v(pb_lo+1), v(pb_lo+2));
-    }
+    }*/
 
-    if (v.i_ == 128 && v.j_ == 128) {printf("SUCCESS LINE %i\n", __LINE__);}
+    //if (v.i_ == 128 && v.j_ == 128) {printf("SUCCESS LINE %i\n", __LINE__);}
     return ConToPrimStatus::success;
   }
 };
