@@ -193,8 +193,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             Real hm1 = std::exp(lnh) - 1.;
             Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam),
                                 1. / (gam - 1.));
+            if (i == 128 && j == 128 ) printf("orig rho: %e\n", rho);
             Real u = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
             rho /= rho_rmax;
+            if (i == 128 && j == 128 ) printf("orig rho now: %e\n", rho);
 
             Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
             Real gcov[4][4];
@@ -218,6 +220,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       }*/
 
             v(irho,k,j,i) += rho/(nsub*nsub);
+            if (i == 128 && j == 128 ) printf("new orig rho now: %e\n", v(irho,k,j,i));
             v(ieng,k,j,i) += u/(nsub*nsub);
             for (int d = 0; d < 3; d++) {
               v(ivlo+d,k,j,i) += W*vcon[d]/(nsub*nsub);
@@ -235,14 +238,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real epsflr;
       floor.GetFloors(x1v, x2v, x3, rhoflr, epsflr);
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
+            if (i == 128 && j == 128 ) printf("post floor rho now: %e\n", v(irho,k,j,i));
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
       v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
       v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i));
 
-      //if (i == 128 && j == 128) {
-      //  printf("rho: %e u: %e P: %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i));
-      //  printf("v: %e %e %e\n", v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
-      //}
+      if (i == 128 && j == 128) {
+        printf("rho: %e u: %e P: %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i));
+        printf("v: %e %e %e\n", v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
+      }
 
       rng_pool.free_state(rng_gen);
     });
@@ -295,9 +299,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real bsq = (Bsq + b0*b0)/(W*W);
       Real beta = v(iprs,k,j,i)/(0.5*bsq + 1.e-100);
       if (v(irho,k,j,i) > 1.e-4 && beta < bmin) bmin = beta;
-      //if (i == 128 && j == 128) {
-      //  printf("b: %e %e %e\n", v(iblo,k,j,i), v(iblo+1,k,j,i), v(iblo+2,k,j,i));
-      //}
+      if (i == 128 && j == 128) {
+        printf("rho: %e u: %e P: %e\n", v(irho,k,j,i), v(ieng,k,j,i), v(iprs,k,j,i));
+        printf("v: %e %e %e\n", v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
+        printf("b: %e %e %e\n", v(iblo,k,j,i), v(iblo+1,k,j,i), v(iblo+2,k,j,i));
+      }
       //if (bsq > b2max) b2max = bsq;
     }, Kokkos::Min<Real>(beta_min));
     if (parthenon::Globals::my_rank == 0)
@@ -307,7 +313,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   fluid::PrimitiveToConserved(rc);
   printf("Problem initialized!\n");
 
-  /*fluid::ConservedToPrimitive(rc);
+  fluid::ConservedToPrimitive(rc);
   pmb->par_for(
     "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e-1, ib.s, ib.e-1,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -317,7 +323,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         printf("v: %e %e %e\n", v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i));
         printf("b: %e %e %e\n", v(iblo,k,j,i), v(iblo+1,k,j,i), v(iblo+2,k,j,i));
       }
-      });*/
+      });
       //exit(-1);
 }
 

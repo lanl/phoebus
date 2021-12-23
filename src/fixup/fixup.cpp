@@ -356,8 +356,10 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
                                 Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)));
             v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
-            v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
+            //v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
+            //                      Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
+            v(b,gm1,k,j,i) = Geometry::Utils::ratio(eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
+                                  v(b,tmp,k,j,i)), v(b,prs,k,j,i));
           } else {
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive velocities to zero
 
@@ -372,8 +374,10 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
                                 Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)));
             v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
-            v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
+            //v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
+            //                      Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
+            v(b,gm1,k,j,i) = Geometry::Utils::ratio(eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
+                                  v(b,tmp,k,j,i)), v(b,prs,k,j,i));
 
             // Zero primitive velocities
             SPACELOOP(ii) {
@@ -406,6 +410,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             ye_prim = v(b, pye, k, j, i);
           }
           Real sig[3];
+          PARTHENON_REQUIRE(!isnan(v(b,prho,k,j,i)), "NAN rho after fixup!");
           prim2con::p2c(v(b,prho,k,j,i), vel, bp, v(b,peng,k,j,i), ye_prim, v(b,prs,k,j,i), v(b,gm1,k,j,i),
               gcov, gcon, beta, alpha, gdet,
               v(b,crho,k,j,i), S, bcons, v(b,ceng,k,j,i), ye_cons, sig);

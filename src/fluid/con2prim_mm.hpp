@@ -57,11 +57,11 @@ class Residual {
     SetPressure();
     Real resid = Wp - tau_ - P_ + Bsq_ / 2. +
                  (Bsq_ * Ssq_ - SdB_ * SdB_) / (2. * pow(Bsq_ + Wp + D_, 2.));
-                 if (isnan(resid)) {
+                 /*if (isnan(resid)) {
                    printf("D_: %e Ssq_: %e tau_: %e Bsq_: %e SdB_: %e\n",
                      D_, Ssq_, tau_, Bsq_, SdB_);
                    printf("Wp: %e gamma: %e wp: %e P: %e\n", Wp, gamma_, wp_, P_);
-                 }
+                 }*/
     return resid;
   }
 
@@ -79,9 +79,9 @@ class Residual {
     const Real A = Ssq_ / WpB + SdB_ * SdB_ / (W * W * WpB) * (2. * W + Bsq_);
     const Real xsq = A / (1. - A);
     gamma_ = sqrt(1. + xsq);
-    if (isnan(gamma_)) {
-      printf("W: %e WpB: %e A: %e xsq: %e\n", W, WpB, A, xsq);
-    }
+    //if (isnan(gamma_)) {
+    //  printf("W: %e WpB: %e A: %e xsq: %e\n", W, WpB, A, xsq);
+    //}
     wp_ = 1. / (gamma_ * gamma_) * (Wp - D_ * xsq / (1. + gamma_));
   }
 
@@ -249,6 +249,10 @@ class ConToPrim {
     Real err = res(Wp);
     const Real errp = res(Wpp);
 
+    if (isnan(Wp) || isnan(err)) {
+      return ConToPrimStatus::failure;
+    }
+
     // Halley/Muller/Bailey/Press
     Real dedW = (errp - errm) / (Wpp - Wpm);
     Real dedW2 = (errp - 2. * err + errm) / (h * h);
@@ -263,7 +267,7 @@ class ConToPrim {
     //Real Wp = root_find::itp(res, 0.0, 10.*D, rel_tolerance, max_iter, &status);
 
     // Secant method if initial step not good enough
-    if (fabs(err / Wp) > rel_tolerance) {
+    if (fabs(err / Wp) > rel_tolerance || 1) {
       //Wp = root_find::secant(res, Wp_guess, rel_tolerance, max_iter, &status);
       Wp = root_find::secant(res, Wp, rel_tolerance, max_iter, &status);
     }
@@ -282,7 +286,8 @@ class ConToPrim {
       printf("xsq: %e gamma: %e wp: %e\n", xsq, gamma, wp);
     }*/
     if (status == RootfindStatus::failure) {
-      if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i Wp_guess: %e Wp: %e tol: %e max_iter: %i\n", __LINE__, Wp_guess, Wp, rel_tolerance, max_iter);}
+      if (/*v.i_ == 128 && */v.j_ == 128) {printf("[%i %i] FAIL LINE %i Wp_guess: %e Wp: %e tol: %e max_iter: %i\n", 
+          v.i_, v.j_, __LINE__, Wp_guess, Wp, rel_tolerance, max_iter);}
       return ConToPrimStatus::failure;
     }
     const Real gamma = res.GetLorentzFactor();
@@ -304,9 +309,14 @@ class ConToPrim {
     v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng)/v(prho));
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp)) / v(prs);
 
-    if (v(prs) < 0 || isnan(v(prs)) || v(peng) < 0. || isnan(v(peng)) ||
+    if (isnan(v(prho)) || v(prs) < 0 || isnan(v(prs)) || v(peng) < 0. || isnan(v(peng)) ||
         v(tmp) < 0. || isnan(v(tmp))) {
       if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
+      // Avoid NANs
+      v(prho) = 0.;
+      v(prs) = 0.;
+      v(peng) = 0.;
+      v(tmp) = 0.;
       return ConToPrimStatus::failure; 
     }
 
@@ -334,11 +344,11 @@ class ConToPrim {
       printf("[%i %i] sig: %e %e %e\n", v.i_, v.j_, sig[0], sig[1], sig[2]);
     }
 
-    /*if (v.i_ == 128 && v.j_ == 128) {
+    if (v.i_ == 128 && v.j_ == 128) {
       printf("  rho: %e u: %e P: %e\n", v(prho), v(peng), v(prs));
       printf("  vel: %e %e %e\n", v(pvel_lo), v(pvel_lo+1), v(pvel_lo+2));
       printf("  b:   %e %e %e\n", v(pb_lo), v(pb_lo+1), v(pb_lo+2));
-    }*/
+    }
 
     //if (v.i_ == 128 && v.j_ == 128) {printf("SUCCESS LINE %i\n", __LINE__);}
     return ConToPrimStatus::success;
