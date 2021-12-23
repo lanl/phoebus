@@ -188,6 +188,7 @@ class ConToPrim {
     // Catch negative density
     if (v(crho) < 0.) {
       //if (/*v.i_ == 128 &&*/ v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
+      printf("[%i %i] %s:%i\n", v.i_, v.j_, __FILE__, __LINE__);
       return ConToPrimStatus::failure;
     }
 
@@ -250,6 +251,8 @@ class ConToPrim {
     const Real errp = res(Wpp);
 
     if (isnan(Wp) || isnan(err)) {
+      printf("[%i %i] %s:%i (%e %e %e %e %e\n", v.i_, v.j_, __FILE__, __LINE__,
+        D, Ssq, tau, Bsq, SdB);
       return ConToPrimStatus::failure;
     }
 
@@ -286,6 +289,7 @@ class ConToPrim {
       printf("xsq: %e gamma: %e wp: %e\n", xsq, gamma, wp);
     }*/
     if (status == RootfindStatus::failure) {
+      printf("[%i %i] %s:%i\n", v.i_, v.j_, __FILE__, __LINE__);
       if (/*v.i_ == 128 && */v.j_ == 128) {printf("[%i %i] FAIL LINE %i Wp_guess: %e Wp: %e tol: %e max_iter: %i\n", 
           v.i_, v.j_, __LINE__, Wp_guess, Wp, rel_tolerance, max_iter);}
       return ConToPrimStatus::failure;
@@ -297,6 +301,7 @@ class ConToPrim {
     if (gamma < 1. || gamma > 50.) {
       // TODO(BRR) actually fix this up by reducing speed, don't mark the zone a failure
       if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
+      printf("[%i %i] %s:%i\n", v.i_, v.j_, __FILE__, __LINE__);
       return ConToPrimStatus::failure;
     }
     //if (v.i_ == 128 && v.j_ == 128) printf("gamma: %e P: %e\n", gamma, P);
@@ -311,6 +316,7 @@ class ConToPrim {
 
     if (isnan(v(prho)) || v(prs) < 0 || isnan(v(prs)) || v(peng) < 0. || isnan(v(peng)) ||
         v(tmp) < 0. || isnan(v(tmp))) {
+      printf("[%i %i] %s:%i\n", v.i_, v.j_, __FILE__, __LINE__);
       if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
       // Avoid NANs
       v(prho) = 0.;

@@ -88,7 +88,7 @@ print("")
 # Numblocks, nz, ny, nx
 Pg = dfile1.Get("pressure", flatten=False)
 #bfield = dfile.Get("p.bfield", flatten=False)
-vcon = dfile.Get("p.velocity", flatten=False)
+vcon = dfile1.Get("p.velocity", flatten=False)
 density = dfile1.Get("p.density", flatten=False)
 crho = dfile1.Get("c.density", flatten=False)
 ug = dfile1.Get("p.energy", flatten=False)
@@ -101,6 +101,7 @@ Bcon = dfile1.Get("p.bfield", flatten=False)
 flatgcov = dfile1.Get("g.c.gcov", flatten=False)
 alpha = dfile1.Get("g.c.alpha", flatten=False)
 gcov = np.zeros([nb,nz,ny,nx,4,4])
+divb = dfile1.Get("divb", flatten=False)
 for mu in range(4):
   gcov[:,:,:,:,mu,0] = flatgcov[:,:,:,:,mu]
   gcov[:,:,:,:,0,mu] = flatgcov[:,:,:,:,mu]
@@ -211,7 +212,8 @@ def myplot(myvar, n, vmin=vmin, vmax=vmax, uselog=True, cmap='jet',label=None):
 
 fig, axes = plt.subplots(1, 2, figsize=(8,8))
 myplot(var1,0,label='density')
-myplot(beta,1,vmin=-3,vmax=3,uselog=True,cmap='RdBu',label='plasma beta')
+#myplot(beta,1,vmin=-3,vmax=3,uselog=True,cmap='RdBu',label='plasma beta')
+myplot(np.fabs(divb),1,vmin=-14,vmax=-5,uselog=True,cmap='RdBu',label='divb')
 
 if args.savefig:
   plt.savefig('frame_%08d.png' % args.nfinal, bbox_inches='tight')
