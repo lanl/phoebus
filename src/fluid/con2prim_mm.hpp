@@ -267,7 +267,7 @@ class ConToPrim {
     //Real Wp = root_find::itp(res, 0.0, 10.*D, rel_tolerance, max_iter, &status);
 
     // Secant method if initial step not good enough
-    if (fabs(err / Wp) > rel_tolerance || 1) {
+    if (fabs(err / Wp) > rel_tolerance) {
       //Wp = root_find::secant(res, Wp_guess, rel_tolerance, max_iter, &status);
       Wp = root_find::secant(res, Wp, rel_tolerance, max_iter, &status);
     }
