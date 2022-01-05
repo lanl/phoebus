@@ -152,7 +152,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
                    "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n", i, ispec, 
                    E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), isdetgam, result.xi, result.phi, result.fXi, result.fPhi, 
                    con_v(0), con_v(1), con_v(2), xi, phi);
-            if (std::isnan(J) || std::isnan(covH(0))) throw 0;
+            if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
           }
         } 
         else if (CLOSURE_TYPE == ClosureType::Eddington) {
@@ -403,7 +403,7 @@ TaskStatus CalculateFluxesImpl(T* rc) {
   
   const int nspec = idx_ql.DimSize(1);
 
-  const int nblock = 1; //v.GetDim(5); 
+  // const int nblock = 1; //v.GetDim(5); 
   
   auto geom = Geometry::GetCoordinateSystem(rc); 
   
@@ -581,7 +581,7 @@ template <class T, ClosureType CLOSURE_TYPE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) { 
 
   constexpr int ND = Geometry::NDFULL;
-  constexpr int NS = Geometry::NDSPACE;
+  //constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
   
   namespace cr = radmoment_cons;  
