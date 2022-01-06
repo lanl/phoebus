@@ -61,6 +61,7 @@ namespace radiation
     int iter;
     Real xi, phi;
     Real fXi, fPhi;
+    Real errXi, errPhi;
   };
 
   /// Holds methods for closing the radiation moment equations as well as calculating radiation
@@ -631,7 +632,7 @@ namespace radiation
     *xi_out = xi;
     *phi_out = phi;
     //printf("iter: %i xi: %e cos(phi): %f fXi: %e fPhi: %e \n", iter, *xi_out, cos(*phi_out), fXi, fPhi);
-    M1Result result{Status::success, iter, xi, phi, fXi, fPhi};
+    M1Result result{Status::success, iter, xi, phi, fXi, fPhi, err_xi, err_phi};
     if (std::isnan(xi))
       result.status = Status::failure;
     if (iter == max_iter)

@@ -743,11 +743,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   int pT = imap[p::temperature].first; 
   int pYe = imap[p::ye].first; 
 
-  int ceng(-1), cmom_lo(-1), cmom_hi(-1), cye(-1); 
+  int ceng(-1), cmom_lo(-1), cye(-1); 
   if (update_fluid) { 
     ceng = imap[c::energy].first;
     cmom_lo = imap[c::momentum].first;
-    cmom_hi = imap[c::momentum].second;
     cye = imap[c::ye].first;
   }
 
@@ -789,7 +788,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Vec cov_dF;
 
           /// TODO: (LFR) Move beyond Eddington for this update
-          Vec con_tilf;
           Tens2 con_tilPi{{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}};  
 
           // Treat the Eddington tensor explicitly for now
@@ -798,6 +796,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                      J*v(iblock, idx_H(ispec, 1), k, j, i),
                      J*v(iblock, idx_H(ispec, 2), k, j, i),
                     }}; 
+          //Vec con_tilf;
           //c.M1FluidPressureTensor(J, cov_H, &con_tilPi, &con_tilf); 
 
           Real B = v(iblock, idx_JBB(ispec), k, j, i); 
@@ -815,6 +814,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           
           // Add source corrections to conserved fluid variables 
           if (update_fluid) {
+            v(iblock, cye, k, j, i) -= sdetgam*0.0; 
             v(iblock, ceng, k, j, i) -= sdetgam*dE; 
             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam*cov_dF(0); 
             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam*cov_dF(1); 
