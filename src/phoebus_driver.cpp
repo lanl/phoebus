@@ -195,12 +195,14 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto update = tl.AddTask(avg_data, UpdateIndependentData<MeshData<Real>>, sc0.get(),
                              dudt.get(), beta*dt, sc1.get());
 
-    // Implicit source update  
-    auto impl_update = tl.AddTask(update, radiation::MomentFluidSource<MeshData<Real>>, 
+    if (rad_active) {
+      auto impl_update = tl.AddTask(update, radiation::MomentFluidSource<MeshData<Real>>, 
                                   sc1.get(), beta*dt, fluid_active);
+      update = impl_update | update;
+    } 
 
     // update ghost cells
-    auto send = tl.AddTask(impl_update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
+    auto send = tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
     auto recv = tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
     auto fill_from_bufs = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, sc1);
   }
