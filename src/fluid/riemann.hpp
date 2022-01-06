@@ -65,7 +65,6 @@ class FluxState {
     }
   }
   static void ReconVars(const std::string &var) {
-    printf("add recon var: %s\n", var.c_str());
     recon_vars.push_back(var);
   }
   static void FluxVars(std::vector<std::string> &vars) {
@@ -78,10 +77,6 @@ class FluxState {
   }
 
   static std::vector<std::string> ReconVars() {
-    for (auto &var : recon_vars) {
-      printf("recon var: %s\n", var.c_str());
-    }
-    //exit(-1);
     return recon_vars;
   }
   static std::vector<std::string> FluxVars() {

@@ -57,11 +57,11 @@ class Residual {
     SetPressure();
     Real resid = Wp - tau_ - P_ + Bsq_ / 2. +
                  (Bsq_ * Ssq_ - SdB_ * SdB_) / (2. * pow(Bsq_ + Wp + D_, 2.));
-                 /*if (isnan(resid)) {
+                 if (isnan(resid)) {
                    printf("D_: %e Ssq_: %e tau_: %e Bsq_: %e SdB_: %e\n",
                      D_, Ssq_, tau_, Bsq_, SdB_);
                    printf("Wp: %e gamma: %e wp: %e P: %e\n", Wp, gamma_, wp_, P_);
-                 }*/
+                 }
     return resid;
   }
 
@@ -79,9 +79,9 @@ class Residual {
     const Real A = Ssq_ / WpB + SdB_ * SdB_ / (W * W * WpB) * (2. * W + Bsq_);
     const Real xsq = A / (1. - A);
     gamma_ = sqrt(1. + xsq);
-    //if (isnan(gamma_)) {
-    //  printf("W: %e WpB: %e A: %e xsq: %e\n", W, WpB, A, xsq);
-    //}
+    if (isnan(gamma_)) {
+      printf("W: %e WpB: %e A: %e xsq: %e\n", W, WpB, A, xsq);
+    }
     wp_ = 1. / (gamma_ * gamma_) * (Wp - D_ * xsq / (1. + gamma_));
   }
 
@@ -253,6 +253,9 @@ class ConToPrim {
     if (isnan(Wp) || isnan(err)) {
       printf("[%i %i] %s:%i (%e %e %e %e %e\n", v.i_, v.j_, __FILE__, __LINE__,
         D, Ssq, tau, Bsq, SdB);
+      printf("rho: %e eng: %e prs: %e gamma: %e Wp: %e err: %e\n",
+        v(prho), v(peng), v(prs), gamma_guess, Wp, err);
+      exit(-1);
       return ConToPrimStatus::failure;
     }
 
@@ -290,7 +293,7 @@ class ConToPrim {
     }*/
     if (status == RootfindStatus::failure) {
       printf("[%i %i] %s:%i\n", v.i_, v.j_, __FILE__, __LINE__);
-      if (/*v.i_ == 128 && */v.j_ == 128) {printf("[%i %i] FAIL LINE %i Wp_guess: %e Wp: %e tol: %e max_iter: %i\n", 
+      if (/*v.i_ == 128 && */v.j_ == 128) {printf("[%i %i] FAIL LINE %i Wp_guess: %e Wp: %e tol: %e max_iter: %i\n",
           v.i_, v.j_, __LINE__, Wp_guess, Wp, rel_tolerance, max_iter);}
       return ConToPrimStatus::failure;
     }
@@ -306,6 +309,8 @@ class ConToPrim {
     }
     //if (v.i_ == 128 && v.j_ == 128) printf("gamma: %e P: %e\n", gamma, P);
 
+    Real rho_old = v(prho);
+    Real eng_old = v(peng);
     v(prho) = D / gamma;
     v(prs) = P;
     // TODO(BRR) use singularity for this
@@ -316,14 +321,16 @@ class ConToPrim {
 
     if (isnan(v(prho)) || v(prs) < 0 || isnan(v(prs)) || v(peng) < 0. || isnan(v(peng)) ||
         v(tmp) < 0. || isnan(v(tmp))) {
-      printf("[%i %i] %s:%i\n", v.i_, v.j_, __FILE__, __LINE__);
+      //printf("[%i %i] %s:%i\n", v.i_, v.j_, __FILE__, __LINE__);
+      //printf("rho: %e prs: %e eng: %e tmp: %e rho_old: %e eng_old: %e\n",
+       // v(prho), v(prs), v(peng), v(tmp), rho_old, eng_old);
       if (/*v.i_ == 128 && */v.j_ == 128) {printf("FAIL LINE %i\n", __LINE__);}
       // Avoid NANs
       v(prho) = 0.;
       v(prs) = 0.;
       v(peng) = 0.;
       v(tmp) = 0.;
-      return ConToPrimStatus::failure; 
+      return ConToPrimStatus::failure;
     }
 
     Real vcov[3];
