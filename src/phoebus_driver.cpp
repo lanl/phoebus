@@ -139,11 +139,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto flux_div =
         tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>, sc0.get(), dudt.get());
 
+#if SET_FLUX_SRC_DIAGS
     auto copy_flux_div = tl.AddTask(flux_div|geom_src, fluid::CopyFluxDivergence, dudt.get());
+#endif
 
     auto add_rhs = tl.AddTask(flux_div|geom_src, SumData<std::string,MeshBlockData<Real>>,
                               src_names, dudt.get(), gsrc.get(), dudt.get());
-    auto zero = tl.AddTask(add_rhs, fluid::ZeroUpdate, dudt.get());
 
     #if PRINT_RHS
     auto print_rhs = tl.AddTask(add_rhs, Debug::PrintRHS<MeshBlockData<Real>>, dudt.get());
@@ -198,10 +199,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto fixup = tl.AddTask(fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
+    auto floors = tl.AddTask(fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+
     // estimate next time step
     if (stage == integrator->nstages) {
       auto new_dt = tl.AddTask(
-          fixup, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
+          floors, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
 
       auto divb = tl.AddTask(set_bc, fluid::CalculateDivB, sc1.get());
 
@@ -209,7 +212,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       if (pmesh->adaptive) {
         //using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
         auto tag_refine = tl.AddTask(
-            fixup, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
+            floors, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
       }
     }
   }
