@@ -86,8 +86,11 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
       }
     }
     {
-      const Real v[3] = {0.7, 0.2, 0.1};
+      Real v[3] = {0.7, 0.2, 0.1};
       const Real Gamma_ref = 1.474419561548971247e+00;
+      v[0] *= Gamma_ref;
+      v[1] *= Gamma_ref;
+      v[2] *= Gamma_ref;
       const Real ucon_ref[4] = {1.474419561548971247e+00,
                                 1.032093693084279895e+00,
                                 2.948839123097942716e-01,

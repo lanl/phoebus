@@ -28,6 +28,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/robust.hpp"
+#include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
 
@@ -41,86 +42,6 @@ struct FailFlags {
   static constexpr Real fail = 0.0;
 };
 
-template <typename F>
-KOKKOS_INLINE_FUNCTION
-Real find_root(F &func, Real a, Real b, const Real tol, int line) {
-  constexpr Real kappa1 = 0.1;
-  constexpr Real kappa2 = 2.0;
-  constexpr int n0 = 0;
-
-  const int nmax = std::ceil(std::log2(0.5*(b-a)/tol)) + n0;
-  int j = 0;
-
-  Real ya = func(a);
-  Real yb = func(b);
-  if (ya * yb > 0.0) {
-    printf("Root not bracketed in find_root\n");
-    return 0.5*(a+b);
-  }
-  Real sign = (ya < 0 ? 1.0 : -1.0);
-  ya *= sign;
-  yb *= sign;
-
-  while (b-a > 2.0*tol) {
-    const Real xh = 0.5*(a + b);
-    const Real xf = (yb*a - ya*b)/(yb - ya);
-    const Real xhxf = xh - xf;
-    const Real delta = std::min(kappa1*std::pow(b-a,kappa2),std::abs(xhxf));
-    const Real sigma = (xhxf > 0 ? 1.0 : -1.0);
-    const Real xt = (delta <= sigma*xhxf ? xf + sigma*delta : xh);
-    const Real r = tol*std::pow(2.0,nmax-j) - 0.5*(b - a);
-    const Real xitp = (std::fabs(xt - xh) > r ? xh - sigma*r : xt);
-    const Real yitp = sign*func(xitp);
-    if (yitp > 0.0) {
-      b = xitp;
-      yb = yitp;
-    } else if (yitp < 0.0) {
-      a = xitp;
-      ya = yitp;
-    } else {
-      a = xitp;
-      b = xitp;
-    }
-    j++;
-  }
-  return 0.5*(a+b);
-}
-
-template <typename F>
-KOKKOS_INLINE_FUNCTION
-Real find_root_bisect(F func, Real a, Real b, const Real tol, int line) {
-
-  Real ya = func(a);
-  Real yb = func(b);
-  if (ya*yb > 0.0) {
-    printf("root failure: %g %g   %g %g\n", a, b, ya, yb);
-  }
-  PARTHENON_REQUIRE(ya * yb <= 0.0, "Root not bracketed in find_root from\n"
-    + std::to_string(a) + "\n"
-    + std::to_string(b) + "\n"
-    + std::to_string(ya) + "\n"
-    + std::to_string(yb) + "\n");
-  Real sign = (ya < 0 ? 1.0 : -1.0);
-  ya *= sign;
-  yb *= sign;
-
-  while (b-a > tol) {
-    const Real xh = 0.5*(a + b);
-    const Real yh = sign*func(xh);
-    if (yh > 0.0) {
-      b = xh;
-      yb = yh;
-    } else if (yh < 0.0) {
-      a = xh;
-      ya = yh;
-    } else {
-      a = xh;
-      b = xh;
-    }
-  }
-  return 0.5*(a+b);
-}
-
 class Residual {
  public:
   KOKKOS_FUNCTION
@@ -128,18 +49,17 @@ class Residual {
 	   const Real bsq_rpsq, const Real rsq,
 	   const Real rbsq, const Real v0sq, const singularity::EOS &eos,
      const fixup::Bounds &bnds, const Real x1, const Real x2, const Real x3)
-	   //const Real rho_floor, const Real e_floor,
-     //const Real gam_max, const Real e_max)
     : D_(D), q_(q), bsq_(bsq), bsq_rpsq_(bsq_rpsq), rsq_(rsq),
       rbsq_(rbsq), v0sq_(v0sq),
       eos_(eos), bounds_(bnds),
-      x1_(x1), x2_(x2), x3_(x3)
-      //rho_floor_(rho_floor), e_floor_(e_floor),
-      //gam_max_(gam_max), e_max_(e_max)
-      {
+      x1_(x1), x2_(x2), x3_(x3) {
     Real garbage = 0.0;
     bounds_.GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
     bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
+
+#if !USE_C2P_ROBUST_FLOORS
+    rho_floor_ = 1.e-20;
+#endif
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
@@ -175,14 +95,11 @@ class Residual {
     const Real rho_trial = D_*iWhat;
     if (rho_trial <= rho_floor_) {
       used_density_floor_ = true;
-      //printf("set true\n");
       return rho_floor_;
     } else {
       used_density_floor_ = false;
-      //printf("set false\n");
       return rho_trial;
     }
-    //return std::max(D_*iWhat, rho_floor_);
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real ehat_mu(const Real mu, const Real qbar, const Real rbarsq, const Real vhatsq, const Real What) {
@@ -204,7 +121,6 @@ class Residual {
 
   KOKKOS_INLINE_FUNCTION
   Real operator()(const Real mu) {
-    //feenableexcept(FE_DIVBYZERO|FE_INVALID);
     const Real x = x_mu(mu);
     const Real rbarsq = rbarsq_mu(mu,x);
     const Real qbar = qbar_mu(mu,x);
@@ -213,21 +129,16 @@ class Residual {
     const Real What = 1.0/iWhat;
     Real rhohat = rhohat_mu(iWhat);
     Real ehat = ehat_mu(mu,qbar,rbarsq,vhatsq,What);
-    // insert bounds for rhohat and ehat
-    // or how about bounding That?
-    //const Real That = eos_.TemperatureFromDensityInternalEnergy(rhohat,ehat);
     const Real Phat = eos_.PressureFromDensityInternalEnergy(rhohat,ehat);
     Real hhat = rhohat*(1.0 + ehat) + Phat;
     const Real ahat = Phat/make_positive(hhat-Phat);
     hhat /= rhohat;
 
-    const Real nua = (1.0 + ahat) * (1.0 + ehat)*iWhat; //hhat*iWhat;
+    const Real nua = (1.0 + ahat) * (1.0 + ehat)*iWhat;
     const Real nub = (1.0 + ahat)*(1.0 + qbar - mu*rbarsq);
     const Real nuhat = std::max(nua, nub);
 
     const Real muhat = 1.0/(nuhat + mu*rbarsq);
-    //fedisableexcept(FE_DIVBYZERO|FE_INVALID);
-    //PARTHENON_REQUIRE(muhat > 0.0, "muhat < 0");
     return mu-muhat;
   }
 
@@ -236,7 +147,7 @@ class Residual {
     auto func = [=](const Real x) {
       return aux_func(x,h0sq);
     };
-    return find_root(func,1.e-16,1.0/sqrt(h0sq),rho_floor_, __LINE__);
+    return root_find::itp(func,1.e-16,1.0/sqrt(h0sq),rho_floor_);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -355,19 +266,11 @@ class ConToPrim {
                                     internal_variables::cell_signal_speed, fluid_prim::gamma1});
   }
 
-  KOKKOS_INLINE_FUNCTION
-  bool my_cell(const Real x1, const Real x2) const {
-    //if (fabs(x1 - 3.24365) < 1.e-3 && fabs(x2 - 0.493164) < 1.e-3) return true;
-    return false;
-  }
-
   template <typename CoordinateSystem, class... Args>
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus operator()(const CoordinateSystem &geom, const singularity::EOS &eos, const Coordinates_t &coords, Args &&... args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
-    //Real x[4];
-    //geom.Coords(CellLocation::Cent, std::forward<Args>(args)..., x);
     Real x1 = coords.x1v(std::forward<Args>(args)...);
     Real x2 = coords.x2v(std::forward<Args>(args)...);
     Real x3 = coords.x3v(std::forward<Args>(args)...);
@@ -397,16 +300,6 @@ class ConToPrim {
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos,
                         const Real x1, const Real x2, const Real x3) const {
-    /*PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
-    PARTHENON_REQUIRE(!std::isnan(v(cmom_lo)), "v(cmom_lo) = NaN");
-    PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
-    PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+2)), "v(cmom_lo+2) = NaN");
-    PARTHENON_REQUIRE(!std::isnan(v(ceng)), "v(ceng) = NaN");
-    if (cb_hi > 0) {
-      PARTHENON_REQUIRE(!std::isnan(v(cb_lo)), "v(cb_lo) = NaN");
-      PARTHENON_REQUIRE(!std::isnan(v(cb_lo+1)), "v(cb_lo+1) = NaN");
-      PARTHENON_REQUIRE(!std::isnan(v(cb_lo+2)), "v(cb_lo+2) = NaN");
-    }*/
     int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);
     if (num_nans > 0) return ConToPrimStatus::failure;
     const Real igdet = 1.0/g.gdet;
@@ -416,7 +309,6 @@ class ConToPrim {
     bounds.GetFloors(x1,x2,x3,rhoflr,epsflr);
     Real gam_max, eps_max;
     bounds.GetCeilings(x1,x2,x3,gam_max,eps_max);
-    bool negative_crho = false;
     const Real D = v(crho)*igdet;
     #if USE_VALENCIA
     const Real tau = v(ceng)*igdet;
@@ -433,7 +325,6 @@ class ConToPrim {
     tau -= D;
     #endif // USE_VALENCIA
     const Real q = tau/D;
-    //PARTHENON_REQUIRE(D > 0, "D < 0");
 
     if (pye > 0) v(pye) = v(cye)/v(crho);
 
@@ -452,29 +343,6 @@ class ConToPrim {
       }
       rsq += rcon[i] * rcov[i];
     }
-    /*Real Dtau = D + tau;
-    Dtau *= Dtau;
-    if (rsq * D*D > Dtau) {
-      const Real scale = std::sqrt(Dtau/(rsq*D*D));
-      SPACELOOP(i) {
-        rcon[i] *= scale;
-        rcov[i] *= scale;
-        v(cmom_lo+i) *= scale;
-
-      }
-      rsq *= scale*scale;
-      printf("scaled back momuntum %g\n", scale);
-    }*/
-    /*
-    if (rsq > 1.e10) {
-      const Real rscale = sqrt(1.e10/rsq);
-      SPACELOOP(i) {
-        rcon[i] *= rscale;
-        rcov[i] *= rscale;
-      }
-      rsq = 1.e10;
-    }
-    */
     PARTHENON_REQUIRE(rsq >= 0.0, "rsq < 0");
     Real bu[] = {0.0, 0.0, 0.0};
     if (pb_hi > 0) {
@@ -499,7 +367,6 @@ class ConToPrim {
     if (v0sq >= 1) {
       printf("whoa: %g %g %g %g\n", rsq, h0sq_, zsq, v0sq);
     }
-    //v0sq = make_bounded(v0sq, 0.0, 1.0);
     if (!(bsq >= 0)) {
       printf("bsq < 0: %e\n", bsq);
       PARTHENON_FAIL("bsq < 0");
@@ -508,23 +375,14 @@ class ConToPrim {
       printf("rbsq < 0: %e\n", rbsq);
       PARTHENON_FAIL("rbsq < 0");
     }
-    /*PARTHENON_REQUIRE(bsq_rpsq >= 0, "bsq_rpsq < 0: " + std::to_string(bsq_rpsq)
-      + " " + std::to_string(bsq)
-      + " " + std::to_string(rsq)
-      + " " + std::to_string(rbsq));*/
-    //PARTHENON_REQUIRE(v0sq < 1, "v0sq >= 1: " + std::to_string(v0sq));
-    //PARTHENON_REQUIRE(v0sq >= 0, "v0sq < 0: " + std::to_string(v0sq));
 
-    Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,bounds,x1,x2,x3);//rhoflr,epsflr,gam_max,eps_max);
+    Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,bounds,x1,x2,x3);
 
     // find the upper bound
+    // TODO(JCD): revisit this.  is it worth it to find the upper bound?
     //const Real mu_r = res.compute_upper_bound(h0sq_);
     // solve
-    const Real mu = find_root(res, 0.0, 1.0, rel_tolerance, __LINE__);
-    //if(atm) printf("used atm\n");
-    if(my_cell(x1,x2)) {
-      printf("res = %e\n", res(mu));
-    }
+    const Real mu = root_find::itp(res, 0.0, 1.0, rel_tolerance);
 
     // now unwrap everything into primitive and conserved vars
     const Real x = res.x_mu(mu);
@@ -540,18 +398,8 @@ class ConToPrim {
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
 
-    /*if (v(prho) < 0.99999*rhoflr ||
-        v(peng)/v(prho) < 0.99999*epsflr ||
-        v(peng)/v(prho) > 1.00001*eps_max ||
-        W > 1.00001*gam_max) {
-      printf("bounds violated %e %e %e %e\n", v(prho)/rhoflr, v(peng)/v(prho)/epsflr,
-                                              v(peng)/v(prho)/eps_max, W/gam_max);
-    }*/
-
-    //const Real vscale = (W > 10 ? 10.0/W : 1.0);
     Real vel[3];
     SPACELOOP(i) {
-      //v(pvel_lo+i) = atm ? 0 : mu*x*(rcon[i] + mu*bdotr*bu[i]);
       vel[i] = W*mu*x*(rcon[i] + mu*bdotr*bu[i]);
       v(pvel_lo+i) = vel[i];
     }
@@ -560,21 +408,6 @@ class ConToPrim {
         bu[i] = v(pb_lo+i);
       }
     }
-
-    /*if (res.used_density_floor() ||
-        res.used_energy_floor() ||
-        res.used_gamma_max()) {
-      v(prho) = rhoflr;
-      SPACELOOP(i) {
-        v(pvel_lo+i) = 0.0;
-        vel[i] = v(pvel_lo+i);
-      }
-      v(peng) = epsflr;
-      v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
-      v(peng) *= v(prho);
-      v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
-      v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
-    }*/
 
     Real ye_prim = 0.0;
     if (pye > 0) ye_prim = v(pye);
@@ -597,18 +430,10 @@ class ConToPrim {
     }
 
     num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
-    //PARTHENON_REQUIRE(!std::isnan(v(crho)), "v(crho) = NaN");
-    //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo)), "v(cmom_lo) = NaN");
-    //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+1)), "v(cmom_lo+1) = NaN");
-    //PARTHENON_REQUIRE(!std::isnan(v(cmom_lo+2)), "v(cmom_lo+2) = NaN");
-    //PARTHENON_REQUIRE(!std::isnan(v(ceng)), "v(ceng) = NaN");
 
-    if (//res.used_density_floor() ||
-        //res.used_energy_max() ||
-        //res.used_energy_floor() ||
-        //res.used_gamma_max() ||
-        num_nans > 0)
+    if (num_nans > 0) {
       return ConToPrimStatus::failure;
+    }
     return ConToPrimStatus::success;
   }
 };

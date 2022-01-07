@@ -55,7 +55,7 @@ GetLorentzFactor(const Real vcon[Geometry::NDSPACE], const Real gcov[Geometry::N
 /*
  * Calculate the normal observer Lorentz factor from normal observer three-velocity
  *
- * PARAM[IN] - v[3] - Normal observer three-velocity (phoebus primitive velocity)
+ * PARAM[IN] - v[3] - Gamma*Normal observer three-velocity (phoebus primitive velocity)
  * PARAM[IN] - system - Coordinate system
  * PARAM[IN] - loc - Location on spatial cell where geometry is processed
  * PARAM[IN] - k - k index of meshblock cell
@@ -75,7 +75,7 @@ GetLorentzFactor(const Real vcon[Geometry::NDSPACE], const Geometry::CoordSysMes
 /*
  * Calculate the coordinate frame four-velocity from the normal observer three-velocity
  *
- * PARAM[IN] - v[3] - Normal observer three-velocity (phoebus primitive velocity)
+ * PARAM[IN] - v[3] - Gamma*Normal observer three-velocity (phoebus primitive velocity)
  * PARAM[IN] - system - Coordinate system
  * PARAM[IN] - loc - Location on spatial cell where geometry is processed
  * PARAM[IN] - k - X3 index of meshblock cell
@@ -93,7 +93,7 @@ GetFourVelocity(const Real v[3], const Geometry::CoordSysMeshBlock &system,
   system.ContravariantShift(loc, k, j, i, beta);
   u[0] = W / (std::abs(alpha) + SMALL);
   for (int l = 1; l < Geometry::NDFULL; ++l) {
-    u[l] = W * v[l - 1] - u[0] * beta[l - 1];
+    u[l] = v[l - 1] - u[0] * beta[l - 1];
   }
 }
 

@@ -108,9 +108,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
   params.Add("mhd", mhd);
 
-  bool zero_update = pin->GetOrAddBoolean("fluid", "zero_update", false);
-  params.Add("zero_update", zero_update);
-
   Metadata m;
   std::vector<int> three_vec(1, 3);
 
@@ -146,6 +143,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
 
+  // TODO(BRR) Should these go in a "phoebus" package?
+  const std::string bc_ix1 = pin->GetString("phoebus", "bc_ix1");
+  params.Add("bc_ix1", bc_ix1);
+  const std::string bc_ox1 = pin->GetString("phoebus", "bc_ox1");
+  params.Add("bc_ox1", bc_ox1);
+
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
     ndim = 3;
@@ -171,7 +174,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
-  physics->AddField("zero_update", mprim_scalar);
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
   physics->AddField(impl::fail, mprim_scalar);
@@ -187,18 +189,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(c::ye, mcons_scalar);
   }
 
+#if SET_FLUX_SRC_DIAGS
   // DIAGNOSTIC STUFF FOR DEBUGGING
   std::vector<int> five_vec(1,5);
   Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                              Metadata::Derived, Metadata::OneCopy},
                              five_vec);
-  physics->AddField("flux_divergence", mdiv);
-  std::vector<int> seven_vec(1,7);
+  physics->AddField(diag::divf, mdiv);
+  std::vector<int> seven_vec(1,5);
   Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                              Metadata::Derived, Metadata::OneCopy},
                              seven_vec);
-  physics->AddField("src_terms", mdiag);
-
+  physics->AddField(diag::src_terms, mdiag);
+#endif
 
   // set up the arrays for left and right states
   // add the base state for reconstruction/fluxes
@@ -306,6 +309,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
       DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(), 0, v.GetDim(5) - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+
         Real gcov4[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
         Real gcon[3][3];
@@ -360,6 +364,16 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   return TaskStatus::complete;
 }
 
+template <typename T>
+TaskStatus ConservedToPrimitive(T *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
+  return c2p(rc, ib, jb, kb);
+}
 
 template <typename T>
 TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRange &jb,
@@ -379,10 +393,9 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto coords = pmb->coords;
 
+  // TODO(JCD): move the setting of this into the solver so we can call this on MeshData
   auto fail = rc->Get(internal_variables::fail).data;
 
-  // breaking con2prim into 3 kernels seems more performant.  WHY?
-  // if we can combine them, we can get rid of the mesh sized scratch array
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
       invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -394,17 +407,6 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
       });
 
   return TaskStatus::complete;
-}
-
-template <typename T>
-TaskStatus ConservedToPrimitive(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
-  auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
-  return c2p(rc, ib, jb, kb);
 }
 
 template <typename T>
@@ -431,6 +433,8 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
   // if we can combine them, we can get rid of the mesh sized scratch array
+  // TODO(JCD): revisit this.  don't think it's required anymore.  in fact the
+  //            original performance thing was related to the loop being a reduce
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Setup", DevExecSpace(), 0,
       invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -442,24 +446,9 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
       invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         auto status = invert(eos, k, j, i);
-        /*if (status != ConToPrimStatus::success) {
-          auto rstatus = invert_robust(geom, eos, coords, k, j, i);
-          status = (rstatus == con2prim_robust::ConToPrimStatus::success ? ConToPrimStatus::success : ConToPrimStatus::failure);
-        }*/
         fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
                                                             : FailFlags::fail);
       });
-  // this is where we might stick fixup
-  /*int fail_cnt;
-  parthenon::par_reduce(
-      parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve", DevExecSpace(),
-      0, invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
-                    int &f) {
-        f += (fail(k, j, i) == FailFlags::success ? 0 : 1);
-      },
-      Kokkos::Sum<int>(fail_cnt));
-  PARTHENON_REQUIRE(fail_cnt == 0, "Con2Prim Failed!");*/
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Finalize", DevExecSpace(), 0,
       invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -467,24 +456,10 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
         invert.Finalize(eos, geom, k, j, i);
       });
 
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
-      invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        auto status = invert(eos, k, j, i);
-        //if (fail(k, j, i) != FailFlags::success) {
-          auto rstatus = invert_robust(geom, eos, coords, k, j, i);
-          status = (rstatus == con2prim_robust::ConToPrimStatus::success ? ConToPrimStatus::success : ConToPrimStatus::failure);
-          fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
-                                                              : FailFlags::fail);
-        //}
-      });
-
-
   return TaskStatus::complete;
 }
 
-// template <typename T>
+#if SET_FLUX_SRC_DIAGS
 TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
 
@@ -499,7 +474,7 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   const int cmom_lo = imap[fluid_cons::momentum].first;
   const int cmom_hi = imap[fluid_cons::momentum].second;
   const int ceng = imap[fluid_cons::energy].first;
-  std::vector<std::string> diag_vars({"flux_divergence"});
+  std::vector<std::string> diag_vars({diagnostic_variables::divf});
   auto diag = rc->PackVariables(diag_vars);
 
   parthenon::par_for(
@@ -515,44 +490,8 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   );
   return TaskStatus::complete;
 }
-TaskStatus ZeroUpdate(MeshBlockData<Real> *rc) {
-  auto *pmb = rc->GetParentPointer().get();
-  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
-  const bool zero_update = pkg->Param<bool>("zero_update");
+#endif
 
-  if (!zero_update) {
-    return TaskStatus::complete;
-  }
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-
-  std::vector<std::string> vars({fluid_cons::density, fluid_cons::momentum, fluid_cons::energy, "zero_update"});
-  PackIndexMap imap;
-  auto du = rc->PackVariables(vars, imap);
-  const int crho = imap[fluid_cons::density].first;
-  const int cmom_lo = imap[fluid_cons::momentum].first;
-  const int cmom_hi = imap[fluid_cons::momentum].second;
-  const int ceng = imap[fluid_cons::energy].first;
-  const int izero = imap["zero_update"].first;
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "Zero Update", DevExecSpace(), kb.s, kb.e,
-      jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        du(crho,k,j,i) *= du(izero,k,j,i);
-        du(cmom_lo,k,j,i) *= du(izero,k,j,i);
-        du(cmom_lo+1,k,j,i) *= du(izero,k,j,i);
-        du(cmom_hi,k,j,i) *= du(izero,k,j,i);
-        du(ceng,k,j,i) *= du(izero,k,j,i);
-      }
-  );
-  return TaskStatus::complete;
-}
-
-
-// template <typename T>
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src) {
   constexpr int ND = Geometry::NDFULL;
@@ -566,13 +505,15 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   std::vector<std::string> vars({fluid_cons::momentum, fluid_cons::energy});
+#if SET_FLUX_SRC_DIAGS
+  vars.push_back(diagnostic_variables::src_terms);
+#endif
   PackIndexMap imap;
   auto src = rc_src->PackVariables(vars, imap);
   const int cmom_lo = imap[fluid_cons::momentum].first;
   const int cmom_hi = imap[fluid_cons::momentum].second;
   const int ceng = imap[fluid_cons::energy].first;
-  std::vector<std::string> diag_vars({"src_terms"});
-  auto diag = rc->PackVariables(diag_vars);
+  const int idiag = imap[diagnostic_variables::src_terms].first;
 
   auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -585,7 +526,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
         tmunu(Tmunu, k, j, i);
         geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
 	      Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
-        diag(0,k,j,i) = 0.0;
         // momentum source terms
         for (int l = 0; l < NS; l++) {
           Real src_mom = 0.0;
@@ -623,17 +563,11 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
-          diag(4,k,j,i) = src(ceng,k,j,i);
-          diag(5,k,j,i) = gdet*alpha*Ta;
-          diag(6,k,j,i) = -gdet*alpha*TGam;
           #else
           SPACETIMELOOP2(mu, nu) {
             TGam += Tmunu[mu][nu] * gam[nu][0][mu];
           }
           src(ceng,k,j,i) = gdet * TGam;
-          diag(4,k,j,i) = src(ceng, k, j, i);
-          diag(5,k,j,i) = 0.;
-          diag(6,k,j,i) = 0.;
           #endif // USE_VALENCIA
         }
 
@@ -647,14 +581,20 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
             }
           }
           src(cmom_lo + l, k, j, i) += gdet*src_mom;
-          diag(l+1, k, j, i) = src(cmom_lo+l,k,j,i);
         }
+
+#if SET_FLUX_SRC_DIAGS
+        src(idiag, k, j, i) = 0.0;
+        src(idiag+1, k, j, i) = src(cmom_lo, k, j, i);
+        src(idiag+2, k, j, i) = src(cmom_lo+1, k, j, i);
+        src(idiag+3, k, j, i) = src(cmom_lo+2, k, j, i);
+        src(idiag+4, k, j, i) = src(ceng, k, j, i);
+#endif
       });
 
   return TaskStatus::complete;
 }
 
-// template <typename T>
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
   if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
