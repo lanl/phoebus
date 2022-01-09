@@ -84,8 +84,9 @@ Real superbee(const Real dm, const Real dp) {
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real nolim(const Real dm, const Real dp) {
-  if (std::abs(dp) > 0.)
+  if (fabs(dp) > 0.0) {
     return 0.5*(dp - dm)/dp;
+  }
   return 1.0;
 }
 

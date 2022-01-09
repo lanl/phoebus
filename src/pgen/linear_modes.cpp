@@ -243,26 +243,25 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ib_lo + 2, k, j, i) = B30 + (dB3*mode).real();
       }
 
+      Real vsq = 0.;
+      SPACELOOP2(ii, jj) {
+        vsq += v(ivlo + ii, k, j, i)*v(ivlo + jj, k, j, i);
+      }
+      Real Gamma = 1./sqrt(1. - vsq);
+      SPACELOOP(ii) {
+        v(ivlo + ii, k, j, i) *= Gamma;
+      }
+
       if (is_snake ||is_inchworm || is_boosted_minkowski) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
-        Real vsq = 0.;
         Real gcov[NDFULL][NDFULL] = {0};
-        Real vcon[NDSPACE] = {v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
+        Real vcon[NDSPACE] = {v(ivlo, k, j, i)/Gamma, v(ivlo+1, k, j, i)/Gamma, v(ivlo+2, k, j, i)/Gamma};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-        Real gcov_mink[4][4] = {0};
-        gcov_mink[0][0] = -1.;
-        gcov_mink[1][1] = 1.;
-        gcov_mink[2][2] = 1.;
-        gcov_mink[3][3] = 1.;
-        SPACELOOP2(m, n) {
-          vsq += gcov_mink[m+1][n+1]*vcon[m]*vcon[n];
-        }
-        Real Gamma = 1./sqrt(1. - vsq);
         Real ucon[NDFULL] = {Gamma, // alpha = 1 in Minkowski
-                             Gamma*v(ivlo, k, j, i),
-                             Gamma*v(ivlo+1, k, j, i),
-                             Gamma*v(ivlo+2, k, j, i)};
+                             v(ivlo, k, j, i), // beta^i = 0 in Minkowski
+                             v(ivlo+1, k, j, i),
+                             v(ivlo+2, k, j, i)};
         Real J[NDFULL][NDFULL] = {0};
         if (is_snake) {
           J[0][0] = 1/alpha;
@@ -285,9 +284,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Gamma = lapse * ucon_transformed[0];
         Real shift[NDSPACE];
         geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
-        v(ivlo, k, j, i) = ucon_transformed[1]/Gamma + shift[0]/lapse;
-        v(ivlo+1, k, j, i) = ucon_transformed[2]/Gamma + shift[1]/lapse;
-        v(ivlo+2, k, j, i) = ucon_transformed[3]/Gamma + shift[2]/lapse;
+        v(ivlo, k, j, i) = ucon_transformed[1] + Gamma*shift[0]/lapse;
+        v(ivlo+1, k, j, i) = ucon_transformed[2] + Gamma*shift[1]/lapse;
+        v(ivlo+2, k, j, i) = ucon_transformed[3] + Gamma*shift[2]/lapse;
 
         // Enforce zero B fields for now
         if (ib_hi >= 3) {
