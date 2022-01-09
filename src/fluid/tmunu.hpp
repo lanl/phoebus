@@ -127,8 +127,7 @@ private:
       b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha * b[0] * u[l]);
     }
 
-    b[0] *= alpha;
-    bsq = (Bsq + b[0] * b[0]) * iW * iW;
+    bsq = (Bsq + alpha * alpha * b[0] * b[0]) * iW * iW;
   }
 
   Pack pack_;
