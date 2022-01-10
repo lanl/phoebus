@@ -43,6 +43,16 @@ void ProblemModifier(ParameterInput *pin) {
   f(pin);
 }
 
+void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+  std::string name = pin->GetString("phoebus", "problem");
+  if (name == "phoebus" || pinitmod_dict.count(name) == 0) {
+    return;
+  }
+
+  auto f = pinitmod_dict[name];
+  f(pin, pmesh);
+}
+
 KOKKOS_FUNCTION
 Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
