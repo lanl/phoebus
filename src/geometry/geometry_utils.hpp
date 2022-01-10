@@ -35,6 +35,7 @@ namespace Geometry {
 constexpr int NDSPACE = 3;
 constexpr int NDFULL = NDSPACE + 1;
 constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
+constexpr Real DTFACTOR = 1.e-5; //arbitrary
 } // namespace Geometry
 
 #define SPACELOOP(i) for (int i = 0; i < Geometry::NDSPACE; i++)
@@ -99,10 +100,16 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
                                                Real X0, Real X1, Real X2,
                                                Real X3, Real da[NDFULL]) {
   LinearAlgebra::SetZero(da, NDFULL);
-  for (int d = 1; d < NDFULL; ++d) {
+  for (int d = 0; d < NDFULL; ++d) {
+    Real XX0 = X0;
     Real XX1 = X1;
     Real XX2 = X2;
     Real XX3 = X3;
+    Real dxd = dx;
+    if (d == 0) {
+      dxd = DTFACTOR*dx;
+      XX0 += dxd;
+    }
     if (d == 1)
       XX1 += dx;
     if (d == 2)
@@ -110,8 +117,8 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
     if (d == 3)
       XX3 += dx;
     Real alpha = s.Lapse(X0, X1, X2, X3);
-    Real alphap = s.Lapse(X0, XX1, XX2, XX3);
-    da[d] = ratio(alphap - alpha, dx * alpha);
+    Real alphap = s.Lapse(XX0, XX1, XX2, XX3);
+    da[d] = ratio(alphap - alpha, dxd * alpha);
   }
 }
 
@@ -154,13 +161,21 @@ SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
   LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
   Real gl[NDFULL][NDFULL];
   Real gr[NDFULL][NDFULL];
-  for (int d = 1; d < NDFULL; ++d) {
+  for (int d = 0; d < NDFULL; ++d) {
+    Real X0L = X0;
     Real X1L = X1;
     Real X2L = X2;
     Real X3L = X3;
+    Real X0R = X0;
     Real X1R = X1;
     Real X2R = X2;
     Real X3R = X3;
+    Real dxd = dx;
+    if (d == 0) {
+      dxd = DTFACTOR*dx;
+      X0L -= dxd;
+      X0R += dxd;
+    }
     if (d == 1) {
       X1L -= dx;
       X1R += dx;
@@ -173,10 +188,10 @@ SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
       X3L -= dx;
       X3R += dx;
     }
-    s.SpacetimeMetric(X0, X1R, X2R, X3R, gr);
-    s.SpacetimeMetric(X0, X1L, X2L, X3L, gl);
+    s.SpacetimeMetric(X0R, X1R, X2R, X3R, gr);
+    s.SpacetimeMetric(X0L, X1L, X2L, X3L, gl);
     SPACETIMELOOP(mu) {
-      SPACETIMELOOP(nu) { dg[mu][nu][d] = ratio(gr[mu][nu] - gl[mu][nu], 2*dx); }
+      SPACETIMELOOP(nu) { dg[mu][nu][d] = ratio(gr[mu][nu] - gl[mu][nu], 2*dxd); }
     }
   }
 }

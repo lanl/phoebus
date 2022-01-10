@@ -300,10 +300,10 @@ public:
     if (axisymmetric_)
       k = k_;
     SPACETIMELOOP3(mu, nu, sigma) {
-      int offst = (sigma - 1) * Utils::SymSize(NDFULL) +
-                  Utils::Flatten2(mu, nu, NDFULL);
+      int offst = sigma * Utils::SymSize(NDFULL) +
+                 Utils::Flatten2(mu, nu, NDFULL);
       dg[mu][nu][sigma] =
-          (sigma == 0) ? 0 : pack_(b, idx_[loc].dg + offst, k, j, i);
+	pack_(b, idx_[loc].dg + offst, k, j, i);
     }
   }
   KOKKOS_INLINE_FUNCTION
@@ -397,7 +397,7 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin,
                                 Utils::SymSize(NDFULL),
                                 Utils::SymSize(NDSPACE),
                                 1,
-                                NDSPACE * Utils::SymSize(NDFULL),
+                                NDFULL * Utils::SymSize(NDFULL),
                                 NDFULL};
   std::vector<std::string> var_names = {"alpha",  "dalpha", "bcon", "gcov",
                                         "gamcon", "detgam", "dg",   "coord"};
@@ -528,7 +528,7 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
     pack(idx[loc].detgam, k, j, i) = system.DetGamma(loc, k, j, i);
     system.MetricDerivative(loc, k, j, i, dg);
     lin = 0;
-    for (int sigma = 1; sigma < NDFULL; ++sigma) {
+    for (int sigma = 0; sigma < NDFULL; ++sigma) {
       for (int mu = 0; mu < NDFULL; ++mu) {
         for (int nu = mu; nu < NDFULL; ++nu) {
           int offst = idx[loc].dg + lin;
