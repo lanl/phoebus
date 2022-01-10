@@ -1,8 +1,22 @@
+// © 2021. Triad National Security, LLC. All rights reserved.  This
+// program was produced under U.S. Government contract
+// 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
+// is operated by Triad National Security, LLC for the U.S.
+// Department of Energy/National Nuclear Security Administration. All
+// rights in the program are reserved by Triad National Security, LLC,
+// and the U.S. Department of Energy/National Nuclear Security
+// Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works,
+// distribute copies to the public, perform publicly and display
+// publicly, and to permit others to do so.
+
 #include "pgen/pgen.hpp"
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "geometry/boyer_lindquist.hpp"
 #include "fluid/con2prim_robust.hpp"
 #include "Kokkos_Random.hpp"
+#include "phoebus_utils/reduction.hpp"
 
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
@@ -290,7 +304,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     if (parthenon::Globals::my_rank == 0)
       std::cout << "beta_min = " << beta_min << std::endl;
   }
+
   // now normalize the b-field
+
+
   fluid::PrimitiveToConserved(rc);
   printf("Problem initialized!\n");
 }
@@ -308,6 +325,10 @@ void ProblemModifier(ParameterInput *pin) {
   Real dx = (x1max - xh)/(nx1 - ninside);
   Real x1min = xh - ninside*dx;
   pin->SetReal("parthenon/mesh", "x1min", x1min);
+}
+
+void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+  PARTHENON_FAIL("here!");
 }
 
 }
