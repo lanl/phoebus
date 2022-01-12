@@ -299,6 +299,32 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
           tl.AddTask(none, radiation::InitializeCommunicationMesh, "monte_carlo", blocks);
     }
 
+    TaskRegion &creation_region = tc.AddRegion(num_task_lists_executed_independently);
+    int reg_dep_id = 0;
+    total_particles.val = 0;
+    for (int i = 0; i < num_task_lists_executed_independently; i++) {
+      auto &pmb = blocks[i];
+      auto &tl = creation_region[i];
+      auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+
+      auto estimate_particles = tl.AddTask(none, radiation::MonteCarloEstimateParticles,
+        pmb.get(), mbd0.get(), sc0.get(), t0, dt);
+
+      creation_region.AddRegionalDependencies(reg_dep_id, i, estimate_particles);
+      reg_dep_id++;
+
+      auto start_source_reduce = (i == 0 ? tl.AddTask(estimate_particles,
+        &AllReduce<int64_t>::StartReduce, &total_particles, MPI_SUM) : none);
+
+      auto finish_source_reduce = tl.AddTask(start_source_reduce,
+        &AllReduce<int64_t>::CheckReduce, &total_particles);
+      creation_region.AddRegionalDependencies(reg_dep_id, i, finish_source_reduce);
+      reg_dep_id++;
+
+      printf("[%i] total particles: %i\n", Globals::my_rank, total_particles);
+    }
+
     TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
     for (int i = 0; i < blocks.size(); i++) {
       auto &pmb = blocks[i];
