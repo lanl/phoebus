@@ -79,10 +79,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
 TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
-  SwarmContainer *sc, const double t0, const double dt, Real *particles_sum) {
-  particles_sum += 1;
-  return TaskStatus::complete;
-}
+  SwarmContainer *sc, const double t0, const double dt, int64_t *particles_sum);
 
 // Mark all MPI requests as NULL / initialize boundary flags.
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,

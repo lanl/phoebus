@@ -309,7 +309,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
 
       auto estimate_particles = tl.AddTask(none, radiation::MonteCarloEstimateParticles,
-        pmb.get(), mbd0.get(), sc0.get(), t0, dt);
+        pmb.get(), mbd0.get(), sc0.get(), t0, dt, &total_particles.val);
 
       creation_region.AddRegionalDependencies(reg_dep_id, i, estimate_particles);
       reg_dep_id++;
