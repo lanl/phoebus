@@ -531,6 +531,13 @@ TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {
   return TaskStatus::complete;
 }
 
+TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
+  SwarmContainer *sc, const double t0, const double dt, int64_t *particles_sum)
+  {
+  particles_sum += 1;
+  return TaskStatus::complete;
+}
+
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks) {
   // Boundary transfers on same MPI proc are blocking
