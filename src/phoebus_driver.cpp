@@ -299,9 +299,10 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
           tl.AddTask(none, radiation::InitializeCommunicationMesh, "monte_carlo", blocks);
     }
 
-    TaskRegion &creation_region = tc.AddRegion(num_task_lists_executed_independently);
+    // TODO this is actually not necessary because we will be updating tuning parameters separately
+    /*TaskRegion &creation_region = tc.AddRegion(num_task_lists_executed_independently);
     int reg_dep_id = 0;
-    total_particles.val = 0;
+    dNtot.val = 0.;
     for (int i = 0; i < num_task_lists_executed_independently; i++) {
       auto &pmb = blocks[i];
       auto &tl = creation_region[i];
@@ -309,22 +310,30 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
 
       auto estimate_particles = tl.AddTask(none, radiation::MonteCarloEstimateParticles,
-        pmb.get(), mbd0.get(), sc0.get(), t0, dt, &total_particles.val);
+        pmb.get(), mbd0.get(), sc0.get(), t0, dt, &dNtot.val);
 
       creation_region.AddRegionalDependencies(reg_dep_id, i, estimate_particles);
       reg_dep_id++;
 
       auto start_source_reduce = (i == 0 ? tl.AddTask(estimate_particles,
-        &AllReduce<int64_t>::StartReduce, &total_particles, MPI_SUM) : none);
+        &AllReduce<Real>::StartReduce, &dNtot, MPI_SUM) : none);
 
       auto finish_source_reduce = tl.AddTask(start_source_reduce,
-        &AllReduce<int64_t>::CheckReduce, &total_particles);
+        &AllReduce<Real>::CheckReduce, &dNtot);
       creation_region.AddRegionalDependencies(reg_dep_id, i, finish_source_reduce);
       reg_dep_id++;
 
-      printf("[%i] total particles: %i\n", Globals::my_rank, total_particles);
-    }
+      // Report total particles
+      auto report_particles = (i == 0 && Globals::my_rank == 0
+        ? tl.AddTask(finish_source_reduce, [](Real *dN) {
+          std::cout << "Total particles = " << *dN << std::endl;
+          exit(-1);
+          return TaskStatus::complete;
+        },
+        &dNtot.val) : none);
+    }*/
 
+    // TODO(BRR) make transport an async region for ghost cells
     TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
     for (int i = 0; i < blocks.size(); i++) {
       auto &pmb = blocks[i];
@@ -343,6 +352,47 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       auto receive =
           tl.AddTask(send, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
     }
+
+    TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
+    {
+      tuning_reduce.val.resize(3); // made, absorbed, scattered
+      for (int i = 0; i < 3; i++) {
+        tuning_reduce.val[i] = 0.;
+      }
+      for (int i = 0; i < num_task_lists_executed_independently; i++) {
+        int reg_dep_id = 0;
+        auto &pmb = blocks[i];
+        auto &tl = tuning_region[i];
+        auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+        auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+
+        auto update_tuning_local = tl.AddTask(none, radiation::MonteCarloUpdateTuningLocal,
+          pmb.get(), sc0.get(), &tuning_reduce.val);
+
+        tuning_region.AddRegionalDependencies(reg_dep_id, i, update_tuning_local);
+        reg_dep_id++;
+
+        auto start_tuning_reduce = (i == 0 ? tl.AddTask(update_tuning_local,
+          &AllReduce<std::vector<Real>>::StartReduce, &tuning_reduce, MPI_SUM) : none);
+
+        auto finish_tuning_reduce = tl.AddTask(start_tuning_reduce,
+          &AllReduce<std::vector<Real>>::CheckReduce, &tuning_reduce);
+      tuning_region.AddRegionalDependencies(reg_dep_id, i, finish_tuning_reduce);
+      reg_dep_id++;
+
+      // Report tuning
+      auto report_tuning = (i == 0 && Globals::my_rank == 0
+        ? tl.AddTask(finish_tuning_reduce, [](std::vector<Real> *tuning) {
+          std::cout << "Total made = " << (*tuning)[0] << " abs = " <<
+            (*tuning)[1] << " scatt = " << (*tuning)[2] << std::endl;
+          exit(-1);
+          return TaskStatus::complete;
+        },
+        &tuning_reduce.val) : none);
+      }
+
+    }
+
     status = tc.Execute();
   }
 

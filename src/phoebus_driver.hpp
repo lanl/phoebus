@@ -36,7 +36,8 @@ class PhoebusDriver : public EvolutionDriver {
   std::unique_ptr<StagedIntegrator> integrator;
   Real dt_init, dt_init_fact;
 
-  AllReduce<int64_t> total_particles;
+  AllReduce<Real> dNtot;
+  AllReduce<std::vector<Real>> tuning_reduce;
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
