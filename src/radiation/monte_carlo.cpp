@@ -231,6 +231,13 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
     return TaskStatus::complete;
   }
 
+  printf("Nstot: %i\n", Nstot);
+  const auto tune_made = rad->Param<int>("tune_made");
+  printf("tune_made: %i\n", tune_made);
+  rad->UpdateParam<int>("tune_made", tune_made + Nstot);
+  //const auto tune_made = rad->Param<int>("tune_made");
+  //*tune_made += Nstot;
+
   ParArrayND<int> new_indices;
   const auto new_particles_mask = swarm->AddEmptyParticles(Nstot, new_indices);
 
@@ -531,10 +538,177 @@ TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {
   return TaskStatus::complete;
 }
 
+TaskStatus MonteCarloUpdateTuningLocal(MeshBlock *pmb, SwarmContainer *sc, std::vector<Real> *tuning) {
+  printf("%s:%i\n", __FILE__, __LINE__);
+  auto swarm = sc->Get("monte_carlo");
+  auto rad = pmb->packages.Get("radiation");
+  // TODO(BRR) these params are per mesh (per proc) not per meshblock
+  const auto tune_made = rad->Param<int>("tune_made");
+  // TODO(BRR) get made, absorbed, and scattered from the swarm
+  (*tuning)[static_cast<int>(Tuning::made)] += tune_made;
+  (*tuning)[static_cast<int>(Tuning::absorbed)] += 2;
+  (*tuning)[static_cast<int>(Tuning::scattered)] += 3;
+  return TaskStatus::complete;
+}
+
 TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
-  SwarmContainer *sc, const double t0, const double dt, int64_t *particles_sum)
-  {
-  particles_sum += 1;
+  SwarmContainer *sc, const double t0, const double dt, Real *dNtot) {
+
+  namespace fp = fluid_prim;
+  namespace fc = fluid_cons;
+  namespace iv = internal_variables;
+  auto opac = pmb->packages.Get("opacity");
+  auto rad = pmb->packages.Get("radiation");
+  auto swarm = sc->Get("monte_carlo");
+  auto rng_pool = rad->Param<RNGPool>("rng_pool");
+  const auto tune_emiss = rad->Param<Real>("tune_emiss");
+
+  const auto nu_min = rad->Param<Real>("nu_min");
+  const auto nu_max = rad->Param<Real>("nu_max");
+  const Real lnu_min = log(nu_min);
+  const Real lnu_max = log(nu_max);
+  const auto nu_bins = rad->Param<int>("nu_bins");
+  const auto dlnu = rad->Param<Real>("dlnu");
+  const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  const auto num_particles = rad->Param<int>("num_particles");
+  const auto remove_emitted_particles =
+      rad->Param<bool>("remove_emitted_particles");
+
+  const auto d_opacity = opac->Param<Opacity>("d.opacity");
+
+  bool do_species[3] = {rad->Param<bool>("do_nu_electron"),
+                        rad->Param<bool>("do_nu_electron_anti"),
+                        rad->Param<bool>("do_nu_heavy")};
+
+  // Meshblock geometry
+  const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
+  const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
+  const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
+  const Real &dx_i =
+      pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
+  const Real &dx_j =
+      pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
+  const Real &dx_k =
+      pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
+  const Real &minx_i = pmb->coords.x1f(ib.s);
+  const Real &minx_j = pmb->coords.x2f(jb.s);
+  const Real &minx_k = pmb->coords.x3f(kb.s);
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
+  StateDescriptor *eos = pmb->packages.Get("eos").get();
+  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  const Real MASS = unit_conv.GetMassCodeToCGS();
+  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
+  const Real TIME = unit_conv.GetTimeCodeToCGS();
+  const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
+  const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
+  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
+  const Real CENERGY = unit_conv.GetEnergyCGSToCode();
+  const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
+  const Real CTIME = unit_conv.GetTimeCGSToCode();
+  const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
+
+  const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
+  const Real dV_code = dx_i * dx_j * dx_k * dt;
+  const Real d3x_cgs = dx_i * dx_j * dx_k * pow(LENGTH, 3);
+  const Real d3x_code = dx_i * dx_j * dx_k;
+
+  std::vector<std::string> vars({fp::density, fp::temperature, fp::ye, fp::velocity,
+                                 "dNdlnu_max", "dNdlnu", "dN", "Ns"});
+  PackIndexMap imap;
+  auto v = rc->PackVariables(vars, imap);
+  const int iye = imap[fp::ye].first;
+  const int pdens = imap[fp::density].first;
+  const int ptemp = imap[fp::temperature].first;
+  const int pvlo = imap[fp::velocity].first;
+  const int pvhi = imap[fp::velocity].second;
+  const int idNdlnu = imap["dNdlnu"].first;
+  const int idNdlnu_max = imap["dNdlnu_max"].first;
+  const int idN = imap["dN"].first;
+  const int iNs = imap["Ns"].first;
+
+  // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting
+  // value
+  Real wgtC = 1.e50; // Typical-ish value
+
+  for (int sidx = 0; sidx < 3; sidx++) {
+    if (do_species[sidx]) {
+      auto s = species[sidx];
+      pmb->par_for(
+          "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            auto rng_gen = rng_pool.get_state();
+            Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+            Real ye = v(iye, k, j, i);
+
+            const Real rho_cgs = v(pdens, k, j, i) * DENSITY;
+            const Real T_cgs = v(ptemp, k, j, i) * TEMPERATURE;
+
+            Real dN = 0.;
+            Real dNdlnu_max = 0.;
+            for (int n = 0; n <= nu_bins; n++) {
+              Real nu = nusamp(n);
+              Real wgt = GetWeight(wgtC, nu);
+              Real Jnu = d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu);
+
+              dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
+
+              // Factors of nu in numerator and denominator cancel
+              Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
+              v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) = dNdlnu;
+              if (dNdlnu > dNdlnu_max) {
+                dNdlnu_max = dNdlnu;
+              }
+            }
+
+            for (int n = 0; n <= nu_bins; n++) {
+              v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) /= dNdlnu_max;
+            }
+
+            // Trapezoidal rule
+            Real nu0 = nusamp[0];
+            Real nu1 = nusamp[nu_bins];
+            dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu0) *
+                  nu0 / (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
+            dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu1) *
+                  nu1 / (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
+            dN *= d3x_cgs * detG * dt * TIME;
+
+            v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
+
+            int Ns = static_cast<int>(dN);
+            if (dN - Ns > rng_gen.drand()) {
+              Ns++;
+            }
+
+            // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
+            v(idN + sidx, k, j, i) = dN;
+            v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
+            rng_pool.free_state(rng_gen);
+          });
+    }
+  }
+
+  // Reduce dN over zones for calibrating weights (requires w ~ wgtC)
+  Real dNtot_local = 0;
+  parthenon::par_reduce(
+      parthenon::loop_pattern_mdrange_tag, "MonteCarloReduceParticleCreation",
+      DevExecSpace(), 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i,
+                    Real &dN) {
+        if (do_species[sidx]) {
+          dN += v(idN + sidx, k, j, i);
+        }
+      },
+      Kokkos::Sum<Real>(dNtot_local));
+
+  printf("[%i] dNtot: %e + %e\n", Globals::my_rank, *dNtot, dNtot_local);
+
+  *dNtot += dNtot_local;
+
   return TaskStatus::complete;
 }
 

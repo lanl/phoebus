@@ -20,13 +20,13 @@ namespace reduction {
 
 #include <mpi.h>
 
-Real Max(const Real &x) {
+Real inline Max(const Real &x) {
   Real xmax;
   MPI_Allreduce(&x, &xmax, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
   return xmax;
 }
 
-Real Min(const Real &x) {
+Real inline Min(const Real &x) {
   Real xmin;
   MPI_Allreduce(&x, &xmin, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
   return xmin;
@@ -34,8 +34,8 @@ Real Min(const Real &x) {
 
 #else
 
-Real Max(const Real &x) { return x; }
-Real Min(const Real &x) { return x; }
+Real inline Max(const Real &x) { return x; }
+Real inline Min(const Real &x) { return x; }
 
 #endif // MPI_PARALLEL
 

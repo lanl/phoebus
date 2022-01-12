@@ -115,6 +115,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     int num_particles = pin->GetOrAddInteger("radiation", "num_particles", 100);
     params.Add("num_particles", num_particles);
 
+    int tune_made = 0;
+    params.Add("tune_made", tune_made, true);
+
     bool remove_emitted_particles =
         pin->GetOrAddBoolean("monte_carlo", "remove_emitted_particles", false);
     params.Add("remove_emitted_particles", remove_emitted_particles);
