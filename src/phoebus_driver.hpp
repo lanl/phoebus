@@ -17,6 +17,7 @@
 #include <memory>
 
 #include <parthenon/driver.hpp>
+#include <parthenon/package.hpp>
 using namespace parthenon::driver::prelude;
 
 namespace phoebus {
@@ -34,6 +35,8 @@ class PhoebusDriver : public EvolutionDriver {
  private:
   std::unique_ptr<StagedIntegrator> integrator;
   Real dt_init, dt_init_fact;
+
+  AllReduce<int64_t> total_particles;
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
