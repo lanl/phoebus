@@ -85,7 +85,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(ieng, k, j, i) = u;
       v(itmp, k, j, i) = T;
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
-      v(ivlo, k, j, i) = vel;
+      v(ivlo, k, j, i) = W*vel;
     });
 
   fluid::PrimitiveToConserved(rc.get());

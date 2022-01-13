@@ -167,6 +167,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(itmp,k,j,i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
       v(irho,k,j,i) = std::pow(v(itmp,k,j,i),n);
       v(ieng,k,j,i) = v(irho,k,j,i)*v(itmp,k,j,i)/(gam - 1.0);
+      v(iprs,k,j,i) = eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
       Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
       ucon_bl[1] = -C1/(std::pow(v(itmp,k,j,i),n)*std::pow(r,2));
 
@@ -213,7 +214,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
       Real W = lapse * ucon[0];
       for (int d = 0; d < 3; d++) {
-        v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
+        v(ivlo+d,k,j,i) = ucon[d+1] + W*beta[d]/lapse;
       }
     });
 
@@ -221,5 +222,3 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 }
 
 }
-
-//} // namespace phoebus

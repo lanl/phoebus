@@ -19,8 +19,10 @@
 using namespace parthenon::package::prelude;
 
 #include "compile_constants.hpp"
+#include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
 
@@ -30,20 +32,26 @@ enum class solver {LLF, HLL};
 
 struct FaceGeom {
   KOKKOS_INLINE_FUNCTION
-  FaceGeom(const Geometry::CoordSysMeshBlock &g, const CellLocation loc,
+  FaceGeom(const Coordinates_t &coords, const Geometry::CoordSysMeshBlock &g, const CellLocation loc,
            const int d, const int k, const int j, const int i)
-           : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetG(loc,k,j,i)) {
+           : alpha(g.Lapse(loc,k,j,i)), gdet(g.DetG(loc,k,j,i)),
+             gammadet(g.DetGamma(loc,k,j,i)) {
     auto gcon = reinterpret_cast<Real (*)[3]>(&gcov[0][0]);
     g.MetricInverse(loc,k,j,i,gcon);
     gdd = gcon[d-1][d-1];
     g.SpacetimeMetric(loc,k,j,i,gcov);
     g.ContravariantShift(loc,k,j,i,beta);
+    X[1] = (loc == CellLocation::Face1 ? coords.x1f(k, j, i) : coords.x1v(k, j, i));
+    X[2] = (loc == CellLocation::Face2 ? coords.x2f(k, j, i) : coords.x2v(k, j, i));
+    X[3] = (loc == CellLocation::Face3 ? coords.x3f(k, j, i) : coords.x3v(k, j, i));
   }
   const Real alpha;
   const Real gdet;
+  const Real gammadet;
   Real gcov[4][4];
   Real beta[3];
   Real gdd;
+  Real X[4];
 };
 
 class FluxState {
@@ -81,14 +89,24 @@ class FluxState {
 
   KOKKOS_INLINE_FUNCTION
   void prim_to_flux(const int d, const int k, const int j, const int i, const FaceGeom &g,
-                    const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F) const {
+                    const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F,
+                    const Real sie_max, const Real gam_max) const {
     const int dir = d-1;
-    const Real rho = q(dir,prho,k,j,i);
-    const Real vcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
+    Real rho_floor = q(dir,prho,k,j,i);
+    Real sie_floor;
+    bounds.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
+    const Real rho = std::max(q(dir,prho,k,j,i),rho_floor);
+    Real vpcon[] = {q(dir,pvel_lo,k,j,i), q(dir,pvel_lo+1,k,j,i), q(dir,pvel_lo+2,k,j,i)};
+    Real W = phoebus::GetLorentzFactor(vpcon, g.gcov);
+    Real vcon[] = {vpcon[0]/W, vpcon[1]/W, vpcon[2]/W};
     const Real &vel = vcon[dir];
     Real Bcon[] = {0.0, 0.0, 0.0};
-    const Real u = q(dir,peng,k,j,i);
-    const Real P = q(dir,prs,k,j,i);
+    const Real u = (q(dir,peng,k,j,i)/rho > sie_floor
+                      ? (q(dir,peng,k,j,i)/rho > sie_max
+                          ? rho*sie_max
+                          : q(dir,peng,k,j,i))
+                      : rho*sie_floor);
+    const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
     for (int m = pb_lo; m <= pb_hi; m++) {
@@ -105,7 +123,15 @@ class FluxState {
         BdotB += g.gcov[m+1][n+1]*Bcon[m]*Bcon[n];
       }
     }
-    const Real W = 1.0/sqrt(1-vsq);
+    const Real vsq_max = 1.0 - 1.0/(gam_max*gam_max);
+    if (vsq > vsq_max) {
+      Real scale = vsq_max/vsq;
+      vsq *= scale;
+      scale = std::sqrt(scale);
+      Bdotv *= scale;
+      for (int m = 0; m < 3; m++) vcon[m] *= scale;
+    }
+    W = 1.0/sqrt(1-vsq);
 
     const Real vtil = vel - g.beta[dir]/g.alpha;
 
@@ -139,8 +165,33 @@ class FluxState {
     }
 
     // energy
+    #if USE_VALENCIA
     U[ceng] = rhohWsq + bsqWsq - (P + 0.5*bsq) - b0*b0 - U[crho];
     F[ceng] = U[ceng]*vtil + (P + 0.5*bsq)*vel - Bdotv*Bcon[dir];
+    #else
+    // TODO(BRR) share calculated quantities for ucon, ucov, bcon, bcov with above
+    Real ucon[4] = {W/g.alpha,
+                    vpcon[0] - g.beta[0]*W/g.alpha,
+                    vpcon[1] - g.beta[1]*W/g.alpha,
+                    vpcon[2] - g.beta[2]*W/g.alpha};
+    Real ucov[4] = {0};
+    SPACETIMELOOP2(mu, nu) {
+      ucov[mu] += g.gcov[mu][nu]*ucon[nu];
+    }
+    Real bcon[4] = {0., 0., 0., 0.};
+    Real bcov0 = 0.;
+    SPACELOOP(ii) SPACETIMELOOP(mu) {
+      bcon[0] += Bcon[ii]*ucon[mu]*g.gcov[ii][mu];
+    }
+    SPACELOOP(ii) {
+      bcon[ii] = (Bcon[ii] + bcon[0]*ucon[ii])/ucon[0];
+    }
+    SPACETIMELOOP(mu) {
+      bcov0 += g.gcov[0][mu]*bcon[mu];
+    }
+    U[ceng] = g.alpha*((rho + u + P + bsq)*ucon[0]*ucov[0] + P + 0.5*bsq) - bcon[0]*bcov0 + U[crho];
+    F[ceng] = (rho + u + P + bsq)*ucon[d]*ucov[0] -bcon[d]*bcov0 + rho*ucon[d];
+    #endif // USE_VALENCIA
 
     // magnetic fields
     for (int m = cb_lo; m <= cb_hi; m++) {
@@ -148,15 +199,14 @@ class FluxState {
       F[m] = U[m]*vtil - Bcon[dir]*(vcon[m-cb_lo] - g.beta[m-cb_lo]/g.alpha);
     }
 
-    const Real vasq = bsqWsq/(rhohWsq+bsqWsq);
-    const Real cssq = gamma1*P*W*W/rhohWsq;
-    Real cmsq = cssq + vasq*(1.0 - cssq);
-    cmsq = (cmsq > 0.0 ? cmsq : 1.e-16); // TODO(JCD): what should this 1.e-16 be?
-    cmsq = (cmsq > 1.0 ? 1.0 : cmsq);
+    // TODO(JCD): are all these make_positive/make_bounded calls really necessary?
+    const Real vasq = bsqWsq/robust::make_positive(rhohWsq+bsqWsq);
+    const Real cssq = robust::make_bounded(gamma1*P*W*W/robust::make_positive(rhohWsq), 0.0, 1.0);
+    Real cmsq = robust::make_bounded(cssq + vasq*(1.0 - cssq), 0.0, 1.0);
 
     const Real vcoff = g.alpha/(1.0 - vsq*cmsq);
     const Real v0 = vel*(1.0 - cmsq);
-    const Real vpm = sqrt(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0));
+    const Real vpm = sqrt(robust::make_positive(cmsq*(1.0  - vsq)*(g.gdd*(1.0 - vsq*cmsq) - vel*v0)));
     vp = vcoff*(v0 + vpm) - g.beta[dir];
     vm = vcoff*(v0 - vpm) - g.beta[dir];
   }
@@ -165,6 +215,8 @@ class FluxState {
   const ParArrayND<Real> ql;
   const ParArrayND<Real> qr;
   const Geometry::CoordSysMeshBlock geom;
+  const Coordinates_t coords;
+  fixup::Bounds bounds;
  private:
   const int prho, pvel_lo, peng, pb_lo, pb_hi, pye, prs, gm1;
   const int crho, cmom_lo, ceng, cb_lo, cb_hi, cye, ncons;
@@ -174,6 +226,8 @@ class FluxState {
       ql(rc->Get("ql").data),
       qr(rc->Get("qr").data),
       geom(Geometry::GetCoordinateSystem(rc)),
+      coords(rc->GetParentPointer().get()->coords),
+      bounds(rc->GetParentPointer().get()->packages.Get("fixup").get()->Param<fixup::Bounds>("bounds")),
       prho(imap[fluid_prim::density].first),
       pvel_lo(imap[fluid_prim::velocity].first),
       peng(imap[fluid_prim::energy].first),
@@ -205,14 +259,16 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   Real vml, vpl, vmr, vpr;
 
   CellLocation loc = DirectionToFaceID(d);
-  FaceGeom g(fs.geom, loc, d, k, j, i);
-  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl);
-  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr);
+  FaceGeom g(fs.coords, fs.geom, loc, d, k, j, i);
+  Real gam_max, sie_max;
+  fs.bounds.GetCeilings(g.X[1], g.X[2], g.X[3], gam_max, sie_max);
+  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, sie_max, gam_max);
+  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, sie_max, gam_max);
 
   const Real cmax = std::max(std::max(-vml,vpl), std::max(-vmr,vpr));
 
   for (int m = 0; m < fs.NumConserved(); m++) {
-    fs.v.flux(d,m,k,j,i) = 0.5*(Fl[m] + Fr[m] - cmax*(Ur[m] - Ul[m])) * g.gdet;
+    fs.v.flux(d,m,k,j,i) = 0.5*((Fl[m] + Fr[m])*g.gdet - cmax*((Ur[m] - Ul[m])*g.gammadet));
   }
   return cmax;
 }
@@ -224,15 +280,17 @@ Real hll(const FluxState &fs, const int d, const int k, const int j, const int i
   Real vml, vpl, vmr, vpr;
 
   CellLocation loc = DirectionToFaceID(d);
-  FaceGeom g(fs.geom, loc, d, k, j, i);
-  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl);
-  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr);
+  FaceGeom g(fs.coords, fs.geom, loc, d, k, j, i);
+  Real gam_max, sie_max;
+  fs.bounds.GetCeilings(g.X[1], g.X[2], g.X[3], gam_max, sie_max);
+  fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, sie_max, gam_max);
+  fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, sie_max, gam_max);
 
   const Real cl = std::min(std::min(vml, vmr), 0.0);
   const Real cr = std::max(std::max(vpl, vpr), 0.0);
 
   for (int m = 0; m < fs.NumConserved(); m++) {
-    fs.v.flux(d,m,k,j,i) = (cr*Fl[m] - cl*Fr[m] + cr*cl*(Ur[m] - Ul[m]))/(cr - cl) * g.gdet;
+    fs.v.flux(d,m,k,j,i) = ((cr*Fl[m] - cl*Fr[m])*g.gdet + cr*cl*(Ur[m] - Ul[m])*g.gammadet)/(cr - cl);
   }
   return std::max(-cl,cr);
 }

@@ -170,6 +170,9 @@ add_subdirectory(external/singularity-opac singularity-opac)
 # Geometry
 include(cmake/Geometry.cmake)
 
+# Fluid
+include(cmake/Fluid.cmake)
+
 # Print RHS
 option(PHOEBUS_PRINT_RHS "Print right hand sides" OFF)
 if (PHOEBUS_PRINT_RHS)
