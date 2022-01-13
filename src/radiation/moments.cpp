@@ -307,12 +307,15 @@ TaskStatus ReconstructEdgeStates(T* rc) {
 
   const int offset = imap_ql[ir::ql].first; 
   
-  const int nblock = ql_base.GetDim(5); 
+  const int nblock = ql_base.GetDim(5);
+  const int ndim = pmb->pmy_mesh->ndim;
+  auto& coords = pmb->coords;  
   
   //PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
+  
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), 
-      X1DIR, pmb->pmy_mesh->ndim, // Loop over directions for reconstruction
+      X1DIR, ndim, // Loop over directions for reconstruction
       0, nblock-1, // Loop over blocks
       kb.s - dk, kb.e + dk, // z-loop  
       jb.s - dj, jb.e + dj, // y-loop 
@@ -349,16 +352,17 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         const int st_j[3] = {0, 1, 0};
         const int st_i[3] = {1, 0, 0};
         for (int ispec=0; ispec<nspec; ++ispec) {
-          for (int idir = X1DIR; idir <= pmb->pmy_mesh->ndim; ++idir) {
+          for (int idir = X1DIR; idir <= ndim; ++idir) {
             // Calculate the derivatives in the plane of the face (and put junk in the derivative perpendicular to the face) 
-            const Real dy = pmb->coords.Dx(idir, k, j, i); 
+            const Real dy = coords.Dx(idir, k, j, i); 
             v(b, idx_dJ(ispec, idir-1, iface-1), k, j, i) = (v(b, idx_J(ispec), k+st_k[idir-1], j+st_j[idir-1], i+st_i[idir-1])  
-                                                            -v(b, idx_J(ispec), k-st_k[idir-1], j-st_j[idir-1], i-st_i[idir-1])
-                                                            +v(b, idx_J(ispec), k+st_k[idir-1]-off_k, j+st_j[idir-1]-off_j, i+st_i[idir-1]-off_i)
-                                                            -v(b, idx_J(ispec), k-st_k[idir-1]-off_k, j-st_j[idir-1]-off_j, i-st_i[idir-1]-off_i))/(4*dy);
+                                                              -v(b, idx_J(ispec), k-st_k[idir-1], j-st_j[idir-1], i-st_i[idir-1])
+                                                              +v(b, idx_J(ispec), k+st_k[idir-1]-off_k, j+st_j[idir-1]-off_j, i+st_i[idir-1]-off_i)
+                                                              -v(b, idx_J(ispec), k-st_k[idir-1]-off_k, j-st_j[idir-1]-off_j, i-st_i[idir-1]-off_i))/(4*dy);
+            
           }
           // Overwrite the derivative perpendicular to the face
-          const Real dx = pmb->coords.Dx(iface, k, j, i); 
+          const Real dx = coords.Dx(iface, k, j, i); 
           v(b, idx_dJ(ispec, iface-1, iface-1), k, j, i) =  (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k-off_k, j-off_j, i-off_i))/dx;
         }
       });
@@ -409,6 +413,8 @@ TaskStatus CalculateFluxesImpl(T* rc) {
   
   const Real kappaH_min = 1.e-20; 
 
+  auto& coords = pmb->coords;  
+  
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(), 
       X1DIR, pmb->pmy_mesh->ndim, // Loop over directions 
@@ -471,7 +477,7 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           geom.ContravariantShift(face, k, j, i, con_beta.data);
           const Real sdetgam = geom.DetGamma(face, k, j, i);
           
-          const Real dx = pmb->coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
+          const Real dx = coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH*dx), 1)));
           
           // Calculate the observer frame quantities on either side of the interface  
