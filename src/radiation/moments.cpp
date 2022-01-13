@@ -147,7 +147,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
           v(b, iPhi(ispec), k, j, i) = result.phi;
         
         
-          if (result.status == Status::failure && !(result.xi < 1.e-4) && !(std::fabs(result.fXi) < 1.e-6)) {
+          if (result.status == Status::failure && !(result.xi < 1.e-4) && !(std::fabs(result.fXi) < 1.e-3)) {
             printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) 1/sqrt(gammma) = %e \n "
                    "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n", i, ispec, 
                    E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), isdetgam, result.xi, result.phi, result.fXi, result.fPhi, 
@@ -244,7 +244,7 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
           SPACELOOP2(ii, jj) conTilPi(ii,jj) = 0.0;
           c.Prim2Con(J, covH, conTilPi, &E, &covF);
         }
-        printf("i = %i J = %e E = %e H = %e F = %e sdetgam = %e \n", i, J, E, covH(0), covF(0), sdetgam);
+        //printf("i = %i J = %e E = %e H = %e F = %e sdetgam = %e \n", i, J, E, covH(0), covF(0), sdetgam);
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
