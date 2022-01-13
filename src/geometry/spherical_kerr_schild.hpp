@@ -141,7 +141,12 @@ public:
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    Utils::SetConnectionCoeffByFD(*this, Gamma, X0, X1, X2, X3);
+    //Utils::SetConnectionCoeffByFD(*this, Gamma, X0, X1, X2, X3);
+    Real dg[NDFULL][NDFULL][NDFULL];
+    MetricDerivative(X0, X1, X2, X3, dg);
+    SPACETIMELOOP3(a,b,c) {
+      Gamma[c][b][a] = 0.5*(dg[c][a][b] + dg[c][b][a] - dg[a][b][c]);
+    }
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -160,6 +165,7 @@ public:
     const Real s2th = std::sin(2 * th);
     const Real c2th = std::cos(2 * th);
     LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
+    
     dg[0][0][1] = 2 * ratio(rho2 - 2 * r2, rho4);
     dg[0][1][1] = dg[1][0][1] = dg[0][0][1];
     dg[0][3][1] = dg[3][0][1] = ratio(2 * a_ * (r2 - a2_ * cth2) * sth2, rho4);

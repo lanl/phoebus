@@ -17,7 +17,7 @@
 #include <parthenon_manager.hpp>
 
 #include "geometry/geometry.hpp"
-#include "initial_conditions.hpp"
+#include "pgen/pgen.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
 
@@ -45,24 +45,34 @@ int main(int argc, char *argv[]) {
 
   // TODO(JMM): Move this into another function somewhere?
   const std::string bc_ix1 =
-      pman.pinput->GetOrAddString("phoebus", "bc_ix1", "reflect");
+      pman.pinput->GetOrAddString("phoebus", "bc_ix1", "outflow");
   const std::string bc_ox1 =
       pman.pinput->GetOrAddString("phoebus", "bc_ox1", "outflow");
+
+  // Ensure only allowed parthenon boundary conditions are used
+  const std::string ix1_bc = pman.pinput->GetString("parthenon/mesh", "ix1_bc");
+  PARTHENON_REQUIRE(ix1_bc == "user" || ix1_bc == "periodic", 
+    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ix1_bc");
+  const std::string ox1_bc = pman.pinput->GetString("parthenon/mesh", "ox1_bc");
+  PARTHENON_REQUIRE(ox1_bc == "user" || ox1_bc == "periodic", 
+    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ox1_bc");
 
   if (bc_ix1 == "reflect") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
         Boundaries::ReflectInnerX1;
-  } else {
+  } else if (bc_ix1 == "outflow") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
         Boundaries::OutflowInnerX1;
-  }
+  } // else, parthenon periodic boundaries
   if (bc_ox1 == "reflect") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
         Boundaries::ReflectOuterX1;
-  } else {
+  } else if (bc_ox1 == "outflow") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
         Boundaries::OutflowOuterX1;
-  }
+  } // else, parthenon periodic boundaries
+
+  phoebus::ProblemModifier(pman.pinput.get());
 
   // call ParthenonInit to set up the mesh
   pman.ParthenonInitPackagesAndMesh();

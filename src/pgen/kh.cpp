@@ -84,6 +84,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = v_pert*2.0*(rng_gen.drand()-0.5);
       v(ivlo, k, j, i) += vel;
+      Real vsq = 0.;
+      SPACELOOP2(ii, jj) {
+        vsq += v(ivlo+ii,k,j,i)*v(ivlo+jj,k,j,i);
+      }
+      const Real W = 1./sqrt(1. - vsq);
+      SPACELOOP(ii) {
+        v(ivlo+ii,k,j,i) *= W;
+      }
       if (ib_hi > 0) {
         const Real Bx = y < 0.25 ? Bx1 : Bx0;
         const Real By = y < 0.25 ? By1 : By0;
