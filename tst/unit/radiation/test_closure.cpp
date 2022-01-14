@@ -55,8 +55,8 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
       FILE *fptr;
       fptr = fopen("Closure_error.out","w");
 
-      for (double phiv = 0; phiv < pi; phiv += pi*1.e-2) {
-        for (double vmag = 0.0; vmag < 0.7; vmag += 1.e-2) { 
+      for (double phiv = 0; phiv <= 0.0; phiv += pi*1.e-2) {
+        for (double vmag = 0.0; vmag < 0.6; vmag += 1.e-2) { 
           for (double xi = 1.e-10; xi<=1.0; xi +=1.e-2) {
          
             // Set up background state
