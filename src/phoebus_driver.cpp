@@ -353,43 +353,42 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
           tl.AddTask(send, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
     }
 
+    //TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
     TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
     {
-      tuning_reduce.val.resize(3); // made, absorbed, scattered
+      particle_resolution.val.resize(3); // made, absorbed, scattered
       for (int i = 0; i < 3; i++) {
-        tuning_reduce.val[i] = 0.;
+        particle_resolution.val[i] = 0.;
       }
-      for (int i = 0; i < num_task_lists_executed_independently; i++) {
+      //for (int i = 0; i < num_task_lists_executed_independently; i++) {
         int reg_dep_id = 0;
-        auto &pmb = blocks[i];
-        auto &tl = tuning_region[i];
-        auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
-        auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+        //auto &pmb = blocks[i];
+        auto &tl = tuning_region[0];
+        //auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+        //auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
 
-        auto update_tuning_local = tl.AddTask(none, radiation::MonteCarloUpdateTuningLocal,
-          pmb.get(), sc0.get(), &tuning_reduce.val);
+        auto update_resolution = tl.AddTask(none, radiation::MonteCarloUpdateParticleResolution,
+          pmesh, &particle_resolution.val);
 
-        tuning_region.AddRegionalDependencies(reg_dep_id, i, update_tuning_local);
+        tuning_region.AddRegionalDependencies(reg_dep_id, 0, update_resolution);
         reg_dep_id++;
 
-        auto start_tuning_reduce = (i == 0 ? tl.AddTask(update_tuning_local,
-          &AllReduce<std::vector<Real>>::StartReduce, &tuning_reduce, MPI_SUM) : none);
+        auto start_resolution_reduce = tl.AddTask(update_resolution,
+          &AllReduce<std::vector<Real>>::StartReduce, &particle_resolution, MPI_SUM);
 
-        auto finish_tuning_reduce = tl.AddTask(start_tuning_reduce,
-          &AllReduce<std::vector<Real>>::CheckReduce, &tuning_reduce);
-      tuning_region.AddRegionalDependencies(reg_dep_id, i, finish_tuning_reduce);
+        auto finish_resolution_reduce = tl.AddTask(start_resolution_reduce,
+          &AllReduce<std::vector<Real>>::CheckReduce, &particle_resolution);
+      tuning_region.AddRegionalDependencies(reg_dep_id, 0, finish_resolution_reduce);
       reg_dep_id++;
 
       // Report tuning
-      auto report_tuning = (i == 0 && Globals::my_rank == 0
-        ? tl.AddTask(finish_tuning_reduce, [](std::vector<Real> *tuning) {
-          std::cout << "Total made = " << (*tuning)[0] << " abs = " <<
-            (*tuning)[1] << " scatt = " << (*tuning)[2] << std::endl;
-          exit(-1);
+      auto report_resolution = (Globals::my_rank == 0 || 1
+        ? tl.AddTask(finish_resolution_reduce, [](std::vector<Real> *res) {
+          std::cout << "Total made = " << (*res)[0] << " abs = " <<
+            (*res)[1] << " scatt = " << (*res)[2] << std::endl;
           return TaskStatus::complete;
         },
-        &tuning_reduce.val) : none);
-      }
+        &particle_resolution.val) : none);
 
     }
 
