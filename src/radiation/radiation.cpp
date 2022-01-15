@@ -109,14 +109,48 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
     physics->AddField("dNdlnu", mdNdlnu);
 
-    Real tune_emiss = pin->GetOrAddReal("radiation", "tune_emiss", 1.);
-    params.Add("tune_emiss", tune_emiss);
-
+    // Parameters controlling automatic sampling resolution.
+    // This system targets 1 scattering per light crossing time.
+    // This explicit Monte Carlo method is not accurate once optical depths per
+    // zone become >~ 1.
     int num_particles = pin->GetOrAddInteger("radiation", "num_particles", 100);
     params.Add("num_particles", num_particles);
 
-    int tune_made = 0;
-    params.Add("tune_made", tune_made, true);
+    Real num_emitted = 0.;
+    params.Add("num_emitted", num_emitted, true);
+
+    Real num_absorbed = 0.;
+    params.Add("num_absorbed", num_absorbed, true);
+
+    Real dt_tune_emission = pin->GetOrAddReal("radiation", "dt_tune_emission", 1.);
+    params.Add("dt_tune_emission", dt_tune_emission);
+
+    // Time of first tuning. Make > dt_tune_emission to avoid tuning to a transient
+    Real t_tune_emission = pin->GetOrAddReal("radiation", "t_tune_emission", dt_tune_emission);
+    PARTHENON_REQUIRE(t_tune_emission >= dt_tune_emission, "Must wait at least dt_tune_emission before tuning!");
+    params.Add("t_tune_emission", t_tune_emission, true);
+
+    // Tuning parameter for particle emission
+    Real tune_emission = pin->GetOrAddReal("radiation", "tune_emission", 1.);
+    PARTHENON_REQUIRE(tune_emission > 0.0, "tune_emission must be > 0 for resolution controls!");
+    params.Add("tune_emission", tune_emission, true);
+
+    Real num_scattered = 0.;
+    params.Add("num_scattered", num_scattered, true);
+
+    // Approximately the light crossing time for the simulation volume.
+    Real dt_tune_scattering = pin->GetOrAddReal("radiation", "dt_tune_scattering", 100.);
+    params.Add("dt_tune_scattering", dt_tune_scattering);
+
+    // Time of first tuning. Make > dt_tune_scattering to avoid tuning to a transient
+    Real t_tune_scattering = pin->GetOrAddReal("radiation", "t_tune_scattering", dt_tune_scattering);
+    PARTHENON_REQUIRE(t_tune_scattering >= dt_tune_scattering, "Must wait at least dt_tune_scattering before tuning!");
+    params.Add("t_tune_scattering", t_tune_scattering, true);
+
+    // Tuning parameter for biased particle scattering
+    Real tune_scattering = pin->GetOrAddReal("radiation", "tune_scattering", 1.0);
+    PARTHENON_REQUIRE(tune_scattering > 0.0, "tune_scattering must be > 0 for resolution controls!");
+    params.Add("tune_scattering", tune_scattering, true);
 
     bool remove_emitted_particles =
         pin->GetOrAddBoolean("monte_carlo", "remove_emitted_particles", false);

@@ -40,7 +40,7 @@ using namespace phoebus;
 
 namespace radiation {
 
-enum class Tuning { made = 0, absorbed = 1, scattered = 2 };
+enum class ParticleResolution { emitted = 0, absorbed = 1, scattered = 2 };
 
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
@@ -80,7 +80,10 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                const double dt);
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
-TaskStatus MonteCarloUpdateTuningLocal(MeshBlock *pmb, SwarmContainer *sc, std::vector<Real> *tuning);
+TaskStatus MonteCarloUpdateTuning(MeshBlock *pmb, MeshBlockData<Real> *rc,
+  SwarmContainer *sc, const double t0, const double dt);
+
+TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *tuning);
 
 TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   SwarmContainer *sc, const double t0, const double dt, Real *dNtot);

@@ -12,6 +12,7 @@
 // publicly, and to permit others to do so.
 
 #include "geodesics.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "radiation.hpp"
 
 using Geometry::CoordSysMeshBlock;
@@ -38,7 +39,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto rad = pmb->packages.Get("radiation");
   auto swarm = sc->Get("monte_carlo");
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
-  const auto tune_emiss = rad->Param<Real>("tune_emiss");
 
   const auto nu_min = rad->Param<Real>("nu_min");
   const auto nu_max = rad->Param<Real>("nu_max");
@@ -232,11 +232,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   }
 
   printf("Nstot: %i\n", Nstot);
-  const auto tune_made = rad->Param<int>("tune_made");
-  printf("tune_made: %i\n", tune_made);
-  rad->UpdateParam<int>("tune_made", tune_made + Nstot);
-  //const auto tune_made = rad->Param<int>("tune_made");
-  //*tune_made += Nstot;
+  const auto num_emitted = rad->Param<Real>("num_emitted");
+  rad->UpdateParam<Real>("num_emitted", num_emitted + Nstot);
 
   ParArrayND<int> new_indices;
   const auto new_particles_mask = swarm->AddEmptyParticles(Nstot, new_indices);
@@ -383,7 +380,6 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto swarm = sc->Get("monte_carlo");
   auto opac = pmb->packages.Get("opacity");
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
-  const auto tune_emiss = rad->Param<Real>("tune_emiss");
 
   const auto nu_min = rad->Param<Real>("nu_min");
   const auto nu_max = rad->Param<Real>("nu_max");
@@ -532,26 +528,82 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
     swarm->RemoveMarkedParticles();
   }
 
+  const auto num_absorbed = rad->Param<Real>("num_absorbed");
+  // TODO(BRR) actually count
+  rad->UpdateParam<Real>("num_absorbed", num_absorbed + 1);
+
   return TaskStatus::complete;
 }
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {
   return TaskStatus::complete;
 }
 
-TaskStatus MonteCarloUpdateTuningLocal(MeshBlock *pmb, SwarmContainer *sc, std::vector<Real> *tuning) {
-  printf("%s:%i\n", __FILE__, __LINE__);
-  auto swarm = sc->Get("monte_carlo");
-  auto rad = pmb->packages.Get("radiation");
-  // TODO(BRR) these params are per mesh (per proc) not per meshblock
-  const auto tune_made = rad->Param<int>("tune_made");
-  // TODO(BRR) get made, absorbed, and scattered from the swarm
-  (*tuning)[static_cast<int>(Tuning::made)] += tune_made;
-  (*tuning)[static_cast<int>(Tuning::absorbed)] += 2;
-  (*tuning)[static_cast<int>(Tuning::scattered)] += 3;
+// Reduce particle sampling resolution statistics from per-mesh to global as part of global
+// reduction.
+TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *resolution) {
+  auto rad = pmesh->packages.Get("radiation");
+  const auto num_emitted = rad->Param<Real>("num_emitted");
+  const auto num_absorbed = rad->Param<Real>("num_absorbed");
+  const auto num_scattered = rad->Param<Real>("num_scattered");
+  (*resolution)[static_cast<int>(ParticleResolution::emitted)] += num_emitted;
+  (*resolution)[static_cast<int>(ParticleResolution::absorbed)] += num_absorbed;
+  (*resolution)[static_cast<int>(ParticleResolution::scattered)] += num_scattered;
   return TaskStatus::complete;
 }
 
-TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
+// Update particle resolution tuning parameters and reset counters if it is time for an update.
+TaskStatus MonteCarloUpdateTuning(MeshBlock *pmb, MeshBlockData<Real> *rc,
+  SwarmContainer *sc, const double t0, const double dt) {
+  auto rad = pmb->packages.Get("radiation");
+  const auto t_tune_emission = rad->Param<Real>("t_tune_emission");
+  const auto dt_tune_emission = rad->Param<Real>("dt_tune_emission");
+  const auto t_tune_scattering = rad->Param<Real>("t_tune_scattering");
+  const auto dt_tune_scattering = rad->Param<Real>("dt_tune_scattering");
+  const auto num_particles = rad->Param<Real>("num_particles");
+
+  // TODO(BRR) This should be Rout_rad (add it) or max cartesian size
+  const Real L = 1.;
+
+  if (t_tune_emission < t0 + dt) {
+    const auto num_emitted = rad->Param<Real>("num_emitted");
+    const auto num_absorbed = rad->Param<Real>("num_absorbed");
+
+    const Real real = num_emitted - num_absorbed;
+    const Real ideal = dt_tune_emission*num_particles;
+    Real correction = ideal/real;
+
+    // Limit strength of correction
+    robust::make_bounded(correction, 3./4., 4./3.);
+
+    const auto tune_emission = rad->Param<Real>("tune_emission");
+    rad->UpdateParam<Real>("tune_emission", correction*tune_emission);
+
+    rad->UpdateParam<Real>("num_emitted", 0.);
+    rad->UpdateParam<Real>("num_absorbed", 0.);
+    rad->UpdateParam<Real>("t_tune_emission", t_tune_emission + dt_tune_emission);
+  }
+
+  if (t_tune_scattering < t0 + dt) {
+    const auto num_scattered = rad->Param<Real>("num_scattered");
+
+    const Real real = num_scattered;
+    const Real ideal = dt_tune_scattering*num_particles;
+    Real correction = ideal/real;
+
+    // Limit strength of correction
+    robust::make_bounded(correction, 0.5, 2.);
+
+    const auto tune_scattering = rad->Param<Real>("tune_scattering");
+    rad->UpdateParam<Real>("tune_scattering", correction*tune_scattering);
+
+    rad->UpdateParam<Real>("num_scattered", 0.);
+    rad->UpdateParam<Real>("t_tune_scattering", t_tune_scattering + dt_tune_scattering);
+  }
+
+  return TaskStatus::complete;
+}
+
+/*TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   SwarmContainer *sc, const double t0, const double dt, Real *dNtot) {
 
   namespace fp = fluid_prim;
@@ -561,7 +613,7 @@ TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto rad = pmb->packages.Get("radiation");
   auto swarm = sc->Get("monte_carlo");
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
-  const auto tune_emiss = rad->Param<Real>("tune_emiss");
+  const auto num_emitted = rad->Param<Real>("tune_emiss");
 
   const auto nu_min = rad->Param<Real>("nu_min");
   const auto nu_max = rad->Param<Real>("nu_max");
@@ -710,7 +762,7 @@ TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   *dNtot += dNtot_local;
 
   return TaskStatus::complete;
-}
+}*/
 
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks) {
