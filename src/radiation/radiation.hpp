@@ -80,8 +80,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                const double dt);
 TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks);
 
-TaskStatus MonteCarloUpdateTuning(MeshBlock *pmb, MeshBlockData<Real> *rc,
-  SwarmContainer *sc, const double t0, const double dt);
+TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
+  const double t0, const double dt);
 
 TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *tuning);
 
