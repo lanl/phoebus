@@ -390,6 +390,9 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
         },
         &particle_resolution.val) : none);
 
+      auto update_tuning = tl.AddTask(finish_resolution_reduce,
+        radiation::MonteCarloUpdateTuning, pmesh, &particle_resolution.val, t0, dt);
+
     }
 
     status = tc.Execute();

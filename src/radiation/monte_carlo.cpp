@@ -446,6 +446,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int iGcov_hi = imap[iv::Gcov].second;
   const int iGye = imap[iv::Gye].first;
 
+  ParArray1D<Real> num_interactions("Number interactions", 2);
+
   pmb->par_for(
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(),
       KOKKOS_LAMBDA(const int n) {
@@ -483,6 +485,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               (4. * M_PI);
 
           Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
+          printf("dtau_abs = %e\n", dtau_abs);
 
           bool absorbed = false;
 
@@ -507,6 +510,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                  1. / dV_code * weight(n) * pc::mp / MASS);
 
               absorbed = true;
+              Kokkos::atomic_add(&(num_interactions[0]),
+                1.);
               swarm_d.MarkParticleForRemoval(n);
             }
           }
@@ -528,9 +533,15 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
     swarm->RemoveMarkedParticles();
   }
 
+  auto num_interactions_h = Kokkos::create_mirror_view(num_interactions);
+  Kokkos::deep_copy(num_interactions_h, num_interactions);
+  printf("num_interactions_h[0] = %e\n", num_interactions_h[0]);
+
   const auto num_absorbed = rad->Param<Real>("num_absorbed");
+  const auto num_scattered = rad->Param<Real>("num_scattered");
   // TODO(BRR) actually count
-  rad->UpdateParam<Real>("num_absorbed", num_absorbed + 1);
+  rad->UpdateParam<Real>("num_absorbed", num_absorbed + num_interactions_h[0]);
+  rad->UpdateParam<Real>("num_scattered", num_scattered + num_interactions_h[1]);
 
   return TaskStatus::complete;
 }
@@ -552,21 +563,29 @@ TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *re
 }
 
 // Update particle resolution tuning parameters and reset counters if it is time for an update.
-TaskStatus MonteCarloUpdateTuning(MeshBlock *pmb, MeshBlockData<Real> *rc,
-  SwarmContainer *sc, const double t0, const double dt) {
-  auto rad = pmb->packages.Get("radiation");
+//TaskStatus MonteCarloUpdateTuning(MeshBlock *pmb, MeshBlockData<Real> *rc,
+//  SwarmContainer *sc, const double t0, const double dt) {
+TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
+  const double t0, const double dt) {
+  auto rad = pmesh->packages.Get("radiation");
   const auto t_tune_emission = rad->Param<Real>("t_tune_emission");
   const auto dt_tune_emission = rad->Param<Real>("dt_tune_emission");
   const auto t_tune_scattering = rad->Param<Real>("t_tune_scattering");
   const auto dt_tune_scattering = rad->Param<Real>("dt_tune_scattering");
-  const auto num_particles = rad->Param<Real>("num_particles");
+  const auto num_particles = rad->Param<int>("num_particles");
 
   // TODO(BRR) This should be Rout_rad (add it) or max cartesian size
   const Real L = 1.;
 
+  printf("t_tune_emission: %e t0 + dt: %e\n", t_tune_emission, t0 + dt);
+    const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
+    const auto num_absorbed = (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
+    printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
+
   if (t_tune_emission < t0 + dt) {
-    const auto num_emitted = rad->Param<Real>("num_emitted");
-    const auto num_absorbed = rad->Param<Real>("num_absorbed");
+    const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
+    const auto num_absorbed = (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
+    printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
 
     const Real real = num_emitted - num_absorbed;
     const Real ideal = dt_tune_emission*num_particles;
@@ -584,7 +603,7 @@ TaskStatus MonteCarloUpdateTuning(MeshBlock *pmb, MeshBlockData<Real> *rc,
   }
 
   if (t_tune_scattering < t0 + dt) {
-    const auto num_scattered = rad->Param<Real>("num_scattered");
+    const auto num_scattered = (*resolution)[static_cast<int>(ParticleResolution::scattered)];
 
     const Real real = num_scattered;
     const Real ideal = dt_tune_scattering*num_particles;
