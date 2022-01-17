@@ -38,6 +38,7 @@ class PhoebusDriver : public EvolutionDriver {
 
   AllReduce<Real> dNtot;
   AllReduce<std::vector<Real>> particle_resolution;
+  AllReduce<int> particles_outstanding;
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);

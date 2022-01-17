@@ -292,12 +292,25 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
   // Create all particles sourced due to emission during timestep
   {
     TaskCollection tc;
+    // TODO(BRR) no longer necessary with iterative task right
     TaskRegion &sync_region0 = tc.AddRegion(1);
     {
       auto &tl = sync_region0[0];
       auto initialize_comms =
           tl.AddTask(none, radiation::InitializeCommunicationMesh, "monte_carlo", blocks);
     }
+
+    TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
+    for (int i = 0; i < blocks.size(); i++) {
+      auto &pmb = blocks[i];
+      auto &tl = async_region0[i];
+      auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+      auto sample_particles = tl.AddTask(none, radiation::MonteCarloSourceParticles,
+                                         pmb.get(), mbd0.get(), sc0.get(), t0, dt);
+    }
+
+    // TODO(BRR) Sample particles here
 
     // TODO this is actually not necessary because we will be updating tuning parameters separately
     /*TaskRegion &creation_region = tc.AddRegion(num_task_lists_executed_independently);
@@ -332,6 +345,65 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
         },
         &dNtot.val) : none);
     }*/
+
+    // Iterate over particle send/receives until all particles are finished
+    TaskRegion &transport_region = tc.AddRegion(num_task_lists_executed_independently);
+    for (int i = 0; i < blocks.size(); i++) {
+      particles_outstanding.val = 0;
+
+      for (int i = 0; i < num_task_lists_executed_independently; i++) {
+        int reg_dep_id = 0;
+
+        auto &pmb = blocks[i];
+        auto &tl = transport_region0[i];
+        auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+        auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+
+        auto &solver = tl.AddIteration("particle transport");
+        solver.SetMaxIterations(max_iters);
+        solver.SetCheckInterval(check_interval);
+        solver.SetFailWithMaxIterations(fail_flag);
+        solver.SetWarnWithMaxIterations(warn_flag);
+        auto transport_particles = solver.AddTask(none, radiation::MonteCarloTransport, pmb.get(),
+          mbd0.get(), sc0.get(), t0, dt);
+
+        auto send_particles = solver.AddTask(transport_particles, &SwarmContainer::Send, sc0.get(),
+                               BoundaryCommSubset::all);
+
+        auto receive_particles =
+            solver.AddTask(send_particles, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
+
+        auto count_outstanding_particles = solver.AddTask(receive_particles, radiation::MonteCarloCountOutstandingParticles, pmb.get(), mbd0.get(), sc0.get());
+
+        transport_region.AddRegionalDependencies(reg_dep_id, i, count_outstanding_particles);
+        reg_dep_id++;
+
+        auto start_global_reduce = (i == 0 ? tl.AddTask(count_outstanding_particles, &AllReduce<int>::StartReduce, &particles_outstanding, MPI_SUM) : none);
+
+        auto finish_global_reduce = tl.AddTask(start_global_reduce, &AllReduce<int>::CheckReduce, &particles_outstanding);
+
+
+        auto check = solver.SetCompletionTask(finish_global_reduce, radiation::CheckNoOutstandingParticles, &particles_outstanding.val);
+
+        transport_region.AddRegionalDependencies(reg_dep_id, i, check);
+        reg_dep_id++;
+
+
+
+        /*auto update_resolution = tl.AddTask(none, radiation::MonteCarloUpdateParticleResolution,
+          pmesh, &particle_resolution.val);
+
+        tuning_region.AddRegionalDependencies(reg_dep_id, 0, update_resolution);
+        reg_dep_id++;
+
+        auto start_resolution_reduce = tl.AddTask(update_resolution,
+          &AllReduce<std::vector<Real>>::StartReduce, &particle_resolution, MPI_SUM);
+
+        auto finish_resolution_reduce = tl.AddTask(start_resolution_reduce,
+          &AllReduce<std::vector<Real>>::CheckReduce, &particle_resolution);*/
+
+
+    }
 
     // TODO(BRR) make transport an async region for ghost cells
     TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
