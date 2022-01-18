@@ -75,6 +75,8 @@ namespace geometric_variables {
 
 namespace diagnostic_variables {
   constexpr char divb[] = "divb";
+  constexpr char divf[] = "flux_divergence";
+  constexpr char src_terms[] = "src_terms";
 }
 
 #endif // PHOEBUS_UTILS_VARIABLES_HPP_

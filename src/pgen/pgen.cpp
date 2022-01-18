@@ -33,6 +33,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   f(pmb, pin);
 }
 
+void ProblemModifier(ParameterInput *pin) {
+  std::string name = pin->GetString("phoebus", "problem");
+  if (name == "phoebus" || pmod_dict.count(name) == 0) {
+    return;
+  }
+
+  auto f = pmod_dict[name];
+  f(pin);
+}
+
 KOKKOS_FUNCTION
 Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");

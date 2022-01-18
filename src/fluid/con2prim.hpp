@@ -230,9 +230,9 @@ private:
     const Real W2 = W * W;
     const Real z = (rho_guess + v(peng) + v(prs)) * W2;
     const Real izbsq = 1. / (z + Bsq);
-    for (int i = 0; i < 3; i++) {
+    SPACELOOP(i) {
       Real sconi = 0.0;
-      for (int j = 0; j < 3; j++) {
+      SPACELOOP(j) {
         sconi += g.gcon[i][j] * v(cmom_lo + j);
       }
       sconi *= igdet;
@@ -258,6 +258,11 @@ private:
       Real vp = vcoff * (v(pvel_lo + i) * (1.0 - cssq) + vpm) - g.beta[i];
       Real vm = vcoff * (v(pvel_lo + i) * (1.0 - cssq) - vpm) - g.beta[i];
       v(sig_lo + i) = std::max(std::fabs(vp), std::fabs(vm));
+    }
+
+    // Convert from three-velocity to phoebus primitive veloity
+    SPACELOOP(ii) {
+      v(pvel_lo + ii) = W*v(pvel_lo + ii);
     }
   }
 

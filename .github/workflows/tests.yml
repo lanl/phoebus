@@ -30,7 +30,9 @@ jobs:
         - name: Run test scripts
           run: |
             cd tst/regression
+            # TODO(BRR) add --use_gpu flag here if running on GPU
             ./linear_modes.py
+            ./bondi.py
         - name: Build code
           run: |
             mkdir build
