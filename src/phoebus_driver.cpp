@@ -395,10 +395,11 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
         // Ensure zero particles transported to end transport cycle
         auto check = solver.SetCompletionTask(finish_global_reduce,
         [](int *num_transported) {
-            if (num_transported == 0) {
+          printf("num_transported: %i\n", *num_transported);
+            if (*num_transported == 0) {
               return TaskStatus::complete;
             } else {
-              return TaskStatus::incomplete;
+              return TaskStatus::iterate;
             }
           },
         //radiation::CheckNoOutstandingParticles,

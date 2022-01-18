@@ -787,6 +787,7 @@ TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_o
   auto swarm = pmb->swarm_data.Get()->Get("monte_carlo");
 
   *particles_outstanding += swarm->num_particles_sent_;
+  printf("particles_outstanding: %i\n", *particles_outstanding);
 
   return TaskStatus::complete;
 }
