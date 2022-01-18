@@ -110,22 +110,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
             Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
                three_vec);
   
-  if (active) {
-    if (bc_vars == "conserved") {
-      mcons_scalar.Set(Metadata::FillGhost);
-      mcons_threev.Set(Metadata::FillGhost);
-    } else if (bc_vars == "primitive") {
-      mprim_scalar.Set(Metadata::FillGhost);
-      mprim_threev.Set(Metadata::FillGhost);
-      // TODO(BRR) Still set FillGhost on conserved variables to ensure buffers exist.
-      // Fixing this requires modifying parthenon Metadata logic.
-      mcons_scalar.Set(Metadata::FillGhost);
-      mcons_threev.Set(Metadata::FillGhost);
-    } else {
-      PARTHENON_REQUIRE_THROWS(bc_vars == "conserved" || bc_vars == "primitive",
-        "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
-    }
+  if (bc_vars == "conserved") {
+    mcons_scalar.Set(Metadata::FillGhost);
+    mcons_threev.Set(Metadata::FillGhost);
+  } else if (bc_vars == "primitive") {
+    mprim_scalar.Set(Metadata::FillGhost);
+    mprim_threev.Set(Metadata::FillGhost);
+    // TODO(BRR) Still set FillGhost on conserved variables to ensure buffers exist.
+    // Fixing this requires modifying parthenon Metadata logic.
+    mcons_scalar.Set(Metadata::FillGhost);
+    mcons_threev.Set(Metadata::FillGhost);
+  } else {
+    PARTHENON_REQUIRE_THROWS(bc_vars == "conserved" || bc_vars == "primitive",
+      "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
+
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
     ndim = 3;
