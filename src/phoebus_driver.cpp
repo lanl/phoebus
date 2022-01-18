@@ -346,16 +346,21 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
         &dNtot.val) : none);
     }*/
 
+    int max_iters = 10000;
+    int check_interval = 100;
+    bool fail_flag = true;
+    bool warn_flag = true;
+
     // Iterate over particle send/receives until all particles are finished
     TaskRegion &transport_region = tc.AddRegion(num_task_lists_executed_independently);
     for (int i = 0; i < blocks.size(); i++) {
       particles_outstanding.val = 0;
 
-      for (int i = 0; i < num_task_lists_executed_independently; i++) {
+      //for (int i = 0; i < num_task_lists_executed_independently; i++) {
         int reg_dep_id = 0;
 
         auto &pmb = blocks[i];
-        auto &tl = transport_region0[i];
+        auto &tl = transport_region[i];
         auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
         auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
 
@@ -373,40 +378,40 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
         auto receive_particles =
             solver.AddTask(send_particles, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
 
-        auto count_outstanding_particles = solver.AddTask(receive_particles, radiation::MonteCarloCountOutstandingParticles, pmb.get(), mbd0.get(), sc0.get());
+        // TODO(BRR) This should be a task in parthenon
+        // TODO(BRR) to do this I need a separate STATUS variable for each particle to say whether it is being absorbed, being transported, being scattered, done, etc.
+        auto add_sent_particles = solver.AddTask(receive_particles,
+          radiation::MonteCarloCountCommunicatedParticles, pmb.get(), &particles_outstanding.val);
 
-        transport_region.AddRegionalDependencies(reg_dep_id, i, count_outstanding_particles);
+//        auto count_outstanding_particles = solver.AddTask(receive_particles, radiation::MonteCarloCountOutstandingParticles, pmb.get(), mbd0.get(), sc0.get(), &particles_outstanding.val);
+
+        transport_region.AddRegionalDependencies(reg_dep_id, i, add_sent_particles);
         reg_dep_id++;
 
-        auto start_global_reduce = (i == 0 ? tl.AddTask(count_outstanding_particles, &AllReduce<int>::StartReduce, &particles_outstanding, MPI_SUM) : none);
+        auto start_global_reduce = (i == 0 ? tl.AddTask(add_sent_particles, &AllReduce<int>::StartReduce, &particles_outstanding, MPI_SUM) : none);
 
         auto finish_global_reduce = tl.AddTask(start_global_reduce, &AllReduce<int>::CheckReduce, &particles_outstanding);
 
-
-        auto check = solver.SetCompletionTask(finish_global_reduce, radiation::CheckNoOutstandingParticles, &particles_outstanding.val);
+        // Ensure zero particles transported to end transport cycle
+        auto check = solver.SetCompletionTask(finish_global_reduce,
+        [](int *num_transported) {
+            if (num_transported == 0) {
+              return TaskStatus::complete;
+            } else {
+              return TaskStatus::incomplete;
+            }
+          },
+        //radiation::CheckNoOutstandingParticles,
+        &particles_outstanding.val);
 
         transport_region.AddRegionalDependencies(reg_dep_id, i, check);
         reg_dep_id++;
 
-
-
-        /*auto update_resolution = tl.AddTask(none, radiation::MonteCarloUpdateParticleResolution,
-          pmesh, &particle_resolution.val);
-
-        tuning_region.AddRegionalDependencies(reg_dep_id, 0, update_resolution);
-        reg_dep_id++;
-
-        auto start_resolution_reduce = tl.AddTask(update_resolution,
-          &AllReduce<std::vector<Real>>::StartReduce, &particle_resolution, MPI_SUM);
-
-        auto finish_resolution_reduce = tl.AddTask(start_resolution_reduce,
-          &AllReduce<std::vector<Real>>::CheckReduce, &particle_resolution);*/
-
-
+        // TODO(BRR) after this, reset bd_var_ to BoundaryStatus::completed for everyone?
     }
 
     // TODO(BRR) make transport an async region for ghost cells
-    TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
+    /*TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
     for (int i = 0; i < blocks.size(); i++) {
       auto &pmb = blocks[i];
       auto &tl = async_region0[i];
@@ -423,7 +428,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
 
       auto receive =
           tl.AddTask(send, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
-    }
+    }*/
 
     //TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
     TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
