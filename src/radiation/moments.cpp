@@ -174,7 +174,7 @@ TaskStatus MomentCon2Prim(T* rc) {
   auto *pm = rc->GetParentPointer().get(); 
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method"); 
-  if (method == "moment") { 
+  if (method == "moment_m1") { 
     return MomentCon2PrimImpl<T, ClosureType::M1>(rc);
   }
   else if (method == "moment_eddington") {
@@ -260,7 +260,7 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   auto *pm = rc->GetParentPointer().get(); 
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method"); 
-  if (method == "moment") { 
+  if (method == "moment_m1") { 
     return MomentPrim2ConImpl<T, ClosureType::M1>(rc, domain);
   }
   else if (method == "moment_eddington") {
@@ -569,7 +569,7 @@ TaskStatus CalculateFluxes(T* rc) {
   auto *pm = rc->GetParentPointer().get(); 
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method"); 
-  if (method == "moment") { 
+  if (method == "moment_m1") { 
     return CalculateFluxesImpl<T, ClosureType::M1>(rc);
   }
   else if (method == "moment_eddington") {
@@ -703,7 +703,7 @@ TaskStatus CalculateGeometricSource(T* rc, T* rc_src) {
   auto *pm = rc->GetParentPointer().get(); 
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method"); 
-  if (method == "moment") { 
+  if (method == "moment_m1") { 
     return CalculateGeometricSourceImpl<T, ClosureType::M1>(rc, rc_src);
   }
   else if (method == "moment_eddington") {
