@@ -373,6 +373,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                SwarmContainer *sc, const double t0,
                                const double dt) {
+  printf("[%i] MonteCarloTransport()\n", Globals::my_rank);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -475,6 +476,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           } else {
             k = 0;
           }
+
+          //printf("Transporting! %i %i %i\n", i, j, k);
           // swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
           const Real rho_cgs = v(prho, k, j, i) * DENSITY;
           const Real T_cgs = v(itemp, k, j, i) * TEMPERATURE;
@@ -485,7 +488,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               (4. * M_PI);
 
           Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
-          printf("dtau_abs = %e\n", dtau_abs);
+          //printf("alphanu: %e dtau_abs: %e\n", alphanu, dtau_abs);
+          //printf("dtau_abs = %e\n", dtau_abs);
 
           bool absorbed = false;
 
@@ -517,12 +521,15 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           }
 
           if (absorbed == false) {
+            //printf("before: %e %e %e\n", x(n), y(n), z(n));
             PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt,
                          geom);
+            //printf("after: %e %e %e\n", x(n), y(n), z(n));
 
             bool on_current_mesh_block = true;
             swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n),
                                           on_current_mesh_block);
+            //printf("on_current_mesh_block: %i\n", on_current_mesh_block);
           }
 
           rng_pool.free_state(rng_gen);
@@ -784,10 +791,39 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
 }*/
 
 TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_outstanding) {
-  auto swarm = pmb->swarm_data.Get()->Get("monte_carlo");
+  printf("[%i] MonteCarloCountCommunicated()\n", Globals::my_rank);
+  auto &swarm = pmb->swarm_data.Get()->Get("monte_carlo");
 
   *particles_outstanding += swarm->num_particles_sent_;
   printf("particles_outstanding: %i\n", *particles_outstanding);
+
+  printf("nbmax: %i nneighbor: %i\n", swarm->vbswarm->bd_var_.nbmax,
+    pmb->pbval->nneighbor);
+
+  // Reset communication flags
+  // TODO(BRR) nneighbor instead of nbmax?
+  //for (int n = 0; n < swarm->vbswarm->bd_var_.nbmax; n++) {
+  for (int n = 0; n < pmb->pbval->nneighbor; n++) {
+    auto &nb = pmb->pbval->neighbor[n];
+    swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
+#ifdef MPI_PARALLEL
+    swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
+#endif // MPI_PARALLEL
+  }
+
+  #ifdef MPI_PARALLEL
+  pmb->exec_space.fence();
+  for (int n = 0; n < pmb->pbval->nneighbor; n++) {
+    auto &nb = pmb->pbval->neighbor[n];
+    if (nb.snb.rank != Globals::my_rank) {
+      PARTHENON_MPI_CHECK(MPI_Wait(&(swarm->vbswarm->bd_var_.req_send[nb.bufid]), MPI_STATUS_IGNORE));
+    }
+    swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
+    printf("[%i] req_send[%i] = MPI_REQUEST_NULL (%i)\n", Globals::my_rank, nb.bufid,
+      swarm->vbswarm->bd_var_.req_send[nb.bufid]);
+  }
+
+  #endif
 
   return TaskStatus::complete;
 }
@@ -805,7 +841,7 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
   }
 #endif // MPI_PARALLEL
 
-  for (auto &block : blocks) {
+  /*for (auto &block : blocks) {
     auto &pmb = block;
     auto sc = pmb->swarm_data.Get();
     auto swarm = sc->Get(swarmName);
@@ -814,7 +850,7 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
       auto &nb = pmb->pbval->neighbor[n];
       swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
     }
-  }
+  }*/
 
   // Reset boundary statuses
   for (auto &block : blocks) {
