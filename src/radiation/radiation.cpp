@@ -42,7 +42,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
-  std::vector<std::string> known_methods = {"cooling_function", "moment", "moment_eddington",
+  std::vector<std::string> known_methods = {"cooling_function", "moment_m1", "moment_eddington",
                                             "monte_carlo", "mocmc"};
   if (std::find(known_methods.begin(), known_methods.end(), method) ==
       known_methods.end()) {
@@ -143,7 +143,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     RNGPool rng_pool(rng_seed);
     physics->AddParam<>("rng_pool", rng_pool);
   }
-  if ((method == "moment") || (method == "mocmc") || (method == "moment_eddington")) { 
+  if ((method == "mocmc") || (method == "moment_m1") || (method == "moment_eddington")) { 
     Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived, 
                                               Metadata::Intensive, Metadata::FillGhost, Metadata::Vector},
                                               std::vector<int>{NumRadiationTypes, 3}); 

@@ -90,7 +90,7 @@ Ye = true
 
 <radiation>
 cfl = 0.5 
-method = moment
+method = moment_m1
 nu_min = 1.e15
 nu_max = 1.e22
 nu_bins = 200
@@ -104,16 +104,20 @@ do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
 
+scattering_fraction = 1.0 
 B_fake = 0.5
 use_B_fake = true
 
 <opacity> 
 type = gray 
-gray_kappa = 1.e0 
+gray_kappa = 1.e3 
 
 <radiation_advection>
 J = 1.0
 Hx = 0.0
 Hy = 0.0
 Hz = 0.0
-vx = 0.0
+vx = 0.3
+width = 0.0333
+kappas_init = 1.e3
+boost_profile = true
