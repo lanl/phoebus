@@ -260,7 +260,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 TaskStatus DefaultTask() { return TaskStatus::complete; }
 
 TaskListStatus PhoebusDriver::RadiationPostStep() {
-  TaskListStatus status;
   TaskCollection tc;
   TaskID none(0);
 
