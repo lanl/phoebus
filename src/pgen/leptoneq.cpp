@@ -74,13 +74,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ieng, k, j, i) = rho0*eos.InternalEnergyFromDensityTemperature(rho0, T0, lambda);
         v(iprs, k, j, i) = eos.PressureFromDensityTemperature(rho0, T0, lambda);
 
-        printf("rho: %e eng: %e prs: %e\n", v(irho, k, j, i),
-          v(ieng,k,j,i), v(iprs,k,j,i));
-
         for (int d = 0; d < 3; d++)
           v(ivlo + d, k, j, i) = 0.0;
       });
-  pmb->exec_space.fence(); exit(-1);
 
   fluid::PrimitiveToConserved(rc.get());
 }

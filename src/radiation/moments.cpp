@@ -147,7 +147,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
           v(b, iPhi(ispec), k, j, i) = result.phi;
         
         
-          if (result.status == Status::failure && !(result.xi < 1.e-4) && !(std::fabs(result.fXi) < 1.e-6)) {
+          if (result.status == Status::failure && !(result.xi < 1.e-4) && !(std::fabs(result.fXi) < 1.e-3)) {
             printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) 1/sqrt(gammma) = %e \n "
                    "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n", i, ispec, 
                    E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), isdetgam, result.xi, result.phi, result.fXi, result.fPhi, 
@@ -244,7 +244,7 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
           SPACELOOP2(ii, jj) conTilPi(ii,jj) = 0.0;
           c.Prim2Con(J, covH, conTilPi, &E, &covF);
         }
-        printf("i = %i J = %e E = %e H = %e F = %e sdetgam = %e \n", i, J, E, covH(0), covF(0), sdetgam);
+        
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
@@ -547,17 +547,6 @@ TaskStatus CalculateFluxesImpl(T* rc) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
-          /*if (i<5) printf("i = %i ispec = %i fluxE = %10e fluxF = %10e sdetgam = %10e speed = %10e\n" 
-                                         "                   El = %10e    Er = %10e   covFl = %10e covFr = %10e\n"
-                                         "                conFl = %10e conFr = %10e      Pl = %10e    Pr = %10e\n" 
-                                         "                   Jl = %10e    Jr = %10e      Hl = %10e    Hr = %10e\n", 
-                                         i, ispec, 
-                                         v.flux(idir_in, idx_Ef(ispec), k, j, i),
-                                         v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
-                                         sdetgam, speed, El, Er, covFl(0), covFr(0),
-                                         conFl(0), conFr(0), Pl(idir, 0), Pr(idir, 0),
-                                         Jl, Jr, Hl(0), Hr(0)); */
-        
         } 
       });
 
@@ -692,8 +681,6 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           }
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam*srcE; 
           SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam*srcF(ii);
-          //if (i<10 && ispec == 0) printf("i = %i ispec = %i srE = %e srcF = (%e, %e, %e) J = %e conP/J = %e\n", 
-          //                               i, ispec, srcE, srcF(0), srcF(1), srcF(2), J, conP(0,0)/J); 
         }
   });
   return TaskStatus::complete;

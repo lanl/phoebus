@@ -359,9 +359,6 @@ namespace radiation
     b[1] = vFstar + (W2-1)/W*tauJ*JBB;
 
     SolveAxb2x2(A, b, x);
-    //printf("\n tauJ = %e tauH = %e \n", tauJ, tauH);
-    //printf("(%e  %e) (%e) = (%e)\n", A[0][0], A[0][1], x[0], b[0]);
-    //printf("(%e  %e) (%e) = (%e)\n", A[1][0], A[1][1], x[1], b[1]);
     //if (std::isnan(b[0])) throw 1; 
 
     Real &J = x[0];
@@ -466,14 +463,6 @@ namespace radiation
     xi = std::min(ratio(HEdd, JEdd), 0.99);
     phi = 1.000001 * acos(-1);
 
-    //xi = 0.99;
-    //Real gf = contractConCov3Vectors(con_tilg, cov_HEdd) - vHEdd*contractConCov3Vectors(con_tilg, cov_v);
-    //printf("gf = %e HEdd = %e \n", gf, HEdd);
-    // gf = std::max(std::min(ratio(gf, HEdd), 1.0), -1.0);
-    //phi = 1.000001*acos(-gf);
-    //if (xi > 0.8 || xi < 1.e-5) phi = acos(-1.0)*1.000001;
-    //printf("Initial guess: xi = %e phi = %e \n", xi, phi);
-
     return Con2PrimM1(E, cov_F, xi, phi, J, cov_H, con_tilPi);
   }
 
@@ -551,12 +540,6 @@ namespace radiation
       Closure<Vec, Tens2>::SolveClosure(Real E, V cov_F, Real *xi_out, Real *phi_out,
                                         const Real xi_guess, const Real phi_guess)
   {
-    // Temporary Eddington closure
-    //*xi_out = 0.0;
-    //*phi_out = 3.14159;
-    //M1Result resultEdd{Status::success, 0, *xi_out, *phi_out, 0.0, 0.0};
-    //return resultEdd;
-
     const int max_iter = 30;
     const Real tol = 1.e6 * std::numeric_limits<Real>::epsilon();
     const Real eps = std::sqrt(10 * std::numeric_limits<Real>::epsilon());
@@ -622,16 +605,12 @@ namespace radiation
 
       err_xi = std::abs(dx[0]) / (std::abs(xi) + delta);
       err_phi = std::abs(dx[1]) / (std::abs(phi) + delta);
-      //printf("iter: %i xi = %e phi = %e alpha = %e\n", iter, xi, phi, alpha);
-      //printf("..... % e % e | % e = % e\n", Jac[0][0], Jac[0][1], dx[0], f[0]);
-      //printf("..... % e % e | % e = % e\n", Jac[1][0], Jac[1][1], dx[1], f[1]);
       ++iter;
 
     } while (iter < max_iter && (fabs(fXi) > tol || fabs(fPhi) > tol));
 
     *xi_out = xi;
     *phi_out = phi;
-    //printf("iter: %i xi: %e cos(phi): %f fXi: %e fPhi: %e \n", iter, *xi_out, cos(*phi_out), fXi, fPhi);
     M1Result result{Status::success, iter, xi, phi, fXi, fPhi, err_xi, err_phi};
     if (std::isnan(xi))
       result.status = Status::failure;
@@ -672,11 +651,8 @@ namespace radiation
     vTilf += cov_v(i) * con_tilf(i);
     Hf -= vTilf * vTilH;
     H = std::sqrt(H - vTilH * vTilH);
-    //printf("tilH = (%f, %f, %f) \n", cov_tilH(0), cov_tilH(1), cov_tilH(2));
     *fXi = xi - ratio(H, J);
     *fPhi = Hf - H;
-    //printf("xi = %e phi = %e Hf = %e H = %e J = %e fXi = %e fPhi = %e\n", xi, phi, Hf, H, J, *fXi, *fPhi);
-    //printf("3: %f %f %f %f %f\n", xi, phi, con_tilPi(0,0), *fXi, *fPhi);
 
     return Status::success;
   }
@@ -728,10 +704,6 @@ namespace radiation
     const Real c = cos(phi);
     SPACELOOP(i)
     (*con_tilf)(i) = -c * con_tilg(i) + s * con_tild(i);
-    //printf("v2 = %e vl*vl = %e lam = %e invDenom = %e \n", v2, vl*vl, lam, invDenom);
-    //printf("tilg = (%e, %e, %e) \n", con_tilg(0), con_tilg(1), con_tilg(2));
-    //printf("tild = (%e, %e, %e) \n", con_tild(0), con_tild(1), con_tild(2));
-    //printf("tilf = (%e, %e, %e) \n", (*con_tilf)(0), (*con_tilf)(1), (*con_tilf)(2));
 
     // Calculate the closure interpolation
     const Real athin = 0.5 * (3 * closure(xi) - 1);
@@ -746,8 +718,6 @@ namespace radiation
       }
     }
 
-    //printf("2b: %f %f %f %f %f\n", E, cov_F(0), xi, phi, athin);
-    //printf("    %f %f %f %f %f\n", (*con_tilf)(0), con_tilg(0), con_tild(0), con_v(0), (*con_tilPi)(0,0));
     return Status::success;
   }
 
@@ -784,7 +754,6 @@ namespace radiation
     }
     //if (aa < 1.e-6) (*con_tild) = {{0,0,0}};
 
-    //printf("lam = %e W = %e Fmag = %e aa = %e v2 - vl*vl = %e \n", lam, W, Fmag, aa, v2 - vl*vl);
     return Status::success;
   }
 } // namespace radiation

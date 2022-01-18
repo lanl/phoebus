@@ -25,6 +25,7 @@ using namespace parthenon::package::prelude;
 // internal includes
 #include "fluid/fluid.hpp"
 #include "radiation/radiation.hpp"
+#include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
 // add the name of a namespace that contains your new ProblemGenerator
@@ -41,7 +42,13 @@ using namespace parthenon::package::prelude;
   PROBLEM(blandford_mckee)                                                               \
   PROBLEM(bondi)                                                                         \
   PROBLEM(radiation_advection)                                                           \
-  PROBLEM(homogeneous_sphere)
+  PROBLEM(homogeneous_sphere)                                                            \
+  PROBLEM(torus)
+
+// if you need problem-specific modifications to inputs, add the name here
+#define FOREACH_MODIFIER                                                                 \
+  MODIFIER(phoebus)                                                                      \
+  MODIFIER(torus)
 
 /*
 // DO NOT TOUCH THE MACROS BELOW
@@ -52,6 +59,11 @@ using namespace parthenon::package::prelude;
   FOREACH_PROBLEM
 #undef PROBLEM
 
+// declare all the modifiers
+#define MODIFIER(name) namespace name { void ProblemModifier(ParameterInput *pin); }
+  FOREACH_MODIFIER
+#undef MODIFIER
+
 namespace phoebus {
 
 // make a map so we get all the function pointers available for lookup by name
@@ -59,6 +71,12 @@ static std::map<std::string, std::function<void(MeshBlock *pmb, ParameterInput *
 #define PROBLEM(name) {#name, name::ProblemGenerator} ,
   FOREACH_PROBLEM
 #undef PROBLEM
+});
+
+static std::map<std::string, std::function<void(ParameterInput *pin)>> pmod_dict ({
+#define MODIFIER(name) {#name, name::ProblemModifier} ,
+  FOREACH_MODIFIER
+#undef MODIFIER
 });
 
 /*

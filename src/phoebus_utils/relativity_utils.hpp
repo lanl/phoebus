@@ -19,9 +19,43 @@
 namespace phoebus {
 
 /*
+ * Calculate the normal observer Lorentz factor from primitive three-velocity
+ *
+ * PARAM[IN] - vcon[3] - Gamma*normal observer three-velocity (phoebus primitive)
+ * PARAM[IN] - gammacov[3][3] - Covariant three-metric
+ *
+ * RETURN - Lorentz factor in normal observer frame
+ */
+KOKKOS_INLINE_FUNCTION Real
+GetLorentzFactor(const Real vcon[Geometry::NDSPACE], const Real gammacov[Geometry::NDSPACE][Geometry::NDSPACE]) {
+  Real vsq = 0.;
+  SPACELOOP2(ii, jj) {
+    vsq += gammacov[ii][jj]*vcon[ii]*vcon[jj];
+  }
+  return sqrt(1. + vsq);
+}
+
+/*
+ * Calculate the normal observer Lorentz factor from primitive three-velocity
+ *
+ * PARAM[IN] - vcon[3] - Gamma*normal pbserver three velocity (phoebus primitive)
+ * PARAM[IN] - gcov[4][4] - Covariant four-metric
+ *
+ * RETURN - Lorentz factor in normal observer frame
+ */
+KOKKOS_INLINE_FUNCTION Real
+GetLorentzFactor(const Real vcon[Geometry::NDSPACE], const Real gcov[Geometry::NDFULL][Geometry::NDFULL]) {
+  Real vsq = 0.;
+  SPACELOOP2(ii, jj) {
+    vsq += gcov[ii+1][jj+1]*vcon[ii]*vcon[jj];
+  }
+  return sqrt(1. + vsq);
+}
+
+/*
  * Calculate the normal observer Lorentz factor from normal observer three-velocity
  *
- * PARAM[IN] - v[3] - Normal observer three-velocity (phoebus primitive velocity)
+ * PARAM[IN] - v[3] - Gamma*Normal observer three-velocity (phoebus primitive velocity)
  * PARAM[IN] - system - Coordinate system
  * PARAM[IN] - loc - Location on spatial cell where geometry is processed
  * PARAM[IN] - k - k index of meshblock cell
@@ -31,24 +65,17 @@ namespace phoebus {
  * RETURN - Lorentz factor in normal observer frame
  */
 KOKKOS_INLINE_FUNCTION Real
-GetLorentzFactor(const Real v[3], const Geometry::CoordSysMeshBlock &system,
+GetLorentzFactor(const Real vcon[Geometry::NDSPACE], const Geometry::CoordSysMeshBlock &system,
                  CellLocation loc, const int k, const int j, const int i) {
-  Real W = 1;
   Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
   system.Metric(loc, k, j, i, gamma);
-  for (int l = 0; l < Geometry::NDSPACE; ++l) {
-    for (int m = 0; m < Geometry::NDSPACE; ++m) {
-      W -= v[l] * v[m] * gamma[l][m];
-    }
-  }
-  W = 1. / std::sqrt(std::abs(W) + SMALL);
-  return W;
+  return GetLorentzFactor(vcon, gamma);
 }
 
 /*
  * Calculate the coordinate frame four-velocity from the normal observer three-velocity
  *
- * PARAM[IN] - v[3] - Normal observer three-velocity (phoebus primitive velocity)
+ * PARAM[IN] - v[3] - Gamma*Normal observer three-velocity (phoebus primitive velocity)
  * PARAM[IN] - system - Coordinate system
  * PARAM[IN] - loc - Location on spatial cell where geometry is processed
  * PARAM[IN] - k - X3 index of meshblock cell
@@ -66,7 +93,7 @@ GetFourVelocity(const Real v[3], const Geometry::CoordSysMeshBlock &system,
   system.ContravariantShift(loc, k, j, i, beta);
   u[0] = W / (std::abs(alpha) + SMALL);
   for (int l = 1; l < Geometry::NDFULL; ++l) {
-    u[l] = W * v[l - 1] - u[0] * beta[l - 1];
+    u[l] = v[l - 1] - u[0] * beta[l - 1];
   }
 }
 
