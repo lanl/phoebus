@@ -783,6 +783,14 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
   return TaskStatus::complete;
 }*/
 
+TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_outstanding) {
+  auto swarm = pmb->swarm_data.Get()->Get("monte_carlo");
+
+  *particles_outstanding += swarm->num_particles_sent_;
+
+  return TaskStatus::complete;
+}
+
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks) {
   // Boundary transfers on same MPI proc are blocking

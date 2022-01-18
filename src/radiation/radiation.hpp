@@ -88,6 +88,8 @@ TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *tu
 TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   SwarmContainer *sc, const double t0, const double dt, Real *dNtot);
 
+TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_outstanding);
+
 // Mark all MPI requests as NULL / initialize boundary flags.
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks);
