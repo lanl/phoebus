@@ -92,7 +92,7 @@ Ye = true
 
 <radiation>
 cfl = 0.5
-method = moment
+method = moment_m1
 nu_min = 1.e15
 nu_max = 1.e22
 nu_bins = 200
