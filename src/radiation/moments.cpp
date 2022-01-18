@@ -269,7 +269,6 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   return TaskStatus::fail;
 }
 
-//template TaskStatus MomentPrim2Con<MeshData<Real>>(MeshData<Real> *, IndexDomain);
 template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *, IndexDomain);
 
 template <class T> 
@@ -310,8 +309,6 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   const int nblock = ql_base.GetDim(5);
   const int ndim = pmb->pmy_mesh->ndim;
   auto& coords = pmb->coords;  
-  
-  //PARTHENON_REQUIRE(nrecon == v.GetDim(4), "Issue with number of reconstruction variables in moments.");
   
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), 
@@ -444,7 +441,6 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           }
         
         for (int ispec = 0; ispec<nspec; ++ispec) { 
-          /// TODO: (LFR) Fix indexing so everything starts on a consistent index
         
           const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
           const Real& Jr = v(idx_qr(ispec, 0, idir), k, j, i);
