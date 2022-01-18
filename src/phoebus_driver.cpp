@@ -69,9 +69,6 @@ TaskListStatus PhoebusDriver::Step() {
   tm.dt = dt_trial;
   integrator->dt = dt_trial;
 
-  /// TODO: (LFR) The status checking here seems to be broken, since it is just overwritten
-  status = RadiationPreStep(); 
-
   for (int stage = 1; stage <= integrator->nstages; stage++) {
     TaskCollection tc = RungeKuttaStage(stage);
     status = tc.Execute();
@@ -252,45 +249,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
 TaskStatus DefaultTask() { return TaskStatus::complete; }
 
-TaskListStatus PhoebusDriver::RadiationPreStep() {
-  // TaskListStatus status;
-  TaskCollection tc;
-  TaskID none(0);
-
-  BlockList_t &blocks = pmesh->block_list;
-
-  const Real dt = integrator->dt;
-  const auto &stage_name = integrator->stage_name;
-
-  auto rad = pmesh->packages.Get("radiation");
-  const auto rad_active = rad->Param<bool>("active");
-  if (!rad_active) {
-    return TaskListStatus::complete;
-  }
-  auto fluid = pmesh->packages.Get("fluid");
-  const auto fluid_active = fluid->Param<bool>("active");
-
-  auto num_independent_task_lists = blocks.size();
-
-  const auto rad_method = rad->Param<std::string>("method");
-  if (false /*rad_method == "moment"*/) {
-    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
-    for (int ib = 0; ib < num_independent_task_lists; ib++) {
-      auto pmb = blocks[ib].get();
-      auto &tl = async_region[ib];
-      auto &sc0 = pmb->meshblock_data.Get(stage_name[0]); // This should be equivalent to base
-      using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-      auto get_opacities = tl.AddTask(none, radiation::MomentCalculateOpacities<MDT>, sc0.get());  
-      auto fluid_source_update = 
-          tl.AddTask(get_opacities, radiation::MomentFluidSource<MDT>, sc0.get(), 0.5*dt, fluid_active);
-    }
-  } else if (rad_method == "mocmc") {
-    PARTHENON_FAIL("MOCMC not implemented!");
-  }
-
-  return tc.Execute();
-}
-
 TaskListStatus PhoebusDriver::RadiationPostStep() {
   TaskListStatus status;
   TaskCollection tc;
@@ -322,17 +280,6 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
           tl.AddTask(none, radiation::CoolingFunctionCalculateFourForce, sc0.get(), dt);
       auto apply_four_force = tl.AddTask(
           calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
-    }
-  } else if (false /*rad_method == "moment"*/) {
-    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
-    for (int ib = 0; ib < num_independent_task_lists; ib++) {
-      auto pmb = blocks[ib].get();
-      auto &tl = async_region[ib];
-      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
-      using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-      auto get_opacities = tl.AddTask(none, radiation::MomentCalculateOpacities<MDT>, sc0.get());  
-      auto fluid_source_update = 
-          tl.AddTask(get_opacities, radiation::MomentFluidSource<MDT>, sc0.get(), 0.5*dt, fluid_active);
     }
   } else if (rad_method == "monte_carlo") {
     return MonteCarloStep();
