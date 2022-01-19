@@ -55,7 +55,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real T0 = 2.5*1.e6*pc.eV/pc.kb * unit_conv.GetTemperatureCGSToCode();
 
   pmb->par_for(
-      "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      "Phoebus::ProblemGenerator::LeptonEq", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const Real x = coords.x1v(i);
         const Real y = coords.x2v(j);
@@ -81,4 +81,4 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   fluid::PrimitiveToConserved(rc.get());
 }
 
-} // namespace thin_cooling
+} // namespace leptoneq
