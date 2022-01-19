@@ -94,6 +94,7 @@ add_executable(phoebus
   phoebus_utils/linear_algebra.hpp
   phoebus_utils/relativity_utils.hpp
   phoebus_utils/robust.hpp
+  phoebus_utils/root_find.hpp
   phoebus_utils/variables.hpp
 
   radiation/radiation.hpp

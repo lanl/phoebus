@@ -21,6 +21,7 @@
 
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 
 namespace fluid {
@@ -100,37 +101,33 @@ private:
                                              Real gscratch[4][4],
                                              Args &&... args) const {
     Real beta[ND - 1];
-    Real W = 1.0;
     Real Bdotv = 0.0;
     Real Bsq = 0.0;
     auto gcov = reinterpret_cast<Real(*)[3]>(&gscratch[0][0]);
     system_.Metric(loc, std::forward<Args>(args)..., gcov);
-    for (int l = 1; l < ND; ++l) {
-      for (int m = 1; m < ND; ++m) {
-        const Real gamma = gcov[l - 1][m - 1];
-        const Real &vl = v_(l, std::forward<Args>(args)...);
-        const Real &vm = v_(m, std::forward<Args>(args)...);
-        W -= vl * vm * gamma;
-        const Real &bl = b_(l, std::forward<Args>(args)...);
-        const Real &bm = b_(m, std::forward<Args>(args)...);
-        Bdotv += bl * vm * gamma;
-        Bsq += bl * bm * gamma;
-      }
+    Real vp[3] = {v_(1, std::forward<Args>(args)...),
+                  v_(2, std::forward<Args>(args)...),
+                  v_(3, std::forward<Args>(args)...)};
+    const Real W = phoebus::GetLorentzFactor(vp, gcov);
+
+    SPACELOOP2(ii, jj) {
+        const Real &bi = b_(ii+1, std::forward<Args>(args)...);
+        const Real &bj = b_(jj+1, std::forward<Args>(args)...);
+        Bdotv += bi * vp[jj] / W * gcov[ii][jj];
+        Bsq += bi * bj * gcov[ii][jj];
     }
-    const Real iW = std::sqrt(std::abs(W));
-    W = 1. / (iW + SMALL);
+    const Real iW = 1. / W;
 
     Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
     system_.ContravariantShift(loc, std::forward<Args>(args)..., beta);
     u[0] = W / (std::abs(alpha) + SMALL);
     b[0] = u[0] * Bdotv;
     for (int l = 1; l < ND; ++l) {
-      u[l] = W * v_(l, std::forward<Args>(args)...) - u[0] * beta[l - 1];
+      u[l] = v_(l, std::forward<Args>(args)...) - u[0] * beta[l - 1];
       b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha * b[0] * u[l]);
     }
 
-    b[0] *= alpha;
-    bsq = (Bsq + b[0] * b[0]) * iW * iW;
+    bsq = (Bsq + alpha * alpha * b[0] * b[0]) * iW * iW;
   }
 
   Pack pack_;

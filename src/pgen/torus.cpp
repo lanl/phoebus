@@ -92,6 +92,9 @@ Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
+                    "Problem \"torus\" requires FMKS geometry!");
+
   auto rc = pmb->meshblock_data.Get().get();
 
   PackIndexMap imap;
@@ -126,7 +129,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real u_jitter = pin->GetOrAddReal("torus", "u_jitter", 1.e-2);
   const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
   const Real bnorm = pin->GetOrAddReal("torus", "Bnorm", 1.e-2);
-  
+  const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
+
   const Real a = pin->GetReal("geometry","a");
   auto bl = Geometry::BoyerLindquist(a);
 
@@ -153,7 +157,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real smooth = gpkg->Param<Real>("smooth");
   auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
-  RNGPool rng_pool(pin->GetOrAddInteger("kelvin_helmholtz", "seed", seed));
+  RNGPool rng_pool(seed);
 
   Real uphi_rmax;
   const Real hm1_rmax = std::exp(log_enthalpy(rmax,0.5*M_PI,a,rin,angular_mom,uphi_rmax)) - 1.0;
@@ -165,73 +169,71 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
       auto rng_gen = rng_pool.get_state();
-      const Real x1 = coords.x1v(k,j,i);
-      const Real x2 = coords.x2v(k,j,i);
+      const Real dx_sub = coords.Dx(X1DIR, k, j, i)/nsub;
+      const Real dy_sub = coords.Dx(X2DIR, k, j, i)/nsub;
+      v(irho,k,j,i) = 0.0;
+      v(ieng,k,j,i) = 0.0;
+      SPACELOOP(d) {
+        v(ivlo+d,k,j,i) = 0.0;
+      }
       const Real x3 = coords.x3v(k,j,i);
+      for (int m = 0; m < nsub; m++) {
+        for (int n = 0; n < nsub; n++) {
+          const Real x1 = coords.x1f(k, j, i) + (m + 0.5)*dx_sub;
+          const Real x2 = coords.x2f(k, j, i) + (n + 0.5)*dy_sub;
 
-      Real r = tr.bl_radius(x1);
-      Real th = tr.bl_theta(x1,x2);
+          Real r = tr.bl_radius(x1);
+          Real th = tr.bl_theta(x1,x2);
 
-      Real lnh = -1.0;
-      Real uphi;
-      if (r > rin) lnh = log_enthalpy(r,th,a,rin,angular_mom,uphi);
+          Real lnh = -1.0;
+          Real uphi;
+          if (r > rin) lnh = log_enthalpy(r,th,a,rin,angular_mom,uphi);
 
-      Real beta[3];
-      Real gcov[4][4];
-      // regions outside torus
-      if (lnh < 0. || r < rin) {
-        // Nominal values; real value set by fixup
-        v(irho,k,j,i) = 0.0;
-        v(ieng,k,j,i) = 0.0;
-        geom.SpacetimeMetric(CellLocation::Cent,k,j,i,gcov);
-        geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
-        const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
-        Real ucon[4] = {0.0, -beta[1]/lapse, 0.0, -beta[2]/lapse};
-        //ucon[0] = ucon_norm(ucon,gcov);
-        const Real W = ucon[0]*lapse;
-        for (int d = 0; d < 3; d++) {
-          v(ivlo+d,k,j,i) = 0.0;//beta[d]/lapse;
+          if (lnh > 0.0) {
+            Real hm1 = std::exp(lnh) - 1.;
+            Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam),
+                                1. / (gam - 1.));
+            Real u = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
+            rho /= rho_rmax;
+
+            Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
+            Real gcov[4][4];
+            bl.SpacetimeMetric(0.0, r, th, x3, gcov);
+            ucon_bl[0] = ucon_norm(ucon_bl, gcov);
+            Real ucon[4];
+            tr.bl_to_fmks(x1,x2,x3,a,ucon_bl,ucon);
+            const Real lapse = geom.Lapse(0.0, x1, x2, x3);
+            Real beta[3];
+            geom.ContravariantShift(0.0, x1, x2, x3, beta);
+            geom.SpacetimeMetric(0.0, x1, x2, x3, gcov);
+            ucon[0] = ucon_norm(ucon, gcov);
+            const Real W = lapse*ucon[0];
+            Real vcon[] = {ucon[1]/W + beta[0]/lapse,
+                           ucon[2]/W + beta[1]/lapse,
+                           ucon[3]/W + beta[2]/lapse};
+
+            v(irho,k,j,i) += rho/(nsub*nsub);
+            v(ieng,k,j,i) += u/(nsub*nsub);
+            for (int d = 0; d < 3; d++) {
+              v(ivlo+d,k,j,i) += W*vcon[d]/(nsub*nsub);
+            }
+          }
         }
       }
-      /* region inside magnetized torus; u^i is calculated in
-       * Boyer-Lindquist coordinates, as per Fishbone & Moncrief,
-       * so it needs to be transformed at the end */
-      else {
-        Real hm1 = std::exp(lnh) - 1.;
-        Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam),
-                 1. / (gam - 1.));
-        Real u = kappa * std::pow(rho, gam) / (gam - 1.);
+      const Real x1v = coords.x1v(k, j, i);
+      const Real x2v = coords.x2v(k, j, i);
 
-        v(irho,k,j,i) = rho / rho_rmax;
-        v(ieng,k,j,i) = u / rho_rmax;
-        v(ieng,k,j,i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
+      v(ieng,k,j,i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
 
-        Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
-        bl.SpacetimeMetric(0.0, r, th, x3, gcov);
-        ucon_bl[0] = ucon_norm(ucon_bl, gcov);
-        Real ucon[4];
-        tr.bl_to_fmks(x1,x2,x3,a,ucon_bl,ucon);
-        const Real lapse = geom.Lapse(CellLocation::Cent,k,j,i);
-        geom.ContravariantShift(CellLocation::Cent,k,j,i,beta);
-        geom.SpacetimeMetric(CellLocation::Cent,k,j,i, gcov);
-        ucon[0] = ucon_norm(ucon, gcov);
-        const Real W = lapse*ucon[0];
-        for (int d = 0; d < 3; d++) {
-          v(ivlo+d,k,j,i) = ucon[d+1]/W + beta[d]/lapse;
-        }
-        //v(ivlo,k,j,i) = beta[0]/lapse;
-        //v(ivlo+1,k,j,i) = beta[1]/lapse;
-      }
       // fixup
-      Real rhoflr, epsflr;
-      floor.GetFloors(x1, x2, x3, rhoflr, epsflr);
+      Real rhoflr = 0;
+      Real epsflr;
+      floor.GetFloors(x1v, x2v, x3, rhoflr, epsflr);
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
-      v(iprs,k,j,i) = eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
-      
-      v(itmp,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i)/Cv;
-      //fprintf(stderr,"%g %g %g %g\n", r, th, v(irho,k,j,i), v(ieng,k,j,i));
-      //if (i == ib.e) fprintf(stderr,"\n");
+      v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
+      v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i));
+
       rng_pool.free_state(rng_gen);
     });
 
@@ -249,12 +251,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   //Real bsq_max;
   Real beta_min;
   if (ibhi > 0) {
+    std::cout << "bnorm = " << bnorm << std::endl;
   pmb->par_reduce(
     "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e-1, ib.s, ib.e-1,
     KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bmin) {
       const Real gdet = geom.DetGamma(CellLocation::Cent,k,j,i);
       v(iblo,k,j,i) = - ( A(j,i) - A(j+1,i)
-                         + A(j,i+1) - A(j+1,i+1) ) 
+                         + A(j,i+1) - A(j+1,i+1) )
                          / (2.0 * coords.Dx(X2DIR,k,j,i) * gdet);
       v(iblo+1,k,j,i) = ( A(j,i) + A(j+1,i)
                          - A(j,i+1) - A(j+1,i+1) )
@@ -271,38 +274,25 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real Bdotv = 0.0;
       Real gcov[3][3];
       geom.Metric(CellLocation::Cent,k,j,i,gcov);
+      Real vp[3] = {v(ivlo,k,j,i), v(ivlo+1,k,j,i), v(ivlo+2,k,j,i)};
+      const Real W = phoebus::GetLorentzFactor(vp, gcov);
       SPACELOOP2(m,n) {
-        vsq += gcov[m][n] * v(ivlo+m,k,j,i) * v(ivlo+n,k,j,i);
-        Bdotv += gcov[m][n] * v(ivlo+m,k,j,i) * v(iblo+n,k,j,i);
+        vsq += gcov[m][n] * v(ivlo+m,k,j,i) / W * v(ivlo+n,k,j,i) / W;
+        Bdotv += gcov[m][n] * v(ivlo+m,k,j,i) / W * v(iblo+n,k,j,i);
         Bsq += gcov[m][n] * v(iblo+m,k,j,i) * v(iblo+n,k,j,i);
       }
-      const Real W = 1.0/std::sqrt(1.0 - vsq);
       Real b0 = W*Bdotv;
       Real bsq = (Bsq + b0*b0)/(W*W);
-      Real beta = v(iprs,k,j,i)/(0.5*bsq + 1.e-10);
-      if (v(irho,k,j,i) > 1.e-8 && beta < bmin) bmin = beta;
+      Real beta = v(iprs,k,j,i)/(0.5*bsq + 1.e-100);
+      if (v(irho,k,j,i) > 1.e-4 && beta < bmin) bmin = beta;
       //if (bsq > b2max) b2max = bsq;
     }, Kokkos::Min<Real>(beta_min));
     if (parthenon::Globals::my_rank == 0)
       std::cout << "beta_min = " << beta_min << std::endl;
   }
   // now normalize the b-field
-  //for (int i = 0; i < 100; i++) {
   fluid::PrimitiveToConserved(rc);
-  //fluid::ConservedToPrimitive(rc);
-  //}
-/*
-  Real beta[3];
-  geom.ContravariantShift(CellLocation::Cent,kb.s,jb.s+256,ib.s+440, beta);
-  alpha = geom.Lapse(CellLocation::Cent,kb.s,jb.s+256,ib.s+440);
-  std::cout << "rho, u = " << v(irho,kb.s,256,440) << " " << v(ieng, kb.s, 256, 440) << std::endl;
-  std::cout << "v1_0 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
-  fluid::PrimitiveToConserved(rc);
-  std::cout << "v1_1 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
-  fluid::ConservedToPrimitive(rc);
-  std::cout << "rho, u = " << v(irho,kb.s,256,440) << " " << v(ieng, kb.s, 256, 440) << std::endl;
-  std::cout << "v1_2 = " << v(ivlo,kb.s,256,440) - beta[0]/alpha << std::endl;
-  */
+  printf("Problem initialized!\n");
 }
 
 void ProblemModifier(ParameterInput *pin) {
@@ -317,9 +307,7 @@ void ProblemModifier(ParameterInput *pin) {
   int nx1 = pin->GetInteger("parthenon/mesh", "nx1");
   Real dx = (x1max - xh)/(nx1 - ninside);
   Real x1min = xh - ninside*dx;
-  pin->SetReal("parthenon/mesh", "x1min", x1min);\
+  pin->SetReal("parthenon/mesh", "x1min", x1min);
 }
 
-
 }
-

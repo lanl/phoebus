@@ -98,20 +98,31 @@ template <typename System>
 KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
                                                Real X0, Real X1, Real X2,
                                                Real X3, Real da[NDFULL]) {
+  Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0/3.0);
   LinearAlgebra::SetZero(da, NDFULL);
   for (int d = 1; d < NDFULL; ++d) {
-    Real XX1 = X1;
-    Real XX2 = X2;
-    Real XX3 = X3;
-    if (d == 1)
-      XX1 += dx;
-    if (d == 2)
-      XX2 += dx;
-    if (d == 3)
-      XX3 += dx;
-    Real alpha = s.Lapse(X0, X1, X2, X3);
-    Real alphap = s.Lapse(X0, XX1, XX2, XX3);
-    da[d] = ratio(alphap - alpha, dx * alpha);
+    Real X1p = X1;
+    Real X1m = X1;
+    Real X2p = X2;
+    Real X2m = X2;
+    Real X3p = X3;
+    Real X3m = X3;
+    if (d == 1) {
+      dx = std::max(std::abs(X1),1.0)*EPS;
+      X1p += dx;
+      X1m -= dx;
+    } else if (d == 2) {
+      dx = std::max(std::abs(X2),1.0)*EPS;
+      X2p += dx;
+      X2m -= dx;
+    } else if (d == 3) {
+      dx = std::max(std::abs(X3),1.0)*EPS;
+      X3p += dx;
+      X3m -= dx;
+    }
+    Real alpham = s.Lapse(X0, X1m, X2m, X3m);
+    Real alphap = s.Lapse(X0, X1p, X2p, X3p);
+    da[d] = ratio(alphap - alpham, dx * (alpham + alphap));
   }
 }
 
@@ -151,6 +162,7 @@ template <typename System>
 KOKKOS_INLINE_FUNCTION void
 SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
                       Real X3, Real dg[NDFULL][NDFULL][NDFULL]) {
+  Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0/3.0);
   LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
   Real gl[NDFULL][NDFULL];
   Real gr[NDFULL][NDFULL];
@@ -162,14 +174,17 @@ SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
     Real X2R = X2;
     Real X3R = X3;
     if (d == 1) {
+      dx = std::max(std::abs(X1),1.0)*EPS;
       X1L -= dx;
       X1R += dx;
     }
     if (d == 2) {
+      dx = std::max(std::abs(X2),1.0)*EPS;
       X2L -= dx;
       X2R += dx;
     }
     if (d == 3) {
+      dx = std::max(std::abs(X3),1.0)*EPS;
       X3L -= dx;
       X3R += dx;
     }
