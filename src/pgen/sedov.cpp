@@ -87,9 +87,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real ua = phoebus::energy_from_rho_P(eos, rho, Pa);
       const Real u = (r <= rinner) ? uinner : ua;
 
+      Real lambda[2];
+      if (iye > 0) {
+	v(iye, k, j, i) = 0.5;
+	lambda[0] = v(iye, k, j, i);
+      }
+
       const Real eps = u / (rho + 1e-20);
-      const Real P = eos.PressureFromDensityInternalEnergy(rho, eps);
-      const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps);
+      const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, lambda);
+      const Real P = eos.PressureFromDensityInternalEnergy(rho, eps, lambda);
 
       v(irho, k, j, i) = rho;
       v(iprs, k, j, i) = P;

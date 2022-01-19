@@ -44,27 +44,29 @@ void ProblemModifier(ParameterInput *pin) {
 }
 
 KOKKOS_FUNCTION
-Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P) {
+Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P, const Real Ye) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
 
+  Real lambda[2] = {Ye, 0.};
   Real eguessl = P/rho;
-  Real Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl);
+  Real Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl, lambda);
   Real eguessr = eguessl;
   Real Pguessr = Pguessl;
+  printf("%g %g %g %g\n", eguessl, Pguessl, eguessr, Pguessr); // DEBUG
   while (Pguessl > P) {
     eguessl /= 2.0;
-    Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl);
+    Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl, lambda);
   }
   while (Pguessr < P) {
     eguessr *= 2.0;
-    Pguessr = eos.PressureFromDensityInternalEnergy(rho, eguessr);
+    Pguessr = eos.PressureFromDensityInternalEnergy(rho, eguessr, lambda);
   }
 
   PARTHENON_REQUIRE(Pguessr>P && Pguessl<P, "Pressure not bracketed");
 
   while (Pguessr - Pguessl > 1.e-10*P) {
     Real emid = 0.5*(eguessl + eguessr);
-    Real Pmid = eos.PressureFromDensityInternalEnergy(rho, emid);
+    Real Pmid = eos.PressureFromDensityInternalEnergy(rho, emid, lambda);
     if (Pmid < P) {
       eguessl = emid;
       Pguessl = Pmid;

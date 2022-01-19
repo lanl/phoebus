@@ -26,6 +26,7 @@
 // phoebus includes
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
+#include "phoebus_utils/variables.hpp"
 
 namespace Microphysics {
 namespace EOS {
@@ -158,6 +159,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Store eos params in case they're needed
   for (auto &name : names) {
     params.Add(name, (pin->GetReal(block_name, name)));
+  }
+
+  // If using StellarCollapse, we need additional variables.
+  if (eos_type == StellarCollapse::EosType()) {
+    // We request that Ye and temperature exist, but do not provide them.
+    Metadata m = Metadata({Metadata::Cell, Metadata::Intensive,
+			      Metadata::Derived, Metadata::OneCopy,
+			      Metadata::Requires});
+
+    pkg->AddField(fluid_prim::ye, m);
+    pkg->AddField(fluid_prim::temperature, m);
   }
 
   return pkg;
