@@ -84,6 +84,29 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
+
+// Moment tasks 
+template <class T>
+TaskStatus MomentCon2Prim(T* rc);
+
+template <class T>
+TaskStatus MomentPrim2Con(T* rc, IndexDomain domain = IndexDomain::entire);
+
+template <class T> 
+TaskStatus ReconstructEdgeStates(T* rc); 
+
+template <class T> 
+TaskStatus CalculateFluxes(T* rc);
+
+template <class T>
+TaskStatus CalculateGeometricSource(T *rc, T *rc_src);
+
+template <class T>
+TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid);
+
+template <class T>
+TaskStatus MomentCalculateOpacities(T *rc);
+
 } // namespace radiation
 
 #endif // RADIATION_HPP_

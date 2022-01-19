@@ -24,6 +24,7 @@ using namespace parthenon::package::prelude;
 
 // internal includes
 #include "fluid/fluid.hpp"
+#include "radiation/radiation.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 
@@ -40,7 +41,10 @@ using namespace parthenon::package::prelude;
   PROBLEM(sedov)                                                                         \
   PROBLEM(blandford_mckee)                                                               \
   PROBLEM(bondi)                                                                         \
-  PROBLEM(torus)                                                                         \
+  PROBLEM(radiation_advection)                                                           \
+  PROBLEM(homogeneous_sphere)                                                            \
+  PROBLEM(torus)
+           \
   PROBLEM(tov)
 
 // if you need problem-specific modifications to inputs, add the name here

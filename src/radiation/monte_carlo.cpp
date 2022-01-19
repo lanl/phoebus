@@ -539,7 +539,9 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
     auto swarm = block->swarm_data.Get()->Get(swarmName);
     for (int n = 0; n < block->pbval->nneighbor; n++) {
       auto &nb = block->pbval->neighbor[n];
-      swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
+      #ifdef MPI_PARALLEL
+        swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
+      #endif
     }
   }
 #endif // MPI_PARALLEL
