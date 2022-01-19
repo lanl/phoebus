@@ -26,12 +26,14 @@ using singularity::RadiationType;
 // TODO(BRR) temporary
 // auto s = RadiationType::NU_ELECTRON;
 
+// TODO(BRR) Switch from nu (cgs) to ener (code)
 KOKKOS_INLINE_FUNCTION
 Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
 
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                      SwarmContainer *sc, const double t0,
                                      const double dt) {
+  printf("[%i] MonteCarloSourceParticles\n", Globals::my_rank);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -91,7 +93,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
   const Real dV_code = dx_i * dx_j * dx_k * dt;
   const Real d3x_cgs = dx_i * dx_j * dx_k * pow(LENGTH, 3);
-  const Real d3x_code = dx_i * dx_j * dx_k;
+  const Real d3x = dx_i * dx_j * dx_k;
+
+  const Real h_code = pc::h*TIME/(MASS*LENGTH*LENGTH);
 
   std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
                                  "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov,
@@ -141,13 +145,18 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real dNdlnu_max = 0.;
             for (int n = 0; n <= nu_bins; n++) {
               Real nu = nusamp(n);
+              Real ener = pc::h*nu*CENERGY;
               Real wgt = GetWeight(wgtC, nu);
-              Real Jnu = d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu);
+              //Real Jnu = d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu);
+              //Real Jnu = d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, ener);
+              Real Jnu = d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu/CTIME);
 
-              dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
+              //dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
+              dN += Jnu / (ener * wgt) * (nu * dlnu / CTIME);
 
               // Factors of nu in numerator and denominator cancel
-              Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
+              //Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
+              Real dNdlnu = Jnu * d3x * detG / (h_code * wgt);
               v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) = dNdlnu;
               if (dNdlnu > dNdlnu_max) {
                 dNdlnu_max = dNdlnu;
@@ -161,11 +170,22 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             // Trapezoidal rule
             Real nu0 = nusamp[0];
             Real nu1 = nusamp[nu_bins];
-            dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu0) *
-                  nu0 / (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
-            dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu1) *
-                  nu1 / (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
-            dN *= d3x_cgs * detG * dt * TIME;
+            //dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu0) *
+            //      nu0 / (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
+            //dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu1) *
+            //      nu1 / (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
+            //dN *= d3x_cgs * detG * dt * TIME;
+            Real ener0 = pc::h*nusamp[0]*CENERGY;
+            Real ener1 = pc::h*nusamp[1]*CENERGY;
+            //dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, ener0) /
+            //  (h_code * GetWeight(wgtC, nu0)) * dlnu;
+            //dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, ener1) /
+            //  (h_code * GetWeight(wgtC, nu1)) * dlnu;
+            dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu0/CTIME) /
+              (h_code * GetWeight(wgtC, nu0)) * dlnu;
+            dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu1/CTIME) /
+              (h_code * GetWeight(wgtC, nu1)) * dlnu;
+            dN *= d3x * detG * dt;
 
             v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
 
@@ -194,6 +214,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         }
       },
       Kokkos::Sum<Real>(dNtot));
+
+  printf("dNtot: %e\n", dNtot);
+  exit(-1);
 
   // TODO(BRR) Mpi reduction here....... this really needs to be a separate task
   Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
@@ -373,7 +396,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                SwarmContainer *sc, const double t0,
                                const double dt) {
-  printf("[%i] MonteCarloTransport()\n", Globals::my_rank);
+  printf("[%i] MonteCarloTransport() t = %e\n", Globals::my_rank, t0);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -458,7 +481,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           auto s = static_cast<RadiationType>(swarm_species(n));
 
           // TODO(BRR) Get u^mu, evaluate -k.u
-          Real nu = -k0(n) * ENERGY / pc::h;
+          Real nu = -k0(n) * ENERGY;// / pc::h;
 
           // TODO(BRR) Get K^0 via metric
           Real Kcon0 = -k0(n);
@@ -483,12 +506,20 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           const Real T_cgs = v(itemp, k, j, i) * TEMPERATURE;
           const Real Ye = v(iye, k, j, i);
 
+          const Real h_code = pc::h*TIME/(MASS*LENGTH*LENGTH);
+          printf("h_code: %e\n", h_code);
+
           Real alphanu =
-              d_opacity.AbsorptionCoefficient(rho_cgs, T_cgs, Ye, s, nu) /
+              //d_opacity.AbsorptionCoefficient(rho_cgs, T_cgs, Ye, s, nu) /
+              //(4. * M_PI);
+              d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, -k0(n)) /
               (4. * M_PI);
 
-          Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
-          //printf("alphanu: %e dtau_abs: %e\n", alphanu, dtau_abs);
+          //Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
+          //Real dtau_abs = dlam / (-k0(n) * alphanu);
+          Real dtau_abs = (dlam * h_code) / ((-k0(n) / h_code) * alphanu);
+          printf("alphanu: %e dtau_abs: %e (%e %e %e %e)\n", alphanu, dtau_abs,
+            rho_cgs, T_cgs, Ye, nu);
           //printf("dtau_abs = %e\n", dtau_abs);
 
           bool absorbed = false;
@@ -559,6 +590,7 @@ TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {
 // Reduce particle sampling resolution statistics from per-mesh to global as part of global
 // reduction.
 TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *resolution) {
+  printf("[%i] MonteCarloUpdateParticleResolution\n", Globals::my_rank);
   auto rad = pmesh->packages.Get("radiation");
   const auto num_emitted = rad->Param<Real>("num_emitted");
   const auto num_absorbed = rad->Param<Real>("num_absorbed");
@@ -819,8 +851,8 @@ TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_o
       PARTHENON_MPI_CHECK(MPI_Wait(&(swarm->vbswarm->bd_var_.req_send[nb.bufid]), MPI_STATUS_IGNORE));
     }
     swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
-    printf("[%i] req_send[%i] = MPI_REQUEST_NULL (%i)\n", Globals::my_rank, nb.bufid,
-      swarm->vbswarm->bd_var_.req_send[nb.bufid]);
+    //printf("[%i] req_send[%i] = MPI_REQUEST_NULL (%i)\n", Globals::my_rank, nb.bufid,
+    //  swarm->vbswarm->bd_var_.req_send[nb.bufid]);
   }
 
   #endif
@@ -830,6 +862,7 @@ TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_o
 
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks) {
+  printf("[%i] InitializeCommunicationMesh\n", Globals::my_rank);
   // Boundary transfers on same MPI proc are blocking
 #ifdef MPI_PARALLEL
   for (auto &block : blocks) {
