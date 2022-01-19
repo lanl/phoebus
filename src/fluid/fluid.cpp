@@ -43,65 +43,67 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("fluid");
   Params &params = physics->AllParams();
 
-  const bool hydro = pin->GetBoolean("physics", "hydro");
-  params.Add("hydro", hydro);
+  // Check that we are actually evolving the fluid  
+  const bool active = pin->GetBoolean("physics", "hydro");
+  params.Add("active", active);
+  if (active) { // Only set up these parameters if the fluid is evolved
 
-  Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
-  params.Add("cfl", cfl);
-
-  std::string c2p_method = pin->GetOrAddString("fluid", "c2p_method", "robust");
-  params.Add("c2p_method", c2p_method);
-  if (c2p_method == "robust") {
-    params.Add("c2p_func", ConservedToPrimitiveRobust<MeshBlockData<Real>>);
-  } else if (c2p_method == "classic") {
-    params.Add("c2p_func", ConservedToPrimitiveClassic<MeshBlockData<Real>>);
-  } else {
-    PARTHENON_THROW("Invalid c2p_method.");
-  }
-
-  Real c2p_tol = pin->GetOrAddReal("fluid", "c2p_tol", 1.e-8);
-  params.Add("c2p_tol", c2p_tol);
-
-  int c2p_max_iter = pin->GetOrAddInteger("fluid", "c2p_max_iter", 20);
-  params.Add("c2p_max_iter", c2p_max_iter);
-
-  std::string recon = pin->GetOrAddString("fluid", "recon", "linear");
-  PhoebusReconstruction::ReconType rt =
-      PhoebusReconstruction::ReconType::linear;
-  if (recon == "weno5" || recon == "weno5z") {
-    PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
-                             "weno5 requires 4+ ghost cells");
-    rt = PhoebusReconstruction::ReconType::weno5z;
-  } else if (recon == "weno5a") {
-    PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
-                             "weno5 requires 4+ ghost cells");
-    rt = PhoebusReconstruction::ReconType::weno5a;
-  } else if (recon == "mp5") {
-    PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
-                             "mp5 requires 4+ ghost cells");
-    if (cfl > 0.4) {
-      PARTHENON_WARN("mp5 often requires smaller cfl numbers for stability");
+    Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
+    params.Add("cfl", cfl);
+    
+    std::string c2p_method = pin->GetOrAddString("fluid", "c2p_method", "robust");
+    params.Add("c2p_method", c2p_method);
+    if (c2p_method == "robust") {
+      params.Add("c2p_func", ConservedToPrimitiveRobust<MeshBlockData<Real>>);
+    } else if (c2p_method == "classic") {
+      params.Add("c2p_func", ConservedToPrimitiveClassic<MeshBlockData<Real>>);
+    } else {
+      PARTHENON_THROW("Invalid c2p_method.");
     }
-    rt = PhoebusReconstruction::ReconType::mp5;
-  } else if (recon == "linear") {
-    rt = PhoebusReconstruction::ReconType::linear;
-  } else {
-    PARTHENON_THROW(
-        "Invalid Reconstruction option.  Choose from [linear,weno5]");
-  }
-  params.Add("Recon", rt);
 
-  std::string solver = pin->GetOrAddString("fluid", "riemann", "hll");
-  riemann::solver rs = riemann::solver::HLL;
-  if (solver == "llf") {
-    rs = riemann::solver::LLF;
-  } else if (solver == "hll") {
-    rs = riemann::solver::HLL;
-  } else {
-    PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
-  }
-  params.Add("RiemannSolver", rs);
+    Real c2p_tol = pin->GetOrAddReal("fluid", "c2p_tol", 1.e-8);
+    params.Add("c2p_tol", c2p_tol);
 
+    int c2p_max_iter = pin->GetOrAddInteger("fluid", "c2p_max_iter", 20);
+    params.Add("c2p_max_iter", c2p_max_iter);
+
+    std::string recon = pin->GetOrAddString("fluid", "recon", "linear");
+    PhoebusReconstruction::ReconType rt =
+        PhoebusReconstruction::ReconType::linear;
+    if (recon == "weno5" || recon == "weno5z") {
+      PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                               "weno5 requires 4+ ghost cells");
+      rt = PhoebusReconstruction::ReconType::weno5z;
+    } else if (recon == "weno5a") {
+      PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                               "weno5 requires 4+ ghost cells");
+      rt = PhoebusReconstruction::ReconType::weno5a;
+    } else if (recon == "mp5") {
+      PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                               "mp5 requires 4+ ghost cells");
+      if (cfl > 0.4) {
+        PARTHENON_WARN("mp5 often requires smaller cfl numbers for stability");
+      }
+      rt = PhoebusReconstruction::ReconType::mp5;
+    } else if (recon == "linear") {
+      rt = PhoebusReconstruction::ReconType::linear;
+    } else {
+      PARTHENON_THROW(
+          "Invalid Reconstruction option.  Choose from [linear,weno5]");
+    }
+    params.Add("Recon", rt);
+
+    std::string solver = pin->GetOrAddString("fluid", "riemann", "hll");
+    riemann::solver rs = riemann::solver::HLL;
+    if (solver == "llf") {
+      rs = riemann::solver::LLF;
+    } else if (solver == "hll") {
+      rs = riemann::solver::HLL;
+    } else {
+      PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
+    }
+    params.Add("RiemannSolver", rs);
+  } 
   bool ye = pin->GetOrAddBoolean("fluid", "Ye", false);
   params.Add("Ye", ye);
 
@@ -127,7 +129,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
             Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
                three_vec);
-
+  
   if (bc_vars == "conserved") {
     mcons_scalar.Set(Metadata::FillGhost);
     mcons_threev.Set(Metadata::FillGhost);
@@ -174,6 +176,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
+  // Just want constant primitive fields around to serve as 
+  // background if we are not evolving the fluid, don't need 
+  // to do the rest.
+  if (!active) return physics; 
+
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
   physics->AddField(impl::fail, mprim_scalar);
@@ -497,7 +504,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
     return TaskStatus::complete;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -597,7 +604,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("hydro"))
+  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
     return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
@@ -731,6 +738,8 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
 
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetBlockPointer();
+  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
+    return TaskStatus::complete;
   if (!pmb->packages.Get("fluid")->Param<bool>("mhd"))
     return TaskStatus::complete;
 

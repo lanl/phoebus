@@ -70,9 +70,11 @@ add_executable(phoebus
   pgen/advection.cpp
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
+  pgen/homogeneous_sphere.cpp
   pgen/kh.cpp
   pgen/leptoneq.cpp
   pgen/linear_modes.cpp
+  pgen/radiation_advection.cpp
   pgen/rhs_tester.cpp
   pgen/shock_tube.cpp
   pgen/thin_cooling.cpp
@@ -98,6 +100,7 @@ add_executable(phoebus
   radiation/radiation.hpp
   radiation/radiation.cpp
   radiation/cooling_function.cpp
+  radiation/moments.cpp
   radiation/monte_carlo.cpp
   radiation/geodesics.hpp
 

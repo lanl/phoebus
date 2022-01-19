@@ -22,6 +22,7 @@
 using namespace parthenon::package::prelude;
 
 #include "fluid/fluid.hpp"
+#include "radiation/radiation.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
@@ -197,8 +198,7 @@ void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
-  std::string bc_vars = pkg->Param<std::string>("bc_vars");
+  
   auto pmb = rc->GetBlockPointer();
   const int ndim = pmb->pmy_mesh->ndim;
 
@@ -211,15 +211,28 @@ TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc) 
       domains.push_back(IndexDomain::outer_x3);
     }
   }
+  
+  auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
+  if (pkg->Param<bool>("active")) {
+    std::string bc_vars = pkg->Param<std::string>("bc_vars");
+    if (bc_vars == "primitive") {
+      //auto c2p = pkg->Param<fluid::c2p_meshblock_type>("c2p_func");
+      for (auto &domain : domains) {
+        IndexRange ib = rc->GetBoundsI(domain);
+        IndexRange jb = rc->GetBoundsJ(domain);
+        IndexRange kb = rc->GetBoundsK(domain);
+        fluid::PrimitiveToConservedRegion(rc.get(), ib, jb, kb);
+      }
+    }
+  }
 
-  if (bc_vars == "primitive") {
-    //auto c2p = pkg->Param<fluid::c2p_meshblock_type>("c2p_func");
-    for (auto &domain : domains) {
-      IndexRange ib = rc->GetBoundsI(domain);
-      IndexRange jb = rc->GetBoundsJ(domain);
-      IndexRange kb = rc->GetBoundsK(domain);
-      //c2p(rc.get(), ib, jb, kb);
-      fluid::PrimitiveToConservedRegion(rc.get(), ib, jb, kb);
+  auto &pkg_rad = rc->GetParentPointer()->packages.Get("radiation");
+  if (pkg_rad->Param<bool>("active")) {
+    std::string bc_vars = pkg_rad->Param<std::string>("bc_vars");
+    if (bc_vars == "primitive") {
+      for (auto &domain : domains) {
+        radiation::MomentPrim2Con(rc.get(), domain);
+      }
     }
   }
 
