@@ -43,8 +43,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(bondi)                                                                         \
   PROBLEM(radiation_advection)                                                           \
   PROBLEM(homogeneous_sphere)                                                            \
-  PROBLEM(torus)
-           \
+  PROBLEM(torus)                                                                         \
   PROBLEM(tov)
 
 // if you need problem-specific modifications to inputs, add the name here
