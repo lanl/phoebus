@@ -38,7 +38,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap[p::velocity].first;
   const int ivhi = imap[p::velocity].second;
   const int ieng = imap[p::energy].first;
-  const int iye  = imap[p::ye].first;
+  const int iye  = imap[p::ye].second;
   const int iprs = imap[p::pressure].first;
   const int itmp = imap[p::temperature].first;
 
@@ -64,10 +64,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const Real x = coords.x1v(i);
+	Real lambda[2] = {0.5, 0.};
+	if (iye > 0) {
+	  v(iye, k, j, i) = lambda[0];
+	}
+
         v(irho, k, j, i) = rho0;
         v(ieng, k, j, i) = u0;
-        v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho0, u0/rho0);
-        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho0, u0/rho0);
+        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho0, u0/rho0, lambda);
+        v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho0, u0/rho0, lambda);
         v(iye, k, j, i) = 0.5; // TODO(BRR) change depending on species
 
         for (int d = 0; d < 3; d++)

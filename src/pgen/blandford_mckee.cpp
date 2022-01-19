@@ -78,7 +78,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       Real u = phoebus::energy_from_rho_P(eos, rho, P);
       Real eps = u/rho;
-      Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps);
+
+      Real eos_lambda[2];
+      if (iye > 0) {
+	v(iye, k, j, i) = 0.5;
+	eos_lambda[0] = v(iye, k, j, i);
+      }
+      Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, eos_lambda);
 
       v(irho, k, j, i) = rho;
       v(iprs, k, j, i) = P;

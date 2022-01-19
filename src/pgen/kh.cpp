@@ -78,10 +78,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       const Real rho = y < 0.25 ? rho1 : rho0;
       const Real P = y < 0.25 ? P1 : P0;
       const Real vel = y < 0.25 ? v1 : v0;
+
+      Real eos_lambda[2];
+      if (iye > 0) {
+	v(iye, k, j, i) = sin(2.0*M_PI*x);
+	eos_lambda[0] = v(iye, k, j, i);
+      }
+
       v(irho, k, j, i) = rho;
       v(iprs, k, j, i) = P;
-      v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho, P);
-      v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho); // this doesn't have to be exact, just a reasonable guess
+      v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho, P, eos_lambda[0]);
+      v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho, eos_lambda); // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = v_pert*2.0*(rng_gen.drand()-0.5);
       v(ivlo, k, j, i) += vel;
       Real vsq = 0.;
@@ -100,7 +107,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ib_lo + 1, k, j, i) = By;
         v(ib_hi, k, j, i) = Bz;
       }
-      if (iye > 0) v(iye, k, j, i) = sin(2.0*M_PI*x);
       rng_pool.free_state(rng_gen);
     });
 
