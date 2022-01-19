@@ -29,6 +29,8 @@ catch_discover_tests(phoebus_unit_tests
   TEST_SPEC "[MonopoleGR]" TEST_PREFIX "MonopoleGR:")
 catch_discover_tests(phoebus_unit_tests
   TEST_SPEC "[relativity_utils]" TEST_PREFIX "relativity_utils:")
+catch_discover_tests(phoebus_unit_tests 
+  TEST_SPEC "[radiation]" TEST_PREFIX "radiation:")
 
 if(PHOEBUS_ENABLE_UNIT_TESTS)
   message("Building unit tests.")

@@ -27,7 +27,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   const bool active = pin->GetBoolean("physics", "rad");
   params.Add("active", active);
-
+  
   if (!active) {
     return physics;
   }
@@ -42,7 +42,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
-  std::vector<std::string> known_methods = {"cooling_function", "moment",
+  std::vector<std::string> known_methods = {"cooling_function", "moment_m1", "moment_eddington",
                                             "monte_carlo", "mocmc"};
   if (std::find(known_methods.begin(), known_methods.end(), method) ==
       known_methods.end()) {
@@ -60,6 +60,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("do_nu_electron_anti", do_nu_electron_anti);
   bool do_nu_heavy = pin->GetOrAddBoolean("radiation", "do_nu_heavy", true);
   params.Add("do_nu_heavy", do_nu_heavy);
+
+  // Boundary conditions
+  const std::string bc_vars = pin->GetOrAddString("phoebus/mesh", "bc_vars", "conserved");
+  params.Add("bc_vars", bc_vars);
+
+  // Set radiation cfl factor
+  Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.8);
+  params.Add("cfl", cfl);
+  
+  // Get fake value for integrated BB for testing  
+  Real B_fake = pin->GetOrAddReal("radiation", "B_fake", 1.0);
+  params.Add("B_fake", B_fake);
+  bool use_B_fake = pin->GetOrAddBoolean("radiation", "use_B_fake", false);
+  params.Add("use_B_fake", use_B_fake);
+  Real scattering_fraction = pin->GetOrAddReal("radiation", "scattering_fraction", 0.0);
+  params.Add("scattering_fraction", scattering_fraction);
 
   // Initialize frequency discretization
   Real nu_min = pin->GetReal("radiation", "nu_min");
@@ -127,6 +143,65 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     RNGPool rng_pool(rng_seed);
     physics->AddParam<>("rng_pool", rng_pool);
   }
+  if ((method == "mocmc") || (method == "moment_m1") || (method == "moment_eddington")) { 
+    Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived, 
+                                              Metadata::Intensive, Metadata::FillGhost, Metadata::Vector},
+                                              std::vector<int>{NumRadiationTypes, 3}); 
+    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived, 
+                                              Metadata::Intensive, Metadata::FillGhost},
+                                              std::vector<int>{NumRadiationTypes}); 
+
+    Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved, 
+                                                   Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost, Metadata::Vector}, 
+                                                   std::vector<int>{NumRadiationTypes, 3}); 
+    Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved, 
+                                              Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost}, 
+                                              std::vector<int>{NumRadiationTypes}); 
+    
+    namespace p = radmoment_prim; 
+    namespace c = radmoment_cons; 
+    namespace i = radmoment_internal;
+
+    physics->AddField(c::E, mspecies_scalar_cons); 
+    physics->AddField(p::J, mspecies_scalar);
+
+    physics->AddField(c::F, mspecies_three_vector_cons); 
+    physics->AddField(p::H, mspecies_three_vector); 
+    
+    int ndim = 3;
+    //if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
+    //else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
+    
+
+    // Fields for saving guesses for NR iteration in the radiation Con2Prim type solve
+    physics->AddField(i::xi, mspecies_scalar);
+    physics->AddField(i::phi, mspecies_scalar);
+    
+    // Fields for cell edge reconstruction
+    /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense of more dependency
+    Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     std::vector<int>{NumRadiationTypes, 4, ndim});
+    Metadata mrecon_v = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     std::vector<int>{3, ndim});
+    physics->AddField(i::ql, mrecon);
+    physics->AddField(i::qr, mrecon);
+    physics->AddField(i::ql_v, mrecon_v);
+    physics->AddField(i::qr_v, mrecon_v);
+    
+    // Add variable for calculating gradients of rest frame energy density 
+    Metadata mdJ = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     std::vector<int>{NumRadiationTypes, ndim, ndim});
+    physics->AddField(i::dJ, mdJ);
+
+    // Add variables for source functions 
+    Metadata mSourceVar = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+			     std::vector<int>{NumRadiationTypes});
+    physics->AddField(i::kappaJ, mSourceVar);
+    physics->AddField(i::kappaH, mSourceVar);
+    physics->AddField(i::JBB, mSourceVar);
+    
+    physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
+  }
 
   if (method != "cooling_function") {
     physics->EstimateTimestepBlock = EstimateTimestepBlock;
@@ -181,7 +256,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
   // TODO(BRR) Can't just use dx^i/dx^0 = 1 for speed of light
   // TODO(BRR) add a cfl-like fudge factor to radiation
-  auto &pars = pmb->packages.Get("fluid")->AllParams();
+  auto &pars = pmb->packages.Get("radiation")->AllParams();
   Real min_dt;
   pmb->par_reduce(
       "Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,

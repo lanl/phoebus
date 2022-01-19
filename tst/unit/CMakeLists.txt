@@ -14,3 +14,4 @@
 add_subdirectory(geometry)
 add_subdirectory(monopole_gr)
 add_subdirectory(phoebus_utils)
+add_subdirectory(radiation)
