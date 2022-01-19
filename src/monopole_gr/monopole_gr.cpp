@@ -19,6 +19,7 @@
 
 // Parthenon
 #include <kokkos_abstraction.hpp>
+#include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
@@ -33,6 +34,7 @@
 #include "monopole_gr_utils.hpp"
 
 using namespace parthenon::package::prelude;
+using parthenon::AllReduce;
 
 namespace MonopoleGR {
 
@@ -104,6 +106,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto hypersurface_h = Kokkos::create_mirror_view(hypersurface);
   auto alpha_h = Kokkos::create_mirror_view(alpha);
 
+  // Reduction objects.
+  AllReduce<Matter_host_t> matter_reducer;
+  matter_reducer.val = matter_h;
+  AllReduce<Volumes_host_t> volumes_reducer;
+  volumes_reducer.val = volumes_h;
+
   // Host-only scratch arrays for Thomas' Method
   Alpha_host_t alpha_m_l("monopole_gr alpha matrix, band below diagonal", npoints);
   Alpha_host_t alpha_m_d("monopole_gr alpha matrix, diagonal", npoints);
@@ -122,6 +130,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("hypersurface_h", hypersurface_h);
   params.Add("lapse", alpha);
   params.Add("lapse_h", alpha_h);
+  // mutable because the reducer is stateful
+  params.Add("matter_reducer", matter_reducer, true);
+  params.Add("volumes_reducer", volumes_reducer, true);
   // M . alpha = b
   params.Add("alpha_m_l", alpha_m_l); // hostonly arrays
   params.Add("alpha_m_d", alpha_m_d);
