@@ -453,7 +453,8 @@ namespace radiation
     GetBasisVectors(E, cov_F, &con_tilg, &con_tild);
 
     // Perform an Eddington approximation Con2Prim to get initial guesses
-    Tens2 con_PiEdd{{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}};
+    Tens2 con_PiEdd;
+    SPACELOOP2(i, j) con_PiEdd(i,j) = 0.0;
     Real JEdd;
     Vec cov_HEdd;
     Con2Prim(E, cov_F, con_PiEdd, &JEdd, &cov_HEdd);
