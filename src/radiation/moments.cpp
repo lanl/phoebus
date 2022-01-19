@@ -23,6 +23,8 @@
 namespace radiation {
 
 struct Vec { 
+  // Do not add any member data to this struct since it is initialized in many places in 
+  // the code using initializer lits 
   Real data[Geometry::NDSPACE]; 
   KOKKOS_FORCEINLINE_FUNCTION
   Real& operator()(const int idx){return data[idx];}
@@ -43,7 +45,9 @@ Vec operator*(Real a, Vec b) {Vec out; SPACELOOP(i) out(i) = a*b(i); return out;
 KOKKOS_FORCEINLINE_FUNCTION 
 Vec operator/(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = ratio(a(i), b); return out;} 
 
-struct Tens2 { 
+struct Tens2 {
+  // Do not add any member data to this struct since it is initialized in many places in 
+  // the code using initializer lits 
   Real data[Geometry::NDSPACE][Geometry::NDSPACE]; 
   KOKKOS_FORCEINLINE_FUNCTION 
   Real& operator()(const int i, const int j){return data[i][j];} 
