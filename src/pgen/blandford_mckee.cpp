@@ -64,6 +64,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
+  auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::blandford_mckee", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -76,7 +78,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real P = rescale*rescale*P0*std::pow(W/tshock, 4.0);
       Real rho = rho0*std::pow(W/tshock,3.0);
 
-      Real u = phoebus::energy_from_rho_P(eos, rho, P);
+      Real u = phoebus::energy_from_rho_P(eos, rho, P, emin, emax);
       Real eps = u/rho;
 
       Real eos_lambda[2];

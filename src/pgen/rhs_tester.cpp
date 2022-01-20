@@ -42,6 +42,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
+  auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::rhs_tester", kb.s, kb.e, jb.s, jb.e, ib.s,
@@ -50,15 +52,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real rho = 1;
         const Real P = x / 2;
         const Real vel = x / 2;
-        v(irho, k, j, i) = rho;
-        v(iprs, k, j, i) = P;
-        v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho, P);
 
 	Real eos_lambda[2];
 	if (iye > 0) {
 	  v(iye, k, j, i) = 0.5;
 	  eos_lambda[0] = v(iye, k, j, i);
 	}
+
+        v(irho, k, j, i) = rho;
+        v(iprs, k, j, i) = P;
+        v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho, P, emin, emax, eos_lambda[0]);
+
         v(itmp, k, j, i) =
 	  eos.TemperatureFromDensityInternalEnergy(rho,
 						   v(ieng, k, j, i) / rho,
