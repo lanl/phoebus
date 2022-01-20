@@ -54,7 +54,7 @@ nx3 = 1
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
-Cv = 1.23816e8
+Cv = 1.23816e8 # gam = 5/3, mu = mp
 
 <units>
 scale_free = false

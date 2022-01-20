@@ -197,18 +197,18 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s,
       kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        if (fabs(v(Gcov_lo,k,j,i)) > 0.)
+        /*if (fabs(v(Gcov_lo,k,j,i)) > 0.)
         printf("[%i %i %i] U: %e %e %e %e %e\n    dU: %e %e %e %e %e\n",
           i, j, k,
           v(ceng,k,j,i), v(cmom_lo,k,j,i), v(cmom_lo+1,k,j,i), v(cmom_lo+2,k,j,i),
           v(cye,k,j,i),
           v(Gcov_lo, k, j, i) * dt,
           v(Gcov_lo+1,k,j,i)*dt, v(Gcov_lo+2,k,j,i)*dt, v(Gcov_lo+3,k,j,i)*dt,
-          v(Gye,k,j,i)*dt);
-        v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
-        v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
-        v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
-        v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
+          v(Gye,k,j,i)*dt);*/
+        //v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
+        //v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
+        //v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
+        //v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
         v(cye, k, j, i) += v(Gye, k, j, i) * dt;
       });
 
