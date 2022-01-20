@@ -117,7 +117,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting
   // value
-  Real wgtC = 1.e50; // Typical-ish value
+  Real wgtC = 1.e40; // Typical-ish value
 
   pmb->par_for(
       "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -216,9 +216,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       Kokkos::Sum<Real>(dNtot));
 
   printf("dNtot: %e\n", dNtot);
-  exit(-1);
+  //exit(-1);
 
   // TODO(BRR) Mpi reduction here....... this really needs to be a separate task
+  // TODO(BRR) actually use tuning parameter
   Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
 
   pmb->par_for(
@@ -453,6 +454,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real MASS = unit_conv.GetMassCodeToCGS();
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
+  const Real CTIME = unit_conv.GetTimeCGSToCode();
   const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
   const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
   const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
@@ -482,6 +484,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           // TODO(BRR) Get u^mu, evaluate -k.u
           Real nu = -k0(n) * ENERGY;// / pc::h;
+          Real nu_code = -k0(n) * ENERGY / pc::h / CTIME;
 
           // TODO(BRR) Get K^0 via metric
           Real Kcon0 = -k0(n);
@@ -507,19 +510,22 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           const Real Ye = v(iye, k, j, i);
 
           const Real h_code = pc::h*TIME/(MASS*LENGTH*LENGTH);
-          printf("h_code: %e\n", h_code);
 
           Real alphanu =
               //d_opacity.AbsorptionCoefficient(rho_cgs, T_cgs, Ye, s, nu) /
               //(4. * M_PI);
-              d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, -k0(n)) /
+              //d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, -k0(n)) /
+              //(4. * M_PI);
+              d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, nu_code) /
               (4. * M_PI);
 
           //Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
           //Real dtau_abs = dlam / (-k0(n) * alphanu);
-          Real dtau_abs = (dlam * h_code) / ((-k0(n) / h_code) * alphanu);
-          printf("alphanu: %e dtau_abs: %e (%e %e %e %e)\n", alphanu, dtau_abs,
-            rho_cgs, T_cgs, Ye, nu);
+          //Real dtau_abs = (dlam * h_code) / ((-k0(n) / h_code) * alphanu);
+          //Real dtau_abs = (nu / CTIME * alphanu) * h_code * dlam;
+          Real dtau_abs = alphanu * dt;
+          //printf("alphanu: %e dtau_abs: %e (%e %e %e %e)\n", alphanu, dtau_abs,
+          //  rho_cgs, T_cgs, Ye, nu);
           //printf("dtau_abs = %e\n", dtau_abs);
 
           bool absorbed = false;
