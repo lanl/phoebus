@@ -348,6 +348,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Real E = nu * pc::h * CENERGY;
               Real theta = acos(2. * rng_gen.drand() - 1.);
               Real phi = 2. * M_PI * rng_gen.drand();
+              printf("E: %e w: %e\n", E, weight(m));
               Real K_tetrad[4] = {-E, E * cos(theta), E * cos(phi) * sin(theta),
                                   E * sin(phi) * sin(theta)};
               Real K_coord[4];
@@ -538,7 +539,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real xabs = -log(rng_gen.drand());
             if (xabs <= dtau_abs) {
               // Deposit energy-momentum and lepton number in fluid
-              Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)),
+              /*Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)),
                                  -1. / dV_code * weight(n) * k0(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 1, k, j, i)),
                                  -1. / dV_code * weight(n) * k1(n));
@@ -549,7 +550,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               // TODO(BRR) Add Ucon[0] in the below
               Kokkos::atomic_add(&(v(iGye, k, j, i)),
                                  1. / dV_code * weight(n) * pc::mp / MASS);
-
+*/
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]),
                 1.);
