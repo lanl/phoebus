@@ -382,7 +382,12 @@ class ConToPrim {
     // TODO(JCD): revisit this.  is it worth it to find the upper bound?
     //const Real mu_r = res.compute_upper_bound(h0sq_);
     // solve
-    const Real mu = root_find::itp(res, 0.0, 1.0, rel_tolerance);
+    root_find::RootFindStatus status;
+    const Real mu = root_find::itp(res, 0.0, 1.0, rel_tolerance, &status);
+    if (status == root_find::RootFindStatus::failure) {
+      printf("bad mu find!\n");
+      exit(-1);
+    }
 
     // now unwrap everything into primitive and conserved vars
     const Real x = res.x_mu(mu);

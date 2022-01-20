@@ -33,7 +33,6 @@ Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                      SwarmContainer *sc, const double t0,
                                      const double dt) {
-  printf("[%i] MonteCarloSourceParticles\n", Globals::my_rank);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -215,9 +214,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       },
       Kokkos::Sum<Real>(dNtot));
 
-  printf("dNtot: %e\n", dNtot);
-  //exit(-1);
-
   // TODO(BRR) Mpi reduction here....... this really needs to be a separate task
   // TODO(BRR) actually use tuning parameter
   Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
@@ -343,12 +339,12 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                                          dlnu));
 
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
+              //weight(m) /= 10;
 
               // Encode frequency and randomly sample direction
               Real E = nu * pc::h * CENERGY;
               Real theta = acos(2. * rng_gen.drand() - 1.);
               Real phi = 2. * M_PI * rng_gen.drand();
-              printf("E: %e w: %e\n", E, weight(m));
               Real K_tetrad[4] = {-E, E * cos(theta), E * cos(phi) * sin(theta),
                                   E * sin(phi) * sin(theta)};
               Real K_coord[4];
@@ -398,7 +394,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                SwarmContainer *sc, const double t0,
                                const double dt) {
-  printf("[%i] MonteCarloTransport() t = %e\n", Globals::my_rank, t0);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -475,6 +470,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   ParArray1D<Real> num_interactions("Number interactions", 2);
 
+  printf("Particles: %i\n", swarm->GetNumActive());
+
   pmb->par_for(
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(),
       KOKKOS_LAMBDA(const int n) {
@@ -484,7 +481,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           auto s = static_cast<RadiationType>(swarm_species(n));
 
           // TODO(BRR) Get u^mu, evaluate -k.u
-          Real nu = -k0(n) * ENERGY;// / pc::h;
+          Real nu = -k0(n) * ENERGY / pc::h;
           Real nu_code = -k0(n) * ENERGY / pc::h / CTIME;
 
           // TODO(BRR) Get K^0 via metric
@@ -517,14 +514,18 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               //(4. * M_PI);
               //d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, -k0(n)) /
               //(4. * M_PI);
-              d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, nu_code) /
-              (4. * M_PI);
+              d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, nu_code);//
+              // /(4. * M_PI);
 
           //Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
           //Real dtau_abs = dlam / (-k0(n) * alphanu);
           //Real dtau_abs = (dlam * h_code) / ((-k0(n) / h_code) * alphanu);
           //Real dtau_abs = (nu / CTIME * alphanu) * h_code * dlam;
           Real dtau_abs = alphanu * dt;
+
+          //printf("dtau_abs: %e alphanu: %e cm^-1 mft: %e s rho cgs: %e T cgs: %e nu cgs: %e\n",
+          //dtau_abs, alphanu/LENGTH, 1./(alphanu/LENGTH*pc::c),
+          //  rho_cgs, T_cgs, nu);
           //printf("alphanu: %e dtau_abs: %e (%e %e %e %e)\n", alphanu, dtau_abs,
           //  rho_cgs, T_cgs, Ye, nu);
           //printf("dtau_abs = %e\n", dtau_abs);
@@ -539,7 +540,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real xabs = -log(rng_gen.drand());
             if (xabs <= dtau_abs) {
               // Deposit energy-momentum and lepton number in fluid
-              /*Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)),
+              Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)),
                                  -1. / dV_code * weight(n) * k0(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 1, k, j, i)),
                                  -1. / dV_code * weight(n) * k1(n));
@@ -550,7 +551,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               // TODO(BRR) Add Ucon[0] in the below
               Kokkos::atomic_add(&(v(iGye, k, j, i)),
                                  1. / dV_code * weight(n) * pc::mp / MASS);
-*/
+
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]),
                 1.);
@@ -580,7 +581,6 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   auto num_interactions_h = Kokkos::create_mirror_view(num_interactions);
   Kokkos::deep_copy(num_interactions_h, num_interactions);
-  printf("num_interactions_h[0] = %e\n", num_interactions_h[0]);
 
   const auto num_absorbed = rad->Param<Real>("num_absorbed");
   const auto num_scattered = rad->Param<Real>("num_scattered");
@@ -597,7 +597,6 @@ TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {
 // Reduce particle sampling resolution statistics from per-mesh to global as part of global
 // reduction.
 TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *resolution) {
-  printf("[%i] MonteCarloUpdateParticleResolution\n", Globals::my_rank);
   auto rad = pmesh->packages.Get("radiation");
   const auto num_emitted = rad->Param<Real>("num_emitted");
   const auto num_absorbed = rad->Param<Real>("num_absorbed");
@@ -830,14 +829,9 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
 }*/
 
 TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_outstanding) {
-  printf("[%i] MonteCarloCountCommunicated()\n", Globals::my_rank);
   auto &swarm = pmb->swarm_data.Get()->Get("monte_carlo");
 
   *particles_outstanding += swarm->num_particles_sent_;
-  printf("particles_outstanding: %i\n", *particles_outstanding);
-
-  printf("nbmax: %i nneighbor: %i\n", swarm->vbswarm->bd_var_.nbmax,
-    pmb->pbval->nneighbor);
 
   // Reset communication flags
   // TODO(BRR) nneighbor instead of nbmax?
@@ -869,7 +863,6 @@ TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_o
 
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks) {
-  printf("[%i] InitializeCommunicationMesh\n", Globals::my_rank);
   // Boundary transfers on same MPI proc are blocking
 #ifdef MPI_PARALLEL
   for (auto &block : blocks) {
