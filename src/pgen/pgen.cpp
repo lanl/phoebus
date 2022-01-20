@@ -14,6 +14,7 @@
 #include "geometry/geometry.hpp"
 
 #include "pgen.hpp"
+#include "phoebus_utils/root_find.hpp"
 
 namespace phoebus {
 
@@ -43,39 +44,30 @@ void ProblemModifier(ParameterInput *pin) {
   f(pin);
 }
 
+class PressResidual {
+ public:
+  KOKKOS_INLINE_FUNCTION
+  PressResidual(const singularity::EOS &eos, const Real rho, const Real P, const Real Ye)
+    : eos_(eos), rho_(rho), P_(P) {
+    lambda_[0] = Ye;
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real operator()(const Real e) {
+    return eos_.PressureFromDensityInternalEnergy(rho_, e, lambda_);
+  }
+ private:
+  const singularity::EOS &eos_;
+  Real rho_, P_;
+  Real lambda_[2];
+};
+
 KOKKOS_FUNCTION
-Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P, const Real Ye) {
+Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P,
+		       const Real emin, const Real emax, const Real Ye) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
-
-  Real lambda[2] = {Ye, 0.};
-  Real eguessl = P/rho;
-  Real Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl, lambda);
-  Real eguessr = eguessl;
-  Real Pguessr = Pguessl;
-  printf("%g %g %g %g\n", eguessl, Pguessl, eguessr, Pguessr); // DEBUG
-  while (Pguessl > P) {
-    eguessl /= 2.0;
-    Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl, lambda);
-  }
-  while (Pguessr < P) {
-    eguessr *= 2.0;
-    Pguessr = eos.PressureFromDensityInternalEnergy(rho, eguessr, lambda);
-  }
-
-  PARTHENON_REQUIRE(Pguessr>P && Pguessl<P, "Pressure not bracketed");
-
-  while (Pguessr - Pguessl > 1.e-10*P) {
-    Real emid = 0.5*(eguessl + eguessr);
-    Real Pmid = eos.PressureFromDensityInternalEnergy(rho, emid, lambda);
-    if (Pmid < P) {
-      eguessl = emid;
-      Pguessl = Pmid;
-    } else {
-      eguessr = emid;
-      Pguessr = Pmid;
-    }
-  }
-  return 0.5*rho*(eguessl + eguessr);
+  PressResidual res(eos, rho, P, Ye);
+  Real eroot = root_find::itp(res, emin, emax, 1.e-10*P);
+  return rho*eroot;
 }
 
 }

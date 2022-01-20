@@ -66,6 +66,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
+  auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
   RNGPool rng_pool(pin->GetOrAddInteger("kelvin_helmholtz", "seed", 37));
 
@@ -87,7 +89,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       v(irho, k, j, i) = rho;
       v(iprs, k, j, i) = P;
-      v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho, P, eos_lambda[0]);
+      v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho, P, emin, emax, eos_lambda[0]);
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho, eos_lambda); // this doesn't have to be exact, just a reasonable guess
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = v_pert*2.0*(rng_gen.drand()-0.5);
       v(ivlo, k, j, i) += vel;
