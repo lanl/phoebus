@@ -11,30 +11,27 @@
 # publicly and display publicly, and to permit others to do so.
 
 <phoebus>
-problem = shock_tube
-bc_ix1 = outflow
-bc_ox1 = outflow
+problem = homogeneous_sphere
+bc_ix1 = reflect 
+bc_ox1 = outflow 
 
 <parthenon/job>
-problem_id  = sod       # problem ID: basename of output filenames
+problem_id  = hom_sph   # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = p.density,  &
-	    c.density,  &
-            p.velocity, &
-            p.energy,   &
-	    pressure,	&
-	    cs, &
-	    p.ye
+variables = r.c.E, &
+            r.c.F, &
+            r.p.J, &
+            r.p.H 
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1.0      # time increment between outputs
+dt          = 1.e-1     # time increment between outputs
 
 <parthenon/time>
-nlim        = -1        # cycle limit
-tlim        = 4.e1       # time limit
-integrator  = rk2       # time integration algorithm
-ncycle_out  = 1        # interval for stdout summary info
+nlim        = -1      # cycle limit
+tlim        = 1.e1   # time limit
+integrator  = rk2     # time integration algorithm
+ncycle_out  = 1       # interval for stdout summary info
 dt_init_fact = 1.e-6
 
 <parthenon/mesh>
@@ -42,15 +39,15 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 512       # Number of zones in X1-direction
+nx1         = 128      # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
-x1max       = 1         # maximum value of X1
+x1max       = 5        # maximum value of X1
 ix1_bc      = user     # Inner-X1 boundary condition flag
 ox1_bc      = user     # Outer-X1 boundary condition flag
 
-nx2         = 1       # Number of zones in X2-direction
-x2min       = -1        # minimum value of X2
-x2max       = 1         # maximum value of X2
+nx2         = 1         # Number of zones in X2-direction
+x2min       = 0         # minimum value of X2
+x2max       = 3.14159265359   # maximum value of X2
 ix2_bc      = periodic  # Inner-X2 boundary condition flag
 ox2_bc      = periodic  # Outer-X2 boundary condition flag
 
@@ -62,8 +59,10 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
+bc_vars = conservative
+
 <parthenon/meshblock>
-nx1 = 512
+nx1 = 128
 nx2 = 1
 nx3 = 1
 
@@ -78,10 +77,10 @@ Gamma = 1.6666666666666666667
 Cv = 1.0 
 
 <physics>
-hydro = true
+hydro = false
 he = false
 3t = false
-rad = false
+rad = true
 
 <fluid>
 xorder = 2
@@ -91,10 +90,30 @@ recon = weno5
 c2p_max_iter = 100
 Ye = true
 
-<shocktube>
-rhol = 1.0
-Pl = 1.e-5
-vl = 0.0
-rhor = 0.125
-Pr = 1.e-6
-vr = 0.0
+<radiation>
+cfl = 0.5
+method = moment_m1
+nu_min = 1.e15
+nu_max = 1.e22
+nu_bins = 200
+#opacity_model = gray
+absorption = true
+do_nu_electron = true
+do_nu_electron_anti = false
+do_nu_heavy = false
+
+scattering_fraction = 0.0 
+B_fake = 1.0
+use_B_fake = true
+
+<opacity> 
+type = gray 
+gray_kappa = 1.e1
+
+<homogeneous_sphere>
+J = 0.01
+Hx = 0.01
+Hy = 0.0
+Hz = 0.0
+vx = 0.0
+radius = 1.0
