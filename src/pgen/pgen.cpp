@@ -53,7 +53,7 @@ class PressResidual {
   }
   KOKKOS_INLINE_FUNCTION
   Real operator()(const Real e) {
-    return eos_.PressureFromDensityInternalEnergy(rho_, e, lambda_);
+    return eos_.PressureFromDensityInternalEnergy(rho_, e, lambda_) - P_;
   }
  private:
   const singularity::EOS &eos_;

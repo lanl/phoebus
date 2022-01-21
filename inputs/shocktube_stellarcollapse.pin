@@ -96,6 +96,11 @@ recon = weno5
 c2p_max_iter = 100
 Ye = true
 
+# Density of roughly 1e9 g/cm^3
+<units>
+fluid_mass_g = 1e18
+geom_length_cm = 1e3
+
 <shocktube>
 rhol = 10.0
 Pl = 13.3333333333333333333333
