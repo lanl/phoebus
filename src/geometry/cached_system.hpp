@@ -283,11 +283,11 @@ public:
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
-  void ConnectionCoefficient(CellLocation loc, int b, int k, int j, int i,
+  void ConnectionCoefficient(CellLocation loc, int bid, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
     if (axisymmetric_)
       k = k_;
-    Utils::SetConnectionCoeffByFD(*this, Gamma, loc, b, k, j, i);
+    Utils::SetConnectionCoeffByFD(*this, Gamma, loc, bid, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
@@ -453,6 +453,7 @@ template <typename System>
 void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetParentPointer();
   auto system = GetCoordinateSystem<System>(rc);
+  auto coords = pmb->coords;
 
   auto &pkg = pmb->packages.Get("geometry");
   bool axisymmetric = pkg->Param<bool>("axisymmetric");
@@ -552,8 +553,8 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  Real kbs = axisymmetric ? 0 : kb.s;
-  Real kbe = axisymmetric ? 0 : kb.e;
+  int kbs = axisymmetric ? 0 : kb.s;
+  int kbe = axisymmetric ? 0 : kb.e;
   pmb->par_for(
       "SetGeometry::Set Cached data, Cent", kbs, kbe, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -581,6 +582,7 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
       ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         lamb(k, j, i, CellLocation::Corn);
       });
+    
   // don't let other kernels launch until geometry is set
   pmb->exec_space.fence();
 }

@@ -15,8 +15,11 @@ add_executable(phoebus
   main.cpp # first
 
   # alphabetical
+  fixup/fixup.cpp
+  fixup/fixup.hpp
 
   fluid/con2prim.hpp
+  fluid/con2prim_robust.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
   fluid/riemann.hpp
@@ -67,13 +70,16 @@ add_executable(phoebus
   pgen/advection.cpp
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
+  pgen/homogeneous_sphere.cpp
   pgen/kh.cpp
   pgen/leptoneq.cpp
   pgen/linear_modes.cpp
+  pgen/radiation_advection.cpp
   pgen/rhs_tester.cpp
   pgen/shock_tube.cpp
   pgen/thin_cooling.cpp
   pgen/sedov.cpp
+  pgen/torus.cpp
 
   phoebus_boundaries/phoebus_boundaries.hpp
   phoebus_boundaries/phoebus_boundaries.cpp
@@ -87,11 +93,14 @@ add_executable(phoebus
   phoebus_utils/debug_utils.hpp
   phoebus_utils/linear_algebra.hpp
   phoebus_utils/relativity_utils.hpp
+  phoebus_utils/robust.hpp
+  phoebus_utils/root_find.hpp
   phoebus_utils/variables.hpp
 
   radiation/radiation.hpp
   radiation/radiation.cpp
   radiation/cooling_function.cpp
+  radiation/moments.cpp
   radiation/monte_carlo.cpp
   radiation/geodesics.hpp
 

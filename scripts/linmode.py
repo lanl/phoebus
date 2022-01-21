@@ -287,8 +287,8 @@ for n, N in enumerate(res):
   else:
     for var in mode['vars']:
       mode[var + '_soln'] = get_mode(x, y, t, var)
-    
-  for var in mode['vars']:  
+
+  for var in mode['vars']:
     L1[var][n] =  np.fabs(parth['d' + var] - mode[var + '_soln']).sum()/(N*N*amp)
 
   if plot_each_wave:
