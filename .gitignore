@@ -1,6 +1,10 @@
 bin
 BIN
-build
+build*
 BUILD
+results
+.devcontainer 
+.vscode 
+.DS_Store 
 __pycache__
 *.swp
