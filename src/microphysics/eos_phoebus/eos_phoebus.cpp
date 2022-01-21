@@ -181,13 +181,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     singularity::StellarCollapse eos_sc(pin->GetString(block_name, "filename"),
 					pin->GetOrAddBoolean(block_name, "use_sp5", true),
 					false);
-    
-    params.Add("sie_min", eos_sc.sieMin());
-    params.Add("sie_max", eos_sc.sieMax());
-    params.Add("T_min", eos_sc.TMin());
-    params.Add("T_max", eos_sc.TMax());
-    params.Add("rho_min", eos_sc.rhoMin());
-    params.Add("rho_max", eos_sc.rhoMax());
+    Real M_unit = unit_conv.GetMassCodeToCGS();
+    Real L_unit = unit_conv.GetLengthCodeToCGS();
+    Real rho_unit = M_unit/(L_unit*L_unit*L_unit);
+    Real e_unit = unit_conv.GetEnergyCodeToCGS();
+    Real sie_unit = e_unit/M_unit;
+    Real T_unit = unit_conv.GetTemperatureCodeToCGS();
+
+    params.Add("sie_min", eos_sc.sieMin()/sie_unit);
+    params.Add("sie_max", eos_sc.sieMax()/sie_unit);
+    params.Add("T_min", eos_sc.TMin()/T_unit);
+    params.Add("T_max", eos_sc.TMax()/T_unit);
+    params.Add("rho_min", eos_sc.rhoMin()/rho_unit);
+    params.Add("rho_max", eos_sc.rhoMax()/rho_unit);
   } else { // TODO: Be more clever here?
     Real rho_min = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
     Real sie_min = pin->GetOrAddReal("fixup", "sie0_floor", 0.0);
