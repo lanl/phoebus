@@ -12,8 +12,8 @@
 
 <phoebus>
 problem = shock_tube
-ix1_bc = outflow
-ox1_bc = outflow
+bc_ix1 = outflow
+bc_ox1 = outflow
 
 <parthenon/job>
 problem_id  = sod       # problem ID: basename of output filenames
@@ -45,8 +45,8 @@ nghost = 4
 nx1         = 512       # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1         # maximum value of X1
-ix1_bc      = user  # Inner-X1 boundary condition flag
-ox1_bc      = user  # Outer-X1 boundary condition flag
+ix1_bc      = user     # Inner-X1 boundary condition flag
+ox1_bc      = user     # Outer-X1 boundary condition flag
 
 nx2         = 1       # Number of zones in X2-direction
 x2min       = -1        # minimum value of X2
@@ -76,9 +76,11 @@ method = derivative_order_1
 max_level = 3
 
 <eos>
-type = IdealGas
-Gamma = 1.6666666666666666667
-Cv = 1.0
+#type = IdealGas
+#Gamma = 1.6666666666666666667
+#Cv = 1.0
+type = StellarCollapse
+filename = /home/jonahm/data/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.1_20120817.sp5
 
 <physics>
 hydro = true
@@ -93,6 +95,11 @@ riemann = hll
 recon = weno5
 c2p_max_iter = 100
 Ye = true
+
+# Density of roughly 1e9 g/cm^3
+<units>
+fluid_mass_g = 1e18
+geom_length_cm = 1e3
 
 <shocktube>
 rhol = 10.0

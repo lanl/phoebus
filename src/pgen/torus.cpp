@@ -132,8 +132,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int itmp = imap[fluid_prim::temperature].first;
 
   // this only works with ideal gases
+  // The Fishbone solver needs to know about Ye
+  // and the eos machinery needs to construct adiabats.
   const std::string eos_type = pin->GetString("eos","type");
-  PARTHENON_REQUIRE_THROWS(eos_type=="IdealGas", "Bondi setup only works with ideal gas");
+  PARTHENON_REQUIRE_THROWS(eos_type=="IdealGas",
+			   "Torus setup only works with ideal gas");
   const Real gam = pin->GetReal("eos","Gamma");
   const Real Cv = pin->GetReal("eos", "Cv");
 
@@ -144,6 +147,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
   const Real bnorm = pin->GetOrAddReal("torus", "Bnorm", 1.e-2);
   const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
+  const Real Ye = pin->GetOrAddReal("torus", "Ye", 0.5);
 
   const Real a = pin->GetReal("geometry","a");
   auto bl = Geometry::BoyerLindquist(a);
@@ -244,10 +248,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       Real rhoflr = 0;
       Real epsflr;
       floor.GetFloors(x1v, x2v, x3, rhoflr, epsflr);
+      Real lambda[2] = {Ye, 0.0};
+      if (iye > 0) {
+	v(iye,k,j,i) = lambda[0];
+      }
       v(irho,k,j,i) = v(irho,k,j,i) < rhoflr ? rhoflr : v(irho,k,j,i);
       v(ieng,k,j,i) = v(ieng,k,j,i)/v(irho,k,j,i) < epsflr ? v(irho,k,j,i)*epsflr : v(ieng,k,j,i);
-      v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
-      v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i));
+      v(itmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i), lambda);
+      v(iprs,k,j,i) = eos.PressureFromDensityTemperature(v(irho,k,j,i), v(itmp,k,j,i), lambda);
 
       rng_pool.free_state(rng_gen);
     });
