@@ -95,6 +95,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   auto rad = pmesh->packages.Get("radiation");
   auto fluid = pmesh->packages.Get("fluid");
   const auto rad_active = rad->Param<bool>("active");
+  const auto rad_moments_active = rad->Param<bool>("moments_active");
   const auto fluid_active = fluid->Param<bool>("active");
 
   std::vector<std::string> src_names;
@@ -148,7 +149,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       geom_src = geom_src | hydro_geom_src;
     }
 
-    if (rad_active) {
+    if (rad_moments_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       auto moment_recon = tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get());
       auto get_opacities = tl.AddTask(moment_recon, radiation::MomentCalculateOpacities<MDT>, sc0.get());
@@ -202,7 +203,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto update = tl.AddTask(avg_data, UpdateIndependentData<MeshData<Real>>, sc0.get(),
                              dudt.get(), beta * dt, sc1.get());
 
-    if (rad_active) {
+    if (rad_moments_active) {
       auto impl_update = tl.AddTask(update, radiation::MomentFluidSource<MeshData<Real>>,
                                   sc1.get(), beta*dt, fluid_active);
       update = impl_update | update;
