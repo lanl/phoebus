@@ -62,7 +62,7 @@ geom_length_cm = 1.e14
 fluid_mass_g = 1.e0
 
 <physics>
-hydro = false
+hydro = true
 he = false
 3t = false
 rad = true
