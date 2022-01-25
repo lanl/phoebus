@@ -75,8 +75,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
   auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
-  printf("pgen\n"); // debug
-
   pmb->par_for(
     "Phoebus::ProblemGenerator::Sod", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
     KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -93,10 +91,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       v(irho, k, j, i) = rho;
       v(iprs, k, j, i) = P;
-      printf("get energy from rho P\n");
       v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho, P, emin, emax, lambda[0]);
       v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho, lambda); // this doesn't have to be exact, just a reasonable guess
-      printf("eos calls finished\n");
       for (int d = 0; d < 3; d++) v(ivlo+d, k, j, i) = 0.0;
       v(ivlo, k, j, i) = vel;
       Real gammacov[3][3] = {0};
@@ -116,7 +112,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     });
 
   fluid::PrimitiveToConserved(rc.get());
-  printf("pgen finished\n"); // debug
 }
 
 } // namespace shock_tube
