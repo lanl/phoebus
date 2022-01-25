@@ -29,7 +29,8 @@ Real itp(F &func, Real a, Real b, const Real tol) {
   Real ya = func(a);
   Real yb = func(b);
   if (ya * yb > 0.0) {
-    printf("Root not bracketed in find_root\n");
+    printf("Root not bracketed in find_root. a, b, ya, yb = %g %g %g %g\n",
+           a, b, ya, yb);
     return 0.5*(a+b);
   }
   Real sign = (ya < 0 ? 1.0 : -1.0);
