@@ -43,14 +43,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("fluid");
   Params &params = physics->AllParams();
 
-  // Check that we are actually evolving the fluid  
+  // Check that we are actually evolving the fluid
   const bool active = pin->GetBoolean("physics", "hydro");
   params.Add("active", active);
   if (active) { // Only set up these parameters if the fluid is evolved
 
+    const bool zero_fluxes = pin->GetOrAddBoolean("fluid", "zero_fluxes", false);
+    params.Add("zero_fluxes", zero_fluxes);
+
     Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
     params.Add("cfl", cfl);
-    
+
     std::string c2p_method = pin->GetOrAddString("fluid", "c2p_method", "robust");
     params.Add("c2p_method", c2p_method);
     if (c2p_method == "robust") {
@@ -103,7 +106,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
     }
     params.Add("RiemannSolver", rs);
-  } 
+  }
   bool ye = pin->GetOrAddBoolean("fluid", "Ye", false);
   params.Add("Ye", ye);
 
@@ -129,7 +132,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
             Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
                three_vec);
-  
+
   if (bc_vars == "conserved") {
     mcons_scalar.Set(Metadata::FillGhost);
     mcons_threev.Set(Metadata::FillGhost);
@@ -176,10 +179,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
-  // Just want constant primitive fields around to serve as 
-  // background if we are not evolving the fluid, don't need 
+  // Just want constant primitive fields around to serve as
+  // background if we are not evolving the fluid, don't need
   // to do the rest.
-  if (!active) return physics; 
+  if (!active) return physics;
 
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
@@ -603,7 +606,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
+  auto &fluid = pmb->packages.Get("fluid");
+  if (fluid->Param<bool>("active"))
     return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
@@ -619,6 +623,17 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>(
       "Recon");
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
+
+  if (fluid->Param<bool>("zero_fluxes")) {
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "ZeroFluxes", DevExecSpace(), X1DIR,
+    pmb->pmy_mesh->ndim, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
+    ib.s - 1, ib.e + 1,
+    KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
+      for (int m = 0; m < flux.NumConserved(); m++) {
+        flux.v.flux(d,m,k,j,i) = 0.;
+      }
+    });
+  }
 
 #define RECON(method)                                                          \
   parthenon::par_for(                                                          \
