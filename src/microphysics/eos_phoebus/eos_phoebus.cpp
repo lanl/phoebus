@@ -12,6 +12,7 @@
 // publicly, and to permit others to do so.
 
 // system includes
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -30,6 +31,9 @@
 
 namespace Microphysics {
 namespace EOS {
+
+parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
+
 using names_t = std::vector<std::string>;
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   using namespace singularity;
@@ -183,10 +187,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 					false);
     Real M_unit = unit_conv.GetMassCodeToCGS();
     Real L_unit = unit_conv.GetLengthCodeToCGS();
-    Real rho_unit = M_unit/(L_unit*L_unit*L_unit);
-    Real e_unit = unit_conv.GetEnergyCodeToCGS();
-    Real sie_unit = e_unit/M_unit;
+    Real rho_unit = M_unit/std::pow(L_unit, 3);
     Real T_unit = unit_conv.GetTemperatureCodeToCGS();
+    // Always C^2
+    Real sie_unit = std::pow(pc.c, 2);
+    Real press_unit = rho_unit*sie_unit;
 
     params.Add("sie_min", eos_sc.sieMin()/sie_unit);
     params.Add("sie_max", eos_sc.sieMax()/sie_unit);
