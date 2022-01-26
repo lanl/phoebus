@@ -11,7 +11,7 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
-PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
+#PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
 DUMP_NAMES = '/home/brryan/builds/phoebus/cooling.out1.*.phdf'
 
 import numpy as np
@@ -21,8 +21,9 @@ import shutil
 import os
 from subprocess import call, DEVNULL
 import glob
-sys.path.append(PHDF_PATH)
-import phdf
+#sys.path.append(PHDF_PATH)
+#import phdf
+from parthenon_tools import phdf
 import time
 from enum import Enum
 
@@ -84,6 +85,9 @@ for n, dfnam in enumerate(dfnams):
   t_code[n] = dfile.Time*T_unit
   Ye_code[n] = dfile.Get("p.ye").mean()
   u_code[n] = dfile.Get("p.energy").mean()*U_unit
+
+print(t_code)
+print(Ye_code)
 
 fig, axes = plt.subplots(2, 1, figsize=(8,6))
 ax = axes[0]
