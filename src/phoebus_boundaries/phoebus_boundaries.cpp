@@ -27,6 +27,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace Boundaries {
 
@@ -54,7 +55,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
           Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
-          Real gratio = Geometry::Utils::ratio(detg, detg_ref);
+          Real gratio = robust::ratio(detg, detg_ref);
           q(l, k, j, i) = gratio * q(l, k, j, ref);
         });
   } else if (bc_vars == "primitive") {
@@ -115,7 +116,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
           Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
-          Real gratio = Geometry::Utils::ratio(detg, detg_ref);
+          Real gratio = robust::ratio(detg, detg_ref);
           q(l, k, j, i) = gratio * q(l, k, j, ref);
         });
   } else if (bc_vars == "primitive") {
@@ -169,7 +170,7 @@ void ReflectInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         int iref = 2*ref - i - 1;
         Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, iref);
         Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
-        Real gratio = Geometry::Utils::ratio(detg, detg_ref);
+        Real gratio = robust::ratio(detg, detg_ref);
         Real reflect = q.VectorComponent(l) == X1DIR ? -1.0 : 1.0;
         q(l, k, j, i) = gratio * reflect * q(l, k, j, iref);
       });
@@ -191,7 +192,7 @@ void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         int iref = 2*ref - i + 1;
         Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, iref);
         Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
-        Real gratio = Geometry::Utils::ratio(detg, detg_ref);
+        Real gratio = robust::ratio(detg, detg_ref);
         Real reflect = q.VectorComponent(l) == X1DIR ? -1.0 : 1.0;
         q(l, k, j, i) = gratio * reflect * q(l, k, j, iref);
       });

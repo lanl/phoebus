@@ -29,12 +29,12 @@ using namespace parthenon::package::prelude;
 
 // Phoebus includes
 #include "phoebus_utils/linear_algebra.hpp"
+#incluee "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
 namespace Geometry {
 constexpr int NDSPACE = 3;
 constexpr int NDFULL = NDSPACE + 1;
-constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
 } // namespace Geometry
 
 #define SPACELOOP(i) for (int i = 0; i < Geometry::NDSPACE; i++)
@@ -48,13 +48,6 @@ constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
 
 namespace Geometry {
 namespace Utils {
-
-template <typename T> KOKKOS_INLINE_FUNCTION int sgn(const T &val) {
-  return (T(0) <= val) - (val < T(0));
-}
-KOKKOS_INLINE_FUNCTION Real ratio(Real a, Real b) {
-  return a / (b + sgn(b) * SMALL);
-}
 
 struct MeshBlockShape {
   MeshBlockShape(ParameterInput *pin) {
@@ -122,7 +115,7 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
     }
     Real alpham = s.Lapse(X0, X1m, X2m, X3m);
     Real alphap = s.Lapse(X0, X1p, X2p, X3p);
-    da[d] = ratio(alphap - alpham, dx * (alpham + alphap));
+    da[d] = robust::ratio(alphap - alpham, dx * (alpham + alphap));
   }
 }
 
@@ -191,7 +184,7 @@ SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
     s.SpacetimeMetric(X0, X1R, X2R, X3R, gr);
     s.SpacetimeMetric(X0, X1L, X2L, X3L, gl);
     SPACETIMELOOP(mu) {
-      SPACETIMELOOP(nu) { dg[mu][nu][d] = ratio(gr[mu][nu] - gl[mu][nu], 2*dx); }
+      SPACETIMELOOP(nu) { dg[mu][nu][d] = robust::ratio(gr[mu][nu] - gl[mu][nu], 2*dx); }
     }
   }
 }

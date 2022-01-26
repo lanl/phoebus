@@ -12,8 +12,8 @@
 
 <phoebus>
 problem = homogeneous_sphere
-bc_ix1 = reflect 
-bc_ox1 = outflow 
+ix1_bc = reflect 
+ox1_bc = outflow 
 
 <parthenon/job>
 problem_id  = hom_sph   # problem ID: basename of output filenames
