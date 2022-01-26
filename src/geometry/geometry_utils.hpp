@@ -29,7 +29,7 @@ using namespace parthenon::package::prelude;
 
 // Phoebus includes
 #include "phoebus_utils/linear_algebra.hpp"
-#incluee "phoebus_utils/robust.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
 namespace Geometry {

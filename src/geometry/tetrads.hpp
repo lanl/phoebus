@@ -15,6 +15,7 @@
 #define GEOMETRY_TETRADS_HPP_
 
 #include <parthenon/package.hpp>
+#include "phoebus_utils/robust.hpp"
 
 namespace Geometry {
 
@@ -95,7 +96,7 @@ private:
       Econ_[3][mu] = Geometry::Utils::KroneckerDelta(mu, 3);
     }
 
-    if (norm > SMALL) {
+    if (norm > robust::SMALL()) {
       // We can use the Trial vector
       if (X1ness > X2ness && X1ness > X3ness) {
         // Trial vector is closest to X1. Overwrite

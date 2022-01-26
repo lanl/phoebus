@@ -274,7 +274,7 @@ private:
                         bool print = false) const {
     using robust::sgn;
     using robust::ratio;
-    constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
+    constexpr Real SMALL = robust::SMALL();
     Real &D = v(scr_lo + iD);
     Real &tau = v(scr_lo + itau);
     Real &Bsq = v(scr_lo + iBsq);
