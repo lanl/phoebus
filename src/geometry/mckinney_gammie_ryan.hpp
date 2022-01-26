@@ -27,6 +27,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace Geometry {
 
@@ -57,6 +58,7 @@ public:
   void operator()(Real X1, Real X2, Real X3, Real C[NDSPACE],
                   Real Jcov[NDSPACE][NDSPACE],
                   Real Jcon[NDSPACE][NDSPACE]) const {
+    using robust::ratio;
     Real y, th, thJ;
     const Real r = r_(X1);
     th_(X1, X2, y, th);
@@ -88,9 +90,9 @@ public:
     Jcov[1][1] = dthdX2;
     Jcov[2][2] = 1.;     // phi
     // Jcon
-    Jcon[0][0] = Utils::ratio(1., drdX1);               // r
-    Jcon[1][0] = -Utils::ratio(dthdX1, drdX1 * dthdX2); // th
-    Jcon[1][1] = Utils::ratio(1., dthdX2);
+    Jcon[0][0] = ratio(1., drdX1);               // r
+    Jcon[1][0] = -ratio(dthdX1, drdX1 * dthdX2); // th
+    Jcon[1][1] = ratio(1., dthdX2);
     Jcon[2][2] = 1.;                                    // phi
   }
 

@@ -29,6 +29,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
 namespace con2prim {
@@ -271,8 +272,8 @@ private:
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const singularity::EOS &eos,
                         bool print = false) const {
-    using Geometry::Utils::sgn;
-    using Geometry::Utils::ratio;
+    using robust::sgn;
+    using robust::ratio;
     constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
     Real &D = v(scr_lo + iD);
     Real &tau = v(scr_lo + itau);

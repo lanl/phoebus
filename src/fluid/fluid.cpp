@@ -146,10 +146,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   // TODO(BRR) Should these go in a "phoebus" package?
-  const std::string bc_ix1 = pin->GetString("phoebus", "bc_ix1");
-  params.Add("bc_ix1", bc_ix1);
-  const std::string bc_ox1 = pin->GetString("phoebus", "bc_ox1");
-  params.Add("bc_ox1", bc_ox1);
+  const std::string ix1_bc = pin->GetString("phoebus", "ix1_bc");
+  params.Add("ix1_bc", bc_ix1);
+  const std::string ox1_bc = pin->GetString("phoebus", "ox1_bc");
+  params.Add("ox1_bc", bc_ox1);
 
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
