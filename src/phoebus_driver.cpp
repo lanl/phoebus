@@ -343,7 +343,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
           tl.AddTask(none, radiation::InitializeCommunicationMesh, "monte_carlo", blocks);
     }
 
-    TaskRegion &sample_region = tc.AddRegion(num_task_lists_executed_independently);
+    /*TaskRegion &sample_region = tc.AddRegion(num_task_lists_executed_independently);
     for (int i = 0; i < blocks.size(); i++) {
       auto &pmb = blocks[i];
       auto &tl = sample_region[i];
@@ -424,7 +424,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
 
       transport_region.AddRegionalDependencies(reg_dep_id, i, check);
       reg_dep_id++;
-    }
+    }*/
 
     // TODO(BRR) make transport an async region for ghost cells
     TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
