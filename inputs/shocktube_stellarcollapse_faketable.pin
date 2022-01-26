@@ -10,8 +10,12 @@
 # prepare derivative works, distribute copies to the public, perform
 # publicly and display publicly, and to permit others to do so.
 
-# Sod shock tube for SFHo EOS from the nubhlight paper
-# Miller, Ryan, and Dolence, ApJS 241 30, 2019.
+# Sod shock tube for fake stellar collapse table generated with ideal gas eos
+# to generate, run
+# python external/singularity-eos/utils/scripts/make_tabulated_gamma.py -o ideal_gas.h5
+# to generate ideal gas table.
+# optionally run the stellarcollapse2spiner utility in singularity-eos to convert to a
+# stellar collapse file. This will make reading the table much faster.
 
 <phoebus>
 problem = shock_tube
@@ -35,7 +39,7 @@ dt          = 0.01      # time increment between outputs
 
 <parthenon/time>
 nlim        = -1       # cycle limit
-tlim        = 0.75     # time limit
+tlim        = 0.4      # time limit
 integrator  = rk2      # time integration algorithm
 ncycle_out  = 1        # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -80,8 +84,10 @@ max_level = 3
 
 <eos>
 type = StellarCollapse
-filename = /home/jonahm/data/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.1_20120817.sp5
-#filename = /home/jonahm/data/ideal_gas.sp5
+# change to true if you ran stellarcollapse2spiner
+use_sp5 = false
+# change this to sp5 file if using sp5 true
+filename = ideal_gas.h5
 
 <physics>
 hydro = true
@@ -93,20 +99,20 @@ rad = false
 xorder = 2
 cfl = 0.8
 riemann = hll
-recon = linear
+recon = weno5
 c2p_max_iter = 100
 Ye = true
 
-# Density of roughly 1e9 g/cm^3
+# Units set from the table units
 <units>
 scale_free = false
-fluid_mass_g = 1e31
-geom_length_cm = 3e7
+fluid_mass_g = 1e3
+geom_length_cm = 1e3
 
 <shocktube>
-rhol = 1.0
-Pl = 0.25
+rhol = 10.0
+Pl = 13.3333333333333333333333
 vl = 0.0
-rhor = 0.25
-Pr = 0.025
+rhor = 1.0
+Pr = 1.e-6
 vr = 0.0
