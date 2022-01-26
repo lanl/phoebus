@@ -22,6 +22,7 @@
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
 namespace fluid {
@@ -35,7 +36,7 @@ class StressEnergyTensorCon {
 public:
   // TODO(JMM): Should these be moved out of Geometry?
   static constexpr int ND = Geometry::NDFULL;
-  static constexpr Real SMALL = Geometry::SMALL;
+  static constexpr Real SMALL = robust::SMALL();
   static constexpr CellLocation loc = CellLocation::Cent;
 
   StressEnergyTensorCon() = default;

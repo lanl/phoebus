@@ -44,18 +44,20 @@ int main(int argc, char *argv[]) {
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
 
   // TODO(JMM): Move this into another function somewhere?
+  // Ensure only allowed parthenon boundary conditions are used
+  const std::string parth_ix1_bc =
+    pman.pinput->GetString("parthenon/mesh", "ix1_bc");
+  PARTHENON_REQUIRE(parth_ix1_bc == "user" || parth_ix1_bc == "periodic", 
+    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ix1_bc");
+  const std::string parth_ox1_bc =
+    pman.pinput->GetString("parthenon/mesh", "ox1_bc");
+  PARTHENON_REQUIRE(parth_ox1_bc == "user" || parth_ox1_bc == "periodic", 
+    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ox1_bc");
+
   const std::string ix1_bc =
       pman.pinput->GetOrAddString("phoebus", "ix1_bc", "outflow");
   const std::string ox1_bc =
       pman.pinput->GetOrAddString("phoebus", "ox1_bc", "outflow");
-
-  // Ensure only allowed parthenon boundary conditions are used
-  const std::string ix1_bc = pman.pinput->GetString("parthenon/mesh", "ix1_bc");
-  PARTHENON_REQUIRE(ix1_bc == "user" || ix1_bc == "periodic", 
-    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ix1_bc");
-  const std::string ox1_bc = pman.pinput->GetString("parthenon/mesh", "ox1_bc");
-  PARTHENON_REQUIRE(ox1_bc == "user" || ox1_bc == "periodic", 
-    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ox1_bc");
 
   if (ix1_bc == "reflect") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =

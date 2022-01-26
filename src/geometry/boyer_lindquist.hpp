@@ -126,7 +126,7 @@ public:
     const Real r3dm = r3 * DD * mu;
     LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
     g[0][0] = ratio(DD, mu);
-    g[1][1] = ratio(1, r2 * mu);
+    g[1][1] = ratio(1., r2 * mu);
     g[2][2] = ratio((r * mu - 2) * sth * sth, r3dm);
   }
   KOKKOS_INLINE_FUNCTION
@@ -275,11 +275,11 @@ private:
     sth = std::sin(th);
     cth = std::cos(th);
     /*
-    if (std::abs(sth) < SMALL) {
-      sth = sgn(sth) * SMALL;
+    if (std::abs(sth) < SMALL()) {
+      sth = sgn(sth) * SMALL();
     }
-    if (std::abs(cth) < SMALL) {
-      cth = sgn(cth) * SMALL;
+    if (std::abs(cth) < SMALL()) {
+      cth = sgn(cth) * SMALL();
     }
     */
     r2 = r * r;
