@@ -247,7 +247,7 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   PARTHENON_DEBUG_REQUIRE(is_monopole_sph || is_monopole_cart,
                           "Monopole solver requires monopole geometry");
 
-  auto matter = params.Get<Matter_t>("matter");
+  auto matter = params.Get<Matter_t>("matter_cells");
   auto vols = params.Get<Volumes_t>("integration_volumes");
   auto radius1d = params.Get<Radius>("radius");
   auto npoints = params.Get<Real>("npoints");
