@@ -29,6 +29,7 @@
 // Phoebus
 #include "geometry/geometry_utils.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
+#include "phoebus_utils/robust.hpp"
 
 #include "monopole_gr.hpp"
 #include "monopole_gr_utils.hpp"
@@ -400,6 +401,24 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
         gradients(Gradients::DKDT, i) = force_static ? 0 : dKdt;
         gradients(Gradients::DBETADT, i) = force_static ? 0 : dbetadt;
       });
+
+  return TaskStatus::complete;
+}
+
+TaskStatus DivideVols(StateDescriptor *pkg) {
+  auto &params = pkg->AllParams();
+  auto enabled = params.Get<bool>("enable_monopole_gr");
+  if (!enabled) return TaskStatus::complete;
+
+  auto npoints = params.Get<int>("npoints");
+  auto matter_h = params.Get<Matter_host_t>("matter_h");
+  auto vols_h = params.Get<Volumes_host_t>("integration_volumes_h");
+
+  for (int i = 0; i < npoints; ++i) {
+    for (int v = 0; v < NMAT; ++v) {
+      matter_h(v, i) = robust::ratio(matter_h(v,i),vols_h(i));
+    }
+  }
 
   return TaskStatus::complete;
 }

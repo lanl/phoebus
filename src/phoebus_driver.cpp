@@ -17,6 +17,8 @@
 #include <vector>
 
 // TODO(JCD): this should be exported by parthenon
+#include <parthenon/driver.hpp>
+#include <parthenon/package.hpp>
 #include <refinement/refinement.hpp>
 #include <utils/error_checking.hpp>
 
@@ -34,6 +36,7 @@
 #include "tov/tov.hpp"
 
 using namespace parthenon::driver::prelude;
+using parthenon::AllReduce;
 
 namespace phoebus {
 
@@ -95,8 +98,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
   auto rad = pmesh->packages.Get("radiation");
   auto fluid = pmesh->packages.Get("fluid");
+  auto monopole = pmesh->packages.Get("monopole_gr");
   const auto rad_active = rad->Param<bool>("active");  
   const auto fluid_active = fluid->Param<bool>("active");
+  // Force static here means monopole only called at initialization.
+  const auto monopole_gr_active = (monopole->Param<bool>("enabled")
+                                   && !(monopole->Param<bool>("force_static")));
 
   std::vector<std::string> src_names; 
   if (fluid_active) { 
@@ -108,11 +115,21 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     src_names.push_back(radmoment_cons::F);
   }
 
+  using MonoMatRed_t = AllReduce<MonopoleGR::Matter_host_t>;
+  using MonoVolRed_t = AllReduce<MonopoleGR::Volumes_host_t>;
+  MonoMatRed_t *pmono_mat_red;
+  MonoVolRed_t *pmono_vol_red;
+  if (monopole_gr_active) {
+    pmono_mat_red = monopole->MutableParam<MonoMatRed_t>("matter_reducer");
+    pmono_vol_red = monopole->MutableParam<MonoVolRed_t>("volumes_reducer");
+  }
+
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region_1[ib];
+    int reg_dep_id = 0;
 
     // first make other useful containers
     auto &base = pmb->meshblock_data.Get();
@@ -140,6 +157,31 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     TaskID geom_src(0); 
     TaskID sndrcv_flux_depend(0); 
 
+    using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+
+    // TODO(JMM): This can be batched up per partition, but I put it
+    // here for now to avoid "blocking." We should move everything to
+    // per-partition when we can.
+    if (monopole_gr_active) {
+      // tasks that depend on interp to monopole can't execute until all task lists
+      // have completed it. It's "blocking" in this sense.
+      auto interp_to_monopole = tl.AddTask(none, MonopoleGR::InterpolateMatterTo1D<MDT>, sc0.get());
+      async_region_1.AddRegionalDependencies(reg_dep_id++, i, interp_to_monopole);
+      auto matter_to_host = tl.AddTask(interp_to_monopole,
+                                       MonopoleGR::MatterToHost,
+                                       monopole.get(), true);
+      TaskID start_reduce_matter =
+        (i == 0 ? tl.AddTask(matter_to_host, &MonoMatRed_t::StartReduce,
+                             pmono_mat_red, MPI_SUM)
+         : none);
+      async_region_1.AddRegionalDependencies(reg_dep_id++, i, start_reduce_matter);
+      TaskID start_reduce_vols =
+        (i == 0 ? tl.AddTask(matter_to_host, &MonoVolRed_t::StartReduce,
+                             pmono_vol_red, MPI_SUM)
+         : none);
+      async_region_1.AddRegionalDependencies(reg_dep_id++, i, start_reduce_vol);
+    }
+
     if (fluid_active) { 
       auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
       auto fix_flux = tl.AddTask(hydro_flux, fixup::FixFluxes, sc0.get());
@@ -150,7 +192,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
 
     if (rad_active) {
-      using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       auto moment_recon = tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get()); 
       auto get_opacities = tl.AddTask(moment_recon, radiation::MomentCalculateOpacities<MDT>, sc0.get());  
       auto moment_flux = tl.AddTask(get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());

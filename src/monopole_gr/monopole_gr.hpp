@@ -197,6 +197,8 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
 
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 
+TaskStatus DivideVols(StateDescriptor *pkg);
+
 namespace impl {
 // Gets ADM mass rho0, adm momentum in r, jr, the rr component of S^i_j, and the trace
 // of the spatial stress tensor. Applies coordinate transforms if necessary.
