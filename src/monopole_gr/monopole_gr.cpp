@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <string>
 #include <sstream>
 
 // Parthenon
@@ -84,7 +85,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
-  Matter_t matter("monopole_gr matter grid", NMAT, npoints);
+  // TODO(JMM): Extra arrays for cell-centered matter?
+  // Probably fine.
+  // matter_cells is just shifte to r + dr/2, but contains same number of points.
+  Matter_t matter("monopole_gr matter grid. face centered.", NMAT, npoints);
+  Matter_t matter_cells("monopole_gr matter grid. cell centered.", NMAT, npoints);
   Volumes_t integration_volumes("monopole_gr matter integration volumes", npoints);
   Hypersurface_t hypersurface("monopole_gr hypersurface grid", NHYPER, npoints);
   Alpha_t alpha("monopole_gr lapse grid", npoints);
@@ -94,6 +99,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
         for (int v = 0; v < NMAT; ++v) {
           matter(v, i) = 0;
+          matter_cells(v, i) = 0;
         }
         hypersurface(Hypersurface::A, i) = 1;
         hypersurface(Hypersurface::K, i) = 0;
@@ -103,6 +109,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Host mirrors
   auto matter_h = Kokkos::create_mirror_view(matter);
+  auto matter_cells_h = Kokkos::create_mirror_view(matter_cells);
   auto integration_vols_h = Kokkos::create_mirror_view(integration_volumes);
   auto hypersurface_h = Kokkos::create_mirror_view(hypersurface);
   auto alpha_h = Kokkos::create_mirror_view(alpha);
@@ -125,6 +132,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("matter", matter);
   params.Add("matter_h", matter_h);
+  params.Add("matter_cells", matter_cells);
+  params.Add("matter_cells_h", matter_cells_h);
   params.Add("integration_volumes", integration_volumes);
   params.Add("integration_volumes_h", integration_vols_h);
   params.Add("hypersurface", hypersurface);
@@ -157,8 +166,10 @@ TaskStatus MatterToHost(StateDescriptor *pkg, bool do_vols) {
   auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
-  auto matter = params.Get<Matter_t>("matter");
-  auto matter_h = params.Get<Matter_host_t>("matter_h");
+  const std::string matter_name = do_vols ? "matter_cells" : "matter";
+  const std::string matter_h_name = do_vols ? "matter_cells_h" : "matter_h";
+  auto matter = params.Get<Matter_t>(matter_name);
+  auto matter_h = params.Get<Matter_host_t>(matter_h_name);
   Kokkos::deep_copy(matter_h, matter);
 
   if (do_vols) {
@@ -411,13 +422,24 @@ TaskStatus DivideVols(StateDescriptor *pkg) {
   if (!enabled) return TaskStatus::complete;
 
   auto npoints = params.Get<int>("npoints");
+  auto matter_cells_h = params.Get<Matter_host_t>("matter_cells_h");
   auto matter_h = params.Get<Matter_host_t>("matter_h");
   auto vols_h = params.Get<Volumes_host_t>("integration_volumes_h");
 
+  // Divide by volumes
   for (int i = 0; i < npoints; ++i) {
     for (int v = 0; v < NMAT; ++v) {
-      matter_h(v, i) = robust::ratio(matter_h(v,i),vols_h(i));
+      matter_cells_h(v, i) = robust::ratio(matter_cells_h(v,i),vols_h(i));
     }
+  }
+  // Shift to the face-centered grid
+  for (int i = 1; i < npoints; ++i) {
+    for (int v = 0; v < NMAT; ++v) {
+      matter_h(v, i) = 0.5*(matter_cells_h(v, i) + matter_cells_h(v, i-1));
+    }
+  }
+  for (int v = 0; v < NMAT; ++v) {
+    matter_h(v, 0) = matter_cells_h(v, 0);
   }
 
   return TaskStatus::complete;
