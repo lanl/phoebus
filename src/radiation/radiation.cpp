@@ -289,12 +289,15 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
           v(Gcov_lo, k, j, i) * dt,
           v(Gcov_lo+1,k,j,i)*dt, v(Gcov_lo+2,k,j,i)*dt, v(Gcov_lo+3,k,j,i)*dt,
           v(Gye,k,j,i)*dt);*/
-        //v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
-        //v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
-        //v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
-        //v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
+        //printf("ceng: %e += %e\n", v(ceng,k,j,i), v(Gcov_lo,k,j,i)*dt);
+        //printf("cye: %e += %e\n", v(cye,k,j,i), v(Gye,k,j,i)*dt);
+        v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
+        v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
+        v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
+        v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
         v(cye, k, j, i) += v(Gye, k, j, i) * dt;
       });
+  //exit(-1);
 
   return TaskStatus::complete;
 }

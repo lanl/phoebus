@@ -40,7 +40,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   const std::string block_name = "opacity";
-  
+
   auto unit_conv = phoebus::UnitConversions(pin);
   double time_unit = unit_conv.GetTimeCodeToCGS();
   double mass_unit = unit_conv.GetMassCodeToCGS();
