@@ -110,7 +110,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   AllReduce<Matter_host_t> matter_reducer;
   matter_reducer.val = matter_h;
   AllReduce<Volumes_host_t> volumes_reducer;
-  volumes_reducer.val = volumes_h;
+  volumes_reducer.val = integration_vols_h;
 
   // Host-only scratch arrays for Thomas' Method
   Alpha_host_t alpha_m_l("monopole_gr alpha matrix, band below diagonal", npoints);
