@@ -86,7 +86,7 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   auto matter = params.Get<Matter_t>("matter_cells");
   auto vols = params.Get<Volumes_t>("integration_volumes");
   auto radius1d = params.Get<Radius>("radius");
-  auto npoints = params.Get<Real>("npoints");
+  auto npoints = params.Get<int>("npoints");
 
   // Initialize 1D arrays to zero
   parthenon::par_for(
