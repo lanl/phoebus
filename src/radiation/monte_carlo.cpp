@@ -260,9 +260,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       Kokkos::Sum<int>(Nstot));
 
 // TODO(BRR) DEBUG!!!!!!!!!!!!
-  if (dNtot <= 0 || t0 > 0.1) {
-    return TaskStatus::complete;
-  }
+  //if (dNtot <= 0 || t0 > 0.1) {
+  //  return TaskStatus::complete;
+  //}
 
   printf("Nstot: %i\n", Nstot);
   const auto num_emitted = rad->Param<Real>("num_emitted");
@@ -532,14 +532,18 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               //(4. * M_PI);
               //d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, -k0(n)) /
               //(4. * M_PI);
-              d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, nu_code);//
+              4.*M_PI * d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, nu_code);//
               // /(4. * M_PI);
 
           //Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
           //Real dtau_abs = dlam / (-k0(n) * alphanu);
           //Real dtau_abs = (dlam * h_code) / ((-k0(n) / h_code) * alphanu);
           //Real dtau_abs = (nu / CTIME * alphanu) * h_code * dlam;
-          Real dtau_abs = 0. * alphanu * dt;
+          Real dtau_abs = alphanu * dt;
+          //printf("dtau_abs: %e\n", dtau_abs);
+
+          // TODO(BRR) DEBUG!!!!!!!!!!
+          //if (t0 > 10) dtau_abs *= 1.e8;
 
           //printf("dtau_abs: %e alphanu: %e cm^-1 mft: %e s rho cgs: %e T cgs: %e nu cgs: %e\n",
           //dtau_abs, alphanu/LENGTH, 1./(alphanu/LENGTH*pc::c),
@@ -579,10 +583,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           }
 
           if (absorbed == false) {
-            printf("before: %e %e %e\n", x(n), y(n), z(n));
             PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt,
                          geom);
-            printf("after: %e %e %e\n", x(n), y(n), z(n));
             //exit(-1);
 
             bool on_current_mesh_block = true;
