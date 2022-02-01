@@ -17,6 +17,7 @@
 #include <vector>
 
 // TODO(JCD): this should be exported by parthenon
+#include <globals.hpp>
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 #include <refinement/refinement.hpp>
@@ -102,7 +103,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const auto rad_active = rad->Param<bool>("active");  
   const auto fluid_active = fluid->Param<bool>("active");
   // Force static here means monopole only called at initialization.
-  const auto monopole_gr_active = (monopole->Param<bool>("enabled")
+  const auto monopole_gr_active = (monopole->Param<bool>("enable_monopole_gr")
                                    && !(monopole->Param<bool>("force_static")));
 
   std::vector<std::string> src_names; 
@@ -129,7 +130,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region_1[ib];
-    int reg_dep_id = 0;
 
     // first make other useful containers
     auto &base = pmb->meshblock_data.Get();
@@ -158,29 +158,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     TaskID sndrcv_flux_depend(0); 
 
     using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-
-    // TODO(JMM): This can be batched up per partition, but I put it
-    // here for now to avoid "blocking." We should move everything to
-    // per-partition when we can.
-    if (monopole_gr_active) {
-      // tasks that depend on interp to monopole can't execute until all task lists
-      // have completed it. It's "blocking" in this sense.
-      auto interp_to_monopole = tl.AddTask(none, MonopoleGR::InterpolateMatterTo1D<MDT>, sc0.get());
-      async_region_1.AddRegionalDependencies(reg_dep_id++, i, interp_to_monopole);
-      auto matter_to_host = tl.AddTask(interp_to_monopole,
-                                       MonopoleGR::MatterToHost,
-                                       monopole.get(), true);
-      TaskID start_reduce_matter =
-        (i == 0 ? tl.AddTask(matter_to_host, &MonoMatRed_t::StartReduce,
-                             pmono_mat_red, MPI_SUM)
-         : none);
-      async_region_1.AddRegionalDependencies(reg_dep_id++, i, start_reduce_matter);
-      TaskID start_reduce_vols =
-        (i == 0 ? tl.AddTask(matter_to_host, &MonoVolRed_t::StartReduce,
-                             pmono_vol_red, MPI_SUM)
-         : none);
-      async_region_1.AddRegionalDependencies(reg_dep_id++, i, start_reduce_vol);
-    }
 
     if (fluid_active) { 
       auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
@@ -227,6 +204,20 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
     auto &dudt = pmesh->mesh_data.GetOrAdd("dUdt", ib);
     auto &tl = sync_region[ib];
+    int reg_dep_id = 0;
+
+    using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+
+    // TODO(JMM): Not sure what the optimal inter-weaving is from an
+    // accuracy point of view. The way I have it now, the metric
+    // updates before con2prim and boundaries, which is I think where
+    // it's first needed.
+    TaskID interp_to_monopole = none;
+    if (monopole_gr_active) {
+      auto interp_to_monopole =
+        tl.AddTask(none, MonopoleGR::InterpolateMatterTo1D<MDT>, sc0.get());
+      sync_region.AddRegionalDependencies(reg_dep_id++, ib, interp_to_monopole);
+    }
 
     // update step
     auto avg_data = tl.AddTask(none, AverageIndependentData<MeshData<Real>>, sc0.get(),
@@ -239,6 +230,47 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                   sc1.get(), beta*dt, fluid_active);
       update = impl_update | update;
     } 
+
+    // TODO(JMM): Is this the right place for this?
+    // TODO(JMM): Should this stuff be in the synchronous region?
+    if (monopole_gr_active) {
+      auto matter_to_host = (ib == 0 ? tl.AddTask(interp_to_monopole,
+                                                  MonopoleGR::MatterToHost,
+                                                  monopole.get(), true)
+                             : none);
+      sync_region.AddRegionalDependencies(reg_dep_id++, ib, matter_to_host);
+      auto start_reduce_matter =
+        (ib == 0 ? tl.AddTask(matter_to_host, &MonoMatRed_t::StartReduce,
+                              pmono_mat_red, MPI_SUM)
+         : none);
+      auto start_reduce_vols =
+        (ib == 0 ? tl.AddTask(matter_to_host, &MonoVolRed_t::StartReduce,
+                              pmono_vol_red, MPI_SUM)
+         : none);
+      auto finish_reduce_matter = tl.AddTask(
+        start_reduce_matter, &MonoMatRed_t::CheckReduce, pmono_mat_red);
+      sync_region.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_matter);
+      auto finish_reduce_vols = tl.AddTask(
+        start_reduce_vols, &MonoVolRed_t::CheckReduce, pmono_vol_red);
+      sync_region.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_vols);
+      auto finish_mono_reds = finish_reduce_matter | finish_reduce_vols;
+      auto divide_vols = (ib == 0 ? tl.AddTask(finish_mono_reds,
+                                               MonopoleGR::DivideVols,
+                                               monopole.get())
+                          : none);
+      auto integrate_hypersurface = (ib == 0 ? tl.AddTask(divide_vols,
+                                                          MonopoleGR::IntegrateHypersurface,
+                                                          monopole.get())
+                                     : none);
+      auto lin_solve_for_lapse = (ib == 0 ? tl.AddTask(integrate_hypersurface,
+                                                       MonopoleGR::LinearSolveForAlpha,
+                                                       monopole.get())
+                                  : none);
+      auto spacetime_to_device = (ib == 0 ? tl.AddTask(lin_solve_for_lapse,
+                                                       MonopoleGR::SpacetimeToDevice,
+                                                       monopole.get())
+                                  : none);
+    }
 
     // update ghost cells
     auto send =
@@ -375,11 +407,13 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     TOV::IntegrateTov(tov_pkg.get(), monopole_pkg.get(), eos_pkg.get());
   }
   if (enable_monopole) {
-    MonopoleGR::MatterToHost(monopole_pkg.get());
+    MonopoleGR::MatterToHost(monopole_pkg.get(), false);
     MonopoleGR::IntegrateHypersurface(monopole_pkg.get());
     MonopoleGR::LinearSolveForAlpha(monopole_pkg.get());
     MonopoleGR::SpacetimeToDevice(monopole_pkg.get());
-    MonopoleGR::DumpToTxt("tov.dat", monopole_pkg.get());
+    if (parthenon::Globals::my_rank == 0) {
+      MonopoleGR::DumpToTxt("tov.dat", monopole_pkg.get());
+    }
   }
 
   return packages;

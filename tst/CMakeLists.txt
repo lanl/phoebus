@@ -22,6 +22,11 @@ target_link_libraries(phoebus_unit_tests
     singularity-eos
     $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
     )
+if (PHOEBUS_ENABLE_MPI)
+  target_compile_definitions(phoebus_unit_tests
+    PRIVATE
+    MPI_PARALLEL)
+endif()
 
 catch_discover_tests(phoebus_unit_tests
   TEST_SPEC "[geometry]" TEST_PREFIX "geometry:")

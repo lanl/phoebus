@@ -16,7 +16,7 @@
 
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 
-#include "monopole_gr.hpp"
+#include "monopole_gr_base.hpp"
 
 namespace MonopoleGR {
 

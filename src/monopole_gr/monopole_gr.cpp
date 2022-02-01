@@ -32,7 +32,7 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/robust.hpp"
 
-#include "monopole_gr.hpp"
+#include "monopole_gr_interface.hpp"
 #include "monopole_gr_utils.hpp"
 
 using namespace parthenon::package::prelude;
@@ -181,6 +181,8 @@ TaskStatus MatterToHost(StateDescriptor *pkg, bool do_vols) {
   return TaskStatus::complete;
 }
 
+// TODO(JMM): This could leverage the cell-centered values
+// we compute.
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   using namespace ShootingMethod;
 
@@ -417,6 +419,8 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
 }
 
 TaskStatus DivideVols(StateDescriptor *pkg) {
+  using Geometry::Utils::ratio;
+
   auto &params = pkg->AllParams();
   auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
@@ -429,7 +433,7 @@ TaskStatus DivideVols(StateDescriptor *pkg) {
   // Divide by volumes
   for (int i = 0; i < npoints; ++i) {
     for (int v = 0; v < NMAT; ++v) {
-      matter_cells_h(v, i) = robust::ratio(matter_cells_h(v,i),vols_h(i));
+      matter_cells_h(v, i) = ratio(matter_cells_h(v,i),vols_h(i));
     }
   }
   // Shift to the face-centered grid
