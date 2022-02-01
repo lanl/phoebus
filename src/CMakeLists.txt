@@ -62,8 +62,10 @@ add_executable(phoebus
   microphysics/opac_phoebus/opac_phoebus.hpp
   microphysics/opac_phoebus/opac_phoebus.cpp
 
+  monopole_gr/interp_3d_to_1d.hpp
   monopole_gr/monopole_gr.hpp
   monopole_gr/monopole_gr_base.hpp
+  monopole_gr/monopole_gr_interface.hpp
   monopole_gr/monopole_gr_utils.hpp
   monopole_gr/monopole_gr.cpp
 

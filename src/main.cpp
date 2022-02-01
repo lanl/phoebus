@@ -14,9 +14,11 @@
 //========================================================================================
 
 #include <defs.hpp>
+#include <globals.hpp>
 #include <parthenon_manager.hpp>
 
 #include "geometry/geometry.hpp"
+#include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
@@ -83,6 +85,11 @@ int main(int argc, char *argv[]) {
 
   // This line actually runs the simulation
   auto driver_status = driver.Execute();
+
+  // output some diagnostics
+  if (parthenon::Globals::my_rank == 0) {
+    MonopoleGR::DumpCurrentState(pman.pmesh->packages.Get("monopole_gr").get());
+  }
 
   // call MPI_Finalize and Kokkos::finalize if necessary
   pman.ParthenonFinalize();

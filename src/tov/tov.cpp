@@ -28,7 +28,8 @@
 // Phoebus
 #include "geometry/geometry_utils.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
-#include "monopole_gr/monopole_gr.hpp"
+#include "monopole_gr/monopole_gr_base.hpp"
+#include "monopole_gr/monopole_gr_interface.hpp"
 #include "monopole_gr/monopole_gr_utils.hpp"
 
 #include "tov.hpp"

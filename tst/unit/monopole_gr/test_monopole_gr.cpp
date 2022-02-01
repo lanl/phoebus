@@ -32,7 +32,8 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 
 // monopole_gr includes
-#include "monopole_gr/monopole_gr.hpp"
+#include "monopole_gr/monopole_gr_base.hpp"
+#include "monopole_gr/monopole_gr_interface.hpp"
 #include "tov/tov.hpp"
 
 using namespace parthenon::package::prelude;
@@ -190,7 +191,7 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
       }
       WHEN("We integrate the hypersurface") {
         auto start = std::chrono::high_resolution_clock::now();
-        MonopoleGR::MatterToHost(pkg.get());
+        MonopoleGR::MatterToHost(pkg.get(), false);
         MonopoleGR::IntegrateHypersurface(pkg.get());
         auto stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<Duration_t>(stop - start);
@@ -246,7 +247,7 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
     WHEN("We integrate the TOV equations") {
       TOV::IntegrateTov(tov_pkg.get(), monopole_pkg.get(), eos_pkg.get());
       THEN("We can solve for the metric") {
-        MonopoleGR::MatterToHost(monopole_pkg.get());
+        MonopoleGR::MatterToHost(monopole_pkg.get(), false);
         MonopoleGR::IntegrateHypersurface(monopole_pkg.get());
         MonopoleGR::LinearSolveForAlpha(monopole_pkg.get());
         MonopoleGR::SpacetimeToDevice(monopole_pkg.get());
