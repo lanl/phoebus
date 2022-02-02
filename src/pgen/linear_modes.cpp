@@ -47,6 +47,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                               "p.velocity",
                               "p.energy",
                               fluid_prim::bfield,
+			      fluid_prim::ye,
                               "pressure",
                               "temperature",
                               "gamma1",
@@ -61,6 +62,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ib_hi = imap[fluid_prim::bfield].second;
   const int iprs = imap["pressure"].first;
   const int itmp = imap["temperature"].first;
+  const int iye = imap[fluid_prim::ye].second;
   const int nv = ivhi - ivlo + 1;
 
   const Real gam = pin->GetReal("eos", "Gamma");
@@ -221,9 +223,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       double Pg = (gam - 1.)*ug;
       v(ieng, k, j, i) = ug;
       v(iprs, k, j, i) = Pg;
+
+      Real eos_lambda[2];
+      if (iye > 0) {
+	v(iye, k, j, i) = 0.5;
+	eos_lambda[0] = v(iye, k, j, i);
+      }
       // This line causes NaNs and I don't know why
       //v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho);
-      v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho);
+      v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho, eos_lambda);
       if (ivhi > 0) {
         v(ivlo, k, j, i) = u10 + (du1*mode).real();
       }
