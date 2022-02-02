@@ -114,6 +114,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   auto state_h = params.Get<TOV::State_host_t>("tov_state_h");
   auto intrinsic_h = params.Get<TOV::State_host_t>("tov_intrinsic_h");
 
+  // Currently only works with ideal gas.
   auto pc = params.Get<Real>("pc");
   auto s = params.Get<Real>("entropy");
   auto Pmin = params.Get<Real>("pmin");

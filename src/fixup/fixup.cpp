@@ -11,6 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+#include <cmath>
+
 #include "fixup.hpp"
 
 #include <bvals/bvals_interfaces.hpp>
@@ -167,6 +169,10 @@ TaskStatus ApplyFloors(T *rc) {
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(),
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+          double eos_lambda[2]; // used for stellarcollapse eos and
+				// other EOS's that require root
+				// finding.
+	  eos_lambda[1] = std::log10(v(b,tmp,k,j,i)); // use last temp as initial guess
             
           double rho_floor, sie_floor;
           bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
@@ -215,11 +221,13 @@ TaskStatus ApplyFloors(T *rc) {
 
           if (floor_applied) {
             // Update dependent primitives
+	    if (pye > 0) eos_lambda[0] = v(b,pye,k,j,i);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-                                v(b,peng,k,j,i)/v(b,prho,k,j,i));
-            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+								      v(b,peng,k,j,i)/v(b,prho,k,j,i), eos_lambda);
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i),
+								eos_lambda);
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i);
+								   v(b,tmp,k,j,i), eos_lambda)/v(b,prs,k,j,i);
 
             // Update conserved variables
             const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -329,6 +337,11 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+	Real eos_lambda[2]; // use last temp as initial guess
+	eos_lambda[0] = 0.5;
+	eos_lambda[1] = std::log10(v(b,tmp,k,j,i));
+
+
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b,iv,k,j,i)  = v(b,ifail,k,j,i-1)*v(b,iv,k,j,i-1)
                          + v(b,ifail,k,j,i+1)*v(b,iv,k,j,i+1);
@@ -356,11 +369,14 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             v(b,peng,k,j,i) = fixup(peng, norm);
             
             if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
+	    if (pye > 0) eos_lambda[0] = v(b,pye,k,j,i);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-                                Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)));
-            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+								      Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)),
+								      eos_lambda);
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i), eos_lambda);
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
+								   Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)),
+								   eos_lambda);
           } else {
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive velocities to zero
             
@@ -372,11 +388,15 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
               v(b, pye, k, j, i) = 0.5;
             }
 
+	    if (pye > 0) eos_lambda[0] = v(b,pye,k,j,i);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-                                Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)));
-            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+								      Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)),
+								      eos_lambda);
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i),
+								eos_lambda);
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
+								   Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)),
+								   eos_lambda);
 
             // Zero primitive velocities
             SPACELOOP(ii) {

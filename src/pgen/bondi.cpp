@@ -164,10 +164,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         r = tr.bl_radius(x1);
       }
 
+      Real eos_lambda[2];
+      if (iye > 0) {
+	v(iye,k,j,i) = 0.5;
+	eos_lambda[0] = v(iye,k,j,i);
+      }
+
       v(itmp,k,j,i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
       v(irho,k,j,i) = std::pow(v(itmp,k,j,i),n);
       v(ieng,k,j,i) = v(irho,k,j,i)*v(itmp,k,j,i)/(gam - 1.0);
-      v(iprs,k,j,i) = eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i));
+      v(iprs,k,j,i) = eos.PressureFromDensityInternalEnergy(v(irho,k,j,i), v(ieng,k,j,i)/v(irho,k,j,i), eos_lambda);
       Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
       ucon_bl[1] = -C1/(std::pow(v(itmp,k,j,i),n)*std::pow(r,2));
 

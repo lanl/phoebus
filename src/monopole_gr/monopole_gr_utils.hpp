@@ -15,15 +15,10 @@
 #define MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
 
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
-
 #include "monopole_gr_base.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace MonopoleGR {
-
-constexpr unsigned int log2(unsigned int n) { return (n > 1) ? 1 + log2(n >> 1) : 0; }
-
-// ======================================================================
-
 namespace ShootingMethod {
 
 KOKKOS_INLINE_FUNCTION
@@ -34,7 +29,7 @@ Real GetARHS(const Real a, const Real K, const Real r, const Real rho) {
 
 KOKKOS_INLINE_FUNCTION
 Real GetKRHS(Real a, Real K, Real r, Real j) {
-  return (r <= 0) ? 0 : 8 * M_PI * a * a * j - (3. / r) * K;
+  return (r <= 0) ? 0 : 8 * M_PI * a * a * j - robust::ratio(3.*K, r);
 }
 
 KOKKOS_INLINE_FUNCTION
@@ -59,7 +54,6 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
   R[Hypersurface::K] = K;
 }
 } // namespace ShootingMethod
-
 } // namespace MonopoleGR
 
 #endif // MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
