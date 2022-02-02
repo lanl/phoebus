@@ -160,8 +160,8 @@ private:
       th = thG;
     }
     // coordinate singularity fix at the poles. Avoid theta = 0.
-    if (std::abs(th) < robust::SMALL())
-      th = robust::sgn(th) * robust::SMALL();
+    if (std::abs(th) < robust::EPS())
+      th = robust::sgn(th) * robust::EPS();
   }
   KOKKOS_INLINE_FUNCTION
   Real thG_(Real X2) const {

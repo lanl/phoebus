@@ -36,7 +36,6 @@ class StressEnergyTensorCon {
 public:
   // TODO(JMM): Should these be moved out of Geometry?
   static constexpr int ND = Geometry::NDFULL;
-  static constexpr Real SMALL = robust::SMALL();
   static constexpr CellLocation loc = CellLocation::Cent;
 
   StressEnergyTensorCon() = default;
@@ -121,7 +120,7 @@ private:
 
     Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
     system_.ContravariantShift(loc, std::forward<Args>(args)..., beta);
-    u[0] = W / (std::abs(alpha) + SMALL);
+    u[0] = robust::ratio(W, std::abs(alpha));
     b[0] = u[0] * Bdotv;
     for (int l = 1; l < ND; ++l) {
       u[l] = v_(l, std::forward<Args>(args)...) - u[0] * beta[l - 1];

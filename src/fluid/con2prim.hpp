@@ -274,7 +274,7 @@ private:
                         bool print = false) const {
     using robust::sgn;
     using robust::ratio;
-    constexpr Real SMALL = robust::SMALL();
+    using robust::make_positive;
     Real &D = v(scr_lo + iD);
     Real &tau = v(scr_lo + itau);
     Real &Bsq = v(scr_lo + iBsq);
@@ -297,7 +297,7 @@ private:
     Real delta_fact = delta_fact_min;
     constexpr Real delta_adj = 1.2;
     constexpr Real idelta_adj = 1. / delta_adj;
-    const Real delta_min = std::max(rel_tolerance*delta_fact_min, SMALL);
+    const Real delta_min = make_positive(rel_tolerance*delta_fact_min);
     Rfunc(rho_guess, T_guess, res);
     do {
       Real drho = delta_fact * rho_guess;
