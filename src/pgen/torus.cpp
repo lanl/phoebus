@@ -17,6 +17,7 @@
 #include "fluid/con2prim_robust.hpp"
 #include "Kokkos_Random.hpp"
 #include "phoebus_utils/reduction.hpp"
+#include "phoebus_utils/robust.hpp"
 
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
@@ -358,7 +359,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
       }
       const Real b0 = W*Bdotv;
       const Real bsq = (Bsq + b0*b0)/(W*W);
-      const Real beta = Geometry::Utils::ratio(v(iprs, k, j, i), 0.5 * bsq);
+      const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
       if (v(irho,k,j,i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
     }, Kokkos::Min<Real>(beta_min_local));
 
