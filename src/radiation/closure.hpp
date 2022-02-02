@@ -66,7 +66,7 @@ namespace radiation
 
   /// Holds methods for closing the radiation moment equations as well as calculating radiation
   /// moment source terms.
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE = true>
   class Closure
   {
   public:
@@ -96,7 +96,7 @@ namespace radiation
                               T2B *concov_P);
     
     //-------------------------------------------------------------------------------------
-    /// Calculate the momentum density flux P^i_j from J, \tilde H_i, and \tilde pi^{ij}.
+    /// Calculate the momentum density flux P^{ij} from J, \tilde H_i, and \tilde pi^{ij}.
     template <class V, class T2A, class T2B>
     KOKKOS_FUNCTION
     Status getConPFromPrim(const Real J, const V cov_tilH, const T2A con_tilPi,
@@ -116,7 +116,7 @@ namespace radiation
     /// is externally specified
     template <class VA, class VB, class T2>
     KOKKOS_FUNCTION
-    Status Con2Prim(const Real E, const VA cov_F, const T2 con_tilPi, Real *J, VB *cov_H);
+    Status Con2Prim(Real E, const VA cov_F, const T2 con_tilPi, Real *J, VB *cov_H);
 
     //-------------------------------------------------------------------------------------
     /// Prim2ConM1 returns conservative variables E and F_i, as well as \tilde \pi^{ij} from
@@ -186,6 +186,8 @@ namespace radiation
     Tens2 cov_gamma;
     Tens2 con_gamma;
 
+  protected:
+  
     //-------------------------------------------------------------------------------------
     /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
     /// J and \tilde H_i.
@@ -194,7 +196,6 @@ namespace radiation
     Status M1FluidPressureTensor(const Real J, const V cov_H,
                                  Tens2 *con_tilPi, Vec *con_tilf);
   
-  protected:
     //-------------------------------------------------------------------------------------
     /// Calculate the residuals of the M1 root equations
     template <class V>
@@ -210,12 +211,12 @@ namespace radiation
     /// E, F_i, \xi = H/J, and \phi that are a root of the M1 residual equations.
     template <class V>
     KOKKOS_FUNCTION
-    Status M1FluidPressureTensor(const Real E, const V cov_F,
+    Status M1FluidPressureTensor(const V cov_F,
                                  const Real xi, const Real phi,
                                  Tens2 *con_tilPi, Vec *con_tilf) {
       Vec con_tilg, con_tild;
-      GetBasisVectors(E, cov_F, &con_tilg, &con_tild);
-      return M1FluidPressureTensor(E, cov_F, xi, phi, con_tilg, con_tild, con_tilPi, con_tilf);
+      GetBasisVectors(cov_F, &con_tilg, &con_tild);
+      return M1FluidPressureTensor(cov_F, xi, phi, con_tilg, con_tild, con_tilPi, con_tilf);
     }
 
     //-------------------------------------------------------------------------------------
@@ -224,7 +225,7 @@ namespace radiation
     /// vectors are explicitly passed so they don't need to be recalculated repeatedly.
     template <class V>
     KOKKOS_FUNCTION
-    Status M1FluidPressureTensor(const Real E, const V cov_F,
+    Status M1FluidPressureTensor(const V cov_F,
                                  const Real xi, const Real phi,
                                  const Vec con_tilg, const Vec con_tild,
                                  Tens2 *con_tilPi, Vec *con_tilf);
@@ -242,8 +243,7 @@ namespace radiation
     /// Calculate the basis vectors for \tilde f_i as described in the notes.
     template <class V>
     KOKKOS_FUNCTION
-    Status GetBasisVectors(const Real E, const V cov_F,
-                           Vec *con_tilg, Vec *con_tild);
+    Status GetBasisVectors(const V cov_F, Vec *con_tilg, Vec *con_tild);
 
     template <class T2>
     KOKKOS_FORCEINLINE_FUNCTION 
@@ -270,10 +270,10 @@ namespace radiation
   private:
   };
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class V, class T2>
   KOKKOS_FUNCTION
-  Closure<Vec, Tens2>::Closure(const V con_v_in, const T2 cov_gamma_in)
+  Closure<Vec, Tens2, ENERGY_CONSERVE>::Closure(const V con_v_in, const T2 cov_gamma_in)
   {
     SPACELOOP2(i,j){ cov_gamma(i, j) = cov_gamma_in(i, j);}
 
@@ -290,10 +290,10 @@ namespace radiation
     W4 = W * W3;
   }
    
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class VA, class VB, class T2>
   KOKKOS_FUNCTION
-  Status Closure<Vec, Tens2>::LinearSourceUpdate(const Real Estar, const VA cov_Fstar,
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::LinearSourceUpdate(const Real Estar, const VA cov_Fstar,
                                                  const T2 con_tilPi, const Real JBB,  
                                                  const Real tauJ, const Real tauH,
                                                  Real *dE, VB *cov_dF) {
@@ -308,27 +308,40 @@ namespace radiation
     A[1][0] = A[0][0] - 1 - tauJ/W;
     A[1][1] = A[0][1] - 1/W; 
     
-    Real vFstar = contractConCov3Vectors(con_v, cov_Fstar); 
-    b[0] = Estar + W*tauJ*JBB; 
-    b[1] = vFstar + (W2-1)/W*tauJ*JBB;
+    if (!ENERGY_CONSERVE) {
+      A[0][0] = W + tauJ; 
+      A[0][1] = 1.0; 
+    }
 
+    Real vFstar = contractConCov3Vectors(con_v, cov_Fstar); 
+    if (ENERGY_CONSERVE) {
+      b[0] = Estar + W*tauJ*JBB;
+    } else { 
+      b[0] = Estar + tauJ*JBB;
+    } 
+    b[1] = vFstar + (W2-1)/W*tauJ*JBB;
+    
     SolveAxb2x2(A, b, x);
     //if (std::isnan(b[0])) throw 1; 
 
     Real &J = x[0];
     Real &zeta = x[1]; //v^i \tilde H_i  
-
-    *dE = (4*W2 - 1 + 3*W2*vvTilPi) / 3 * J + 2*W*zeta - Estar;      
+    
+    if (ENERGY_CONSERVE) {
+      *dE = (4*W2 - 1 + 3*W2*vvTilPi) / 3 * J + 2*W*zeta - Estar;      
+    } else { 
+      *dE = W*J + zeta - Estar;
+    }
     SPACELOOP(i) (*cov_dF)(i) = (cov_v(i)*tauH*(4*W2/3*J + W*zeta) + tauH*cov_vTilPi(i)*J 
                    + tauJ*W2*cov_v(i)*(JBB-J) + W*cov_Fstar(i))/(W+tauH) - cov_Fstar(i); 
     
     return Status::success;  
   }
   
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class VA, class VB, class T2>
   KOKKOS_FUNCTION
-  Status Closure<Vec, Tens2>::Prim2Con(const Real J, const VA cov_H,
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::Prim2Con(const Real J, const VA cov_H,
                                        const T2 con_tilPi, Real *E, VB *cov_F) {
     Real vvPi;
     Vec cov_vPi;
@@ -336,14 +349,19 @@ namespace radiation
 
     Real vH = 0.0;
     SPACELOOP(i) vH += con_v(i) * cov_H(i);
-    *E = (4 * W2 - 1 + 3 * W2 * vvPi) / 3 * J + 2 * W * vH;
+    if (ENERGY_CONSERVE) {
+      *E = (4 * W2 - 1 + 3 * W2 * vvPi) / 3 * J + 2 * W * vH;
+    } else { 
+      *E = W*J + vH;
+    }
     SPACELOOP(i) (*cov_F)(i) = 4 * W2 / 3 * cov_v(i) * J + W * cov_v(i) * vH + W * cov_H(i) + J * cov_vPi(i);
     return Status::success;
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class VA, class VB, class T2>
-  Status Closure<Vec, Tens2>::Con2Prim(const Real E, const VA cov_F,
+  KOKKOS_FUNCTION
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::Con2Prim(Real E, const VA cov_F,
                                        const T2 con_tilPi,
                                        Real *J, VB *cov_tilH) {
     Real vvTilPi;
@@ -352,6 +370,8 @@ namespace radiation
 
     double vF = 0.0;
     SPACELOOP(i) vF += con_v(i) * cov_F(i);
+    
+    if (!ENERGY_CONSERVE) E = E/W + vF; 
 
     // lam is proportional to the determinant of the 2x2 linear system relating
     // E and v_i F^i to J and v_i H^i for fixed tilde pi^ij
@@ -369,10 +389,10 @@ namespace radiation
     return Status::success;
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class VA, class VB, class T2>
   KOKKOS_FUNCTION
-  Status Closure<Vec, Tens2>::Prim2ConM1(const Real J, const VA cov_H,
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::Prim2ConM1(const Real J, const VA cov_H,
                                          Real *E, VB *cov_F, T2 *con_tilPi) {
     Vec con_tilf;
     M1FluidPressureTensor(J, cov_H, con_tilPi, &con_tilf);
@@ -381,17 +401,17 @@ namespace radiation
     return Status::success;
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class VA, class VB, class T2>
   KOKKOS_FUNCTION
-  M1Result Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F,
+  M1Result Closure<Vec, Tens2, ENERGY_CONSERVE>::Con2PrimM1(const Real E, const VA cov_F,
                                            Real *J, VB *cov_H, T2 *con_tilPi) {
     Real xi, phi;
     Vec con_tilf;
-
+    
     // Get the basis vectors for the search
     Vec con_tilg, con_tild;
-    GetBasisVectors(E, cov_F, &con_tilg, &con_tild);
+    GetBasisVectors(cov_F, &con_tilg, &con_tild);
 
     // Perform an Eddington approximation Con2Prim to get initial guesses
     Tens2 con_PiEdd;
@@ -408,24 +428,24 @@ namespace radiation
     return Con2PrimM1(E, cov_F, xi, phi, J, cov_H, con_tilPi);
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class VA, class VB, class T2>
   KOKKOS_FUNCTION
-  M1Result Closure<Vec, Tens2>::Con2PrimM1(const Real E, const VA cov_F,
+  M1Result Closure<Vec, Tens2, ENERGY_CONSERVE>::Con2PrimM1(const Real E, const VA cov_F,
                                            const Real xi_guess, const Real phi_guess,
                                            Real *J, VB *cov_H, T2 *con_tilPi) {
     Real xi, phi;
     Vec con_tilf;
     auto status = SolveClosure(E, cov_F, &xi, &phi, xi_guess, phi_guess);
-    M1FluidPressureTensor(E, cov_F, xi, phi, con_tilPi, &con_tilf);
+    M1FluidPressureTensor(cov_F, xi, phi, con_tilPi, &con_tilf);
     Con2Prim(E, cov_F, *con_tilPi, J, cov_H);
     return status;
   }
   
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class V, class T2A, class T2B>
   KOKKOS_FORCEINLINE_FUNCTION
-  Status Closure<Vec, Tens2>::getConPFromPrim(const Real J, const V cov_tilH,
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::getConPFromPrim(const Real J, const V cov_tilH,
                                               const T2A con_tilPi, T2B *con_P) {
     Vec con_tilH;
     raise3Vector(cov_tilH, &con_tilH);
@@ -436,10 +456,10 @@ namespace radiation
     return Status::success;
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class V, class T2A, class T2B>
   KOKKOS_FORCEINLINE_FUNCTION
-  Status Closure<Vec, Tens2>::getConCovPFromPrim(const Real J, const V cov_tilH,
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::getConCovPFromPrim(const Real J, const V cov_tilH,
                                                  const T2A con_tilPi, T2B *concov_P) {
     Vec con_tilH;
     Tens2 concov_tilPi;
@@ -458,10 +478,10 @@ namespace radiation
     return Status::success;
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class V>
   KOKKOS_FUNCTION
-  M1Result Closure<Vec, Tens2>::SolveClosure(Real E, V cov_F, Real *xi_out, Real *phi_out,
+  M1Result Closure<Vec, Tens2, ENERGY_CONSERVE>::SolveClosure(Real E, V cov_F, Real *xi_out, Real *phi_out,
                                              const Real xi_guess, const Real phi_guess) {
     const int max_iter = 30;
     const Real tol = 1.e6 * std::numeric_limits<Real>::epsilon();
@@ -476,7 +496,7 @@ namespace radiation
 
     // Get the basis vectors for the search
     Vec con_tilg, con_tild;
-    GetBasisVectors(E, cov_F, &con_tilg, &con_tild);
+    GetBasisVectors(cov_F, &con_tilg, &con_tild);
 
     int iter = 0;
     Real fXi = 1.e3;
@@ -540,17 +560,17 @@ namespace radiation
     return result;
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class V>
   KOKKOS_FUNCTION
-  Status Closure<Vec, Tens2>::M1Residuals(const Real E, const V cov_F,
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::M1Residuals(const Real E, const V cov_F,
                                           const Real xi, const Real phi,
                                           const Vec con_tilg, const Vec con_tild,
                                           Real *fXi, Real *fPhi) {
     // Calculate rest frame fluid variables
     Tens2 con_tilPi;
     Vec con_tilf;
-    M1FluidPressureTensor(E, cov_F, xi, phi, con_tilg, con_tild, &con_tilPi, &con_tilf);
+    M1FluidPressureTensor(cov_F, xi, phi, con_tilg, con_tild, &con_tilPi, &con_tilf);
     Real J;
     Vec cov_tilH;
     Con2Prim(E, cov_F, con_tilPi, &J, &cov_tilH);
@@ -569,10 +589,10 @@ namespace radiation
     return Status::success;
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class V>
   KOKKOS_FUNCTION
-  Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real J, const V cov_tilH,
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const Real J, const V cov_tilH,
                                                     Tens2 *con_tilPi, Vec *con_tilf) {
     Vec con_tilH;
     raise3Vector(cov_tilH, &con_tilH);
@@ -592,10 +612,10 @@ namespace radiation
     return Status::success;
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class V>
   KOKKOS_FUNCTION
-  Status Closure<Vec, Tens2>::M1FluidPressureTensor(const Real E, const V cov_F,
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const V /*cov_F*/,
                                                     const Real xi, const Real phi,
                                                     const Vec con_tilg, const Vec con_tild,
                                                     Tens2 *con_tilPi, Vec *con_tilf) {
@@ -618,10 +638,10 @@ namespace radiation
     return Status::success;
   }
 
-  template <class Vec, class Tens2>
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class V>
   KOKKOS_FUNCTION
-  Status Closure<Vec, Tens2>::GetBasisVectors(const Real E, const V cov_F,
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::GetBasisVectors(const V cov_F,
                                               Vec *con_tilg, Vec *con_tild) {
     // Build projected basis vectors for flux direction
     // These vectors are actually fixed, so there is no need to recalculate
