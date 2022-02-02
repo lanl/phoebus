@@ -68,6 +68,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
+  auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
   pmb->par_for(
     "Phoebus::ProblemGenerator::sedov", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -84,12 +86,18 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       }
       const Real rho = rhoa;
 
-      const Real ua = phoebus::energy_from_rho_P(eos, rho, Pa);
+      Real lambda[2];
+      if (iye > 0) {
+	v(iye, k, j, i) = 0.5;
+	lambda[0] = v(iye, k, j, i);
+      }
+
+      const Real ua = phoebus::energy_from_rho_P(eos, rho, Pa, emin, emax, lambda[0]);
       const Real u = (r <= rinner) ? uinner : ua;
 
       const Real eps = u / (rho + 1e-20);
-      const Real P = eos.PressureFromDensityInternalEnergy(rho, eps);
-      const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps);
+      const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, lambda);
+      const Real P = eos.PressureFromDensityInternalEnergy(rho, eps, lambda);
 
       v(irho, k, j, i) = rho;
       v(iprs, k, j, i) = P;
