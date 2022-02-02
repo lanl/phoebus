@@ -23,10 +23,6 @@ namespace radiation {
 using namespace singularity::neutrinos;
 using singularity::RadiationType;
 
-// TODO(BRR) temporary
-// auto s = RadiationType::NU_ELECTRON;
-
-// TODO(BRR) Switch from nu (cgs) to ener (code)
 KOKKOS_INLINE_FUNCTION
 Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
 
@@ -142,6 +138,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
             Real dN = 0.;
             Real dNdlnu_max = 0.;
+            Real dE = 0.;
+            Real dye = 0.;
             for (int n = 0; n <= nu_bins; n++) {
               Real nu = nusamp(n);
               Real ener = pc::h*nu*CENERGY;
@@ -152,6 +150,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
               //dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
               dN += Jnu / (ener * wgt) * (nu * dlnu / CTIME);
+
+              dE += Jnu * (nu * dlnu / CTIME) * d3x * dt;
+              dye += Jnu / ener * (nu * dlnu / CTIME) * pc::mp / MASS;
 
               // Factors of nu in numerator and denominator cancel
               //Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
@@ -200,6 +201,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           });
     }
   }
+  //exit(-1);
 
   // Reduce dN over zones for calibrating weights (requires w ~ wgtC)
   Real dNtot = 0;
@@ -246,10 +248,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         }
       },
       Kokkos::Sum<int>(Nstot));
-
-  if (dNtot <= 0) {
-    return TaskStatus::complete;
-  }
 
   printf("Nstot: %i\n", Nstot);
   const auto num_emitted = rad->Param<Real>("num_emitted");
@@ -339,7 +337,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                                          dlnu));
 
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
-              //weight(m) /= 10;
 
               // Encode frequency and randomly sample direction
               Real E = nu * pc::h * CENERGY;
@@ -489,7 +486,10 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Real dlam = dt / Kcon0;
 
           int k, j, i;
-          i = static_cast<int>(std::floor((x(n) - minx_i) / dx_i) + ib.s);
+          swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+          //printf("k,j,i: %i %i %i\n", k, j, i);
+
+          /*i = static_cast<int>(std::floor((x(n) - minx_i) / dx_i) + ib.s);
           if (ndim > 1) {
             j = static_cast<int>(std::floor((y(n) - minx_j) / dx_j) + jb.s);
           } else {
@@ -499,7 +499,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
             k = static_cast<int>(std::floor((z(n) - minx_k) / dx_k) + kb.s);
           } else {
             k = 0;
-          }
+          }*/
 
           //printf("Transporting! %i %i %i\n", i, j, k);
           // swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
@@ -514,7 +514,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               //(4. * M_PI);
               //d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, -k0(n)) /
               //(4. * M_PI);
-              d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, nu_code);//
+              4.*M_PI * d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, nu_code);//
               // /(4. * M_PI);
 
           //Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
@@ -522,6 +522,10 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           //Real dtau_abs = (dlam * h_code) / ((-k0(n) / h_code) * alphanu);
           //Real dtau_abs = (nu / CTIME * alphanu) * h_code * dlam;
           Real dtau_abs = alphanu * dt;
+          //printf("dtau_abs: %e\n", dtau_abs);
+
+          // TODO(BRR) DEBUG!!!!!!!!!!
+          //if (t0 > 10) dtau_abs *= 1.e8;
 
           //printf("dtau_abs: %e alphanu: %e cm^-1 mft: %e s rho cgs: %e T cgs: %e nu cgs: %e\n",
           //dtau_abs, alphanu/LENGTH, 1./(alphanu/LENGTH*pc::c),
@@ -539,6 +543,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
             // Process absorption events
             Real xabs = -log(rng_gen.drand());
             if (xabs <= dtau_abs) {
+              //printf("absorbed: %i %i %i\n", k, j, i);
               // Deposit energy-momentum and lepton number in fluid
               Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)),
                                  -1. / dV_code * weight(n) * k0(n));
@@ -560,10 +565,9 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           }
 
           if (absorbed == false) {
-            //printf("before: %e %e %e\n", x(n), y(n), z(n));
             PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt,
                          geom);
-            //printf("after: %e %e %e\n", x(n), y(n), z(n));
+            //exit(-1);
 
             bool on_current_mesh_block = true;
             swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n),
@@ -583,6 +587,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   Kokkos::deep_copy(num_interactions_h, num_interactions);
 
   const auto num_absorbed = rad->Param<Real>("num_absorbed");
+  printf("num_absorbed: %i\n", static_cast<int>(num_absorbed));
   const auto num_scattered = rad->Param<Real>("num_scattered");
   // TODO(BRR) actually count
   rad->UpdateParam<Real>("num_absorbed", num_absorbed + num_interactions_h[0]);
