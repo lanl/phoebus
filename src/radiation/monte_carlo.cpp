@@ -23,10 +23,6 @@ namespace radiation {
 using namespace singularity::neutrinos;
 using singularity::RadiationType;
 
-// TODO(BRR) temporary
-// auto s = RadiationType::NU_ELECTRON;
-
-// TODO(BRR) Switch from nu (cgs) to ener (code)
 KOKKOS_INLINE_FUNCTION
 Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
 
@@ -98,8 +94,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
                                  "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov,
-                                 iv::Gye,
-                                 p::energy});
+                                 iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int iye = imap[p::ye].first;
@@ -114,8 +109,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gcov_lo = imap[iv::Gcov].first;
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
-
-  const int pu = imap[p::energy].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting
   // value
@@ -195,9 +188,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             dN *= d3x * detG * dt;
 
             v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
-            //printf("[%i %i %i] dE = %e du = %e u = %e tau = %e dye = %e cye: %e tauye = %e\n", k,j,i,dE, dE/d3x,
-            //  v(pu,k,j,i), v(pu,k,j,i)/(dE/d3x/dt), dye, v(pdens,k,j,i)*v(iye,k,j,i),
-            //  v(pdens,k,j,i)*v(iye,k,j,i)/dye);
 
             int Ns = static_cast<int>(dN);
             if (dN - Ns > rng_gen.drand()) {
@@ -258,11 +248,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         }
       },
       Kokkos::Sum<int>(Nstot));
-
-// TODO(BRR) DEBUG!!!!!!!!!!!!
-  //if (dNtot <= 0 || t0 > 0.1) {
-  //  return TaskStatus::complete;
-  //}
 
   printf("Nstot: %i\n", Nstot);
   const auto num_emitted = rad->Param<Real>("num_emitted");
@@ -340,8 +325,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               x(m) = minx_i + (i - ib.s + 0.5) * dx_i;
               y(m) = minx_j + (j - jb.s + 0.5) * dx_j;
               z(m) = minx_k + (k - kb.s + 0.5) * dx_k;
-              //printf("[%i %i %i] x = %e minx_i = %e i - ib.s + 0.5 = %e dx_i = %e\n",
-              //  i,j,k,x(m),minx_i,i-ib.s+0.5,dx_i);
 
               // Sample energy and set weight
               Real nu;
@@ -354,7 +337,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                                          dlnu));
 
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
-              //weight(m) /= 100.;
 
               // Encode frequency and randomly sample direction
               Real E = nu * pc::h * CENERGY;
