@@ -27,6 +27,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry_utils.hpp"
 #include "monopole_gr/monopole_gr.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace Geometry {
 
@@ -88,11 +89,12 @@ class MonopoleSph {
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
+    using robust::ratio;
     const Real r = std::abs(X1);
-    const Real ir2 = Utils::ratio(1., r * r);
+    const Real ir2 = ratio(1., r * r);
     const Real sth = std::sin(X2);
     const Real alpha = MonopoleGR::Interpolate(r, alpha_, rgrid_);
-    const Real ialpha2 = Utils::ratio(1., alpha * alpha);
+    const Real ialpha2 = ratio(1., alpha * alpha);
     const Real beta = MonopoleGR::Interpolate(r, beta_, rgrid_);
     const Real a =
         MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
@@ -100,9 +102,9 @@ class MonopoleSph {
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
     g[0][0] = -ialpha2;
     g[0][1] = g[1][0] = beta * ialpha2;
-    g[1][1] = Utils::ratio(1., a * a) - beta * beta * ialpha2;
+    g[1][1] = ratio(1., a * a) - beta * beta * ialpha2;
     g[2][2] = ir2;
-    g[3][3] = ir2 * Utils::ratio(1., sth * sth);
+    g[3][3] = ir2 * ratio(1., sth * sth);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -120,15 +122,16 @@ class MonopoleSph {
 
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
+    using robust::ratio;
     const Real r = std::abs(X1);
-    const Real ir2 = Utils::ratio(1., r * r);
+    const Real ir2 = ratio(1., r * r);
     const Real sth = std::sin(X2);
     const Real a =
         MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
     LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
-    g[0][0] = Utils::ratio(1., a * a);
+    g[0][0] = ratio(1., a * a);
     g[1][1] = ir2;
-    g[2][2] = ir2 * Utils::ratio(1., sth * sth);
+    g[2][2] = ir2 * ratio(1., sth * sth);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -420,7 +423,7 @@ class MonopoleCart {
   KOKKOS_INLINE_FUNCTION
   void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph) const {
     r = std::sqrt(X1 * X1 + X2 * X2 + X3 * X3);
-    th = std::acos(Utils::ratio(X3, r));
+    th = std::acos(robust::ratio(X3, r));
     ph = std::atan2(X2, X1);
   }
 
@@ -448,20 +451,21 @@ class MonopoleCart {
   }
   KOKKOS_INLINE_FUNCTION
   void C2S(Real x, Real y, Real z, Real r, Real J[NDFULL][NDFULL]) const {
+    using robust::ratio;
     const Real r2 = r * r;
     const Real rho2 = x * x + y * y;
     const Real rho = std::sqrt(rho2);
 
     LinearAlgebra::SetZero(J, NDFULL, NDFULL);
     J[0][0] = 1;
-    J[1][1] = Utils::ratio(x, r);
-    J[1][2] = Utils::ratio(y, r);
-    J[1][3] = Utils::ratio(z, r);
-    J[2][1] = Utils::ratio(x * z, r2 * rho);
-    J[2][2] = Utils::ratio(y * z, r2 * rho2);
-    J[2][3] = -Utils::ratio(rho, r2);
-    J[3][1] = -Utils::ratio(y, rho2);
-    J[3][2] = Utils::ratio(x, rho2);
+    J[1][1] = ratio(x, r);
+    J[1][2] = ratio(y, r);
+    J[1][3] = ratio(z, r);
+    J[2][1] = ratio(x * z, r2 * rho);
+    J[2][2] = ratio(y * z, r2 * rho2);
+    J[2][3] = -ratio(rho, r2);
+    J[3][1] = -ratio(y, rho2);
+    J[3][2] = ratio(x, rho2);
     J[3][3] = 0;
   }
   // Hessian
@@ -470,6 +474,7 @@ class MonopoleCart {
   // and x^mu' = {x,y,z}
   KOKKOS_INLINE_FUNCTION
   void Hessian(Real x, Real y, Real z, Real r, Real H[NDFULL][NDFULL][NDFULL]) const {
+    using robust::ratio;
     const Real x2 = x * x;
     const Real y2 = y * y;
     const Real z2 = z * z;
@@ -483,11 +488,11 @@ class MonopoleCart {
     const Real rho3 = rho2 * rho;
     const Real rho4 = rho3 * rho;
 
-    const Real irho = Utils::ratio(1., rho);
-    const Real irho3 = Utils::ratio(1., rho3);
-    const Real irho4 = Utils::ratio(1., rho4);
-    const Real ir3 = Utils::ratio(1.,r3);
-    const Real ir4 = Utils::ratio(1., r4);
+    const Real irho = ratio(1., rho);
+    const Real irho3 = ratio(1., rho3);
+    const Real irho4 = ratio(1., rho4);
+    const Real ir3 = ratio(1.,r3);
+    const Real ir4 = ratio(1., r4);
 
     LinearAlgebra::SetZero(H, NDFULL, NDFULL, NDFULL);
     H[1][1][1] = (y2 + z2) * ir3;
