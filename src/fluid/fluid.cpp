@@ -434,7 +434,6 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-
   auto fail = rc->Get(internal_variables::fail).data;
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
