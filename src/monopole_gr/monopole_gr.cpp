@@ -344,12 +344,15 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   auto alpha_h = params.Get<Alpha_host_t>("lapse_h");
   Kokkos::deep_copy(alpha, alpha_h);
 
+  auto matter = params.Get<Matter_t>("matter");
+  auto matter_h = params.Get<Matter_host_t>("matter_h");
+  Kokkos::deep_copy(matter, matter_h);
+  
   // Fill device-side arrays
   auto npoints = params.Get<int>("npoints");
   auto radius = params.Get<MonopoleGR::Radius>("radius");
   const Real dr = radius.dx();
   const Real dr2 = dr * dr;
-  auto matter = params.Get<Matter_t>("matter");
   auto beta = params.Get<Beta_t>("shift");
   auto gradients = params.Get<Gradients_t>("gradients");
   parthenon::par_for(
@@ -419,7 +422,7 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
 }
 
 TaskStatus DivideVols(StateDescriptor *pkg) {
-  using Geometry::Utils::ratio;
+  using robust::ratio;
 
   auto &params = pkg->AllParams();
   auto enabled = params.Get<bool>("enable_monopole_gr");

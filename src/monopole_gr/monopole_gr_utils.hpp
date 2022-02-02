@@ -14,6 +14,13 @@
 #ifndef MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
 #define MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
 
+// System includes
+#include <cmath>
+
+// Parthenon includes
+#include <parthenon/package.hpp>
+
+// Phoebus includes
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "monopole_gr_base.hpp"
 #include "phoebus_utils/robust.hpp"
@@ -54,6 +61,52 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
   R[Hypersurface::K] = K;
 }
 } // namespace ShootingMethod
+
+namespace Interp3DTo1D {
+
+PORTABLE_INLINE_FUNCTION
+bool InBoundsHelper(Real a, Real r, Real dr) {
+  return ((a >= (r - 0.5 * dr)) && (a < (r + 0.5 * dr)));
+}
+
+PORTABLE_INLINE_FUNCTION
+Real GetVolIntersectHelper(const Real rsmall, const Real drsmall, const Real rbig,
+                           const Real drbig) {
+  if (drsmall > drbig) { // evaluates only once but the compiler may
+                         // not be smart enough to realize that.
+    return GetVolIntersectHelper(rbig, drbig, rsmall, drsmall);
+  }
+  bool left_in_bnds = InBoundsHelper(rsmall - 0.5 * drsmall, rbig, drbig);
+  bool right_in_bnds = InBoundsHelper(rsmall + 0.5 * drsmall, rbig, drbig);
+  // TODO(JMM): This vectorizes thanks to using masking. But is it
+  // actually a good idea?  We already have branching, because of the
+  // above if statement, so...
+  bool interior_mask = left_in_bnds || right_in_bnds;
+  bool left_mask = right_in_bnds && !left_in_bnds;
+  bool right_mask = left_in_bnds && !right_in_bnds;
+  // divide by zero impossible because these are grid deltas
+  return interior_mask * (drsmall / drbig) +
+         left_mask * (rsmall + 0.5 * drsmall - (rbig - 0.5 * rbig) / drbig) +
+         right_mask * (rbig + 0.5 * rbig - (rsmall - 0.5 * rsmall) / drbig);
+}
+
+PORTABLE_INLINE_FUNCTION
+void GetCoordsAndDerivsSph(const int k, const int j, const int i,
+			   const parthenon::Coordinates_t &coords,
+			   Real &r , Real &th, Real &ph,
+			   Real &dr, Real &dth, Real &dph,
+			   Real &dv) {
+  r = coords.x1v(k, j, i);
+  th = coords.x2v(k, j, i);
+  ph = coords.x3v(k, j, i);
+  dr = coords.Dx(1, k, j, i);
+  dth = coords.Dx(2, k, j, i);
+  dph = coords.Dx(3, k, j, i);
+  const Real idr = (1. / 12.) * (dr * dr * dr) + dr * (r * r);
+  dv = std::sin(th) * dth * dph * idr;
+}
+
+} // namespace Interp3DTo1D
 } // namespace MonopoleGR
 
 #endif // MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
