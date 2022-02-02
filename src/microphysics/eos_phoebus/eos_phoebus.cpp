@@ -12,6 +12,7 @@
 // publicly, and to permit others to do so.
 
 // system includes
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,9 +27,13 @@
 // phoebus includes
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
+#include "phoebus_utils/variables.hpp"
 
 namespace Microphysics {
 namespace EOS {
+
+parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
+
 using names_t = std::vector<std::string>;
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   using namespace singularity;
@@ -151,6 +156,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   singularity::EOS eos_host =
       EOSBuilder::buildEOS(type, base_params, modifiers);
   singularity::EOS eos_device = eos_host.GetOnDevice();
+
   params.Add("d.EOS", eos_device);
   params.Add("h.EOS", eos_host);
   params.Add("needs_ye", needs_ye);
@@ -158,6 +164,54 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Store eos params in case they're needed
   for (auto &name : names) {
     params.Add(name, (pin->GetReal(block_name, name)));
+  }
+
+  // If using StellarCollapse, we need additional variables.
+  // We also need table max and min values, regardless of the EOS.
+  // These can be used for floors/ceilings or for root find bounds
+  if (eos_type == StellarCollapse::EosType()) {
+    // We request that Ye and temperature exist, but do not provide them.
+    Metadata m = Metadata({Metadata::Cell, Metadata::Intensive,
+			      Metadata::Derived, Metadata::OneCopy,
+			      Metadata::Requires});
+
+    pkg->AddField(fluid_prim::ye, m);
+    pkg->AddField(fluid_prim::temperature, m);
+
+    // TODO(JMM): To get around current limitations of
+    // singularity-eos, I just load the table and throw it away.  This
+    // will be resolved in a future version of singularity-eos.
+    // See issue #69.
+    singularity::StellarCollapse eos_sc(pin->GetString(block_name, "filename"),
+					pin->GetOrAddBoolean(block_name, "use_sp5", true),
+					false);
+    Real M_unit = unit_conv.GetMassCodeToCGS();
+    Real L_unit = unit_conv.GetLengthCodeToCGS();
+    Real rho_unit = M_unit/std::pow(L_unit, 3);
+    Real T_unit = unit_conv.GetTemperatureCodeToCGS();
+    // Always C^2
+    Real sie_unit = std::pow(pc.c, 2);
+    Real press_unit = rho_unit*sie_unit;
+
+    params.Add("sie_min", eos_sc.sieMin()/sie_unit);
+    params.Add("sie_max", eos_sc.sieMax()/sie_unit);
+    params.Add("T_min", eos_sc.TMin()/T_unit);
+    params.Add("T_max", eos_sc.TMax()/T_unit);
+    params.Add("rho_min", eos_sc.rhoMin()/rho_unit);
+    params.Add("rho_max", eos_sc.rhoMax()/rho_unit);
+  } else { // TODO: Be more clever here?
+    Real rho_min = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
+    Real sie_min = pin->GetOrAddReal("fixup", "sie0_floor", 0.0);
+    Real T_min = eos_host.TemperatureFromDensityInternalEnergy(rho_min, sie_min);
+    Real rho_max = pin->GetOrAddReal("fixup", "rho0_ceiling", 1e18);
+    Real sie_max = pin->GetOrAddReal("fixup", "sie0_ceiling", 1e35);
+    Real T_max = eos_host.TemperatureFromDensityInternalEnergy(rho_max, sie_max);
+    params.Add("sie_min", sie_min);
+    params.Add("sie_max", sie_max);
+    params.Add("T_min", T_min);
+    params.Add("T_max", T_max);
+    params.Add("rho_min", rho_min);
+    params.Add("rho_max", rho_max);
   }
 
   return pkg;
