@@ -75,6 +75,7 @@ riemann = hll
 recon = linear
 c2p_max_iter = 100
 Ye = true
+zero_fluxes = true
 
 <radiation>
 method = monte_carlo
