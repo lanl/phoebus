@@ -32,11 +32,6 @@ KOKKOS_INLINE_FUNCTION auto ratio(const A &a, const B &b) {
   const B sgn = b >= 0 ? 1 : -1;
   return a / (b + sgn * std::numeric_limits<B>::min());
 }
-template <>
-KOKKOS_INLINE_FUNCTION auto ratio(const Real &a, const Real &b) {
-  return a / (b + sgn(b) * SMALL());
-}
-
 } // namespace robust
 
 #endif // PHOEBUS_UTILS_ROBUST_HPP_
