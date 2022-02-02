@@ -28,6 +28,7 @@
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "monopole_gr/monopole_gr_base.hpp"
+#include "monopole_gr/monopole_gr_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/variables.hpp"
 
@@ -46,19 +47,12 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom, const P
 // Gets the radius r of a cell, as well as its width in radius dr, and
 // its volume element dv. Computes this for both Cartesian and
 // spherical coords.
-template <bool IS_CART, typename Geometry, typename Pack>
+template <bool IS_CART, typename Pack>
 PORTABLE_INLINE_FUNCTION void
-GetCoordsAndCellWidthsHelper(const Geometry &geom, const Pack &p, const int b,
+GetCoordsAndCellWidthsHelper(const Pack &p, const int b,
                              const int k, const int j, const int i, Real &r, Real &th,
                              Real &ph, Real &dr, Real &dth, Real &dph, Real &dv);
-// Get volume intersect for integration weight
-PORTABLE_INLINE_FUNCTION
-Real GetVolIntersectHelper(const Real rsmall, const Real drsmall, const Real rbig,
-                           const Real drbig);
-PORTABLE_INLINE_FUNCTION
-bool InBoundsHelper(Real a, Real r, Real dr) {
-  return ((a >= (r - 0.5 * dr)) && (a < (r + 0.5 * dr)));
-}
+
 } // namespace impl
 
 // TODO(JMM): Try hierarchical parallelism too. Not sure how to write
@@ -66,6 +60,7 @@ bool InBoundsHelper(Real a, Real r, Real dr) {
 // not what I've written here.
 template <typename Data>
 TaskStatus InterpolateMatterTo1D(Data *rc) {
+  using namespace Interp3DTo1D;
   using namespace impl;
 
   // Available in both mesh and meshblock
@@ -130,7 +125,7 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
             matter_loc[Matter::J_R], matter_loc[Matter::Srr], matter_loc[Matter::trcS]);
         // Next get coords and grid spacing
         Real r, th, ph, dr, dth, dph, dv;
-        GetCoordsAndCellWidthsHelper<is_monopole_cart>(geom, pack, b, k, j, i, r, th, ph,
+        GetCoordsAndCellWidthsHelper<is_monopole_cart>(pack, b, k, j, i, r, th, ph,
                                                        dr, dth, dph, dv);
 
         // Bounds in the 1d grid We're wasteful here because I'm
@@ -233,9 +228,9 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom, const
   }
 }
 
-template <bool IS_CART, typename Geometry_t, typename Pack>
+template <bool IS_CART, typename Pack>
 PORTABLE_INLINE_FUNCTION void
-GetCoordsAndCellWidthsHelper(const Geometry_t &geom, const Pack &p, const int b,
+GetCoordsAndCellWidthsHelper(const Pack &p, const int b,
                              const int k, const int j, const int i, Real &r, Real &th,
                              Real &ph, Real &dr, Real &dth, Real &dph, Real &dv) {
   const parthenon::Coordinates_t &coords = p.GetCoords(b);
@@ -246,37 +241,11 @@ GetCoordsAndCellWidthsHelper(const Geometry_t &geom, const Pack &p, const int b,
       th, ph, dr, dth, dph);
     dv = coords.Volume(k, j, i);
   } else {
-    r = coords.x1v(k, j, i);
-    th = coords.x2v(k, j, i);
-    ph = coords.x3v(k, j, i);
-    dr = coords.Dx(1, k, j, i);
-    dth = coords.Dx(2, k, j, i);
-    dph = coords.Dx(3, k, j, i);
-    Real idr = (1. / 12.) * (dr * dr * dr) + dr * (r * r);
-    dv = std::sin(th) * dth * dph * idr;
+    Interp3DTo1D::GetCoordsAndDerivsSph(k, j, i, coords,
+      r, th, ph, dr, dth, dph, dv);
   }
 }
 
-PORTABLE_INLINE_FUNCTION
-Real GetVolIntersectHelper(const Real rsmall, const Real drsmall, const Real rbig,
-                           const Real drbig) {
-  if (drsmall > drbig) { // evaluates only once but the compiler may
-                         // not be smart enough to realize that.
-    return GetVolIntersectHelper(rbig, drbig, rsmall, drsmall);
-  }
-  bool left_in_bnds = InBoundsHelper(rsmall - 0.5 * drsmall, rbig, drbig);
-  bool right_in_bnds = InBoundsHelper(rsmall + 0.5 * drsmall, rbig, drbig);
-  // TODO(JMM): This vectorizes thanks to using masking. But is it
-  // actually a good idea?  We already have branching, because of the
-  // above if statement, so...
-  bool interior_mask = left_in_bnds || right_in_bnds;
-  bool left_mask = right_in_bnds && !left_in_bnds;
-  bool right_mask = left_in_bnds && !right_in_bnds;
-  // divide by zero impossible because these are grid deltas
-  return interior_mask * (drsmall / drbig) +
-         left_mask * (rsmall + 0.5 * drsmall - (rbig - 0.5 * rbig) / drbig) +
-         right_mask * (rbig + 0.5 * rbig - (rsmall - 0.5 * rsmall) / drbig);
-}
 } // namespace impl
 } // namespace MonopoleGR
 
