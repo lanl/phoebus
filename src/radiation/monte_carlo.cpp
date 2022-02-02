@@ -77,17 +77,17 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real MASS = unit_conv.GetMassCodeToCGS();
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
-  const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
+  /*const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
   const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
   const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
   const Real CENERGY = unit_conv.GetEnergyCGSToCode();
   const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
   const Real CTIME = unit_conv.GetTimeCGSToCode();
-  const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
+  const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;*/
 
-  const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
+  //const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
   const Real dV_code = dx_i * dx_j * dx_k * dt;
-  const Real d3x_cgs = dx_i * dx_j * dx_k * pow(LENGTH, 3);
+  //const Real d3x_cgs = dx_i * dx_j * dx_k * pow(LENGTH, 3);
   const Real d3x = dx_i * dx_j * dx_k;
 
   const Real h_code = pc::h*TIME/(MASS*LENGTH*LENGTH);
