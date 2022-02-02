@@ -27,6 +27,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry_utils.hpp"
 #include "monopole_gr/monopole_gr_base.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace Geometry {
 
@@ -108,11 +109,12 @@ class MonopoleSph {
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
+    using robust::ratio;
     const Real r = std::abs(X1);
-    const Real ir2 = Utils::ratio(1., r * r);
+    const Real ir2 = ratio(1., r * r);
     const Real sth = std::sin(X2);
     const Real alpha = MonopoleGR::Interpolate(r, alpha_, rgrid_);
-    const Real ialpha2 = Utils::ratio(1., alpha * alpha);
+    const Real ialpha2 = ratio(1., alpha * alpha);
     const Real beta = MonopoleGR::Interpolate(r, beta_, rgrid_);
     const Real a =
         MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
@@ -120,9 +122,9 @@ class MonopoleSph {
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
     g[0][0] = -ialpha2;
     g[0][1] = g[1][0] = beta * ialpha2;
-    g[1][1] = Utils::ratio(1., a * a) - beta * beta * ialpha2;
+    g[1][1] = ratio(1., a * a) - beta * beta * ialpha2;
     g[2][2] = ir2;
-    g[3][3] = ir2 * Utils::ratio(1., sth * sth);
+    g[3][3] = ir2 * ratio(1., sth * sth);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -140,15 +142,16 @@ class MonopoleSph {
 
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
+    using robust::ratio;
     const Real r = std::abs(X1);
-    const Real ir2 = Utils::ratio(1., r * r);
+    const Real ir2 = ratio(1., r * r);
     const Real sth = std::sin(X2);
     const Real a =
         MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
     LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
-    g[0][0] = Utils::ratio(1., a * a);
+    g[0][0] = ratio(1., a * a);
     g[1][1] = ir2;
-    g[2][2] = ir2 * Utils::ratio(1., sth * sth);
+    g[2][2] = ir2 * ratio(1., sth * sth);
   }
 
   KOKKOS_INLINE_FUNCTION
