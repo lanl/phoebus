@@ -60,6 +60,13 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
   const Real CTIME = unit_conv.GetTimeCGSToCode();
   const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
 
+  // TODO(BRR) output these dimensions to parameters dump file
+  /*const Real T_unit = unit_conv.GetTimeCodeToCGS();
+  const Real L_unit = unit_conv.GetLengthCodeToCGS();
+  const Real U_unit = unit_conv.GetEnergyCodeToCGS()/pow(L_unit,3);
+  printf("T_unit: %e U_unit: %e\n", T_unit, U_unit);
+  exit(-1);*/
+
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   bool do_species[3] = {rad->Param<bool>("do_nu_electron"),
@@ -78,6 +85,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
       });
 
   for (int sidx = 0; sidx < 3; sidx++) {
+    printf("do_species[%i] = %i\n", sidx, do_species[sidx]);
     // Apply cooling for each neutrino species separately
       if (do_species[sidx]) {
         auto s = species[sidx];
@@ -99,10 +107,19 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
           const Real T_cgs = v(ptemp, k, j, i) * TEMPERATURE;
           const Real Ye = v(pye, k, j, i);
 
-          double J = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, s);
+          //double J = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, s);
+          double J = d_opacity.Emissivity(v(prho,k,j,i), v(ptemp,k,j,i), Ye, s);
+          //double Jye =
+          //    pc::mp * d_opacity.NumberEmissivity(rho_cgs, T_cgs, Ye, s);
           double Jye =
-              pc::mp * d_opacity.NumberEmissivity(rho_cgs, T_cgs, Ye, s);
-          Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
+              pc::mp * d_opacity.NumberEmissivity(v(prho,k,j,i), v(ptemp,k,j,i), Ye, s);
+
+          // Is this a singularity-opac or my script issue?
+          J /= 4.*M_PI;
+          Jye /= 4.*M_PI;
+
+          //Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
+          Real Gcov_tetrad[4] = {-J, 0., 0., 0.};
           Real Gcov_coord[4];
           Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
           Real detG = geom.DetG(CellLocation::Cent, k, j, i);
@@ -111,8 +128,10 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
             Kokkos::atomic_add(&(v(mu, k, j, i)),
                                detG * Gcov_coord[mu - Gcov_lo]);
           }
+          //Kokkos::atomic_add(&(v(Gye, k, j, i)),
+          //                   -detG * Jye * CDENSITY / CTIME);
           Kokkos::atomic_add(&(v(Gye, k, j, i)),
-                             -detG * Jye * CDENSITY / CTIME);
+                             -detG * Jye);
         });
       }
   }
