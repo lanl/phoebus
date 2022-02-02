@@ -96,7 +96,7 @@ private:
       Econ_[3][mu] = Geometry::Utils::KroneckerDelta(mu, 3);
     }
 
-    if (norm > robust::SMALL()) {
+    if (norm > robust::EPS()) {
       // We can use the Trial vector
       if (X1ness > X2ness && X1ness > X3ness) {
         // Trial vector is closest to X1. Overwrite

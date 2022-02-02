@@ -275,11 +275,11 @@ private:
     sth = std::sin(th);
     cth = std::cos(th);
     /*
-    if (std::abs(sth) < SMALL()) {
-      sth = sgn(sth) * SMALL();
+    if (std::abs(sth) < EPS()) {
+      sth = sgn(sth) * EPS();
     }
-    if (std::abs(cth) < SMALL()) {
-      cth = sgn(cth) * SMALL();
+    if (std::abs(cth) < EPS()) {
+      cth = sgn(cth) * EPS();
     }
     */
     r2 = r * r;
