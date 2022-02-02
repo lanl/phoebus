@@ -366,7 +366,7 @@ namespace radiation
 
     *dE = (4*W2 - 1 + 3*W2*vvTilPi) / 3 * J + 2*W*zeta - Estar;      
     SPACELOOP(i)
-      (*cov_dF)(i) = (cov_v(i)*tauH*(4*W2/3*J + W*zeta) + tauH*cov_vTilPi(i) 
+      (*cov_dF)(i) = (cov_v(i)*tauH*(4*W2/3*J + W*zeta) + tauH*cov_vTilPi(i)*J 
                    + tauJ*W2*cov_v(i)*(JBB-J) + W*cov_Fstar(i))/(W+tauH) - cov_Fstar(i); 
     
     return Status::success;  
