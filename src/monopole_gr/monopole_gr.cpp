@@ -470,6 +470,9 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
   auto gradients = params.Get<Gradients_t>("gradients");
   auto gradients_h = Kokkos::create_mirror_view(gradients);
 
+  auto matter_cells_h = params.Get<Matter_host_t>("matter_cells_h");
+  auto vols_h = params.Get<Volumes_host_t>("integration_volumes_h");
+
   Kokkos::deep_copy(matter_h, matter);
   Kokkos::deep_copy(hypersurface_h, hypersurface);
   Kokkos::deep_copy(alpha_h, alpha);
@@ -482,14 +485,18 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
     Real r = radius.x(i);
     fprintf(pf,
             "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e "
-            "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e\n",
+            "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e "
+	    "%.14e %.14e %.14e %.14e %.14e\n",
             r, hypersurface_h(Hypersurface::A, i), hypersurface_h(Hypersurface::K, i),
             alpha_h(i), matter_h(Matter::RHO, i), matter_h(Matter::J_R, i),
             matter_h(Matter::trcS, i), matter_h(Matter::Srr, i),
             gradients_h(Gradients::DADR, i), gradients_h(Gradients::DKDR, i),
             gradients_h(Gradients::DALPHADR, i), gradients_h(Gradients::DBETADR, i),
             gradients_h(Gradients::DADT, i), gradients_h(Gradients::DALPHADT, i),
-            gradients_h(Gradients::DKDR, i), gradients_h(Gradients::DBETADT, i));
+            gradients_h(Gradients::DKDR, i), gradients_h(Gradients::DBETADT, i),
+	    matter_cells_h(Matter::RHO, i), matter_cells_h(Matter::J_R, i),
+	    matter_cells_h(Matter::trcS, i), matter_cells_h(Matter::Srr, i),
+	    vols_h(i));
   }
   fclose(pf);
 }
