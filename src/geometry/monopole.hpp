@@ -452,7 +452,7 @@ namespace MonopoleCoordTransforms {
 KOKKOS_INLINE_FUNCTION
 void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph) {
   r = std::sqrt(X1 * X1 + X2 * X2 + X3 * X3);
-  th = std::acos(Utils::ratio(X3, r));
+  th = std::acos(robust::ratio(X3, r));
   ph = std::atan2(X2, X1);
 }
 
@@ -496,14 +496,14 @@ void C2S(Real x, Real y, Real z, Real r, Real J[NDFULL][NDFULL]) {
 
   LinearAlgebra::SetZero(J, NDFULL, NDFULL);
   J[0][0] = 1;
-  J[1][1] = Utils::ratio(x, r);
-  J[1][2] = Utils::ratio(y, r);
-  J[1][3] = Utils::ratio(z, r);
-  J[2][1] = Utils::ratio(x * z, r2 * rho);
-  J[2][2] = Utils::ratio(y * z, r2 * rho2);
-  J[2][3] = -Utils::ratio(rho, r2);
-  J[3][1] = -Utils::ratio(y, rho2);
-  J[3][2] = Utils::ratio(x, rho2);
+  J[1][1] = robust::ratio(x, r);
+  J[1][2] = robust::ratio(y, r);
+  J[1][3] = robust::ratio(z, r);
+  J[2][1] = robust::ratio(x * z, r2 * rho);
+  J[2][2] = robust::ratio(y * z, r2 * rho2);
+  J[2][3] = -robust::ratio(rho, r2);
+  J[3][1] = -robust::ratio(y, rho2);
+  J[3][2] = robust::ratio(x, rho2);
   J[3][3] = 0;
 }
 // Hessian
@@ -525,11 +525,11 @@ void Hessian(Real x, Real y, Real z, Real r, Real H[NDFULL][NDFULL][NDFULL]) {
   const Real rho3 = rho2 * rho;
   const Real rho4 = rho3 * rho;
 
-  const Real irho = Utils::ratio(1., rho);
-  const Real irho3 = Utils::ratio(1., rho3);
-  const Real irho4 = Utils::ratio(1., rho4);
-  const Real ir3 = Utils::ratio(1., r3);
-  const Real ir4 = Utils::ratio(1., r4);
+  const Real irho = robust::ratio(1., rho);
+  const Real irho3 = robust::ratio(1., rho3);
+  const Real irho4 = robust::ratio(1., rho4);
+  const Real ir3 = robust::ratio(1., r3);
+  const Real ir4 = robust::ratio(1., r4);
 
   LinearAlgebra::SetZero(H, NDFULL, NDFULL, NDFULL);
   H[1][1][1] = (y2 + z2) * ir3;
