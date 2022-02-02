@@ -25,6 +25,7 @@
 #include "geometry/cached_system.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace Geometry {
 
@@ -54,7 +55,7 @@ public:
                      r2 * (-4 + r * mu * (2 - 2 * DD + r * DD * mu)) +
                      4 * a2 * sth * sth;
     const Real den = r3 * DD * mu * rm2;
-    return std::sqrt(Utils::ratio(num, den));
+    return std::sqrt(robust::ratio(num, den));
   }
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
@@ -67,13 +68,14 @@ public:
     // -g^{33}/g^{00} = g^{33}*alpha^2
     const Real num = -2 * a_ * r * sth * sth;
     const Real den = (r - 2) * r + a2_ * cth * cth;
-    beta[3 - 1] = Utils::ratio(num, den);
+    beta[3 - 1] = robust::ratio(num, den);
   }
   // TODO(JMM): SpacetimeMetric and metric could be combined?
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
                        Real g[NDFULL][NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
@@ -92,6 +94,7 @@ public:
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
@@ -115,6 +118,7 @@ public:
   void Metric(Real X0, Real X1, Real X2, Real X3,
               Real g[NDSPACE][NDSPACE]) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
@@ -122,13 +126,14 @@ public:
     const Real r3dm = r3 * DD * mu;
     LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
     g[0][0] = ratio(DD, mu);
-    g[1][1] = ratio(1, r2 * mu);
+    g[1][1] = ratio(1., r2 * mu);
     g[2][2] = ratio((r * mu - 2) * sth * sth, r3dm);
   }
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
                      Real g[NDSPACE][NDSPACE]) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
@@ -154,6 +159,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
@@ -182,6 +188,7 @@ public:
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
     const Real r = std::abs(X1);
     const Real th = X2;
@@ -264,20 +271,21 @@ private:
   void ComputeDeltaMu_(Real r, Real th, Real &r2, Real &r3, Real &sth,
                        Real &cth, Real &DD, Real &mu) const {
     using namespace Utils;
+    using namespace robust;
     sth = std::sin(th);
     cth = std::cos(th);
     /*
-    if (std::abs(sth) < SMALL) {
-      sth = sgn(sth) * SMALL;
+    if (std::abs(sth) < EPS()) {
+      sth = sgn(sth) * EPS();
     }
-    if (std::abs(cth) < SMALL) {
-      cth = sgn(cth) * SMALL;
+    if (std::abs(cth) < EPS()) {
+      cth = sgn(cth) * EPS();
     }
     */
     r2 = r * r;
     r3 = r2 * r;
-    DD = 1. - Utils::ratio(2., r) + Utils::ratio(a2_, r2);
-    mu = 1. + Utils::ratio(a2_ * cth * cth, r2);
+    DD = 1. - ratio(2., r) + ratio(a2_, r2);
+    mu = 1. + ratio(a2_ * cth * cth, r2);
   }
   Real dx_ = 1e-8;
   Real a_ = 0;

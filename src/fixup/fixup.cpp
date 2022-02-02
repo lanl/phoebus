@@ -22,8 +22,11 @@
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
-#include "phoebus_utils/variables.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
+#include "phoebus_utils/robust.hpp"
+#include "phoebus_utils/variables.hpp"
+
+using robust::ratio;
 
 namespace fixup {
 
@@ -367,11 +370,11 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
 	    if (pye > 0) eos_lambda[0] = v(b,pye,k,j,i);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-								      Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)),
+								      ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)),
 								      eos_lambda);
             v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i), eos_lambda);
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-								   Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)),
+								   ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)),
 								   eos_lambda);
           } else {
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive velocities to zero
@@ -386,12 +389,12 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
 	    if (pye > 0) eos_lambda[0] = v(b,pye,k,j,i);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-								      Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)),
+								      ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)),
 								      eos_lambda);
             v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i),
 								eos_lambda);
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-								   Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)),
+								   ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)),
 								   eos_lambda);
 
             // Zero primitive velocities
