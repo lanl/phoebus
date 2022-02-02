@@ -50,7 +50,9 @@ public:
   Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
            const Real BdotS, const Real Ye, const singularity::EOS &eos)
       : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
-        Ye_(Ye), eos_(eos) {}
+        Ye_(Ye), eos_(eos) {
+    lambda_[0] = Ye_;
+  }
   KOKKOS_FORCEINLINE_FUNCTION
   Real sfunc(const Real z, const Real Wp) const {
     Real zBsq = (z + Bsq_);
@@ -64,9 +66,8 @@ public:
   }
   KOKKOS_FORCEINLINE_FUNCTION
   void operator()(const Real rho, const Real Temp, Real res[2]) {
-    double lambda[2] = {Ye_, 0.};
-    const Real p = eos_.PressureFromDensityTemperature(rho, Temp, lambda);
-    const Real sie = eos_.InternalEnergyFromDensityTemperature(rho, Temp, lambda);
+    const Real p = eos_.PressureFromDensityTemperature(rho, Temp, lambda_);
+    const Real sie = eos_.InternalEnergyFromDensityTemperature(rho, Temp, lambda_);
     const Real Wp = D_ / rho;
     const Real z = (rho * (1.0 + sie) + p) * Wp * Wp;
     res[0] = sfunc(z, Wp);
@@ -82,6 +83,7 @@ public:
 private:
   const singularity::EOS &eos_;
   const Real D_, tau_, Bsq_, Ssq_, BdotSsq_, Ye_;
+  Real lambda_[2] = {0., 0.};
 };
 
 template <typename T> class VarAccessor {

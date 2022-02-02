@@ -101,7 +101,8 @@ static std::map<std::string, std::function<void(ParameterInput *pin, Mesh *pmesh
 */
 
 KOKKOS_FUNCTION
-Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P);
+Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P,
+		       const Real emin, const Real emax, const Real Ye = 0.0);
 
 } // namespace phoebus
 

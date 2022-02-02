@@ -10,10 +10,17 @@
 # prepare derivative works, distribute copies to the public, perform
 # publicly and display publicly, and to permit others to do so.
 
+# Sod shock tube for fake stellar collapse table generated with ideal gas eos
+# to generate, run
+# python external/singularity-eos/utils/scripts/make_tabulated_gamma.py -o ideal_gas.h5
+# to generate ideal gas table.
+# optionally run the stellarcollapse2spiner utility in singularity-eos to convert to a
+# stellar collapse file. This will make reading the table much faster.
+
 <phoebus>
 problem = shock_tube
-ix1_bc = outflow
-ox1_bc = outflow
+bc_ix1 = outflow
+bc_ox1 = outflow
 
 <parthenon/job>
 problem_id  = sod       # problem ID: basename of output filenames
@@ -31,9 +38,9 @@ file_type   = hdf5      # Tabular data dump
 dt          = 0.01      # time increment between outputs
 
 <parthenon/time>
-nlim        = -1        # cycle limit
-tlim        = 0.4       # time limit
-integrator  = rk2       # time integration algorithm
+nlim        = -1       # cycle limit
+tlim        = 0.4      # time limit
+integrator  = rk2      # time integration algorithm
 ncycle_out  = 1        # interval for stdout summary info
 dt_init_fact = 1.e-6
 
@@ -45,8 +52,8 @@ nghost = 4
 nx1         = 512       # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1         # maximum value of X1
-ix1_bc      = user  # Inner-X1 boundary condition flag
-ox1_bc      = user  # Outer-X1 boundary condition flag
+ix1_bc      = user     # Inner-X1 boundary condition flag
+ox1_bc      = user     # Outer-X1 boundary condition flag
 
 nx2         = 1       # Number of zones in X2-direction
 x2min       = -1        # minimum value of X2
@@ -76,9 +83,11 @@ method = derivative_order_1
 max_level = 3
 
 <eos>
-type = IdealGas
-Gamma = 1.6666666666666666667
-Cv = 1.0
+type = StellarCollapse
+# change to true if you ran stellarcollapse2spiner
+use_sp5 = false
+# change this to sp5 file if using sp5 true
+filename = ideal_gas.h5
 
 <physics>
 hydro = true
@@ -93,6 +102,12 @@ riemann = hll
 recon = weno5
 c2p_max_iter = 100
 Ye = true
+
+# Units set from the table units
+<units>
+scale_free = false
+fluid_mass_g = 1e3
+geom_length_cm = 1e3
 
 <shocktube>
 rhol = 10.0
