@@ -77,17 +77,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real MASS = unit_conv.GetMassCodeToCGS();
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
-  /*const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
-  const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
-  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
-  const Real CENERGY = unit_conv.GetEnergyCGSToCode();
-  const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
-  const Real CTIME = unit_conv.GetTimeCGSToCode();
-  const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;*/
 
-  //const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
-  const Real dV_code = dx_i * dx_j * dx_k * dt;
-  //const Real d3x_cgs = dx_i * dx_j * dx_k * pow(LENGTH, 3);
   const Real d3x = dx_i * dx_j * dx_k;
 
   const Real h_code = pc::h*TIME/(MASS*LENGTH*LENGTH);
@@ -133,29 +123,17 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
             Real ye = v(iye, k, j, i);
 
-            const Real rho_cgs = v(pdens, k, j, i) * DENSITY;
-            const Real T_cgs = v(ptemp, k, j, i) * TEMPERATURE;
-
             Real dN = 0.;
             Real dNdlnu_max = 0.;
-            Real dE = 0.;
-            Real dye = 0.;
             for (int n = 0; n <= nu_bins; n++) {
               Real nu = nusamp(n);
-              Real ener = pc::h*nu*CENERGY;
+              Real ener = h_code * nu * TIME;
               Real wgt = GetWeight(wgtC, nu);
-              //Real Jnu = d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu);
-              //Real Jnu = d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, ener);
-              Real Jnu = d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu/CTIME);
+              Real Jnu = d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu * TIME);
 
-              //dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
-              dN += Jnu / (ener * wgt) * (nu * dlnu / CTIME);
+              dN += Jnu / (ener * wgt) * (nu * dlnu * TIME);
 
-              dE += Jnu * (nu * dlnu / CTIME) * d3x * dt;
-              dye += Jnu / ener * (nu * dlnu / CTIME) * pc::mp / MASS;
-
-              // Factors of nu in numerator and denominator cancel
-              //Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
+              // Note that factors of nu in numerator and denominator cancel
               Real dNdlnu = Jnu * d3x * detG / (h_code * wgt);
               v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) = dNdlnu;
               if (dNdlnu > dNdlnu_max) {
@@ -170,20 +148,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             // Trapezoidal rule
             Real nu0 = nusamp[0];
             Real nu1 = nusamp[nu_bins];
-            //dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu0) *
-            //      nu0 / (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
-            //dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu1) *
-            //      nu1 / (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
-            //dN *= d3x_cgs * detG * dt * TIME;
-            Real ener0 = pc::h*nusamp[0]*CENERGY;
-            Real ener1 = pc::h*nusamp[1]*CENERGY;
-            //dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, ener0) /
-            //  (h_code * GetWeight(wgtC, nu0)) * dlnu;
-            //dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, ener1) /
-            //  (h_code * GetWeight(wgtC, nu1)) * dlnu;
-            dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu0/CTIME) /
+            dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu0 * TIME) /
               (h_code * GetWeight(wgtC, nu0)) * dlnu;
-            dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu1/CTIME) /
+            dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu1 * TIME) /
               (h_code * GetWeight(wgtC, nu1)) * dlnu;
             dN *= d3x * detG * dt;
 
@@ -201,7 +168,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           });
     }
   }
-  //exit(-1);
 
   // Reduce dN over zones for calibrating weights (requires w ~ wgtC)
   Real dNtot = 0;
@@ -339,7 +305,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
               // Encode frequency and randomly sample direction
-              Real E = nu * pc::h * CENERGY;
+              Real E = nu * TIME * h_code;
               Real theta = acos(2. * rng_gen.drand() - 1.);
               Real phi = 2. * M_PI * rng_gen.drand();
               Real K_tetrad[4] = {-E, E * cos(theta), E * cos(phi) * sin(theta),
@@ -355,11 +321,11 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
                 // detG is in both numerator and denominator
                 v(mu, k, j, i) +=
-                    1. / dV_code * weight(m) * K_coord[mu - Gcov_lo];
+                    1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
               }
               // TODO(BRR) lepton sign
               v(Gye, k, j, i) -=
-                  1. / dV_code * Ucon[0] * weight(m) * pc::mp / MASS;
+                  1. / (d3x * dt) * Ucon[0] * weight(m) * pc::mp / MASS;
 
               rng_pool.free_state(rng_gen);
             }
