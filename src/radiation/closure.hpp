@@ -365,7 +365,9 @@ namespace radiation
       gamma->raise3Vector(cov_F, con_F);
     } else { 
       SPACELOOP(i) (*con_F)(i) = W*con_v(i)*J + cov_tilH(i); 
-    } 
+    }
+    SPACELOOP2(i,j) (*concov_P)(i,j) *= gamma->alpha;  
+    SPACELOOP(i) (*con_F)(i) *= gamma->alpha;
     return Status::success;
   } 
   
