@@ -1,8 +1,8 @@
 
 <phoebus>
 problem = torus
-bc_ix1 = outflow
-bc_ox1 = outflow
+ix1_bc = outflow
+ox1_bc = outflow
 
 <parthenon/job>
 problem_id  = torus       # problem ID: basename of output filenames

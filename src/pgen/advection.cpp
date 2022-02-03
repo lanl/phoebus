@@ -63,14 +63,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::advection", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+	Real eos_lambda[2];
         Real x = coords.x1v(i);
         Real y = (ndim > 1 && shapedim > 1) ? coords.x2v(j) : 0;
         Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
 
+        if (iye > 0) {
+          v(iye, k, j, i) = (r * r <= rin * rin) ? 1.0 : 0.0;
+	  eos_lambda[0] = v(iye, k, j, i);
+	}
+
         const Real eps = u / (rho + 1e-20);
-        const Real P = eos.PressureFromDensityInternalEnergy(rho, eps);
-        const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps);
+        const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, eos_lambda);
+        const Real P = eos.PressureFromDensityInternalEnergy(rho, eps, eos_lambda);
 
         v(irho, k, j, i) = rho;
         v(iprs, k, j, i) = P;
@@ -86,9 +92,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo + 0, k, j, i) = W*vx;
         v(ivlo + 1, k, j, i) = W*vy;
         v(ivlo + 2, k, j, i) = W*vz;
-
-        if (iye > 0)
-          v(iye, k, j, i) = (r * r <= rin * rin) ? 1.0 : 0.0;
       });
 
   fluid::PrimitiveToConserved(rc.get());
