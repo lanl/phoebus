@@ -131,7 +131,9 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         Tens2 cov_gamma; 
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real isdetgam = 1.0/geom.DetGamma(CellLocation::Cent, b, k, j, i);
-        Closure<Vec, Tens2> c(con_v, cov_gamma); 
+
+        LocalThreeGeometry<Vec, Tens2> g(geom, CellLocation::Cent, b, k, j, i); 
+        Closure<Vec, Tens2> c(con_v, &g); 
         
         Real J; 
         Vec covH;
@@ -232,8 +234,10 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
         Tens2 cov_gamma; 
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
-        Closure<Vec, Tens2> c(con_v, cov_gamma); 
-        
+
+        LocalThreeGeometry<Vec, Tens2> g(geom, CellLocation::Cent, 0, b, j, i); 
+        Closure<Vec, Tens2> c(con_v, &g); 
+         
         Real E; 
         Vec covF;
         Tens2 conTilPi;
@@ -449,7 +453,8 @@ TaskStatus CalculateFluxesImpl(T* rc) {
         geom.Metric(face, k, j, i, cov_gamma.data); 
         geom.ContravariantShift(face, k, j, i, con_beta.data);
         const Real sdetgam = geom.DetGamma(face, k, j, i);
-        
+        LocalThreeGeometry<Vec, Tens2> g(geom, face, 0, k, j, i); 
+
         const Real dx = coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));
 
         for (int ispec = 0; ispec<nspec; ++ispec) { 
@@ -485,8 +490,8 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           /// TODO: (LFR) Add other contributions to the asymptotic flux 
           Vec HasymL = -cov_dJ/(3*kappaH + 3*kappaH_min);   
           Vec HasymR = HasymL; 
-          Closure<Vec, Tens2> cl(con_vl, cov_gamma); 
-          Closure<Vec, Tens2> cr(con_vr, cov_gamma); 
+          Closure<Vec, Tens2> cl(con_vl, &g); 
+          Closure<Vec, Tens2> cr(con_vr, &g); 
           Real El, Er;
           Tens2 con_tilPil, con_tilPir; 
           Vec covFl, conFl, conFl_asym;
@@ -618,7 +623,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Tens2 cov_gamma; 
         geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
         
-        Closure<Vec, Tens2> c(con_v, cov_gamma); 
+        LocalThreeGeometry<Vec, Tens2> g(geom, CellLocation::Cent, iblock, k, j, i); 
+        Closure<Vec, Tens2> c(con_v, &g); 
         
         Real alp = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
         Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
@@ -656,7 +662,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                     J*v(iblock, idx_H(ispec, 1), k, j, i),
                     J*v(iblock, idx_H(ispec, 2), k, j, i)}};
           Vec conF;
-          c.gamma.raise3Vector(covF, &conF);           
+          c.gamma->raise3Vector(covF, &conF);           
           Tens2 conP, con_tilPi; 
           if (CLOSURE_TYPE == ClosureType::M1) {
             Real tempE;
@@ -766,7 +772,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
           Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
           Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-          Closure<Vec, Tens2> c(con_v, cov_gamma); 
+          LocalThreeGeometry<Vec, Tens2> g(geom, CellLocation::Cent, iblock, k, j, i); 
+          Closure<Vec, Tens2> c(con_v, &g); 
           
           Real Estar = v(iblock, idx_E(ispec), k, j, i)/sdetgam; 
           Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i)/sdetgam,

@@ -62,13 +62,13 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             // Set up background state
             Vec con_v = {vmag*cos(phiv), vmag*sin(phiv), 0.0}; 
             Tens2 cov_gamma = {{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}}; 
-  
-            Closure<Vec, Tens2> cl(con_v, cov_gamma); 
+            LocalThreeGeometry<Vec, Tens2> g(cov_gamma); 
+            Closure<Vec, Tens2> cl(con_v, &g); 
   
   
             // Assume a fluid frame state  
             Real J = 1.0;
-            Vec cov_tilH = {{xi*J/sqrt(cl.gamma.con_gamma(0,0) - con_v(0)*con_v(0)), 0.0, 0.0}}; 
+            Vec cov_tilH = {{xi*J/sqrt(cl.gamma->con_gamma(0,0) - con_v(0)*con_v(0)), 0.0, 0.0}}; 
             Tens2 con_tilPi;
 
             // Calculate comoving frame state 
