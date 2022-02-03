@@ -444,6 +444,14 @@ TaskStatus CalculateFluxesImpl(T* rc) {
               break;
           }
         
+        Vec con_beta; 
+        Tens2 cov_gamma;
+        geom.Metric(face, k, j, i, cov_gamma.data); 
+        geom.ContravariantShift(face, k, j, i, con_beta.data);
+        const Real sdetgam = geom.DetGamma(face, k, j, i);
+        
+        const Real dx = coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));
+
         for (int ispec = 0; ispec<nspec; ++ispec) { 
         
           const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
@@ -470,14 +478,7 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           // Calculate the geometric mean of the opacity on either side of the interface, this 
           // is necessary for handling the asymptotic limit near sharp surfaces
           Real kappaH = sqrt((v(idx_kappaH(ispec), k, j, i)*v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
-          
-          Vec con_beta; 
-          Tens2 cov_gamma;
-          geom.Metric(face, k, j, i, cov_gamma.data); 
-          geom.ContravariantShift(face, k, j, i, con_beta.data);
-          const Real sdetgam = geom.DetGamma(face, k, j, i);
-          
-          const Real dx = coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));  
+            
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH*dx), 1)));
           
           // Calculate the observer frame quantities on either side of the interface  
@@ -501,14 +502,10 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           else if (CLOSURE_TYPE == ClosureType::Eddington) { 
             SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
             SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
-            cl.Prim2Con(Jl, HasymL, con_tilPil, &El, &covFl); 
-            cr.Prim2Con(Jr, HasymR, con_tilPir, &Er, &covFr);
           } 
-          cl.gamma.raise3Vector(covFl, &conFl_asym); 
-          cr.gamma.raise3Vector(covFr, &conFr_asym); 
-          cl.getConCovPFromPrim(Jl, HasymL, con_tilPil, &Pl_asym);
-          cr.getConCovPFromPrim(Jr, HasymR, con_tilPir, &Pr_asym);
-
+          cl.getFluxesFromPrim(Jl, HasymL, con_tilPil, &conFl_asym, &Pl_asym); 
+          cr.getFluxesFromPrim(Jr, HasymR, con_tilPir, &conFr_asym, &Pr_asym); 
+          
           // Regular fluxes          
           if (CLOSURE_TYPE == ClosureType::M1) { 
             cl.Prim2ConM1(Jl, Hl, &El, &covFl, &con_tilPil); 
@@ -517,14 +514,13 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           else if (CLOSURE_TYPE == ClosureType::Eddington) { 
             SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
             SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
-            cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl); 
-            cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
           }
-          cl.gamma.raise3Vector(covFl, &conFl);
-          cr.gamma.raise3Vector(covFr, &conFr);
-          cl.getConCovPFromPrim(Jl, Hl, con_tilPil, &Pl);
-          cr.getConCovPFromPrim(Jr, Hr, con_tilPir, &Pr);
+          cl.getFluxesFromPrim(Jl, Hl, con_tilPil, &conFl, &Pl); 
+          cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr); 
+          cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl); 
+          cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
           
+
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices  
           const Real speed = a*1.0 + (1-a)*std::max(sqrt(cl.v2), sqrt(cr.v2));  
