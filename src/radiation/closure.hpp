@@ -129,6 +129,14 @@ namespace radiation
                               const T2 con_tilPi, const Real JBB,  
                               const Real tauJ, const Real tauH,
                               Real *dE, VB *cov_dF);
+ 
+    //-------------------------------------------------------------------------------------
+    /// Calculate the fluxes for the conservation equations from J, \tilde H_i, and 
+    /// \tilde pi^{ij}.   
+    template <class VA, class VB, class T2A, class T2B>
+    KOKKOS_FUNCTION
+    Status getFluxesFromPrim(const Real J, const VA cov_tilH, const T2A con_tilPi,
+                             VB *con_F, T2B *concov_P);
 
     //-------------------------------------------------------------------------------------
     /// Calculate the momentum density flux P^i_j from J, \tilde H_i, and \tilde pi^{ij}.
@@ -204,7 +212,6 @@ namespace radiation
                        const Real xi, const Real phi,
                        const Vec con_tilg, const Vec con_tild,
                        Real *fXi, Real *fPhi);
-
 
     //-------------------------------------------------------------------------------------
     /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
@@ -332,7 +339,57 @@ namespace radiation
     
     return Status::success;  
   }
+
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class VA, class VB, class T2A, class T2B>
+  KOKKOS_FUNCTION
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::getFluxesFromPrim(const Real J, const VA cov_tilH, 
+                                                                 const T2A con_tilPi, VB *con_F, 
+                                                                 T2B *concov_P) {
+    getConCovPFromPrim(J, cov_tilH, con_tilPi, concov_P);
+    Real E;
+    Vec cov_F;  
+    Prim2Con(J, cov_tilH, con_tilPi, &E, &cov_F); 
+    gamma.raise3Vector(cov_F, con_F); 
+    return Status::success;
+  } 
   
+    template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class V, class T2A, class T2B>
+  KOKKOS_FORCEINLINE_FUNCTION
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::getConPFromPrim(const Real J, const V cov_tilH,
+                                              const T2A con_tilPi, T2B *con_P) {
+    Vec con_tilH;
+    gamma.raise3Vector(cov_tilH, &con_tilH);
+    SPACELOOP2(i,j) (*con_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * con_v(j) * J 
+            + W * (con_v(i) * con_tilH(j) + con_v(j) * con_tilH(i)) + J * con_tilPi(i, j) 
+            + J/3.0*gamma.con_gamma(i,j);
+    
+    return Status::success;
+  }
+
+  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class V, class T2A, class T2B>
+  KOKKOS_FORCEINLINE_FUNCTION
+  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::getConCovPFromPrim(const Real J, const V cov_tilH,
+                                                 const T2A con_tilPi, T2B *concov_P) {
+    Vec con_tilH;
+    Tens2 concov_tilPi;
+    SPACELOOP2(i,j) {
+        concov_tilPi(i, j) = 0.0;
+        SPACELOOP(k) concov_tilPi(i, j) += con_tilPi(i, k) * gamma.cov_gamma(k, j);
+    }
+    gamma.raise3Vector(cov_tilH, &con_tilH);
+    SPACELOOP(i) {
+      SPACELOOP(j) {
+        (*concov_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * cov_v(j) * J 
+            + W * (con_v(i) * cov_tilH(j) + cov_v(j) * con_tilH(i)) + J * concov_tilPi(i, j);
+      }
+      (*concov_P)(i, i) += J / 3.0;
+    }
+    return Status::success;
+  }
+
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class VA, class VB, class T2>
   KOKKOS_FUNCTION
@@ -437,42 +494,9 @@ namespace radiation
     return status;
   }
   
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
-  template <class V, class T2A, class T2B>
-  KOKKOS_FORCEINLINE_FUNCTION
-  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::getConPFromPrim(const Real J, const V cov_tilH,
-                                              const T2A con_tilPi, T2B *con_P) {
-    Vec con_tilH;
-    gamma.raise3Vector(cov_tilH, &con_tilH);
-    SPACELOOP2(i,j) (*con_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * con_v(j) * J 
-            + W * (con_v(i) * con_tilH(j) + con_v(j) * con_tilH(i)) + J * con_tilPi(i, j) 
-            + J/3.0*gamma.con_gamma(i,j);
-    
-    return Status::success;
-  }
-
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
-  template <class V, class T2A, class T2B>
-  KOKKOS_FORCEINLINE_FUNCTION
-  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::getConCovPFromPrim(const Real J, const V cov_tilH,
-                                                 const T2A con_tilPi, T2B *concov_P) {
-    Vec con_tilH;
-    Tens2 concov_tilPi;
-    SPACELOOP2(i,j) {
-        concov_tilPi(i, j) = 0.0;
-        SPACELOOP(k) concov_tilPi(i, j) += con_tilPi(i, k) * gamma.cov_gamma(k, j);
-    }
-    gamma.raise3Vector(cov_tilH, &con_tilH);
-    SPACELOOP(i) {
-      SPACELOOP(j) {
-        (*concov_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * cov_v(j) * J 
-            + W * (con_v(i) * cov_tilH(j) + cov_v(j) * con_tilH(i)) + J * concov_tilPi(i, j);
-      }
-      (*concov_P)(i, i) += J / 3.0;
-    }
-    return Status::success;
-  }
-
+  //----------------
+  // Protected functions below
+  //----------------
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   template <class V>
   KOKKOS_FUNCTION
