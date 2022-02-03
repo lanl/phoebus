@@ -504,8 +504,8 @@ TaskStatus CalculateFluxesImpl(T* rc) {
             cl.Prim2Con(Jl, HasymL, con_tilPil, &El, &covFl); 
             cr.Prim2Con(Jr, HasymR, con_tilPir, &Er, &covFr);
           } 
-          cl.raise3Vector(covFl, &conFl_asym); 
-          cr.raise3Vector(covFr, &conFr_asym); 
+          cl.gamma.raise3Vector(covFl, &conFl_asym); 
+          cr.gamma.raise3Vector(covFr, &conFr_asym); 
           cl.getConCovPFromPrim(Jl, HasymL, con_tilPil, &Pl_asym);
           cr.getConCovPFromPrim(Jr, HasymR, con_tilPir, &Pr_asym);
 
@@ -520,8 +520,8 @@ TaskStatus CalculateFluxesImpl(T* rc) {
             cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl); 
             cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
           }
-          cl.raise3Vector(covFl, &conFl);
-          cr.raise3Vector(covFr, &conFr);
+          cl.gamma.raise3Vector(covFl, &conFl);
+          cr.gamma.raise3Vector(covFr, &conFr);
           cl.getConCovPFromPrim(Jl, Hl, con_tilPil, &Pl);
           cr.getConCovPFromPrim(Jr, Hr, con_tilPir, &Pr);
           
@@ -660,7 +660,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                     J*v(iblock, idx_H(ispec, 1), k, j, i),
                     J*v(iblock, idx_H(ispec, 2), k, j, i)}};
           Vec conF;
-          c.raise3Vector(covF, &conF);           
+          c.gamma.raise3Vector(covF, &conF);           
           Tens2 conP, con_tilPi; 
           if (CLOSURE_TYPE == ClosureType::M1) {
             Real tempE;

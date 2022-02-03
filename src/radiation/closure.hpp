@@ -63,6 +63,61 @@ namespace radiation
     Real fXi, fPhi;
     Real errXi, errPhi;
   };
+  
+  template <class Tens2>
+  struct LocalThreeGeometry {
+  
+    Real gdet;
+    Tens2 cov_gamma;
+    Tens2 con_gamma;
+    //Real alpha;
+    //Vec con_beta;
+
+    template <class T2>
+    KOKKOS_FUNCTION LocalThreeGeometry(const T2 cov_gamma_in) {
+      SPACELOOP2(i,j){ cov_gamma(i, j) = cov_gamma_in(i, j);}
+      gdet = matrixInverse3x3(cov_gamma, con_gamma);
+    }
+
+    //-------------------------------------------------------------------------------------
+    /// Routines for raising, lowering, contracting, etc. three vectors.
+    template <class VA, class VB>
+    KOKKOS_FORCEINLINE_FUNCTION void lower3Vector(const VA &con_U, VB *cov_U) const {
+      SPACELOOP(i) (*cov_U)(i) = 0.0;
+      SPACELOOP2(i,j){ (*cov_U)(i) += con_U(j) * cov_gamma(i, j); }
+    }
+
+    template <class VA, class VB>
+    KOKKOS_FORCEINLINE_FUNCTION void raise3Vector(const VA &cov_U, VB *con_U) const {
+      SPACELOOP(i) (*con_U)(i) = 0.0;
+      SPACELOOP2(i,j){ (*con_U)(i) += cov_U(j) * con_gamma(i, j); }     
+    }
+
+    template <class VA, class VB>
+    KOKKOS_FORCEINLINE_FUNCTION
+    Real contractCon3Vectors(const VA &con_A, const VB &con_B) const {
+      Real s(0.0);
+      SPACELOOP2(i,j){ s += cov_gamma(i, j) * con_A(i) * con_B(j); }
+      return s;
+    }
+
+    template <class VA, class VB>
+    KOKKOS_FORCEINLINE_FUNCTION
+    Real contractCov3Vectors(const VA &cov_A, const VB &cov_B) const
+    {
+      Real s(0.0);
+      SPACELOOP2(i,j){ s += con_gamma(i, j) * cov_A(i) * cov_B(j); }
+      return s;
+    }
+
+    template <class VA, class VB>
+    KOKKOS_FORCEINLINE_FUNCTION
+    Real contractConCov3Vectors(const VA &con_A, const VB &cov_B) const {
+      Real s(0.0);
+      SPACELOOP(i) { s += con_A(i) * cov_B(i); }
+      return s;
+    }
+  };
 
   /// Holds methods for closing the radiation moment equations as well as calculating radiation
   /// moment source terms.
@@ -138,53 +193,11 @@ namespace radiation
     KOKKOS_FUNCTION
     M1Result Con2PrimM1(const Real E, const VA cov_F, Real xi_guess, Real phi_guess,
                         Real *J, VB *cov_H, T2 *con_tilPi);
-
-    //-------------------------------------------------------------------------------------
-    /// Routines for raising, lowering, contracting, etc. three vectors.
-    template <class VA, class VB>
-    KOKKOS_FORCEINLINE_FUNCTION void lower3Vector(const VA &con_U, VB *cov_U) const {
-      SPACELOOP(i) (*cov_U)(i) = 0.0;
-      SPACELOOP2(i,j){ (*cov_U)(i) += con_U(j) * cov_gamma(i, j); }
-    }
-
-    template <class VA, class VB>
-    KOKKOS_FORCEINLINE_FUNCTION void raise3Vector(const VA &cov_U, VB *con_U) const {
-      SPACELOOP(i) (*con_U)(i) = 0.0;
-      SPACELOOP2(i,j){ (*con_U)(i) += cov_U(j) * con_gamma(i, j); }     
-    }
-
-    template <class VA, class VB>
-    KOKKOS_FORCEINLINE_FUNCTION
-    Real contractCon3Vectors(const VA &con_A, const VB &con_B) const {
-      Real s(0.0);
-      SPACELOOP2(i,j){ s += cov_gamma(i, j) * con_A(i) * con_B(j); }
-      return s;
-    }
-
-    template <class VA, class VB>
-    KOKKOS_FORCEINLINE_FUNCTION
-    Real contractCov3Vectors(const VA &cov_A, const VB &cov_B) const
-    {
-      Real s(0.0);
-      SPACELOOP2(i,j){ s += con_gamma(i, j) * cov_A(i) * cov_B(j); }
-      return s;
-    }
-
-    template <class VA, class VB>
-    KOKKOS_FORCEINLINE_FUNCTION
-    Real contractConCov3Vectors(const VA &con_A, const VB &cov_B) const {
-      Real s(0.0);
-      SPACELOOP(i) { s += con_A(i) * cov_B(i); }
-      return s;
-    }
-
-    Real v2, W, W2, W3, W4;
+    
+    Real v2, W, W2;
     Vec cov_v;
     Vec con_v;
-    Real gdet, alpha;
-    Vec con_beta;
-    Tens2 cov_gamma;
-    Tens2 con_gamma;
+    LocalThreeGeometry<Tens2> gamma;
 
   protected:
   
@@ -257,7 +270,7 @@ namespace radiation
         }
         *vvTilPi += cov_v(i) * con_vTilPi(i);
       }
-      lower3Vector(con_vTilPi, cov_vTilPi);
+      gamma.lower3Vector(con_vTilPi, cov_vTilPi);
     }
 
     KOKKOS_FORCEINLINE_FUNCTION
@@ -274,20 +287,15 @@ namespace radiation
   template <class V, class T2>
   KOKKOS_FUNCTION
   Closure<Vec, Tens2, ENERGY_CONSERVE>::Closure(const V con_v_in, const T2 cov_gamma_in)
+      : gamma(cov_gamma_in) 
   {
-    SPACELOOP2(i,j){ cov_gamma(i, j) = cov_gamma_in(i, j);}
-
     SPACELOOP(i) con_v(i) = con_v_in(i);
 
-    gdet = matrixInverse3x3(cov_gamma, con_gamma);
-
-    lower3Vector(con_v, &cov_v);
+    gamma.lower3Vector(con_v, &cov_v);
     v2 = 0.0;
     SPACELOOP(i) v2 += con_v(i) * cov_v(i);
     W = 1 / std::sqrt(1 - v2);
     W2 = W * W;
-    W3 = W * W2;
-    W4 = W * W3;
   }
    
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
@@ -313,7 +321,7 @@ namespace radiation
       A[0][1] = 1.0; 
     }
 
-    Real vFstar = contractConCov3Vectors(con_v, cov_Fstar); 
+    Real vFstar = gamma.contractConCov3Vectors(con_v, cov_Fstar); 
     if (ENERGY_CONSERVE) {
       b[0] = Estar + W*tauJ*JBB;
     } else { 
@@ -375,7 +383,7 @@ namespace radiation
 
     // lam is proportional to the determinant of the 2x2 linear system relating
     // E and v_i F^i to J and v_i H^i for fixed tilde pi^ij
-    const Real lam = (2.0 * W2 + 1.0) / 3.0 + (2 * W4 - 3 * W2) * vvTilPi;
+    const Real lam = (2.0 * W2 + 1.0) / 3.0 + (2.0 * W2 - 3.0) * W2 * vvTilPi;
 
     // zeta = v_i H^i
     // const Real zeta = -W/lam*(((4*W2-4)/3 + vvPi)*E
@@ -419,8 +427,8 @@ namespace radiation
     Real JEdd;
     Vec cov_HEdd;
     Con2Prim(E, cov_F, con_PiEdd, &JEdd, &cov_HEdd);
-    Real vHEdd = contractConCov3Vectors(con_v, cov_HEdd);
-    Real HEdd = sqrt(contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd * vHEdd);
+    Real vHEdd = gamma.contractConCov3Vectors(con_v, cov_HEdd);
+    Real HEdd = sqrt(gamma.contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd * vHEdd);
 
     xi = std::min(ratio(HEdd, JEdd), 0.99);
     phi = 1.000001 * acos(-1);
@@ -448,7 +456,7 @@ namespace radiation
   Status Closure<Vec, Tens2, ENERGY_CONSERVE>::getConPFromPrim(const Real J, const V cov_tilH,
                                               const T2A con_tilPi, T2B *con_P) {
     Vec con_tilH;
-    raise3Vector(cov_tilH, &con_tilH);
+    gamma.raise3Vector(cov_tilH, &con_tilH);
     SPACELOOP2(i,j) (*con_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * con_v(j) * J 
             + W * (con_v(i) * con_tilH(j) + con_v(j) * con_tilH(i)) + J * con_tilPi(i, j) 
             + J/3.0*con_gamma(i,j);
@@ -467,7 +475,7 @@ namespace radiation
         concov_tilPi(i, j) = 0.0;
         SPACELOOP(k) concov_tilPi(i, j) += con_tilPi(i, k) * cov_gamma(k, j);
     }
-    raise3Vector(cov_tilH, &con_tilH);
+    gamma.raise3Vector(cov_tilH, &con_tilH);
     SPACELOOP(i) {
       SPACELOOP(j) {
         (*concov_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * cov_v(j) * J 
@@ -595,7 +603,7 @@ namespace radiation
   Status Closure<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const Real J, const V cov_tilH,
                                                     Tens2 *con_tilPi, Vec *con_tilf) {
     Vec con_tilH;
-    raise3Vector(cov_tilH, &con_tilH);
+    gamma.raise3Vector(cov_tilH, &con_tilH);
     Real H(0.0), vH(0.0);
     SPACELOOP(i) H += cov_tilH(i) * con_tilH(i);
     SPACELOOP(i) vH += cov_tilH(i) * con_v(i);
@@ -647,7 +655,7 @@ namespace radiation
     // These vectors are actually fixed, so there is no need to recalculate
     // them every step in the root find 
     Vec con_F;
-    raise3Vector(cov_F, &con_F);
+    gamma.raise3Vector(cov_F, &con_F);
     Real Fmag(0.0), vl(0.0), v2(0.0);
     SPACELOOP(i) Fmag += cov_F(i) * con_F(i);
     Fmag = std::sqrt(Fmag);
