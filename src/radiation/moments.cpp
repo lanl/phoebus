@@ -609,7 +609,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   int nspec = idx_E.DimSize(1);
   
   parthenon::par_for( 
-      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 
+      DEFAULT_LOOP_PATTERN, "RadMoments::GeometricSource", DevExecSpace(), 
       0, nblock-1, // Loop over blocks
       kb.s, kb.e, // z-loop  
       jb.s, jb.e, // y-loop 
