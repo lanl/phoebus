@@ -358,10 +358,14 @@ namespace radiation
                                                                  const T2A con_tilPi, VB *con_F, 
                                                                  T2B *concov_P) {
     getConCovPFromPrim(J, cov_tilH, con_tilPi, concov_P);
-    Real E;
-    Vec cov_F;  
-    Prim2Con(J, cov_tilH, con_tilPi, &E, &cov_F); 
-    gamma->raise3Vector(cov_F, con_F); 
+    if (ENERGY_CONSERVE) {
+      Real E;
+      Vec cov_F;  
+      Prim2Con(J, cov_tilH, con_tilPi, &E, &cov_F); 
+      gamma->raise3Vector(cov_F, con_F);
+    } else { 
+      SPACELOOP(i) (*con_F)(i) = W*con_v(i)*J + cov_tilH(i); 
+    } 
     return Status::success;
   } 
   
