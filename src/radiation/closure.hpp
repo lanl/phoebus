@@ -136,7 +136,7 @@ namespace radiation
     KOKKOS_FUNCTION
     Status getConCovPFromPrim(const Real J, const V cov_tilH, const T2A con_tilPi,
                               T2B *concov_P);
-    
+
     //-------------------------------------------------------------------------------------
     /// Calculate the momentum density flux P^{ij} from J, \tilde H_i, and \tilde pi^{ij}.
     template <class V, class T2A, class T2B>
@@ -446,7 +446,7 @@ namespace radiation
     gamma.raise3Vector(cov_tilH, &con_tilH);
     SPACELOOP2(i,j) (*con_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * con_v(j) * J 
             + W * (con_v(i) * con_tilH(j) + con_v(j) * con_tilH(i)) + J * con_tilPi(i, j) 
-            + J/3.0*con_gamma(i,j);
+            + J/3.0*gamma.con_gamma(i,j);
     
     return Status::success;
   }
@@ -460,7 +460,7 @@ namespace radiation
     Tens2 concov_tilPi;
     SPACELOOP2(i,j) {
         concov_tilPi(i, j) = 0.0;
-        SPACELOOP(k) concov_tilPi(i, j) += con_tilPi(i, k) * cov_gamma(k, j);
+        SPACELOOP(k) concov_tilPi(i, j) += con_tilPi(i, k) * gamma.cov_gamma(k, j);
     }
     gamma.raise3Vector(cov_tilH, &con_tilH);
     SPACELOOP(i) {
@@ -572,7 +572,7 @@ namespace radiation
 
     // Construct the residual functions
     Real H(0.0), vTilH(0.0), Hf(0.0), vTilf(0.0);
-    SPACELOOP2(i,j){ H += cov_tilH(i) * cov_tilH(j) * con_gamma(i, j); }
+    SPACELOOP2(i,j){ H += cov_tilH(i) * cov_tilH(j) * gamma.con_gamma(i, j); }
     SPACELOOP(i) vTilH += con_v(i) * cov_tilH(i);
     SPACELOOP(i) Hf += cov_tilH(i) * con_tilf(i);
     SPACELOOP(i) vTilf += cov_v(i) * con_tilf(i);
@@ -600,7 +600,7 @@ namespace radiation
     const Real athin = 0.5 * (3 * closure(xi) - 1);
     // Calculate the projected rest frame radiation pressure tensor
     SPACELOOP2(i,j) {
-      (*con_tilPi)(i, j) = (*con_tilf)(i) * (*con_tilf)(j) - (W2 * con_v(i) * con_v(j) + con_gamma(i, j)) / 3;
+      (*con_tilPi)(i, j) = (*con_tilf)(i) * (*con_tilf)(j) - (W2 * con_v(i) * con_v(j) + gamma.con_gamma(i, j)) / 3;
       (*con_tilPi)(i, j) *= athin;
     }
 
@@ -626,7 +626,7 @@ namespace radiation
     // Calculate the projected rest frame radiation pressure tensor
     SPACELOOP2(i,j)
     {
-      (*con_tilPi)(i, j) = (*con_tilf)(i) * (*con_tilf)(j) - (W2 * con_v(i) * con_v(j) + con_gamma(i, j)) / 3;
+      (*con_tilPi)(i, j) = (*con_tilf)(i) * (*con_tilf)(j) - (W2 * con_v(i) * con_v(j) + gamma.con_gamma(i, j)) / 3;
       (*con_tilPi)(i, j) *= athin;
     }
 
