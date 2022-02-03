@@ -51,19 +51,30 @@ namespace radiation
     Real errXi, errPhi;
   };
   
-  template <class Tens2>
+  template <class Vec, class Tens2>
   struct LocalThreeGeometry {
   
     Real gdet;
     Tens2 cov_gamma;
     Tens2 con_gamma;
-    //Real alpha;
-    //Vec con_beta;
+    Real alpha;
+    Vec con_beta;
 
     template <class T2>
     KOKKOS_FUNCTION LocalThreeGeometry(const T2 cov_gamma_in) {
       SPACELOOP2(i,j){ cov_gamma(i, j) = cov_gamma_in(i, j);}
       gdet = matrixInverse3x3(cov_gamma, con_gamma);
+      alpha = 1.0; 
+      SPACELOOP(i) con_beta(i) = 0.0;
+    }
+    
+    template<class T, class C> 
+    KOKKOS_FUNCTION LocalThreeGeometry(const T& geom, const C& face, 
+                                       int b, int k, int j, int i) {
+      geom.Metric(face, b, k, j, i, cov_gamma.data); 
+      gdet = matrixInverse3x3(cov_gamma, con_gamma);
+      geom.ContravariantShift(face, b, k, j, i, con_beta.data);
+      alpha = geom.Lapse(face, b, k, j, i); 
     }
 
     //-------------------------------------------------------------------------------------
@@ -115,9 +126,9 @@ namespace radiation
     //-------------------------------------------------------------------------------------
     /// Constructor just calculates the inverse 3-metric, covariant three-velocity, and the
     /// Lorentz factor for the given background state.
-    template <class V, class T2>
+    template <class V>
     KOKKOS_FUNCTION
-    Closure(const V con_v_in, const T2 cov_gamma_in);
+    Closure(const V con_v_in, LocalThreeGeometry<Vec, Tens2>* g); 
     
     //-------------------------------------------------------------------------------------
     /// Calculate the update values dE and cov_dF for a linear, implicit source term update
@@ -192,7 +203,7 @@ namespace radiation
     Real v2, W, W2;
     Vec cov_v;
     Vec con_v;
-    LocalThreeGeometry<Tens2> gamma;
+    LocalThreeGeometry<Vec, Tens2>* gamma;
 
   protected:
   
@@ -264,7 +275,7 @@ namespace radiation
         }
         *vvTilPi += cov_v(i) * con_vTilPi(i);
       }
-      gamma.lower3Vector(con_vTilPi, cov_vTilPi);
+      gamma->lower3Vector(con_vTilPi, cov_vTilPi);
     }
 
     KOKKOS_FORCEINLINE_FUNCTION
@@ -278,14 +289,14 @@ namespace radiation
   };
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
-  template <class V, class T2>
+  template <class V>
   KOKKOS_FUNCTION
-  Closure<Vec, Tens2, ENERGY_CONSERVE>::Closure(const V con_v_in, const T2 cov_gamma_in)
-      : gamma(cov_gamma_in) 
+  Closure<Vec, Tens2, ENERGY_CONSERVE>::Closure(const V con_v_in, LocalThreeGeometry<Vec, Tens2>* g) 
+      : gamma(g) 
   {
     SPACELOOP(i) con_v(i) = con_v_in(i);
 
-    gamma.lower3Vector(con_v, &cov_v);
+    gamma->lower3Vector(con_v, &cov_v);
     v2 = 0.0;
     SPACELOOP(i) v2 += con_v(i) * cov_v(i);
     W = 1 / std::sqrt(1 - v2);
@@ -315,7 +326,7 @@ namespace radiation
       A[0][1] = 1.0; 
     }
 
-    Real vFstar = gamma.contractConCov3Vectors(con_v, cov_Fstar); 
+    Real vFstar = gamma->contractConCov3Vectors(con_v, cov_Fstar); 
     if (ENERGY_CONSERVE) {
       b[0] = Estar + W*tauJ*JBB;
     } else { 
@@ -350,7 +361,7 @@ namespace radiation
     Real E;
     Vec cov_F;  
     Prim2Con(J, cov_tilH, con_tilPi, &E, &cov_F); 
-    gamma.raise3Vector(cov_F, con_F); 
+    gamma->raise3Vector(cov_F, con_F); 
     return Status::success;
   } 
   
@@ -360,10 +371,10 @@ namespace radiation
   Status Closure<Vec, Tens2, ENERGY_CONSERVE>::getConPFromPrim(const Real J, const V cov_tilH,
                                               const T2A con_tilPi, T2B *con_P) {
     Vec con_tilH;
-    gamma.raise3Vector(cov_tilH, &con_tilH);
+    gamma->raise3Vector(cov_tilH, &con_tilH);
     SPACELOOP2(i,j) (*con_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * con_v(j) * J 
             + W * (con_v(i) * con_tilH(j) + con_v(j) * con_tilH(i)) + J * con_tilPi(i, j) 
-            + J/3.0*gamma.con_gamma(i,j);
+            + J/3.0*gamma->con_gamma(i,j);
     
     return Status::success;
   }
@@ -377,9 +388,9 @@ namespace radiation
     Tens2 concov_tilPi;
     SPACELOOP2(i,j) {
         concov_tilPi(i, j) = 0.0;
-        SPACELOOP(k) concov_tilPi(i, j) += con_tilPi(i, k) * gamma.cov_gamma(k, j);
+        SPACELOOP(k) concov_tilPi(i, j) += con_tilPi(i, k) * gamma->cov_gamma(k, j);
     }
-    gamma.raise3Vector(cov_tilH, &con_tilH);
+    gamma->raise3Vector(cov_tilH, &con_tilH);
     SPACELOOP(i) {
       SPACELOOP(j) {
         (*concov_P)(i, j) = 4.0 / 3.0 * W2 * con_v(i) * cov_v(j) * J 
@@ -471,8 +482,8 @@ namespace radiation
     Real JEdd;
     Vec cov_HEdd;
     Con2Prim(E, cov_F, con_PiEdd, &JEdd, &cov_HEdd);
-    Real vHEdd = gamma.contractConCov3Vectors(con_v, cov_HEdd);
-    Real HEdd = sqrt(gamma.contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd * vHEdd);
+    Real vHEdd = gamma->contractConCov3Vectors(con_v, cov_HEdd);
+    Real HEdd = sqrt(gamma->contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd * vHEdd);
 
     xi = std::min(ratio(HEdd, JEdd), 0.99);
     phi = 1.000001 * acos(-1);
@@ -596,7 +607,7 @@ namespace radiation
 
     // Construct the residual functions
     Real H(0.0), vTilH(0.0), Hf(0.0), vTilf(0.0);
-    SPACELOOP2(i,j){ H += cov_tilH(i) * cov_tilH(j) * gamma.con_gamma(i, j); }
+    SPACELOOP2(i,j){ H += cov_tilH(i) * cov_tilH(j) * gamma->con_gamma(i, j); }
     SPACELOOP(i) vTilH += con_v(i) * cov_tilH(i);
     SPACELOOP(i) Hf += cov_tilH(i) * con_tilf(i);
     SPACELOOP(i) vTilf += cov_v(i) * con_tilf(i);
@@ -614,7 +625,7 @@ namespace radiation
   Status Closure<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const Real J, const V cov_tilH,
                                                     Tens2 *con_tilPi, Vec *con_tilf) {
     Vec con_tilH;
-    gamma.raise3Vector(cov_tilH, &con_tilH);
+    gamma->raise3Vector(cov_tilH, &con_tilH);
     Real H(0.0), vH(0.0);
     SPACELOOP(i) H += cov_tilH(i) * con_tilH(i);
     SPACELOOP(i) vH += cov_tilH(i) * con_v(i);
@@ -624,7 +635,7 @@ namespace radiation
     const Real athin = 0.5 * (3 * closure(xi) - 1);
     // Calculate the projected rest frame radiation pressure tensor
     SPACELOOP2(i,j) {
-      (*con_tilPi)(i, j) = (*con_tilf)(i) * (*con_tilf)(j) - (W2 * con_v(i) * con_v(j) + gamma.con_gamma(i, j)) / 3;
+      (*con_tilPi)(i, j) = (*con_tilf)(i) * (*con_tilf)(j) - (W2 * con_v(i) * con_v(j) + gamma->con_gamma(i, j)) / 3;
       (*con_tilPi)(i, j) *= athin;
     }
 
@@ -650,7 +661,7 @@ namespace radiation
     // Calculate the projected rest frame radiation pressure tensor
     SPACELOOP2(i,j)
     {
-      (*con_tilPi)(i, j) = (*con_tilf)(i) * (*con_tilf)(j) - (W2 * con_v(i) * con_v(j) + gamma.con_gamma(i, j)) / 3;
+      (*con_tilPi)(i, j) = (*con_tilf)(i) * (*con_tilf)(j) - (W2 * con_v(i) * con_v(j) + gamma->con_gamma(i, j)) / 3;
       (*con_tilPi)(i, j) *= athin;
     }
 
@@ -666,7 +677,7 @@ namespace radiation
     // These vectors are actually fixed, so there is no need to recalculate
     // them every step in the root find 
     Vec con_F;
-    gamma.raise3Vector(cov_F, &con_F);
+    gamma->raise3Vector(cov_F, &con_F);
     Real Fmag(0.0), vl(0.0), v2(0.0);
     SPACELOOP(i) Fmag += cov_F(i) * con_F(i);
     Fmag = std::sqrt(Fmag);
