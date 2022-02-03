@@ -30,9 +30,9 @@
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/robust.hpp"
 
 using namespace parthenon::package::prelude;
-using parthenon::ParArray1D;
 
 namespace Geometry {
 
@@ -230,15 +230,16 @@ public:
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(CellLocation loc, int b, int k, int j, int i,
                               Real g[NDFULL][NDFULL]) const {
+    using robust::ratio;
     if (axisymmetric_)
       k = k_;
     auto &idx = idx_[loc];
     Real alpha2 = Lapse(loc, b, k, j, i);
     alpha2 *= alpha2;
-    g[0][0] = -Utils::ratio(1, alpha2);
+    g[0][0] = -ratio(1, alpha2);
     SPACELOOP(mu) {
       g[mu + 1][0] = g[0][mu + 1] =
-          Utils::ratio(pack_(b, idx.bcon + mu, k, j, i), alpha2);
+          ratio(pack_(b, idx.bcon + mu, k, j, i), alpha2);
     }
     SPACELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDSPACE);

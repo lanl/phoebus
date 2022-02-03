@@ -19,31 +19,18 @@
 #include <utils/error_checking.hpp>
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/robust.hpp"
 
 #include <cmath>
 #include <iostream>
 #include <type_traits>
 #include <limits>
 
-using namespace LinearAlgebra;
-
 namespace radiation
 {
 
-  template <class T>
-  KOKKOS_FORCEINLINE_FUNCTION
-      T
-      ratio(T num, T denom)
-  {
-    const T sgn = denom >= 0 ? 1 : -1;
-    return num / (denom + sgn * std::numeric_limits<T>::min());
-  }
-
-  template <class T>
-  KOKKOS_FORCEINLINE_FUNCTION int sgn(T val)
-  {
-    return (T(0) <= val) - (val < T(0));
-  }
+  using namespace LinearAlgebra;
+  using namespace robust;
 
   /// Status of closure calculation
   enum class Status

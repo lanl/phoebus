@@ -27,6 +27,7 @@
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/robust.hpp"
 
 // coordinate system includes
 #include <geometry/analytic_system.hpp>
@@ -46,6 +47,7 @@ using parthenon::ParameterInput;
 using parthenon::ParArray1D;
 using parthenon::Real;
 using parthenon::RegionSize;
+using robust::ratio;
 
 constexpr int NTRIALS = 100;
 constexpr int NG = 2;
@@ -54,7 +56,7 @@ constexpr Real EPS = 1e-5;
 
 KOKKOS_INLINE_FUNCTION
 Real GetDifference(Real a, Real b) {
-  return 2. * std::abs(b - a) / (std::abs(b) + std::abs(a) + SMALL);
+  return 2*ratio(std::abs(b - a), std::abs(b) + std::abs(a));
 }
 
 TEST_CASE("Minkowski Coordinates", "[geometry]") {
