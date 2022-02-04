@@ -37,9 +37,8 @@ if args.executable == None:
   rt.cleanup()
 else:
   rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                     input_file='../../../inputs/bondi.pin',
-                     modified_inputs=modified_inputs,
                      input_file=args.input,
+                     modified_inputs=modified_inputs,
                      executable=args.executable,
                      upgold=args.upgold,
                      compression_factor=1)
