@@ -365,36 +365,22 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto opac = pmb->packages.Get("opacity");
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
 
-  const auto nu_min = rad->Param<Real>("nu_min");
-  const auto nu_max = rad->Param<Real>("nu_max");
-  const Real lnu_min = log(nu_min);
-  const Real lnu_max = log(nu_max);
-  const auto nu_bins = rad->Param<int>("nu_bins");
-  const auto dlnu = rad->Param<Real>("dlnu");
-  const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const auto num_particles = rad->Param<int>("num_particles");
   const auto absorption = rad->Param<bool>("absorption");
 
   const auto d_opacity = opac->Param<Opacity>("d.opacity");
 
   // Meshblock geometry
-  const int ndim = pmb->pmy_mesh->ndim;
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-  const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
-  const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
-  const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
   const Real &dx_i =
       pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
   const Real &dx_j =
       pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
   const Real &dx_k =
       pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
-  const Real &minx_i = pmb->coords.x1f(ib.s);
-  const Real &minx_j = pmb->coords.x2f(jb.s);
-  const Real &minx_k = pmb->coords.x3f(kb.s);
-  const Real dV_code = dx_i * dx_j * dx_k * dt;
+  const Real d4x = dx_i * dx_j * dx_k * dt;
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto &t = swarm->Get<Real>("t").Get();
   auto &x = swarm->Get<Real>("x").Get();
@@ -413,10 +399,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real MASS = unit_conv.GetMassCodeToCGS();
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
-  const Real CTIME = unit_conv.GetTimeCGSToCode();
-  const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
-  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
-  const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
+
+  const Real h_code = pc::h*TIME/(MASS*LENGTH*LENGTH);
 
   std::vector<std::string> vars(
       {p::density, p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});
@@ -444,8 +428,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           auto s = static_cast<RadiationType>(swarm_species(n));
 
           // TODO(BRR) Get u^mu, evaluate -k.u
-          Real nu = -k0(n) * ENERGY / pc::h;
-          Real nu_code = -k0(n) * ENERGY / pc::h / CTIME;
+          const Real nu = -k0(n) / h_code;
 
           // TODO(BRR) Get K^0 via metric
           Real Kcon0 = -k0(n);
@@ -453,75 +436,31 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
-          //printf("k,j,i: %i %i %i\n", k, j, i);
-
-          /*i = static_cast<int>(std::floor((x(n) - minx_i) / dx_i) + ib.s);
-          if (ndim > 1) {
-            j = static_cast<int>(std::floor((y(n) - minx_j) / dx_j) + jb.s);
-          } else {
-            j = 0;
-          }
-          if (ndim > 2) {
-            k = static_cast<int>(std::floor((z(n) - minx_k) / dx_k) + kb.s);
-          } else {
-            k = 0;
-          }*/
-
-          //printf("Transporting! %i %i %i\n", i, j, k);
-          // swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
-          const Real rho_cgs = v(prho, k, j, i) * DENSITY;
-          const Real T_cgs = v(itemp, k, j, i) * TEMPERATURE;
-          const Real Ye = v(iye, k, j, i);
-
-          const Real h_code = pc::h*TIME/(MASS*LENGTH*LENGTH);
 
           Real alphanu =
-              //d_opacity.AbsorptionCoefficient(rho_cgs, T_cgs, Ye, s, nu) /
-              //(4. * M_PI);
-              //d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, -k0(n)) /
-              //(4. * M_PI);
-              4.*M_PI * d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), Ye, s, nu_code);//
-              // /(4. * M_PI);
+              4.*M_PI * d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), v(iye,k,j,i), s, nu);
 
-          //Real dtau_abs = LENGTH * pc::h / ENERGY * dlam * (nu * alphanu);
-          //Real dtau_abs = dlam / (-k0(n) * alphanu);
-          //Real dtau_abs = (dlam * h_code) / ((-k0(n) / h_code) * alphanu);
-          //Real dtau_abs = (nu / CTIME * alphanu) * h_code * dlam;
-          Real dtau_abs = alphanu * dt;
-          //printf("dtau_abs: %e\n", dtau_abs);
-
-          // TODO(BRR) DEBUG!!!!!!!!!!
-          //if (t0 > 10) dtau_abs *= 1.e8;
-
-          //printf("dtau_abs: %e alphanu: %e cm^-1 mft: %e s rho cgs: %e T cgs: %e nu cgs: %e\n",
-          //dtau_abs, alphanu/LENGTH, 1./(alphanu/LENGTH*pc::c),
-          //  rho_cgs, T_cgs, nu);
-          //printf("alphanu: %e dtau_abs: %e (%e %e %e %e)\n", alphanu, dtau_abs,
-          //  rho_cgs, T_cgs, Ye, nu);
-          //printf("dtau_abs = %e\n", dtau_abs);
+          Real dtau_abs = alphanu * dt; // c = 1 in code units
 
           bool absorbed = false;
 
-          // TODO(BRR) This is first order in space to avoid extra
-          // communications
-
+          // TODO(BRR) This is first order in space to avoid extra communications
           if (absorption) {
             // Process absorption events
             Real xabs = -log(rng_gen.drand());
             if (xabs <= dtau_abs) {
-              //printf("absorbed: %i %i %i\n", k, j, i);
               // Deposit energy-momentum and lepton number in fluid
               Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)),
-                                 -1. / dV_code * weight(n) * k0(n));
+                                 -1. / d4x * weight(n) * k0(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 1, k, j, i)),
-                                 -1. / dV_code * weight(n) * k1(n));
+                                 -1. / d4x * weight(n) * k1(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 2, k, j, i)),
-                                 -1. / dV_code * weight(n) * k2(n));
+                                 -1. / d4x * weight(n) * k2(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
-                                 -1. / dV_code * weight(n) * k3(n));
+                                 -1. / d4x * weight(n) * k3(n));
               // TODO(BRR) Add Ucon[0] in the below
               Kokkos::atomic_add(&(v(iGye, k, j, i)),
-                                 1. / dV_code * weight(n) * pc::mp / MASS);
+                                 1. / d4x * weight(n) * pc::mp / MASS);
 
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]),
@@ -533,12 +472,10 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           if (absorbed == false) {
             PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt,
                          geom);
-            //exit(-1);
 
             bool on_current_mesh_block = true;
             swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n),
                                           on_current_mesh_block);
-            //printf("on_current_mesh_block: %i\n", on_current_mesh_block);
           }
 
           rng_pool.free_state(rng_gen);
@@ -553,9 +490,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   Kokkos::deep_copy(num_interactions_h, num_interactions);
 
   const auto num_absorbed = rad->Param<Real>("num_absorbed");
-  printf("num_absorbed: %i\n", static_cast<int>(num_absorbed));
   const auto num_scattered = rad->Param<Real>("num_scattered");
-  // TODO(BRR) actually count
   rad->UpdateParam<Real>("num_absorbed", num_absorbed + num_interactions_h[0]);
   rad->UpdateParam<Real>("num_scattered", num_scattered + num_interactions_h[1]);
 

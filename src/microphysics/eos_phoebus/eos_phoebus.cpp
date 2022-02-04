@@ -131,6 +131,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("unit_conv", phoebus::UnitConversions(pin));
   auto &unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
 
+  // Store unit conversions mainly for dump file output
+  params.Add("length_unit", unit_conv.GetLengthCodeToCGS());
+  params.Add("time_unit", unit_conv.GetTimeCodeToCGS());
+  params.Add("mass_unit", unit_conv.GetMassCodeToCGS());
+  params.Add("temperature_unit", unit_conv.GetTemperatureCodeToCGS());
+
   // modifiers
   /*
   // TODO(JMM): Disabling this for now

@@ -115,7 +115,7 @@ def modify_input(dict_key, value, input_file):
 #
 
 # -- Configure and build phoebus with problem-specific options
-def build_code(geometry, use_gpu=False):
+def build_code(geometry, use_gpu=False, build_type="Release"):
   if os.path.isdir(BUILD_DIR):
     print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
     sys.exit()
@@ -124,7 +124,13 @@ def build_code(geometry, use_gpu=False):
 
   # Base configure options
   configure_options = []
-  configure_options.append("-DCMAKE_BUILD_TYPE=Release")
+  if build_type == "Release":
+    configure_options.append("-DCMAKE_BUILD_TYPE=Release")
+  elif build_type == "Debug":
+    configure_options.append("-DCMAKE_BUILD_TYPE=Debug")
+  else:
+    print(f"Build type \"{build_type}\" not known!")
+    sys.exit()
   configure_options.append("-DPHOEBUS_ENABLE_UNIT_TESTS=OFF")
   configure_options.append("-DMAX_NUMBER_CONSERVED_VARS=10")
   configure_options.append("-DPHOEBUS_CACHE_GEOMETRY=ON")
@@ -151,17 +157,35 @@ def build_code(geometry, use_gpu=False):
   # Compile
   call(['cmake', '--build', '.', '--parallel', str(NUM_PROCS)])
 
+# -- Clean up working directory
+def cleanup():
+  if os.getcwd().split(os.sep)[-1] == BUILD_DIR:
+    os.chdir('..')
+
+  if os.path.isabs(BUILD_DIR):
+    print(f"Absolute paths not allowed for build directory \"{BUILD_DIR}\" -- unsafe when cleaning up!")
+    sys.exit()
+
+  if not os.path.exists(BUILD_DIR):
+    print(f"Build directory \"{BUILDIDR}\" does not exist -- cannot be cleaned up!")
+    sys.exit()
+
+  try:
+    shutil.rmtree(BUILD_DIR)
+  except:
+    print(f"Error cleaning up build directory \"{BUILD_DIR}\"!")
+
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
 def gold_comparison(variables, input_file, modified_inputs={}, executable='./src/phoebus',
                     upgold=False, compression_factor=1, tolerance=1.e-5):
 
-  if not os.getcwd().endswith(BUILD_DIR):
-    if os.path.isdir(BUILD_DIR):
-      print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
-      sys.exit()
-    os.mkdir(BUILD_DIR)
-    os.chdir(BUILD_DIR)
+  #if not os.getcwd().endswith(BUILD_DIR):
+  #  if os.path.isdir(BUILD_DIR):
+  #    print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
+  #    sys.exit()
+  #  os.mkdir(BUILD_DIR)
+  #  os.chdir(BUILD_DIR)
 
   # Copy test problem and modify inputs
   shutil.copyfile(input_file, TEMPORARY_INPUT_FILE)
@@ -210,17 +234,6 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
       for n in range(len(gold_variables)):
         if not soft_equiv(variables_data[n], gold_variables[n]):
           success = False
-
-  # Clean up
-  os.chdir('..')
-  if os.path.isabs(BUILD_DIR):
-    print(f"Absolute paths not allowed for build directory \"{BUILD_DIR}\" -- unsafe when cleaning up!")
-    sys.exit()
-
-  try:
-    shutil.rmtree(BUILD_DIR)
-  except:
-    print(f"Error cleaning up build directory \"{BUILD_DIR}\"!")
 
   # Report upgolding, success, or failure
   if upgold:

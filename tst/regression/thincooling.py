@@ -14,13 +14,14 @@
 # publicly, and to permit others to do so.
 
 import argparse
+import os
 import regression_test as rt
 
 parser = argparse.ArgumentParser(description='Run optically thin cooling as a test')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
 parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
 parser.add_argument('--executable', type=str, default=None)
-parser.add_argument('--input', type=str, default='../../../inputs/thincooling.pin')
+parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../inputs/thincooling.pin'))
 parser.add_argument('--compression', type=int, default=1)
 parser.add_argument('--tolerance', type=float, default=1.e-2)
 args = parser.parse_args()
@@ -32,9 +33,12 @@ if args.executable == None:
                      upgold=args.upgold,
                      compression_factor=args.compression,
                      tolerance=args.tolerance)
+  rt.cleanup()
 else:
-  rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                     input_file='../../../inputs/linear_modes.pin',
+  print(os.getcwd())
+  print(args.executable)
+  rt.gold_comparison(variables=['p.density', 'p.energy'],
+                     input_file=args.input,
                      executable=args.executable,
                      upgold=args.upgold,
                      compression_factor=args.compression,
