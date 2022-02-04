@@ -17,6 +17,7 @@ import argparse
 import os
 import shutil
 import stat
+import sys
 from subprocess import call
 import regression_test as rt
 
