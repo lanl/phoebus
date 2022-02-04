@@ -14,11 +14,13 @@
 # publicly, and to permit others to do so.
 
 import argparse
+import os
 import regression_test as rt
 
 parser = argparse.ArgumentParser(description='Run the Bondi accretion problem as a test')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
 parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
+parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../inputs/bondi.pin'))
 parser.add_argument('--executable', type=str, default=None)
 args = parser.parse_args()
 
@@ -28,14 +30,17 @@ modified_inputs['parthenon/mesh/nx1'] = 128
 if args.executable == None:
   rt.build_code(geometry="FMKS", use_gpu=args.use_gpu)
   rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                     input_file='../../../inputs/bondi.pin',
+                     input_file=args.input,
                      modified_inputs=modified_inputs,
                      upgold=args.upgold,
                      compression_factor=1)
+  rt.cleanup()
 else:
   rt.gold_comparison(variables=['p.density', 'p.velocity'],
                      input_file='../../../inputs/bondi.pin',
                      modified_inputs=modified_inputs,
+                     input_file=args.input,
                      executable=args.executable,
                      upgold=args.upgold,
                      compression_factor=1)
+

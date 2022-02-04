@@ -31,9 +31,8 @@ jobs:
           run: |
             cd tst/regression
             # TODO(BRR) add --use_gpu flag here if running on GPU
-            ./linear_modes.py
-            ./bondi.py
-        - name: Build code
+            ./suite.py
+        - name: Build code for unit testing
           run: |
             mkdir build
             cd build
