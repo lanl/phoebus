@@ -51,6 +51,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     const bool zero_fluxes = pin->GetOrAddBoolean("fluid", "zero_fluxes", false);
     params.Add("zero_fluxes", zero_fluxes);
 
+    const bool zero_sources = pin->GetOrAddBoolean("fluid", "zero_sources", false);
+    params.Add("zero_sources", zero_sources);
+
     Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
     params.Add("cfl", cfl);
 
@@ -506,7 +509,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
+  auto &fluid = pmb->packages.Get("fluid");
+  if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_sources"))
     return TaskStatus::complete;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -607,7 +611,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
   auto &fluid = pmb->packages.Get("fluid");
-  if (fluid->Param<bool>("active"))
+  if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
@@ -623,17 +627,6 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>(
       "Recon");
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
-
-  if (fluid->Param<bool>("zero_fluxes")) {
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "ZeroFluxes", DevExecSpace(), X1DIR,
-    pmb->pmy_mesh->ndim, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
-    ib.s - 1, ib.e + 1,
-    KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {
-      for (int m = 0; m < flux.NumConserved(); m++) {
-        flux.v.flux(d,m,k,j,i) = 0.;
-      }
-    });
-  }
 
 #define RECON(method)                                                          \
   parthenon::par_for(                                                          \
@@ -687,7 +680,8 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 
 TaskStatus FluxCT(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("mhd"))
+  auto &fluid = pmb->packages.Get("fluid");
+  if (!fluid->Param<bool>("mhd") || !fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
 
   const int ndim = pmb->pmy_mesh->ndim;
