@@ -300,7 +300,7 @@ class ConToPrim {
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos,
                         const Real x1, const Real x2, const Real x3) const {
-    int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);
+    int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
     if (num_nans > 0) return ConToPrimStatus::failure;
     const Real igdet = 1.0/g.gdet;
 
@@ -415,6 +415,10 @@ class ConToPrim {
     Real S[3];
     Real bcons[3];
     Real sig[3];
+  /*if (fabs(vel[0]) > 0.0 || fabs(vel[1]) > 0.0) {
+    printf("Uninitialized? %g %g %g\n", vel[0], vel[1], vel[2]);
+    printf("%g %g %g %g %g %g %g %g %g %g\n", W, mu, x, rcon[0], rcon[1], rcon[2], bdotr, bu[0], bu[1], bu[2]);
+  }*/
     prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
                   g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
                   v(crho), S, bcons, v(ceng), ye_cons, sig);

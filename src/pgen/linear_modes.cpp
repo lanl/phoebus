@@ -39,29 +39,31 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE(is_minkowski || is_boosted_minkowski || is_snake || is_inchworm,
                     "Problem \"linear_modes\" requires \"Minkowski\" geometry!");
 
+  printf("minkowski/boosted_minkowski/snake/inchworm: %d/%d/%d/%d\n",
+          is_minkowski, is_boosted_minkowski, is_snake, is_inchworm);
+
   auto &rc = pmb->meshblock_data.Get();
   const int ndim = pmb->pmy_mesh->ndim;
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({"p.density",
-                              "p.velocity",
-                              "p.energy",
-                              fluid_prim::bfield,
-                              "pressure",
-                              "temperature",
-                              "gamma1",
-                              "cs"},
-                              imap);
+  std::vector<std::string> vars({fluid_prim::density, fluid_prim::velocity,
+                                 fluid_prim::energy, fluid_prim::bfield,
+                                 fluid_prim::pressure, fluid_prim::temperature});
+  auto v = rc->PackVariables(vars, imap);
 
-  const int irho = imap["p.density"].first;
-  const int ivlo = imap["p.velocity"].first;
-  const int ivhi = imap["p.velocity"].second;
-  const int ieng = imap["p.energy"].first;
+  const int irho = imap[fluid_prim::density].first;
+  const int ivlo = imap[fluid_prim::velocity].first;
+  const int ivhi = imap[fluid_prim::velocity].second;
+  const int ieng = imap[fluid_prim::energy].first;
   const int ib_lo = imap[fluid_prim::bfield].first;
   const int ib_hi = imap[fluid_prim::bfield].second;
-  const int iprs = imap["pressure"].first;
-  const int itmp = imap["temperature"].first;
+  const int iprs = imap[fluid_prim::pressure].first;
+  const int itmp = imap[fluid_prim::temperature].first;
   const int nv = ivhi - ivlo + 1;
+
+  for (auto &field : vars) {
+    std::cout << field << ":  " << imap[field].first << " " << imap[field].second << std::endl;
+  }
 
   const Real gam = pin->GetReal("eos", "Gamma");
 
@@ -124,6 +126,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       PARTHENON_FAIL(msg);
     }
   } else if (physics == "mhd") {
+    if (ib_lo < 0 || ib_hi < 0) {
+      PARTHENON_THROW("physics = mhd but bfields are not present");
+    }
+    printf("ib_lo = %d  ib_hi = %d\n", ib_lo, ib_hi);
     B10 = 1.0;
     if (mode == "slow") {
       omega = complex<double>(0., 2.41024185339);
@@ -252,11 +258,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo + ii, k, j, i) *= Gamma;
       }
 
-      if (is_snake ||is_inchworm || is_boosted_minkowski) {
+      if (is_snake || is_inchworm || is_boosted_minkowski) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
         Real gcov[NDFULL][NDFULL] = {0};
-        Real vcon[NDSPACE] = {v(ivlo, k, j, i)/Gamma, v(ivlo+1, k, j, i)/Gamma, v(ivlo+2, k, j, i)/Gamma};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
         Real ucon[NDFULL] = {Gamma, // alpha = 1 in Minkowski
                              v(ivlo, k, j, i),  // beta^i = 0 in Minkowski
@@ -301,7 +306,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo, k, j, i) = ucon_transformed[1] + Gamma*shift[0]/lapse;
         v(ivlo+1, k, j, i) = ucon_transformed[2] + Gamma*shift[1]/lapse;
         v(ivlo+2, k, j, i) = ucon_transformed[3] + Gamma*shift[2]/lapse;
-
         for(int d = ib_lo; d <= ib_hi; d++){
           v(d, k, j, i) = bcon_transformed[d-ib_lo+1]*Gamma - lapse*bcon_transformed[0]*ucon_transformed[d-ib_lo+1];
         }

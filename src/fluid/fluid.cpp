@@ -330,6 +330,10 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         const Real vel[] = {v(b, pvel_lo, k, j, i),
                             v(b, pvel_lo+1, k, j, i),
                             v(b, pvel_hi, k, j, i)};
+  if (fabs(vel[0]) > 0.0 || fabs(vel[1]) > 0.0) {
+    printf("Uninitialized? %d %d %d %d  %g %g %g\n", b, k, j, i, vel[0], vel[1], vel[2]);
+  }
+        //printf("vel: %g %g %g\n", vel[0], vel[1], vel[2]);
         Real bcons[3];
         Real bp[3] = {0.0, 0.0, 0.0};
         if (pb_hi > 0) {
@@ -407,6 +411,7 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
       invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        //printf("cell: %d %d %d %d\n", b, k, j, i);
         auto status = invert(geom, eos, coords, k, j, i);
         fail(k, j, i) = (status == con2prim_robust::ConToPrimStatus::success
                                  ? con2prim_robust::FailFlags::success

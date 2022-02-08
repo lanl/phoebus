@@ -32,7 +32,7 @@ GetLorentzFactor(const Real vcon[Geometry::NDSPACE], const Real gammacov[Geometr
   SPACELOOP2(ii, jj) {
     vsq += gammacov[ii][jj]*vcon[ii]*vcon[jj];
   }
-  return sqrt(1. + vsq);
+  return std::sqrt(1. + vsq);
 }
 
 /*
@@ -49,7 +49,7 @@ GetLorentzFactor(const Real vcon[Geometry::NDSPACE], const Real gcov[Geometry::N
   SPACELOOP2(ii, jj) {
     vsq += gcov[ii+1][jj+1]*vcon[ii]*vcon[jj];
   }
-  return sqrt(1. + vsq);
+  return std::sqrt(1. + vsq);
 }
 
 /*

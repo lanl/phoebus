@@ -63,6 +63,7 @@ class Snake {
     g[1][3] = g[3][1] = 0;
     g[2][2] = 1;
     g[2][3] = g[3][2] = 0;
+    g[3][3] = 1;
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
@@ -98,7 +99,7 @@ class Snake {
     gamma[2][0] = gamma[0][2] = 0;
     gamma[1][1] = d * d + 1;
     gamma[1][2] = gamma[2][1] = 0;
-    gamma[2][2] = 0;
+    gamma[2][2] = 1;
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const { return 1.; }
@@ -108,6 +109,8 @@ class Snake {
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
+    //Utils::SetConnectionCoeffByFD(*this, Gamma, X0, X1, X2, X3);
+
     const Real a2 = a_ * a_;
     const Real k2 = k_ * k_;
     const Real k3 = k_ * k_ * k_;
@@ -119,6 +122,7 @@ class Snake {
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
+    //Utils::SetMetricGradientByFD(*this, 1.e-6, X0, X1, X2, X3, dg);
     const Real a2 = a_ * a_;
     const Real k2 = k_ * k_;
     const Real k3 = k_ * k_ * k_;
