@@ -63,6 +63,7 @@ class Snake {
     g[1][3] = g[3][1] = 0;
     g[2][2] = 1;
     g[2][3] = g[3][2] = 0;
+    g[3][3] = 1;
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
@@ -98,7 +99,7 @@ class Snake {
     gamma[2][0] = gamma[0][2] = 0;
     gamma[1][1] = d * d + 1;
     gamma[1][2] = gamma[2][1] = 0;
-    gamma[2][2] = 0;
+    gamma[2][2] = 1;
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const { return 1.; }
