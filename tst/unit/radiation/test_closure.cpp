@@ -68,7 +68,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
   
             // Assume a fluid frame state  
             Real J = 1.0;
-            Vec cov_tilH = {{xi*J/sqrt(cl.gamma->con_gamma(0,0) - con_v(0)*con_v(0)), 0.0, 0.0}}; 
+            Vec cov_tilH = {{xi*J/sqrt(g.con_gamma(0,0) - con_v(0)*con_v(0)), 0.0, 0.0}}; 
             Tens2 con_tilPi;
 
             // Calculate comoving frame state 

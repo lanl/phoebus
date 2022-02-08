@@ -662,7 +662,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                     J*v(iblock, idx_H(ispec, 1), k, j, i),
                     J*v(iblock, idx_H(ispec, 2), k, j, i)}};
           Vec conF;
-          c.gamma->raise3Vector(covF, &conF);           
+          g.raise3Vector(covF, &conF);           
           Tens2 conP, con_tilPi; 
           if (CLOSURE_TYPE == ClosureType::M1) {
             Real tempE;
