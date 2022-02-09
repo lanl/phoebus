@@ -142,7 +142,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         Vec covF ={{v(b, cF(ispec, 0), k, j, i) * isdetgam, 
                     v(b, cF(ispec, 1), k, j, i) * isdetgam, 
                     v(b, cF(ispec, 2), k, j, i) * isdetgam}};
-        
+        /*
         if (CLOSURE_TYPE == ClosureType::M1) {  
           Real xi = v(b, iXi(ispec), k, j, i);
           Real phi = 1.0001*v(b, iPhi(ispec), k, j, i);
@@ -165,7 +165,22 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
           SPACELOOP2(ii, jj) conTilPi(ii, jj) = 0.0;
           c.Con2Prim(E, covF, conTilPi, &J, &covH); 
         }
+        */
         
+        if (CLOSURE_TYPE == ClosureType::M1) {
+          Real xi = v(b, iXi(ispec), k, j, i);
+          Real phi = 1.0001*v(b, iPhi(ispec), k, j, i);
+          c.GetCovTilPiFromConM1(E, covF, xi, phi, &conTilPi);
+          v(b, iXi(ispec), k, j, i) = xi;
+          v(b, iPhi(ispec), k, j, i) = phi;
+        } 
+        else if (CLOSURE_TYPE == ClosureType::Eddington) {
+          c.GetCovTilPiFromConEdd(E, covF, &conTilPi);
+        }
+
+        c.Con2Prim(E, covF, conTilPi, &J, &covH); 
+        if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
+
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
           v(b, pH(ispec, idir), k, j, i) = covH(idir)/J;
@@ -245,14 +260,11 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
         Vec covH ={{v(b, pH(ispec, 0), k, j, i)*J, 
                     v(b, pH(ispec, 1), k, j, i)*J, 
                     v(b, pH(ispec, 2), k, j, i)*J}};
-        if (CLOSURE_TYPE == ClosureType::M1) { 
-          c.Prim2ConM1(J, covH, &E, &covF, &conTilPi);
-        } 
-        else if (CLOSURE_TYPE == ClosureType::Eddington) {
-          SPACELOOP2(ii, jj) conTilPi(ii,jj) = 0.0;
-          c.Prim2Con(J, covH, conTilPi, &E, &covF);
-        }
         
+        if (CLOSURE_TYPE == ClosureType::Eddington) c.GetCovTilPiFromPrimM1(J, covH, &conTilPi);
+        else if (CLOSURE_TYPE == ClosureType::Eddington) c.GetCovTilPiFromPrimEdd(J, covH, &conTilPi);
+        
+        c.Prim2Con(J, covH, conTilPi, &E, &covF);
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { 
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
@@ -501,24 +513,24 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           
           // Fluxes in the asymptotic limit
           if (CLOSURE_TYPE == ClosureType::M1) { 
-            cl.Prim2ConM1(Jl, HasymL, &El, &covFl, &con_tilPil); 
-            cr.Prim2ConM1(Jr, HasymR, &Er, &covFr, &con_tilPir);
+            cl.GetCovTilPiFromPrimM1(Jl, HasymL, &con_tilPil); 
+            cr.GetCovTilPiFromPrimM1(Jr, HasymR, &con_tilPir);
           }
           else if (CLOSURE_TYPE == ClosureType::Eddington) { 
-            SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
-            SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
+            cl.GetCovTilPiFromPrimEdd(Jl, HasymL, &con_tilPil); 
+            cr.GetCovTilPiFromPrimEdd(Jr, HasymR, &con_tilPir);
           } 
           cl.getFluxesFromPrim(Jl, HasymL, con_tilPil, &conFl_asym, &Pl_asym); 
           cr.getFluxesFromPrim(Jr, HasymR, con_tilPir, &conFr_asym, &Pr_asym); 
           
           // Regular fluxes          
           if (CLOSURE_TYPE == ClosureType::M1) { 
-            cl.Prim2ConM1(Jl, Hl, &El, &covFl, &con_tilPil); 
-            cr.Prim2ConM1(Jr, Hr, &Er, &covFr, &con_tilPir);
+            cl.GetCovTilPiFromPrimM1(Jl, Hl, &con_tilPil); 
+            cr.GetCovTilPiFromPrimM1(Jr, Hr, &con_tilPir); 
           }
           else if (CLOSURE_TYPE == ClosureType::Eddington) { 
-            SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
-            SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
+            cl.GetCovTilPiFromPrimEdd(Jl, Hl, &con_tilPil); 
+            cr.GetCovTilPiFromPrimEdd(Jr, Hr, &con_tilPir); 
           }
           cl.getFluxesFromPrim(Jl, Hl, con_tilPil, &conFl, &Pl); 
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr); 
@@ -664,14 +676,10 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Vec conF;
           g.raise3Vector(covF, &conF);           
           Tens2 conP, con_tilPi; 
-          if (CLOSURE_TYPE == ClosureType::M1) {
-            Real tempE;
-            Vec tempF; 
-            c.Prim2ConM1(J, covH, &tempE, &tempF, &con_tilPi); 
-          }
-          else if (CLOSURE_TYPE == ClosureType::Eddington) { 
-            SPACELOOP2(ii,jj) con_tilPi(ii,jj) = 0.0;
-          }
+
+          if (CLOSURE_TYPE == ClosureType::M1) c.GetCovTilPiFromPrimM1(J, covH, &con_tilPi); 
+          else if (CLOSURE_TYPE == ClosureType::Eddington) c.GetCovTilPiFromPrimEdd(J, covH, &con_tilPi); 
+          
           c.getConPFromPrim(J, covH, con_tilPi, &conP); 
           
           Real srcE = 0.0; 
@@ -783,8 +791,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Real dE;
           Vec cov_dF;
 
-          /// TODO: (LFR) Move beyond Eddington for this update
-          Tens2 con_tilPi{{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}};  
 
           // Treat the Eddington tensor explicitly for now
           Real& J = v(iblock, idx_J(ispec), k, j, i); 
@@ -792,6 +798,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                      J*v(iblock, idx_H(ispec, 1), k, j, i),
                      J*v(iblock, idx_H(ispec, 2), k, j, i),
                     }}; 
+          Tens2 con_tilPi;  
+          
+          /// TODO: (LFR) Move beyond Eddington for this update
+          c.GetCovTilPiFromPrimEdd(J, cov_H, &con_tilPi); 
           //Vec con_tilf;
           //c.M1FluidPressureTensor(J, cov_H, &con_tilPi, &con_tilf); 
 
