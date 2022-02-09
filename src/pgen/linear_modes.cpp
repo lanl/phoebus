@@ -253,10 +253,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       SPACELOOP2(ii, jj) {
         vsq += v(ivlo + ii, k, j, i)*v(ivlo + jj, k, j, i);
       }
-      Real Gamma = 1./sqrt(1. - vsq);
-      SPACELOOP(ii) {
-        v(ivlo + ii, k, j, i) *= Gamma;
-      }
+      Real Gamma = sqrt(1. + vsq);
 
       if (is_snake || is_inchworm || is_boosted_minkowski) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
