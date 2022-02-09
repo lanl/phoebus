@@ -415,10 +415,6 @@ class ConToPrim {
     Real S[3];
     Real bcons[3];
     Real sig[3];
-  /*if (fabs(vel[0]) > 0.0 || fabs(vel[1]) > 0.0) {
-    printf("Uninitialized? %g %g %g\n", vel[0], vel[1], vel[2]);
-    printf("%g %g %g %g %g %g %g %g %g %g\n", W, mu, x, rcon[0], rcon[1], rcon[2], bdotr, bu[0], bu[1], bu[2]);
-  }*/
     prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
                   g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
                   v(crho), S, bcons, v(ceng), ye_cons, sig);
