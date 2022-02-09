@@ -39,9 +39,18 @@ namespace radiation
     success = 0,
     failure = 1
   };
-
+  
   enum class ClosureType {Eddington, M1, MOCMC};
-
+  enum class ClosureEquationType {energy_conserve, number_conserve}; 
+  enum class ClosureVerbosity {quiet, v1, v2}; 
+  
+  template <ClosureEquationType EQ = ClosureEquationType::energy_conserve, 
+            ClosureVerbosity VE = ClosureVerbosity::quiet> 
+  struct ClosureSettings {
+    static const ClosureEquationType equation_type = EQ; 
+    static const ClosureVerbosity verbosity = VE; 
+  };
+   
   /// Store results of M1 closure root find
   struct M1Result
   {
@@ -124,7 +133,34 @@ namespace radiation
     KOKKOS_FUNCTION
     M1Result Con2PrimM1(const Real E, const Vec cov_F, Real xi_guess, Real phi_guess,
                         Real *J, Vec *cov_H, Tens2 *con_tilPi);
+
+    KOKKOS_FUNCTION 
+    Status GetCovTilPiFromPrimEdd(const Real J, const Vec cov_tilH, Tens2* con_tilPi) {
+      SPACELOOP2(i,j) (*con_tilPi)(i,j) = 0.0;
+      return Status::success; 
+    }
+
+    KOKKOS_FUNCTION 
+    Status GetCovTilPiFromConEdd(const Real E, const Vec cov_F, Tens2* con_tilPi) {
+      SPACELOOP2(i,j) (*con_tilPi)(i,j) = 0.0; 
+      return Status::success; 
+    }
     
+    KOKKOS_FUNCTION 
+    Status GetCovTilPiFromPrimM1(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
+      Vec con_tilf; 
+      M1FluidPressureTensor(J, cov_H, con_tilPi, &con_tilf); 
+      return Status::success; 
+    }
+    
+    KOKKOS_FUNCTION 
+    Status GetCovTilPiFromConM1(const Real E, const Vec cov_F, Real& xi, Real& phi, Tens2 *con_tilPi) {
+      Vec con_tilf;
+      auto status = SolveClosure(E, cov_F, &xi, &phi, xi, phi); 
+      M1FluidPressureTensor(cov_F, xi, phi, con_tilPi, &con_tilf); 
+      return status.status; 
+    } 
+
     Real v2, W, W2;
     Vec cov_v;
     Vec con_v;
