@@ -74,15 +74,19 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             // Calculate comoving frame state 
             Real E;
             Vec F;
-            cl.Prim2ConM1(J, cov_tilH, &E, &F, &con_tilPi); 
+            cl.GetCovTilPiFromPrimM1(J, cov_tilH, &con_tilPi);
+            cl.Prim2Con(J, cov_tilH, con_tilPi, &E, &F); 
               
             
             // re-Calculate rest frame quantities using closure 
             // to check for self-consistency
             Real J_out; 
             Vec H_out;
-            auto result = cl.Con2PrimM1(E, F, &J_out, &H_out, &con_tilPi);
             
+            Real xig, phig; 
+            cl.GetM1GuessesFromEddington(E, F, &xig, &phig); 
+            cl.GetCovTilPiFromConM1(E, F, xig, phig, &con_tilPi);
+            cl.Con2Prim(E, F, con_tilPi, &J_out, &H_out);
             
             //if (result.status == radiation::Status::failure) throw 2;
             bool bad_solution = true;

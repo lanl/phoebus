@@ -116,24 +116,6 @@ namespace radiation
     KOKKOS_FUNCTION
     Status Con2Prim(Real E, const Vec cov_F, const Tens2 con_tilPi, Real *J, Vec *cov_H);
 
-    //-------------------------------------------------------------------------------------
-    /// Prim2ConM1 returns conservative variables E and F_i, as well as \tilde \pi^{ij} from
-    /// the closure for a given J and \tilde H_i.
-    KOKKOS_FUNCTION
-    Status Prim2ConM1(const Real J, const Vec cov_tilH, Real *E, Vec *cov_F, Tens2 *con_tilPi);
-
-    //-------------------------------------------------------------------------------------
-    /// Con2PrimM1 returns primitive variables J, \tilde H_i, and \tilde \pi^{ij} for given
-    /// E and F_i. Requires an internal root find, so a bit expensive.
-    KOKKOS_FUNCTION
-    M1Result Con2PrimM1(const Real E, const Vec cov_F, Real *J, Vec *cov_H, Tens2 *con_tilPi);
-    
-    /// Same as above, but explicitly provide guesses for ratio H/J and angle relative to
-    /// basis vectors.
-    KOKKOS_FUNCTION
-    M1Result Con2PrimM1(const Real E, const Vec cov_F, Real xi_guess, Real phi_guess,
-                        Real *J, Vec *cov_H, Tens2 *con_tilPi);
-
     KOKKOS_FUNCTION 
     Status GetCovTilPiFromPrimEdd(const Real J, const Vec cov_tilH, Tens2* con_tilPi) {
       SPACELOOP2(i,j) (*con_tilPi)(i,j) = 0.0;
@@ -160,6 +142,9 @@ namespace radiation
       M1FluidPressureTensor(cov_F, xi, phi, con_tilPi, &con_tilf); 
       return status.status; 
     } 
+    
+    KOKKOS_FUNCTION
+    void GetM1GuessesFromEddington(const Real E, const Vec cov_F, Real *xi, Real *phi);
 
     Real v2, W, W2;
     Vec cov_v;
@@ -407,20 +392,8 @@ namespace radiation
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  Status Closure<Vec, Tens2, ENERGY_CONSERVE>::Prim2ConM1(const Real J, const Vec cov_H,
-                                         Real *E, Vec *cov_F, Tens2 *con_tilPi) {
-    Vec con_tilf;
-    M1FluidPressureTensor(J, cov_H, con_tilPi, &con_tilf);
-    Prim2Con(J, cov_H, *con_tilPi, E, cov_F);
-
-    return Status::success;
-  }
-
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
-  KOKKOS_FUNCTION
-  M1Result Closure<Vec, Tens2, ENERGY_CONSERVE>::Con2PrimM1(const Real E, const Vec cov_F,
-                                           Real *J, Vec *cov_H, Tens2 *con_tilPi) {
-    Real xi, phi;
+  void Closure<Vec, Tens2, ENERGY_CONSERVE>::GetM1GuessesFromEddington(const Real E, const Vec cov_F,
+                                           Real *xi, Real *phi) {
     Vec con_tilf;
     
     // Get the basis vectors for the search
@@ -436,23 +409,8 @@ namespace radiation
     Real vHEdd = gamma->contractConCov3Vectors(con_v, cov_HEdd);
     Real HEdd = sqrt(gamma->contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd * vHEdd);
 
-    xi = std::min(ratio(HEdd, JEdd), 0.99);
-    phi = 1.000001 * acos(-1);
-
-    return Con2PrimM1(E, cov_F, xi, phi, J, cov_H, con_tilPi);
-  }
-
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
-  KOKKOS_FUNCTION
-  M1Result Closure<Vec, Tens2, ENERGY_CONSERVE>::Con2PrimM1(const Real E, const Vec cov_F,
-                                           const Real xi_guess, const Real phi_guess,
-                                           Real *J, Vec *cov_H, Tens2 *con_tilPi) {
-    Real xi, phi;
-    Vec con_tilf;
-    auto status = SolveClosure(E, cov_F, &xi, &phi, xi_guess, phi_guess);
-    M1FluidPressureTensor(cov_F, xi, phi, con_tilPi, &con_tilf);
-    Con2Prim(E, cov_F, *con_tilPi, J, cov_H);
-    return status;
+    *xi = std::min(ratio(HEdd, JEdd), 0.99);
+    *phi = 1.000001 * acos(-1);
   }
   
   //----------------
@@ -534,8 +492,15 @@ namespace radiation
     M1Result result{Status::success, iter, xi, phi, fXi, fPhi, err_xi, err_phi};
     if (std::isnan(xi))
       result.status = Status::failure;
-    if (iter == max_iter)
+    if (iter >= max_iter) {
+      if (!(xi < 1.e-4) && !(std::fabs(fXi) < 1.e-3)) {
+            printf("Con2Prim (Fail) : E = %e F = (%e, %e, %e) \n"
+                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n", 
+                   E, cov_F(0), cov_F(1), cov_F(2), xi, phi, fXi, fPhi, 
+                   con_v(0), con_v(1), con_v(2), xi_guess, phi_guess);
+      }
       result.status = Status::failure;
+    }
     return result;
   }
 

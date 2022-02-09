@@ -142,30 +142,6 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         Vec covF ={{v(b, cF(ispec, 0), k, j, i) * isdetgam, 
                     v(b, cF(ispec, 1), k, j, i) * isdetgam, 
                     v(b, cF(ispec, 2), k, j, i) * isdetgam}};
-        /*
-        if (CLOSURE_TYPE == ClosureType::M1) {  
-          Real xi = v(b, iXi(ispec), k, j, i);
-          Real phi = 1.0001*v(b, iPhi(ispec), k, j, i);
-
-          auto result = c.Con2PrimM1(E, covF, xi, phi, &J, &covH, &conTilPi);
-          
-          v(b, iXi(ispec), k, j, i) = result.xi;
-          v(b, iPhi(ispec), k, j, i) = result.phi;
-        
-        
-          if (result.status == Status::failure && !(result.xi < 1.e-4) && !(std::fabs(result.fXi) < 1.e-3)) {
-            printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) 1/sqrt(gammma) = %e \n "
-                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n", i, ispec, 
-                   E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), isdetgam, result.xi, result.phi, result.fXi, result.fPhi, 
-                   con_v(0), con_v(1), con_v(2), xi, phi);
-            if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
-          }
-        } 
-        else if (CLOSURE_TYPE == ClosureType::Eddington) {
-          SPACELOOP2(ii, jj) conTilPi(ii, jj) = 0.0;
-          c.Con2Prim(E, covF, conTilPi, &J, &covH); 
-        }
-        */
         
         if (CLOSURE_TYPE == ClosureType::M1) {
           Real xi = v(b, iXi(ispec), k, j, i);
@@ -183,7 +159,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
-          v(b, pH(ispec, idir), k, j, i) = covH(idir)/J;
+          v(b, pH(ispec, idir), k, j, i) = covH(idir)/J; // Used the scaled value of the rest frame flux for reconstruction
         }
       });
 
