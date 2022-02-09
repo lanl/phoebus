@@ -330,10 +330,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         const Real vel[] = {v(b, pvel_lo, k, j, i),
                             v(b, pvel_lo+1, k, j, i),
                             v(b, pvel_hi, k, j, i)};
-  if (fabs(vel[0]) > 0.0 || fabs(vel[1]) > 0.0) {
-    printf("Uninitialized? %d %d %d %d  %g %g %g\n", b, k, j, i, vel[0], vel[1], vel[2]);
-  }
-        //printf("vel: %g %g %g\n", vel[0], vel[1], vel[2]);
         Real bcons[3];
         Real bp[3] = {0.0, 0.0, 0.0};
         if (pb_hi > 0) {
