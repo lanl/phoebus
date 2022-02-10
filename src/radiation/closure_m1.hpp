@@ -73,7 +73,14 @@ namespace radiation
     }
     
     KOKKOS_FUNCTION 
-    Status GetCovTilPiFromCon(const Real E, const Vec cov_F, Real& xi, Real& phi, Tens2 *con_tilPi) {
+    Status GetCovTilPiFromCon(Real E, const Vec cov_F, Real& xi, Real& phi, Tens2 *con_tilPi) {
+      
+      if (!ENERGY_CONSERVE) {
+        double vF = 0.0; 
+        SPACELOOP(i) vF += con_v(i)*cov_F(i);
+        E = E/W + vF;
+      }
+
       Vec con_tilf;
       auto status = SolveClosure(E, cov_F, &xi, &phi, xi, phi); 
       M1FluidPressureTensor(cov_F, xi, phi, con_tilPi, &con_tilf); 
@@ -94,7 +101,7 @@ namespace radiation
     using ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::gamma;
   
   protected:
-  
+    // All internal methods are written in terms of E = n^\mu n^\nu M_{\mu \nu} 
     //-------------------------------------------------------------------------------------
     /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
     /// J and \tilde H_i.
@@ -164,6 +171,8 @@ namespace radiation
     SPACELOOP2(i, j) con_PiEdd(i,j) = 0.0;
     Real JEdd;
     Vec cov_HEdd;
+    // Con2Prim deals with which E is being passed (number or energy conserving), 
+    // so we need to make no transformation here
     Con2Prim(E, cov_F, con_PiEdd, &JEdd, &cov_HEdd);
     Real vHEdd = gamma->contractConCov3Vectors(con_v, cov_HEdd);
     Real HEdd = sqrt(gamma->contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd * vHEdd);
