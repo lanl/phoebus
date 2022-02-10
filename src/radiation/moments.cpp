@@ -22,12 +22,7 @@
 #include "radiation/closure.hpp"
 #include "radiation/closure_m1.hpp"
 
-namespace {
-  const Real pi = acos(-1);
-}
-
 namespace radiation {
-
 
 template <class T> 
   class ReconstructionIndexer  {
@@ -79,7 +74,8 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   auto iPhi = imap.GetFlatIdx(ir::phi);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
-  
+  const Real pi = acos(-1);
+
   parthenon::par_for( 
       DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 
       0, v.GetDim(5)-1, // Loop over meshblocks
