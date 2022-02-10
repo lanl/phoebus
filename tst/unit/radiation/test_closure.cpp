@@ -15,6 +15,7 @@
 
 #include "catch2/catch.hpp"
 #include "radiation/closure.hpp"
+#include "radiation/closure_m1.hpp"
 
 // parthenon includes
 #include <coordinates/coordinates.hpp>
@@ -32,7 +33,7 @@
 
 using namespace Geometry;
 using namespace radiation; 
-
+/*
 struct Vec { 
   Real data[NDSPACE]; 
   inline Real& operator()(const int idx){return data[idx];}
@@ -44,7 +45,7 @@ struct Tens2 {
   inline Real& operator()(const int i, const int j){return data[i][j];} 
   inline const Real& operator()(const int i, const int j) const {return data[i][j];} 
 };
-
+*/
 const Real pi = acos(-1);
 
 TEST_CASE("M1 Closure", "[radiation][closure]") { 
@@ -63,7 +64,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             Vec con_v = {vmag*cos(phiv), vmag*sin(phiv), 0.0}; 
             Tens2 cov_gamma = {{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}}; 
             LocalThreeGeometry<Vec, Tens2> g(cov_gamma); 
-            Closure<Vec, Tens2> cl(con_v, &g); 
+            ClosureM1<Vec, Tens2> cl(con_v, &g); 
   
   
             // Assume a fluid frame state  
@@ -74,7 +75,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             // Calculate comoving frame state 
             Real E;
             Vec F;
-            cl.GetCovTilPiFromPrimM1(J, cov_tilH, &con_tilPi);
+            cl.GetCovTilPiFromPrim(J, cov_tilH, &con_tilPi);
             cl.Prim2Con(J, cov_tilH, con_tilPi, &E, &F); 
               
             
@@ -85,7 +86,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             
             Real xig, phig; 
             cl.GetM1GuessesFromEddington(E, F, &xig, &phig); 
-            cl.GetCovTilPiFromConM1(E, F, xig, phig, &con_tilPi);
+            cl.GetCovTilPiFromCon(E, F, xig, phig, &con_tilPi);
             cl.Con2Prim(E, F, con_tilPi, &J_out, &H_out);
             
             //if (result.status == radiation::Status::failure) throw 2;
