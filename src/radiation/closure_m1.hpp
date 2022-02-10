@@ -160,8 +160,6 @@ namespace radiation
   KOKKOS_FUNCTION
   void ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::GetM1GuessesFromEddington(const Real E, const Vec cov_F,
                                            Real *xi, Real *phi) {
-    Vec con_tilf;
-    
     // Get the basis vectors for the search
     Vec con_tilg, con_tild;
     GetBasisVectors(cov_F, &con_tilg, &con_tild);
