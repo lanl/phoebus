@@ -32,6 +32,51 @@ namespace radiation
   using namespace LinearAlgebra;
   using namespace robust;
 
+
+  struct Vec { 
+    // Do not add any member data to this struct since it is initialized in many places in 
+    // the code using initializer lits 
+    Real data[Geometry::NDSPACE]; 
+    KOKKOS_FORCEINLINE_FUNCTION
+    Real& operator()(const int idx){return data[idx];}
+    KOKKOS_FORCEINLINE_FUNCTION
+    const Real& operator()(const int idx) const {return data[idx];}
+  };
+  
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Vec operator+(Vec a, Vec b) {Vec out; SPACELOOP(i) out(i) = a(i) + b(i); return out;} 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Vec operator-(Vec a, Vec b) {Vec out; SPACELOOP(i) out(i) = a(i) - b(i); return out;} 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Vec operator-(Vec a) {Vec out; SPACELOOP(i) out(i) = -a(i); return out;} 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Vec operator*(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = a(i)*b; return out;} 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Vec operator*(Real a, Vec b) {Vec out; SPACELOOP(i) out(i) = a*b(i); return out;} 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Vec operator/(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = ratio(a(i), b); return out;} 
+  
+  struct Tens2 {
+    // Do not add any member data to this struct since it is initialized in many places in 
+    // the code using initializer lits 
+    Real data[Geometry::NDSPACE][Geometry::NDSPACE]; 
+    KOKKOS_FORCEINLINE_FUNCTION 
+    Real& operator()(const int i, const int j){return data[i][j];} 
+    KOKKOS_FORCEINLINE_FUNCTION
+    const Real& operator()(const int i, const int j) const {return data[i][j];} 
+  };
+  
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Tens2 operator+(Tens2 a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j) + b(i,j);} return out;} 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Tens2 operator-(Tens2 a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j) - b(i,j);} return out;} 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Tens2 operator*(Real a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a*b(i,j);} return out;} 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Tens2 operator*(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j)*b;} return out;} 
+  KOKKOS_FORCEINLINE_FUNCTION 
+  Tens2 operator/(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = ratio(a(i,j), b);} return out;}
+
   template <class Vec, class Tens2>
   struct LocalThreeGeometry {
   
@@ -98,6 +143,7 @@ namespace radiation
     }
   };
 
+  using LocaLGeometry = LocalThreeGeometry<Vec, Tens2>; 
 } // namespace radiation
 
 #endif // LOCAL_THREE_GEOMETRY_HPP_
