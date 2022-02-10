@@ -830,7 +830,6 @@ TaskStatus MomentCalculateOpacities(T *rc) {
 
           Real kappa = d_opacity.AbsorptionCoefficient(rho_cgs, T_cgs, Ye, dev_species[ispec], enu);
           const Real emis = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, dev_species[ispec]); 
-          Real B = 0.1*pow(T_code, 4); 
           if (use_B_fake) B = B_fake; 
 
           v(iblock, idx_JBB(ispec), k, j, i) = B;  
