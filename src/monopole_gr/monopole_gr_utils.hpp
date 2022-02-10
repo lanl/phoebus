@@ -64,33 +64,36 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
 
 namespace Interp3DTo1D {
 
-PORTABLE_INLINE_FUNCTION
-bool InBoundsHelper(Real a, Real r, Real dr) {
+// True if a in a box centered at r with width dr.
+// False otherwise.
+KOKKOS_INLINE_FUNCTION
+bool InBoundsHelper(const Real a, const Real r, const Real dr) {
   return ((a >= (r - 0.5 * dr)) && (a < (r + 0.5 * dr)));
 }
 
-PORTABLE_INLINE_FUNCTION
+KOKKOS_INLINE_FUNCTION
 Real GetVolIntersectHelper(const Real rsmall, const Real drsmall, const Real rbig,
                            const Real drbig) {
-  if (drsmall > drbig) { // evaluates only once but the compiler may
-                         // not be smart enough to realize that.
-    return GetVolIntersectHelper(rbig, drbig, rsmall, drsmall);
-  }
+  // TODO(JMM): If drsmall > drbig, we can probably just swap all the
+  // arguments, but I haven't tested the monopole solver in this regime,
+  // so I'm forbidding it for now.
+  PARTHENON_DEBUG_REQUIRE(drsmall <= drbig, "drsmall <= drbig required.");
+  // TODO(JMM): Is this masking too cute?
+  // cast this way, there's no branching, but there are more flops maybe?
   bool left_in_bnds = InBoundsHelper(rsmall - 0.5 * drsmall, rbig, drbig);
   bool right_in_bnds = InBoundsHelper(rsmall + 0.5 * drsmall, rbig, drbig);
-  // TODO(JMM): This vectorizes thanks to using masking. But is it
-  // actually a good idea?  We already have branching, because of the
-  // above if statement, so...
-  bool interior_mask = left_in_bnds || right_in_bnds;
+  bool interior_mask = left_in_bnds && right_in_bnds;
   bool left_mask = right_in_bnds && !left_in_bnds;
   bool right_mask = left_in_bnds && !right_in_bnds;
+  Real vol_intersect = interior_mask*(drsmall / drbig);
+  
   // divide by zero impossible because these are grid deltas
-  return interior_mask * (drsmall / drbig) +
-         left_mask * (rsmall + 0.5 * drsmall - (rbig - 0.5 * rbig) / drbig) +
-         right_mask * (rbig + 0.5 * rbig - (rsmall - 0.5 * rsmall) / drbig);
+  vol_intersect += left_mask*(rsmall + 0.5*drsmall - (rbig - 0.5*drbig))/drbig;
+  vol_intersect += right_mask*(rbig + 0.5*drbig - (rsmall - 0.5*drsmall))/drbig;
+  return vol_intersect;
 }
 
-PORTABLE_INLINE_FUNCTION
+KOKKOS_INLINE_FUNCTION
 void GetCoordsAndDerivsSph(const int k, const int j, const int i,
 			   const parthenon::Coordinates_t &coords,
 			   Real &r , Real &th, Real &ph,
