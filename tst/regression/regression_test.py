@@ -154,7 +154,7 @@ def build_code(geometry, use_gpu=False):
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
 def gold_comparison(variables, input_file, modified_inputs={}, executable='./src/phoebus',
-                    upgold=False, compression_factor=1):
+                    upgold=False, compression_factor=1, save_output=False):
 
   if not os.getcwd().endswith(BUILD_DIR):
     if os.path.isdir(BUILD_DIR):
@@ -218,7 +218,8 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
     sys.exit()
 
   try:
-    shutil.rmtree(BUILD_DIR)
+    if not save_output: 
+      shutil.rmtree(BUILD_DIR)
   except:
     print(f"Error cleaning up build directory \"{BUILD_DIR}\"!")
 
