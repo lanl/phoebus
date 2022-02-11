@@ -126,6 +126,7 @@ private:
       u[l] = v_(l, std::forward<Args>(args)...) - u[0] * beta[l - 1];
       b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha * b[0] * u[l]);
     }
+    //printf("b[] = %g %g %g %g\n", b[0], b[1], b[2], b[3]);
 
     bsq = (Bsq + alpha * alpha * b[0] * b[0]) * iW * iW;
   }

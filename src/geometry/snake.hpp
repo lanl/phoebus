@@ -109,8 +109,6 @@ class Snake {
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    //Utils::SetConnectionCoeffByFD(*this, Gamma, X0, X1, X2, X3);
-
     const Real a2 = a_ * a_;
     const Real k2 = k_ * k_;
     const Real k3 = k_ * k_ * k_;
@@ -122,7 +120,6 @@ class Snake {
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
-    //Utils::SetMetricGradientByFD(*this, 1.e-6, X0, X1, X2, X3, dg);
     const Real a2 = a_ * a_;
     const Real k2 = k_ * k_;
     const Real k3 = k_ * k_ * k_;
