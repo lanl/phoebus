@@ -169,7 +169,8 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
-  call(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
+  #call(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
+  call([executable, '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))
