@@ -31,8 +31,11 @@ jobs:
           run: |
             cd tst/regression
             # TODO(BRR) add --use_gpu flag here if running on GPU
-            ./linear_modes.py
-            ./bondi.py
+            export OMPI_ALLOW_RUN_AS_ROOT=1
+            export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+            ./radiation_diffusion.py
+            #./linear_modes.py
+            #./bondi.py
         - name: Build code
           run: |
             mkdir build
