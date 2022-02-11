@@ -19,6 +19,7 @@ import regression_test as rt
 parser = argparse.ArgumentParser(description='Run a finite velocity radiation diffusion test')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
 parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
+parser.add_argument('--save_output', dest='save_output', action='store_true')
 parser.add_argument('--executable', type=str, default=None)
 args = parser.parse_args()
 
@@ -40,11 +41,13 @@ if args.executable == None:
                      input_file='../../../inputs/radiation_advection.pin',
                      modified_inputs=modified_inputs,
                      upgold=args.upgold,
-                     compression_factor=10)
+                     compression_factor=10,
+                     save_output=args.save_output)
 else:
   rt.gold_comparison(variables=['r.p.J', 'r.p.H'],
                      input_file='../../../inputs/radiation_advection.pin',
                      modified_inputs=modified_inputs,
                      executable=args.executable,
                      upgold=args.upgold,
-                     compression_factor=10)
+                     compression_factor=10,
+                     save_output=args.save_output)
