@@ -14,7 +14,15 @@
 #ifndef PHOEBUS_UTILS_RELATIVITY_UTILS_HPP_
 #define PHOEBUS_UTILS_RELATIVITY_UTILS_HPP_
 
-#define SMALL (1.e-200)
+// System includes
+#include <cmath>
+
+// Parthenon includes
+#include <kokkos_abstraction.hpp>
+
+// Phoebus includes
+#include "geometry/geometry_utils.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace phoebus {
 
@@ -91,14 +99,12 @@ GetFourVelocity(const Real v[3], const Geometry::CoordSysMeshBlock &system,
   Real W = GetLorentzFactor(v, system, loc, k, j, i);
   Real alpha = system.Lapse(loc, k, j, i);
   system.ContravariantShift(loc, k, j, i, beta);
-  u[0] = W / (std::abs(alpha) + SMALL);
+  u[0] = robust::ratio(W, std::abs(alpha));
   for (int l = 1; l < Geometry::NDFULL; ++l) {
     u[l] = v[l - 1] - u[0] * beta[l - 1];
   }
 }
 
 } // namespace phoebus
-
-#undef SMALL
 
 #endif // PHOEBUS_UTILS_RELATIVITY_UTILS_HPP_

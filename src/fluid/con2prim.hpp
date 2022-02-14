@@ -29,6 +29,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
 namespace con2prim {
@@ -50,7 +51,9 @@ public:
   Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
            const Real BdotS, const Real Ye, const singularity::EOS &eos)
       : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
-        Ye_(Ye), eos_(eos) {}
+        Ye_(Ye), eos_(eos) {
+    lambda_[0] = Ye_;
+  }
   KOKKOS_FORCEINLINE_FUNCTION
   Real sfunc(const Real z, const Real Wp) const {
     Real zBsq = (z + Bsq_);
@@ -64,9 +67,8 @@ public:
   }
   KOKKOS_FORCEINLINE_FUNCTION
   void operator()(const Real rho, const Real Temp, Real res[2]) {
-    double lambda[2] = {Ye_, 0.};
-    const Real p = eos_.PressureFromDensityTemperature(rho, Temp, lambda);
-    const Real sie = eos_.InternalEnergyFromDensityTemperature(rho, Temp, lambda);
+    const Real p = eos_.PressureFromDensityTemperature(rho, Temp, lambda_);
+    const Real sie = eos_.InternalEnergyFromDensityTemperature(rho, Temp, lambda_);
     const Real Wp = D_ / rho;
     const Real z = (rho * (1.0 + sie) + p) * Wp * Wp;
     res[0] = sfunc(z, Wp);
@@ -82,6 +84,7 @@ public:
 private:
   const singularity::EOS &eos_;
   const Real D_, tau_, Bsq_, Ssq_, BdotSsq_, Ye_;
+  Real lambda_[2] = {0., 0.};
 };
 
 template <typename T> class VarAccessor {
@@ -269,9 +272,9 @@ private:
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const singularity::EOS &eos,
                         bool print = false) const {
-    using Geometry::Utils::sgn;
-    using Geometry::Utils::ratio;
-    constexpr Real SMALL = 10 * std::numeric_limits<Real>::epsilon();
+    using robust::sgn;
+    using robust::ratio;
+    using robust::make_positive;
     Real &D = v(scr_lo + iD);
     Real &tau = v(scr_lo + itau);
     Real &Bsq = v(scr_lo + iBsq);
@@ -294,7 +297,7 @@ private:
     Real delta_fact = delta_fact_min;
     constexpr Real delta_adj = 1.2;
     constexpr Real idelta_adj = 1. / delta_adj;
-    const Real delta_min = std::max(rel_tolerance*delta_fact_min, SMALL);
+    const Real delta_min = make_positive(rel_tolerance*delta_fact_min);
     Rfunc(rho_guess, T_guess, res);
     do {
       Real drho = delta_fact * rho_guess;

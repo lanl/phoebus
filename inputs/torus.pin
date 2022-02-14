@@ -1,15 +1,15 @@
 
 <phoebus>
 problem = torus
-bc_ix1 = outflow
-bc_ox1 = outflow
+ix1_bc = outflow
+ox1_bc = outflow
 
 <parthenon/job>
 problem_id  = torus       # problem ID: basename of output filenames
 
-#<parthenon/output0>
-#file_type = rst
-#dt = 1.0
+<parthenon/output0>
+file_type = rst
+dt = 200.0
 
 <parthenon/output1>
 variables = p.density,       &

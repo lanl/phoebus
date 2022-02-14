@@ -14,6 +14,7 @@
 #ifndef CON2PRIM_ROBUST_HPP_
 #define CON2PRIM_ROBUST_HPP_
 
+#include <cmath>
 #include <fenv.h>
 
 // parthenon provided headers
@@ -47,12 +48,14 @@ class Residual {
   KOKKOS_FUNCTION
   Residual(const Real D, const Real q, const Real bsq,
 	   const Real bsq_rpsq, const Real rsq,
-	   const Real rbsq, const Real v0sq, const singularity::EOS &eos,
-     const fixup::Bounds &bnds, const Real x1, const Real x2, const Real x3)
+	   const Real rbsq, const Real v0sq,
+	   const Real Ye, const singularity::EOS &eos,
+	   const fixup::Bounds &bnds, const Real x1, const Real x2, const Real x3)
     : D_(D), q_(q), bsq_(bsq), bsq_rpsq_(bsq_rpsq), rsq_(rsq),
       rbsq_(rbsq), v0sq_(v0sq),
       eos_(eos), bounds_(bnds),
       x1_(x1), x2_(x2), x3_(x3) {
+    lambda_[0] = Ye;
     Real garbage = 0.0;
     bounds_.GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
     bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
@@ -129,7 +132,7 @@ class Residual {
     const Real What = 1.0/iWhat;
     Real rhohat = rhohat_mu(iWhat);
     Real ehat = ehat_mu(mu,qbar,rbarsq,vhatsq,What);
-    const Real Phat = eos_.PressureFromDensityInternalEnergy(rhohat,ehat);
+    const Real Phat = eos_.PressureFromDensityInternalEnergy(rhohat,ehat,lambda_);
     Real hhat = rhohat*(1.0 + ehat) + Phat;
     const Real ahat = Phat/make_positive(hhat-Phat);
     hhat /= rhohat;
@@ -164,6 +167,7 @@ class Residual {
   const singularity::EOS &eos_;
   const fixup::Bounds &bounds_;
   const Real x1_, x2_, x3_;
+  Real lambda_[2];
   Real rho_floor_, e_floor_, gam_max_, e_max_;
   bool used_density_floor_, used_energy_floor_, used_energy_max_, used_gamma_max_;
 
@@ -327,6 +331,7 @@ class ConToPrim {
     const Real q = tau/D;
 
     if (pye > 0) v(pye) = v(cye)/v(crho);
+    Real ye_local = (pye > 0) ? v(pye) : 0.5;
 
     Real bsq = 0.0;
     Real bsq_rpsq = 0.0;
@@ -376,7 +381,7 @@ class ConToPrim {
       PARTHENON_FAIL("rbsq < 0");
     }
 
-    Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,eos,bounds,x1,x2,x3);
+    Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,ye_local,eos,bounds,x1,x2,x3);
 
     // find the upper bound
     // TODO(JCD): revisit this.  is it worth it to find the upper bound?
@@ -392,11 +397,14 @@ class ConToPrim {
     v(prho) = res.rhohat_mu(iW);
     const Real qbar = res.qbar_mu(mu,x);
     Real W = 1.0/iW;
+    Real eos_lambda[2];
+    if (pye > 0) eos_lambda[0] = v(pye);
+    eos_lambda[1] = std::log10(v(tmp)); // initial guess
     v(peng) = res.ehat_mu(mu, qbar, rbarsq, vsq, W);
-    v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng));
+    v(tmp) = eos.TemperatureFromDensityInternalEnergy(v(prho), v(peng), eos_lambda);
     v(peng) *= v(prho);
-    v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp));
-    v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp))/v(prs);
+    v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp), eos_lambda);
+    v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp), eos_lambda)/v(prs);
 
     Real vel[3];
     SPACELOOP(i) {

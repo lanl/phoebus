@@ -29,6 +29,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace Geometry {
 
@@ -49,13 +50,14 @@ public:
     const Real r = std::abs(X1);
     const Real cth = std::cos(X2);
     const Real rho2 = rho2_(r, cth);
-    return std::sqrt(Utils::ratio(rho2, 2 * r + rho2));
+    return std::sqrt(robust::ratio(rho2, 2 * r + rho2));
   }
 
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
                           Real beta[NDSPACE]) const {
     using namespace Utils;
+    using namespace robust;
     Real r, th, cth, sth;
     rth_(X1, X2, r, th, cth, sth);
     const Real rho2 = rho2_(r, cth);
@@ -67,6 +69,7 @@ public:
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
                        Real g[NDFULL][NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
@@ -85,6 +88,7 @@ public:
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
@@ -102,6 +106,7 @@ public:
   void Metric(Real X0, Real X1, Real X2, Real X3,
               Real g[NDSPACE][NDSPACE]) const {
     using namespace Utils;
+    using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
     const Real br = ratio(2 * r, rho2);
@@ -116,6 +121,7 @@ public:
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
                      Real g[NDSPACE][NDSPACE]) const {
     using namespace Utils;
+    using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
     LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
@@ -153,6 +159,7 @@ public:
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
     const Real r2 = r * r;
@@ -195,6 +202,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
     const Real rho4 = rho2 * rho2;

@@ -2,23 +2,40 @@
 #define PHOEBUS_UTILS_ROBUST_HPP_
 
 #include <kokkos_abstraction.hpp>
+#include <limits>
 
 namespace robust {
 
-#define TINY (1.e-14)
-
+template<typename T=Real>
 KOKKOS_FORCEINLINE_FUNCTION
-Real make_positive(const Real val) {
-  return std::max(val,TINY);
+constexpr auto SMALL() {
+  return 10 * std::numeric_limits<T>::min();
+}
+template<typename T=Real>
+KOKKOS_FORCEINLINE_FUNCTION
+constexpr auto EPS() {
+  return 10 * std::numeric_limits<T>::epsilon();
+}
+
+template<typename T>
+KOKKOS_FORCEINLINE_FUNCTION
+auto make_positive(const T val) {
+  return std::max(val,EPS<T>());
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real make_bounded(const Real val, const Real vmin, const Real vmax) {
-  return std::min(std::max(val,vmin+TINY), vmax*(1.0-TINY));
+  return std::min(std::max(val,vmin+EPS()), vmax*(1.0-EPS()));
 }
 
-#undef TINY
-
+template <typename T> KOKKOS_INLINE_FUNCTION int sgn(const T &val) {
+  return (T(0) <= val) - (val < T(0));
+}
+template <typename A, typename B>
+KOKKOS_INLINE_FUNCTION auto ratio(const A &a, const B &b) {
+  const B sgn = b >= 0 ? 1 : -1;
+  return a / (b + sgn * SMALL<B>());
+}
 } // namespace robust
 
 #endif // PHOEBUS_UTILS_ROBUST_HPP_

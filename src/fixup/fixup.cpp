@@ -11,6 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+#include <cmath>
+
 #include "fixup.hpp"
 
 #include <bvals/bvals_interfaces.hpp>
@@ -20,8 +22,11 @@
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
-#include "phoebus_utils/variables.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
+#include "phoebus_utils/robust.hpp"
+#include "phoebus_utils/variables.hpp"
+
+using robust::ratio;
 
 namespace fixup {
 
@@ -163,6 +168,10 @@ TaskStatus ApplyFloors(T *rc) {
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(),
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+          double eos_lambda[2]; // used for stellarcollapse eos and
+				// other EOS's that require root
+				// finding.
+	  eos_lambda[1] = std::log10(v(b,tmp,k,j,i)); // use last temp as initial guess
             
           double rho_floor, sie_floor;
           bounds.GetFloors(coords.x1v(k,j,i), coords.x2v(k,j,i), coords.x3v(k,j,i), rho_floor, sie_floor);
@@ -211,11 +220,13 @@ TaskStatus ApplyFloors(T *rc) {
 
           if (floor_applied) {
             // Update dependent primitives
+	    if (pye > 0) eos_lambda[0] = v(b,pye,k,j,i);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-                                v(b,peng,k,j,i)/v(b,prho,k,j,i));
-            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+								      v(b,peng,k,j,i)/v(b,prho,k,j,i), eos_lambda);
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i),
+								eos_lambda);
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  v(b,tmp,k,j,i))/v(b,prs,k,j,i);
+								   v(b,tmp,k,j,i), eos_lambda)/v(b,prs,k,j,i);
 
             // Update conserved variables
             const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -325,6 +336,11 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(),
       0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+	Real eos_lambda[2]; // use last temp as initial guess
+	eos_lambda[0] = 0.5;
+	eos_lambda[1] = std::log10(v(b,tmp,k,j,i));
+
+
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b,iv,k,j,i)  = v(b,ifail,k,j,i-1)*v(b,iv,k,j,i-1)
                          + v(b,ifail,k,j,i+1)*v(b,iv,k,j,i+1);
@@ -352,11 +368,14 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             v(b,peng,k,j,i) = fixup(peng, norm);
             
             if (pye > 0) v(b, pye,k,j,i) = fixup(pye, norm);
+	    if (pye > 0) eos_lambda[0] = v(b,pye,k,j,i);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-                                Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)));
-            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+								      ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)),
+								      eos_lambda);
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i), eos_lambda);
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
+								   ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)),
+								   eos_lambda);
           } else {
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive velocities to zero
             
@@ -368,11 +387,15 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
               v(b, pye, k, j, i) = 0.5;
             }
 
+	    if (pye > 0) eos_lambda[0] = v(b,pye,k,j,i);
             v(b,tmp,k,j,i) = eos.TemperatureFromDensityInternalEnergy(v(b,prho,k,j,i),
-                                Geometry::Utils::ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)));
-            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i));
+								      ratio(v(b,peng,k,j,i), v(b,prho,k,j,i)),
+								      eos_lambda);
+            v(b,prs,k,j,i) = eos.PressureFromDensityTemperature(v(b,prho,k,j,i),v(b,tmp,k,j,i),
+								eos_lambda);
             v(b,gm1,k,j,i) = eos.BulkModulusFromDensityTemperature(v(b,prho,k,j,i),
-                                  Geometry::Utils::ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)));
+								   ratio(v(b,tmp,k,j,i), v(b,prs,k,j,i)),
+								   eos_lambda);
 
             // Zero primitive velocities
             SPACELOOP(ii) {
@@ -428,8 +451,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (!pmb->packages.Get("fixup")->Param<bool>("enable_flux_fixup")) return TaskStatus::complete;
   
   auto fluid = pmb->packages.Get("fluid");
-  const std::string bc_ix1 = fluid->Param<std::string>("bc_ix1");
-  const std::string bc_ox1 = fluid->Param<std::string>("bc_ox1");
+  const std::string ix1_bc = fluid->Param<std::string>("ix1_bc");
+  const std::string ox1_bc = fluid->Param<std::string>("ox1_bc");
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -442,14 +465,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 
   // x1-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
-    if (bc_ix1 == "outflow") {
+    if (ix1_bc == "outflow") {
       auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density}),
                                              std::vector<std::string>({fluid_cons::density}));
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(),
         kb.s, kb.e, jb.s, jb.e, ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           flux.flux(X1DIR,0,k,j,i) = std::min(flux.flux(X1DIR,0,k,j,i), 0.0);
         });
-    } else if (bc_ix1 == "reflect") {
+    } else if (ix1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, fluid_cons::energy}),
                                              std::vector<std::string>({fluid_cons::density, fluid_cons::energy}));
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(),
@@ -460,14 +483,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     }
   }
   if (pmb->boundary_flag[BoundaryFace::outer_x1] == BoundaryFlag::user) {
-    if (bc_ox1 == "outflow") {
+    if (ox1_bc == "outflow") {
       auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density}),
                                              std::vector<std::string>({fluid_cons::density}));
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(),
         kb.s, kb.e, jb.s, jb.e, ib.e+1, ib.e+1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           flux.flux(X1DIR,0,k,j,i) = std::max(flux.flux(X1DIR,0,k,j,i), 0.0);
         });
-    } else if (bc_ox1 == "reflect") {
+    } else if (ox1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, fluid_cons::energy}),
                                              std::vector<std::string>({fluid_cons::density, fluid_cons::energy}));
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(),
