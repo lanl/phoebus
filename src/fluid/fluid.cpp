@@ -203,10 +203,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                              Metadata::Derived, Metadata::OneCopy},
                              five_vec);
   physics->AddField(diag::divf, mdiv);
-  std::vector<int> seven_vec(1,5);
   Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                              Metadata::Derived, Metadata::OneCopy},
-                             seven_vec);
+                             five_vec);
   physics->AddField(diag::src_terms, mdiag);
 #endif
 

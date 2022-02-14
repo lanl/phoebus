@@ -178,13 +178,10 @@ class FluxState {
     SPACETIMELOOP2(mu, nu) {
       ucov[mu] += g.gcov[mu][nu]*ucon[nu];
     }
-    Real bcon[4] = {0., 0., 0., 0.};
+    Real bcon[4] = {b0/g.alpha, 0., 0., 0.};
     Real bcov0 = 0.;
-    SPACELOOP(ii) SPACETIMELOOP(mu) {
-      bcon[0] += Bcon[ii]*ucon[mu]*g.gcov[ii][mu];
-    }
     SPACELOOP(ii) {
-      bcon[ii] = (Bcon[ii] + bcon[0]*ucon[ii])/ucon[0];
+      bcon[ii+1] = (Bcon[ii] + b0*ucon[ii+1])/W;
     }
     SPACETIMELOOP(mu) {
       bcov0 += g.gcov[0][mu]*bcon[mu];
