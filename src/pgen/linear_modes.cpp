@@ -39,9 +39,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE(is_minkowski || is_boosted_minkowski || is_snake || is_inchworm,
                     "Problem \"linear_modes\" requires \"Minkowski\" geometry!");
 
-  printf("minkowski/boosted_minkowski/snake/inchworm: %d/%d/%d/%d\n",
-          is_minkowski, is_boosted_minkowski, is_snake, is_inchworm);
-
   auto &rc = pmb->meshblock_data.Get();
   const int ndim = pmb->pmy_mesh->ndim;
 
@@ -60,7 +57,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ib_hi = imap[fluid_prim::bfield].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
-  const int iye = imap[fluid_prim::ye].first;
+  const int iye = imap[fluid_prim::ye].second;
   const int nv = ivhi - ivlo + 1;
 
   const Real gam = pin->GetReal("eos", "Gamma");
@@ -124,9 +121,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       PARTHENON_FAIL(msg);
     }
   } else if (physics == "mhd") {
-    if (ib_lo < 0 || ib_hi < 0) {
-      PARTHENON_THROW("physics = mhd but bfields are not present");
-    }
     B10 = 1.0;
     if (mode == "slow") {
       omega = complex<double>(0., 2.41024185339);
