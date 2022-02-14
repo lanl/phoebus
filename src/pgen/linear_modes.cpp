@@ -127,7 +127,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     if (ib_lo < 0 || ib_hi < 0) {
       PARTHENON_THROW("physics = mhd but bfields are not present");
     }
-    printf("ib_lo = %d  ib_hi = %d\n", ib_lo, ib_hi);
     B10 = 1.0;
     if (mode == "slow") {
       omega = complex<double>(0., 2.41024185339);
