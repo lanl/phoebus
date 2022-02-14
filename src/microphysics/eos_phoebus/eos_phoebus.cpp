@@ -202,7 +202,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     
     sie_min = eos_sc.sieMin()/sie_unit;
     sie_max = eos_sc.sieMax()/sie_unit;
-    T_min = seos_sc.TMin()/T_unit;
+    T_min = eos_sc.TMin()/T_unit;
     T_max = eos_sc.TMax()/T_unit;
     rho_min = eos_sc.rhoMin()/rho_unit;
     rho_max = eos_sc.rhoMax()/rho_unit;
