@@ -252,9 +252,9 @@ def gold_comparison(variables, input_file, modified_inputs={},
   else:
     if success:
       print("TEST PASSED")
-      return sys.exit(os.EX_OK)
+      return os.EX_OK
     else:
       print("TEST FAILED")
       mean_error = np.mean(variables_data - gold_variables)
       print(f"Mean error: {mean_error}")
-      return sys.exit(os.EX_SOFTWARE)
+      return os.EX_SOFTWARE

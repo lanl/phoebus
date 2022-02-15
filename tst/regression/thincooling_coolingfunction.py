@@ -15,6 +15,7 @@
 
 import argparse
 import os
+import sys
 import regression_test as rt
 
 parser = argparse.ArgumentParser(description='Run optically thin cooling as a test')
@@ -32,19 +33,21 @@ modified_inputs['parthenon/mesh/x1max'] = 1.e-7
 
 if args.executable == None:
   rt.build_code(geometry="Minkowski", use_gpu=args.use_gpu)
-  rt.gold_comparison(variables=['p.density', 'p.energy'],
-                     input_file=args.input,
-                     modified_inputs=modified_inputs,
-                     upgold=args.upgold,
-                     compression_factor=args.compression,
-                     tolerance=args.tolerance)
+  code = rt.gold_comparison(variables=['p.density', 'p.energy'],
+                            input_file=args.input,
+                            modified_inputs=modified_inputs,
+                            upgold=args.upgold,
+                            compression_factor=args.compression,
+                            tolerance=args.tolerance)
 else:
-  rt.gold_comparison(variables=['p.density', 'p.energy'],
-                     input_file=args.input,
-                     modified_inputs=modified_inputs,
-                     executable=args.executable,
-                     upgold=args.upgold,
-                     compression_factor=args.compression,
-                     tolerance=args.tolerance)
+  code = rt.gold_comparison(variables=['p.density', 'p.energy'],
+                            input_file=args.input,
+                            modified_inputs=modified_inputs,
+                            executable=args.executable,
+                            upgold=args.upgold,
+                            compression_factor=args.compression,
+                            tolerance=args.tolerance)
 
 rt.cleanup()
+
+sys.exit(code)
