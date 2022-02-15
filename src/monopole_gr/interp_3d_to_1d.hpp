@@ -97,10 +97,14 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   auto tmunu = fluid::BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  // I just need the pack for the coords object, so I choose something
-  // arbitrary here
-  std::vector<std::string> vars({fluid_cons::density});
-  auto pack = rc->PackVariables();
+  // I just need the pack for the coords object,
+  // but I may want these quantities in a future
+  // iteration, so I ask for them here.
+  std::vector<std::string> vars({fluid_cons::density,
+      fluid_cons::energy,
+      fluid_cons::momentum});
+  // PackIndexMap imap;
+  auto pack = rc->PackVariables(vars);
 
   // Available in all Container types
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
@@ -121,11 +125,13 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
         // First compute the relevant conserved/prim vars
         Real matter_loc[4];
         GetMonopoleVarsHelper<is_monopole_cart>(
-            tmunu, geom, pack, b, k, j, i, matter_loc[Matter::RHO],
-            matter_loc[Matter::J_R], matter_loc[Matter::Srr], matter_loc[Matter::trcS]);
+          tmunu, geom, pack, b, k, j, i, matter_loc[Matter::RHO],
+          matter_loc[Matter::J_R], matter_loc[Matter::Srr],
+	  matter_loc[Matter::trcS]);
         // Next get coords and grid spacing
         Real r, th, ph, dr, dth, dph, dv;
-        GetCoordsAndCellWidthsHelper<is_monopole_cart>(pack, b, k, j, i, r, th, ph,
+        GetCoordsAndCellWidthsHelper<is_monopole_cart>(pack,
+						       b, k, j, i, r, th, ph,
                                                        dr, dth, dph, dv);
 
         // Bounds in the 1d grid We're wasteful here because I'm
@@ -176,11 +182,12 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom, const
   Real beta[NS];
   geom.ContravariantShift(loc, b, k, j, i, beta);
   const Real alpha = geom.Lapse(loc, b, k, j, i);
+  // const Real gdet = geom.DetGamma(loc, b, k, j, i);
 
   // Get rho and S before lowering T
   Real Scon[NS];
   rho0 = alpha * alpha * Tcon[0][0];
-  SPACELOOP(d) { Scon[d] = -alpha * Tcon[0][d] + beta[d] * Tcon[0][0]; }
+  SPACELOOP(d) { Scon[d] = -alpha * Tcon[0][d+1] + beta[d] * Tcon[0][0]; }
 
   // Lower Tmunu
   Real TConCov[ND][ND] = {0};
