@@ -38,7 +38,6 @@ if args.executable == None:
                      upgold=args.upgold,
                      compression_factor=args.compression,
                      tolerance=args.tolerance)
-  rt.cleanup()
 else:
   rt.gold_comparison(variables=['p.density', 'p.energy'],
                      input_file=args.input,
@@ -47,3 +46,5 @@ else:
                      upgold=args.upgold,
                      compression_factor=args.compression,
                      tolerance=args.tolerance)
+
+rt.cleanup()

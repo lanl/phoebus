@@ -15,6 +15,7 @@
 
 import argparse
 import os
+import sys
 import regression_test as rt
 
 parser = argparse.ArgumentParser(description='Run optically thin cooling as a test')
@@ -28,18 +29,19 @@ args = parser.parse_args()
 
 if args.executable == None:
   rt.build_code(geometry="Minkowski", use_gpu=args.use_gpu)
-  rt.gold_comparison(variables=['p.density', 'p.energy'],
+  code = rt.gold_comparison(variables=['p.density', 'p.energy'],
                      input_file=args.input,
                      upgold=args.upgold,
                      compression_factor=args.compression,
                      tolerance=args.tolerance)
-  rt.cleanup()
 else:
-  print(os.getcwd())
-  print(args.executable)
-  rt.gold_comparison(variables=['p.density', 'p.energy'],
+  code = rt.gold_comparison(variables=['p.density', 'p.energy'],
                      input_file=args.input,
                      executable=args.executable,
                      upgold=args.upgold,
                      compression_factor=args.compression,
                      tolerance=args.tolerance)
+
+rt.cleanup()
+
+sys.exit(code)

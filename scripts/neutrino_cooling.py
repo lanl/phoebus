@@ -76,7 +76,7 @@ def get_Ye(t):
 def get_u(t):
   return u0 + Bc/(2.*Ac)*(np.exp(-2.*Ac*t) - 1.)
 
-t = np.logspace(0, 3, 128)
+t = np.logspace(0, np.log10(500.), 128)
 Ye = get_Ye(t)
 u = get_u(t)
 
