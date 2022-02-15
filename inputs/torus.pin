@@ -7,9 +7,9 @@ ox1_bc = outflow
 <parthenon/job>
 problem_id  = torus       # problem ID: basename of output filenames
 
-#<parthenon/output0>
-#file_type = rst
-#dt = 1.0
+<parthenon/output0>
+file_type = rst
+dt = 200.0
 
 <parthenon/output1>
 variables = p.density,       &
