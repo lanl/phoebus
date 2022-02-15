@@ -131,6 +131,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Real wgt = GetWeight(wgtC, nu);
               Real Jnu = d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu * TIME);
 
+              //Jnu /= (4.*M_PI);
+
               dN += Jnu / (ener * wgt) * (nu * dlnu * TIME);
 
               // Note that factors of nu in numerator and denominator cancel
