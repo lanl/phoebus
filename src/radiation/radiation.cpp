@@ -134,11 +134,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     int num_particles = pin->GetOrAddInteger("radiation", "num_particles", 100);
     params.Add("num_particles", num_particles);
 
+    Real num_total = 0.;
+    params.Add("num_total", num_total, true);
+
     Real num_emitted = 0.;
     params.Add("num_emitted", num_emitted, true);
 
     Real num_absorbed = 0.;
     params.Add("num_absorbed", num_absorbed, true);
+
+    std::string tuning = pin->GetOrAddString("radiation", "tuning", "static");
+    params.Add("tuning", tuning);
 
     Real dt_tune_emission = pin->GetOrAddReal("radiation", "dt_tune_emission", 1.);
     params.Add("dt_tune_emission", dt_tune_emission);

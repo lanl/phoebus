@@ -37,7 +37,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
   const int pvhi = imap[p::velocity].second;
   const int ptemp = imap[p::temperature].first;
   const int pye = imap[p::ye].first;
-  const int ceng = imap[c::energy].first;
   const int Gcov_lo = imap[iv::Gcov].first;
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
@@ -52,13 +51,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
   auto opac = pmb->packages.Get("opacity").get();
 
   const auto d_opacity = opac->Param<Opacity>("d.opacity");
-
-  const Real RHO = unit_conv.GetMassDensityCodeToCGS();
-  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
-  const Real CENERGY = unit_conv.GetEnergyCGSToCode();
-  const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
-  const Real CTIME = unit_conv.GetTimeCGSToCode();
-  const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -96,22 +88,12 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
           GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
           Geometry::Tetrads Tetrads(Ucon, Gcov);
 
-          const Real rho_cgs = v(prho, k, j, i) * RHO;
-          const Real T_cgs = v(ptemp, k, j, i) * TEMPERATURE;
           const Real Ye = v(pye, k, j, i);
 
-          //double J = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, s);
           double J = d_opacity.Emissivity(v(prho,k,j,i), v(ptemp,k,j,i), Ye, s);
-          //double Jye =
-          //    pc::mp * d_opacity.NumberEmissivity(rho_cgs, T_cgs, Ye, s);
           double Jye =
               pc::mp * d_opacity.NumberEmissivity(v(prho,k,j,i), v(ptemp,k,j,i), Ye, s);
 
-          // Is this a singularity-opac or my script issue?
-          //J /= 4.*M_PI;
-          //Jye /= 4.*M_PI;
-
-          //Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
           Real Gcov_tetrad[4] = {-J, 0., 0., 0.};
           Real Gcov_coord[4];
           Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
@@ -121,8 +103,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
             Kokkos::atomic_add(&(v(mu, k, j, i)),
                                detG * Gcov_coord[mu - Gcov_lo]);
           }
-          //Kokkos::atomic_add(&(v(Gye, k, j, i)),
-          //                   -detG * Jye * CDENSITY / CTIME);
           Kokkos::atomic_add(&(v(Gye, k, j, i)),
                              -detG * Jye);
         });
