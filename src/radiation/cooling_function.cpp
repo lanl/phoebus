@@ -108,8 +108,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
               pc::mp * d_opacity.NumberEmissivity(v(prho,k,j,i), v(ptemp,k,j,i), Ye, s);
 
           // Is this a singularity-opac or my script issue?
-          J /= 4.*M_PI;
-          Jye /= 4.*M_PI;
+          //J /= 4.*M_PI;
+          //Jye /= 4.*M_PI;
 
           //Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
           Real Gcov_tetrad[4] = {-J, 0., 0., 0.};
