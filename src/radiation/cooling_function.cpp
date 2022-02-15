@@ -60,13 +60,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
   const Real CTIME = unit_conv.GetTimeCGSToCode();
   const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
 
-  // TODO(BRR) output these dimensions to parameters dump file
-  /*const Real T_unit = unit_conv.GetTimeCodeToCGS();
-  const Real L_unit = unit_conv.GetLengthCodeToCGS();
-  const Real U_unit = unit_conv.GetEnergyCodeToCGS()/pow(L_unit,3);
-  printf("T_unit: %e U_unit: %e\n", T_unit, U_unit);
-  exit(-1);*/
-
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   bool do_species[3] = {rad->Param<bool>("do_nu_electron"),
