@@ -182,12 +182,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       },
       Kokkos::Sum<Real>(dNtot));
 
-  // TODO(BRR) Mpi reduction here....... this really needs to be a separate task
-  // TODO(BRR) actually use tuning parameter
   //Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
   Real wgtCfac = rad->Param<Real>("tune_emission");
-  //printf("tune_emission: %e tune_scattering: %e\n", rad->Param<Real>("tune_emission"),
-  //  rad->Param<Real>("tune_scattering"));
+
+  PARTHENON_DEBUG_REQUIRE(wgtCfac*dNtot < 1.e8, "tune_emission*dNtot is very large, you wouldn't want to overflow an integer");
 
   pmb->par_for(
       "MonteCarlodiNsEval", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -588,175 +586,12 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
   return TaskStatus::complete;
 }
 
-/*TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
-  SwarmContainer *sc, const double t0, const double dt, Real *dNtot) {
-
-  namespace fp = fluid_prim;
-  namespace fc = fluid_cons;
-  namespace iv = internal_variables;
-  auto opac = pmb->packages.Get("opacity");
-  auto rad = pmb->packages.Get("radiation");
-  auto swarm = sc->Get("monte_carlo");
-  auto rng_pool = rad->Param<RNGPool>("rng_pool");
-  const auto num_emitted = rad->Param<Real>("tune_emiss");
-
-  const auto nu_min = rad->Param<Real>("nu_min");
-  const auto nu_max = rad->Param<Real>("nu_max");
-  const Real lnu_min = log(nu_min);
-  const Real lnu_max = log(nu_max);
-  const auto nu_bins = rad->Param<int>("nu_bins");
-  const auto dlnu = rad->Param<Real>("dlnu");
-  const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
-  const auto num_particles = rad->Param<int>("num_particles");
-  const auto remove_emitted_particles =
-      rad->Param<bool>("remove_emitted_particles");
-
-  const auto d_opacity = opac->Param<Opacity>("d.opacity");
-
-  bool do_species[3] = {rad->Param<bool>("do_nu_electron"),
-                        rad->Param<bool>("do_nu_electron_anti"),
-                        rad->Param<bool>("do_nu_heavy")};
-
-  // Meshblock geometry
-  const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-  const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
-  const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
-  const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
-  const Real &dx_i =
-      pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
-  const Real &dx_j =
-      pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
-  const Real &dx_k =
-      pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
-  const Real &minx_i = pmb->coords.x1f(ib.s);
-  const Real &minx_j = pmb->coords.x2f(jb.s);
-  const Real &minx_k = pmb->coords.x3f(kb.s);
-  auto geom = Geometry::GetCoordinateSystem(rc);
-
-  StateDescriptor *eos = pmb->packages.Get("eos").get();
-  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  const Real MASS = unit_conv.GetMassCodeToCGS();
-  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
-  const Real TIME = unit_conv.GetTimeCodeToCGS();
-  const Real ENERGY = unit_conv.GetEnergyCodeToCGS();
-  const Real DENSITY = unit_conv.GetMassDensityCodeToCGS();
-  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
-  const Real CENERGY = unit_conv.GetEnergyCGSToCode();
-  const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
-  const Real CTIME = unit_conv.GetTimeCGSToCode();
-  const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
-
-  const Real dV_cgs = dx_i * dx_j * dx_k * dt * pow(LENGTH, 3) * TIME;
-  const Real dV_code = dx_i * dx_j * dx_k * dt;
-  const Real d3x_cgs = dx_i * dx_j * dx_k * pow(LENGTH, 3);
-  const Real d3x_code = dx_i * dx_j * dx_k;
-
-  std::vector<std::string> vars({fp::density, fp::temperature, fp::ye, fp::velocity,
-                                 "dNdlnu_max", "dNdlnu", "dN", "Ns"});
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-  const int iye = imap[fp::ye].first;
-  const int pdens = imap[fp::density].first;
-  const int ptemp = imap[fp::temperature].first;
-  const int pvlo = imap[fp::velocity].first;
-  const int pvhi = imap[fp::velocity].second;
-  const int idNdlnu = imap["dNdlnu"].first;
-  const int idNdlnu_max = imap["dNdlnu_max"].first;
-  const int idN = imap["dN"].first;
-  const int iNs = imap["Ns"].first;
-
-  // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting
-  // value
-  Real wgtC = 1.e50; // Typical-ish value
-
-  for (int sidx = 0; sidx < 3; sidx++) {
-    if (do_species[sidx]) {
-      auto s = species[sidx];
-      pmb->par_for(
-          "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-          KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            auto rng_gen = rng_pool.get_state();
-            Real detG = geom.DetG(CellLocation::Cent, k, j, i);
-            Real ye = v(iye, k, j, i);
-
-            const Real rho_cgs = v(pdens, k, j, i) * DENSITY;
-            const Real T_cgs = v(ptemp, k, j, i) * TEMPERATURE;
-
-            Real dN = 0.;
-            Real dNdlnu_max = 0.;
-            for (int n = 0; n <= nu_bins; n++) {
-              Real nu = nusamp(n);
-              Real wgt = GetWeight(wgtC, nu);
-              Real Jnu = d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu);
-
-              dN += Jnu * nu / (pc::h * nu * wgt) * dlnu;
-
-              // Factors of nu in numerator and denominator cancel
-              Real dNdlnu = Jnu * d3x_cgs * detG / (pc::h * wgt);
-              v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) = dNdlnu;
-              if (dNdlnu > dNdlnu_max) {
-                dNdlnu_max = dNdlnu;
-              }
-            }
-
-            for (int n = 0; n <= nu_bins; n++) {
-              v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) /= dNdlnu_max;
-            }
-
-            // Trapezoidal rule
-            Real nu0 = nusamp[0];
-            Real nu1 = nusamp[nu_bins];
-            dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu0) *
-                  nu0 / (pc::h * nu0 * GetWeight(wgtC, nu0)) * dlnu;
-            dN -= 0.5 * d_opacity.EmissivityPerNu(rho_cgs, T_cgs, ye, s, nu1) *
-                  nu1 / (pc::h * nu1 * GetWeight(wgtC, nu1)) * dlnu;
-            dN *= d3x_cgs * detG * dt * TIME;
-
-            v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
-
-            int Ns = static_cast<int>(dN);
-            if (dN - Ns > rng_gen.drand()) {
-              Ns++;
-            }
-
-            // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
-            v(idN + sidx, k, j, i) = dN;
-            v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
-            rng_pool.free_state(rng_gen);
-          });
-    }
-  }
-
-  // Reduce dN over zones for calibrating weights (requires w ~ wgtC)
-  Real dNtot_local = 0;
-  parthenon::par_reduce(
-      parthenon::loop_pattern_mdrange_tag, "MonteCarloReduceParticleCreation",
-      DevExecSpace(), 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i,
-                    Real &dN) {
-        if (do_species[sidx]) {
-          dN += v(idN + sidx, k, j, i);
-        }
-      },
-      Kokkos::Sum<Real>(dNtot_local));
-
-  printf("[%i] dNtot: %e + %e\n", Globals::my_rank, *dNtot, dNtot_local);
-
-  *dNtot += dNtot_local;
-
-  return TaskStatus::complete;
-}*/
-
 TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_outstanding) {
   auto &swarm = pmb->swarm_data.Get()->Get("monte_carlo");
 
   *particles_outstanding += swarm->num_particles_sent_;
 
   // Reset communication flags
-  // TODO(BRR) nneighbor instead of nbmax?
-  //for (int n = 0; n < swarm->vbswarm->bd_var_.nbmax; n++) {
   for (int n = 0; n < pmb->pbval->nneighbor; n++) {
     auto &nb = pmb->pbval->neighbor[n];
     swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
@@ -773,8 +608,6 @@ TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_o
       PARTHENON_MPI_CHECK(MPI_Wait(&(swarm->vbswarm->bd_var_.req_send[nb.bufid]), MPI_STATUS_IGNORE));
     }
     swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
-    //printf("[%i] req_send[%i] = MPI_REQUEST_NULL (%i)\n", Globals::my_rank, nb.bufid,
-    //  swarm->vbswarm->bd_var_.req_send[nb.bufid]);
   }
 
   #endif
@@ -796,17 +629,6 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
     }
   }
 #endif // MPI_PARALLEL
-
-  /*for (auto &block : blocks) {
-    auto &pmb = block;
-    auto sc = pmb->swarm_data.Get();
-    auto swarm = sc->Get(swarmName);
-
-    for (int n = 0; n < swarm->vbswarm->bd_var_.nbmax; n++) {
-      auto &nb = pmb->pbval->neighbor[n];
-      swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
-    }
-  }*/
 
   // Reset boundary statuses
   for (auto &block : blocks) {

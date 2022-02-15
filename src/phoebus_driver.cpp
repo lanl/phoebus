@@ -454,7 +454,6 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
           tl.AddTask(send, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
     }
 
-    // TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
     TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
     {
       particle_resolution.val.resize(4); // made, absorbed, scattered, total

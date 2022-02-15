@@ -189,22 +189,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddParam<>("rng_pool", rng_pool);
   }
 
-    namespace p = radmoment_prim;
-    namespace c = radmoment_cons;
+  namespace p = radmoment_prim;
+  namespace c = radmoment_cons;
 
-    Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
-                                              Metadata::Intensive, Metadata::FillGhost, Metadata::Vector},
-                                              std::vector<int>{NumRadiationTypes, 3});
-    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
-                                              Metadata::Intensive, Metadata::FillGhost},
-                                              std::vector<int>{NumRadiationTypes});
+  Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
+                                            Metadata::Intensive, Metadata::FillGhost, Metadata::Vector},
+                                            std::vector<int>{NumRadiationTypes, 3});
+  Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
+                                            Metadata::Intensive, Metadata::FillGhost},
+                                            std::vector<int>{NumRadiationTypes});
 
-    Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
-                                                   Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost, Metadata::Vector},
-                                                   std::vector<int>{NumRadiationTypes, 3});
-    Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
-                                              Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost},
-                                              std::vector<int>{NumRadiationTypes});
+  Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
+                                                 Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost, Metadata::Vector},
+                                                 std::vector<int>{NumRadiationTypes, 3});
+  Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
+                                            Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost},
+                                            std::vector<int>{NumRadiationTypes});
 
   physics->AddField(c::E, mspecies_scalar_cons);
   physics->AddField(c::F, mspecies_three_vector_cons);

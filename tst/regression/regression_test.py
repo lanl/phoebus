@@ -26,6 +26,7 @@ import __main__
 #
 
 BUILD_DIR='build'
+RUN_DIR='run'
 SOURCE_DIR='../../../'
 NUM_PROCS=4 # Default values for cmake --build --parallel can overwhelm CI systems
 TEMPORARY_INPUT_FILE='test_input.pin'
@@ -118,7 +119,7 @@ def modify_input(dict_key, value, input_file):
 def build_code(geometry, use_gpu=False, build_type="Release"):
   if os.path.isdir(BUILD_DIR):
     print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
-    sys.exit()
+    sys.exit(os.EX_SOFTWARE)
   os.mkdir(BUILD_DIR)
   os.chdir(BUILD_DIR)
 
@@ -130,7 +131,7 @@ def build_code(geometry, use_gpu=False, build_type="Release"):
     configure_options.append("-DCMAKE_BUILD_TYPE=Debug")
   else:
     print(f"Build type \"{build_type}\" not known!")
-    sys.exit()
+    sys.exit(os.EX_SOFTWARE)
   configure_options.append("-DPHOEBUS_ENABLE_UNIT_TESTS=OFF")
   configure_options.append("-DMAX_NUMBER_CONSERVED_VARS=10")
   configure_options.append("-DPHOEBUS_CACHE_GEOMETRY=ON")
@@ -157,35 +158,45 @@ def build_code(geometry, use_gpu=False, build_type="Release"):
   # Compile
   call(['cmake', '--build', '.', '--parallel', str(NUM_PROCS)])
 
+  # Return to base directory
+  os.chdir('..')
+
 # -- Clean up working directory
 def cleanup():
-  if os.getcwd().split(os.sep)[-1] == BUILD_DIR:
+  if os.getcwd().split(os.sep)[-1] == BUILD_DIR or os.getcwd().split(os.sep)[-1] == RUN_DIR:
     os.chdir('..')
 
   if os.path.isabs(BUILD_DIR):
     print(f"Absolute paths not allowed for build directory \"{BUILD_DIR}\" -- unsafe when cleaning up!")
-    sys.exit()
+    sys.exit(os.EX_SOFTWARE)
 
-  if not os.path.exists(BUILD_DIR):
-    print(f"Build directory \"{BUILDIDR}\" does not exist -- cannot be cleaned up!")
-    sys.exit()
+  if os.path.isabs(RUN_DIR):
+    print(f"Absolute paths not allowed for run directory \"{RUN_DIR}\" -- unsafe when cleaning up!")
+    sys.exit(os.EX_SOFTWARE)
 
-  try:
-    shutil.rmtree(BUILD_DIR)
-  except:
-    print(f"Error cleaning up build directory \"{BUILD_DIR}\"!")
+  if os.path.exists(BUILD_DIR):
+    try:
+      shutil.rmtree(BUILD_DIR)
+    except:
+      print(f"Error cleaning up build directory \"{BUILD_DIR}\"!")
+
+  if os.path.exists(RUN_DIR):
+    try:
+      shutil.rmtree(RUN_DIR)
+    except:
+      print(f"Error cleaning up build directory \"{RUN_DIR}\"!")
 
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
-def gold_comparison(variables, input_file, modified_inputs={}, executable='./src/phoebus',
+def gold_comparison(variables, input_file, modified_inputs={},
+                    executable=os.path.join('..', BUILD_DIR, 'src', 'phoebus'),
                     upgold=False, compression_factor=1, tolerance=1.e-5):
 
-  #if not os.getcwd().endswith(BUILD_DIR):
-  #  if os.path.isdir(BUILD_DIR):
-  #    print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
-  #    sys.exit()
-  #  os.mkdir(BUILD_DIR)
-  #  os.chdir(BUILD_DIR)
+  if os.path.isdir(RUN_DIR):
+    print(f"RUN_DIR \"{RUN_DIR}\" already exists! Clean up before calling a regression test script!")
+    sys.exit(os.EX_SOFTWARE)
+  os.mkdir(RUN_DIR)
+  os.chdir(RUN_DIR)
 
   # Copy test problem and modify inputs
   shutil.copyfile(input_file, TEMPORARY_INPUT_FILE)
@@ -199,7 +210,7 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
   dumpfiles = np.sort(glob.glob('*.phdf'))
   if len(dumpfiles) == 0:
     print("Could not load any dump files!")
-    sys.exit()
+    sys.exit(os.EX_SOFTWARE)
   dump = phdf.phdf(dumpfiles[-1])
 
   # Construct array of results values
@@ -241,9 +252,9 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
   else:
     if success:
       print("TEST PASSED")
-      sys.exit(os.EX_OK)
+      return sys.exit(os.EX_OK)
     else:
       print("TEST FAILED")
       mean_error = np.mean(variables_data - gold_variables)
       print(f"Mean error: {mean_error}")
-      sys.exit(os.EX_SOFTWARE)
+      return sys.exit(os.EX_SOFTWARE)
