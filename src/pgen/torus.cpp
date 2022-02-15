@@ -319,7 +319,7 @@ void ProblemModifier(ParameterInput *pin) {
     int nx1_target = pin->GetInteger("torus", "nx1_target");
     Real dx = (x1max - xh)/(nx1_target - ninside);
     x1min = x1max - nx1*dx;
-    printf("Setting inner radius to %g", std::exp(x1min));
+    printf("Setting inner radius to %g\n", std::exp(x1min));
   } else {
     Real dx = (x1max - xh)/(nx1 - ninside);
     x1min = xh - ninside*dx;
