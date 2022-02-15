@@ -312,9 +312,18 @@ void ProblemModifier(ParameterInput *pin) {
   Real Rh = 1.0 + sqrt(1.0 - a*a);
   Real xh = log(Rh);
   int ninside = pin->GetOrAddInteger("torus", "n_inside_horizon", 4);
+  bool cutout = pin->GetOrAddBoolean("torus", "cutout", false);
   int nx1 = pin->GetInteger("parthenon/mesh", "nx1");
-  Real dx = (x1max - xh)/(nx1 - ninside);
-  Real x1min = xh - ninside*dx;
+  Real x1min;
+  if (cutout) {
+    int nx1_target = pin->GetInteger("torus", "nx1_target");
+    Real dx = (x1max - xh)/(nx1_target - ninside);
+    x1min = x1max - nx1*dx;
+    printf("Setting inner radius to %g", std::exp(x1min));
+  } else {
+    Real dx = (x1max - xh)/(nx1 - ninside);
+    x1min = xh - ninside*dx;
+  }
   pin->SetReal("parthenon/mesh", "x1min", x1min);
 }
 
