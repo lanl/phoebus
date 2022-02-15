@@ -255,16 +255,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       SPACELOOP2(ii, jj) {
         vsq += v(ivlo + ii, k, j, i)*v(ivlo + jj, k, j, i);
       }
-      Real Gamma = 1./sqrt(1. - vsq);
-      SPACELOOP(ii) {
-        v(ivlo + ii, k, j, i) *= Gamma;
-      }
+      Real Gamma = sqrt(1. + vsq);
 
       if (is_snake ||is_inchworm || is_boosted_minkowski) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
         Real gcov[NDFULL][NDFULL] = {0};
-        Real vcon[NDSPACE] = {v(ivlo, k, j, i)/Gamma, v(ivlo+1, k, j, i)/Gamma, v(ivlo+2, k, j, i)/Gamma};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
         Real ucon[NDFULL] = {Gamma, // alpha = 1 in Minkowski
                              v(ivlo, k, j, i), // beta^i = 0 in Minkowski
