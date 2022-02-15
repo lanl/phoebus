@@ -14,7 +14,7 @@
 import os
 import sys
 import numpy as np
-from subprocess import call
+from subprocess import run
 import shutil
 import glob
 sys.path.append("../../external/parthenon/scripts/python/packages/parthenon_tools")
@@ -153,10 +153,10 @@ def build_code(geometry, use_gpu=False, build_type="Release"):
   cmake_call.append(SOURCE_DIR)
 
   # Configure
-  call(cmake_call)
+  run(cmake_call)
 
   # Compile
-  call(['cmake', '--build', '.', '--parallel', str(NUM_PROCS)])
+  run(['cmake', '--build', '.', '--parallel', str(NUM_PROCS)])
 
   # Return to base directory
   os.chdir('..')
@@ -204,7 +204,7 @@ def gold_comparison(variables, input_file, modified_inputs={},
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
-  call(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
+  run(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))
