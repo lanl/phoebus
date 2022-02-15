@@ -14,7 +14,7 @@
 import os
 import sys
 import numpy as np
-from subprocess import run
+from subprocess import run, check_output, CalledProcessError
 import shutil
 import glob
 sys.path.append("../../external/parthenon/scripts/python/packages/parthenon_tools")
@@ -204,7 +204,11 @@ def gold_comparison(variables, input_file, modified_inputs={},
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
-  run(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
+  try:
+    #run(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
+    print(check_output(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE]))
+  except CalledProcessError as e:
+    print("Subprocess error: ", e.output)
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))
