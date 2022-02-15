@@ -455,8 +455,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (!pmb->packages.Get("fixup")->Param<bool>("enable_flux_fixup")) return TaskStatus::complete;
   
   auto fluid = pmb->packages.Get("fluid");
-  const std::string bc_ix1 = fluid->Param<std::string>("bc_ix1");
-  const std::string bc_ox1 = fluid->Param<std::string>("bc_ox1");
+  const std::string ix1_bc = fluid->Param<std::string>("ix1_bc");
+  const std::string ox1_bc = fluid->Param<std::string>("ox1_bc");
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -469,14 +469,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 
   // x1-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
-    if (bc_ix1 == "outflow") {
+    if (ix1_bc == "outflow") {
       auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density}),
                                              std::vector<std::string>({fluid_cons::density}));
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(),
         kb.s, kb.e, jb.s, jb.e, ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           flux.flux(X1DIR,0,k,j,i) = std::min(flux.flux(X1DIR,0,k,j,i), 0.0);
         });
-    } else if (bc_ix1 == "reflect") {
+    } else if (ix1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, fluid_cons::energy}),
                                              std::vector<std::string>({fluid_cons::density, fluid_cons::energy}));
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(),
@@ -487,14 +487,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     }
   }
   if (pmb->boundary_flag[BoundaryFace::outer_x1] == BoundaryFlag::user) {
-    if (bc_ox1 == "outflow") {
+    if (ox1_bc == "outflow") {
       auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density}),
                                              std::vector<std::string>({fluid_cons::density}));
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(),
         kb.s, kb.e, jb.s, jb.e, ib.e+1, ib.e+1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           flux.flux(X1DIR,0,k,j,i) = std::max(flux.flux(X1DIR,0,k,j,i), 0.0);
         });
-    } else if (bc_ox1 == "reflect") {
+    } else if (ox1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, fluid_cons::energy}),
                                              std::vector<std::string>({fluid_cons::density, fluid_cons::energy}));
       parthenon::par_for(DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(),
