@@ -358,7 +358,7 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "monopole_gr gradients and shift",
       parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
-        if (force_static) {
+	if (force_static) {
           hypersurface(Hypersurface::K, i) = 0;
         }
 
@@ -436,7 +436,7 @@ TaskStatus DivideVols(StateDescriptor *pkg) {
   // Divide by volumes
   for (int i = 0; i < npoints; ++i) {
     for (int v = 0; v < NMAT; ++v) {
-      matter_cells_h(v, i) = ratio(matter_cells_h(v,i),vols_h(i));
+      matter_cells_h(v, i) = ratio(matter_cells_h(v,i), vols_h(i));
     }
   }
   // Shift to the face-centered grid
@@ -445,6 +445,8 @@ TaskStatus DivideVols(StateDescriptor *pkg) {
       matter_h(v, i) = 0.5*(matter_cells_h(v, i) + matter_cells_h(v, i-1));
     }
   }
+  matter_cells_h(Matter::J_R, 0) = 0;
+  matter_cells_h(Matter::Srr, 0) = 0;
   for (int v = 0; v < NMAT; ++v) {
     matter_h(v, 0) = matter_cells_h(v, 0);
   }
