@@ -31,7 +31,7 @@ namespace ShootingMethod {
 KOKKOS_INLINE_FUNCTION
 Real GetARHS(const Real a, const Real K, const Real r, const Real rho) {
   if (r <= 0) return 0;
-  return a * (4 + a * a * (-4 + r * r * (-3 * K * K + 32 * M_PI * rho))) / (8 * r);
+  return a * (4 + a * a * (-4 + r * r * (3 * K * K + 32 * M_PI * rho))) / (8 * r);
 }
 
 KOKKOS_INLINE_FUNCTION
