@@ -26,14 +26,17 @@ args = parser.parse_args()
 
 if args.executable == None:
   rt.build_code(geometry="Minkowski", use_gpu=args.use_gpu)
-  rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                     input_file=args.input,
-                     upgold=args.upgold,
-                     compression_factor=10)
-  rt.cleanup()
+  code = rt.gold_comparison(variables=['p.density', 'p.velocity'],
+                            input_file=args.input,
+                            upgold=args.upgold,
+                            compression_factor=10)
 else:
-  rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                     input_file=args.input,
-                     executable=args.executable,
-                     upgold=args.upgold,
-                     compression_factor=10)
+  code = rt.gold_comparison(variables=['p.density', 'p.velocity'],
+                            input_file=args.input,
+                            executable=args.executable,
+                            upgold=args.upgold,
+                            compression_factor=10)
+
+rt.cleanup()
+
+sys.exit(code)

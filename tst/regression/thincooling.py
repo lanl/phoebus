@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description='Run optically thin cooling as a te
 parser.add_argument('--upgold', dest='upgold', action='store_true')
 parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
 parser.add_argument('--executable', type=str, default=None)
-parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../inputs/thincooling.pin'))
+parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'inputs/thincooling.pin'))
 parser.add_argument('--compression', type=int, default=1)
 parser.add_argument('--tolerance', type=float, default=1.e-2)
 args = parser.parse_args()
@@ -30,17 +30,17 @@ args = parser.parse_args()
 if args.executable == None:
   rt.build_code(geometry="Minkowski", use_gpu=args.use_gpu)
   code = rt.gold_comparison(variables=['p.density', 'p.energy'],
-                     input_file=args.input,
-                     upgold=args.upgold,
-                     compression_factor=args.compression,
-                     tolerance=args.tolerance)
+                            input_file=args.input,
+                            upgold=args.upgold,
+                            compression_factor=args.compression,
+                            tolerance=args.tolerance)
 else:
   code = rt.gold_comparison(variables=['p.density', 'p.energy'],
-                     input_file=args.input,
-                     executable=args.executable,
-                     upgold=args.upgold,
-                     compression_factor=args.compression,
-                     tolerance=args.tolerance)
+                            input_file=args.input,
+                            executable=args.executable,
+                            upgold=args.upgold,
+                            compression_factor=args.compression,
+                            tolerance=args.tolerance)
 
 rt.cleanup()
 

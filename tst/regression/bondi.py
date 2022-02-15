@@ -29,17 +29,19 @@ modified_inputs['parthenon/mesh/nx1'] = 128
 
 if args.executable == None:
   rt.build_code(geometry="FMKS", use_gpu=args.use_gpu)
-  rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                     input_file=args.input,
-                     modified_inputs=modified_inputs,
-                     upgold=args.upgold,
-                     compression_factor=1)
-  rt.cleanup()
+  code = rt.gold_comparison(variables=['p.density', 'p.velocity'],
+                            input_file=args.input,
+                            modified_inputs=modified_inputs,
+                            upgold=args.upgold,
+                            compression_factor=1)
 else:
-  rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                     input_file=args.input,
-                     modified_inputs=modified_inputs,
-                     executable=args.executable,
-                     upgold=args.upgold,
-                     compression_factor=1)
+  code = rt.gold_comparison(variables=['p.density', 'p.velocity'],
+                            input_file=args.input,
+                            modified_inputs=modified_inputs,
+                            executable=args.executable,
+                            upgold=args.upgold,
+                            compression_factor=1)
 
+rt.cleanup()
+
+sys.exit(code)
