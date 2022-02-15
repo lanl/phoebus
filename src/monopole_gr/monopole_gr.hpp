@@ -68,7 +68,7 @@
 
   K^i_j = K^r_r diag(1, -1/2, -1/2)
 
-  da/dr = a (4 + a^2 (-4 + r^2 (-3 (K^r_r)^2 + 32 pi rho)))/(8 r);
+  da/dr = a (4 + a^2 (-4 + r^2 (3 (K^r_r)^2 + 32 pi rho)))/(8 r);
 
   d K^r_r/dr = 8 pi a^2 j^r - (3/r) K^r_r
 
