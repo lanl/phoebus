@@ -317,6 +317,7 @@ void ProblemModifier(ParameterInput *pin) {
   Real x1min;
   if (cutout) {
     int nx1_target = pin->GetInteger("torus", "nx1_target");
+    PARTHENON_REQUIRE(nx1_target >= nx1, "nx1_target should be >= nx1");
     Real dx = (x1max - xh)/(nx1_target - ninside);
     x1min = x1max - nx1*dx;
     printf("Setting inner radius to %g\n", std::exp(x1min));
