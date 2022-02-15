@@ -131,8 +131,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Real wgt = GetWeight(wgtC, nu);
               Real Jnu = d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu * TIME);
 
-              //Jnu /= (4.*M_PI);
-
               dN += Jnu / (ener * wgt) * (nu * dlnu * TIME);
 
               // Note that factors of nu in numerator and denominator cancel
@@ -186,7 +184,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   // TODO(BRR) Mpi reduction here....... this really needs to be a separate task
   // TODO(BRR) actually use tuning parameter
-  Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
+  //Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
+  Real wgtCfac = rad->Param<Real>("tune_emission");
+  //printf("tune_emission: %e tune_scattering: %e\n", rad->Param<Real>("tune_emission"),
+  //  rad->Param<Real>("tune_scattering"));
 
   pmb->par_for(
       "MonteCarlodiNsEval", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -217,7 +218,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       },
       Kokkos::Sum<int>(Nstot));
 
-  printf("Nstot: %i\n", Nstot);
   const auto num_emitted = rad->Param<Real>("num_emitted");
   rad->UpdateParam<Real>("num_emitted", num_emitted + Nstot);
 
@@ -419,8 +419,6 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   ParArray1D<Real> num_interactions("Number interactions", 2);
 
-  printf("Particles: %i\n", swarm->GetNumActive());
-
   pmb->par_for(
       "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(),
       KOKKOS_LAMBDA(const int n) {
@@ -495,6 +493,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_scattered = rad->Param<Real>("num_scattered");
   rad->UpdateParam<Real>("num_absorbed", num_absorbed + num_interactions_h[0]);
   rad->UpdateParam<Real>("num_scattered", num_scattered + num_interactions_h[1]);
+  rad->UpdateParam<Real>("num_total", swarm->GetNumActive());
 
   return TaskStatus::complete;
 }
@@ -509,67 +508,81 @@ TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *re
   const auto num_emitted = rad->Param<Real>("num_emitted");
   const auto num_absorbed = rad->Param<Real>("num_absorbed");
   const auto num_scattered = rad->Param<Real>("num_scattered");
+  const auto num_total = rad->Param<Real>("num_total");
   (*resolution)[static_cast<int>(ParticleResolution::emitted)] += num_emitted;
   (*resolution)[static_cast<int>(ParticleResolution::absorbed)] += num_absorbed;
   (*resolution)[static_cast<int>(ParticleResolution::scattered)] += num_scattered;
+  (*resolution)[static_cast<int>(ParticleResolution::total)] += num_total;
   return TaskStatus::complete;
 }
 
 // Update particle resolution tuning parameters and reset counters if it is time for an update.
-//TaskStatus MonteCarloUpdateTuning(MeshBlock *pmb, MeshBlockData<Real> *rc,
-//  SwarmContainer *sc, const double t0, const double dt) {
 TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
   const double t0, const double dt) {
   auto rad = pmesh->packages.Get("radiation");
+  const auto tuning = rad->Param<std::string>("tuning");
   const auto t_tune_emission = rad->Param<Real>("t_tune_emission");
   const auto dt_tune_emission = rad->Param<Real>("dt_tune_emission");
   const auto t_tune_scattering = rad->Param<Real>("t_tune_scattering");
   const auto dt_tune_scattering = rad->Param<Real>("dt_tune_scattering");
   const auto num_particles = rad->Param<int>("num_particles");
 
-  // TODO(BRR) This should be Rout_rad (add it) or max cartesian size
-  const Real L = 1.;
+  if (tuning == "static") {
+    // Do nothing
+  } else if (tuning == "dynamic_total") {
+    // TODO(BRR): Tune based on ParticleResolution::total
+  } else if (tuning == "dynamic_difference") {
 
-  printf("t_tune_emission: %e t0 + dt: %e\n", t_tune_emission, t0 + dt);
-    const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
-    const auto num_absorbed = (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
-    printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
+    // TODO(BRR) This should be Rout_rad (add it) or max cartesian size
+    const Real L = 1.;
 
-  if (t_tune_emission < t0 + dt) {
-    const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
-    const auto num_absorbed = (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
-    printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
+    printf("t_tune_emission: %e t0 + dt: %e\n", t_tune_emission, t0 + dt);
+      const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
+      const auto num_absorbed = (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
+      printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
 
-    const Real real = num_emitted - num_absorbed;
-    const Real ideal = dt_tune_emission*num_particles;
-    Real correction = ideal/real;
+    if (t_tune_emission < t0 + dt) {
+      const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
+      const auto num_absorbed = (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
+      printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
 
-    // Limit strength of correction
-    robust::make_bounded(correction, 3./4., 4./3.);
+      const Real real = num_emitted - num_absorbed;
+      const Real ideal = dt_tune_emission*num_particles;
+      Real correction = ideal/real;
 
-    const auto tune_emission = rad->Param<Real>("tune_emission");
-    rad->UpdateParam<Real>("tune_emission", correction*tune_emission);
+      printf("real: %e ideal: %e correction: %e\n", real, ideal, correction);
 
-    rad->UpdateParam<Real>("num_emitted", 0.);
-    rad->UpdateParam<Real>("num_absorbed", 0.);
-    rad->UpdateParam<Real>("t_tune_emission", t_tune_emission + dt_tune_emission);
-  }
+      // Limit strength of correction
+      correction = robust::make_bounded(correction, 3./4., 4./3.);
 
-  if (t_tune_scattering < t0 + dt) {
-    const auto num_scattered = (*resolution)[static_cast<int>(ParticleResolution::scattered)];
+      printf("bounded correction: %e\n", correction);
 
-    const Real real = num_scattered;
-    const Real ideal = dt_tune_scattering*num_particles;
-    Real correction = ideal/real;
+      const auto tune_emission = rad->Param<Real>("tune_emission");
+      rad->UpdateParam<Real>("tune_emission", correction*tune_emission);
 
-    // Limit strength of correction
-    robust::make_bounded(correction, 0.5, 2.);
+      rad->UpdateParam<Real>("num_emitted", 0.);
+      rad->UpdateParam<Real>("num_absorbed", 0.);
+      rad->UpdateParam<Real>("t_tune_emission", t_tune_emission + dt_tune_emission);
+    }
 
-    const auto tune_scattering = rad->Param<Real>("tune_scattering");
-    rad->UpdateParam<Real>("tune_scattering", correction*tune_scattering);
+    if (t_tune_scattering < t0 + dt) {
+      const auto num_scattered = (*resolution)[static_cast<int>(ParticleResolution::scattered)];
 
-    rad->UpdateParam<Real>("num_scattered", 0.);
-    rad->UpdateParam<Real>("t_tune_scattering", t_tune_scattering + dt_tune_scattering);
+      const Real real = num_scattered;
+      const Real ideal = dt_tune_scattering*num_particles;
+      Real correction = ideal/real;
+
+      // Limit strength of correction
+      robust::make_bounded(correction, 0.5, 2.);
+
+      const auto tune_scattering = rad->Param<Real>("tune_scattering");
+      rad->UpdateParam<Real>("tune_scattering", correction*tune_scattering);
+
+      rad->UpdateParam<Real>("num_scattered", 0.);
+      rad->UpdateParam<Real>("t_tune_scattering", t_tune_scattering + dt_tune_scattering);
+    }
+  } else {
+    PARTHENON_FAIL("\"tuning\" must be either \"static\" or \"dynamic\"");
   }
 
   return TaskStatus::complete;

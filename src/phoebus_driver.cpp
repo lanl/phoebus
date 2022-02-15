@@ -346,6 +346,9 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
           tl.AddTask(none, radiation::InitializeCommunicationMesh, "monte_carlo", blocks);
     }
 
+    //// BEGINNING OF NEW SOLVER REGION
+    // TODO(BRR) Currently this doesn't work properly
+
     /*TaskRegion &sample_region = tc.AddRegion(num_task_lists_executed_independently);
     for (int i = 0; i < blocks.size(); i++) {
       auto &pmb = blocks[i];
@@ -429,6 +432,8 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       reg_dep_id++;
     }*/
 
+    //// END OF NEW SOLVER REGION
+
     // TODO(BRR) make transport an async region for ghost cells
     TaskRegion &async_region0 = tc.AddRegion(num_task_lists_executed_independently);
     for (int i = 0; i < blocks.size(); i++) {
@@ -452,16 +457,12 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
     // TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
     TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
     {
-      particle_resolution.val.resize(3); // made, absorbed, scattered
-      for (int i = 0; i < 3; i++) {
+      particle_resolution.val.resize(4); // made, absorbed, scattered, total
+      for (int i = 0; i < 4; i++) {
         particle_resolution.val[i] = 0.;
       }
-      // for (int i = 0; i < num_task_lists_executed_independently; i++) {
       int reg_dep_id = 0;
-      // auto &pmb = blocks[i];
       auto &tl = tuning_region[0];
-      // auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
-      // auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
 
       auto update_resolution =
           tl.AddTask(none, radiation::MonteCarloUpdateParticleResolution, pmesh,
@@ -486,8 +487,8 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
                ? tl.AddTask(
                      finish_resolution_reduce,
                      [](std::vector<Real> *res) {
-                       std::cout << "Total made = " << (*res)[0] << " abs = " << (*res)[1]
-                                 << " scatt = " << (*res)[2] << std::endl;
+                       std::cout << "particles made = " << (*res)[0] << " abs = " << (*res)[1]
+                                 << " scatt = " << (*res)[2] << " total = " << (*res)[3] << std::endl;
                        return TaskStatus::complete;
                      },
                      &particle_resolution.val)

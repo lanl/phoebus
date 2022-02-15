@@ -21,7 +21,7 @@ nlim         = -1        # cycle limit
 tlim         = 10.
 integrator   = rk2      # time integration algorithm
 ncycle_out   = 1        # interval for stdout summary info
-dt_init_fact = 1.e-6
+dt_init_fact = 1.
 
 <parthenon/mesh>
 nghost = 4
@@ -82,8 +82,7 @@ method = monte_carlo
 nu_min = 1.e15
 nu_max = 1.e22
 nu_bins = 200
-#tune_emiss = 1.e-1
-tune_emiss = 1.e0
+tune_emission = 1.e-11
 num_particles = 100
 #opacity_model = gray
 absorption = true

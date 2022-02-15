@@ -40,7 +40,7 @@ using namespace phoebus;
 
 namespace radiation {
 
-enum class ParticleResolution { emitted = 0, absorbed = 1, scattered = 2 };
+enum class ParticleResolution { emitted = 0, absorbed = 1, scattered = 2, total = 3 };
 
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
@@ -97,17 +97,17 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
 
-// Moment tasks 
+// Moment tasks
 template <class T>
 TaskStatus MomentCon2Prim(T* rc);
 
 template <class T>
 TaskStatus MomentPrim2Con(T* rc, IndexDomain domain = IndexDomain::entire);
 
-template <class T> 
-TaskStatus ReconstructEdgeStates(T* rc); 
+template <class T>
+TaskStatus ReconstructEdgeStates(T* rc);
 
-template <class T> 
+template <class T>
 TaskStatus CalculateFluxes(T* rc);
 
 template <class T>
