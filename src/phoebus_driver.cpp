@@ -102,6 +102,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   if (fluid_active) {
     src_names.push_back(fluid_cons::momentum);
     src_names.push_back(fluid_cons::energy);
+#if SET_FLUX_SRC_DIAGS
+    src_names.push_back(diagnostic_variables::src_terms);
+#endif
   }
   if (rad_active) {
     src_names.push_back(radmoment_cons::E);
