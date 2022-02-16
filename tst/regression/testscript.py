@@ -10,3 +10,10 @@ try:
   stderr=STDOUT))
 except CalledProcessError as e:
   print("Subprocess error: ", e.output)
+
+try:
+  #print(check_output(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE],
+  print(check_output(['mpirun', '-np', '1', 'phoebus', '-i', 'phoebus.pin'],
+  stderr=STDOUT))
+except CalledProcessError as e:
+  print("Subprocess error: ", e.output)

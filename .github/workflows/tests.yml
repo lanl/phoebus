@@ -31,8 +31,6 @@ jobs:
           run: |
             cd tst/regression
             mpirun --version
-            python3 testscript.py
-            python testscript.py
             ./testscript.py
             #mkdir build_minkowski
             #cd build_minkowski
