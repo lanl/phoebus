@@ -14,7 +14,7 @@
 import os
 import sys
 import numpy as np
-from subprocess import run, check_output, CalledProcessError, STDOUT
+from subprocess import run
 import shutil
 import glob
 sys.path.append("../../external/parthenon/scripts/python/packages/parthenon_tools")
@@ -205,9 +205,7 @@ def gold_comparison(variables, input_file, modified_inputs={},
 
   # Run test problem
   try:
-    #run(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
-    print(check_output(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE],
-    stderr=STDOUT))
+    run([executable, '-i', TEMPORARY_INPUT_FILE])
   except CalledProcessError as e:
     print("Subprocess error: ", e.output)
 
