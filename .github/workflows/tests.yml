@@ -30,6 +30,9 @@ jobs:
         - name: Run test scripts
           run: |
             cd tst/regression
+            mpirun --version
+            python3 testscript.py
+            ./testscript.py
             #mkdir build_minkowski
             #cd build_minkowski
             #cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
