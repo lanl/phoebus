@@ -204,7 +204,7 @@ def gold_comparison(variables, input_file, modified_inputs={},
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
-  call([executable, '-i', TEMPORARY_INPUT_FILE])
+  call([os.path.join('..', executable), '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))
