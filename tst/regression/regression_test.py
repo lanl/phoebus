@@ -14,7 +14,7 @@
 import os
 import sys
 import numpy as np
-from subprocess import run, check_output, CalledProcessError, STDERR, STDOUT
+from subprocess import run, check_output, CalledProcessError, STDOUT
 import shutil
 import glob
 sys.path.append("../../external/parthenon/scripts/python/packages/parthenon_tools")
