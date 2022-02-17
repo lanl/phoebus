@@ -270,5 +270,5 @@ def gold_comparison(variables, input_file, modified_inputs={},
 
       print(f"Mean error:           {mean_error}")
       print(f"Max error:            {max_error}")
-      print(f"Max fractional error: {max_fractional_error}")
+      print(f"Max fractional error: {max_frac_error}")
       return os.EX_SOFTWARE
