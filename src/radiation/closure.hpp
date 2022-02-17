@@ -34,7 +34,7 @@ namespace radiation
   using namespace robust;
 
   /// Status of closure calculation
-  enum class Status
+  enum class ClosureStatus
   {
     success = 0,
     failure = 1
@@ -71,7 +71,7 @@ namespace radiation
     /// from the starred state using the optical depths tauJ = lapse kappa_a dt and 
     /// tauH = lapse (kappa_a + kappa_s) dt 
     KOKKOS_FUNCTION
-    Status LinearSourceUpdate(const Real Estar, const Vec cov_Fstar,
+    ClosureStatus LinearSourceUpdate(const Real Estar, const Vec cov_Fstar,
                               const Tens2 con_tilPi, const Real JBB,  
                               const Real tauJ, const Real tauH,
                               Real *dE, Vec *cov_dF);
@@ -80,19 +80,19 @@ namespace radiation
     /// Calculate the fluxes for the conservation equations from J, \tilde H_i, and 
     /// \tilde pi^{ij}.   
     KOKKOS_FUNCTION
-    Status getFluxesFromPrim(const Real J, const Vec cov_tilH, const Tens2 con_tilPi,
+    ClosureStatus getFluxesFromPrim(const Real J, const Vec cov_tilH, const Tens2 con_tilPi,
                              Vec *con_F, Tens2 *concov_P);
 
     //-------------------------------------------------------------------------------------
     /// Calculate the momentum density flux P^i_j from J, \tilde H_i, and \tilde pi^{ij}.
     KOKKOS_FUNCTION
-    Status getConCovPFromPrim(const Real J, const Vec cov_tilH, const Tens2 con_tilPi,
+    ClosureStatus getConCovPFromPrim(const Real J, const Vec cov_tilH, const Tens2 con_tilPi,
                               Tens2 *concov_P);
 
     //-------------------------------------------------------------------------------------
     /// Calculate the momentum density flux P^{ij} from J, \tilde H_i, and \tilde pi^{ij}.
     KOKKOS_FUNCTION
-    Status getConPFromPrim(const Real J, const Vec cov_tilH, const Tens2 con_tilPi,
+    ClosureStatus getConPFromPrim(const Real J, const Vec cov_tilH, const Tens2 con_tilPi,
                            Tens2 *con_P);
 
     //-------------------------------------------------------------------------------------
@@ -100,27 +100,27 @@ namespace radiation
     /// Eddington approximation (i.e. \tilde \pi_{ij} = 0) and MoCMC where \tilde \pi^{ij}
     /// is externally specified
     KOKKOS_FUNCTION 
-    Status Prim2Con(const Real J, const Vec cov_H, const Tens2 con_tilPi, Real *E, Vec *cov_F);
+    ClosureStatus Prim2Con(const Real J, const Vec cov_H, const Tens2 con_tilPi, Real *E, Vec *cov_F);
 
     //-------------------------------------------------------------------------------------
     /// Transform from J, \tilde H_i, and \tilde \pi_{ij} to E and F_i. Should be used for
     /// Eddington approximation (i.e. \tilde \pi_{ij} = 0) and MoCMC where \tilde \pi^{ij}
     /// is externally specified
     KOKKOS_FUNCTION
-    Status Con2Prim(Real E, const Vec cov_F, const Tens2 con_tilPi, Real *J, Vec *cov_H);
+    ClosureStatus Con2Prim(Real E, const Vec cov_F, const Tens2 con_tilPi, Real *J, Vec *cov_H);
 
     KOKKOS_FUNCTION 
-    Status GetCovTilPiFromPrim(const Real J, const Vec cov_tilH, Tens2* con_tilPi) {
+    ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_tilH, Tens2* con_tilPi) {
       SPACELOOP2(i,j) (*con_tilPi)(i,j) = 0.0;
-      return Status::success; 
+      return ClosureStatus::success; 
     }
 
     KOKKOS_FUNCTION 
-    Status GetCovTilPiFromCon(const Real E, const Vec cov_F, Real& xi, Real& phi, Tens2* con_tilPi) {
+    ClosureStatus GetCovTilPiFromCon(const Real E, const Vec cov_F, Real& xi, Real& phi, Tens2* con_tilPi) {
       SPACELOOP2(i,j) (*con_tilPi)(i,j) = 0.0;
       xi = 0.0; 
       phi = acos(-1);  
-      return Status::success; 
+      return ClosureStatus::success; 
     }
     
     Real v2, W, W2;
@@ -163,7 +163,7 @@ namespace radiation
    
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  Status ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::LinearSourceUpdate(const Real Estar, const Vec cov_Fstar,
+  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::LinearSourceUpdate(const Real Estar, const Vec cov_Fstar,
                                                  const Tens2 con_tilPi, const Real JBB,  
                                                  const Real tauJ, const Real tauH,
                                                  Real *dE, Vec *cov_dF) {
@@ -205,12 +205,12 @@ namespace radiation
     SPACELOOP(i) (*cov_dF)(i) = (cov_v(i)*tauH*(4*W2/3*J + W*zeta) + tauH*cov_vTilPi(i)*J 
                    + tauJ*W2*cov_v(i)*(JBB-J) + W*cov_Fstar(i))/(W+tauH) - cov_Fstar(i); 
     
-    return Status::success;  
+    return ClosureStatus::success;  
   }
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  Status ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::getFluxesFromPrim(const Real J, const Vec cov_tilH, 
+  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::getFluxesFromPrim(const Real J, const Vec cov_tilH, 
                                                                  const Tens2 con_tilPi, Vec *con_F, 
                                                                  Tens2 *concov_P) {
     getConCovPFromPrim(J, cov_tilH, con_tilPi, concov_P);
@@ -224,12 +224,12 @@ namespace radiation
     }
     SPACELOOP2(i,j) (*concov_P)(i,j) *= gamma->alpha;  
     SPACELOOP(i) (*con_F)(i) *= gamma->alpha;
-    return Status::success;
+    return ClosureStatus::success;
   } 
   
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FORCEINLINE_FUNCTION
-  Status ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::getConPFromPrim(const Real J, const Vec cov_tilH,
+  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::getConPFromPrim(const Real J, const Vec cov_tilH,
                                               const Tens2 con_tilPi, Tens2 *con_P) {
     Vec con_tilH;
     gamma->raise3Vector(cov_tilH, &con_tilH);
@@ -237,12 +237,12 @@ namespace radiation
             + W * (con_v(i) * con_tilH(j) + con_v(j) * con_tilH(i)) + J * con_tilPi(i, j) 
             + J/3.0*gamma->con_gamma(i,j);
     
-    return Status::success;
+    return ClosureStatus::success;
   }
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FORCEINLINE_FUNCTION
-  Status ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::getConCovPFromPrim(const Real J, const Vec cov_tilH,
+  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::getConCovPFromPrim(const Real J, const Vec cov_tilH,
                                                  const Tens2 con_tilPi, Tens2 *concov_P) {
     Vec con_tilH;
     Tens2 concov_tilPi;
@@ -258,12 +258,12 @@ namespace radiation
       }
       (*concov_P)(i, i) += J / 3.0;
     }
-    return Status::success;
+    return ClosureStatus::success;
   }
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  Status ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::Prim2Con(const Real J, const Vec cov_H,
+  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::Prim2Con(const Real J, const Vec cov_H,
                                        const Tens2 con_tilPi, Real *E, Vec *cov_F) {
     Real vvPi;
     Vec cov_vPi;
@@ -277,12 +277,12 @@ namespace radiation
       *E = W*J + vH;
     }
     SPACELOOP(i) (*cov_F)(i) = 4 * W2 / 3 * cov_v(i) * J + W * cov_v(i) * vH + W * cov_H(i) + J * cov_vPi(i);
-    return Status::success;
+    return ClosureStatus::success;
   }
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  Status ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::Con2Prim(Real E, const Vec cov_F,
+  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::Con2Prim(Real E, const Vec cov_F,
                                        const Tens2 con_tilPi,
                                        Real *J, Vec *cov_tilH) {
     Real vvTilPi;
@@ -307,7 +307,7 @@ namespace radiation
     // Calculate fluid rest frame (i.e. primitive) quantities
     *J = ratio((2 * W2 - 1) * E - 2 * W2 * vF, lam);
     SPACELOOP(i) (*cov_tilH)(i) = (cov_F(i) - (*J) * cov_vTilPi(i) - cov_v(i) * a) / W;
-    return Status::success;
+    return ClosureStatus::success;
   }
 
 } // namespace radiation
