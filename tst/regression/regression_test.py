@@ -38,10 +38,10 @@ SCRIPT_NAME=os.path.basename(__main__.__file__).split('.py')[0]
 
 # -- Compare two values up to some floating point tolerance
 def soft_equiv(val, ref, tol = 1.e-5):
-  if ref < 1.e-100:
-    return True
+  numerator = np.fabs(val - ref)
+  denominator = max(np.fabs((val + ref) / 2), 1.e-10)
 
-  if np.fabs(val - ref)/np.fabs(ref) > tol:
+  if numerator/denominator > tol:
     return False
   else:
     return True
@@ -153,10 +153,10 @@ def build_code(geometry, use_gpu=False, build_type="Release"):
   cmake_call.append(SOURCE_DIR)
 
   # Configure
-  run(cmake_call)
+  call(cmake_call)
 
   # Compile
-  run(['cmake', '--build', '.', '--parallel', str(NUM_PROCS)])
+  call(['cmake', '--build', '.', '--parallel', str(NUM_PROCS)])
 
   # Return to base directory
   os.chdir('..')
@@ -189,7 +189,7 @@ def cleanup():
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
 def gold_comparison(variables, input_file, modified_inputs={},
-                    executable=os.path.join('..', BUILD_DIR, 'src', 'phoebus'),
+                    executable=os.path.join(BUILD_DIR, 'src', 'phoebus'),
                     upgold=False, compression_factor=1, tolerance=1.e-5):
 
   if os.path.isdir(RUN_DIR):
@@ -204,7 +204,10 @@ def gold_comparison(variables, input_file, modified_inputs={},
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
-  call([os.path.join('..', executable), '-i', TEMPORARY_INPUT_FILE])
+  if os.path.isabs(executable):
+    call([executable, '-i', TEMPORARY_INPUT_FILE])
+  else:
+    call([os.path.join('..', executable), '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))

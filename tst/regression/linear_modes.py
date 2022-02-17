@@ -15,6 +15,7 @@
 
 import argparse
 import os
+import sys
 import regression_test as rt
 
 parser = argparse.ArgumentParser(description='Run a linear mode as a test')
