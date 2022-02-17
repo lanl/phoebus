@@ -115,8 +115,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
      && ((monopole_run_n_times < 0)
 	 || (monopole_nth_call <= monopole_run_n_times))
      && !monopole_force_static);
-  printf("%d/%d: %d\n",monopole_nth_call,monopole_run_n_times,
-	 monopole_gr_active);
   if (monopole_gr_active) {
     monopole->AllParams().Update("nth_call", monopole_nth_call + 1);
   }
