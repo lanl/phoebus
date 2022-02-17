@@ -125,9 +125,13 @@ gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
-npoints = 2048
+npoints = 1024
 rout = 250
-force_static = true
+# Disables time derivatives. Runs only at initialization
+force_static = false
+# Runs the first n subcycles. Then freezes. Source terms are not disabled.
+# -1 means it's always run.
+run_n_times = -1
 
 <tov>
 enabled = true
@@ -138,3 +142,7 @@ Pmin = 1e-9
 # The atmosphere values in the problem generator for density and energy
 rhomin = 1e-9
 epsmin = 1e-9
+# Velocity perturbation
+vpert_amp = 0
+vpert_radius = 5
+vpert_sigma = 1
