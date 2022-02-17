@@ -189,39 +189,43 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddParam<>("rng_pool", rng_pool);
   }
 
-  namespace p = radmoment_prim;
-  namespace c = radmoment_cons;
+//  physics->AddField(c::E, mspecies_scalar_cons);
+//  physics->AddField(c::F, mspecies_three_vector_cons);
 
-  Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
-                                            Metadata::Intensive, Metadata::FillGhost, Metadata::Vector},
-                                            std::vector<int>{NumRadiationTypes, 3});
-  Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
-                                            Metadata::Intensive, Metadata::FillGhost},
-                                            std::vector<int>{NumRadiationTypes});
-
-  Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
-                                                 Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost, Metadata::Vector},
-                                                 std::vector<int>{NumRadiationTypes, 3});
-  Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
-                                            Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost},
-                                            std::vector<int>{NumRadiationTypes});
-
-  physics->AddField(c::E, mspecies_scalar_cons);
-  physics->AddField(c::F, mspecies_three_vector_cons);
-
-  physics->AddField(p::J, mspecies_scalar);
-  physics->AddField(p::H, mspecies_three_vector);
+//  physics->AddField(p::J, mspecies_scalar);
+//  physics->AddField(p::H, mspecies_three_vector);
 
   bool moments_active = false;
   if ((method == "mocmc") || (method == "moment_m1") || (method == "moment_eddington")) {
     moments_active = true;
 
+    namespace p = radmoment_prim;
+    namespace c = radmoment_cons;
     namespace i = radmoment_internal;
 
     int ndim = 3;
     //if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
     //else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
 
+    Metadata mspecies_three_vector = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
+                                              Metadata::Intensive, Metadata::FillGhost, Metadata::Vector},
+                                              std::vector<int>{NumRadiationTypes, 3});
+    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
+                                              Metadata::Intensive, Metadata::FillGhost},
+                                              std::vector<int>{NumRadiationTypes});
+
+    Metadata mspecies_three_vector_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
+                                                   Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost, Metadata::Vector},
+                                                   std::vector<int>{NumRadiationTypes, 3});
+    Metadata mspecies_scalar_cons = Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
+                                              Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost},
+                                              std::vector<int>{NumRadiationTypes});
+
+    physics->AddField(c::E, mspecies_scalar_cons);
+    physics->AddField(c::F, mspecies_three_vector_cons);
+
+    physics->AddField(p::J, mspecies_scalar);
+    physics->AddField(p::H, mspecies_three_vector);
 
     // Fields for saving guesses for NR iteration in the radiation Con2Prim type solve
     physics->AddField(i::xi, mspecies_scalar);
