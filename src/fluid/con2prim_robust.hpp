@@ -315,7 +315,7 @@ class ConToPrim {
 #endif // CON2PRIM_ROBUST_PRINT_FAILURES
       return ConToPrimStatus::failure;
     }
-    const Real igdet = 1.0/g.gdet;
+    const Real igdet = ratio(1.0, std::abs(g.gdet));
 
     Real rhoflr = 0.0;
     Real epsflr;
