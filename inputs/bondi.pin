@@ -12,6 +12,8 @@
 
 <phoebus>
 problem = bondi
+ix1_bc = outflow
+ox1_bc = outflow
 
 <parthenon/job>
 problem_id  = bondi       # problem ID: basename of output filenames
@@ -44,11 +46,11 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 256      # Number of zones in X1-direction
-x1min       = 0.59           # minimum value of X1
-x1max       = 5           # maximum value of X1
-ix1_bc      = outflow  # Inner-X1 boundary condition flag
-ox1_bc      = user    # Outer-X1 boundary condition flag
+nx1         = 256           # Number of zones in X1-direction
+x1min       = 0.59          # minimum value of X1
+x1max       = 5             # maximum value of X1
+ix1_bc      = user          # Inner-X1 boundary condition flag
+ox1_bc      = user          # Outer-X1 boundary condition flag
 
 nx2         = 1             # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
