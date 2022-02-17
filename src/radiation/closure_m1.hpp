@@ -37,7 +37,7 @@ namespace radiation
   /// Store results of M1 closure root find
   struct M1Result
   {
-    Status status;
+    ClosureStatus status;
     int iter;
     Real xi, phi;
     Real fXi, fPhi;
@@ -68,14 +68,14 @@ namespace radiation
         : ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>(con_v_in, g) {}  
     
     KOKKOS_FUNCTION 
-    Status GetCovTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
+    ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
       Vec con_tilf; 
       M1FluidPressureTensor(J, cov_H, con_tilPi, &con_tilf); 
-      return Status::success; 
+      return ClosureStatus::success; 
     }
     
     KOKKOS_FUNCTION 
-    Status GetCovTilPiFromCon(Real E, const Vec cov_F, Real& xi, Real& phi, Tens2 *con_tilPi) {
+    ClosureStatus GetCovTilPiFromCon(Real E, const Vec cov_F, Real& xi, Real& phi, Tens2 *con_tilPi) {
       
       if (!ENERGY_CONSERVE) {
         double vF = 0.0; 
@@ -108,13 +108,13 @@ namespace radiation
     /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
     /// J and \tilde H_i.
     KOKKOS_FUNCTION
-    Status M1FluidPressureTensor(const Real J, const Vec cov_H,
+    ClosureStatus M1FluidPressureTensor(const Real J, const Vec cov_H,
                                  Tens2 *con_tilPi, Vec *con_tilf);
   
     //-------------------------------------------------------------------------------------
     /// Calculate the residuals of the M1 root equations
     KOKKOS_FUNCTION
-    Status M1Residuals(const Real E, const Vec cov_F,
+    ClosureStatus M1Residuals(const Real E, const Vec cov_F,
                        const Real xi, const Real phi,
                        const Vec con_tilg, const Vec con_tild,
                        Real *fXi, Real *fPhi);
@@ -123,7 +123,7 @@ namespace radiation
     /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
     /// E, F_i, \xi = H/J, and \phi that are a root of the M1 residual equations.
     KOKKOS_FUNCTION
-    Status M1FluidPressureTensor(const Vec cov_F,
+    ClosureStatus M1FluidPressureTensor(const Vec cov_F,
                                  const Real xi, const Real phi,
                                  Tens2 *con_tilPi, Vec *con_tilf) {
       Vec con_tilg, con_tild;
@@ -136,7 +136,7 @@ namespace radiation
     /// E, F_i, \xi = H/J, and \phi that are a root of the M1 residual equations. Basis
     /// vectors are explicitly passed so they don't need to be recalculated repeatedly.
     KOKKOS_FUNCTION
-    Status M1FluidPressureTensor(const Vec cov_F,
+    ClosureStatus M1FluidPressureTensor(const Vec cov_F,
                                  const Real xi, const Real phi,
                                  const Vec con_tilg, const Vec con_tild,
                                  Tens2 *con_tilPi, Vec *con_tilf);
@@ -152,7 +152,7 @@ namespace radiation
     //-------------------------------------------------------------------------------------
     /// Calculate the basis vectors for \tilde f_i as described in the notes.
     KOKKOS_FUNCTION
-    Status GetBasisVectors(const Vec cov_F, Vec *con_tilg, Vec *con_tild);
+    ClosureStatus GetBasisVectors(const Vec cov_F, Vec *con_tilg, Vec *con_tild);
 
   };
   
@@ -257,7 +257,7 @@ namespace radiation
 
     *xi_out = xi;
     *phi_out = phi;
-    M1Result result{Status::success, iter, xi, phi, fXi, fPhi, err_xi, err_phi};
+    M1Result result{ClosureStatus::success, iter, xi, phi, fXi, fPhi, err_xi, err_phi};
     if (std::isnan(xi) || iter>=max_iter) {
       if (!(xi < 1.e-4) && !(std::fabs(fXi) < 1.e-3)) {
             printf("Con2Prim (Fail) : E = %e F = (%e, %e, %e) \n"
@@ -265,14 +265,14 @@ namespace radiation
                    E, cov_F(0), cov_F(1), cov_F(2), xi, phi, fXi, fPhi, 
                    con_v(0), con_v(1), con_v(2), xi_guess, phi_guess);
       }
-      result.status = Status::failure;
+      result.status = ClosureStatus::failure;
     }
     return result;
   }
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  Status ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::M1Residuals(const Real E, const Vec cov_F,
+  ClosureStatus ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::M1Residuals(const Real E, const Vec cov_F,
                                           const Real xi, const Real phi,
                                           const Vec con_tilg, const Vec con_tild,
                                           Real *fXi, Real *fPhi) {
@@ -295,12 +295,12 @@ namespace radiation
     *fXi = xi - ratio(H, J);
     *fPhi = Hf - H;
 
-    return Status::success;
+    return ClosureStatus::success;
   }
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  Status ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const Real J, const Vec cov_tilH,
+  ClosureStatus ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const Real J, const Vec cov_tilH,
                                                     Tens2 *con_tilPi, Vec *con_tilf) {
     Vec con_tilH;
     gamma->raise3Vector(cov_tilH, &con_tilH);
@@ -317,12 +317,12 @@ namespace radiation
       (*con_tilPi)(i, j) *= athin;
     }
 
-    return Status::success;
+    return ClosureStatus::success;
   }
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  Status ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const Vec /*cov_F*/,
+  ClosureStatus ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const Vec /*cov_F*/,
                                                     const Real xi, const Real phi,
                                                     const Vec con_tilg, const Vec con_tild,
                                                     Tens2 *con_tilPi, Vec *con_tilf) {
@@ -342,12 +342,12 @@ namespace radiation
       (*con_tilPi)(i, j) *= athin;
     }
 
-    return Status::success;
+    return ClosureStatus::success;
   }
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  Status ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::GetBasisVectors(const Vec cov_F,
+  ClosureStatus ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::GetBasisVectors(const Vec cov_F,
                                               Vec *con_tilg, Vec *con_tild) {
     // Build projected basis vectors for flux direction
     // These vectors are actually fixed, so there is no need to recalculate
@@ -371,7 +371,7 @@ namespace radiation
     }
     //if (aa < 1.e-6) (*con_tild) = {{0,0,0}};
 
-    return Status::success;
+    return ClosureStatus::success;
   }
 } // namespace radiation
 
