@@ -189,8 +189,12 @@ def cleanup():
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
 def gold_comparison(variables, input_file, modified_inputs={},
-                    executable=os.path.join(BUILD_DIR, 'src', 'phoebus'),
+                    executable=None, geometry='Minkowski', use_gpu=False, build_type='Release',
                     upgold=False, compression_factor=1, tolerance=1.e-5):
+
+  if executable is None:
+    executable = os.path.join(BUILD_DIR, 'src', 'phoebus')
+    build_code(geometry, use_gpu, build_type)
 
   if os.path.isdir(RUN_DIR):
     print(f"RUN_DIR \"{RUN_DIR}\" already exists! Clean up before calling a regression test script!")
@@ -248,6 +252,8 @@ def gold_comparison(variables, input_file, modified_inputs={},
       for n in range(len(gold_variables)):
         if not soft_equiv(variables_data[n], gold_variables[n]):
           success = False
+
+  cleanup()
 
   # Report upgolding, success, or failure
   if upgold:

@@ -23,26 +23,21 @@ parser.add_argument('--upgold', dest='upgold', action='store_true')
 parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
 parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../inputs/bondi.pin'))
 parser.add_argument('--executable', type=str, default=None)
+parser.add_argument('--build_type', type=str, default='Release', choices=['Debug', 'Release'])
 args = parser.parse_args()
 
 modified_inputs = {}
 modified_inputs['parthenon/mesh/nx1'] = 128
+modified_inputs['parthenon/meshblock/nx1'] = 128
 
-if args.executable == None:
-  rt.build_code(geometry="FMKS", use_gpu=args.use_gpu)
-  code = rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                            input_file=args.input,
-                            modified_inputs=modified_inputs,
-                            upgold=args.upgold,
-                            compression_factor=1)
-else:
-  code = rt.gold_comparison(variables=['p.density', 'p.velocity'],
-                            input_file=args.input,
-                            modified_inputs=modified_inputs,
-                            executable=args.executable,
-                            upgold=args.upgold,
-                            compression_factor=1)
-
-rt.cleanup()
+code = rt.gold_comparison(variables=['p.density', 'p.velocity'],
+                          input_file=args.input,
+                          modified_inputs=modified_inputs,
+                          executable=args.executable,
+                          geometry='FMKS',
+                          use_gpu=args.use_gpu,
+                          build_type=args.build_type,
+                          upgold=args.upgold,
+                          compression_factor=1)
 
 sys.exit(code)
