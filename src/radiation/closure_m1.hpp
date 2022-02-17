@@ -46,8 +46,8 @@ namespace radiation
   
   /// Holds methods for closing the radiation moment equations as well as calculating radiation
   /// moment source terms.
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE = true>
-  class ClosureM1 : public ClosureEdd<Vec, Tens2, ENERGY_CONSERVE> 
+  template <class Vec, class Tens2, class SET = ClosureSettings<> >
+  class ClosureM1 : public ClosureEdd<Vec, Tens2, SET> 
   {
   protected:
     KOKKOS_FORCEINLINE_FUNCTION
@@ -58,14 +58,14 @@ namespace radiation
     }
   
   public:
-    using typename ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::LocalGeometryType; 
+    using typename ClosureEdd<Vec, Tens2, SET>::LocalGeometryType; 
     
     //-------------------------------------------------------------------------------------
     /// Constructor just calculates the inverse 3-metric, covariant three-velocity, and the
     /// Lorentz factor for the given background state.
     KOKKOS_FUNCTION
     ClosureM1(const Vec con_v_in, LocalGeometryType* g) 
-        : ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>(con_v_in, g) {}  
+        : ClosureEdd<Vec, Tens2, SET>(con_v_in, g) {}  
     
     KOKKOS_FUNCTION 
     ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
@@ -77,7 +77,7 @@ namespace radiation
     KOKKOS_FUNCTION 
     ClosureStatus GetCovTilPiFromCon(Real E, const Vec cov_F, Real& xi, Real& phi, Tens2 *con_tilPi) {
       
-      if (!ENERGY_CONSERVE) {
+      if (SET::eqn_type == ClosureEquation::number_conserve) {
         double vF = 0.0; 
         SPACELOOP(i) vF += con_v(i)*cov_F(i);
         E = E/W + vF;
@@ -93,14 +93,14 @@ namespace radiation
     void GetM1GuessesFromEddington(const Real E, const Vec cov_F, Real *xi, Real *phi);
 
     // Make base template class variables dependent names (pretty ugly, I know)
-    using ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::Con2Prim;
-    using ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::Prim2Con;
-    using ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::v2;
-    using ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::W;
-    using ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::W2;
-    using ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::cov_v;
-    using ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::con_v;
-    using ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::gamma;
+    using ClosureEdd<Vec, Tens2, SET>::Con2Prim;
+    using ClosureEdd<Vec, Tens2, SET>::Prim2Con;
+    using ClosureEdd<Vec, Tens2, SET>::v2;
+    using ClosureEdd<Vec, Tens2, SET>::W;
+    using ClosureEdd<Vec, Tens2, SET>::W2;
+    using ClosureEdd<Vec, Tens2, SET>::cov_v;
+    using ClosureEdd<Vec, Tens2, SET>::con_v;
+    using ClosureEdd<Vec, Tens2, SET>::gamma;
   
   protected:
     // All internal methods are written in terms of E = n^\mu n^\nu M_{\mu \nu} 
@@ -158,9 +158,9 @@ namespace radiation
   
   //---- Method templates instantiated below 
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  void ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::GetM1GuessesFromEddington(const Real E, const Vec cov_F,
+  void ClosureM1<Vec, Tens2, SET>::GetM1GuessesFromEddington(const Real E, const Vec cov_F,
                                            Real *xi, Real *phi) {
     // Get the basis vectors for the search
     Vec con_tilg, con_tild;
@@ -184,9 +184,9 @@ namespace radiation
   //----------------
   // Protected functions below
   //----------------
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  M1Result ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::SolveClosure(Real E, Vec cov_F, Real *xi_out, Real *phi_out,
+  M1Result ClosureM1<Vec, Tens2, SET>::SolveClosure(Real E, Vec cov_F, Real *xi_out, Real *phi_out,
                                              const Real xi_guess, const Real phi_guess) {
     const int max_iter = 30;
     const Real tol = 1.e6 * std::numeric_limits<Real>::epsilon();
@@ -270,9 +270,9 @@ namespace radiation
     return result;
   }
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  ClosureStatus ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::M1Residuals(const Real E, const Vec cov_F,
+  ClosureStatus ClosureM1<Vec, Tens2, SET>::M1Residuals(const Real E, const Vec cov_F,
                                           const Real xi, const Real phi,
                                           const Vec con_tilg, const Vec con_tild,
                                           Real *fXi, Real *fPhi) {
@@ -298,9 +298,9 @@ namespace radiation
     return ClosureStatus::success;
   }
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  ClosureStatus ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const Real J, const Vec cov_tilH,
+  ClosureStatus ClosureM1<Vec, Tens2, SET>::M1FluidPressureTensor(const Real J, const Vec cov_tilH,
                                                     Tens2 *con_tilPi, Vec *con_tilf) {
     Vec con_tilH;
     gamma->raise3Vector(cov_tilH, &con_tilH);
@@ -320,9 +320,9 @@ namespace radiation
     return ClosureStatus::success;
   }
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  ClosureStatus ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::M1FluidPressureTensor(const Vec /*cov_F*/,
+  ClosureStatus ClosureM1<Vec, Tens2, SET>::M1FluidPressureTensor(const Vec /*cov_F*/,
                                                     const Real xi, const Real phi,
                                                     const Vec con_tilg, const Vec con_tild,
                                                     Tens2 *con_tilPi, Vec *con_tilf) {
@@ -345,9 +345,9 @@ namespace radiation
     return ClosureStatus::success;
   }
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  ClosureStatus ClosureM1<Vec, Tens2, ENERGY_CONSERVE>::GetBasisVectors(const Vec cov_F,
+  ClosureStatus ClosureM1<Vec, Tens2, SET>::GetBasisVectors(const Vec cov_F,
                                               Vec *con_tilg, Vec *con_tild) {
     // Build projected basis vectors for flux direction
     // These vectors are actually fixed, so there is no need to recalculate
