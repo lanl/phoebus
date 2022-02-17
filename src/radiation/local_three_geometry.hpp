@@ -77,7 +77,6 @@ namespace radiation
   KOKKOS_FORCEINLINE_FUNCTION 
   Tens2 operator/(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = ratio(a(i,j), b);} return out;}
 
-  template <class Vec, class Tens2>
   struct LocalThreeGeometry {
   
     Real gdet;
@@ -143,7 +142,7 @@ namespace radiation
     }
   };
 
-  using LocaLGeometry = LocalThreeGeometry<Vec, Tens2>; 
+  using LocaLGeometry = LocalThreeGeometry; 
 } // namespace radiation
 
 #endif // LOCAL_THREE_GEOMETRY_HPP_

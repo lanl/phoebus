@@ -58,13 +58,13 @@ namespace radiation
   {
   public:
 
-    using LocalGeometryType = LocalThreeGeometry<Vec, Tens2>; 
+    using LocalGeometryType = LocalThreeGeometry; 
 
     //-------------------------------------------------------------------------------------
     /// Constructor just calculates the inverse 3-metric, covariant three-velocity, and the
     /// Lorentz factor for the given background state.
     KOKKOS_FUNCTION
-    ClosureEdd(const Vec con_v_in, LocalThreeGeometry<Vec, Tens2>* g); 
+    ClosureEdd(const Vec con_v_in, LocalGeometryType* g); 
     
     //-------------------------------------------------------------------------------------
     /// Calculate the update values dE and cov_dF for a linear, implicit source term update
@@ -126,7 +126,7 @@ namespace radiation
     Real v2, W, W2;
     Vec cov_v;
     Vec con_v;
-    LocalThreeGeometry<Vec, Tens2>* gamma;
+    LocalGeometryType* gamma;
 
   protected:
   
@@ -149,7 +149,7 @@ namespace radiation
 
   template <class Vec, class Tens2, bool ENERGY_CONSERVE>
   KOKKOS_FUNCTION
-  ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::ClosureEdd(const Vec con_v_in, LocalThreeGeometry<Vec, Tens2>* g) 
+  ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::ClosureEdd(const Vec con_v_in, LocalGeometryType* g) 
       : gamma(g) 
   {
     SPACELOOP(i) con_v(i) = con_v_in(i);
