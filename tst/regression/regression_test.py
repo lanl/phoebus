@@ -39,7 +39,7 @@ SCRIPT_NAME=os.path.basename(__main__.__file__).split('.py')[0]
 # -- Compare two values up to some floating point tolerance
 def soft_equiv(val, ref, tol = 1.e-5):
   numerator = np.fabs(val - ref)
-  denominator = max(np.fabs((val + ref) / 2), 1.e-10)
+  denominator = max(np.fabs(ref), 1.e-10)
 
   if numerator/denominator > tol:
     return False
