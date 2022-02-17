@@ -58,11 +58,13 @@ namespace radiation
     }
   
   public:
+    using typename ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::LocalGeometryType; 
+    
     //-------------------------------------------------------------------------------------
     /// Constructor just calculates the inverse 3-metric, covariant three-velocity, and the
     /// Lorentz factor for the given background state.
     KOKKOS_FUNCTION
-    ClosureM1(const Vec con_v_in, LocalThreeGeometry<Vec, Tens2>* g) 
+    ClosureM1(const Vec con_v_in, LocalGeometryType* g) 
         : ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>(con_v_in, g) {}  
     
     KOKKOS_FUNCTION 

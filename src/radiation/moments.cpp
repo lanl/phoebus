@@ -700,7 +700,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
           Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
           Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-          LocalThreeGeometry<Vec, Tens2> g(geom, CellLocation::Cent, iblock, k, j, i); 
+          LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i); 
           
           /// TODO: (LFR) Move beyond Eddington for this update
           ClosureEdd<Vec, Tens2> c(con_v, &g); 
