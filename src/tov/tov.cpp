@@ -70,7 +70,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real pmin = pin->GetOrAddReal("tov", "Pmin", 1e-9);
   params.Add("pmin", pmin);
 
-  // Etnropy
+  // Entropy
   Real s = pin->GetOrAddReal("tov", "entropy", 8);
   params.Add("entropy", s);
 
