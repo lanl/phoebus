@@ -41,19 +41,21 @@ namespace radiation
   };
   
   enum class ClosureType {Eddington, M1, MOCMC};
-  enum class ClosureEquationType {energy_conserve, number_conserve}; 
+
+  // enums and struct for specifying behavior of closure class  
+  enum class ClosureEquation {energy_conserve, number_conserve}; 
   enum class ClosureVerbosity {quiet, v1, v2}; 
-  
-  template <ClosureEquationType EQ = ClosureEquationType::energy_conserve, 
-            ClosureVerbosity VE = ClosureVerbosity::quiet> 
+
+  template <ClosureEquation EQ = ClosureEquation::energy_conserve, 
+            ClosureVerbosity VB = ClosureVerbosity::quiet>  
   struct ClosureSettings {
-    static const ClosureEquationType equation_type = EQ; 
-    static const ClosureVerbosity verbosity = VE; 
+    static const ClosureEquation eqn_type = EQ; 
+    static const ClosureVerbosity verbosity = VB; 
   };
    
   /// Holds methods for closing the radiation moment equations as well as calculating radiation
   /// moment source terms.
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE = true>
+  template <class Vec, class Tens2, class SET = ClosureSettings<> >
   class ClosureEdd
   {
   public:
@@ -147,9 +149,9 @@ namespace radiation
   private:
   };
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::ClosureEdd(const Vec con_v_in, LocalGeometryType* g) 
+  ClosureEdd<Vec, Tens2, SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType* g) 
       : gamma(g) 
   {
     SPACELOOP(i) con_v(i) = con_v_in(i);
@@ -161,9 +163,9 @@ namespace radiation
     W2 = W * W;
   }
    
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::LinearSourceUpdate(const Real Estar, const Vec cov_Fstar,
+  ClosureStatus ClosureEdd<Vec, Tens2, SET>::LinearSourceUpdate(const Real Estar, const Vec cov_Fstar,
                                                  const Tens2 con_tilPi, const Real JBB,  
                                                  const Real tauJ, const Real tauH,
                                                  Real *dE, Vec *cov_dF) {
@@ -178,15 +180,17 @@ namespace radiation
     A[1][0] = A[0][0] - 1 - tauJ/W;
     A[1][1] = A[0][1] - 1/W; 
     
-    if (!ENERGY_CONSERVE) {
+    if (SET::eqn_type == ClosureEquation::number_conserve) {
       A[0][0] = W + tauJ; 
       A[0][1] = 1.0; 
     }
 
     Real vFstar = gamma->contractConCov3Vectors(con_v, cov_Fstar); 
-    if (ENERGY_CONSERVE) {
+    
+    if (SET::eqn_type == ClosureEquation::energy_conserve) {
       b[0] = Estar + W*tauJ*JBB;
-    } else { 
+    } 
+    else if (SET::eqn_type == ClosureEquation::number_conserve) {
       b[0] = Estar + tauJ*JBB;
     } 
     b[1] = vFstar + (W2-1)/W*tauJ*JBB;
@@ -197,9 +201,10 @@ namespace radiation
     Real &J = x[0];
     Real &zeta = x[1]; //v^i \tilde H_i  
     
-    if (ENERGY_CONSERVE) {
+    if (SET::eqn_type == ClosureEquation::energy_conserve) {
       *dE = (4*W2 - 1 + 3*W2*vvTilPi) / 3 * J + 2*W*zeta - Estar;      
-    } else { 
+    } 
+    else if (SET::eqn_type == ClosureEquation::number_conserve) {
       *dE = W*J + zeta - Estar;
     }
     SPACELOOP(i) (*cov_dF)(i) = (cov_v(i)*tauH*(4*W2/3*J + W*zeta) + tauH*cov_vTilPi(i)*J 
@@ -208,18 +213,19 @@ namespace radiation
     return ClosureStatus::success;  
   }
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::getFluxesFromPrim(const Real J, const Vec cov_tilH, 
+  ClosureStatus ClosureEdd<Vec, Tens2, SET>::getFluxesFromPrim(const Real J, const Vec cov_tilH, 
                                                                  const Tens2 con_tilPi, Vec *con_F, 
                                                                  Tens2 *concov_P) {
     getConCovPFromPrim(J, cov_tilH, con_tilPi, concov_P);
-    if (ENERGY_CONSERVE) {
+    if (SET::eqn_type == ClosureEquation::energy_conserve) {
       Real E;
       Vec cov_F;  
       Prim2Con(J, cov_tilH, con_tilPi, &E, &cov_F); 
       gamma->raise3Vector(cov_F, con_F);
-    } else { 
+    } 
+    else if (SET::eqn_type == ClosureEquation::number_conserve) {
       SPACELOOP(i) (*con_F)(i) = W*con_v(i)*J + cov_tilH(i); 
     }
     SPACELOOP2(i,j) (*concov_P)(i,j) *= gamma->alpha;  
@@ -227,9 +233,9 @@ namespace radiation
     return ClosureStatus::success;
   } 
   
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FORCEINLINE_FUNCTION
-  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::getConPFromPrim(const Real J, const Vec cov_tilH,
+  ClosureStatus ClosureEdd<Vec, Tens2, SET>::getConPFromPrim(const Real J, const Vec cov_tilH,
                                               const Tens2 con_tilPi, Tens2 *con_P) {
     Vec con_tilH;
     gamma->raise3Vector(cov_tilH, &con_tilH);
@@ -240,9 +246,9 @@ namespace radiation
     return ClosureStatus::success;
   }
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FORCEINLINE_FUNCTION
-  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::getConCovPFromPrim(const Real J, const Vec cov_tilH,
+  ClosureStatus ClosureEdd<Vec, Tens2, SET>::getConCovPFromPrim(const Real J, const Vec cov_tilH,
                                                  const Tens2 con_tilPi, Tens2 *concov_P) {
     Vec con_tilH;
     Tens2 concov_tilPi;
@@ -261,9 +267,9 @@ namespace radiation
     return ClosureStatus::success;
   }
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::Prim2Con(const Real J, const Vec cov_H,
+  ClosureStatus ClosureEdd<Vec, Tens2, SET>::Prim2Con(const Real J, const Vec cov_H,
                                        const Tens2 con_tilPi, Real *E, Vec *cov_F) {
     Real vvPi;
     Vec cov_vPi;
@@ -271,18 +277,19 @@ namespace radiation
 
     Real vH = 0.0;
     SPACELOOP(i) vH += con_v(i) * cov_H(i);
-    if (ENERGY_CONSERVE) {
+    if (SET::eqn_type == ClosureEquation::energy_conserve) {
       *E = (4 * W2 - 1 + 3 * W2 * vvPi) / 3 * J + 2 * W * vH;
-    } else { 
+    } 
+    else if (SET::eqn_type == ClosureEquation::number_conserve) {
       *E = W*J + vH;
     }
     SPACELOOP(i) (*cov_F)(i) = 4 * W2 / 3 * cov_v(i) * J + W * cov_v(i) * vH + W * cov_H(i) + J * cov_vPi(i);
     return ClosureStatus::success;
   }
 
-  template <class Vec, class Tens2, bool ENERGY_CONSERVE>
+  template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
-  ClosureStatus ClosureEdd<Vec, Tens2, ENERGY_CONSERVE>::Con2Prim(Real E, const Vec cov_F,
+  ClosureStatus ClosureEdd<Vec, Tens2, SET>::Con2Prim(Real E, const Vec cov_F,
                                        const Tens2 con_tilPi,
                                        Real *J, Vec *cov_tilH) {
     Real vvTilPi;
@@ -292,7 +299,7 @@ namespace radiation
     double vF = 0.0;
     SPACELOOP(i) vF += con_v(i) * cov_F(i);
     
-    if (!ENERGY_CONSERVE) E = E/W + vF; 
+    if (SET::eqn_type == ClosureEquation::number_conserve) E = E/W + vF; 
 
     // lam is proportional to the determinant of the 2x2 linear system relating
     // E and v_i F^i to J and v_i H^i for fixed tilde pi^ij

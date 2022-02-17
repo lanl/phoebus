@@ -130,11 +130,13 @@ TaskStatus MomentCon2Prim(T* rc) {
   auto *pm = rc->GetParentPointer().get(); 
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method"); 
+  
+  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") { 
-    return MomentCon2PrimImpl<T, ClosureM1<Vec, Tens2, true>, true>(rc);
+    return MomentCon2PrimImpl<T, ClosureM1<Vec, Tens2, settings>, true>(rc);
   }
   else if (method == "moment_eddington") {
-    return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, true>, false>(rc);
+    return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc);
   }
   return TaskStatus::fail;
 }
@@ -214,11 +216,12 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   auto *pm = rc->GetParentPointer().get(); 
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method"); 
+  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") { 
-    return MomentPrim2ConImpl<T, ClosureM1<Vec, Tens2, true>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureM1<Vec, Tens2, settings> >(rc, domain);
   }
   else if (method == "moment_eddington") {
-    return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, true>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, domain);
   }
   return TaskStatus::fail;
 }
@@ -497,11 +500,12 @@ TaskStatus CalculateFluxes(T* rc) {
   auto *pm = rc->GetParentPointer().get(); 
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method"); 
+  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") { 
-    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, true>>(rc);
+    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings> >(rc);
   }
   else if (method == "moment_eddington") {
-    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, true>>(rc);
+    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings> >(rc);
   }
   return TaskStatus::fail;
 }
@@ -624,11 +628,12 @@ TaskStatus CalculateGeometricSource(T* rc, T* rc_src) {
   auto *pm = rc->GetParentPointer().get(); 
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method"); 
+  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") { 
-    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, true>>(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings> >(rc, rc_src);
   }
   else if (method == "moment_eddington") {
-    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, true>>(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings> >(rc, rc_src);
   }
   return TaskStatus::fail;
 }
