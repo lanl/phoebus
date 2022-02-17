@@ -106,7 +106,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
         }
       }
       fclose(fptr);
-      printf("Total points : %i  Points wrong : %i (percent) wrong: %e\n", n_total, n_wrong, (double)n_wrong/ n_total);
+      printf("Total points : %i  Points wrong : %i %% wrong: %e\n", n_total, n_wrong, (double)n_wrong/ n_total);
       REQUIRE(n_wrong == 0); 
     }
   }
