@@ -169,11 +169,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // If using StellarCollapse, we need additional variables.
   // We also need table max and min values, regardless of the EOS.
   // These can be used for floors/ceilings or for root find bounds
+  Real rho_min = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
+  Real sie_min = pin->GetOrAddReal("fixup", "sie0_floor", 0.0);
+  Real T_min = eos_host.TemperatureFromDensityInternalEnergy(rho_min, sie_min);
+  Real rho_max = pin->GetOrAddReal("fixup", "rho0_ceiling", 1e18);
+  Real sie_max = pin->GetOrAddReal("fixup", "sie0_ceiling", 1e35);
+  Real T_max = eos_host.TemperatureFromDensityInternalEnergy(rho_max, sie_max);
+#ifdef SPINER_USE_HDF
   if (eos_type == StellarCollapse::EosType()) {
     // We request that Ye and temperature exist, but do not provide them.
     Metadata m = Metadata({Metadata::Cell, Metadata::Intensive,
-			      Metadata::Derived, Metadata::OneCopy,
-			      Metadata::Requires});
+			   Metadata::Derived, Metadata::OneCopy,
+			   Metadata::Requires});
 
     pkg->AddField(fluid_prim::ye, m);
     pkg->AddField(fluid_prim::temperature, m);
@@ -192,27 +199,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Always C^2
     Real sie_unit = std::pow(pc.c, 2);
     Real press_unit = rho_unit*sie_unit;
-
-    params.Add("sie_min", eos_sc.sieMin()/sie_unit);
-    params.Add("sie_max", eos_sc.sieMax()/sie_unit);
-    params.Add("T_min", eos_sc.TMin()/T_unit);
-    params.Add("T_max", eos_sc.TMax()/T_unit);
-    params.Add("rho_min", eos_sc.rhoMin()/rho_unit);
-    params.Add("rho_max", eos_sc.rhoMax()/rho_unit);
-  } else { // TODO: Be more clever here?
-    Real rho_min = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
-    Real sie_min = pin->GetOrAddReal("fixup", "sie0_floor", 0.0);
-    Real T_min = eos_host.TemperatureFromDensityInternalEnergy(rho_min, sie_min);
-    Real rho_max = pin->GetOrAddReal("fixup", "rho0_ceiling", 1e18);
-    Real sie_max = pin->GetOrAddReal("fixup", "sie0_ceiling", 1e35);
-    Real T_max = eos_host.TemperatureFromDensityInternalEnergy(rho_max, sie_max);
-    params.Add("sie_min", sie_min);
-    params.Add("sie_max", sie_max);
-    params.Add("T_min", T_min);
-    params.Add("T_max", T_max);
-    params.Add("rho_min", rho_min);
-    params.Add("rho_max", rho_max);
+    
+    sie_min = eos_sc.sieMin()/sie_unit;
+    sie_max = eos_sc.sieMax()/sie_unit;
+    T_min = eos_sc.TMin()/T_unit;
+    T_max = eos_sc.TMax()/T_unit;
+    rho_min = eos_sc.rhoMin()/rho_unit;
+    rho_max = eos_sc.rhoMax()/rho_unit;
   }
+#endif // SPINER_USE_HDF
+
+  params.Add("sie_min", sie_min);
+  params.Add("sie_max", sie_max);
+  params.Add("T_min", T_min);
+  params.Add("T_max", T_max);
+  params.Add("rho_min", rho_min);
+  params.Add("rho_max", rho_max);
 
   return pkg;
 }
