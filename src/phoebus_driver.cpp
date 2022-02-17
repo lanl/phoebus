@@ -103,8 +103,23 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const auto rad_active = rad->Param<bool>("active");  
   const auto fluid_active = fluid->Param<bool>("active");
   // Force static here means monopole only called at initialization.
-  const auto monopole_gr_active = (monopole->Param<bool>("enable_monopole_gr")
-                                   && !(monopole->Param<bool>("force_static")));
+  // and source terms are disabled
+  const auto monopole_force_static = monopole->Param<bool>("force_static");
+  // nth call means only run monopole solver the first run_n_times
+  // subcycles. Then stop.
+  const auto monopole_nth_call = monopole->Param<int>("nth_call");
+  const auto monopole_run_n_times = monopole->Param<int>("run_n_times");
+  const auto monopole_enabled = monopole->Param<bool>("enable_monopole_gr");
+  const auto monopole_gr_active =
+    (monopole_enabled
+     && ((monopole_run_n_times < 0)
+	 || (monopole_nth_call <= monopole_run_n_times))
+     && !monopole_force_static);
+  printf("%d/%d: %d\n",monopole_nth_call,monopole_run_n_times,
+	 monopole_gr_active);
+  if (monopole_gr_active) {
+    monopole->AllParams().Update("nth_call", monopole_nth_call + 1);
+  }
 
   std::vector<std::string> src_names; 
   if (fluid_active) { 

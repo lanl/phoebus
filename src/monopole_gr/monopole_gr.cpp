@@ -79,9 +79,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("rin", rin);
   params.Add("rout", rout);
 
-  // Force static spacetime
+  // Kill time derivatives. Only run on initialization
   bool force_static = pin->GetOrAddBoolean("monopole_gr", "force_static", false);
   params.Add("force_static", force_static);
+
+  // Only run the first n subcycles
+  int run_n_times = pin->GetOrAddInteger("monopole_gr", "run_n_times", -1);
+  params.Add("run_n_times", run_n_times);
+  int nth_call = 0;
+  params.Add("nth_call", nth_call, true); // mutable
 
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
@@ -360,7 +366,7 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
       parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
 	if (force_static) {
           hypersurface(Hypersurface::K, i) = 0;
-        }
+	}
 
         Real r = radius.x(i);
         Real a = hypersurface(Hypersurface::A, i);
@@ -436,7 +442,7 @@ TaskStatus DivideVols(StateDescriptor *pkg) {
   // Divide by volumes
   for (int i = 0; i < npoints; ++i) {
     for (int v = 0; v < NMAT; ++v) {
-      matter_cells_h(v, i) = ratio(matter_cells_h(v,i), vols_h(i));
+      matter_cells_h(v, i) = ratio(matter_cells_h(v,i), std::abs(vols_h(i)));
     }
   }
   // Shift to the face-centered grid

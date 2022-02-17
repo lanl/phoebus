@@ -31,6 +31,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool is_monopole_sph =
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
 
+  // Velocity perturbation
+  // of form v = a*r*exp(-(r-mu)^2/(2 sigma)^2)
+  // amplitude
+  const Real vpert_a = pin->GetOrAddReal("tov", "vpert_amp", 0);
+  // center of vel pert
+  const Real vpert_r = pin->GetOrAddReal("tov","vpert_radius", 5);
+  // standard deviation
+  const Real vpert_s = pin->GetOrAddReal("tov", "vpert_sigma", 1);
+
   auto tov_pkg = pmb->packages.Get("tov");
   auto monopole_pkg = pmb->packages.Get("monopole_gr");
   auto eos_pkg = pmb->packages.Get("eos");
@@ -100,8 +109,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(iprs, k, j, i) = P;
         v(ieng, k, j, i) = eps * rho;
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps);
-        for (int d = 0; d < 3; ++d)
+        for (int d = 0; d < 3; ++d) {
           v(ivlo + d, k, j, i) = 0.0;
+        }
+        // Perturbation in velocity for testing
+        if (vpert_a > 0) {
+          v(ivlo, k, j, i) =
+            vpert_a*r*std::exp(-(r-vpert_r)*(r-vpert_r)/(4*vpert_s*vpert_s));
+        }
       });
 
   fluid::PrimitiveToConserved(rc.get());
