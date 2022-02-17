@@ -32,6 +32,7 @@ modified_inputs['parthenon/mesh/x1max'] = 1.e-7
 
 code = rt.gold_comparison(variables=['p.density', 'p.energy'],
                           input_file=args.input,
+                          modified_inputs=modified_inputs,
                           executable=args.executable,
                           geometry='Minkowski',
                           use_gpu=args.use_gpu,
