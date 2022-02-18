@@ -44,13 +44,13 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 256           # Number of zones in X1-direction
+nx1         = 128           # Number of zones in X1-direction
 x1min       = 0.59          # minimum value of X1; overwritten for the torus problem
 x1max       = 3.69          # maximum value of X1; set by <coordinates>/r_outer for the torus problem
 ix1_bc      = user          # Inner-X1 boundary condition flag
 ox1_bc      = user          # Outer-X1 boundary condition flag
 
-nx2         = 256           # Number of zones in X2-direction
+nx2         = 128           # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
 x2max       = 1             # maximum value of X2. X2 = 1 -> theta = pi
 ix2_bc      = reflecting    # Inner-X2 boundary condition flag
@@ -64,10 +64,10 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-<parthenon/meshblock>
-nx1 = 128
-nx2 = 128
-nx3 = 1
+#<parthenon/meshblock>
+#nx1 = 128
+#nx2 = 128
+#nx3 = 1
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -102,7 +102,7 @@ a = 0.9375
 
 <coordinates>
 derefine_poles = false
-r_outer = 100.0
+r_outer = 1000.0
 
 <fixup>
 enable_floors = true
@@ -123,6 +123,8 @@ gam0_ceiling = 10.0;
 u_jitter = 0.05
 Bnorm = 0.02 # beta_min ~ 200
 kappa = 0.01
-rin = 6.0
-rmax = 12.0
+rin = 50.0
+rmax = 100.0
 n_inside_horizon = 4
+nx1_target = 256
+cutout = true

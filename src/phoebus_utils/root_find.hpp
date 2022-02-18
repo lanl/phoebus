@@ -16,9 +16,11 @@
 
 namespace root_find {
 
+enum class RootFindStatus { success, failure };
+
 template <typename F>
 KOKKOS_INLINE_FUNCTION
-Real itp(F &func, Real a, Real b, const Real tol) {
+Real itp(F &func, Real a, Real b, const Real tol, RootFindStatus *status = nullptr) {
   constexpr Real kappa1 = 0.1;
   constexpr Real kappa2 = 2.0;
   constexpr int n0 = 0;
@@ -29,6 +31,9 @@ Real itp(F &func, Real a, Real b, const Real tol) {
   Real ya = func(a);
   Real yb = func(b);
   if (ya * yb > 0.0) {
+    if (status != nullptr) {
+      *status = RootFindStatus::failure;
+    }
     printf("Root not bracketed in find_root. a, b, ya, yb = %g %g %g %g\n",
            a, b, ya, yb);
     return 0.5*(a+b);
@@ -58,6 +63,9 @@ Real itp(F &func, Real a, Real b, const Real tol) {
       b = xitp;
     }
     j++;
+  }
+  if (status != nullptr) {
+    *status = RootFindStatus::success;
   }
   return 0.5*(a+b);
 }
