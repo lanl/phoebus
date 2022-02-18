@@ -41,6 +41,7 @@ jobs:
             cmake --build . --parallel 4
             cd ..
             # TODO(BRR) add --use_gpu flag here if running on GPU
+            ./radiation_diffusion.py --executable build_minkowski/src/phoebus
             ./bondi.py --executable build_fmks/src/phoebus
             ./linear_modes.py --executable build_minkowski/src/phoebus
             ./thincooling.py --executable build_minkowski/src/phoebus
