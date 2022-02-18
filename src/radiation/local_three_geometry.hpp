@@ -86,11 +86,12 @@ namespace radiation
     Vec con_beta;
 
     template <class T2>
-    KOKKOS_FUNCTION LocalThreeGeometry(const T2 cov_gamma_in) {
+    KOKKOS_FUNCTION LocalThreeGeometry(const T2 cov_gamma_in, const Real alpha_in = 1.0, 
+                                       const Vec cBeta_in = {0,0,0}) {
       SPACELOOP2(i,j){ cov_gamma(i, j) = cov_gamma_in(i, j);}
       gdet = matrixInverse3x3(cov_gamma, con_gamma);
-      alpha = 1.0; 
-      SPACELOOP(i) con_beta(i) = 0.0;
+      alpha = alpha_in; 
+      con_beta = cBeta_in;
     }
     
     template<class T, class C> 
