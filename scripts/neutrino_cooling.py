@@ -11,7 +11,6 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
-PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
 DUMP_NAMES = '/home/brryan/builds/phoebus/cooling.out1.*.phdf'
 
 import numpy as np
@@ -21,19 +20,31 @@ import shutil
 import os
 from subprocess import call, DEVNULL
 import glob
-sys.path.append(PHDF_PATH)
-import phdf
+from parthenon_tools import phdf
 import time
 from enum import Enum
 
 NeutrinoSpecies = Enum('NeutrinoSpecies', 'electron electronanti')
 
-s = NeutrinoSpecies.electron
+dfnams = np.sort(glob.glob(DUMP_NAMES))
+dfile0 = phdf.phdf(dfnams[0])
+
+cl = 2.99792458e10
 mp = 1.672621777e-24
 h = 6.62606957e-27
-numax = 1.e17
-numin = 1.e15
-C = 1.
+
+T_unit = dfile0.Params['eos/time_unit']
+L_unit = dfile0.Params['eos/length_unit']
+M_unit = dfile0.Params['eos/mass_unit']
+U_unit = M_unit / L_unit**3 * cl**2
+numin = dfile0.Params['radiation/nu_min']
+numax = dfile0.Params['radiation/nu_max']
+do_nu_electron = dfile0.Params['radiation/do_nu_electron']
+do_nu_electron_anti = dfile0.Params['radiation/do_nu_electron_anti']
+do_nu_heavy = dfile0.Params['radiation/do_nu_heavy']
+
+s = NeutrinoSpecies.electron
+C = 4. * np.pi # This definition of j_nu differs by a factor 4pi from the nubhlght paper
 rho = 1.e6
 u0 = 1.e20
 
@@ -65,17 +76,10 @@ def get_Ye(t):
 def get_u(t):
   return u0 + Bc/(2.*Ac)*(np.exp(-2.*Ac*t) - 1.)
 
-t = np.logspace(0, 3, 128)
+t = np.logspace(0, np.log10(500.), 128)
 Ye = get_Ye(t)
 u = get_u(t)
 
-# TODO(BRR) get these from dump files
-T_unit = 1./2.997925e-04
-U_unit = 8.987552e-22
-#T_unit = 1./3.335641e-01
-#U_unit = 8.987552e-10
-
-dfnams = np.sort(glob.glob(DUMP_NAMES))
 t_code = np.zeros(dfnams.size)
 Ye_code = np.zeros(dfnams.size)
 u_code = np.zeros(dfnams.size)
