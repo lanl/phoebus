@@ -15,6 +15,7 @@
 
 #include "catch2/catch.hpp"
 #include "radiation/closure.hpp"
+#include "radiation/closure_m1.hpp"
 
 // parthenon includes
 #include <coordinates/coordinates.hpp>
@@ -32,7 +33,7 @@
 
 using namespace Geometry;
 using namespace radiation; 
-
+/*
 struct Vec { 
   Real data[NDSPACE]; 
   inline Real& operator()(const int idx){return data[idx];}
@@ -44,7 +45,7 @@ struct Tens2 {
   inline Real& operator()(const int i, const int j){return data[i][j];} 
   inline const Real& operator()(const int i, const int j) const {return data[i][j];} 
 };
-
+*/
 const Real pi = acos(-1);
 
 TEST_CASE("M1 Closure", "[radiation][closure]") { 
@@ -62,27 +63,31 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             // Set up background state
             Vec con_v = {vmag*cos(phiv), vmag*sin(phiv), 0.0}; 
             Tens2 cov_gamma = {{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}}; 
-  
-            Closure<Vec, Tens2> cl(con_v, cov_gamma); 
+            LocalThreeGeometry g(cov_gamma); 
+            ClosureM1<Vec, Tens2> cl(con_v, &g); 
   
   
             // Assume a fluid frame state  
             Real J = 1.0;
-            Vec cov_tilH = {{xi*J/sqrt(cl.con_gamma(0,0) - con_v(0)*con_v(0)), 0.0, 0.0}}; 
+            Vec cov_tilH = {{xi*J/sqrt(g.con_gamma(0,0) - con_v(0)*con_v(0)), 0.0, 0.0}}; 
             Tens2 con_tilPi;
 
             // Calculate comoving frame state 
             Real E;
             Vec F;
-            cl.Prim2ConM1(J, cov_tilH, &E, &F, &con_tilPi); 
+            cl.GetCovTilPiFromPrim(J, cov_tilH, &con_tilPi);
+            cl.Prim2Con(J, cov_tilH, con_tilPi, &E, &F); 
               
             
             // re-Calculate rest frame quantities using closure 
             // to check for self-consistency
             Real J_out; 
             Vec H_out;
-            auto result = cl.Con2PrimM1(E, F, &J_out, &H_out, &con_tilPi);
             
+            Real xig, phig; 
+            cl.GetM1GuessesFromEddington(E, F, &xig, &phig); 
+            cl.GetCovTilPiFromCon(E, F, xig, phig, &con_tilPi);
+            cl.Con2Prim(E, F, con_tilPi, &J_out, &H_out);
             
             //if (result.status == radiation::Status::failure) throw 2;
             bool bad_solution = true;
@@ -101,7 +106,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
         }
       }
       fclose(fptr);
-      printf("Total points : %i  Points wrong : %i \% wrong: %e\n", n_total, n_wrong, (double)n_wrong/ n_total);
+      printf("Total points : %i  Points wrong : %i %% wrong: %e\n", n_total, n_wrong, (double)n_wrong/ n_total);
       REQUIRE(n_wrong == 0); 
     }
   }

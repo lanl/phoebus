@@ -42,6 +42,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(blandford_mckee)                                                               \
   PROBLEM(bondi)                                                                         \
   PROBLEM(radiation_advection)                                                           \
+  PROBLEM(radiation_equilibration)                                                       \
   PROBLEM(homogeneous_sphere)                                                            \
   PROBLEM(torus)
 
