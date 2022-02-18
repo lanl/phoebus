@@ -18,53 +18,11 @@
 
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
-#include "closure.hpp"
+#include "radiation/local_three_geometry.hpp"
+#include "radiation/closure.hpp"
+#include "radiation/closure_m1.hpp"
 
 namespace radiation {
-
-struct Vec {
-  // Do not add any member data to this struct since it is initialized in many places in
-  // the code using initializer lits
-  Real data[Geometry::NDSPACE];
-  KOKKOS_FORCEINLINE_FUNCTION
-  Real& operator()(const int idx){return data[idx];}
-  KOKKOS_FORCEINLINE_FUNCTION
-  const Real& operator()(const int idx) const {return data[idx];}
-};
-
-KOKKOS_FORCEINLINE_FUNCTION
-Vec operator+(Vec a, Vec b) {Vec out; SPACELOOP(i) out(i) = a(i) + b(i); return out;}
-KOKKOS_FORCEINLINE_FUNCTION
-Vec operator-(Vec a, Vec b) {Vec out; SPACELOOP(i) out(i) = a(i) - b(i); return out;}
-KOKKOS_FORCEINLINE_FUNCTION
-Vec operator-(Vec a) {Vec out; SPACELOOP(i) out(i) = -a(i); return out;}
-KOKKOS_FORCEINLINE_FUNCTION
-Vec operator*(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = a(i)*b; return out;}
-KOKKOS_FORCEINLINE_FUNCTION
-Vec operator*(Real a, Vec b) {Vec out; SPACELOOP(i) out(i) = a*b(i); return out;}
-KOKKOS_FORCEINLINE_FUNCTION
-Vec operator/(Vec a, Real b) {Vec out; SPACELOOP(i) out(i) = ratio(a(i), b); return out;}
-
-struct Tens2 {
-  // Do not add any member data to this struct since it is initialized in many places in
-  // the code using initializer lits
-  Real data[Geometry::NDSPACE][Geometry::NDSPACE];
-  KOKKOS_FORCEINLINE_FUNCTION
-  Real& operator()(const int i, const int j){return data[i][j];}
-  KOKKOS_FORCEINLINE_FUNCTION
-  const Real& operator()(const int i, const int j) const {return data[i][j];}
-};
-
-KOKKOS_FORCEINLINE_FUNCTION
-Tens2 operator+(Tens2 a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j) + b(i,j);} return out;}
-KOKKOS_FORCEINLINE_FUNCTION
-Tens2 operator-(Tens2 a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j) - b(i,j);} return out;}
-KOKKOS_FORCEINLINE_FUNCTION
-Tens2 operator*(Real a, Tens2 b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a*b(i,j);} return out;}
-KOKKOS_FORCEINLINE_FUNCTION
-Tens2 operator*(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = a(i,j)*b;} return out;}
-KOKKOS_FORCEINLINE_FUNCTION
-Tens2 operator/(Tens2 a, Real b) {Tens2 out; SPACELOOP2(i,j) {out(i,j) = ratio(a(i,j), b);} return out;}
 
 template <class T>
   class ReconstructionIndexer  {
@@ -87,7 +45,7 @@ template <class T>
   const int block_;
 };
 
-template <class T, ClosureType CLOSURE_TYPE>
+template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T* rc) {
 
   namespace cr = radmoment_cons;
@@ -117,6 +75,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   auto iPhi = imap.GetFlatIdx(ir::phi);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
+  const Real pi = acos(-1);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(),
@@ -132,7 +91,9 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real isdetgam = 1.0/geom.DetGamma(CellLocation::Cent, b, k, j, i);
-        Closure<Vec, Tens2> c(con_v, cov_gamma);
+
+        typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
+        CLOSURE c(con_v, &g);
 
         Real J;
         Vec covH;
@@ -142,36 +103,27 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
                     v(b, cF(ispec, 1), k, j, i) * isdetgam,
                     v(b, cF(ispec, 2), k, j, i) * isdetgam}};
 
-        if (CLOSURE_TYPE == ClosureType::M1) {
-          Real xi = v(b, iXi(ispec), k, j, i);
-          Real phi = 1.0001*v(b, iPhi(ispec), k, j, i);
-
-          auto result = c.Con2PrimM1(E, covF, xi, phi, &J, &covH, &conTilPi);
-
-          v(b, iXi(ispec), k, j, i) = result.xi;
-          v(b, iPhi(ispec), k, j, i) = result.phi;
-
-
-          if (result.status == Status::failure && !(result.xi < 1.e-4) && !(std::fabs(result.fXi) < 1.e-3)) {
-            printf("Con2Prim (Fail) : i = %i ispec = %i E = %e F = (%e, %e, %e) J = %e H = (%e, %e, %e) 1/sqrt(gammma) = %e \n "
-                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n", i, ispec,
-                   E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2), isdetgam, result.xi, result.phi, result.fXi, result.fPhi,
-                   con_v(0), con_v(1), con_v(2), xi, phi);
-            if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
-          }
+        Real xi = 0.0;
+        Real phi = pi;
+        if (STORE_GUESS) {
+          xi = v(b, iXi(ispec), k, j, i);
+          phi = 1.0001*v(b, iPhi(ispec), k, j, i);
         }
-        else if (CLOSURE_TYPE == ClosureType::Eddington) {
-          SPACELOOP2(ii, jj) conTilPi(ii, jj) = 0.0;
-          c.Con2Prim(E, covF, conTilPi, &J, &covH);
+        c.GetCovTilPiFromCon(E, covF, xi, phi, &conTilPi);
+        if (STORE_GUESS) {
+          v(b, iXi(ispec), k, j, i) = xi;
+          v(b, iPhi(ispec), k, j, i) = phi;
         }
-        else if (CLOSURE_TYPE == ClosureType::MOCMC) {
+        if (CLOSURE_TYPE == ClosureType::MOCMC) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
           c.Con2Prim(E, covF, conTilPi, &J, &covH);
         }
+        c.Con2Prim(E, covF, conTilPi, &J, &covH);
+        if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
-          v(b, pH(ispec, idir), k, j, i) = covH(idir)/J;
+          v(b, pH(ispec, idir), k, j, i) = covH(idir)/J; // Used the scaled value of the rest frame flux for reconstruction
         }
       });
 
@@ -183,13 +135,17 @@ TaskStatus MomentCon2Prim(T* rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
+
+  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentCon2PrimImpl<T, ClosureType::M1>(rc);
+    return MomentCon2PrimImpl<T, ClosureM1<Vec, Tens2, settings>, true>(rc);
   }
   else if (method == "moment_eddington") {
+    return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc);
     return MomentCon2PrimImpl<T, ClosureType::Eddington>(rc);
   } else if (method == "mocmc") {
-    return MomentCon2PrimImpl<T, ClosureType::MOCMC>(rc);
+    return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc);
+    //return MomentCon2PrimImpl<T, ClosureType::MOCMC>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown");
   }
@@ -198,7 +154,7 @@ TaskStatus MomentCon2Prim(T* rc) {
 //template TaskStatus MomentCon2Prim<MeshData<Real>>(MeshData<Real> *);
 template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
-template <class T, ClosureType CLOSURE_TYPE>
+template <class T, class CLOSURE>
 TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
 
   namespace cr = radmoment_cons;
@@ -241,7 +197,9 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
-        Closure<Vec, Tens2> c(con_v, cov_gamma);
+
+        typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, 0, b, j, i);
+        CLOSURE c(con_v, &g);
 
         Real E;
         Vec covF;
@@ -250,13 +208,9 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
         Vec covH ={{v(b, pH(ispec, 0), k, j, i)*J,
                     v(b, pH(ispec, 1), k, j, i)*J,
                     v(b, pH(ispec, 2), k, j, i)*J}};
-        if (CLOSURE_TYPE == ClosureType::M1) {
-          c.Prim2ConM1(J, covH, &E, &covF, &conTilPi);
-        }
-        else if (CLOSURE_TYPE == ClosureType::Eddington) {
-          SPACELOOP2(ii, jj) conTilPi(ii,jj) = 0.0;
-          c.Prim2Con(J, covH, conTilPi, &E, &covF);
-        }
+
+        c.GetCovTilPiFromPrim(J, covH, &conTilPi);
+        c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
@@ -273,11 +227,12 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
+  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentPrim2ConImpl<T, ClosureType::M1>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureM1<Vec, Tens2, settings> >(rc, domain);
   }
   else if (method == "moment_eddington") {
-    return MomentPrim2ConImpl<T, ClosureType::Eddington>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, domain);
   }
   else if (method == "mocmc") {
     return MomentPrim2ConImpl<T, ClosureType::MOCMC>(rc, domain);
@@ -387,7 +342,7 @@ TaskStatus ReconstructEdgeStates(T* rc) {
 template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 // This really only works for MeshBlockData right now since fluxes don't have a block index
-template <class T, ClosureType CLOSURE_TYPE>
+template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T* rc) {
 
   auto *pmb = rc->GetParentPointer().get();
@@ -459,6 +414,15 @@ TaskStatus CalculateFluxesImpl(T* rc) {
               break;
           }
 
+        Vec con_beta;
+        Tens2 cov_gamma;
+        geom.Metric(face, k, j, i, cov_gamma.data);
+        geom.ContravariantShift(face, k, j, i, con_beta.data);
+        const Real sdetgam = geom.DetGamma(face, k, j, i);
+        typename CLOSURE::LocalGeometryType g(geom, face, 0, k, j, i);
+
+        const Real dx = coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));
+
         for (int ispec = 0; ispec<nspec; ++ispec) {
 
           const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
@@ -486,21 +450,14 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           // is necessary for handling the asymptotic limit near sharp surfaces
           Real kappaH = sqrt((v(idx_kappaH(ispec), k, j, i)*v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
 
-          Vec con_beta;
-          Tens2 cov_gamma;
-          geom.Metric(face, k, j, i, cov_gamma.data);
-          geom.ContravariantShift(face, k, j, i, con_beta.data);
-          const Real sdetgam = geom.DetGamma(face, k, j, i);
-
-          const Real dx = coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH*dx), 1)));
 
           // Calculate the observer frame quantities on either side of the interface
           /// TODO: (LFR) Add other contributions to the asymptotic flux
           Vec HasymL = -cov_dJ/(3*kappaH + 3*kappaH_min);
           Vec HasymR = HasymL;
-          Closure<Vec, Tens2> cl(con_vl, cov_gamma);
-          Closure<Vec, Tens2> cr(con_vr, cov_gamma);
+          CLOSURE cl(con_vl, &g);
+          CLOSURE cr(con_vr, &g);
           Real El, Er;
           Tens2 con_tilPil, con_tilPir;
           Vec covFl, conFl, conFl_asym;
@@ -509,44 +466,22 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           Tens2 Pr, Pr_asym; // P^i_j on the right side of the interface
 
           // Fluxes in the asymptotic limit
-          if (CLOSURE_TYPE == ClosureType::M1) {
-            cl.Prim2ConM1(Jl, HasymL, &El, &covFl, &con_tilPil);
-            cr.Prim2ConM1(Jr, HasymR, &Er, &covFr, &con_tilPir);
+          if (CLOSURE_TYPE == ClosureType::MOCMC) {
+            // Use reconstructed values of tilPi
+          } else {
+            cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
+            cr.GetCovTilPiFromPrim(Jr, HasymR, &con_tilPir);
           }
-          else if (CLOSURE_TYPE == ClosureType::Eddington) {
-            SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
-            SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
-            cl.Prim2Con(Jl, HasymL, con_tilPil, &El, &covFl);
-            cr.Prim2Con(Jr, HasymR, con_tilPir, &Er, &covFr);
-          }
-          else if (CLOSURE_TYPE == ClosureType::MOCMC) {
-            SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
-            SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
-            cl.Prim2Con(Jl, HasymL, con_tilPil, &El, &covFl);
-            cr.Prim2Con(Jr, HasymR, con_tilPir, &Er, &covFr);
-          }
-          cl.raise3Vector(covFl, &conFl_asym);
-          cr.raise3Vector(covFr, &conFr_asym);
-          cl.getConCovPFromPrim(Jl, HasymL, con_tilPil, &Pl_asym);
-          cr.getConCovPFromPrim(Jr, HasymR, con_tilPir, &Pr_asym);
+          cl.getFluxesFromPrim(Jl, HasymL, con_tilPil, &conFl_asym, &Pl_asym);
+          cr.getFluxesFromPrim(Jr, HasymR, con_tilPir, &conFr_asym, &Pr_asym);
 
           // Regular fluxes
-          if (CLOSURE_TYPE == ClosureType::M1) {
-            cl.Prim2ConM1(Jl, Hl, &El, &covFl, &con_tilPil);
-            cr.Prim2ConM1(Jr, Hr, &Er, &covFr, &con_tilPir);
-          }
-          else if (CLOSURE_TYPE == ClosureType::Eddington) {
-            SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
-            SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
-            cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
-            cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
-          }
-          else if (CLOSURE_TYPE == ClosureType::MOCMC) {
-          }
-          cl.raise3Vector(covFl, &conFl);
-          cr.raise3Vector(covFr, &conFr);
-          cl.getConCovPFromPrim(Jl, Hl, con_tilPil, &Pl);
-          cr.getConCovPFromPrim(Jr, Hr, con_tilPir, &Pr);
+          cl.GetCovTilPiFromPrim(Jl, Hl, &con_tilPil);
+          cr.GetCovTilPiFromPrim(Jr, Hr, &con_tilPir);
+          cl.getFluxesFromPrim(Jl, Hl, con_tilPil, &conFl, &Pl);
+          cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
+          cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
+          cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
@@ -585,13 +520,14 @@ TaskStatus CalculateFluxes(T* rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
+  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateFluxesImpl<T, ClosureType::M1>(rc);
-  }
-  else if (method == "moment_eddington") {
-    return CalculateFluxesImpl<T, ClosureType::Eddington>(rc);
+    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings> >(rc);
+  } else if (method == "moment_eddington") {
+    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings> >(rc);
   } else if (method == "mocmc") {
-    return CalculateFluxesImpl<T, ClosureType::MOCMC>(rc);
+    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings> >(rc);
+    //return CalculateFluxesImpl<T, ClosureType::MOCMC>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -599,7 +535,7 @@ TaskStatus CalculateFluxes(T* rc) {
 }
 template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
-template <class T, ClosureType CLOSURE_TYPE>
+template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
   constexpr int ND = Geometry::NDFULL;
@@ -636,7 +572,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   int nspec = idx_E.DimSize(1);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(),
+      DEFAULT_LOOP_PATTERN, "RadMoments::GeometricSource", DevExecSpace(),
       0, nblock-1, // Loop over blocks
       kb.s, kb.e, // z-loop
       jb.s, jb.e, // y-loop
@@ -649,7 +585,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
 
-        Closure<Vec, Tens2> c(con_v, cov_gamma);
+        typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
+        CLOSURE c(con_v, &g);
 
         Real alp = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
         Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
@@ -687,16 +624,10 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                     J*v(iblock, idx_H(ispec, 1), k, j, i),
                     J*v(iblock, idx_H(ispec, 2), k, j, i)}};
           Vec conF;
-          c.raise3Vector(covF, &conF);
+          g.raise3Vector(covF, &conF);
           Tens2 conP, con_tilPi;
-          if (CLOSURE_TYPE == ClosureType::M1) {
-            Real tempE;
-            Vec tempF;
-            c.Prim2ConM1(J, covH, &tempE, &tempF, &con_tilPi);
-          }
-          else if (CLOSURE_TYPE == ClosureType::Eddington) {
-            SPACELOOP2(ii,jj) con_tilPi(ii,jj) = 0.0;
-          }
+
+          c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
           c.getConPFromPrim(J, covH, con_tilPi, &conP);
 
           Real srcE = 0.0;
@@ -721,11 +652,12 @@ TaskStatus CalculateGeometricSource(T* rc, T* rc_src) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
+  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateGeometricSourceImpl<T, ClosureType::M1>(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings> >(rc, rc_src);
   }
   else if (method == "moment_eddington") {
-    return CalculateGeometricSourceImpl<T, ClosureType::Eddington>(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings> >(rc, rc_src);
   }
   else if (method == "mocmc") {
     return CalculateGeometricSourceImpl<T, ClosureType::MOCMC>(rc, rc_src);
@@ -803,7 +735,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
           Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
           Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-          Closure<Vec, Tens2> c(con_v, cov_gamma);
+          LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
+
+          /// TODO: (LFR) Move beyond Eddington for this update
+          ClosureEdd<Vec, Tens2> c(con_v, &g);
 
           Real Estar = v(iblock, idx_E(ispec), k, j, i)/sdetgam;
           Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i)/sdetgam,
@@ -813,8 +748,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Real dE;
           Vec cov_dF;
 
-          /// TODO: (LFR) Move beyond Eddington for this update
-          Tens2 con_tilPi{{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}}};
 
           // Treat the Eddington tensor explicitly for now
           Real& J = v(iblock, idx_J(ispec), k, j, i);
@@ -822,8 +755,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                      J*v(iblock, idx_H(ispec, 1), k, j, i),
                      J*v(iblock, idx_H(ispec, 2), k, j, i),
                     }};
-          //Vec con_tilf;
-          //c.M1FluidPressureTensor(J, cov_H, &con_tilPi, &con_tilf);
+          Tens2 con_tilPi;
+
+          c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
 
           Real B = v(iblock, idx_JBB(ispec), k, j, i);
           Real tauJ = alpha*dt*v(iblock, idx_kappaJ(ispec), k, j, i);
@@ -918,6 +852,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           const Real rho =  v(iblock, prho, k, j, i);
           const Real Temp =  v(iblock, pT, k, j, i);
           const Real Ye = v(iblock, pYe, k, j, i);
+          const Real T_code =  v(iblock, pT, k, j, i);
 
           Real kappa = d_opacity.AbsorptionCoefficient(rho, Temp, Ye, dev_species[ispec], enu);
           const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
