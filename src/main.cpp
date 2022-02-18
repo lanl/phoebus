@@ -47,11 +47,11 @@ int main(int argc, char *argv[]) {
   // Ensure only allowed parthenon boundary conditions are used
   const std::string parth_ix1_bc =
     pman.pinput->GetString("parthenon/mesh", "ix1_bc");
-  PARTHENON_REQUIRE(parth_ix1_bc == "user" || parth_ix1_bc == "periodic", 
+  PARTHENON_REQUIRE(parth_ix1_bc == "user" || parth_ix1_bc == "periodic",
     "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ix1_bc");
   const std::string parth_ox1_bc =
     pman.pinput->GetString("parthenon/mesh", "ox1_bc");
-  PARTHENON_REQUIRE(parth_ox1_bc == "user" || parth_ox1_bc == "periodic", 
+  PARTHENON_REQUIRE(parth_ox1_bc == "user" || parth_ox1_bc == "periodic",
     "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ox1_bc");
 
   const std::string ix1_bc =
@@ -78,6 +78,9 @@ int main(int argc, char *argv[]) {
 
   // call ParthenonInit to set up the mesh
   pman.ParthenonInitPackagesAndMesh();
+
+  // call post-initialization
+  phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get());
 
   // Initialize the driver
   phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(),

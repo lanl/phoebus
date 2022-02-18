@@ -30,11 +30,23 @@ jobs:
         - name: Run test scripts
           run: |
             cd tst/regression
+            mkdir build_minkowski
+            cd build_minkowski
+            cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
+            cmake --build . --parallel 4
+            cd ..
+            mkdir build_fmks
+            cd build_fmks
+            cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=FMKS -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
+            cmake --build . --parallel 4
+            cd ..
             # TODO(BRR) add --use_gpu flag here if running on GPU
-            ./radiation_diffusion.py
-            #./linear_modes.py
-            #./bondi.py
-        - name: Build code
+            ./radiation_diffusion.py --executable build_minkowski/src/phoebus
+            ./bondi.py --executable build_fmks/src/phoebus
+            ./linear_modes.py --executable build_minkowski/src/phoebus
+            ./thincooling.py --executable build_minkowski/src/phoebus
+            ./thincooling_coolingfunction.py --executable build_minkowski/src/phoebus
+        - name: Build code for unit testing
           run: |
             mkdir build
             cd build
