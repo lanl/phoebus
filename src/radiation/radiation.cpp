@@ -254,6 +254,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(i::kappaH, mSourceVar);
     physics->AddField(i::JBB, mSourceVar);
 
+    // Make Eddington tensor an independent quantity for MOCMC to supply
+    if (method == "mocmc") {
+      Metadata mspecies_three_tensor = Metadata({Metadata::Cell, Metadata::Independent, Metadata::OneCopy},
+        std::vector<int>{NumRadiationTypes, 3, 3});
+
+      physics->AddField(i::tilPi, mspecies_three_tensor);
+    }
+
     physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }
 
@@ -262,6 +270,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (method != "cooling_function") {
     physics->EstimateTimestepBlock = EstimateTimestepBlock;
   }
+
+  printf("Done initializing\n");
 
   return physics;
 }

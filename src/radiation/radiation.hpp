@@ -119,6 +119,14 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid);
 template <class T>
 TaskStatus MomentCalculateOpacities(T *rc);
 
+
+// MOCMC tasks
+template <class T>
+TaskStatus MOCMCTransport(T *rc);
+
+template <class T>
+TaskStatus MOCMCReconstruction(T *rc);
+
 } // namespace radiation
 
 #endif // RADIATION_HPP_

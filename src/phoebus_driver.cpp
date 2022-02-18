@@ -97,6 +97,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const auto rad_active = rad->Param<bool>("active");
   const auto rad_moments_active = rad->Param<bool>("moments_active");
   const auto fluid_active = fluid->Param<bool>("active");
+  const bool rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
 
   std::vector<std::string> src_names;
   if (fluid_active) {
@@ -160,6 +161,14 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto moment_geom_src =  tl.AddTask(none, radiation::CalculateGeometricSource<MDT>, sc0.get(), gsrc.get());
       sndrcv_flux_depend = sndrcv_flux_depend | moment_flux;
       geom_src = geom_src | moment_geom_src;
+    }
+
+    if (rad_mocmc_active) {
+      using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+      auto samples_transport = tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get());
+      auto intensity_recon = tl.AddTask(none, radiation::MOCMCReconstruction<MDT>, sc0.get());
+
+      geom_src = geom_src | intensity_recon;
     }
 
     auto send_flux =
@@ -302,8 +311,6 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
     }
   } else if (rad_method == "monte_carlo") {
     return MonteCarloStep();
-  } else if (rad_method == "mocmc") {
-    PARTHENON_FAIL("MOCMC not implemented!");
   }
 
   return tc.Execute();
