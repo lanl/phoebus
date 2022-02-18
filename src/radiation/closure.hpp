@@ -105,7 +105,7 @@ namespace radiation
     ClosureStatus Prim2Con(const Real J, const Vec cov_H, const Tens2 con_tilPi, Real *E, Vec *cov_F);
 
     //-------------------------------------------------------------------------------------
-    /// Transform from J, \tilde H_i, and \tilde \pi_{ij} to E and F_i. Should be used for
+    /// Transform from E, F_i, and \tilde \pi_{ij} to J and \tilde H_i. Should be used for
     /// Eddington approximation (i.e. \tilde \pi_{ij} = 0) and MoCMC where \tilde \pi^{ij}
     /// is externally specified
     KOKKOS_FUNCTION
