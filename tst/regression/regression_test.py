@@ -26,6 +26,7 @@ import __main__
 #
 
 BUILD_DIR='build'
+RUN_DIR='run'
 SOURCE_DIR='../../../'
 NUM_PROCS=4 # Default values for cmake --build --parallel can overwhelm CI systems
 TEMPORARY_INPUT_FILE='test_input.pin'
@@ -37,10 +38,10 @@ SCRIPT_NAME=os.path.basename(__main__.__file__).split('.py')[0]
 
 # -- Compare two values up to some floating point tolerance
 def soft_equiv(val, ref, tol = 1.e-5):
-  if ref < 1.e-100:
-    return True
+  numerator = np.fabs(val - ref)
+  denominator = max(np.fabs(ref), 1.e-10)
 
-  if np.fabs(val - ref)/np.fabs(ref) > tol:
+  if numerator/denominator > tol:
     return False
   else:
     return True
@@ -115,16 +116,22 @@ def modify_input(dict_key, value, input_file):
 #
 
 # -- Configure and build phoebus with problem-specific options
-def build_code(geometry, use_gpu=False):
+def build_code(geometry, use_gpu=False, build_type="Release"):
   if os.path.isdir(BUILD_DIR):
     print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
-    sys.exit()
+    sys.exit(os.EX_SOFTWARE)
   os.mkdir(BUILD_DIR)
   os.chdir(BUILD_DIR)
 
   # Base configure options
   configure_options = []
-  configure_options.append("-DCMAKE_BUILD_TYPE=Release")
+  if build_type == "Release":
+    configure_options.append("-DCMAKE_BUILD_TYPE=Release")
+  elif build_type == "Debug":
+    configure_options.append("-DCMAKE_BUILD_TYPE=Debug")
+  else:
+    print(f"Build type \"{build_type}\" not known!")
+    sys.exit(os.EX_SOFTWARE)
   configure_options.append("-DPHOEBUS_ENABLE_UNIT_TESTS=OFF")
   configure_options.append("-DMAX_NUMBER_CONSERVED_VARS=10")
   configure_options.append("-DPHOEBUS_CACHE_GEOMETRY=ON")
@@ -151,17 +158,49 @@ def build_code(geometry, use_gpu=False):
   # Compile
   call(['cmake', '--build', '.', '--parallel', str(NUM_PROCS)])
 
+  # Return to base directory
+  os.chdir('..')
+
+# -- Clean up working directory
+def cleanup():
+  if os.getcwd().split(os.sep)[-1] == BUILD_DIR or os.getcwd().split(os.sep)[-1] == RUN_DIR:
+    os.chdir('..')
+
+  if os.path.isabs(BUILD_DIR):
+    print(f"Absolute paths not allowed for build directory \"{BUILD_DIR}\" -- unsafe when cleaning up!")
+    sys.exit(os.EX_SOFTWARE)
+
+  if os.path.isabs(RUN_DIR):
+    print(f"Absolute paths not allowed for run directory \"{RUN_DIR}\" -- unsafe when cleaning up!")
+    sys.exit(os.EX_SOFTWARE)
+
+  if os.path.exists(BUILD_DIR):
+    try:
+      shutil.rmtree(BUILD_DIR)
+    except:
+      print(f"Error cleaning up build directory \"{BUILD_DIR}\"!")
+
+  if os.path.exists(RUN_DIR):
+    try:
+      shutil.rmtree(RUN_DIR)
+    except:
+      print(f"Error cleaning up build directory \"{RUN_DIR}\"!")
+
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
-def gold_comparison(variables, input_file, modified_inputs={}, executable='./src/phoebus',
-                    upgold=False, compression_factor=1, save_output=False):
+def gold_comparison(variables, input_file, modified_inputs={},
+                    executable=None, geometry='Minkowski', use_gpu=False, build_type='Release',
+                    upgold=False, compression_factor=1, tolerance=1.e-5):
 
-  if not os.getcwd().endswith(BUILD_DIR):
-    if os.path.isdir(BUILD_DIR):
-      print(f"BUILD_DIR \"{BUILD_DIR}\" already exists! Clean up before calling a regression test script!")
-      sys.exit()
-    os.mkdir(BUILD_DIR)
-    os.chdir(BUILD_DIR)
+  if executable is None:
+    executable = os.path.join(BUILD_DIR, 'src', 'phoebus')
+    build_code(geometry, use_gpu, build_type)
+
+  if os.path.isdir(RUN_DIR):
+    print(f"RUN_DIR \"{RUN_DIR}\" already exists! Clean up before calling a regression test script!")
+    sys.exit(os.EX_SOFTWARE)
+  os.mkdir(RUN_DIR)
+  os.chdir(RUN_DIR)
 
   # Copy test problem and modify inputs
   shutil.copyfile(input_file, TEMPORARY_INPUT_FILE)
@@ -169,14 +208,16 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
-  #call(['mpirun', '-np', '1', executable, '-i', TEMPORARY_INPUT_FILE])
-  call([executable, '-i', TEMPORARY_INPUT_FILE])
+  if os.path.isabs(executable):
+    call([executable, '-i', TEMPORARY_INPUT_FILE])
+  else:
+    call([os.path.join('..', executable), '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))
   if len(dumpfiles) == 0:
     print("Could not load any dump files!")
-    sys.exit()
+    sys.exit(os.EX_SOFTWARE)
   dump = phdf.phdf(dumpfiles[-1])
 
   # Construct array of results values
@@ -212,17 +253,7 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
         if not soft_equiv(variables_data[n], gold_variables[n]):
           success = False
 
-  # Clean up
-  os.chdir('..')
-  if os.path.isabs(BUILD_DIR):
-    print(f"Absolute paths not allowed for build directory \"{BUILD_DIR}\" -- unsafe when cleaning up!")
-    sys.exit()
-
-  try:
-    if not save_output: 
-      shutil.rmtree(BUILD_DIR)
-  except:
-    print(f"Error cleaning up build directory \"{BUILD_DIR}\"!")
+  cleanup()
 
   # Report upgolding, success, or failure
   if upgold:
@@ -230,9 +261,14 @@ def gold_comparison(variables, input_file, modified_inputs={}, executable='./src
   else:
     if success:
       print("TEST PASSED")
-      sys.exit(os.EX_OK)
+      return os.EX_OK
     else:
       print("TEST FAILED")
       mean_error = np.mean(variables_data - gold_variables)
-      print(f"Mean error: {mean_error}")
-      sys.exit(os.EX_SOFTWARE)
+      max_error = np.max(np.fabs(variables_data - gold_variables))
+      max_frac_error = np.max(np.fabs(variables_data - gold_variables)/gold_variables)
+
+      print(f"Mean error:           {mean_error}")
+      print(f"Max error:            {max_error}")
+      print(f"Max fractional error: {max_frac_error}")
+      return os.EX_SOFTWARE
