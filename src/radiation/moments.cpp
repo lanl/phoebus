@@ -100,7 +100,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi};
+  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi, ir::tilPi};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -109,6 +109,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   auto cF = imap.GetFlatIdx(cr::F);
   auto pH = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi);
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
 
@@ -163,6 +164,10 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
           SPACELOOP2(ii, jj) conTilPi(ii, jj) = 0.0;
           c.Con2Prim(E, covF, conTilPi, &J, &covH);
         }
+        else if (CLOSURE_TYPE == ClosureType::MOCMC) {
+          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
+          c.Con2Prim(E, covF, conTilPi, &J, &covH);
+        }
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -183,6 +188,10 @@ TaskStatus MomentCon2Prim(T* rc) {
   }
   else if (method == "moment_eddington") {
     return MomentCon2PrimImpl<T, ClosureType::Eddington>(rc);
+  } else if (method == "mocmc") {
+    return MomentCon2PrimImpl<T, ClosureType::MOCMC>(rc);
+  } else {
+    PARTHENON_FAIL("Radiation method unknown");
   }
   return TaskStatus::fail;
 }
@@ -270,6 +279,12 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   else if (method == "moment_eddington") {
     return MomentPrim2ConImpl<T, ClosureType::Eddington>(rc, domain);
   }
+  else if (method == "mocmc") {
+    return MomentPrim2ConImpl<T, ClosureType::MOCMC>(rc, domain);
+  }
+  else {
+    PARTHENON_FAIL("Radiation method unknown!");
+  }
   return TaskStatus::fail;
 }
 
@@ -296,7 +311,7 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   PackIndexMap imap_ql, imap_qr, imap;
   VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
   VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
-  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{pr::J, pr::H, ir::dJ}, imap);
+  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{pr::J, pr::H, ir::dJ, ir::tilPi}, imap);
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_dJ = imap.GetFlatIdx(ir::dJ);
 
@@ -504,6 +519,12 @@ TaskStatus CalculateFluxesImpl(T* rc) {
             cl.Prim2Con(Jl, HasymL, con_tilPil, &El, &covFl);
             cr.Prim2Con(Jr, HasymR, con_tilPir, &Er, &covFr);
           }
+          else if (CLOSURE_TYPE == ClosureType::MOCMC) {
+            SPACELOOP2(ii,jj) con_tilPil(ii,jj) = 0.0;
+            SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
+            cl.Prim2Con(Jl, HasymL, con_tilPil, &El, &covFl);
+            cr.Prim2Con(Jr, HasymR, con_tilPir, &Er, &covFr);
+          }
           cl.raise3Vector(covFl, &conFl_asym);
           cr.raise3Vector(covFr, &conFr_asym);
           cl.getConCovPFromPrim(Jl, HasymL, con_tilPil, &Pl_asym);
@@ -519,6 +540,8 @@ TaskStatus CalculateFluxesImpl(T* rc) {
             SPACELOOP2(ii,jj) con_tilPir(ii,jj) = 0.0;
             cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
             cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
+          }
+          else if (CLOSURE_TYPE == ClosureType::MOCMC) {
           }
           cl.raise3Vector(covFl, &conFl);
           cr.raise3Vector(covFr, &conFr);
@@ -567,6 +590,10 @@ TaskStatus CalculateFluxes(T* rc) {
   }
   else if (method == "moment_eddington") {
     return CalculateFluxesImpl<T, ClosureType::Eddington>(rc);
+  } else if (method == "mocmc") {
+    return CalculateFluxesImpl<T, ClosureType::MOCMC>(rc);
+  } else {
+    PARTHENON_FAIL("Radiation method unknown!");
   }
   return TaskStatus::fail;
 }
@@ -699,6 +726,12 @@ TaskStatus CalculateGeometricSource(T* rc, T* rc_src) {
   }
   else if (method == "moment_eddington") {
     return CalculateGeometricSourceImpl<T, ClosureType::Eddington>(rc, rc_src);
+  }
+  else if (method == "mocmc") {
+    return CalculateGeometricSourceImpl<T, ClosureType::MOCMC>(rc, rc_src);
+  }
+  else {
+    PARTHENON_FAIL("Radiation method unknown!");
   }
   return TaskStatus::fail;
 }

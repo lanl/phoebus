@@ -43,7 +43,7 @@ namespace radmoment_cons {
   constexpr char F[] = "r.c.F";
 }
 
-namespace radmoment_internal { 
+namespace radmoment_internal {
   constexpr char xi[] = "r.i.xi";
   constexpr char phi[] = "r.i.phi";
   constexpr char ql[] = "r.i.ql";
@@ -54,6 +54,7 @@ namespace radmoment_internal {
   constexpr char kappaJ[] = "r.i.kappaJ";
   constexpr char kappaH[] = "r.i.kappaH";
   constexpr char JBB[] = "r.i.JBB";
+  constexpr char tilPi[] = "r.i.tilPi";
 }
 
 namespace internal_variables {
