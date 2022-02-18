@@ -51,6 +51,12 @@ using namespace parthenon::package::prelude;
   MODIFIER(phoebus)                                                                      \
   MODIFIER(torus)
 
+// if you need problem-specific post-initialization modifiers to initial conditions, add
+// the name here
+#define FOREACH_POSTINIT_MODIFIER                                                        \
+  POSTINIT_MODIFIER(phoebus)                                                             \
+  POSTINIT_MODIFIER(torus)
+
 /*
 // DO NOT TOUCH THE MACROS BELOW
 */
@@ -60,10 +66,15 @@ using namespace parthenon::package::prelude;
   FOREACH_PROBLEM
 #undef PROBLEM
 
-// declare all the modifiers
+// declare all the input modifiers
 #define MODIFIER(name) namespace name { void ProblemModifier(ParameterInput *pin); }
   FOREACH_MODIFIER
 #undef MODIFIER
+
+// declare all the initial condition modifiers
+#define POSTINIT_MODIFIER(name) namespace name { void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh); }
+  FOREACH_POSTINIT_MODIFIER
+#undef POSTINIT_MODIFIER
 
 namespace phoebus {
 
@@ -78,6 +89,12 @@ static std::map<std::string, std::function<void(ParameterInput *pin)>> pmod_dict
 #define MODIFIER(name) {#name, name::ProblemModifier} ,
   FOREACH_MODIFIER
 #undef MODIFIER
+});
+
+static std::map<std::string, std::function<void(ParameterInput *pin, Mesh *pmesh)>> pinitmod_dict ({
+#define POSTINIT_MODIFIER(name) {#name, name::PostInitializationModifier} ,
+  FOREACH_POSTINIT_MODIFIER
+#undef POSTINITMODIFIER
 });
 
 /*

@@ -20,15 +20,14 @@ namespace radiation {
 using namespace singularity::neutrinos;
 using singularity::RadiationType;
 
-TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
-                                             const double dt) {
+TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({p::density, p::velocity, p::temperature, p::ye,
-                                 c::energy, iv::Gcov, iv::Gye});
+  std::vector<std::string> vars(
+      {p::density, p::velocity, p::temperature, p::ye, c::energy, iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
@@ -37,7 +36,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
   const int pvhi = imap[p::velocity].second;
   const int ptemp = imap[p::temperature].first;
   const int pye = imap[p::ye].first;
-  const int ceng = imap[c::energy].first;
   const int Gcov_lo = imap[iv::Gcov].first;
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
@@ -53,13 +51,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
 
   const auto d_opacity = opac->Param<Opacity>("d.opacity");
 
-  const Real RHO = unit_conv.GetMassDensityCodeToCGS();
-  const Real TEMPERATURE = unit_conv.GetTemperatureCodeToCGS();
-  const Real CENERGY = unit_conv.GetEnergyCGSToCode();
-  const Real CDENSITY = unit_conv.GetNumberDensityCGSToCode();
-  const Real CTIME = unit_conv.GetTimeCGSToCode();
-  const Real CPOWERDENS = CENERGY * CDENSITY / CTIME;
-
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   bool do_species[3] = {rad->Param<bool>("do_nu_electron"),
@@ -67,9 +58,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
                         rad->Param<bool>("do_nu_heavy")};
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(),
-      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // Initialize five-force to zero
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
           v(mu, k, j, i) = 0.;
@@ -79,42 +69,37 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc,
 
   for (int sidx = 0; sidx < 3; sidx++) {
     // Apply cooling for each neutrino species separately
-      if (do_species[sidx]) {
-        auto s = species[sidx];
+    if (do_species[sidx]) {
+      auto s = species[sidx];
 
-        parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(),
-        kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          Real Gcov[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
-          Real Ucon[4];
-          Real vel[3] = {v(pvlo, k, j, i),
-                         v(pvlo + 1, k, j, i),
-                         v(pvlo + 2, k, j, i)};
-          GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
-          Geometry::Tetrads Tetrads(Ucon, Gcov);
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
+          kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            Real Gcov[4][4];
+            geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
+            Real Ucon[4];
+            Real vel[3] = {v(pvlo, k, j, i), v(pvlo + 1, k, j, i), v(pvlo + 2, k, j, i)};
+            GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
+            Geometry::Tetrads Tetrads(Ucon, Gcov);
 
-          const Real rho_cgs = v(prho, k, j, i) * RHO;
-          const Real T_cgs = v(ptemp, k, j, i) * TEMPERATURE;
-          const Real Ye = v(pye, k, j, i);
+            const Real Ye = v(pye, k, j, i);
 
-          double J = d_opacity.Emissivity(rho_cgs, T_cgs, Ye, s);
-          double Jye =
-              pc::mp * d_opacity.NumberEmissivity(rho_cgs, T_cgs, Ye, s);
-          Real Gcov_tetrad[4] = {-J * CPOWERDENS, 0., 0., 0.};
-          Real Gcov_coord[4];
-          Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
-          Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+            double J = d_opacity.Emissivity(v(prho, k, j, i), v(ptemp, k, j, i), Ye, s);
+            double Jye = pc::mp * d_opacity.NumberEmissivity(v(prho, k, j, i),
+                                                             v(ptemp, k, j, i), Ye, s);
 
-          for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-            Kokkos::atomic_add(&(v(mu, k, j, i)),
-                               detG * Gcov_coord[mu - Gcov_lo]);
-          }
-          Kokkos::atomic_add(&(v(Gye, k, j, i)),
-                             -detG * Jye * CDENSITY / CTIME);
-        });
-      }
+            Real Gcov_tetrad[4] = {-J, 0., 0., 0.};
+            Real Gcov_coord[4];
+            Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
+            Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+
+            for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
+              Kokkos::atomic_add(&(v(mu, k, j, i)), detG * Gcov_coord[mu - Gcov_lo]);
+            }
+            Kokkos::atomic_add(&(v(Gye, k, j, i)), -detG * Jye);
+          });
+    }
   }
 
   return TaskStatus::complete;

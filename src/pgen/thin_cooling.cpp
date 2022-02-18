@@ -38,7 +38,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap[p::velocity].first;
   const int ivhi = imap[p::velocity].second;
   const int ieng = imap[p::energy].first;
-  const int iye  = imap[p::ye].second;
+  const int iye = imap[p::ye].second;
   const int iprs = imap[p::pressure].first;
   const int itmp = imap[p::temperature].first;
 
@@ -52,27 +52,30 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &unit_conv = eospkg.get()->Param<phoebus::UnitConversions>("unit_conv");
 
   const Real rho0 = 1.e6 * unit_conv.GetMassDensityCGSToCode();
-  const Real u0 = 1.e20*unit_conv.GetEnergyCGSToCode()*unit_conv.GetNumberDensityCGSToCode();
+  const Real u0 =
+      1.e20 * unit_conv.GetEnergyCGSToCode() * unit_conv.GetNumberDensityCGSToCode();
 
   const Real x1max = pin->GetReal("parthenon/mesh", "x1max");
   const std::string rad_method = pin->GetString("radiation", "method");
   if (x1max > 1.e-7 && rad_method == "cooling_function") {
-    PARTHENON_THROW("Set x1max = 1.e-7 for the cooling_function rad method to get small enough timesteps!");
+    PARTHENON_THROW("Set x1max = 1.e-7 for the cooling_function rad method to get small "
+                    "enough timesteps!");
   }
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const Real x = coords.x1v(i);
-	Real lambda[2] = {0.5, 0.};
-	if (iye > 0) {
-	  v(iye, k, j, i) = lambda[0];
-	}
+        Real lambda[2] = {0.5, 0.};
+        if (iye > 0) {
+          v(iye, k, j, i) = lambda[0];
+        }
 
         v(irho, k, j, i) = rho0;
         v(ieng, k, j, i) = u0;
-        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho0, u0/rho0, lambda);
-        v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho0, u0/rho0, lambda);
+        v(itmp, k, j, i) =
+            eos.TemperatureFromDensityInternalEnergy(rho0, u0 / rho0, lambda);
+        v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho0, u0 / rho0, lambda);
         v(iye, k, j, i) = 0.5; // TODO(BRR) change depending on species
 
         for (int d = 0; d < 3; d++)
