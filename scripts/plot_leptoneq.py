@@ -2,9 +2,10 @@ DUMP_NAMES = '/home/brryan/builds/phoebus/leptoneq.out1.*.phdf'
 
 import argparse
 import numpy as np
-import sys
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import sys
 import shutil
 import os
 from subprocess import call, DEVNULL
@@ -17,6 +18,9 @@ parser = argparse.ArgumentParser(description='Plot torus')
 parser.add_argument('--nfinal', type=int, default=-1, help='dump to plot')
 parser.add_argument('--savefig', type=bool, default=False, help='Whether to save figure')
 args = parser.parse_args()
+
+if args.savefig:
+  matplotlib.use('Agg')
 
 # Whether to plot meshblock boundaries
 plot_meshblocks = True
