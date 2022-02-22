@@ -43,11 +43,11 @@ namespace radiation
     Real fXi, fPhi;
     Real errXi, errPhi;
   };
-  
+
   /// Holds methods for closing the radiation moment equations as well as calculating radiation
   /// moment source terms.
   template <class Vec, class Tens2, class SET = ClosureSettings<> >
-  class ClosureM1 : public ClosureEdd<Vec, Tens2, SET> 
+  class ClosureM1 : public ClosureEdd<Vec, Tens2, SET>
   {
   protected:
     KOKKOS_FORCEINLINE_FUNCTION
@@ -56,39 +56,39 @@ namespace radiation
       return (1.0 - 2*std::pow(xi, 2) + 4*std::pow(xi,3))/3.0;
       //return (1.0 + 2 * xi * xi) / 3;
     }
-  
+
   public:
-    using typename ClosureEdd<Vec, Tens2, SET>::LocalGeometryType; 
-    
+    using typename ClosureEdd<Vec, Tens2, SET>::LocalGeometryType;
+
     //-------------------------------------------------------------------------------------
     /// Constructor just calculates the inverse 3-metric, covariant three-velocity, and the
     /// Lorentz factor for the given background state.
     KOKKOS_FUNCTION
-    ClosureM1(const Vec con_v_in, LocalGeometryType* g) 
-        : ClosureEdd<Vec, Tens2, SET>(con_v_in, g) {}  
-    
-    KOKKOS_FUNCTION 
+    ClosureM1(const Vec con_v_in, LocalGeometryType* g)
+        : ClosureEdd<Vec, Tens2, SET>(con_v_in, g) {}
+
+    KOKKOS_FUNCTION
     ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
-      Vec con_tilf; 
-      M1FluidPressureTensor(J, cov_H, con_tilPi, &con_tilf); 
-      return ClosureStatus::success; 
+      Vec con_tilf;
+      M1FluidPressureTensor(J, cov_H, con_tilPi, &con_tilf);
+      return ClosureStatus::success;
     }
-    
-    KOKKOS_FUNCTION 
+
+    KOKKOS_FUNCTION
     ClosureStatus GetCovTilPiFromCon(Real E, const Vec cov_F, Real& xi, Real& phi, Tens2 *con_tilPi) {
-      
+
       if (SET::eqn_type == ClosureEquation::number_conserve) {
-        double vF = 0.0; 
+        double vF = 0.0;
         SPACELOOP(i) vF += con_v(i)*cov_F(i);
         E = E/W + vF;
       }
 
       Vec con_tilf;
-      auto status = SolveClosure(E, cov_F, &xi, &phi, xi, phi); 
-      M1FluidPressureTensor(cov_F, xi, phi, con_tilPi, &con_tilf); 
-      return status.status; 
-    } 
-    
+      auto status = SolveClosure(E, cov_F, &xi, &phi, xi, phi);
+      M1FluidPressureTensor(cov_F, xi, phi, con_tilPi, &con_tilf);
+      return status.status;
+    }
+
     KOKKOS_FUNCTION
     void GetM1GuessesFromEddington(const Real E, const Vec cov_F, Real *xi, Real *phi);
 
@@ -101,16 +101,16 @@ namespace radiation
     using ClosureEdd<Vec, Tens2, SET>::cov_v;
     using ClosureEdd<Vec, Tens2, SET>::con_v;
     using ClosureEdd<Vec, Tens2, SET>::gamma;
-  
+
   protected:
-    // All internal methods are written in terms of E = n^\mu n^\nu M_{\mu \nu} 
+    // All internal methods are written in terms of E = n^\mu n^\nu M_{\mu \nu}
     //-------------------------------------------------------------------------------------
     /// Calculate \tilde \pi^{ij} and \tilde f_i = \tilde H_i/\sqrt{H_\alpha H^\alpha} from
     /// J and \tilde H_i.
     KOKKOS_FUNCTION
     ClosureStatus M1FluidPressureTensor(const Real J, const Vec cov_H,
                                  Tens2 *con_tilPi, Vec *con_tilf);
-  
+
     //-------------------------------------------------------------------------------------
     /// Calculate the residuals of the M1 root equations
     KOKKOS_FUNCTION
@@ -155,8 +155,8 @@ namespace radiation
     ClosureStatus GetBasisVectors(const Vec cov_F, Vec *con_tilg, Vec *con_tild);
 
   };
-  
-  //---- Method templates instantiated below 
+
+  //---- Method templates instantiated below
 
   template <class Vec, class Tens2, class SET>
   KOKKOS_FUNCTION
@@ -171,7 +171,7 @@ namespace radiation
     SPACELOOP2(i, j) con_PiEdd(i,j) = 0.0;
     Real JEdd;
     Vec cov_HEdd;
-    // Con2Prim deals with which E is being passed (number or energy conserving), 
+    // Con2Prim deals with which E is being passed (number or energy conserving),
     // so we need to make no transformation here
     Con2Prim(E, cov_F, con_PiEdd, &JEdd, &cov_HEdd);
     Real vHEdd = gamma->contractConCov3Vectors(con_v, cov_HEdd);
@@ -180,7 +180,7 @@ namespace radiation
     *xi = std::min(ratio(HEdd, JEdd), 0.99);
     *phi = 1.000001 * acos(-1);
   }
-  
+
   //----------------
   // Protected functions below
   //----------------
@@ -261,8 +261,8 @@ namespace radiation
     if (std::isnan(xi) || iter>=max_iter) {
       if (!(xi < 1.e-4) && !(std::fabs(fXi) < 1.e-3)) {
             printf("Con2Prim (Fail) : E = %e F = (%e, %e, %e) \n"
-                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n", 
-                   E, cov_F(0), cov_F(1), cov_F(2), xi, phi, fXi, fPhi, 
+                   "                 xi = %e phi = %e fXi = %e fPhi = %e v = (%e, %e, %e) xig = %e phig = %e\n",
+                   E, cov_F(0), cov_F(1), cov_F(2), xi, phi, fXi, fPhi,
                    con_v(0), con_v(1), con_v(2), xi_guess, phi_guess);
       }
       result.status = ClosureStatus::failure;
@@ -351,7 +351,7 @@ namespace radiation
                                               Vec *con_tilg, Vec *con_tild) {
     // Build projected basis vectors for flux direction
     // These vectors are actually fixed, so there is no need to recalculate
-    // them every step in the root find 
+    // them every step in the root find
     Vec con_F;
     gamma->raise3Vector(cov_F, &con_F);
     Real Fmag(0.0), vl(0.0), v2(0.0);
@@ -375,4 +375,4 @@ namespace radiation
   }
 } // namespace radiation
 
-#endif // CLOSURE_HPP_
+#endif // CLOSURE_M1_HPP_

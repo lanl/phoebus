@@ -21,6 +21,7 @@
 #include "radiation/local_three_geometry.hpp"
 #include "radiation/closure.hpp"
 #include "radiation/closure_m1.hpp"
+#include "radiation/closure_mocmc.hpp"
 
 namespace radiation {
 
@@ -45,7 +46,7 @@ template <class T>
   const int block_;
 };
 
-template <class T, class CLOSURE, bool STORE_GUESS>
+template <class T, class CLOSURE, bool STORE_GUESS, bool EDDINGTON_KNOWN>
 TaskStatus MomentCon2PrimImpl(T* rc) {
 
   namespace cr = radmoment_cons;
@@ -114,11 +115,12 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
           v(b, iXi(ispec), k, j, i) = xi;
           v(b, iPhi(ispec), k, j, i) = phi;
         }
-        if (CLOSURE_TYPE == ClosureType::MOCMC) {
+        if (EDDINGTON_KNOWN) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
           c.Con2Prim(E, covF, conTilPi, &J, &covH);
+        } else {
+          c.Con2Prim(E, covF, conTilPi, &J, &covH);
         }
-        c.Con2Prim(E, covF, conTilPi, &J, &covH);
         if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
 
         v(b, pJ(ispec), k, j, i) = J;
@@ -138,14 +140,12 @@ TaskStatus MomentCon2Prim(T* rc) {
 
   using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentCon2PrimImpl<T, ClosureM1<Vec, Tens2, settings>, true>(rc);
+    return MomentCon2PrimImpl<T, ClosureM1<Vec, Tens2, settings>, true, false>(rc);
   }
   else if (method == "moment_eddington") {
-    return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc);
-    return MomentCon2PrimImpl<T, ClosureType::Eddington>(rc);
+    return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, settings>, false, false>(rc);
   } else if (method == "mocmc") {
-    return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc);
-    //return MomentCon2PrimImpl<T, ClosureType::MOCMC>(rc);
+    return MomentCon2PrimImpl<T, ClosureMOCMC<Vec, Tens2, settings>, false, true>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown");
   }
@@ -235,7 +235,7 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
     return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, domain);
   }
   else if (method == "mocmc") {
-    return MomentPrim2ConImpl<T, ClosureType::MOCMC>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc, domain);
   }
   else {
     PARTHENON_FAIL("Radiation method unknown!");
@@ -342,7 +342,7 @@ TaskStatus ReconstructEdgeStates(T* rc) {
 template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 // This really only works for MeshBlockData right now since fluxes don't have a block index
-template <class T, class CLOSURE>
+template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
 TaskStatus CalculateFluxesImpl(T* rc) {
 
   auto *pmb = rc->GetParentPointer().get();
@@ -466,7 +466,7 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           Tens2 Pr, Pr_asym; // P^i_j on the right side of the interface
 
           // Fluxes in the asymptotic limit
-          if (CLOSURE_TYPE == ClosureType::MOCMC) {
+          if (EDDINGTON_KNOWN) {
             // Use reconstructed values of tilPi
           } else {
             cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
@@ -522,12 +522,11 @@ TaskStatus CalculateFluxes(T* rc) {
   auto method = rad->Param<std::string>("method");
   using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings> >(rc);
+    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings>, false >(rc);
   } else if (method == "moment_eddington") {
-    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings> >(rc);
+    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings>, false >(rc);
   } else if (method == "mocmc") {
-    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings> >(rc);
-    //return CalculateFluxesImpl<T, ClosureType::MOCMC>(rc);
+    return CalculateFluxesImpl<T, ClosureMOCMC<Vec, Tens2, settings>, true >(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -660,7 +659,7 @@ TaskStatus CalculateGeometricSource(T* rc, T* rc_src) {
     return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings> >(rc, rc_src);
   }
   else if (method == "mocmc") {
-    return CalculateGeometricSourceImpl<T, ClosureType::MOCMC>(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureMOCMC<Vec, Tens2, settings> >(rc, rc_src);
   }
   else {
     PARTHENON_FAIL("Radiation method unknown!");
