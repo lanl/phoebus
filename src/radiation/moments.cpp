@@ -48,6 +48,7 @@ template <class T>
 
 template <class T, class CLOSURE, bool STORE_GUESS, bool EDDINGTON_KNOWN>
 TaskStatus MomentCon2PrimImpl(T* rc) {
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
@@ -164,6 +165,7 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
 TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
@@ -247,6 +249,7 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
 
 template<class T>
 TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
@@ -270,6 +273,7 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *, I
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T* rc) {
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -381,6 +385,7 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // This really only works for MeshBlockData right now since fluxes don't have a block index
 template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
 TaskStatus CalculateFluxesImpl(T* rc) {
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   auto *pmb = rc->GetParentPointer().get();
 
@@ -577,6 +582,7 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   constexpr int ND = Geometry::NDFULL;
   //constexpr int NS = Geometry::NDSPACE;
@@ -617,6 +623,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
   int nblock = v.GetDim(5);
   int nspec = idx_E.DimSize(1);
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::GeometricSource", DevExecSpace(),
@@ -696,6 +703,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam*srcF(ii);
         }
   });
+  printf("%s:%i\n", __FILE__, __LINE__);
   return TaskStatus::complete;
 }
 template<class T>
@@ -722,6 +730,7 @@ template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
@@ -842,6 +851,7 @@ template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *
 
 template <class T>
 TaskStatus MomentCalculateOpacities(T *rc) {
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   auto *pmb = rc->GetParentPointer().get();
 
