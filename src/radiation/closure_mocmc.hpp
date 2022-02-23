@@ -52,12 +52,16 @@ namespace radiation
 
     KOKKOS_FUNCTION
     ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
+      PARTHENON_FAIL("MOCMC has already stored TilPi elsewhere!");
+
       // Do nothing
       return ClosureStatus::success;
     }
 
     KOKKOS_FUNCTION
     ClosureStatus GetCovTilPiFromCon(Real E, const Vec cov_F, Real& xi, Real& phi, Tens2 *con_tilPi) {
+      PARTHENON_FAIL("MOCMC has already stored TilPi elsewhere!");
+
       // Do nothing
       return ClosureStatus::success;
 

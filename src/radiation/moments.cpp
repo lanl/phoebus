@@ -59,7 +59,10 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi, ir::tilPi};
+  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi};
+  if (EDDINGTON_KNOWN) {
+    variables.push_back(ir::tilPi);
+  }
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -68,7 +71,10 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   auto cF = imap.GetFlatIdx(cr::F);
   auto pH = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi);
+  vpack_types::FlatIdx iTilPi({-1}, -1);
+  if (EDDINGTON_KNOWN) {
+    iTilPi = imap.GetFlatIdx(ir::tilPi);
+  }
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
 
@@ -110,17 +116,19 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
           xi = v(b, iXi(ispec), k, j, i);
           phi = 1.0001*v(b, iPhi(ispec), k, j, i);
         }
-        c.GetCovTilPiFromCon(E, covF, xi, phi, &conTilPi);
         if (STORE_GUESS) {
           v(b, iXi(ispec), k, j, i) = xi;
           v(b, iPhi(ispec), k, j, i) = phi;
         }
         if (EDDINGTON_KNOWN) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
-          c.Con2Prim(E, covF, conTilPi, &J, &covH);
+          SPACELOOP2(ii, jj) {
+           printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi(ii, jj));
+          }
         } else {
-          c.Con2Prim(E, covF, conTilPi, &J, &covH);
+          c.GetCovTilPiFromCon(E, covF, xi, phi, &conTilPi);
         }
+        c.Con2Prim(E, covF, conTilPi, &J, &covH);
         if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
 
         v(b, pJ(ispec), k, j, i) = J;
@@ -154,7 +162,7 @@ TaskStatus MomentCon2Prim(T* rc) {
 //template TaskStatus MomentCon2Prim<MeshData<Real>>(MeshData<Real> *);
 template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
-template <class T, class CLOSURE>
+template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
 TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
 
   namespace cr = radmoment_cons;
@@ -167,7 +175,10 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
   IndexRange jb = pm->cellbounds.GetBoundsJ(domain);
   IndexRange kb = pm->cellbounds.GetBoundsK(domain);
 
-  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity};
+  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::tilPi};
+  if (EDDINGTON_KNOWN) {
+    variables.push_back(ir::tilPi);
+  }
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -176,6 +187,10 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
   auto cF = imap.GetFlatIdx(cr::F);
   auto pH = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
+  vpack_types::FlatIdx iTilPi({-1}, -1);
+  if (EDDINGTON_KNOWN) {
+    iTilPi = imap.GetFlatIdx(ir::tilPi);
+  }
 
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
@@ -209,8 +224,16 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
                     v(b, pH(ispec, 1), k, j, i)*J,
                     v(b, pH(ispec, 2), k, j, i)*J}};
 
-        c.GetCovTilPiFromPrim(J, covH, &conTilPi);
+        if (EDDINGTON_KNOWN) {
+  printf("%s:%i\n", __FILE__, __LINE__);
+          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
+  printf("%s:%i\n", __FILE__, __LINE__);
+        } else {
+          c.GetCovTilPiFromPrim(J, covH, &conTilPi);
+        }
+  printf("%s:%i\n", __FILE__, __LINE__);
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
+  printf("%s:%i\n", __FILE__, __LINE__);
 
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
@@ -229,13 +252,13 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   auto method = rad->Param<std::string>("method");
   using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentPrim2ConImpl<T, ClosureM1<Vec, Tens2, settings> >(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureM1<Vec, Tens2, settings>, false>(rc, domain);
   }
   else if (method == "moment_eddington") {
-    return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc, domain);
   }
   else if (method == "mocmc") {
-    return MomentPrim2ConImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureMOCMC<Vec, Tens2, settings>, true>(rc, domain);
   }
   else {
     PARTHENON_FAIL("Radiation method unknown!");
@@ -249,6 +272,12 @@ template <class T>
 TaskStatus ReconstructEdgeStates(T* rc) {
 
   auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  auto method = rad->Param<std::string>("method");
+  bool eddington_known = false;
+  if (method == "mocmc") {
+    eddington_known = true;
+  }
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const int di = ( pmb->pmy_mesh->ndim > 0 ? 1 : 0);
@@ -266,9 +295,17 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   PackIndexMap imap_ql, imap_qr, imap;
   VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
   VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
-  VariablePack<Real> v = rc->PackVariables(std::vector<std::string>{pr::J, pr::H, ir::dJ, ir::tilPi}, imap);
+  std::vector<std::string> variables = {pr::J, pr::H, ir::dJ};
+  if (eddington_known) {
+    variables.push_back(ir::tilPi);
+  }
+  VariablePack<Real> v = rc->PackVariables(variables, imap);
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_dJ = imap.GetFlatIdx(ir::dJ);
+  vpack_types::FlatIdx iTilPi({-1}, -1);
+  if (eddington_known) {
+    iTilPi = imap.GetFlatIdx(ir::tilPi);
+  }
 
   ParArrayND<Real> ql_v = rc->Get(ir::ql_v).data;
   ParArrayND<Real> qr_v = rc->Get(ir::qr_v).data;
@@ -476,8 +513,12 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           cr.getFluxesFromPrim(Jr, HasymR, con_tilPir, &conFr_asym, &Pr_asym);
 
           // Regular fluxes
-          cl.GetCovTilPiFromPrim(Jl, Hl, &con_tilPil);
-          cr.GetCovTilPiFromPrim(Jr, Hr, &con_tilPir);
+          if (EDDINGTON_KNOWN) {
+            // Use reconstructed values of tilPi
+          } else {
+            cl.GetCovTilPiFromPrim(Jl, Hl, &con_tilPil);
+            cr.GetCovTilPiFromPrim(Jr, Hr, &con_tilPir);
+          }
           cl.getFluxesFromPrim(Jl, Hl, con_tilPil, &conFl, &Pl);
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
@@ -534,7 +575,7 @@ TaskStatus CalculateFluxes(T* rc) {
 }
 template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
-template <class T, class CLOSURE>
+template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
   constexpr int ND = Geometry::NDFULL;
@@ -547,12 +588,19 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   namespace p = fluid_prim;
   PackIndexMap imap;
   std::vector<std::string> vars{cr::E, cr::F, pr::J, pr::H, p::velocity};
+  if (EDDINGTON_KNOWN) {
+    vars.push_back(ir::tilPi);
+  }
   auto v = rc->PackVariables(vars, imap);
   auto idx_E = imap.GetFlatIdx(cr::E);
   auto idx_F = imap.GetFlatIdx(cr::F);
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_H = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(p::velocity);
+  vpack_types::FlatIdx iTilPi({-1}, -1);
+  if (EDDINGTON_KNOWN) {
+    iTilPi = imap.GetFlatIdx(ir::tilPi);
+  }
 
   PackIndexMap imap_src;
   std::vector<std::string> vars_src{cr::E, cr::F};
@@ -626,7 +674,11 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           g.raise3Vector(covF, &conF);
           Tens2 conP, con_tilPi;
 
-          c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+          if (EDDINGTON_KNOWN) {
+
+          } else {
+            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+          }
           c.getConPFromPrim(J, covH, con_tilPi, &conP);
 
           Real srcE = 0.0;
@@ -653,13 +705,13 @@ TaskStatus CalculateGeometricSource(T* rc, T* rc_src) {
   auto method = rad->Param<std::string>("method");
   using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings> >(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings>, false>(rc, rc_src);
   }
   else if (method == "moment_eddington") {
-    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings> >(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc, rc_src);
   }
   else if (method == "mocmc") {
-    return CalculateGeometricSourceImpl<T, ClosureMOCMC<Vec, Tens2, settings> >(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureMOCMC<Vec, Tens2, settings>, true>(rc, rc_src);
   }
   else {
     PARTHENON_FAIL("Radiation method unknown!");
