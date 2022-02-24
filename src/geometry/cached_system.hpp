@@ -300,7 +300,7 @@ public:
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     if (axisymmetric_)
       k = k_;
-    SPACELOOP2(mu, nu) {
+    SPACETIMELOOP2(mu, nu) {
       const int flat = 3*Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - 1;
       dg[mu][nu][0] = 0.0;
       for (int sigma = 1; sigma < NDFULL; sigma++) {
@@ -401,7 +401,6 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin,
                                 1,
                                 NDSPACE * Utils::SymSize<NDFULL>(),
                                 NDFULL};
-  printf("SymSize: %d %d\n", Utils::SymSize<NDFULL>(), Utils::SymSize<NDSPACE>());
   std::vector<std::string> var_names = {"alpha",  "dalpha", "bcon", "gcov",
                                         "gamcon", "detgam", "dg",   "coord"};
   PARTHENON_REQUIRE_THROWS(var_sizes.size() == var_names.size(),
@@ -519,7 +518,7 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
     system.MetricInverse(loc, k, j, i, gamcon);
     for (int mu = 0; mu < NDSPACE; ++mu) {
       for (int nu = mu; nu < NDSPACE; ++nu) {
-        int offst = idx[loc].gamcon + Utils::Flatten2(mu, nu, NDFULL);
+        int offst = idx[loc].gamcon + Utils::Flatten2(mu, nu, NDSPACE);
         pack(offst, k, j, i) = gamcon[mu][nu];
       }
     }
