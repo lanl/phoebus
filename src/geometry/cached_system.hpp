@@ -300,11 +300,12 @@ public:
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     if (axisymmetric_)
       k = k_;
-    SPACETIMELOOP3(mu, nu, sigma) {
-      int offst = (sigma - 1) * Utils::SymSize(NDFULL) +
-                  Utils::Flatten2(mu, nu, NDFULL);
-      dg[mu][nu][sigma] =
-          (sigma == 0) ? 0 : pack_(b, idx_[loc].dg + offst, k, j, i);
+    SPACELOOP2(mu, nu) {
+      const int flat = 3*Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - 1;
+      dg[mu][nu][0] = 0.0;
+      for (int sigma = 1; sigma < NDFULL; sigma++) {
+        dg[mu][nu][sigma] = pack_(b, flat + sigma, k, j, i);
+      }
     }
   }
   KOKKOS_INLINE_FUNCTION
@@ -395,10 +396,10 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin,
   std::vector<int> var_sizes = {1,
                                 NDSPACE,
                                 NDSPACE,
-                                Utils::SymSize(NDFULL),
-                                Utils::SymSize(NDSPACE),
+                                Utils::SymSize<NDFULL>(),
+                                Utils::SymSize<NDSPACE>(),
                                 1,
-                                NDSPACE * Utils::SymSize(NDFULL),
+                                NDSPACE * Utils::SymSize<NDFULL>(),
                                 NDFULL};
   std::vector<std::string> var_names = {"alpha",  "dalpha", "bcon", "gcov",
                                         "gamcon", "detgam", "dg",   "coord"};
@@ -508,35 +509,26 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
     system.ContravariantShift(loc, k, j, i, beta);
     SPACELOOP(d) { pack(idx[loc].bcon + d, k, j, i) = beta[d]; }
     system.SpacetimeMetric(loc, k, j, i, gcov);
-    int lin = 0;
     for (int mu = 0; mu < NDFULL; ++mu) {
       for (int nu = mu; nu < NDFULL; ++nu) {
-        int offst = idx[loc].gcov + lin;
-        //printf("offst = %d\n", offst);
+        int offst = idx[loc].gcov + Utils::Flatten2(mu, nu, NDFULL);
         pack(offst, k, j, i) = gcov[mu][nu];
-        lin++;
       }
     }
     system.MetricInverse(loc, k, j, i, gamcon);
-    lin = 0;
     for (int mu = 0; mu < NDSPACE; ++mu) {
       for (int nu = mu; nu < NDSPACE; ++nu) {
-        int offst = idx[loc].gamcon + lin;
-        //printf("offst = %d\n", offst);
+        int offst = idx[loc].gamcon + Utils::Flatten2(mu, nu, NDFULL);
         pack(offst, k, j, i) = gamcon[mu][nu];
-        lin++;
       }
     }
     pack(idx[loc].detgam, k, j, i) = system.DetGamma(loc, k, j, i);
     system.MetricDerivative(loc, k, j, i, dg);
-    lin = 0;
     for (int sigma = 1; sigma < NDFULL; ++sigma) {
       for (int mu = 0; mu < NDFULL; ++mu) {
         for (int nu = mu; nu < NDFULL; ++nu) {
-          int offst = idx[loc].dg + lin;
-          //printf("offst = %d\n", offst);
+          int offst = idx[loc].dg + 3*Utils::Flatten2(mu, nu, NDFULL) + sigma - 1;
           pack(offst, k, j, i) = dg[mu][nu][sigma];
-          lin++;
         }
       }
     }
