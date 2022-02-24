@@ -88,13 +88,14 @@ add_executable(phoebus
   phoebus_driver.hpp
 
   phoebus_utils/cell_locations.hpp
-  phoebus_utils/unit_conversions.cpp
-  phoebus_utils/unit_conversions.hpp
   phoebus_utils/debug_utils.hpp
   phoebus_utils/linear_algebra.hpp
+  phoebus_utils/loop.hpp
   phoebus_utils/relativity_utils.hpp
   phoebus_utils/robust.hpp
   phoebus_utils/root_find.hpp
+  phoebus_utils/unit_conversions.cpp
+  phoebus_utils/unit_conversions.hpp
   phoebus_utils/variables.hpp
 
   radiation/radiation.hpp
@@ -133,6 +134,7 @@ if (Kokkos_ENABLE_CUDA)
 endif()
 
 # target_compile_options(phoebus PUBLIC -G -lineinfo)
+target_compile_options(phoebus PUBLIC -xHost -xCOMMON-AVX512 -g)
 
 target_link_libraries(phoebus PRIVATE parthenon
   singularity-eos::flags

@@ -40,12 +40,12 @@ public:
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
                           Real beta[NDSPACE]) const {
-    LinearAlgebra::SetZero(beta, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE>(beta);
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
                        Real g[NDFULL][NDFULL]) const {
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     Real r2 = X1*X1;
     Real sth = std::sin(X2);
     Real sth2 = sth*sth;
@@ -57,7 +57,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     const Real sth = std::sin(X2);
     g[0][0] = -1;
     g[1][1] = 1;
@@ -67,7 +67,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3,
               Real g[NDSPACE][NDSPACE]) const {
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     g[0][0] = 1;
     g[1][1] = X1 * X1;
     g[2][2] = X1 * std::sin(X2);
@@ -76,7 +76,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
                      Real g[NDSPACE][NDSPACE]) const {
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     const Real sth = std::sin(X2);
     g[0][0] = 1;
     g[1][1] = robust::ratio(1, X1 * X1);
@@ -101,7 +101,7 @@ public:
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     using namespace Utils;
-    LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(dg);
     const Real r = std::abs(X1);
     const Real sth = std::sin(X2);
     const Real s2th = std::sin(2 * X2);
@@ -111,7 +111,7 @@ public:
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
-    LinearAlgebra::SetZero(da, NDFULL);
+    LinearAlgebra::SetZero<NDFULL>(da);
   }
 
   KOKKOS_INLINE_FUNCTION

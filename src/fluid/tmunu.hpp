@@ -21,6 +21,7 @@
 
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/loop.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -56,8 +57,9 @@ public:
   // signature needs to change.
   // TODO(JMM): Should I use enable_if or static asserts or anything?
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void operator()(Real T[ND][ND],
+  KOKKOS_FORCEINLINE_FUNCTION void operator()(Real T[ND][ND],
                                          Args &&... args) const {
+    using namespace loop;
     static_assert(sizeof...(Args) >= 3, "Must at least have k, j, i");
     static_assert(sizeof...(Args) <= 4, "Must have no more than b, k, j, i");
     Real u[ND], b[ND], g[ND][ND], bsq;
@@ -68,11 +70,9 @@ public:
     Real P = GetVar_(ip_, std::forward<Args>(args)...);
     Real A = rho + uu + P + bsq;
     Real B = P + 0.5 * bsq;
-    for (int mu = 0; mu < ND; ++mu) {
-      for (int nu = 0; nu < ND; ++nu) {
+    SpacetimeLoop2([&](const int mu, const int nu) {
         T[mu][nu] = A * u[mu] * u[nu] + B * g[mu][nu] - b[mu] * b[nu];
-      }
-    }
+    });
   }
 
 private:
@@ -96,10 +96,12 @@ private:
     return (ib_ > 0 ? GetVar_(ib_ + l - 1, std::forward<Args>(args)...) : 0.0);
   }
 
+  #pragma omp declare simd
   template <typename... Args>
-  KOKKOS_INLINE_FUNCTION void GetTmunuTerms_(Real u[ND], Real b[ND], Real &bsq,
+  KOKKOS_FORCEINLINE_FUNCTION void GetTmunuTerms_(Real u[ND], Real b[ND], Real &bsq,
                                              Real gscratch[4][4],
                                              Args &&... args) const {
+    using namespace loop;
     Real beta[ND - 1];
     Real Bdotv = 0.0;
     Real Bsq = 0.0;
@@ -110,22 +112,22 @@ private:
                   v_(3, std::forward<Args>(args)...)};
     const Real W = phoebus::GetLorentzFactor(vp, gcov);
 
-    SPACELOOP2(ii, jj) {
+    SpaceLoop2([&](const int ii, const int jj) {
         const Real &bi = b_(ii+1, std::forward<Args>(args)...);
         const Real &bj = b_(jj+1, std::forward<Args>(args)...);
         Bdotv += bi * vp[jj] / W * gcov[ii][jj];
         Bsq += bi * bj * gcov[ii][jj];
-    }
+    });
     const Real iW = 1. / W;
 
     Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
     system_.ContravariantShift(loc, std::forward<Args>(args)..., beta);
     u[0] = robust::ratio(W, std::abs(alpha));
     b[0] = u[0] * Bdotv;
-    for (int l = 1; l < ND; ++l) {
+    UnrolledLoop<1,ND>::exec([&](const int l) {
       u[l] = v_(l, std::forward<Args>(args)...) - u[0] * beta[l - 1];
       b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha * b[0] * u[l]);
-    }
+    });
 
     bsq = (Bsq + alpha * alpha * b[0] * b[0]) * iW * iW;
   }

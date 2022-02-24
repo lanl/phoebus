@@ -14,14 +14,21 @@
 #ifndef PHOEBUS_UTILS_LINEAR_ALGEBRA_HPP_
 #define PHOEBUS_UTILS_LINEAR_ALGEBRA_HPP_
 
+#include <cstring>
+
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
 namespace LinearAlgebra {
 
+template <int size>
+KOKKOS_FORCEINLINE_FUNCTION void SetZero(void *a) {
+  memset(a, 0, size*sizeof(Real));
+}
+
 // TODO(JMM): Replace these with a memset?
-template <typename Array>
+/*template <typename Array>
 KOKKOS_INLINE_FUNCTION void SetZero(Array &a, int size) {
   for (int i = 0; i < size; ++i)
     a[i] = 0;
@@ -43,7 +50,7 @@ KOKKOS_INLINE_FUNCTION void SetZero(Array &a, int n3, int n2, int n1) {
       }
     }
   }
-}
+}*/
 
 // Determinant of a 3x3 matrix
 KOKKOS_INLINE_FUNCTION

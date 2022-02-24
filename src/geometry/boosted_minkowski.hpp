@@ -54,7 +54,7 @@ class BoostedMinkowski {
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     g[0][0] = -1 + vx_ * vx_ + vy_ * vy_ + vz_ * vz_;
     g[1][1] = g[2][2] = g[3][3] = 1;
     g[0][1] = g[1][0] = vx_;
@@ -77,13 +77,13 @@ class BoostedMinkowski {
   }
   KOKKOS_INLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
-    LinearAlgebra::SetZero(gamma, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(gamma);
     gamma[0][0] = gamma[1][1] = gamma[2][2] = 1;
   }
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
                      Real gamma[NDSPACE][NDSPACE]) const {
-    LinearAlgebra::SetZero(gamma, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(gamma);
     gamma[0][0] = gamma[1][1] = gamma[2][2] = 1;
   }
   KOKKOS_INLINE_FUNCTION
@@ -94,16 +94,16 @@ class BoostedMinkowski {
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    LinearAlgebra::SetZero(Gamma, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(Gamma);
   }
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
-    LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(dg);
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
-    LinearAlgebra::SetZero(da, NDFULL);
+    LinearAlgebra::SetZero<NDFULL>(da);
   }
   KOKKOS_INLINE_FUNCTION
   void Coords(Real X0, Real X1, Real X2, Real X3, Real C[NDFULL]) const {

@@ -68,7 +68,7 @@ KOKKOS_INLINE_FUNCTION
   void bl_to_ks(const Real r, const Real a, Real *ucon_bl, Real *ucon_ks) {
     using namespace Geometry;
     Real trans[NDFULL][NDFULL];
-    LinearAlgebra::SetZero(trans, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(trans);
     const Real idenom = 1.0/(r*r - 2.0*r + a*a);
     trans[0][0] = 1.0;
     trans[0][1] = 2.0*r*idenom;
@@ -76,7 +76,7 @@ KOKKOS_INLINE_FUNCTION
     trans[2][2] = 1.0;
     trans[3][1] = a*idenom;
     trans[3][3] = 1.0;
-    LinearAlgebra::SetZero(ucon_ks, NDFULL);
+    LinearAlgebra::SetZero<NDFULL>(ucon_ks);
     SPACETIMELOOP2(mu,nu) {
       ucon_ks[mu] += trans[mu][nu]*ucon_bl[nu];
     }

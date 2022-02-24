@@ -84,7 +84,7 @@ class Snake {
   }
   KOKKOS_INLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
-    LinearAlgebra::SetZero(gamma, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(gamma);
     const Real d = GetDelta(X1);
     gamma[0][0] = d * d + 1.;
     gamma[1][0] = gamma[0][1] = -d;
@@ -112,7 +112,7 @@ class Snake {
     const Real a2 = a_ * a_;
     const Real k2 = k_ * k_;
     const Real k3 = k_ * k_ * k_;
-    LinearAlgebra::SetZero(Gamma, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(Gamma);
     Gamma[0][1][1] = a_ * k2 * vy_ * sin(k_ * X1);
     Gamma[1][1][1] = -a2 * k3 * sin(2. * k_ * X1) / 2.;
     Gamma[2][1][1] = a_ * k2 * sin(k_ * X1);
@@ -123,7 +123,7 @@ class Snake {
     const Real a2 = a_ * a_;
     const Real k2 = k_ * k_;
     const Real k3 = k_ * k_ * k_;
-    LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(dg);
     dg[0][1][1] = dg[1][0][1] = a_ * k2 * vy_ * sin(k_ * X1);
     dg[1][1][1] = -a2 * k3 * sin(2. * k_ * X1);
     dg[2][1][1] = dg[1][2][1] = a_ * k2 * sin(k_ * X1);

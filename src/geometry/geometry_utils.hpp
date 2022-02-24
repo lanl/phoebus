@@ -29,6 +29,7 @@ using namespace parthenon::package::prelude;
 
 // Phoebus includes
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/loop.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
@@ -71,19 +72,15 @@ struct MeshBlockShape {
 };
 
 template <typename System, typename... Args>
-KOKKOS_INLINE_FUNCTION void
+KOKKOS_FORCEINLINE_FUNCTION void
 SetConnectionCoeffByFD(const System &s, Real Gamma[NDFULL][NDFULL][NDFULL],
                        Args... args) {
+  using namespace loop;
   Real dg[NDFULL][NDFULL][NDFULL];
   s.MetricDerivative(std::forward<Args>(args)..., dg);
-  for (int a = 0; a < NDFULL; ++a) {
-    for (int b = 0; b < NDFULL; ++b) {
-      for (int c = 0; c < NDFULL; ++c) {
-        Gamma[a][b][c] = 0.5 * (dg[b][a][c] + dg[c][a][b] - dg[b][c][a]);
-        //Gamma[c][a][b] = 0.5 * (dg[c][a][b] + dg[c][b][a] - dg[a][b][c]);
-      }
-    }
-  }
+  SpacetimeLoop3([&]( const int a, const int b, const int c) {
+    Gamma[a][b][c] = 0.5 * (dg[b][a][c] + dg[c][a][b] - dg[b][c][a]);
+  });
 }
 
 // TODO(JMM) Currently assumes static metric
@@ -92,7 +89,7 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
                                                Real X0, Real X1, Real X2,
                                                Real X3, Real da[NDFULL]) {
   Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0/3.0);
-  LinearAlgebra::SetZero(da, NDFULL);
+  LinearAlgebra::SetZero<NDFULL>(da);
   for (int d = 1; d < NDFULL; ++d) {
     Real X1p = X1;
     Real X1m = X1;
@@ -156,7 +153,7 @@ KOKKOS_INLINE_FUNCTION void
 SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
                       Real X3, Real dg[NDFULL][NDFULL][NDFULL]) {
   Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0/3.0);
-  LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
+  LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(dg);
   Real gl[NDFULL][NDFULL];
   Real gr[NDFULL][NDFULL];
   for (int d = 1; d < NDFULL; ++d) {
@@ -189,7 +186,22 @@ SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
   }
 }
 
-KOKKOS_INLINE_FUNCTION
+#define FLATTEN2(m,n) (m + n + (m > n ? (m+1)/3 + (m+1)/4 : (n+1)/3 + (n+1)/4))
+template <int m, int n, int size>
+KOKKOS_FORCEINLINE_FUNCTION int Flatten2() {
+  PARTHENON_DEBUG_REQUIRE(0 <= m && 0 <= n && m < size && n < size, "bounds");
+  return FLATTEN2(m,n);
+}
+KOKKOS_FORCEINLINE_FUNCTION
+int Flatten2(int m, int n, int size) {
+  static constexpr int ind[4][4] = {{0,1,3,6},{1,2,4,7},{3,4,5,8},{6,7,8,9}};
+  PARTHENON_DEBUG_REQUIRE(0 <= m && 0 <= n && m < size && n < size, "bounds");
+  return ind[m][n];
+}
+#undef FLATTEN2
+
+/*
+KOKKOS_FORCEINLINE_FUNCTION
 int Flatten2(int m, int n, int size) {
   PARTHENON_DEBUG_REQUIRE(0 <= m && 0 <= n && m < size && n < size, "bounds");
   if (m > n) { // remove recursion
@@ -197,10 +209,14 @@ int Flatten2(int m, int n, int size) {
     n = m;
     m = tmp;
   }
-  return n + size * m - m * (m - 1) / 2 - m;
-}
-KOKKOS_INLINE_FUNCTION
-int SymSize(int size) { return size * size - size * (size - 1) / 2; }
+  return n + m * (size - (m - 1) / 2 - 1);
+}*/
+#define SYMSIZE(size) (size*size - (size * (size - 1)) / 2)
+template <int size>
+KOKKOS_FORCEINLINE_FUNCTION int SymSize() { return SYMSIZE(size); }
+KOKKOS_FORCEINLINE_FUNCTION
+int SymSize(int size) { return SYMSIZE(size); }
+#undef SYMSIZE
 
 } // namespace Utils
 } // namespace Geometry

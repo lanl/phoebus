@@ -60,7 +60,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
                           Real beta[NDSPACE]) const {
-    LinearAlgebra::SetZero(beta, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE>(beta);
     const Real r = std::abs(X1);
     const Real th = X2;
     const Real sth = std::sin(th);
@@ -82,7 +82,7 @@ public:
     ComputeDeltaMu_(r, th, r2, r3, sth, cth, DD, mu);
     const Real r3dm = r3 * DD * mu;
     const Real sth2 = sth*sth;
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     g[0][0] = -(1.0 - ratio(2.0,r*mu));
     g[0][3] = g[3][0] = -ratio(2.0 * a_ * sth2, r*mu);
     g[1][1] = mu / DD;
@@ -105,7 +105,7 @@ public:
     const Real sth2 = sth * sth;
     const Real common_denom =
         2 * a2_ * rm2 + r2 * (-4 + rm * (2 + DD * rm2)) + 4 * a2_ * sth2;
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     g[0][0] = ratio(-r3dm * rm2, common_denom);
     g[0][3] = g[3][0] = -ratio(
         a_ * r3dm * sth2,
@@ -124,7 +124,7 @@ public:
     Real r2, r3, sth, cth, DD, mu;
     ComputeDeltaMu_(r, th, r2, r3, sth, cth, DD, mu);
     const Real r3dm = r3 * DD * mu;
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     g[0][0] = ratio(DD, mu);
     g[1][1] = ratio(1., r2 * mu);
     g[2][2] = ratio((r * mu - 2) * sth * sth, r3dm);
@@ -150,7 +150,7 @@ public:
     Real beta[NDSPACE];
     ContravariantShift(X0, X1, X2, X3, beta);
 
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     g[0][0] = ratio(mu, DD);
     g[1][1] = r2 * mu;
     g[2][2] = ratio(r3dm * (2 * a2_ + r2 * (2 + DD * rm)) * sth2, denom);
@@ -189,7 +189,7 @@ public:
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     using namespace Utils;
     using namespace robust;
-    LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(dg);
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, MU;

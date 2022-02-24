@@ -30,9 +30,11 @@
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/loop.hpp"
 #include "phoebus_utils/robust.hpp"
 
 using namespace parthenon::package::prelude;
+using namespace loop;
 
 namespace Geometry {
 
@@ -65,17 +67,17 @@ struct GeomPackIndices {
 };
 template <typename T> class LocArray {
 public:
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   T &operator[](int i) { return a_[i]; }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   T &operator[](CellLocation loc) { return (*this)[icast_(loc)]; }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   const T &operator[](int i) const { return a_[i]; }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   const T &operator[](CellLocation loc) const { return (*this)[icast_(loc)]; }
 
 private:
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   int icast_(CellLocation loc) const { return static_cast<int>(loc); }
   T a_[NUM_CELL_LOCATIONS];
   // std::array<T, NUM_CELL_LOCATIONS> a_;
@@ -131,200 +133,200 @@ public:
     icoord_c_ = imap["g.c.coord"].first;
     icoord_n_ = imap["g.n.coord"].first;
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
     return s_.Lapse(X0, X1, X2, X3);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   Real Lapse(CellLocation loc, int b, int k, int j, int i) const {
-    if (axisymmetric_)
-      k = k_;
+    k = axisymmetric_ ? k_ : k;
     return pack_(b, idx_[loc].alpha, k, j, i);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   Real Lapse(CellLocation loc, int k, int j, int i) const {
     return Lapse(loc, b_, k, j, i);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
                           Real beta[NDSPACE]) const {
     s_.ContravariantShift(X0, X1, X2, X3, beta);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void ContravariantShift(CellLocation loc, int b, int k, int j, int i,
                           Real beta[NDSPACE]) const {
-    if (axisymmetric_)
-      k = k_;
-    SPACELOOP(d) { beta[d] = pack_(b, idx_[loc].bcon + d, k, j, i); }
+    k = axisymmetric_ ? k_ : k;
+    SpaceLoop([&](const int d) { beta[d] = pack_(b, idx_[loc].bcon + d, k, j, i); });
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void ContravariantShift(CellLocation loc, int k, int j, int i,
                           Real beta[NDSPACE]) const {
     ContravariantShift(loc, b_, k, j, i, beta);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3,
               Real gamma[NDSPACE][NDSPACE]) const {
     return s_.Metric(X0, X1, X2, X3, gamma);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void Metric(CellLocation loc, int b, int k, int j, int i,
               Real gamma[NDSPACE][NDSPACE]) const {
-    if (axisymmetric_)
-      k = k_;
-    SPACELOOP2(m, n) { // gamma_{ij} = g_{ij}
+    k = axisymmetric_ ? k_ : k;
+    SpaceLoop2([&](const int m, const int n) { // gamma_{ij} = g_{ij}
+    //UnrolledLoop2_flatidx<0,3,0,3,1,1>::exec([&](const int m, const int n, const int offst) {
       int offst = Utils::Flatten2(m + 1, n + 1, NDFULL);
       gamma[m][n] = pack_(b, idx_[loc].gcov + offst, k, j, i);
-    }
+    });
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void Metric(CellLocation loc, int k, int j, int i,
               Real gamma[NDSPACE][NDSPACE]) const {
     Metric(loc, b_, k, j, i, gamma);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
                      Real gamma[NDSPACE][NDSPACE]) const {
     return s_.MetricInverse(X0, X1, X2, X3, gamma);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void MetricInverse(CellLocation loc, int b, int k, int j, int i,
                      Real gamma[NDSPACE][NDSPACE]) const {
-    if (axisymmetric_)
-      k = k_;
-    SPACELOOP2(m, n) {
+    k = axisymmetric_ ? k_ : k;
+    SpaceLoop2([&](const int m, const int n) {
       int offst = Utils::Flatten2(m, n, NDSPACE);
       gamma[m][n] = pack_(b, idx_[loc].gamcon + offst, k, j, i);
-    }
+    });
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void MetricInverse(CellLocation loc, int k, int j, int i,
                      Real gamma[NDSPACE][NDSPACE]) const {
     MetricInverse(loc, b_, k, j, i, gamma);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
                        Real g[NDFULL][NDFULL]) const {
     return s_.SpacetimeMetric(X0, X1, X2, X3, g);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void SpacetimeMetric(CellLocation loc, int b, int k, int j, int i,
                        Real g[NDFULL][NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
-    SPACETIMELOOP2(mu, nu) {
+    k = axisymmetric_ ? k_ : k;
+    SpacetimeLoop2([&](const int mu, const int nu) {
       int offst = Utils::Flatten2(mu, nu, NDFULL);
       g[mu][nu] = pack_(b, idx_[loc].gcov + offst, k, j, i);
-    }
+    });
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void SpacetimeMetric(CellLocation loc, int k, int j, int i,
                        Real g[NDFULL][NDFULL]) const {
     SpacetimeMetric(loc, b_, k, j, i, g);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
     return s_.SpacetimeMetricInverse(X0, X1, X2, X3, g);
   }
-  KOKKOS_INLINE_FUNCTION
+  #pragma omp declare simd
+  KOKKOS_FORCEINLINE_FUNCTION
   void SpacetimeMetricInverse(CellLocation loc, int b, int k, int j, int i,
                               Real g[NDFULL][NDFULL]) const {
     using robust::ratio;
-    if (axisymmetric_)
-      k = k_;
+    k = axisymmetric_ ? k_ : k;
     auto &idx = idx_[loc];
     Real alpha2 = Lapse(loc, b, k, j, i);
     alpha2 *= alpha2;
     g[0][0] = -ratio(1, alpha2);
-    SPACELOOP(mu) {
+    SpaceLoop([&](const int mu) {
       g[mu + 1][0] = g[0][mu + 1] =
           ratio(pack_(b, idx.bcon + mu, k, j, i), alpha2);
-    }
-    SPACELOOP2(mu, nu) {
+    });
+    SpaceLoop2([&](const int mu, const int nu) {
       int offst = Utils::Flatten2(mu, nu, NDSPACE);
       g[mu + 1][nu + 1] = pack_(b, idx.gamcon + offst, k, j, i);
       g[mu + 1][nu + 1] -= g[0][mu + 1] * g[0][nu + 1] * alpha2;
-    }
+    });
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void SpacetimeMetricInverse(CellLocation loc, int k, int j, int i,
                               Real g[NDFULL][NDFULL]) const {
     SpacetimeMetricInverse(loc, b_, k, j, i, g);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
     return s_.DetGamma(X0, X1, X2, X3);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   Real DetGamma(CellLocation loc, int b, int k, int j, int i) const {
-    if (axisymmetric_)
-      k = k_;
+    k = axisymmetric_ ? k_ : k;
     return pack_(b, idx_[loc].detgam, k, j, i);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   Real DetGamma(CellLocation loc, int k, int j, int i) const {
     return DetGamma(loc, b_, k, j, i);
   }
   template <typename... Args>
-  KOKKOS_INLINE_FUNCTION Real DetG(Args... args) const {
+  KOKKOS_FORCEINLINE_FUNCTION Real DetG(Args... args) const {
     return Lapse(std::forward<Args>(args)...) *
            DetGamma(std::forward<Args>(args)...);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
     return s_.ConnectionCoefficient(X0, X1, X2, X3, Gamma);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
+    k = axisymmetric_ ? k_ : k;
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, k, j, i);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int bid, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
+    k = axisymmetric_ ? k_ : k;
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, bid, k, j, i);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     return s_.MetricDerivative(X0, X1, X2, X3, dg);
   }
-  KOKKOS_INLINE_FUNCTION
+  #pragma omp declare simd
+  KOKKOS_FORCEINLINE_FUNCTION
   void MetricDerivative(CellLocation loc, int b, int k, int j, int i,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
-    SPACETIMELOOP3(mu, nu, sigma) {
-      int offst = (sigma - 1) * Utils::SymSize(NDFULL) +
+    k = axisymmetric_ ? k_ : k;
+    SpacetimeLoop2([&](const int mu, const int nu) {
+      const int flat = 3*Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - 1;
+      dg[mu][nu][0] = 0.0;
+      UnrolledLoop<1,4>::exec([&](const int sigma) {
+        dg[mu][nu][sigma] = pack_(b, flat + sigma, k, j, i);
+      });
+    });
+
+    /*SpacetimeLoop3([&](const int mu, const int nu, const int sigma) {
+      int offst = (sigma - 1) * Utils::SymSize<NDFULL>() +
                   Utils::Flatten2(mu, nu, NDFULL);
       dg[mu][nu][sigma] =
           (sigma == 0) ? 0 : pack_(b, idx_[loc].dg + offst, k, j, i);
-    }
+    });*/
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void MetricDerivative(CellLocation loc, int k, int j, int i,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     MetricDerivative(loc, b_, k, j, i, dg);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
     return s_.GradLnAlpha(X0, X1, X2, X3, da);
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int b, int k, int j, int i,
                    Real da[NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
+    k = axisymmetric_ ? k_ : k;
     da[0] = 0;
-    SPACELOOP(d) { da[d + 1] = pack_(b, idx_[loc].dalpha + d, k, j, i); }
+    SpaceLoop([&](const int d) { da[d + 1] = pack_(b, idx_[loc].dalpha + d, k, j, i); });
   }
-  KOKKOS_INLINE_FUNCTION
+  KOKKOS_FORCEINLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int k, int j, int i,
                    Real da[NDFULL]) const {
     return GradLnAlpha(loc, b_, k, j, i, da);
@@ -508,35 +510,31 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
     system.ContravariantShift(loc, k, j, i, beta);
     SPACELOOP(d) { pack(idx[loc].bcon + d, k, j, i) = beta[d]; }
     system.SpacetimeMetric(loc, k, j, i, gcov);
-    int lin = 0;
     for (int mu = 0; mu < NDFULL; ++mu) {
       for (int nu = mu; nu < NDFULL; ++nu) {
-        int offst = idx[loc].gcov + lin;
+        int offst = idx[loc].gcov + Utils::Flatten2(mu, nu, NDFULL);
         //printf("offst = %d\n", offst);
         pack(offst, k, j, i) = gcov[mu][nu];
-        lin++;
       }
     }
     system.MetricInverse(loc, k, j, i, gamcon);
-    lin = 0;
     for (int mu = 0; mu < NDSPACE; ++mu) {
       for (int nu = mu; nu < NDSPACE; ++nu) {
-        int offst = idx[loc].gamcon + lin;
+        int offst = idx[loc].gamcon + Utils::Flatten2(mu, nu, NDFULL);
         //printf("offst = %d\n", offst);
         pack(offst, k, j, i) = gamcon[mu][nu];
-        lin++;
       }
     }
     pack(idx[loc].detgam, k, j, i) = system.DetGamma(loc, k, j, i);
     system.MetricDerivative(loc, k, j, i, dg);
-    lin = 0;
     for (int sigma = 1; sigma < NDFULL; ++sigma) {
       for (int mu = 0; mu < NDFULL; ++mu) {
         for (int nu = mu; nu < NDFULL; ++nu) {
-          int offst = idx[loc].dg + lin;
+          int offst = idx[loc].dg + 3*Utils::Flatten2(mu, nu, NDFULL) + sigma - 1;
+          //int offst = idx[loc].dg + (sigma - 1) * Utils::SymSize(NDFULL)
+          //            + Utils::Flatten2(mu, nu, NDFULL);
           //printf("offst = %d\n", offst);
           pack(offst, k, j, i) = dg[mu][nu][sigma];
-          lin++;
         }
       }
     }

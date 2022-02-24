@@ -109,9 +109,12 @@ class FluxState {
     const Real P = std::max(q(dir,prs,k,j,i), 0.0);
     const Real gamma1 = q(dir,gm1,k,j,i);
 
-    for (int m = pb_lo; m <= pb_hi; m++) {
+    /*for (int m = pb_lo; m <= pb_hi; m++) {
       Bcon[m-pb_lo] = q(dir, m, k, j, i);
-    }
+    }*/
+    Bcon[0] = q(dir, pb_lo, k, j, i);
+    Bcon[1] = q(dir, pb_lo+1, k, j, i);
+    Bcon[2] = q(dir, pb_hi, k, j, i);
 
     Real BdotB = 0.0;
     Real Bdotv = 0.0;
@@ -140,10 +143,10 @@ class FluxState {
     F[crho] = U[crho]*vtil;
 
     // composition
-    if (cye>0) {
+    /*if (cye>0) {
       U[cye] = U[crho]*q(dir,pye,k,j,i);
       F[cye] = U[cye]*vtil;
-    }
+    }*/
 
     Real b0 = W*Bdotv; // this is really b0*alpha
     const Real bsq = (BdotB + b0*b0)/(W*W);
@@ -285,10 +288,16 @@ Real hll(const FluxState &fs, const int d, const int k, const int j, const int i
 
   const Real cl = std::min(std::min(vml, vmr), 0.0);
   const Real cr = std::max(std::max(vpl, vpr), 0.0);
+  const Real crl = cr*cl;
+  const Real inv_cr_cl = 1.0/(cr - cl);
 
-  for (int m = 0; m < fs.NumConserved(); m++) {
-    fs.v.flux(d,m,k,j,i) = ((cr*Fl[m] - cl*Fr[m])*g.gdet + cr*cl*(Ur[m] - Ul[m])*g.gammadet)/(cr - cl);
+  //fs.v.flux(d, )
+
+  //const int ncons = fs.NumConserved();
+  for (int m = 0; m < 8; m++) {
+    fs.v.flux(d,m,k,j,i) = ((cr*Fl[m] - cl*Fr[m])*g.gdet + crl*(Ur[m] - Ul[m])*g.gammadet)*inv_cr_cl;
   }
+  //for (int m = 0; m < fs.NumConserved(); m++)
   return std::max(-cl,cr);
 }
 

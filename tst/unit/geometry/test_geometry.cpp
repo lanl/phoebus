@@ -753,7 +753,7 @@ TEST_CASE("Modified Kerr-Schild", "[geometry]") {
                 update += 1;
               // Do the metric and inverse metric match?
               Real delta[NDFULL][NDFULL];
-              LinearAlgebra::SetZero(delta,NDFULL,NDFULL);
+              LinearAlgebra::SetZero<NDFULL*NDFULL>(delta);
               SPACETIMELOOP3(mu,nu,sigma) {
                 delta[mu][nu] += ginv[mu][sigma]*g[sigma][nu];
               }

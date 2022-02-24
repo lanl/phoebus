@@ -82,8 +82,8 @@ public:
       dthdX2 = dthGdX2;
     }
 
-    LinearAlgebra::SetZero(Jcov, NDSPACE, NDSPACE);
-    LinearAlgebra::SetZero(Jcon, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(Jcov);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(Jcon);
     // Jcov
     Jcov[0][0] = drdX1;  // r
     Jcov[1][0] = dthdX1; // th
@@ -108,7 +108,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   void bl_to_ks(const Real x1, const Real a, Real *ucon_bl, Real *ucon_ks) const {
     Real trans[NDFULL][NDFULL];
-    LinearAlgebra::SetZero(trans, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(trans);
     const Real r = r_(x1);
     const Real idenom = 1.0/(r*r - 2.0*r + a*a);
     trans[0][0] = 1.0;
@@ -117,7 +117,7 @@ public:
     trans[2][2] = 1.0;
     trans[3][1] = a*idenom;
     trans[3][3] = 1.0;
-    LinearAlgebra::SetZero(ucon_ks, NDFULL);
+    LinearAlgebra::SetZero<NDFULL>(ucon_ks);
     SPACETIMELOOP2(mu,nu) {
       ucon_ks[mu] += trans[mu][nu]*ucon_bl[nu];
     }
@@ -134,12 +134,12 @@ public:
     Real Jcon[NDSPACE][NDSPACE];
     (*this)(x1, x2, x3, c, Jcov, Jcon);
     Real trans[NDFULL][NDFULL];
-    LinearAlgebra::SetZero(trans, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(trans);
     trans[0][0] = 1.0;
     SPACELOOP2(i,j) {
       trans[i+1][j+1] = Jcon[i][j];
     }
-    LinearAlgebra::SetZero(ucon_fmks, NDFULL);
+    LinearAlgebra::SetZero<NDFULL>(ucon_fmks);
     SPACETIMELOOP2(mu,nu) {
       ucon_fmks[mu] += trans[mu][nu]*ucon_ks[nu];
     }

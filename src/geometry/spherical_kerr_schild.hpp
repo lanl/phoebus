@@ -61,7 +61,7 @@ public:
     Real r, th, cth, sth;
     rth_(X1, X2, r, th, cth, sth);
     const Real rho2 = rho2_(r, cth);
-    LinearAlgebra::SetZero(beta, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE>(beta);
     beta[0] = ratio(2 * r, 2 * r + rho2);
   }
 
@@ -72,7 +72,7 @@ public:
     using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     // do this first b/c it shows up lots of places
     g[0][1] = g[1][0] = ratio(2 * r, rho2);
 
@@ -91,7 +91,7 @@ public:
     using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     // do this first b/c it shows up lots of places
     g[0][1] = g[1][0] = ratio(2 * r, rho2);
 
@@ -110,7 +110,7 @@ public:
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
     const Real br = ratio(2 * r, rho2);
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     g[0][0] = 1 + br;
     g[0][2] = g[2][0] = -a_ * (1 + br) * sth2;
     g[1][1] = rho2;
@@ -124,7 +124,7 @@ public:
     using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     g[0][0] = ratio(rho2, 2 * r + rho2) + ratio(a2_ * sth2, rho2);
     g[0][2] = g[2][0] = ratio(a_, rho2);
     g[1][1] = ratio(1, rho2);
@@ -171,7 +171,7 @@ public:
     const Real cth2 = cth * cth;
     const Real s2th = std::sin(2 * th);
     const Real c2th = std::cos(2 * th);
-    LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(dg);
     
     dg[0][0][1] = 2 * ratio(rho2 - 2 * r2, rho4);
     dg[0][1][1] = dg[1][0][1] = dg[0][0][1];
@@ -206,7 +206,7 @@ public:
     Real r, th, cth, sth, sth2, rho2;
     vars_(X1, X2, r, th, cth, sth, sth2, rho2);
     const Real rho4 = rho2 * rho2;
-    LinearAlgebra::SetZero(da, NDFULL);
+    LinearAlgebra::SetZero<NDFULL>(da);
     da[1] = ratio(r, rho2) - ratio(1 + r, 2 * r + rho2);
     da[2] = -ratio(2 * a2_ * r * cth * sth, 2 * r * rho2 + rho4);
   }

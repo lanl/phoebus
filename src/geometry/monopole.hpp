@@ -63,7 +63,7 @@ class MonopoleSph {
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     const Real r = std::abs(X1);
-    LinearAlgebra::SetZero(beta, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE>(beta);
     beta[0] = MonopoleGR::Interpolate(r, beta_, rgrid_);
   }
 
@@ -78,7 +78,7 @@ class MonopoleSph {
         MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
     const Real a2 = a * a;
 
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     g[0][0] = -alpha * alpha + a2 * beta * beta;
     g[0][1] = g[1][0] = a2 * beta;
     g[1][1] = a2;
@@ -99,7 +99,7 @@ class MonopoleSph {
     const Real a =
         MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
 
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     g[0][0] = -ialpha2;
     g[0][1] = g[1][0] = beta * ialpha2;
     g[1][1] = ratio(1., a * a) - beta * beta * ialpha2;
@@ -114,7 +114,7 @@ class MonopoleSph {
     const Real sth = std::sin(X2);
     const Real a =
         MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     g[0][0] = a * a;
     g[1][1] = r2;
     g[2][2] = r2 * sth * sth;
@@ -128,7 +128,7 @@ class MonopoleSph {
     const Real sth = std::sin(X2);
     const Real a =
         MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     g[0][0] = ratio(1., a * a);
     g[1][1] = ir2;
     g[2][2] = ir2 * ratio(1., sth * sth);
@@ -173,7 +173,7 @@ class MonopoleSph {
     const Real dbetadt =
         MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DBETADT);
 
-    LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(dg);
     // d/dt
     dg[0][0][0] = -2 * alpha * dalphadt + 2 * a * beta * (beta * dadt + a * dbetadt);
     dg[1][0][0] = dg[0][1][0] = a * (2 * beta * dadt + a * dbetadt);
@@ -208,7 +208,7 @@ class MonopoleSph {
     const Real dbetadt =
         MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DBETADT);
 
-    LinearAlgebra::SetZero(Gamma, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(Gamma);
 
     Gamma[0][0][0] = -alpha * dalphadt;
     Gamma[0][0][1] = Gamma[0][1][0] = -alpha * dalphadr;
@@ -233,7 +233,7 @@ class MonopoleSph {
     const Real dalphadt =
         MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DALPHADT);
 
-    LinearAlgebra::SetZero(da, NDFULL);
+    LinearAlgebra::SetZero<NDFULL>(da);
     da[0] = dalphadt / alpha;
     da[1] = dalphadr / alpha;
   }
@@ -284,7 +284,7 @@ class MonopoleCart {
     const Real sph = std::sin(ph);
     const Real betar = MonopoleGR::Interpolate(r, sph_.beta_, sph_.rgrid_);
 
-    LinearAlgebra::SetZero(beta, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE>(beta);
     beta[0] = betar * sth * cph;
     beta[1] = betar * sth * sph;
     beta[2] = betar * cth;
@@ -437,7 +437,7 @@ class MonopoleCart {
     Real sth = std::sin(th);
     Real cph = std::cos(ph);
     Real sph = std::sin(ph);
-    LinearAlgebra::SetZero(J, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(J);
     J[0][0] = 1;
     J[1][1] = sth * cph;
     J[1][2] = r * cth * cph;
@@ -456,7 +456,7 @@ class MonopoleCart {
     const Real rho2 = x * x + y * y;
     const Real rho = std::sqrt(rho2);
 
-    LinearAlgebra::SetZero(J, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(J);
     J[0][0] = 1;
     J[1][1] = ratio(x, r);
     J[1][2] = ratio(y, r);
@@ -494,7 +494,7 @@ class MonopoleCart {
     const Real ir3 = ratio(1.,r3);
     const Real ir4 = ratio(1., r4);
 
-    LinearAlgebra::SetZero(H, NDFULL, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL*NDFULL>(H);
     H[1][1][1] = (y2 + z2) * ir3;
     H[1][2][1] = -(x * y) * ir3;
     H[1][3][1] = -(x * z) * ir3;

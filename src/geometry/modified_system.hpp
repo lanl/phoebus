@@ -73,7 +73,7 @@ public:
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     s_.ContravariantShift(X0, C[0], C[1], C[2], beta0);
-    LinearAlgebra::SetZero(beta, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE>(beta);
     SPACELOOP(i) {
       SPACELOOP(j) { beta[i] += Jcon[i][j] * beta0[j]; }
     }
@@ -89,7 +89,7 @@ public:
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     s_.SpacetimeMetric(X0, C[0], C[1], C[2], g0);
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     SPACETIMELOOP(mu) {
       SPACETIMELOOP(nu) {
         SPACETIMELOOP(lam) {
@@ -110,7 +110,7 @@ public:
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     s_.SpacetimeMetricInverse(X0, C[0], C[1], C[2], g0);
-    LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    LinearAlgebra::SetZero<NDFULL*NDFULL>(g);
     SPACETIMELOOP(mu) {
       SPACETIMELOOP(nu) {
         SPACETIMELOOP(lam) {
@@ -133,7 +133,7 @@ public:
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     s_.Metric(X0, C[0], C[1], C[2], g0);
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     SPACELOOP(i) {
       SPACELOOP(j) {
         SPACELOOP(k) {
@@ -154,7 +154,7 @@ public:
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     s_.MetricInverse(X0, C[0], C[1], C[2], g0);
-    LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
+    LinearAlgebra::SetZero<NDSPACE*NDSPACE>(g);
     SPACELOOP(i) {
       SPACELOOP(j) {
         SPACELOOP(k) {

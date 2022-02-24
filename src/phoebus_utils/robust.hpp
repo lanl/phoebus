@@ -32,7 +32,7 @@ template <typename T> KOKKOS_INLINE_FUNCTION int sgn(const T &val) {
   return (T(0) <= val) - (val < T(0));
 }
 template <typename A, typename B>
-KOKKOS_INLINE_FUNCTION auto ratio(const A &a, const B &b) {
+KOKKOS_FORCEINLINE_FUNCTION auto ratio(const A &a, const B &b) {
   const B sgn = b >= 0 ? 1 : -1;
   return a / (b + sgn * SMALL<B>());
 }
