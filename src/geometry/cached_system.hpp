@@ -401,6 +401,7 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin,
                                 1,
                                 NDSPACE * Utils::SymSize<NDFULL>(),
                                 NDFULL};
+  printf("SymSize: %d %d\n", Utils::SymSize<NDFULL>(), Utils::SymSize<NDSPACE>());
   std::vector<std::string> var_names = {"alpha",  "dalpha", "bcon", "gcov",
                                         "gamcon", "detgam", "dg",   "coord"};
   PARTHENON_REQUIRE_THROWS(var_sizes.size() == var_names.size(),
