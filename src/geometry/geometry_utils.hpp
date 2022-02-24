@@ -190,7 +190,10 @@ SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
 }
 KOKKOS_FORCEINLINE_FUNCTION
 int Flatten2(int m, int n, int size) {
-  static constexpr int ind[4][4] = {{0,1,3,6},{1,2,4,7},{3,4,5,8},{6,7,8,9}};
+  static constexpr int ind[4][4] = {{0,1,3,6},
+                                    {1,2,4,7},
+                                    {3,4,5,8},
+                                    {6,7,8,9}};
   PARTHENON_DEBUG_REQUIRE(0 <= m && 0 <= n && m < size && n < size, "bounds");
   return ind[m][n];
 }
