@@ -66,6 +66,7 @@ namespace internal_variables {
   constexpr char fail[] = "fail";
   constexpr char Gcov[] = "Gcov";
   constexpr char Gye[] = "Gye";
+  constexpr char c2p_mu[] = "c2p_mu";
 }
 
 namespace geometric_variables {
