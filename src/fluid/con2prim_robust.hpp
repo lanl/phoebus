@@ -25,6 +25,7 @@ using namespace parthenon::package::prelude;
 // singulaarity
 #include <singularity-eos/eos/eos.hpp>
 
+#include "con2prim_statistics.hpp"
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
@@ -150,7 +151,8 @@ class Residual {
     auto func = [=](const Real x) {
       return aux_func(x,h0sq);
     };
-    return root_find::itp(func,1.e-16,1.0/sqrt(h0sq),rho_floor_);
+    root_find::RootFind root;
+    return root.itp(func,1.e-16,1.0/sqrt(h0sq),1.e-3, -1.0);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -263,6 +265,7 @@ class ConToPrim {
       sig_lo(imap[internal_variables::cell_signal_speed].first),
       sig_hi(imap[internal_variables::cell_signal_speed].second),
       gm1(imap[fluid_prim::gamma1].first),
+      c2p_mu(imap[internal_variables::c2p_mu].first),
       rel_tolerance(tol),
       max_iter(max_iterations),
       h0sq_(1.0) { }
@@ -274,7 +277,8 @@ class ConToPrim {
                                     fluid_prim::bfield, fluid_cons::bfield,
                                     fluid_prim::ye, fluid_cons::ye,
                                     fluid_prim::pressure, fluid_prim::temperature,
-                                    internal_variables::cell_signal_speed, fluid_prim::gamma1});
+                                    internal_variables::cell_signal_speed, fluid_prim::gamma1,
+                                    internal_variables::c2p_mu});
   }
 
   template <typename CoordinateSystem, class... Args>
@@ -303,7 +307,7 @@ class ConToPrim {
   const int pb_lo, pb_hi;
   const int cb_lo, cb_hi;
   const int pye, cye;
-  const int prs, tmp, sig_lo, sig_hi, gm1;
+  const int prs, tmp, sig_lo, sig_hi, gm1, c2p_mu;
   const Real rel_tolerance;
   const int max_iter;
   const Real h0sq_;
@@ -355,7 +359,7 @@ class ConToPrim {
       }
       rsq += rcon[i] * rcov[i];
     }
-    PARTHENON_REQUIRE(rsq >= 0.0, "rsq < 0");
+    //PARTHENON_REQUIRE(rsq >= 0.0, "rsq < 0");
     Real bu[] = {0.0, 0.0, 0.0};
     if (pb_hi > 0) {
       // first set the primitive b-fields
@@ -376,7 +380,7 @@ class ConToPrim {
     }
     const Real zsq = rsq/h0sq_;
     Real v0sq = std::min(zsq/(1.0 + zsq), 1.0 - 1.0/(gam_max*gam_max));
-    if (v0sq >= 1) {
+    /*if (v0sq >= 1) {
       printf("whoa: %g %g %g %g\n", rsq, h0sq_, zsq, v0sq);
     }
     if (!(bsq >= 0)) {
@@ -386,15 +390,21 @@ class ConToPrim {
     if (!(rbsq >= 0)) {
       printf("rbsq < 0: %e\n", rbsq);
       PARTHENON_FAIL("rbsq < 0");
-    }
+    }*/
 
     Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,ye_local,eos,bounds,x1,x2,x3);
 
     // find the upper bound
     // TODO(JCD): revisit this.  is it worth it to find the upper bound?
+    //            Doesn't seem to be at a quick glance.
     //const Real mu_r = res.compute_upper_bound(h0sq_);
     // solve
-    const Real mu = root_find::itp(res, 0.0, 1.0, rel_tolerance);
+    root_find::RootFind root(max_iter);
+    const Real mu = root.regula_falsi(res, 0.0, 1.0, rel_tolerance, v(c2p_mu));
+    v(c2p_mu) = mu;
+#if CON2PRIM_STATISTICS
+    con2prim_statistics::Stats::add(root.iteration_count);
+#endif
 
     // now unwrap everything into primitive and conserved vars
     const Real x = res.x_mu(mu);
@@ -441,17 +451,17 @@ class ConToPrim {
       if (pye > 0) v(cye) = ye_cons;
     } else {
       // just compute signal speeds
+      SPACELOOP(m) vel[m] *= iW;
       bsq = 0.0;
       if (pb_hi > 0) {
         Real bdotv = 0.0;
         SPACELOOP2(m,n) {
-          bsq += v(pb_lo+m) * v(pb_lo+n) * g.gcov4[m+1][n+1];
-          bdotv += v(pb_lo+m) * v(pvel_lo+n) * g.gcov4[m+1][n+1];
+          bsq += bu[m] * bu[n] * g.gcov4[m+1][n+1];
+          bdotv += bu[m] * vel[n] * g.gcov4[m+1][n+1];
         }
         bsq = iW*iW*bsq + bdotv*bdotv;
       }
       
-      SPACELOOP(m) vel[m] *= iW;
       prim2con::signal_speeds(v(prho), v(peng), v(prs), bsq, vel, vsq, v(gm1),
                               g.lapse, g.beta, g.gcon, sig);
     }

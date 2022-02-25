@@ -16,6 +16,7 @@
 #include <defs.hpp>
 #include <parthenon_manager.hpp>
 
+#include "fluid/con2prim_statistics.hpp"
 #include "geometry/geometry.hpp"
 #include "pgen/pgen.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
@@ -88,6 +89,10 @@ int main(int argc, char *argv[]) {
 
   // This line actually runs the simulation
   auto driver_status = driver.Execute();
+
+#if CON2PRIM_STATISTICS
+  con2prim_statistics::Stats::report();
+#endif
 
   // call MPI_Finalize and Kokkos::finalize if necessary
   pman.ParthenonFinalize();
