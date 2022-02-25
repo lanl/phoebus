@@ -70,20 +70,21 @@ struct MeshBlockShape {
   int nx1, nx2, nx3, ndim, ng;
 };
 
+KOKKOS_INLINE_FUNCTION void
+SetConnectionCoeffFromMetricDerivs(const Real dg[NDFULL][NDFULL][NDFULL],
+                                   Real Gamma[NDFULL][NDFULL][NDFULL]) {
+  SPACETIMELOOP3(a,b,c) {
+    Gamma[a][b][c] = 0.5 * (dg[b][a][c] + dg[c][a][b] - dg[b][c][a]);
+  }
+}
+
 template <typename System, typename... Args>
 KOKKOS_INLINE_FUNCTION void
 SetConnectionCoeffByFD(const System &s, Real Gamma[NDFULL][NDFULL][NDFULL],
                        Args... args) {
   Real dg[NDFULL][NDFULL][NDFULL];
   s.MetricDerivative(std::forward<Args>(args)..., dg);
-  for (int a = 0; a < NDFULL; ++a) {
-    for (int b = 0; b < NDFULL; ++b) {
-      for (int c = 0; c < NDFULL; ++c) {
-        Gamma[a][b][c] = 0.5 * (dg[b][a][c] + dg[c][a][b] - dg[b][c][a]);
-        //Gamma[c][a][b] = 0.5 * (dg[c][a][b] + dg[c][b][a] - dg[a][b][c]);
-      }
-    }
-  }
+  SetConnectionCoeffFromMetricDerivs(dg, Gamma);
 }
 
 // TODO(JMM) Currently assumes static metric
