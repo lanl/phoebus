@@ -161,6 +161,13 @@ class Residual {
   bool used_energy_max() const { return used_energy_max_; }
   KOKKOS_INLINE_FUNCTION
   bool used_gamma_max() const { return used_gamma_max_; }
+  KOKKOS_INLINE_FUNCTION
+  bool used_bounds() const {
+    return (used_density_floor_
+         || used_energy_floor_
+         || used_energy_max_
+         || used_gamma_max_);
+  }
 
  private:
   const Real D_, q_, bsq_, bsq_rpsq_, rsq_, rbsq_, v0sq_;
@@ -304,7 +311,7 @@ class ConToPrim {
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos,
                         const Real x1, const Real x2, const Real x3) const {
-    int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);
+    int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
     if (num_nans > 0) return ConToPrimStatus::failure;
     const Real igdet = 1.0/g.gdet;
 
@@ -417,21 +424,37 @@ class ConToPrim {
       }
     }
 
-    Real ye_prim = 0.0;
-    if (pye > 0) ye_prim = v(pye);
-    Real ye_cons;
-    Real S[3];
-    Real bcons[3];
     Real sig[3];
-    prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
-                  g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
-                  v(crho), S, bcons, v(ceng), ye_cons, sig);
+    if (res.used_bounds()) {
+      Real ye_prim = 0.0;
+      if (pye > 0) ye_prim = v(pye);
+      Real ye_cons;
+      Real S[3];
+      Real bcons[3];
+      prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
+                    g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
+                    v(crho), S, bcons, v(ceng), ye_cons, sig);
+      SPACELOOP(i) {
+        v(cmom_lo+i) = S[i];
+      }
 
-    SPACELOOP(i) {
-      v(cmom_lo+i) = S[i];
+      if (pye > 0) v(cye) = ye_cons;
+    } else {
+      // just compute signal speeds
+      bsq = 0.0;
+      if (pb_hi > 0) {
+        Real bdotv = 0.0;
+        SPACELOOP2(m,n) {
+          bsq += v(pb_lo+m) * v(pb_lo+n) * g.gcov4[m+1][n+1];
+          bdotv += v(pb_lo+m) * v(pvel_lo+n) * g.gcov4[m+1][n+1];
+        }
+        bsq = iW*iW*bsq + bdotv*bdotv;
+      }
+      
+      SPACELOOP(m) vel[m] *= iW;
+      prim2con::signal_speeds(v(prho), v(peng), v(prs), bsq, vel, vsq, v(gm1),
+                              g.lapse, g.beta, g.gcon, sig);
     }
-
-    if (pye > 0) v(cye) = ye_cons;
 
     for (int i = 0; i < sig_hi-sig_lo+1; i++) {
       v(sig_lo+i) = sig[i];

@@ -19,6 +19,23 @@
 namespace prim2con {
 
 KOKKOS_INLINE_FUNCTION
+void signal_speeds(const Real &rho, const Real &u, const Real &p, const Real &bsq,
+                   const Real v[], const Real &vsq, const Real &gam1, const Real &alpha,
+                   const Real beta[], const Real gcon[3][3], Real sig[]) {
+  const Real rho_rel = rho + u + p;
+  const Real vasq = bsq/(rho_rel + bsq);
+  Real cssq = gam1*p/rho_rel;
+  cssq += vasq - cssq*vasq;
+  const Real vcoff = alpha/(1.0 - vsq*cssq);
+  SPACELOOP(m) {
+    const Real vpm = std::sqrt(cssq*(1.0 - vsq)*(gcon[m][m]*(1.0 - vsq*cssq) - v[m]*v[m]*(1.0 - cssq)));
+    const Real vp = vcoff*(v[m]*(1.0 - cssq) + vpm) - beta[m];
+    const Real vm = vcoff*(v[m]*(1.0 - cssq) - vpm) - beta[m];
+    sig[m] = std::max(std::fabs(vp), std::fabs(vm));
+  }
+}
+
+KOKKOS_INLINE_FUNCTION
 void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
          const Real &ye_prim, const Real &p, const Real gam1,
          const Real gcov[4][4], const Real gcon[3][3], const Real beta[],
@@ -80,16 +97,7 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
 
   ye_cons = D * ye_prim;
 
-  const Real vasq = bsq*W*W/rho_rel;
-  Real cssq = gam1*p/(rho + u + p);
-  cssq += vasq - cssq*vasq;
-  const Real vcoff = alpha/(1.0 - vsq*cssq);
-  SPACELOOP(m) {
-    const Real vpm = std::sqrt(cssq*(1.0 - vsq)*(gcon[m][m]*(1.0 - vsq*cssq) - v[m]*v[m]*(1.0 - cssq)));
-    const Real vp = vcoff*(v[m]*(1.0 - cssq) + vpm) - beta[m];
-    const Real vm = vcoff*(v[m]*(1.0 - cssq) - vpm) - beta[m];
-    sig[m] = std::max(std::fabs(vp), std::fabs(vm));
-  }
+  signal_speeds(rho, u, p, bsq, v, vsq, gam1, alpha, beta, gcon, sig);
 }
 
 }
