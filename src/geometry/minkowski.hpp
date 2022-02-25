@@ -49,14 +49,11 @@ public:
       for (int nu = 0; nu < NDFULL; ++nu) {
         if (mu == nu) {
           g[mu][nu] = (mu == 0 ? -1 : 1);
-          //printf("%i: [%i][%i] = %e\n", __LINE__, mu, nu, g[mu][nu]);
         } else {
           g[mu][nu] = 0;
-          //printf("%i: [%i][%i] = %e\n", __LINE__, mu, nu, g[mu][nu]);
         }
       }
     }
-    //printf("g[0][0] = %g\n", g[0][0]);
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
