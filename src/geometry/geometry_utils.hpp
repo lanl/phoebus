@@ -188,19 +188,18 @@ SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
     }
   }
 }
-
-KOKKOS_INLINE_FUNCTION
+KOKKOS_FORCEINLINE_FUNCTION
 int Flatten2(int m, int n, int size) {
+  static constexpr int ind[4][4] = {{0,1,3,6},
+                                    {1,2,4,7},
+                                    {3,4,5,8},
+                                    {6,7,8,9}};
   PARTHENON_DEBUG_REQUIRE(0 <= m && 0 <= n && m < size && n < size, "bounds");
-  if (m > n) { // remove recursion
-    int tmp = n;
-    n = m;
-    m = tmp;
-  }
-  return n + size * m - m * (m - 1) / 2 - m;
+  return ind[m][n];
 }
+template <int size>
 KOKKOS_INLINE_FUNCTION
-int SymSize(int size) { return size * size - size * (size - 1) / 2; }
+int SymSize() { return size * size - (size * (size - 1)) / 2; }
 
 } // namespace Utils
 } // namespace Geometry
