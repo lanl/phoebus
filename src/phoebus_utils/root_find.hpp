@@ -19,9 +19,11 @@ namespace root_find {
 enum class RootFindStatus { success, failure };
 
 struct RootFind {
+  KOKKOS_INLINE_FUNCTION
   RootFind(int max_iterations = std::numeric_limits<int>::max())
     : iteration_count(0), max_iter(max_iterations) {}
 
+  KOKKOS_INLINE_FUNCTION
   bool check_bracket(const Real a, const Real b, const Real ya, const Real yb, RootFindStatus *status = nullptr) {
     if (ya * yb > 0.0) {
       if (status != nullptr) {
@@ -55,6 +57,7 @@ struct RootFind {
   }
 
   template <typename F>
+  KOKKOS_INLINE_FUNCTION
   Real secant(F &func, Real a, Real b, const Real tol, const Real guess) {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
@@ -95,6 +98,7 @@ struct RootFind {
 
 
   template <typename F>
+  KOKKOS_INLINE_FUNCTION
   Real regula_falsi(F &func, Real a, Real b, const Real tol, const Real guess) {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
