@@ -145,7 +145,9 @@ struct RootFind {
     }
     if (iteration_count == max_iter) {
       PARTHENON_WARN("root finding reached the maximum number of iterations.  likely not converged");
-      Real val = regula_falsi(func, a0, b0, tol, guess, true);
+      if (!print) {
+        Real val = regula_falsi(func, a0, b0, tol, guess, true);
+      }
       PARTHENON_FAIL("Aborting after root find failed to converge");
     }
     return 0.5*(a+b);
