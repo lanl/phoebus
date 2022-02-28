@@ -99,7 +99,7 @@ struct RootFind {
 
   template <typename F>
   KOKKOS_INLINE_FUNCTION
-  Real regula_falsi(F &func, Real a, Real b, const Real tol, const Real guess, bool print=false) {
+  Real regula_falsi(F &func, Real a, Real b, const Real tol, const Real guess) {
     Real a0 = a;
     Real b0 = b;
     Real ya, yb;
@@ -114,10 +114,7 @@ struct RootFind {
     int b1 = 0;
     int b2 = 0;
     while (b-a > 2.0*tol && iteration_count < max_iter) {
-      if (print) printf("falsi: %d %g %g %g %g\n", iteration_count, a, b, ya, yb);
-      Real w1 = (b2 == 2 ? 0.5 : 1.0);
-      Real w2 = (b1 == 2 ? 0.5 : 1.0);
-      Real c = (w1*a*yb - w2*b*ya)/(w1*yb - w2*ya);
+      Real c = (a*yb - b*ya)/(yb - ya);
       // guard against roundoff because ya or yb is sufficiently close to zero
       if (c == a) {
         b = a;
@@ -131,11 +128,17 @@ struct RootFind {
         b = c;
         yb = yc;
         b1++;
+        if (b1 == 2) {
+          ya *= 0.5;
+        }
         b2 = 0;
       } else if (yc < 0.0) {
         a = c;
         ya = yc;
         b2++;
+        if (b2 == 2) {
+          yb *= 0.5;
+        }
         b1 = 0;
       } else {
         a = c;
@@ -145,10 +148,7 @@ struct RootFind {
     }
     if (iteration_count == max_iter) {
       PARTHENON_WARN("root finding reached the maximum number of iterations.  likely not converged");
-      if (!print) {
-        Real val = regula_falsi(func, a0, b0, tol, guess, true);
-      }
-      PARTHENON_FAIL("Aborting after root find failed to converge");
+      //PARTHENON_FAIL("Aborting after root find failed to converge");
     }
     return 0.5*(a+b);
   }
