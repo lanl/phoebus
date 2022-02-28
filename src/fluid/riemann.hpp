@@ -286,7 +286,7 @@ Real hll(const FluxState &fs, const int d, const int k, const int j, const int i
   const Real cl = std::min(std::min(vml, vmr), 0.0);
   const Real cr = std::max(std::max(vpl, vpr), 0.0);
   const Real crcl = cr*cl;
-  const Real inv_cr_cl = robust::ratio(1, cr - cl);
+  const Real inv_cr_cl = robust::ratio(1.0, cr - cl);
   for (int m = 0; m < fs.NumConserved(); m++) {
     fs.v.flux(d,m,k,j,i) = ((cr*Fl[m] - cl*Fr[m])*g.gdet + crcl*(Ur[m] - Ul[m])*g.gammadet)*inv_cr_cl;
   }
