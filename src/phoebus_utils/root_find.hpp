@@ -55,6 +55,46 @@ struct RootFind {
   }
 
   template <typename F>
+  Real secant(F &func, Real a, Real b, const Real tol, const Real guess) {
+    Real ya, yb;
+    refine_bracket(func, guess, a, b, ya, yb);
+    Real x1,x2,y1,y2;
+    if (a == guess) {
+      x1 = a;
+      y1 = ya;
+      x2 = b;
+      y2 = yb;
+    } else if (b == guess) {
+      x1 = b;
+      y1 = yb;
+      x2 = a;
+      y2 = ya;
+    }
+    Real sign = (y1 < 0 ? 1.0 : -1.0);
+    y1 *= sign;
+    y2 *= sign;
+
+    while (std::abs(x2-x1) > 2.0*tol && iteration_count < max_iter) {
+      Real x0 = (x1*y2 - x2*y1)/(y2 - y1);
+      // guard against roundoff because ya or yb is sufficiently close to zero
+      if (x0 == x1) {
+        x2 = x1;
+        continue;
+      } else if (x0 == x2) {
+        x1 = x2;
+        continue;
+      }
+      Real y0 = sign*func(x0);
+      x2 = x1;
+      y2 = y1;
+      x1 = x0;
+      y1 = y0;
+    }
+    return 0.5*(x1+x2);
+  }
+
+
+  template <typename F>
   Real regula_falsi(F &func, Real a, Real b, const Real tol, const Real guess) {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
@@ -65,8 +105,12 @@ struct RootFind {
     ya *= sign;
     yb *= sign;
 
+    int b1 = 0;
+    int b2 = 0;
     while (b-a > 2.0*tol && iteration_count < max_iter) {
-      Real c = (a*yb - b*ya)/(yb - ya);
+      Real w1 = (b2 == 2 ? 0.5 : 1.0);
+      Real w2 = (b1 == 2 ? 0.5 : 1.0);
+      Real c = (w1*a*yb - w2*b*ya)/(w1*yb - w2*ya);
       // guard against roundoff because ya or yb is sufficiently close to zero
       if (c == a) {
         b = a;
@@ -79,9 +123,13 @@ struct RootFind {
       if (yc > 0.0) {
         b = c;
         yb = yc;
+        b1++;
+        b2 = 0;
       } else if (yc < 0.0) {
         a = c;
         ya = yc;
+        b2++;
+        b1 = 0;
       } else {
         a = c;
         b = c;
@@ -114,6 +162,14 @@ struct RootFind {
     while (b-a > 2.0*tol && iteration_count < max_iter) {
       const Real xh = 0.5*(a + b);
       const Real xf = (yb*a - ya*b)/(yb - ya);
+      // guard against roundoff because ya or yb is sufficiently close to zero
+      if (xf == a) {
+        b = a;
+        continue;
+      } else if (xf == b) {
+        a = b;
+        continue;
+      }
       const Real xhxf = xh - xf;
       const Real delta = std::min(kappa1*std::pow(b-a,kappa2),std::abs(xhxf));
       const Real sigma = (xhxf > 0 ? 1.0 : -1.0);
