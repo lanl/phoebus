@@ -102,6 +102,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
 
+  if (method == "mocmc") {
+    std::string swarm_name = "mocmc";
+    Metadata swarm_metadata({Metadata::Provides});
+    physics->AddSwarm(swarm_name, swarm_metadata);
+    Metadata real_swarmvalue_metadata({Metadata::Real});
+    physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("k0", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("k1", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("k2", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("k3", swarm_name, real_swarmvalue_metadata);
+    Metadata Inu_swarmvalue_metadata({Metadata::Real}, std::vector<int>{nu_bins});
+    //physics->AddSwarmValue("Inu", swarm_name, Inu_swarmvalue_metadata);
+  }
+
   if (method == "monte_carlo") {
     std::string swarm_name = "monte_carlo";
     Metadata swarm_metadata({Metadata::Provides});
