@@ -43,25 +43,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ndim = pmb->pmy_mesh->ndim;
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({"p.density",
-                              "p.velocity",
-                              "p.energy",
-                              fluid_prim::bfield,
-			      fluid_prim::ye,
-                              "pressure",
-                              "temperature",
-                              "gamma1",
-                              "cs"},
-                              imap);
+  std::vector<std::string> vars({fluid_prim::density, fluid_prim::velocity,
+                                 fluid_prim::energy, fluid_prim::bfield,
+                                 fluid_prim::pressure, fluid_prim::temperature,
+                                 fluid_prim::ye});
+  auto v = rc->PackVariables(vars, imap);
 
-  const int irho = imap["p.density"].first;
-  const int ivlo = imap["p.velocity"].first;
-  const int ivhi = imap["p.velocity"].second;
-  const int ieng = imap["p.energy"].first;
+  const int irho = imap[fluid_prim::density].first;
+  const int ivlo = imap[fluid_prim::velocity].first;
+  const int ivhi = imap[fluid_prim::velocity].second;
+  const int ieng = imap[fluid_prim::energy].first;
   const int ib_lo = imap[fluid_prim::bfield].first;
   const int ib_hi = imap[fluid_prim::bfield].second;
-  const int iprs = imap["pressure"].first;
-  const int itmp = imap["temperature"].first;
+  const int iprs = imap[fluid_prim::pressure].first;
+  const int itmp = imap[fluid_prim::temperature].first;
   const int iye = imap[fluid_prim::ye].second;
   const int nv = ivhi - ivlo + 1;
 
@@ -226,8 +221,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
       Real eos_lambda[2];
       if (iye > 0) {
-	v(iye, k, j, i) = 0.5;
-	eos_lambda[0] = v(iye, k, j, i);
+	      v(iye, k, j, i) = 0.5;
+	      eos_lambda[0] = v(iye, k, j, i);
       }
       // This line causes NaNs and I don't know why
       //v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho);
@@ -257,33 +252,47 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       }
       Real Gamma = sqrt(1. + vsq);
 
-      if (is_snake ||is_inchworm || is_boosted_minkowski) {
+      if (is_snake || is_inchworm || is_boosted_minkowski) {
         PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
         // Transform velocity
         Real gcov[NDFULL][NDFULL] = {0};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
         Real ucon[NDFULL] = {Gamma, // alpha = 1 in Minkowski
-                             v(ivlo, k, j, i), // beta^i = 0 in Minkowski
+                             v(ivlo, k, j, i),  // beta^i = 0 in Minkowski
                              v(ivlo+1, k, j, i),
                              v(ivlo+2, k, j, i)};
+        Real Bdotu = 0.0;
+        for(int d = ib_lo; d <= ib_hi; d++){
+          Bdotu += v(d, k, j, i) * ucon[d-ib_lo+1];
+        }
+        Real bcon[NDFULL] = {Bdotu, 0.0,0.0,0.0};
+        for(int d =ib_lo; d <= ib_hi; d++){
+          bcon[d-ib_lo+1] = (v(d, k, j, i) + alpha*bcon[0]*ucon[d-ib_lo+1]) / Gamma;
+        }
         Real J[NDFULL][NDFULL] = {0};
         if (is_snake) {
           J[0][0] = 1/alpha;
-	        J[2][0] = -betay/alpha;
+          J[2][0] = -betay/alpha;
           J[2][1] = a_snake*k_snake*cos(k_snake*x);
-	        J[1][1] = J[2][2] = J[3][3] = 1;
-	      } else if (is_boosted_minkowski) {
-	        J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
-	        J[1][0] = -betax;
-	        J[2][0] = -betay;
-	        J[3][0] = -betaz;
+          J[1][1] = J[2][2] = J[3][3] = 1;
+        } else if (is_boosted_minkowski) {
+          J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
+          J[1][0] = -betax;
+          J[2][0] = -betay;
+          J[3][0] = -betaz;
         } else if (is_inchworm) {
-          PARTHENON_FAIL("This geometry isn't supported with a J!");
+          J[0][0] = J[2][2] = J[3][3] = 1;
+          J[1][1] = 1 + a_snake*k_snake*cos(k_snake*x);
         }
         Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
         SPACETIMELOOP(mu) SPACETIMELOOP(nu){
           ucon_transformed[mu] += J[mu][nu]*ucon[nu];
         }
+        Real bcon_transformed[NDFULL] = {0, 0, 0, 0};
+        SPACETIMELOOP(mu) SPACETIMELOOP(nu){
+          bcon_transformed[mu] += J[mu][nu]*bcon[nu];
+        }
+
         const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
         Gamma = lapse * ucon_transformed[0];
         Real shift[NDSPACE];
@@ -291,12 +300,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo, k, j, i) = ucon_transformed[1] + Gamma*shift[0]/lapse;
         v(ivlo+1, k, j, i) = ucon_transformed[2] + Gamma*shift[1]/lapse;
         v(ivlo+2, k, j, i) = ucon_transformed[3] + Gamma*shift[2]/lapse;
-
-        // Enforce zero B fields for now
-        if (ib_hi >= 3) {
-          v(ib_lo, k, j, i) = 0.;
-          v(ib_lo + 1, k, j, i) = 0.;
-          v(ib_lo + 2, k, j, i) = 0.;
+        for(int d = ib_lo; d <= ib_hi; d++){
+          v(d, k, j, i) = bcon_transformed[d-ib_lo+1]*Gamma - lapse*bcon_transformed[0]*ucon_transformed[d-ib_lo+1];
         }
       }
     });
