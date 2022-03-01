@@ -347,7 +347,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     const int ibhi = imap[fluid_prim::bfield].second;
     const int iprs = imap[fluid_prim::pressure].first;
 
-    if (ibhi > 0) return;
+    if (ibhi < 0) return;
 
     Real beta_min_local;
     pmb->par_reduce("Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e,
@@ -401,6 +401,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           v(ib, k, j, i) *= B_field_fac;
         }
       });
+    fluid::PrimitiveToConserved(rc.get());
   }
 }
 
