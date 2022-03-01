@@ -128,17 +128,13 @@ struct RootFind {
         b = c;
         yb = yc;
         b1++;
-        if (b1 > 1) {
-          ya *= 0.5;
-        }
+        ya *= (b1 > 1 ? 0.5 : 1.0);
         b2 = 0;
       } else if (yc < 0.0) {
         a = c;
         ya = yc;
         b2++;
-        if (b2 > 1) {
-          yb *= 0.5;
-        }
+        yb *= (b2 > 1 ? 0.5 : 1.0);
         b1 = 0;
       } else {
         a = c;
