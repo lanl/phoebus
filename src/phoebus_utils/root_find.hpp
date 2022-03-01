@@ -128,7 +128,7 @@ struct RootFind {
         b = c;
         yb = yc;
         b1++;
-        if (b1 == 2) {
+        if (b1 > 1) {
           ya *= 0.5;
         }
         b2 = 0;
@@ -136,7 +136,7 @@ struct RootFind {
         a = c;
         ya = yc;
         b2++;
-        if (b2 == 2) {
+        if (b2 > 1) {
           yb *= 0.5;
         }
         b1 = 0;
