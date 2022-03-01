@@ -401,6 +401,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           v(ib, k, j, i) *= B_field_fac;
         }
       });
+    fluid::PrimitiveToConserved(rc.get());
   }
 }
 
