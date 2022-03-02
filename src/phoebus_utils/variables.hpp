@@ -57,6 +57,10 @@ namespace radmoment_internal {
   constexpr char tilPi[] = "r.i.tilPi";
 }
 
+namespace mocmc_internal {
+  constexpr char dnsamp[] = "mocmc.i.dnsamp";
+}
+
 namespace internal_variables {
   constexpr char face_signal_speed[] = "face_signal_speed";
   constexpr char cell_signal_speed[] = "cell_signal_speed";

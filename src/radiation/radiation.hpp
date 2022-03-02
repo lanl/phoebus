@@ -122,6 +122,9 @@ TaskStatus MomentCalculateOpacities(T *rc);
 
 // MOCMC tasks
 template <class T>
+void MOCMCInitSamples(T *rc);
+
+template <class T>
 TaskStatus MOCMCTransport(T *rc);
 
 template <class T>

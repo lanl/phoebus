@@ -21,6 +21,28 @@
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
 
+void Mesh::test(ParameterInput *pin) {
+  printf("test!\n");
+  exit(-1);
+
+  const std::string ix1_bc =
+      pman.pinput->GetOrAddString("phoebus", "ix1_bc", "outflow");
+  const std::string ox1_bc =
+      pman.pinput->GetOrAddString("phoebus", "ox1_bc", "outflow");
+  const std::string parth_ix1_bc =
+    pman.pinput->GetString("parthenon/mesh", "ix1_bc");
+  PARTHENON_REQUIRE(parth_ix1_bc == "user" || parth_ix1_bc == "periodic",
+    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ix1_bc");
+  const std::string parth_ox1_bc =
+    pman.pinput->GetString("parthenon/mesh", "ox1_bc");
+  PARTHENON_REQUIRE(parth_ox1_bc == "user" || parth_ox1_bc == "periodic",
+    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ox1_bc");
+
+  if (parth_ix1_bc == "user" && ix1_bc = "outflow") {
+
+  }
+}
+
 int main(int argc, char *argv[]) {
   parthenon::ParthenonManager pman;
 
@@ -42,6 +64,7 @@ int main(int argc, char *argv[]) {
   pman.app_input->InitMeshBlockUserData = Geometry::SetGeometryBlock;
   // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
+  pman.app_input->InitUserMeshData = test;
 
   // TODO(JMM): Move this into another function somewhere?
   // Ensure only allowed parthenon boundary conditions are used

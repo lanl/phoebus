@@ -27,18 +27,18 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PackIndexMap imap;
   auto v =
-      rc->PackVariables(std::vector<std::string>({radmoment_prim::J, radmoment_prim::H, 
-                        fluid_prim::density, fluid_prim::temperature, fluid_prim::velocity, 
+      rc->PackVariables(std::vector<std::string>({radmoment_prim::J, radmoment_prim::H,
+                        fluid_prim::density, fluid_prim::temperature, fluid_prim::velocity,
                         radmoment_internal::xi, radmoment_internal::phi}),
                         imap);
-  
+
   auto idJ = imap.GetFlatIdx(radmoment_prim::J);
   auto idH = imap.GetFlatIdx(radmoment_prim::H);
   auto idv = imap.GetFlatIdx(fluid_prim::velocity);
   auto ixi = imap.GetFlatIdx(radmoment_internal::xi);
   auto iphi = imap.GetFlatIdx(radmoment_internal::phi);
-  const int prho = imap[fluid_prim::density].first; 
-  const int pT = imap[fluid_prim::temperature].first; 
+  const int prho = imap[fluid_prim::density].first;
+  const int pT = imap[fluid_prim::temperature].first;
 
   const auto specB = idJ.GetBounds(1);
   const Real J = pin->GetOrAddReal("radiation_advection", "J", 1.0);
@@ -50,7 +50,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real kappa = pin->GetOrAddReal("radiation_advection", "kappas_init", 1.e3);
   const bool boost = pin->GetOrAddBoolean("radiation_advection", "boost_profile", false);
   const int shapedim = pin->GetOrAddInteger("radiation_advection", "shapedim", 1);
-  
+
   auto &coords = pmb->coords;
   auto pmesh = pmb->pmy_mesh;
   int ndim = pmesh->ndim;
@@ -60,11 +60,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   //auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
-  const Real gamma = 1/sqrt(1-vx*vx); 
+  const Real gamma = 1/sqrt(1-vx*vx);
   const Real t0p = 1.5*kappa*width*width;
-  const Real t0 = t0p; 
+  const Real t0 = t0p;
   const Real x0p = (0.5 - vx*t0)*gamma;
-  printf("t0 = %e kappa = %e width = %e gamma = %e \n", t0, kappa, width, gamma); 
+  printf("t0 = %e kappa = %e width = %e gamma = %e \n", t0, kappa, width, gamma);
   pmb->par_for(
       "Phoebus::ProblemGenerator::radiation_advection", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -73,33 +73,41 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real y = (ndim > 1 && shapedim > 1) ? coords.x2v(j) : 0;
         Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
-        
+
         v(prho, k, j, i) = 1.0;
         v(pT, k, j, i) = 1.0;
 
-        v(idv(0), k, j, i) = vx; 
-        v(idv(1), k, j, i) = 0.0; 
-        v(idv(2), k, j, i) = 0.0; 
+        v(idv(0), k, j, i) = vx;
+        v(idv(1), k, j, i) = 0.0;
+        v(idv(2), k, j, i) = 0.0;
 
         // Write down boosted diffusion initial condition
-        Real tp = gamma*(t0 - vx*x); 
-        Real xp = gamma*(x - vx*t0);  
+        Real tp = gamma*(t0 - vx*x);
+        Real xp = gamma*(x - vx*t0);
         for (int ispec = specB.s; ispec<=specB.e; ++ispec) {
-          
-          v(ixi(ispec), k, j, i) = 0.0;  
-          v(iphi(ispec), k, j, i) = acos(-1.0)*1.000001;  
-          
+
+          v(ixi(ispec), k, j, i) = 0.0;
+          v(iphi(ispec), k, j, i) = acos(-1.0)*1.000001;
+
           if (boost) {
             v(idJ(ispec), k, j, i) = std::max(J*sqrt(t0p/tp)*exp(-3*kappa*std::pow(xp - x0p, 2)/(4*tp)), 1.e-10);
-          } else { 
+          } else {
             v(idJ(ispec), k, j, i) = std::max(J*exp(-std::pow((x - 0.5)/width, 2)/2.0),1.e-10);
           }
-          
+
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
           v(idH(2, ispec), k, j, i) = Hz;
         }
       });
+
+  // Initialize samples
+  auto radpkg = pmb->packages.Get("radiation");
+  if (radpkg->Param<bool>("active")) {
+    if (radpkg->Param<std::string>("method") == "mocmc") {
+      radiation::MOCMCInitSamples(rc.get());
+    }
+  }
 
   radiation::MomentPrim2Con(rc.get());
 }
