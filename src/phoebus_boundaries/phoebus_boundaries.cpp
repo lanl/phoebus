@@ -124,7 +124,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         "OutflowOuterX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
-          
+
           // Enforce u^1 >= 0
           Real vcon[3] = {q(pv_lo,k,j,i), q(pv_lo+1,k,j,i), q(pv_lo+2,k,j,i)};
           Real gammacov[3][3] = {0};
@@ -198,8 +198,15 @@ void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
       });
 }
 
+std::unique_ptr<parthenon::ParticleBound, parthenon::DeviceDeleter<parthenon::DevMemSpace>> SetSwarmIx1Outflow() {
+  return DeviceAllocate<ParticleBoundIX1Outflow>();
+}
+std::unique_ptr<parthenon::ParticleBound, parthenon::DeviceDeleter<parthenon::DevMemSpace>> SetSwarmOx1Outflow() {
+  return DeviceAllocate<ParticleBoundOX1Outflow>();
+}
+
 TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc) {
-  
+
   auto pmb = rc->GetBlockPointer();
   const int ndim = pmb->pmy_mesh->ndim;
 
@@ -212,7 +219,7 @@ TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc) 
       domains.push_back(IndexDomain::outer_x3);
     }
   }
-  
+
   auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
   if (pkg->Param<bool>("active")) {
     std::string bc_vars = pkg->Param<std::string>("bc_vars");

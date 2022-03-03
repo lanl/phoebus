@@ -60,8 +60,7 @@ void MOCMCInitSamples(T *rc) {
   auto dn = imap[im::dnsamp].first;
 
   const int nblock = v.GetDim(5);
-  printf("nblock: %i\n", nblock);
-  exit(-1);
+  PARTHENON_THROW(nblock == 1, "Packing not currently supported for swarms");
 
   ParArray1D<int> nsamptot("Total samples per meshblock", nblock);
 
