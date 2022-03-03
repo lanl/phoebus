@@ -104,9 +104,6 @@ void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin) {
   auto system = GetCoordinateSystem(rc);
   SetGeometry<CoordSysMeshBlock>(rc);
   SetGeometryDefault(rc, system);
-
-  printf("Here\n");
-  exit(-1);
 }
 
 } // namespace Geometry
