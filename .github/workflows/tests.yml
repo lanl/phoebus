@@ -30,22 +30,40 @@ jobs:
         - name: Run test scripts
           run: |
             cd tst/regression
-            mkdir build_minkowski
-            cd build_minkowski
+            mkdir build_minkowski_release
+            cd build_minkowski_release
             cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
             cmake --build . --parallel 4
             cd ..
-            mkdir build_fmks
-            cd build_fmks
+            mkdir build_fmks_release
+            cd build_fmks_release
             cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=FMKS -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
             cmake --build . --parallel 4
             cd ..
+            mkdir build_minkowski_debug
+            cd build_minkowski_debug
+            cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
+            cmake --build . --parallel 4
+            cd ..
+            mkdir build_fmks_debug
+            cd build_fmks_debug
+            cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=FMKS -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
+            cmake --build . --parallel 4
+            cd ..
             # TODO(BRR) add --use_gpu flag here if running on GPU
-            ./radiation_diffusion.py --executable build_minkowski/src/phoebus
-            ./bondi.py --executable build_fmks/src/phoebus
-            ./linear_modes.py --executable build_minkowski/src/phoebus
-            ./thincooling.py --executable build_minkowski/src/phoebus
-            ./thincooling_coolingfunction.py --executable build_minkowski/src/phoebus
+            # Release suite
+            ./radiation_diffusion.py --executable build_minkowski_release/src/phoebus
+            ./bondi.py --executable build_fmks_release/src/phoebus
+            ./linear_modes.py --executable build_minkowski_release/src/phoebus
+            ./thincooling.py --executable build_minkowski_release/src/phoebus
+            ./thincooling_coolingfunction.py --executable build_minkowski_release/src/phoebus
+
+            # Debug suite
+            ./radiation_diffusion.py --executable build_minkowski_debug/src/phoebus
+            ./bondi.py --executable build_fmks_debug/src/phoebus
+            ./linear_modes.py --executable build_minkowski_debug/src/phoebus
+            ./thincooling.py --executable build_minkowski_debug/src/phoebus
+            ./thincooling_coolingfunction.py --executable build_minkowski_debug/src/phoebus
         - name: Build code for unit testing
           run: |
             mkdir build

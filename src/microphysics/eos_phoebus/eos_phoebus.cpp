@@ -177,10 +177,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // These can be used for floors/ceilings or for root find bounds
   Real rho_min = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
   Real sie_min = pin->GetOrAddReal("fixup", "sie0_floor", 0.0);
-  Real T_min = eos_host.TemperatureFromDensityInternalEnergy(rho_min, sie_min);
+  Real lambda[2] = {0.};
+  Real T_min = eos_host.TemperatureFromDensityInternalEnergy(rho_min, sie_min, lambda);
   Real rho_max = pin->GetOrAddReal("fixup", "rho0_ceiling", 1e18);
   Real sie_max = pin->GetOrAddReal("fixup", "sie0_ceiling", 1e35);
-  Real T_max = eos_host.TemperatureFromDensityInternalEnergy(rho_max, sie_max);
+  Real T_max = eos_host.TemperatureFromDensityInternalEnergy(rho_max, sie_max, lambda);
 #ifdef SPINER_USE_HDF
   if (eos_type == StellarCollapse::EosType()) {
     // We request that Ye and temperature exist, but do not provide them.
@@ -205,7 +206,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Always C^2
     Real sie_unit = std::pow(pc.c, 2);
     Real press_unit = rho_unit*sie_unit;
-    
+
     sie_min = eos_sc.sieMin()/sie_unit;
     sie_max = eos_sc.sieMax()/sie_unit;
     T_min = eos_sc.TMin()/T_unit;
