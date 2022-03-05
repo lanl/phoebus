@@ -88,16 +88,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("nu_bins", nu_bins);
   Real dlnu = (log(nu_max) - log(nu_min)) / nu_bins;
   params.Add("dlnu", dlnu);
-  ParArray1D<Real> nusamp("Frequency grid", nu_bins + 1);
-  auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
-  for (int n = 0; n < nu_bins + 1; n++) {
-    nusamp_h(n) = exp(log(nu_min) + n * dlnu);
-  }
-  Kokkos::deep_copy(nusamp, nusamp_h);
-  params.Add("nusamp", nusamp);
 
   int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
   params.Add("num_species", num_species);
+  std::vector<RadiationType> species;
+  if (do_nu_electron) {
+    species.push_back(RadiationType::NU_ELECTRON);
+  }
+  if (do_nu_electron_anti) {
+    species.push_back(RadiationType::NU_ELECTRON_ANTI);
+  }
+  if (do_nu_heavy) {
+    species.push_back(RadiationType::NU_HEAVY);
+  }
+  params.Add("species", species);
+  PARTHENON_REQUIRE(num_species == species.size(), "Number of species does not match requested species!");
 
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
@@ -106,21 +111,30 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     std::string swarm_name = "mocmc";
     Metadata swarm_metadata({Metadata::Provides});
     physics->AddSwarm(swarm_name, swarm_metadata);
-    Metadata real_swarmvalue_metadata({Metadata::Real});
+    Metadata real_swarmvalue_metadata({Metadata::Real, Metadata::Particle});
     physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("k0", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("k1", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("k2", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("k3", swarm_name, real_swarmvalue_metadata);
-    Metadata Inu_swarmvalue_metadata({Metadata::Real}, std::vector<int>{nu_bins});
-    //physics->AddSwarmValue("Inu", swarm_name, Inu_swarmvalue_metadata);
+    Metadata fourv_swarmvalue_metadata({Metadata::Real, Metadata::Particle}, std::vector<int>{4});
+    physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
+    Metadata Inu_swarmvalue_metadata({Metadata::Real, Metadata::Particle}, std::vector<int>{NumRadiationTypes, nu_bins});
+    physics->AddSwarmValue("Inu", swarm_name, Inu_swarmvalue_metadata);
+
+    const int nsamp_per_zone = pin->GetOrAddInteger("radiation/mocmc", "nsamp_per_zone", 32);
+    params.Add("nsamp_per_zone", nsamp_per_zone);
+
+    ParArray1D<Real> nusamp("Frequency grid", nu_bins);
+    auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
+    for (int n = 0; n < nu_bins; n++) {
+      nusamp_h(n) = exp(log(nu_min) + (n + 0.5) * dlnu);
+    }
+    Kokkos::deep_copy(nusamp, nusamp_h);
+    params.Add("nusamp", nusamp);
   }
 
   if (method == "monte_carlo") {
     std::string swarm_name = "monte_carlo";
     Metadata swarm_metadata({Metadata::Provides});
     physics->AddSwarm(swarm_name, swarm_metadata);
-    Metadata real_swarmvalue_metadata({Metadata::Real});
+    Metadata real_swarmvalue_metadata({Metadata::Real, Metadata::Particle});
     physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("k0", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("k1", swarm_name, real_swarmvalue_metadata);
@@ -193,6 +207,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     bool remove_emitted_particles =
         pin->GetOrAddBoolean("monte_carlo", "remove_emitted_particles", false);
     params.Add("remove_emitted_particles", remove_emitted_particles);
+
+    ParArray1D<Real> nusamp("Frequency grid", nu_bins + 1);
+    auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
+    for (int n = 0; n < nu_bins + 1; n++) {
+      nusamp_h(n) = exp(log(nu_min) + n * dlnu);
+    }
+    Kokkos::deep_copy(nusamp, nusamp_h);
+    params.Add("nusamp", nusamp);
   }
 
   if (method == "monte_carlo" || method == "mocmc") {
@@ -202,12 +224,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     RNGPool rng_pool(rng_seed);
     physics->AddParam<>("rng_pool", rng_pool);
   }
-
-//  physics->AddField(c::E, mspecies_scalar_cons);
-//  physics->AddField(c::F, mspecies_three_vector_cons);
-
-//  physics->AddField(p::J, mspecies_scalar);
-//  physics->AddField(p::H, mspecies_three_vector);
 
   bool moments_active = false;
   if ((method == "mocmc") || (method == "moment_m1") || (method == "moment_eddington")) {
@@ -274,6 +290,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         std::vector<int>{NumRadiationTypes, 3, 3});
 
       physics->AddField(i::tilPi, mspecies_three_tensor);
+      physics->AddField(mocmc_internal::dnsamp, mscalar);
     }
 
     physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;

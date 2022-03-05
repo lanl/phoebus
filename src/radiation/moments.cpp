@@ -123,8 +123,10 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         }
         if (EDDINGTON_KNOWN) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
-          SPACELOOP2(ii, jj) {
-           printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi(ii, jj));
+          if (i == 128) {
+            SPACELOOP2(ii, jj) {
+             printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi(ii, jj));
+            }
           }
         } else {
           c.GetCovTilPiFromCon(E, covF, xi, phi, &conTilPi);
@@ -227,15 +229,11 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
                     v(b, pH(ispec, 2), k, j, i)*J}};
 
         if (EDDINGTON_KNOWN) {
-  printf("%s:%i\n", __FILE__, __LINE__);
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
-  printf("%s:%i\n", __FILE__, __LINE__);
         } else {
           c.GetCovTilPiFromPrim(J, covH, &conTilPi);
         }
-  printf("%s:%i\n", __FILE__, __LINE__);
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
-  printf("%s:%i\n", __FILE__, __LINE__);
 
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {

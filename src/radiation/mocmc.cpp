@@ -26,13 +26,16 @@ namespace cr = radmoment_cons;
 namespace pr = radmoment_prim;
 namespace ir = radmoment_internal;
 namespace im = mocmc_internal;
+using namespace singularity::neutrinos;
+using singularity::RadiationType;
 
 KOKKOS_INLINE_FUNCTION
 int get_nsamp_per_zone(const int &k, const int &j, const int &i,
                        const Geometry::CoordSysMeshBlock &geom, const Real &rho,
-                       const Real &T, const Real &Ye, const Real &J) {
+                       const Real &T, const Real &Ye, const Real &J,
+                       const int &nsamp_per_zone_global) {
 
-  return 0;
+  return nsamp_per_zone_global;
 }
 
 template <class T>
@@ -41,6 +44,9 @@ void MOCMCInitSamples(T *rc) {
   auto *pmb = rc->GetParentPointer().get();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
+  // auto swarm = pmb->swarm_data.Get()->Get("mocmc");
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  auto rng_pool = rad->Param<RNGPool>("rng_pool");
 
   // Meshblock geometry
   const auto geom = Geometry::GetCoordinateSystem(rc);
@@ -48,39 +54,128 @@ void MOCMCInitSamples(T *rc) {
   const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
+  // Microphysics
+  auto opac = pmb->packages.Get("opacity");
+  const auto d_opac = opac->template Param<Opacity>("d.opacity");
+  StateDescriptor *eos = pmb->packages.Get("eos").get();
+  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  const Real TIME = unit_conv.GetTimeCodeToCGS();
+
   // auto &dnsamp = rc->Get(mocmc_internal::dnsamp);
-  std::vector<std::string> variables{pr::J, pf::density, pf::temperature, pf::ye};
+  std::vector<std::string> variables{pr::J,           pr::H,  pf::density, pf::velocity,
+                                     pf::temperature, pf::ye, im::dnsamp};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
   auto pJ = imap.GetFlatIdx(pr::J);
+  auto pH = imap.GetFlatIdx(pr::H);
   auto pdens = imap[pf::density].first;
+  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
   auto pT = imap[pf::temperature].first;
   auto pye = imap[pf::ye].first;
   auto dn = imap[im::dnsamp].first;
 
   const int nblock = v.GetDim(5);
-  PARTHENON_THROW(nblock == 1, "Packing not currently supported for swarms");
+  PARTHENON_REQUIRE_THROWS(nblock == 1, "Packing not currently supported for swarms");
 
-  ParArray1D<int> nsamptot("Total samples per meshblock", nblock);
+  const int nsamp_per_zone = rad->Param<int>("nsamp_per_zone");
+  int nsamp_tot = 0;
 
   // Fill nsamp per zone per species and sum over zones
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::Reconstruction", DevExecSpace(), 0, nblock - 1, kb.s,
-      kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+  // TODO(BRR) make this a separate function and use it to update dnsamp which is then
+  // used to decide whether to refine/derefine
+  parthenon::par_reduce(
+      DEFAULT_LOOP_PATTERN, "MOCMC::Init::NumSamples", DevExecSpace(), 0, nblock - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nsamp) {
+        printf("%s:%i\n", __FILE__, __LINE__);
         Real Jtot = 0.;
         for (int s = 0; s < 3; s++) {
           Jtot += v(b, pJ(s), k, j, i);
         }
+        printf("%s:%i\n", __FILE__, __LINE__);
         v(b, dn, k, j, i) =
             get_nsamp_per_zone(k, j, i, geom, v(b, pdens, k, j, i), v(b, pT, k, j, i),
-                               v(b, pye, k, j, i), Jtot);
-        Kokkos::atomic_add(&(nsamptot(b)), static_cast<int>(v(b, dn, k, j, i)));
-      });
+                               v(b, pye, k, j, i), Jtot, nsamp_per_zone);
+        nsamp += v(b, dn, k, j, i);
+        printf("%s:%i\n", __FILE__, __LINE__);
+        // Kokkos::atomic_add(&(nsamptot(b)), static_cast<int>(v(b, dn, k, j, i)));
+        printf("%s:%i\n", __FILE__, __LINE__);
+      },
+      Kokkos::Sum<int>(nsamp_tot));
 
-  // for (int b = 0; b < nblock; b++) {
-  //}
+  printf("nsamptot: %i\n", nsamp_tot);
+
+  ParArrayND<int> new_indices;
+  auto new_mask = swarm->AddEmptyParticles(nsamp_tot, new_indices);
+
+  printf("new_indices.GetDim(1): %i\n", new_indices.GetDim(1));
+
+  const auto &x = swarm->template Get<Real>("x").Get();
+  const auto &y = swarm->template Get<Real>("y").Get();
+  const auto &z = swarm->template Get<Real>("z").Get();
+  const auto &ncov = swarm->template Get<Real>("ncov").Get();
+  const auto &Inu = swarm->template Get<Real>("Inu").Get();
+
+  auto swarm_d = swarm->GetDeviceContext();
+
+  auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  const int nu_bins = rad->Param<int>("nu_bins");
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+
+  const auto B_fake = rad->Param<Real>("B_fake");
+  const auto use_B_fake = rad->Param<bool>("use_B_fake");
+
+  parthenon::par_for(
+      //parthenon::loop_pattern_flatrange_tag, "MOCMC:Init::Sample", DevExecSpace(),
+      DEFAULT_LOOP_PATTERN, "MOCMC:Init::Sample", DevExecSpace(),
+      // 0, new_indices.GetDim(1),
+      0, nblock - 1,
+      0, 1, KOKKOS_LAMBDA(const int b, const int m) {
+        const int n = new_indices(m);
+        auto rng_gen = rng_pool.get_state();
+
+        int i, j, k;
+        swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+
+        const Real rho = v(b, pdens, k, j, i);
+        const Real Temp = v(b, pT, k, j, i);
+        const Real Ye = v(b, pye, k, j, i);
+        Real lambda[2] = {Ye, 0.};
+
+        for (int s = 0; s < num_species; s++) {
+          const RadiationType type = species_d[s];
+          for (int nubin = 0; nubin < nu_bins; nubin++) {
+
+            const Real nu = nusamp(nubin) * TIME;
+            Inu(nubin, s, n) = d_opac.EmissivityPerNu(rho, Temp, Ye, type, nu, lambda) /
+              d_opac.AbsorptionCoefficient(rho, Temp, Ye, type, nu, lambda);
+            if (use_B_fake) Inu(nubin, s, n) = B_fake;
+          }
+        }
+
+        // Sample uniformly in solid angle
+        Real ncov_comov[4] = {0.};
+        const Real theta = acos(2. * rng_gen.drand() - 1.);
+        const Real phi = 2. * M_PI * rng_gen.drand();
+        const Real ncov_tetrad[4] = {-1.,
+                                     cos(theta),
+                                     cos(phi) * sin(theta),
+                                     sin(phi) * sin(theta)};
+
+        // TODO(BRR) do an actual transformation from fluid to lab frame
+        SPACETIMELOOP(mu) {
+          ncov(mu, n) = ncov_tetrad[mu];
+        }
+
+        // Set intensity to thermal equilibrium
+        rng_pool.free_state(rng_gen);
+      });
 }
 
 template <class T>
