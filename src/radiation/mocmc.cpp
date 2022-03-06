@@ -216,6 +216,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
     species_d[s] = species[s];
   }
   const int nu_bins = rad->Param<int>("nu_bins");
+  constexpr int MAX_SPECIES = 3;
 
   swarm->SortParticlesByCell();
   auto swarm_d = swarm->GetDeviceContext();
@@ -223,7 +224,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
   auto mocmc_recon = rad->Param<MOCMCRecon>("mocmc_recon");
 
   if (mocmc_recon == MOCMCRecon::constdmudphi) {
-    // TODO: Allocate dmu dphi grid of intensities
+    // TODO: Allocate dmu dphi grid of intensities per species
 
     parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::ConstDmuDphi", DevExecSpace(),
@@ -240,11 +241,11 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
           const Real mu = ncov_tetrad[3];
           const Real phi = atan2(ncov_tetrad[2], ncov_tetrad[1]);
-          Real I = 0.;
+          Real I[MAX_SPECIES] = {0.};
           for (int s = 0; s < num_species; s++) {
             const RadiationType type = species_d[s];
             for (int nubin = 0; nubin < nu_bins; nubin++) {
-              I += Inu(nubin, s, nswarm); // dlnu = const
+              I[s] += Inu(nubin, s, nswarm); // dlnu = const
             }
           }
 
@@ -254,7 +255,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
         // TODO: subtract mean from all mu, phi cells
       });
 
-    // TODO: Fill in iTilPi -> v(0, iTilPi(ii, jj), k, j, i)
+    // TODO: Fill in iTilPi -> v(0, iTilPi(s, ii, jj), k, j, i)
   }
 
   return TaskStatus::complete;
