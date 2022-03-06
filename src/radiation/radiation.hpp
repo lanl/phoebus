@@ -42,6 +42,8 @@ namespace radiation {
 
 enum class ParticleResolution { emitted = 0, absorbed = 1, scattered = 2, total = 3 };
 
+enum class MOCMCRecon { constdmudphi };
+
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
 
