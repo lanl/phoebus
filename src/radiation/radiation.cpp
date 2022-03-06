@@ -128,6 +128,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     Kokkos::deep_copy(nusamp, nusamp_h);
     params.Add("nusamp", nusamp);
+
+    std::string mocmc_recon_str = pin->GetOrAddString("radiation/mocmc", "recon", "constdmudphi");
+    MOCMCRecon mocmc_recon;
+    if (mocmc_recon_str == "constdmudphi") {
+      mocmc_recon = MOCMCRecon::constdmudphi;
+    } else {
+      std::stringstream msg;
+      msg << "MOCMC reconstruction method \"" << mocmc_recon_str << "\" not recognized!";
+      PARTHENON_FAIL(msg);
+    }
+    params.Add("mocmc_recon", mocmc_recon);
   }
 
   if (method == "monte_carlo") {

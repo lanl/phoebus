@@ -134,9 +134,9 @@ void MOCMCInitSamples(T *rc) {
   parthenon::par_for(
       //parthenon::loop_pattern_flatrange_tag, "MOCMC:Init::Sample", DevExecSpace(),
       DEFAULT_LOOP_PATTERN, "MOCMC:Init::Sample", DevExecSpace(),
-      // 0, new_indices.GetDim(1),
       0, nblock - 1,
-      0, 1, KOKKOS_LAMBDA(const int b, const int m) {
+      0, new_indices.GetDim(1) - 1,
+      KOKKOS_LAMBDA(const int b, const int m) {
         const int n = new_indices(m);
         auto rng_gen = rng_pool.get_state();
 
@@ -189,34 +189,75 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
   namespace ir = radmoment_internal;
 
-  auto *pm = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer().get();
+  auto &sc = pmb->swarm_data.Get();
+  auto &swarm = sc->Get("mocmc");
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
-  IndexRange ib = pm->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   std::vector<std::string> variables{ir::tilPi};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
+  const auto &x = swarm->template Get<Real>("x").Get();
+  const auto &y = swarm->template Get<Real>("y").Get();
+  const auto &z = swarm->template Get<Real>("z").Get();
+  const auto &ncov = swarm->template Get<Real>("ncov").Get();
+  const auto &Inu = swarm->template Get<Real>("Inu").Get();
   auto iTilPi = imap.GetFlatIdx(ir::tilPi);
-  auto specB = iTilPi.GetBounds(1);
 
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::Reconstruction", DevExecSpace(),
-      0, v.GetDim(5)-1,
-      specB.s, specB.e,
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+  const int nu_bins = rad->Param<int>("nu_bins");
+
+  swarm->SortParticlesByCell();
+  auto swarm_d = swarm->GetDeviceContext();
+
+  auto mocmc_recon = rad->Param<MOCMCRecon>("mocmc_recon");
+
+  if (mocmc_recon == MOCMCRecon::constdmudphi) {
+    // TODO: Allocate dmu dphi grid of intensities
+
+    parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MOCMC::ConstDmuDphi", DevExecSpace(),
       kb.s, kb.e,
       jb.s, jb.e,
       ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
-        SPACELOOP2(ii, jj) {
-          v(b, iTilPi(ispec, ii, jj), k, j, i) = 0.;
-}
-} // namespace radiation
-);
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+        for (int n = 0; n < nsamp; n++) {
+          const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
 
-return TaskStatus::complete;
+          // TODO(BRR): Convert ncov from lab frame to fluid frame
+          Real ncov_tetrad[4] = {-1., ncov(1, nswarm), ncov(2, nswarm), ncov(3, nswarm)};
+
+          const Real mu = ncov_tetrad[3];
+          const Real phi = atan2(ncov_tetrad[2], ncov_tetrad[1]);
+          Real I = 0.;
+          for (int s = 0; s < num_species; s++) {
+            const RadiationType type = species_d[s];
+            for (int nubin = 0; nubin < nu_bins; nubin++) {
+              I += Inu(nubin, s, nswarm); // dlnu = const
+            }
+          }
+
+          // TODO: Deposit I on mu, phi grid
+        }
+
+        // TODO: subtract mean from all mu, phi cells
+      });
+
+    // TODO: Fill in iTilPi -> v(0, iTilPi(ii, jj), k, j, i)
+  }
+
+  return TaskStatus::complete;
 }
 
 template TaskStatus MOCMCReconstruction<MeshBlockData<Real>>(MeshBlockData<Real> *);
