@@ -355,7 +355,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 }
 
 TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
-                               SwarmContainer *sc, const double t0,
+                               SwarmContainer *sc,
                                const double dt) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
