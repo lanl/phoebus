@@ -165,7 +165,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (rad_mocmc_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-      auto samples_transport = tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get());
+      auto samples_transport = tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get(), dt);
       auto intensity_recon = tl.AddTask(none, radiation::MOCMCReconstruction<MDT>, sc0.get());
 
       geom_src = geom_src | intensity_recon;
@@ -452,7 +452,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
                                          pmb.get(), mbd0.get(), sc0.get(), t0, dt);
       auto transport_particles =
           tl.AddTask(sample_particles, radiation::MonteCarloTransport, pmb.get(),
-                     mbd0.get(), sc0.get(), t0, dt);
+                     mbd0.get(), sc0.get(), dt);
 
       auto send = tl.AddTask(transport_particles, &SwarmContainer::Send, sc0.get(),
                              BoundaryCommSubset::all);

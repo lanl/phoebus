@@ -16,6 +16,7 @@
 #include <utils/error_checking.hpp>
 
 #include "closure.hpp"
+#include "geodesics.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
@@ -88,28 +89,19 @@ void MOCMCInitSamples(T *rc) {
       DEFAULT_LOOP_PATTERN, "MOCMC::Init::NumSamples", DevExecSpace(), 0, nblock - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nsamp) {
-        printf("%s:%i\n", __FILE__, __LINE__);
         Real Jtot = 0.;
         for (int s = 0; s < 3; s++) {
           Jtot += v(b, pJ(s), k, j, i);
         }
-        printf("%s:%i\n", __FILE__, __LINE__);
         v(b, dn, k, j, i) =
             get_nsamp_per_zone(k, j, i, geom, v(b, pdens, k, j, i), v(b, pT, k, j, i),
                                v(b, pye, k, j, i), Jtot, nsamp_per_zone);
         nsamp += v(b, dn, k, j, i);
-        printf("%s:%i\n", __FILE__, __LINE__);
-        // Kokkos::atomic_add(&(nsamptot(b)), static_cast<int>(v(b, dn, k, j, i)));
-        printf("%s:%i\n", __FILE__, __LINE__);
       },
       Kokkos::Sum<int>(nsamp_tot));
 
-  printf("nsamptot: %i\n", nsamp_tot);
-
   ParArrayND<int> new_indices;
   auto new_mask = swarm->AddEmptyParticles(nsamp_tot, new_indices);
-
-  printf("new_indices.GetDim(1): %i\n", new_indices.GetDim(1));
 
   const auto &x = swarm->template Get<Real>("x").Get();
   const auto &y = swarm->template Get<Real>("y").Get();
@@ -132,11 +124,9 @@ void MOCMCInitSamples(T *rc) {
   const auto use_B_fake = rad->Param<bool>("use_B_fake");
 
   parthenon::par_for(
-      //parthenon::loop_pattern_flatrange_tag, "MOCMC:Init::Sample", DevExecSpace(),
-      DEFAULT_LOOP_PATTERN, "MOCMC:Init::Sample", DevExecSpace(),
-      0, nblock - 1,
-      0, new_indices.GetDim(1) - 1,
-      KOKKOS_LAMBDA(const int b, const int m) {
+      // parthenon::loop_pattern_flatrange_tag, "MOCMC:Init::Sample", DevExecSpace(),
+      DEFAULT_LOOP_PATTERN, "MOCMC:Init::Sample", DevExecSpace(), 0, nblock - 1, 0,
+      new_indices.GetDim(1) - 1, KOKKOS_LAMBDA(const int b, const int m) {
         const int n = new_indices(m);
         auto rng_gen = rng_pool.get_state();
 
@@ -153,8 +143,9 @@ void MOCMCInitSamples(T *rc) {
           for (int nubin = 0; nubin < nu_bins; nubin++) {
 
             const Real nu = nusamp(nubin) * TIME;
-            Inu(nubin, s, n) = d_opac.EmissivityPerNu(rho, Temp, Ye, type, nu, lambda) /
-              d_opac.AbsorptionCoefficient(rho, Temp, Ye, type, nu, lambda);
+            Inu(nubin, s, n) =
+                d_opac.EmissivityPerNu(rho, Temp, Ye, type, nu, lambda) /
+                d_opac.AbsorptionCoefficient(rho, Temp, Ye, type, nu, lambda);
             if (use_B_fake) Inu(nubin, s, n) = B_fake;
           }
         }
@@ -163,26 +154,16 @@ void MOCMCInitSamples(T *rc) {
         Real ncov_comov[4] = {0.};
         const Real theta = acos(2. * rng_gen.drand() - 1.);
         const Real phi = 2. * M_PI * rng_gen.drand();
-        const Real ncov_tetrad[4] = {-1.,
-                                     cos(theta),
-                                     cos(phi) * sin(theta),
+        const Real ncov_tetrad[4] = {-1., cos(theta), cos(phi) * sin(theta),
                                      sin(phi) * sin(theta)};
 
         // TODO(BRR) do an actual transformation from fluid to lab frame
-        SPACETIMELOOP(mu) {
-          ncov(mu, n) = ncov_tetrad[mu];
-        }
+        SPACETIMELOOP(mu) { ncov(mu, n) = ncov_tetrad[mu]; }
 
         // Set intensity to thermal equilibrium
         rng_pool.free_state(rng_gen);
       });
 }
-
-template <class T>
-TaskStatus MOCMCTransport(T *rc) {
-  return TaskStatus::complete;
-}
-template TaskStatus MOCMCTransport<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T>
 TaskStatus MOCMCReconstruction(T *rc) {
@@ -227,33 +208,31 @@ TaskStatus MOCMCReconstruction(T *rc) {
     // TODO: Allocate dmu dphi grid of intensities per species
 
     parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::ConstDmuDphi", DevExecSpace(),
-      kb.s, kb.e,
-      jb.s, jb.e,
-      ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
-        for (int n = 0; n < nsamp; n++) {
-          const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+        DEFAULT_LOOP_PATTERN, "MOCMC::ConstDmuDphi", DevExecSpace(), kb.s, kb.e, jb.s,
+        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+          for (int n = 0; n < nsamp; n++) {
+            const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
 
-          // TODO(BRR): Convert ncov from lab frame to fluid frame
-          Real ncov_tetrad[4] = {-1., ncov(1, nswarm), ncov(2, nswarm), ncov(3, nswarm)};
+            // TODO(BRR): Convert ncov from lab frame to fluid frame
+            Real ncov_tetrad[4] = {-1., ncov(1, nswarm), ncov(2, nswarm),
+                                   ncov(3, nswarm)};
 
-          const Real mu = ncov_tetrad[3];
-          const Real phi = atan2(ncov_tetrad[2], ncov_tetrad[1]);
-          Real I[MAX_SPECIES] = {0.};
-          for (int s = 0; s < num_species; s++) {
-            const RadiationType type = species_d[s];
-            for (int nubin = 0; nubin < nu_bins; nubin++) {
-              I[s] += Inu(nubin, s, nswarm); // dlnu = const
+            const Real mu = ncov_tetrad[3];
+            const Real phi = atan2(ncov_tetrad[2], ncov_tetrad[1]);
+            Real I[MAX_SPECIES] = {0.};
+            for (int s = 0; s < num_species; s++) {
+              const RadiationType type = species_d[s];
+              for (int nubin = 0; nubin < nu_bins; nubin++) {
+                I[s] += Inu(nubin, s, nswarm); // dlnu = const
+              }
             }
+
+            // TODO: Deposit I on mu, phi grid
           }
 
-          // TODO: Deposit I on mu, phi grid
-        }
-
-        // TODO: subtract mean from all mu, phi cells
-      });
+          // TODO: subtract mean from all mu, phi cells
+        });
 
     // TODO: Fill in iTilPi -> v(0, iTilPi(s, ii, jj), k, j, i)
   }
@@ -261,7 +240,37 @@ TaskStatus MOCMCReconstruction(T *rc) {
   return TaskStatus::complete;
 }
 
+template <class T>
+TaskStatus MOCMCTransport(T *rc, const double dt) {
+  auto *pmb = rc->GetParentPointer().get();
+  auto &sc = pmb->swarm_data.Get();
+  auto &swarm = sc->Get("mocmc");
+
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  auto &t = swarm->template Get<Real>("t").Get();
+  auto &x = swarm->template Get<Real>("x").Get();
+  auto &y = swarm->template Get<Real>("y").Get();
+  auto &z = swarm->template Get<Real>("z").Get();
+  auto &ncov = swarm->template Get<Real>("ncov").Get();
+  auto swarm_d = swarm->GetDeviceContext();
+
+  pmb->par_for(
+      "MOCMC::Transport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
+        if (swarm_d.IsActive(n)) {
+          PushParticle(t(n), x(n), y(n), z(n), ncov(0, n), ncov(1, n), ncov(2, n),
+                       ncov(3, n), dt, geom);
+
+          bool on_current_mesh_block = true;
+          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+        }
+      });
+
+  return TaskStatus::complete;
+}
+
 template TaskStatus MOCMCReconstruction<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template void MOCMCInitSamples<MeshBlockData<Real>>(MeshBlockData<Real> *);
+template TaskStatus MOCMCTransport<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
+                                                        const double dt);
 
 } // namespace radiation
