@@ -215,7 +215,15 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto update = tl.AddTask(avg_data, UpdateIndependentData<MeshData<Real>>, sc0.get(),
                              dudt.get(), beta * dt, sc1.get());
 
-    if (rad_moments_active) {
+    if (rad_mocmc_active) {
+      auto impl_update = tl.AddTask(update, radiation::MOCMCFluidSource<MeshData<Real>>,
+        sc1.get(), beta*dt, fluid_active);
+      //for (int nblock = 0; nblock sc1.NumBlocks(); nblock++) {
+      //  auto &mbd = sc1.GetBlockData(nblock);
+      //  auto impl_update =
+      //}
+      update = impl_update | update;
+    } else if (rad_moments_active) {
       auto impl_update = tl.AddTask(update, radiation::MomentFluidSource<MeshData<Real>>,
                                   sc1.get(), beta*dt, fluid_active);
       update = impl_update | update;
