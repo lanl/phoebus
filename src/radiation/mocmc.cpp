@@ -30,6 +30,8 @@ namespace im = mocmc_internal;
 using namespace singularity::neutrinos;
 using singularity::RadiationType;
 
+constexpr int MAX_SPECIES = 3;
+
 KOKKOS_INLINE_FUNCTION
 int get_nsamp_per_zone(const int &k, const int &j, const int &i,
                        const Geometry::CoordSysMeshBlock &geom, const Real &rho,
@@ -107,7 +109,7 @@ void MOCMCInitSamples(T *rc) {
   const auto &y = swarm->template Get<Real>("y").Get();
   const auto &z = swarm->template Get<Real>("z").Get();
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
-  const auto &Inu = swarm->template Get<Real>("Inu").Get();
+  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
 
   auto swarm_d = swarm->GetDeviceContext();
 
@@ -143,10 +145,11 @@ void MOCMCInitSamples(T *rc) {
           for (int nubin = 0; nubin < nu_bins; nubin++) {
 
             const Real nu = nusamp(nubin) * TIME;
-            Inu(nubin, s, n) =
+            Inuinv(nubin, s, n) =
                 d_opac.EmissivityPerNu(rho, Temp, Ye, type, nu, lambda) /
-                d_opac.AbsorptionCoefficient(rho, Temp, Ye, type, nu, lambda);
-            if (use_B_fake) Inu(nubin, s, n) = B_fake;
+                d_opac.AbsorptionCoefficient(rho, Temp, Ye, type, nu, lambda) /
+                pow(nu, 3);
+            if (use_B_fake) Inuinv(nubin, s, n) = B_fake / pow(nu, 3);
           }
         }
 
@@ -187,17 +190,17 @@ TaskStatus MOCMCReconstruction(T *rc) {
   const auto &y = swarm->template Get<Real>("y").Get();
   const auto &z = swarm->template Get<Real>("z").Get();
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
-  const auto &Inu = swarm->template Get<Real>("Inu").Get();
+  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
   auto iTilPi = imap.GetFlatIdx(ir::tilPi);
 
+  auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  const int nu_bins = rad->Param<int>("nu_bins");
   auto species = rad->Param<std::vector<RadiationType>>("species");
   auto num_species = rad->Param<int>("num_species");
-  RadiationType species_d[3] = {};
+  RadiationType species_d[MAX_SPECIES] = {};
   for (int s = 0; s < num_species; s++) {
     species_d[s] = species[s];
   }
-  const int nu_bins = rad->Param<int>("nu_bins");
-  constexpr int MAX_SPECIES = 3;
 
   swarm->SortParticlesByCell();
   auto swarm_d = swarm->GetDeviceContext();
@@ -224,7 +227,8 @@ TaskStatus MOCMCReconstruction(T *rc) {
             for (int s = 0; s < num_species; s++) {
               const RadiationType type = species_d[s];
               for (int nubin = 0; nubin < nu_bins; nubin++) {
-                I[s] += Inu(nubin, s, nswarm); // dlnu = const
+                const Real nu = nusamp(nubin); // ignore frequency units b.c. norm
+                I[s] += Inuinv(nubin, s, nswarm) * pow(nu, 3); // dlnu = const
               }
             }
 
@@ -241,7 +245,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
 }
 
 template <class T>
-TaskStatus MOCMCTransport(T *rc, const double dt) {
+TaskStatus MOCMCTransport(T *rc, const Real dt) {
   auto *pmb = rc->GetParentPointer().get();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
@@ -268,9 +272,119 @@ TaskStatus MOCMCTransport(T *rc, const double dt) {
   return TaskStatus::complete;
 }
 
+// TODO(BRR): Hack to get around current lack of support for packing parthenon swarms
+template <>
+TaskStatus MOCMCFluidSource(MeshData<Real> *rc, const Real dt, const bool update_fluid) {
+  for (int n = 0; n < rc->NumBlocks(); n++) {
+    MOCMCFluidSource(rc->GetBlockData(n).get(), dt, update_fluid);
+  }
+  return TaskStatus::complete;
+}
+
+template <class T>
+TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
+  // Assume particles are already sorted from MOCMCReconstruction call!
+
+  auto *pmb = rc->GetParentPointer().get();
+  auto &sc = pmb->swarm_data.Get();
+  auto &swarm = sc->Get("mocmc");
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+
+  // Meshblock geometry
+  const auto geom = Geometry::GetCoordinateSystem(rc);
+  const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  // Microphysics
+  auto opac = pmb->packages.Get("opacity");
+  const auto d_opac = opac->template Param<Opacity>("d.opacity");
+  StateDescriptor *eos = pmb->packages.Get("eos").get();
+  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  const Real TIME = unit_conv.GetTimeCodeToCGS();
+
+  std::vector<std::string> variables{pr::J,        pr::H,           pf::density,
+                                     pf::velocity, pf::temperature, pf::ye,
+                                     im::dnsamp,   im::Inu0,        im::Inu1};
+  PackIndexMap imap;
+  auto v = rc->PackVariables(variables, imap);
+
+  auto pJ = imap.GetFlatIdx(pr::J);
+  auto pH = imap.GetFlatIdx(pr::H);
+  auto pdens = imap[pf::density].first;
+  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
+  auto pT = imap[pf::temperature].first;
+  auto pye = imap[pf::ye].first;
+  auto Inu0 = imap.GetFlatIdx(im::Inu0);
+  auto Inu1 = imap.GetFlatIdx(im::Inu1);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi);
+
+  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
+  auto swarm_d = swarm->GetDeviceContext();
+
+  auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  const int nu_bins = rad->Param<int>("nu_bins");
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
+      ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const int b = 0;
+        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+
+        // TODO(BRR): relativity -> dtau = dt / u^0
+        const Real dtau = dt;
+
+        const Real dOmega =
+            4. * M_PI / nsamp; // TODO(BRR): Get a real calculation of dOmega
+
+        // Angle-average specific intensity over samples
+        // Sample Inuinv to tetrad Inu
+        // if (angle_averaging == MOCMCAngleAveraging::first_order)
+
+        for (int s = 0; s < num_species; s++) {
+          for (int bin = 0; bin < nu_bins; bin++) {
+            v(b, Inu0(s, bin), k, j, i) = 0.;
+          }
+        }
+
+        for (int n = 0; n < nsamp; n++) {
+          const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+          Real Iold = 0.;
+          Real Inew = 0.;
+
+          for (int s = 0; s < num_species; s++) {
+            for (int bin = 0; bin < nu_bins; bin++) {
+              // TODO(BRR) shift in frequency
+              v(b, Inu0(s, bin), k, j, i) +=
+                  Inuinv(bin, s, nswarm) * pow(nusamp(bin), 3) / dOmega;
+              Iold += v(b, Inu0(s, bin), k, j, i);
+              Inew += v(b, Inu0(s, bin), k, j, i); // After frequency shift
+            }
+            // Normalize shifted spectrum
+            for (int bin = 0; bin < nu_bins; bin++) {
+              v(b, Inu0(s, bin), k, j, i) *= Iold / Inew;
+            }
+          }
+        }
+      });
+
+  return TaskStatus::complete;
+}
+
 template TaskStatus MOCMCReconstruction<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template void MOCMCInitSamples<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template TaskStatus MOCMCTransport<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
-                                                        const double dt);
+                                                        const Real dt);
+// template TaskStatus MOCMCFluidSource<MeshData<Real>>(MeshData<Real> *rc, const Real dt,
+// const bool update_fluid);
+template TaskStatus MOCMCFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
+                                                          const Real dt,
+                                                          const bool update_fluid);
 
 } // namespace radiation
