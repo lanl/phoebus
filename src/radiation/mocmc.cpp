@@ -347,6 +347,7 @@ TaskStatus MOCMCEddington(T *rc) {
           }
         }
       }
+      Real energy[MAX_SPECIES] = {0.0};
       const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
       for (int n = 0; n < nsamp; n++) {
         const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
@@ -370,10 +371,20 @@ TaskStatus MOCMCEddington(T *rc) {
             }
           }
         }
+        for (int s = 0; s < num_species; s++) {
+          energy[s] += (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm)) * I[s];
+        }
       }
-      v(iTilPi(s,1,0),k,j,i) = v(iTilPi(s,0,1),k,j,i);
-      v(iTilPi(s,2,0),k,j,i) = v(iTilPi(s,0,2),k,j,i);
-      v(iTilPi(s,2,1),k,j,i) = v(iTilPi(s,1,2),k,j,i);
+      for (int s = 0; s < num_species; s++) {
+        for (int ii = 0; ii < 3; ii++) {
+          for (int jj = ii; jj < 3; jj++) {
+            v(iTili(s,ii,jj), k, j, i) /= energy;
+          }
+        }
+        v(iTilPi(s,1,0),k,j,i) = v(iTilPi(s,0,1),k,j,i);
+        v(iTilPi(s,2,0),k,j,i) = v(iTilPi(s,0,2),k,j,i);
+        v(iTilPi(s,2,1),k,j,i) = v(iTilPi(s,1,2),k,j,i);
+      }
     });
   return TaskStatus::complete;
 }
