@@ -55,6 +55,7 @@ namespace radmoment_internal {
   constexpr char kappaH[] = "r.i.kappaH";
   constexpr char JBB[] = "r.i.JBB";
   constexpr char tilPi[] = "r.i.tilPi";
+  constexpr char kappaH_mean[] = "mocmc.i.kappaH_mean";
 }
 
 namespace mocmc_internal {
