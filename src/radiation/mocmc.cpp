@@ -378,7 +378,7 @@ TaskStatus MOCMCEddington(T *rc) {
       for (int s = 0; s < num_species; s++) {
         for (int ii = 0; ii < 3; ii++) {
           for (int jj = ii; jj < 3; jj++) {
-            v(iTili(s,ii,jj), k, j, i) /= energy;
+            v(iTili(s,ii,jj), k, j, i) /= energy[s];
           }
         }
         v(iTilPi(s,1,0),k,j,i) = v(iTilPi(s,0,1),k,j,i);
