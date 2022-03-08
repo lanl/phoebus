@@ -16,7 +16,9 @@
 #include "con2prim.hpp"
 #include "con2prim_robust.hpp"
 #include "geometry/geometry.hpp"
+#include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
 #include "reconstruction.hpp"
@@ -534,20 +536,19 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
       DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real Tmunu[ND][ND], gam[ND][ND][ND];
+        Real Tmunu[ND][ND], dg[ND][ND][ND], gam[ND][ND][ND];
         tmunu(Tmunu, k, j, i);
-        geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
 	      Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
+
+        geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
+        Geometry::Utils::SetConnectionCoeffFromMetricDerivs(dg, gam);
         // momentum source terms
-        for (int l = 0; l < NS; l++) {
+        SPACELOOP(l) {
           Real src_mom = 0.0;
-          for (int m = 0; m < ND; m++) {
-            for (int n = 0; n < ND; n++) {
-              // gam is ALL INDICES DOWN
-              src_mom -= Tmunu[m][n] * gam[l+1][n][m];
-            }
+          SPACETIMELOOP2(m,n) {
+            src_mom += Tmunu[m][n] * (dg[n][l+1][m] - gam[l+1][n][m]);
           }
-	        src(cmom_lo + l, k, j, i) = gdet*src_mom;
+          src(cmom_lo + l, k, j, i) = gdet*src_mom;
         }
 
         // energy source term
@@ -555,13 +556,19 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           Real TGam = 0.0;
           #if USE_VALENCIA
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
-          Real gcon[4][4];
-          geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon);
+          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          const Real inv_alpha2 = robust::ratio(1,alpha*alpha);
+          Real shift[NS];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+          Real gcon0[4] = {-inv_alpha2,
+                           inv_alpha2*shift[0],
+                           inv_alpha2*shift[1],
+                           inv_alpha2*shift[2]};
           for (int m = 0; m < ND; m++) {
             for (int n = 0; n < ND; n++) {
               Real gam0 = 0;
               for (int r = 0; r < ND; r++) {
-                gam0 += gcon[0][r] * gam[r][m][n];
+                gam0 += gcon0[r] * gam[r][m][n];
               }
               TGam += Tmunu[m][n] * gam0;
             }
@@ -573,7 +580,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           for (int m = 0; m < ND; m++) {
             Ta += Tmunu[m][0] * da[m];
           }
-          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
           #else
           SPACETIMELOOP2(mu, nu) {
@@ -581,18 +587,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           src(ceng,k,j,i) = gdet * TGam;
           #endif // USE_VALENCIA
-        }
-
-        // re-use gam for metric derivative
-        geom.MetricDerivative(CellLocation::Cent, k, j, i, gam);
-        for (int l = 0; l < NS; l++) {
-          Real src_mom = 0.0;
-          for (int m = 0; m < ND; m++) {
-            for (int n = 0; n < ND; n++) {
-              src_mom += Tmunu[m][n] * gam[n][l+1][m];
-            }
-          }
-          src(cmom_lo + l, k, j, i) += gdet*src_mom;
         }
 
 #if SET_FLUX_SRC_DIAGS
