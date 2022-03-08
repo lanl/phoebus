@@ -196,54 +196,64 @@ void MOCMCInitSamples(T *rc) {
         rng_pool.free_state(rng_gen);
       });
 
-  /*parthenon::par_for(
-      // parthenon::loop_pattern_flatrange_tag, "MOCMC:Init::Sample", DevExecSpace(),
-      DEFAULT_LOOP_PATTERN, "MOCMC:Init::Sample", DevExecSpace(), 0, nblock - 1, 0,
-      new_indices.GetDim(1) - 1, KOKKOS_LAMBDA(const int b, const int m) {
-        const int n = new_indices(m);
-        auto rng_gen = rng_pool.get_state();
+  // Initialize kappaH for diffusion on first step
+  MOCMCAverageOpacities(rc);
+}
 
-        // TODO(BRR) what zone is this index in?
+template <class T>
+void MOCMCAverageOpacities(T *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+  auto &sc = pmb->swarm_data.Get();
+  auto &swarm = sc->Get("mocmc");
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
-        // Create particles at zone centers
-        x(n) = minx_i + (i - ib.s + rng_gen.drand()) * dx_i;
-        y(n) = minx_j + (j - jb.s + rng_gen.drand()) * dx_j;
-        z(n) = minx_k + (k - kb.s + rng_gen.drand()) * dx_k;
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-        int i, j, k;
-        swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+  namespace cr = radmoment_cons;
+  namespace pr = radmoment_prim;
+  namespace ir = radmoment_internal;
+  namespace c = fluid_cons;
+  namespace p = fluid_prim;
+  std::vector<std::string> vars{p::density, p::temperature, p::ye, p::velocity, ir::kappaJ, ir::kappaH, ir::JBB};
 
-        const Real rho = v(b, pdens, k, j, i);
-        const Real Temp = v(b, pT, k, j, i);
-        const Real Ye = v(b, pye, k, j, i);
-        Real lambda[2] = {Ye, 0.};
+  PackIndexMap imap;
+  auto v = rc->PackVariables(vars, imap);
+  auto pv = imap.GetFlatIdx(p::velocity);
 
-        for (int s = 0; s < num_species; s++) {
-          const RadiationType type = species_d[s];
-          for (int nubin = 0; nubin < nu_bins; nubin++) {
+  int prho = imap[p::density].first;
+  int pT = imap[p::temperature].first;
+  int pYe = imap[p::ye].first;
 
-            const Real nu = nusamp(nubin) * TIME;
-            Inuinv(nubin, s, n) =
-                d_opac.EmissivityPerNu(rho, Temp, Ye, type, nu, lambda) /
-                d_opac.AbsorptionCoefficient(rho, Temp, Ye, type, nu, lambda) /
-                pow(nu, 3);
-            if (use_B_fake) Inuinv(nubin, s, n) = B_fake / pow(nu, 3);
-          }
-        }
+  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
+  auto idx_JBB = imap.GetFlatIdx(ir::JBB);
 
-        // Sample uniformly in solid angle
-        Real ncov_comov[4] = {0.};
-        const Real theta = acos(2. * rng_gen.drand() - 1.);
-        const Real phi = 2. * M_PI * rng_gen.drand();
-        const Real ncov_tetrad[4] = {-1., cos(theta), cos(phi) * sin(theta),
-                                     sin(phi) * sin(theta)};
+  // Mainly for testing purposes, probably should be able to do this with the opacity code itself
+  const auto B_fake = rad->Param<Real>("B_fake");
+  const auto use_B_fake = rad->Param<bool>("use_B_fake");
+  const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-        // TODO(BRR) do an actual transformation from fluid to lab frame
-        SPACETIMELOOP(mu) { ncov(mu, n) = ncov_tetrad[mu]; }
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MOCMC::ConstDmuDphi", DevExecSpace(), kb.s, kb.e, jb.s,
+      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
 
-        // Set intensity to thermal equilibrium
-        rng_pool.free_state(rng_gen);
-      });*/
+          const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity at enu = 10 MeV
+          const Real rho =  v(iblock, prho, k, j, i);
+          const Real Temp =  v(iblock, pT, k, j, i);
+          const Real Ye = v(iblock, pYe, k, j, i);
+          const Real T_code =  v(iblock, pT, k, j, i);
+
+          Real kappa = d_opacity.AbsorptionCoefficient(rho, Temp, Ye, dev_species[ispec], enu);
+          const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
+          Real B = emis/kappa;
+          if (use_B_fake) B = B_fake;
+
+          v(iblock, idx_JBB(ispec), k, j, i) = B;
+          v(iblock, idx_kappaJ(ispec), k, j, i) = kappa*(1.0 - scattering_fraction);
+          v(iblock, idx_kappaH(ispec), k, j, i) = kappa;
+      });
 }
 
 template <class T>

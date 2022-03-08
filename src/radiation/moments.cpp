@@ -856,6 +856,12 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
+  const bool rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
+  if (rad_mocmc_active) {
+    // For MOCMC, opacities are calculated by averaging over samples in interaction call
+    return TaskStatus::complete;
+  }
+
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -907,6 +913,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
         for (int ispec = 0; ispec<nspec; ++ispec) {
           /// TODO: (LFR) Need to make a grid variable holding the energy integrated opacity so that we can
           ///             create a task to fill the opacity based on MoCMC or some other rule.
+          /// TOMAYBENOTDO: (BRR) Can't we just use kappaH and kappaJ?
           const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity at enu = 10 MeV
           const Real rho =  v(iblock, prho, k, j, i);
           const Real Temp =  v(iblock, pT, k, j, i);
@@ -914,8 +921,9 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           const Real T_code =  v(iblock, pT, k, j, i);
 
           Real kappa = d_opacity.AbsorptionCoefficient(rho, Temp, Ye, dev_species[ispec], enu);
-          const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
-          Real B = emis/kappa;
+          //const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
+          //Real B = emis/kappa;
+          Real B = d_opacity.ThermalDistributionOfT(temp, dev_species[ispec]);
           if (use_B_fake) B = B_fake;
 
           v(iblock, idx_JBB(ispec), k, j, i) = B;
