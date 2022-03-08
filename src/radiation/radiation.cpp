@@ -113,6 +113,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarm(swarm_name, swarm_metadata);
     Metadata real_swarmvalue_metadata({Metadata::Real, Metadata::Particle});
     physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("mu_lo", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("mu_hi", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("phi_lo", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("phi_hi", swarm_name, real_swarmvalue_metadata);
     Metadata fourv_swarmvalue_metadata({Metadata::Real, Metadata::Particle}, std::vector<int>{4});
     physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
     Metadata Inu_swarmvalue_metadata({Metadata::Real, Metadata::Particle}, std::vector<int>{NumRadiationTypes, nu_bins});
@@ -129,10 +133,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Kokkos::deep_copy(nusamp, nusamp_h);
     params.Add("nusamp", nusamp);
 
-    std::string mocmc_recon_str = pin->GetOrAddString("radiation/mocmc", "recon", "constdmudphi");
+    std::string mocmc_recon_str = pin->GetOrAddString("radiation/mocmc", "recon", "kdgrid");
     MOCMCRecon mocmc_recon;
-    if (mocmc_recon_str == "constdmudphi") {
-      mocmc_recon = MOCMCRecon::constdmudphi;
+    if (mocmc_recon_str == "kdgrid") {
+      mocmc_recon = MOCMCRecon::kdgrid;
     } else {
       std::stringstream msg;
       msg << "MOCMC reconstruction method \"" << mocmc_recon_str << "\" not recognized!";
