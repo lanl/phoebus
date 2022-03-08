@@ -56,6 +56,15 @@ void MOCMCInitSamples(T *rc) {
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
+  const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
+  const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
+  const Real &dx_i = pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
+  const Real &dx_j = pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
+  const Real &dx_k = pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
+  const Real &minx_i = pmb->coords.x1f(ib.s);
+  const Real &minx_j = pmb->coords.x2f(jb.s);
+  const Real &minx_k = pmb->coords.x3f(kb.s);
 
   // Microphysics
   auto opac = pmb->packages.Get("opacity");
@@ -105,6 +114,22 @@ void MOCMCInitSamples(T *rc) {
   ParArrayND<int> new_indices;
   auto new_mask = swarm->AddEmptyParticles(nsamp_tot, new_indices);
 
+  // Calculate array of starting index for each zone to compute particles
+  ParArrayND<int> starting_index("Starting index", nx_k, nx_j, nx_i);
+  auto starting_index_h = starting_index.GetHostMirror();
+  auto dN = rc->Get(im::dnsamp).data;
+  auto dN_h = dN.GetHostMirrorAndCopy();
+  int index = 0;
+  for (int k = 0; k < nx_k; k++) {
+    for (int j = 0; j < nx_j; j++) {
+      for (int i = 0; i < nx_i; i++) {
+        starting_index(k, j, i) = index;
+        index += static_cast<int>(dN_h(k + kb.s, j + jb.s, i + ib.s));
+      }
+    }
+  }
+  starting_index.DeepCopy(starting_index_h);
+
   const auto &x = swarm->template Get<Real>("x").Get();
   const auto &y = swarm->template Get<Real>("y").Get();
   const auto &z = swarm->template Get<Real>("z").Get();
@@ -126,11 +151,64 @@ void MOCMCInitSamples(T *rc) {
   const auto use_B_fake = rad->Param<bool>("use_B_fake");
 
   parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MOCMC::Init::Sample", DevExecSpace(), 0, nblock - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        const int start_idx = starting_index(k - kb.s, j - jb.s, i - ib.s);
+        auto rng_gen = rng_pool.get_state();
+
+        for (int nsamp = 0; nsamp < static_cast<int>(v(b, dn, k, j, i)); nsamp++) {
+          const int n = new_indices(start_idx + nsamp);
+
+          // Create particles at zone centers
+          x(n) = minx_i + (i - ib.s + rng_gen.drand()) * dx_i;
+          y(n) = minx_j + (j - jb.s + rng_gen.drand()) * dx_j;
+          z(n) = minx_k + (k - kb.s + rng_gen.drand()) * dx_k;
+
+          const Real rho = v(b, pdens, k, j, i);
+          const Real Temp = v(b, pT, k, j, i);
+          const Real Ye = v(b, pye, k, j, i);
+          Real lambda[2] = {Ye, 0.};
+
+          for (int s = 0; s < num_species; s++) {
+            const RadiationType type = species_d[s];
+            for (int nubin = 0; nubin < nu_bins; nubin++) {
+              const Real nu = nusamp(nubin) * TIME;
+              Inuinv(nubin, s, n) =
+                  d_opac.EmissivityPerNu(rho, Temp, Ye, type, nu, lambda) /
+                  d_opac.AbsorptionCoefficient(rho, Temp, Ye, type, nu, lambda) /
+                  pow(nu, 3);
+              if (use_B_fake) Inuinv(nubin, s, n) = B_fake / pow(nu, 3);
+            }
+          }
+
+          // Sample uniformly in solid angle
+          Real ncov_comov[4] = {0.};
+          const Real theta = acos(2. * rng_gen.drand() - 1.);
+          const Real phi = 2. * M_PI * rng_gen.drand();
+          const Real ncov_tetrad[4] = {-1., cos(theta), cos(phi) * sin(theta),
+                                       sin(phi) * sin(theta)};
+
+          // TODO(BRR) do an actual transformation from fluid to lab frame
+          SPACETIMELOOP(mu) { ncov(mu, n) = ncov_tetrad[mu]; }
+        }
+
+        rng_pool.free_state(rng_gen);
+      });
+
+  /*parthenon::par_for(
       // parthenon::loop_pattern_flatrange_tag, "MOCMC:Init::Sample", DevExecSpace(),
       DEFAULT_LOOP_PATTERN, "MOCMC:Init::Sample", DevExecSpace(), 0, nblock - 1, 0,
       new_indices.GetDim(1) - 1, KOKKOS_LAMBDA(const int b, const int m) {
         const int n = new_indices(m);
         auto rng_gen = rng_pool.get_state();
+
+        // TODO(BRR) what zone is this index in?
+
+        // Create particles at zone centers
+        x(n) = minx_i + (i - ib.s + rng_gen.drand()) * dx_i;
+        y(n) = minx_j + (j - jb.s + rng_gen.drand()) * dx_j;
+        z(n) = minx_k + (k - kb.s + rng_gen.drand()) * dx_k;
 
         int i, j, k;
         swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
@@ -165,7 +243,7 @@ void MOCMCInitSamples(T *rc) {
 
         // Set intensity to thermal equilibrium
         rng_pool.free_state(rng_gen);
-      });
+      });*/
 }
 
 template <class T>
@@ -303,9 +381,9 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
   const Real TIME = unit_conv.GetTimeCodeToCGS();
 
-  std::vector<std::string> variables{pr::J,        pr::H,           pf::density,
-                                     pf::velocity, pf::temperature, pf::ye,
-                                     im::dnsamp,   im::Inu0,        im::Inu1};
+  std::vector<std::string> variables{pr::J,           pr::H,   pf::density, pf::velocity,
+                                     pf::temperature, pf::ye,  ir::tilPi,   im::dnsamp,
+                                     im::Inu0,        im::Inu1};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -330,6 +408,8 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   for (int s = 0; s < num_species; s++) {
     species_d[s] = species[s];
   }
+
+  printf("num_species: %i nu_bins: %i\n", num_species, nu_bins);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,

@@ -118,7 +118,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
     Metadata Inu_swarmvalue_metadata({Metadata::Real, Metadata::Particle},
                                      std::vector<int>{NumRadiationTypes, nu_bins});
-    physics->AddSwarmValue("Inu", swarm_name, Inu_swarmvalue_metadata);
+    physics->AddSwarmValue("Inuinv", swarm_name, Inu_swarmvalue_metadata);
 
     const int nsamp_per_zone =
         pin->GetOrAddInteger("radiation/mocmc", "nsamp_per_zone", 32);
