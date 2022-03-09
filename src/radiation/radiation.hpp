@@ -128,6 +128,9 @@ template <class T>
 TaskStatus MOCMCReconstruction(T *rc);
 
 template <class T>
+TaskStatus MOCMCEddington(T *rc);
+
+template <class T>
 TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid);
 
 } // namespace radiation
