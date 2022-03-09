@@ -489,7 +489,7 @@ class Residual {
         species_(species), nusamp_(nusamp), dlnu_(dlnu), b_(b), k_(k), j_(j), i_(i) {}
 
   KOKKOS_INLINE_FUNCTION
-  Real operator()(const Real ug1, const Real Ye1) {
+  void operator()(const Real ug1, const Real Ye1, Real res[2]) {
     const Real &rho = var_(b_, iprho_, k_, j_, i_);
     const Real &ug0 = var_(b_, ipeng_, k_, j_, i_);
     Real lambda[2] = {Ye1, 0.};
@@ -528,11 +528,17 @@ class Residual {
     kappaJ /= weight;
     kappaH /= weight;
 
+    if (i_ == 10) {
+      printf("Jem: %e kappaJ: %e kappaH: %e\n", Jem, kappaJ, kappaH);
+    }
+
     // TODO(BRR): Add energy change due to inelastic scattering
     const Real dur = 0.;
 
-    return ((ug1 - ug0) + (ur0 + dtau_ * Jem) / (1. + dtau_ * kappaJ) - ur0 + dur) /
+    res[0] = ((ug1 - ug0) + (ur0 + dtau_ * Jem) / (1. + dtau_ * kappaJ) - ur0 + dur) /
            (ug0 + ur0);
+           // TODO(BRR) actually do Ye update
+    res[1] = 0.;
   }
 
  private:
@@ -623,16 +629,20 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
         const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
         const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
 
-        auto res = Residual(dtau, eos_d, opac_d, v, pdens, peng, pJ, Inu0, Inu1,
-                            num_species, nu_bins, species_d, nusamp, dlnu, 0, k, j, i);
-
         // Angle-average samples
-
         for (int n = 0; n < nsamp; n++) {
           const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
           const Real dOmega =
               (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm));
         }
+
+        auto res = Residual(dtau, eos_d, opac_d, v, pdens, peng, pJ, Inu0, Inu1,
+                            num_species, nu_bins, species_d, nusamp, dlnu, 0, k, j, i);
+
+        Real error[2];
+        res(v(pdens, k, j, i), v(pye, k, j, i), error);
+
+
       });
 
   return TaskStatus::complete;
