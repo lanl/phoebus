@@ -918,12 +918,11 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           const Real rho =  v(iblock, prho, k, j, i);
           const Real Temp =  v(iblock, pT, k, j, i);
           const Real Ye = v(iblock, pYe, k, j, i);
-          const Real T_code =  v(iblock, pT, k, j, i);
 
           Real kappa = d_opacity.AbsorptionCoefficient(rho, Temp, Ye, dev_species[ispec], enu);
           //const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
           //Real B = emis/kappa;
-          Real B = d_opacity.ThermalDistributionOfT(temp, dev_species[ispec]);
+          Real B = d_opacity.ThermalDistributionOfT(Temp, dev_species[ispec]);
           if (use_B_fake) B = B_fake;
 
           v(iblock, idx_JBB(ispec), k, j, i) = B;
