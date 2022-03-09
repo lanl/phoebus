@@ -197,7 +197,7 @@ void MOCMCInitSamples(T *rc) {
       });
 
   // Initialize kappaH for diffusion on first step
-  MOCMCAverageOpacities(rc);
+//  MOCMCAverageOpacities(rc);
 }
 
 template <class T>
@@ -206,6 +206,7 @@ void MOCMCAverageOpacities(T *rc) {
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  StateDescriptor *opac = pmb->packages.Get("opacity").get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -216,7 +217,8 @@ void MOCMCAverageOpacities(T *rc) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{p::density, p::temperature, p::ye, p::velocity, ir::kappaJ, ir::kappaH, ir::JBB};
+  std::vector<std::string> vars{p::density, p::temperature, p::ye,  p::velocity,
+                                ir::kappaJ, ir::kappaH,     ir::JBB};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -230,29 +232,50 @@ void MOCMCAverageOpacities(T *rc) {
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
 
-  // Mainly for testing purposes, probably should be able to do this with the opacity code itself
+  const int nblock = v.GetDim(5);
+  PARTHENON_REQUIRE_THROWS(nblock == 1, "Packing not currently supported for swarms");
+
+  // Get the device opacity object
+  using namespace singularity::neutrinos;
+  const auto d_opacity = opac->Param<Opacity>("d.opacity");
+
+  auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  const int nu_bins = rad->Param<int>("nu_bins");
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+
+  // Mainly for testing purposes, probably should be able to do this with the opacity code
+  // itself
   const auto B_fake = rad->Param<Real>("B_fake");
   const auto use_B_fake = rad->Param<bool>("use_B_fake");
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::ConstDmuDphi", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "MOCMC::ConstDmuDphi", DevExecSpace(), 0, nblock - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity
+                               // at enu = 10 MeV
+        const Real rho = v(b, prho, k, j, i);
+        const Real Temp = v(b, pT, k, j, i);
+        const Real Ye = v(b, pYe, k, j, i);
+        const Real T_code = v(b, pT, k, j, i);
 
-          const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity at enu = 10 MeV
-          const Real rho =  v(iblock, prho, k, j, i);
-          const Real Temp =  v(iblock, pT, k, j, i);
-          const Real Ye = v(iblock, pYe, k, j, i);
-          const Real T_code =  v(iblock, pT, k, j, i);
-
-          Real kappa = d_opacity.AbsorptionCoefficient(rho, Temp, Ye, dev_species[ispec], enu);
-          const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
-          Real B = emis/kappa;
+        for (int ispec = 0; ispec < num_species; ispec++) {
+          Real kappa =
+              d_opacity.AbsorptionCoefficient(rho, Temp, Ye, species_d[ispec], enu);
+          const Real emis = d_opacity.Emissivity(rho, Temp, Ye, species_d[ispec]);
+          Real B = emis / kappa;
           if (use_B_fake) B = B_fake;
 
-          v(iblock, idx_JBB(ispec), k, j, i) = B;
-          v(iblock, idx_kappaJ(ispec), k, j, i) = kappa*(1.0 - scattering_fraction);
-          v(iblock, idx_kappaH(ispec), k, j, i) = kappa;
+          v(b, idx_JBB(ispec), k, j, i) = B;
+          v(b, idx_kappaJ(ispec), k, j, i) = kappa * (1.0 - scattering_fraction);
+          v(b, idx_kappaH(ispec), k, j, i) = kappa;
+        }
       });
 }
 
