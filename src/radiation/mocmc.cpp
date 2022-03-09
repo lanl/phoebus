@@ -32,6 +32,9 @@ using singularity::RadiationType;
 
 constexpr int MAX_SPECIES = 3;
 
+template <class T>
+void MOCMCAverageOpacities(T *rc);
+
 KOKKOS_INLINE_FUNCTION
 int get_nsamp_per_zone(const int &k, const int &j, const int &i,
                        const Geometry::CoordSysMeshBlock &geom, const Real &rho,
@@ -202,6 +205,8 @@ void MOCMCInitSamples(T *rc) {
 
 template <class T>
 void MOCMCAverageOpacities(T *rc) {
+  // Assume particles are already sorted!
+
   auto *pmb = rc->GetParentPointer().get();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
@@ -255,7 +260,7 @@ void MOCMCAverageOpacities(T *rc) {
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::ConstDmuDphi", DevExecSpace(), 0, nblock - 1, kb.s,
+      DEFAULT_LOOP_PATTERN, "MOCMC::AverageOpacities", DevExecSpace(), 0, nblock - 1, kb.s,
       kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity
@@ -499,5 +504,6 @@ template TaskStatus MOCMCTransport<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
 template TaskStatus MOCMCFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
                                                           const Real dt,
                                                           const bool update_fluid);
+template void MOCMCAverageOpacities<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 } // namespace radiation
