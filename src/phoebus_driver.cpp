@@ -100,17 +100,20 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const bool rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
 
   std::vector<std::string> src_names;
+  std::vector<std::string> src_w_diag;
   if (fluid_active) {
     src_names.push_back(fluid_cons::momentum);
     src_names.push_back(fluid_cons::energy);
-#if SET_FLUX_SRC_DIAGS
-    src_names.push_back(diagnostic_variables::src_terms);
-#endif
   }
   if (rad_moments_active) {
     src_names.push_back(radmoment_cons::E);
     src_names.push_back(radmoment_cons::F);
   }
+  src_w_diag = src_names;
+#if SET_FLUX_SRC_DIAGS
+  if (fluid_active)
+    src_w_diag.push_back(diagnostic_variables::src_terms);
+#endif
 
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
@@ -125,7 +128,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       for (int i = 1; i < integrator->nstages; i++) {
         pmb->meshblock_data.Add(stage_name[i], base);
       }
-      pmb->meshblock_data.Add("geometric source terms", base, src_names);
+      pmb->meshblock_data.Add("geometric source terms", base, src_w_diag);
     }
 
     // pull out the container we'll use to get fluxes and/or compute RHSs
@@ -165,7 +168,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (rad_mocmc_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-      auto samples_transport = tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get());
+      auto samples_transport = tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get(), dt);
       auto intensity_recon = tl.AddTask(none, radiation::MOCMCReconstruction<MDT>, sc0.get());
 
       geom_src = geom_src | intensity_recon;
@@ -215,7 +218,15 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto update = tl.AddTask(avg_data, UpdateIndependentData<MeshData<Real>>, sc0.get(),
                              dudt.get(), beta * dt, sc1.get());
 
-    if (rad_moments_active) {
+    if (rad_mocmc_active) {
+      auto impl_update = tl.AddTask(update, radiation::MOCMCFluidSource<MeshData<Real>>,
+        sc1.get(), beta*dt, fluid_active);
+      //for (int nblock = 0; nblock sc1.NumBlocks(); nblock++) {
+      //  auto &mbd = sc1.GetBlockData(nblock);
+      //  auto impl_update =
+      //}
+      update = impl_update | update;
+    } else if (rad_moments_active) {
       auto impl_update = tl.AddTask(update, radiation::MomentFluidSource<MeshData<Real>>,
                                   sc1.get(), beta*dt, fluid_active);
       update = impl_update | update;
@@ -452,7 +463,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
                                          pmb.get(), mbd0.get(), sc0.get(), t0, dt);
       auto transport_particles =
           tl.AddTask(sample_particles, radiation::MonteCarloTransport, pmb.get(),
-                     mbd0.get(), sc0.get(), t0, dt);
+                     mbd0.get(), sc0.get(), dt);
 
       auto send = tl.AddTask(transport_particles, &SwarmContainer::Send, sc0.get(),
                              BoundaryCommSubset::all);

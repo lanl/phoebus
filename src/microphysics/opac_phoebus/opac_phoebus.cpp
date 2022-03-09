@@ -76,7 +76,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 #ifdef SPINER_USE_HDF
     const std::string filename = pin->GetString("opacity", "filename");
 
-    singularity::neutrinos::Opacity opacity_host = NonCGSUnits<SpinerOpacity>(SpinerOpacity(filename), time_unit, mass_unit, length_unit, temp_unit);
+    singularity::neutrinos::Opacity opacity_host = NonCGSUnits<SpinerOpac>(SpinerOpac(filename), time_unit, mass_unit, length_unit, temp_unit);
     singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
     params.Add("h.opacity", opacity_host);
     params.Add("d.opacity", opacity_device);
