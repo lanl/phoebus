@@ -15,6 +15,10 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
+// singularity
+#include <singularity-eos/eos/eos.hpp>
+#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
+
 #include "closure.hpp"
 #include "geodesics.hpp"
 #include "kd_grid.hpp"
@@ -28,8 +32,10 @@ namespace cr = radmoment_cons;
 namespace pr = radmoment_prim;
 namespace ir = radmoment_internal;
 namespace im = mocmc_internal;
+using namespace singularity;
 using namespace singularity::neutrinos;
 using singularity::RadiationType;
+using vpack_types::FlatIdx;
 
 constexpr int MAX_SPECIES = 3;
 
@@ -438,41 +444,6 @@ TaskStatus MOCMCReconstruction(T *rc) {
         }     // n = 0..nsamp
       });
 
-  /*if (mocmc_recon == MOCMCRecon::kdgrid) {
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(),
-      kb.s, kb.e,
-      jb.s, jb.e,
-      ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
-          for (int n = 0; n < nsamp; n++) {
-            const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
-
-            // TODO(BRR): Convert ncov from lab frame to fluid frame
-            Real ncov_tetrad[4] = {-1., ncov(1, nswarm), ncov(2, nswarm),
-                                   ncov(3, nswarm)};
-
-            const Real mu = ncov_tetrad[3];
-            const Real phi = atan2(ncov_tetrad[2], ncov_tetrad[1]);
-            Real I[MAX_SPECIES] = {0.};
-            for (int s = 0; s < num_species; s++) {
-              const RadiationType type = species_d[s];
-              for (int nubin = 0; nubin < nu_bins; nubin++) {
-                const Real nu = nusamp(nubin); // ignore frequency units b.c. norm
-                I[s] += Inuinv(nubin, s, nswarm) * pow(nu, 3); // dlnu = const
-              }
-            }
-
-            // TODO: Deposit I on mu, phi grid
-          }
-
-          // TODO: subtract mean from all mu, phi cells
-        });
-
-    // TODO: Fill in iTilPi -> v(0, iTilPi(s, ii, jj), k, j, i)
-  }*/
-
   return TaskStatus::complete;
 }
 
@@ -504,6 +475,81 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
   return TaskStatus::complete;
 }
 
+class Residual {
+ public:
+  KOKKOS_FUNCTION
+  Residual(const Real &dtau, const EOS &eos, const Opacity &opac,
+           const VariablePack<Real> &var, const int &iprho, const int &ipeng,
+           const FlatIdx &iJ, const FlatIdx &iInu0, const FlatIdx &iInu1,
+           const int &nspecies, const int &nbins, const RadiationType *species,
+           const ParArray1D<Real> &nusamp, const Real &dlnu, const int &b, const int &k,
+           const int &j, const int &i)
+      : dtau_(dtau), eos_(eos), opac_(opac), var_(var), iprho_(iprho), ipeng_(ipeng),
+        iJ_(iJ), iInu0_(iInu0), iInu1_(iInu1), nspecies_(nspecies), nbins_(nbins),
+        species_(species), nusamp_(nusamp), dlnu_(dlnu), b_(b), k_(k), j_(j), i_(i) {}
+
+  KOKKOS_INLINE_FUNCTION
+  Real operator()(const Real ug1, const Real Ye1) {
+    const Real &rho = var_(b_, iprho_, k_, j_, i_);
+    const Real &ug0 = var_(b_, ipeng_, k_, j_, i_);
+    Real lambda[2] = {Ye1, 0.};
+    const Real temp1 = eos_.TemperatureFromDensityInternalEnergy(rho, ug1 / rho, lambda);
+
+    // Update Inu1 from Inu0, use Inu1 to average opacities
+    Real Jem = 0.;
+    Real kappaJ = 0.;
+    Real kappaH = 0.;
+    Real weight = 0.;
+    Real ur0 = 0.;
+    for (int s = 0; s < nspecies_; s++) {
+      ur0 += var_(b_, iJ_(s), k_, j_, i_);
+      for (int bin = 0; bin < nbins_; bin++) {
+        Real trapezoidal_rule = 1.;
+        if (bin == 0 || bin == nbins_ - 1) {
+          trapezoidal_rule = 0.5;
+        }
+
+        const Real nu = nusamp_(bin);
+        Real &Inu0 = var_(b_, iInu0_(s, bin), k_, j_, i_);
+        // Real &Inu1 = var_(b_, iInu1_(s, bin), k_, j_, i_);
+        Real Jnu = opac_.EmissivityPerNu(rho, temp1, Ye1, species_[s], nu);
+        Real kappanu =
+            opac_.AngleAveragedAbsorptionCoefficient(rho, temp1, Ye1, species_[s], nu);
+        Real Inu1 = (Inu0 + dtau_ * Jnu) / (1. + dtau_ * kappanu);
+
+        Jem += trapezoidal_rule * Jnu * nu * dlnu_;
+        // TODO(BRR) scattering fraction = 0
+        kappaJ += trapezoidal_rule * kappanu * Inu1 * nu * dlnu_;
+        kappaH += trapezoidal_rule * kappanu * Inu1 * nu * dlnu_;
+        weight += trapezoidal_rule * Inu1 * nu * dlnu_;
+      }
+    }
+
+    kappaJ /= weight;
+    kappaH /= weight;
+
+    // TODO(BRR): Add energy change due to inelastic scattering
+    const Real dur = 0.;
+
+    return ((ug1 - ug0) + (ur0 + dtau_ * Jem) / (1. + dtau_ * kappaJ) - ur0 + dur) /
+           (ug0 + ur0);
+  }
+
+ private:
+  const Real &dtau_;
+  const EOS &eos_;
+  const Opacity &opac_;
+  const VariablePack<Real> &var_;
+  const int &iprho_, &ipeng_;
+  const FlatIdx &iJ_;
+  const FlatIdx &iInu0_, &iInu1_;
+  const int &nspecies_, &nbins_;
+  const RadiationType *species_;
+  const ParArray1D<Real> &nusamp_;
+  const Real &dlnu_;
+  const int &b_, &k_, &j_, &i_;
+};
+
 // TODO(BRR): Hack to get around current lack of support for packing parthenon swarms
 template <>
 TaskStatus MOCMCFluidSource(MeshData<Real> *rc, const Real dt, const bool update_fluid) {
@@ -530,26 +576,28 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
   // Microphysics
   auto opac = pmb->packages.Get("opacity");
-  const auto d_opac = opac->template Param<Opacity>("d.opacity");
+  const auto opac_d = opac->template Param<Opacity>("d.opacity");
   StateDescriptor *eos = pmb->packages.Get("eos").get();
+  const auto eos_d = eos->template Param<EOS>("d.EOS");
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
   const Real TIME = unit_conv.GetTimeCodeToCGS();
 
-  std::vector<std::string> variables{pr::J,           pr::H,   pf::density, pf::velocity,
-                                     pf::temperature, pf::ye,  ir::tilPi,   im::dnsamp,
-                                     im::Inu0,        im::Inu1};
+  std::vector<std::string> variables{
+      pr::J,  pr::H,     pf::density, pf::energy, pf::velocity, pf::temperature,
+      pf::ye, ir::tilPi, im::dnsamp,  im::Inu0,   im::Inu1};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  auto pJ = imap.GetFlatIdx(pr::J);
-  auto pH = imap.GetFlatIdx(pr::H);
-  auto pdens = imap[pf::density].first;
-  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  auto pT = imap[pf::temperature].first;
-  auto pye = imap[pf::ye].first;
-  auto Inu0 = imap.GetFlatIdx(im::Inu0);
-  auto Inu1 = imap.GetFlatIdx(im::Inu1);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi);
+  const auto pJ = imap.GetFlatIdx(pr::J);
+  const auto pH = imap.GetFlatIdx(pr::H);
+  const auto pdens = imap[pf::density].first;
+  const auto peng = imap[pf::energy].first;
+  const auto pv = imap.GetFlatIdx(fluid_prim::velocity);
+  const auto pT = imap[pf::temperature].first;
+  const auto pye = imap[pf::ye].first;
+  const auto Inu0 = imap.GetFlatIdx(im::Inu0);
+  const auto Inu1 = imap.GetFlatIdx(im::Inu1);
+  const auto iTilPi = imap.GetFlatIdx(ir::tilPi);
 
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
   const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
@@ -557,10 +605,11 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
   const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
   const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
-  auto swarm_d = swarm->GetDeviceContext();
+  const auto swarm_d = swarm->GetDeviceContext();
 
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const int nu_bins = rad->Param<int>("nu_bins");
+  const Real dlnu = rad->Param<Real>("dlnu");
   auto species = rad->Param<std::vector<RadiationType>>("species");
   auto num_species = rad->Param<int>("num_species");
   RadiationType species_d[3] = {};
@@ -568,35 +617,23 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
     species_d[s] = species[s];
   }
 
-  // Average opacities (this should be a separate call)
-  /*parthenon::par_for(
+  parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::AverageOpacities", DevExecSpace(), kb.s, kb.e, jb.s,
-     jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) { const int b
-     = 0; const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+        const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
+
+        auto res = Residual(dtau, eos_d, opac_d, v, pdens, peng, pJ, Inu0, Inu1,
+                            num_species, nu_bins, species_d, nusamp, dlnu, 0, k, j, i);
+
+        // Angle-average samples
 
         for (int n = 0; n < nsamp; n++) {
           const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
-          const Real dOmega = (mu_hi(nswarm) - mu_lo(nswarm))*(phi_hi(nswarm) -
-     phi_lo(nswarm));
+          const Real dOmega =
+              (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm));
         }
-      });*/
-
-  /*parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
-      ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        // TODO(BRR): relativity -> dtau = dt / u^0
-        const Real dtau = dt;
-
-        // Angle-average specific intensity over samples
-        // Sample Inuinv to tetrad Inu
-        // if (angle_averaging == MOCMCAngleAveraging::first_order)
-
-        for (int s = 0; s < num_species; s++) {
-          for (int bin = 0; bin < nu_bins; bin++) {
-            v(b, Inu0(s, bin), k, j, i) = 0.;
-          }
-        }
-      });*/
+      });
 
   return TaskStatus::complete;
 }
