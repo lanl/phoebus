@@ -16,8 +16,8 @@
 #include <utils/error_checking.hpp>
 
 #include "closure.hpp"
-#include "kd_grid.hpp"
 #include "geodesics.hpp"
+#include "kd_grid.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
@@ -200,8 +200,10 @@ void MOCMCInitSamples(T *rc) {
         rng_pool.free_state(rng_gen);
       });
 
-  // Initialize kappaH for diffusion on first step
-//  MOCMCAverageOpacities(rc);
+  // Initialize eddington tensor and opacities for first step
+  MOCMCReconstruction(rc);
+  MOCMCEddington(rc);
+  MOCMCAverageOpacities(rc);
 }
 
 template <class T>
@@ -223,8 +225,8 @@ void MOCMCAverageOpacities(T *rc) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{p::density, p::temperature, p::ye,  p::velocity,
-                                ir::kappaJ, ir::kappaH,     ir::JBB};
+  std::vector<std::string> vars{p::density, p::temperature, p::ye,   p::velocity,
+                                ir::kappaJ, ir::kappaH,     ir::JBB, im::Inu0};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -237,13 +239,24 @@ void MOCMCAverageOpacities(T *rc) {
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
+  auto Inu0 = imap.GetFlatIdx(im::Inu0);
 
   const int nblock = v.GetDim(5);
   PARTHENON_REQUIRE_THROWS(nblock == 1, "Packing not currently supported for swarms");
 
+  const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
+  const auto &mu_hi = swarm->template Get<Real>("mu_hi").Get();
+  const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
+  const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
+  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
+  auto swarm_d = swarm->GetDeviceContext();
+
   // Get the device opacity object
   using namespace singularity::neutrinos;
   const auto d_opacity = opac->Param<Opacity>("d.opacity");
+  StateDescriptor *eos = pmb->packages.Get("eos").get();
+  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  const Real TIME = unit_conv.GetTimeCodeToCGS();
 
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const int nu_bins = rad->Param<int>("nu_bins");
@@ -261,8 +274,8 @@ void MOCMCAverageOpacities(T *rc) {
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::AverageOpacities", DevExecSpace(), 0, nblock - 1, kb.s,
-      kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "MOCMC::AverageOpacities", DevExecSpace(), 0, nblock - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity
                                // at enu = 10 MeV
@@ -271,16 +284,50 @@ void MOCMCAverageOpacities(T *rc) {
         const Real Ye = v(b, pYe, k, j, i);
         const Real T_code = v(b, pT, k, j, i);
 
-        for (int ispec = 0; ispec < num_species; ispec++) {
-          Real kappa =
-              d_opacity.AbsorptionCoefficient(rho, Temp, Ye, species_d[ispec], enu);
-          const Real emis = d_opacity.Emissivity(rho, Temp, Ye, species_d[ispec]);
-          Real B = emis / kappa;
-          if (use_B_fake) B = B_fake;
+        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
 
-          v(b, idx_JBB(ispec), k, j, i) = B;
-          v(b, idx_kappaJ(ispec), k, j, i) = kappa * (1.0 - scattering_fraction);
-          v(b, idx_kappaH(ispec), k, j, i) = kappa;
+        // Angle-average intensities
+        for (int s = 0; s < num_species; s++) {
+          for (int bin = 0; bin < nu_bins; bin++) {
+            v(b, Inu0(s, bin), k, j, i) = 0.;
+          }
+        }
+        for (int n = 0; n < nsamp; n++) {
+          const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+          const Real dOmega =
+              (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm));
+          for (int s = 0; s < num_species; s++) {
+            for (int bin = 0; bin < nu_bins; bin++) {
+              v(b, Inu0(s, bin), k, j, i) +=
+                  Inuinv(s, bin) * pow(nusamp(bin), 3) * dOmega;
+            }
+          }
+        }
+        for (int s = 0; s < num_species; s++) {
+          for (int bin = 0; bin < nu_bins; bin++) {
+            v(b, Inu0(s, bin), k, j, i) /= (4. * M_PI);
+          }
+        }
+
+        // Frequency- (and angle-)average opacities
+        for (int ispec = 0; ispec < num_species; ispec++) {
+          v(b, idx_kappaJ(ispec), k, j, i) = 0.;
+          Real weight = 0.;
+          for (int bin = 0; bin < nu_bins; bin++) {
+            v(b, idx_kappaJ(ispec), k, j, i) +=
+                d_opacity.AbsorptionCoefficient(rho, Temp, Ye, species_d[ispec],
+                                                nusamp(bin) * TIME) *
+                v(b, Inu0(ispec, bin), k, j, i);
+            v(b, idx_kappaH(ispec), k, j, i) +=
+                d_opacity.AbsorptionCoefficient(rho, Temp, Ye, species_d[ispec],
+                                                nusamp(bin) * TIME) *
+                (1.0 - scattering_fraction) * v(b, Inu0(ispec, bin), k, j, i);
+            weight += v(b, Inu0(ispec, bin), k, j, i);
+          }
+          v(b, idx_kappaJ(ispec), k, j, i) /= weight;
+          v(b, idx_kappaH(ispec), k, j, i) /= weight;
+          v(b, idx_JBB(ispec), k, j, i) =
+              d_opacity.ThermalDistributionOfT(Temp, species_d[ispec]);
         }
       });
 }
@@ -328,20 +375,17 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
   auto mocmc_recon = rad->Param<MOCMCRecon>("mocmc_recon");
 
-    parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(),
-      kb.s, kb.e,
-      jb.s, jb.e,
-      ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
+      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
         for (int n = 0; n < nsamp; n++) {
           const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
           if (n == 0) {
             mu_lo(nswarm) = 0.0;
             mu_hi(nswarm) = 2.0;
             phi_lo(nswarm) = 0.0;
-            phi_hi(nswarm) = 2.0*M_PI;
+            phi_hi(nswarm) = 2.0 * M_PI;
             continue;
           }
 
@@ -353,8 +397,10 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
           for (int m = 0; m < n; m++) {
             const int mswarm = swarm_d.GetFullIndex(k, j, i, m);
-            if (mu > mu_lo(mswarm) && mu < mu_hi(mswarm) && phi > phi_lo(mswarm) && phi < phi_hi(mswarm)) {
-              Real mcov_tetrad[4] = {-1., ncov(1, mswarm), ncov(2, mswarm), ncov(3, mswarm)};
+            if (mu > mu_lo(mswarm) && mu < mu_hi(mswarm) && phi > phi_lo(mswarm) &&
+                phi < phi_hi(mswarm)) {
+              Real mcov_tetrad[4] = {-1., ncov(1, mswarm), ncov(2, mswarm),
+                                     ncov(3, mswarm)};
               Real mu0 = mu_hi(mswarm) - mu_lo(mswarm);
               Real phi0 = phi_hi(mswarm) - phi_lo(mswarm);
               if (mu0 > phi0) {
@@ -388,8 +434,8 @@ TaskStatus MOCMCReconstruction(T *rc) {
               }
               break;
             } // if inside
-          } // m = 0..n
-        } // n = 0..nsamp
+          }   // m = 0..n
+        }     // n = 0..nsamp
       });
 
   /*if (mocmc_recon == MOCMCRecon::kdgrid) {
@@ -522,19 +568,24 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
     species_d[s] = species[s];
   }
 
-  printf("num_species: %i nu_bins: %i\n", num_species, nu_bins);
+  // Average opacities (this should be a separate call)
+  /*parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MOCMC::AverageOpacities", DevExecSpace(), kb.s, kb.e, jb.s,
+     jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) { const int b
+     = 0; const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
 
-  parthenon::par_for(
+        for (int n = 0; n < nsamp; n++) {
+          const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+          const Real dOmega = (mu_hi(nswarm) - mu_lo(nswarm))*(phi_hi(nswarm) -
+     phi_lo(nswarm));
+        }
+      });*/
+
+  /*parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
       ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const int b = 0;
-        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
-
         // TODO(BRR): relativity -> dtau = dt / u^0
         const Real dtau = dt;
-
-        const Real dOmega =
-            4. * M_PI / nsamp; // TODO(BRR): Get a real calculation of dOmega
 
         // Angle-average specific intensity over samples
         // Sample Inuinv to tetrad Inu
@@ -545,64 +596,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             v(b, Inu0(s, bin), k, j, i) = 0.;
           }
         }
-
-        /*for (int n = 0; n < nsamp; n++) {
-          const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
-          if (n == 0) {
-            mu_lo(nswarm) = 0.0;
-            mu_hi(nswarm) = 2.0;
-            phi_lo(nswarm) = 0.0;
-            phi_hi(nswarm) = 2.0*M_PI;
-            continue;
-          }
-
-          // TODO(BRR): Convert ncov from lab frame to fluid frame
-          Real ncov_tetrad[4] = {-1., ncov(1, nswarm), ncov(2, nswarm), ncov(3, nswarm)};
-
-          const Real mu = 1.0 - ncov_tetrad[1];
-          const Real phi = atan2(ncov_tetrad[3], ncov_tetrad[2]);
-
-          for (int m = 0; m < n; m++) {
-            const int mswarm = swarm_d.GetFullIndex(k, j, i, m);
-            if (mu > mu_lo(mswarm) && mu < mu_hi(mswarm) && phi > phi_lo(mswarm) && phi < phi_hi(mswarm)) {
-              Real mcov_tetrad[4] = {-1., ncov(1, mswarm), ncov(2, mswarm), ncov(3, mswarm)};
-              Real mu0 = mu_hi(mswarm) - mu_lo(mswarm);
-              Real phi0 = phi_hi(mswarm) - phi_lo(mswarm);
-              if (mu0 > phi0) {
-                const Real mu_m = 1.0 - ncov_tetrad[1];
-                mu0 = 0.5 * (mu + mu_m);
-                if (mu < mu0) {
-                  mu_lo(nswarm) = mu_lo(mswarm);
-                  mu_hi(nswarm) = mu0;
-                  mu_lo(mswarm) = mu0;
-                } else {
-                  mu_lo(nswarm) = mu0;
-                  mu_hi(nswarm) = mu_hi(mswarm);
-                  mu_hi(mswarm) = mu0;
-                }
-                phi_lo(nswarm) = phi_lo(mswarm);
-                phi_hi(nswarm) = phi_hi(mswarm);
-              } else {
-                const Real phi_m = atan2(ncov_tetrad[3], ncov_tetrad[2]);
-                phi0 = 0.5 * (phi + phi_m);
-                if (phi < phi0) {
-                  phi_lo(nswarm) = phi_lo(mswarm);
-                  phi_hi(nswarm) = phi0;
-                  phi_lo(mswarm) = phi0;
-                } else {
-                  phi_lo(nswarm) = phi0;
-                  phi_hi(nswarm) = phi_hi(mswarm);
-                  phi_hi(mswarm) = phi0;
-                }
-                mu_lo(nswarm) = mu_lo(mswarm);
-                mu_hi(nswarm) = mu_hi(mswarm);
-              }
-              break;
-            } // if inside
-          } // m = 0..n
-        } // n = 0..nsamp
-        */
-      });
+      });*/
 
   return TaskStatus::complete;
 }
@@ -644,85 +638,84 @@ TaskStatus MOCMCEddington(T *rc) {
 
   auto swarm_d = swarm->GetDeviceContext();
   parthenon::par_for(
-    DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(),
-    kb.s, kb.e,
-    jb.s, jb.e,
-    ib.s, ib.e,
-    KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      // initialize eddington to zero
-      for (int s = 0; s < num_species; s++) {
-        for (int ii = 0; ii < 3; ii++) {
-          for (int jj = ii; jj < 3; jj++) {
-            v(iTilPi(s,ii,jj), k, j, i) = 0.0;
-          }
-        }
-      }
-      Real energy[MAX_SPECIES] = {0.0};
-      const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
-      for (int n = 0; n < nsamp; n++) {
-        const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
-
-        // get the energy integrated intensity
-        // TODO(jcd): do we need a dlnu or something here
-        Real I[MAX_SPECIES] = {0.0};
-        for (int nubin = 0; nubin < nu_bins; nubin++) {
-          for (int s = 0; s < num_species; s++) {
-            I[s] += Inuinv(nubin, s, nswarm)*pow(nusamp(nubin),3);
-          }
-        }
-            if (i == 10) {
-              printf("I: %e %e %e\n", I[0], I[1], I[2]);
+      DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
+      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        // initialize eddington to zero
+        for (int s = 0; s < num_species; s++) {
+          for (int ii = 0; ii < 3; ii++) {
+            for (int jj = ii; jj < 3; jj++) {
+              v(iTilPi(s, ii, jj), k, j, i) = 0.0;
             }
+          }
+        }
+        Real energy[MAX_SPECIES] = {0.0};
+        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+        for (int n = 0; n < nsamp; n++) {
+          const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
 
-        Real wgts[6];
-        kdgrid::integrate_ninj_domega_quad(mu_lo(nswarm), mu_hi(nswarm), phi_lo(nswarm), phi_hi(nswarm), wgts);
-        for (int ii = 0; ii < 3; ii++) {
-          for (int jj = ii; jj < 3; jj++) {
-            const int ind = Geometry::Utils::Flatten2(ii,jj,3);
+          // get the energy integrated intensity
+          // TODO(jcd): do we need a dlnu or something here
+          Real I[MAX_SPECIES] = {0.0};
+          for (int nubin = 0; nubin < nu_bins; nubin++) {
             for (int s = 0; s < num_species; s++) {
-              v(iTilPi(s,ii,jj), k, j, i) += wgts[ind] * I[s];
+              I[s] += Inuinv(nubin, s, nswarm) * pow(nusamp(nubin), 3);
             }
+          }
+          if (i == 10) {
+            printf("I: %e %e %e\n", I[0], I[1], I[2]);
+          }
+
+          Real wgts[6];
+          kdgrid::integrate_ninj_domega_quad(mu_lo(nswarm), mu_hi(nswarm), phi_lo(nswarm),
+                                             phi_hi(nswarm), wgts);
+          for (int ii = 0; ii < 3; ii++) {
+            for (int jj = ii; jj < 3; jj++) {
+              const int ind = Geometry::Utils::Flatten2(ii, jj, 3);
+              for (int s = 0; s < num_species; s++) {
+                v(iTilPi(s, ii, jj), k, j, i) += wgts[ind] * I[s];
+              }
+            }
+          }
+          for (int s = 0; s < num_species; s++) {
+            energy[s] += (mu_hi(nswarm) - mu_lo(nswarm)) *
+                         (phi_hi(nswarm) - phi_lo(nswarm)) * I[s];
           }
         }
         for (int s = 0; s < num_species; s++) {
-          energy[s] += (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm)) * I[s];
-        }
-      }
-      for (int s = 0; s < num_species; s++) {
-        for (int ii = 0; ii < 3; ii++) {
-          for (int jj = ii; jj < 3; jj++) {
-            v(iTilPi(s,ii,jj), k, j, i) /= energy[s];
-          }
-        }
-        v(iTilPi(s,1,0),k,j,i) = v(iTilPi(s,0,1),k,j,i);
-        v(iTilPi(s,2,0),k,j,i) = v(iTilPi(s,0,2),k,j,i);
-        v(iTilPi(s,2,1),k,j,i) = v(iTilPi(s,1,2),k,j,i);
-      }
-
-      if (i == 10) {
-        SPACELOOP2(ii, jj) {
-          printf("tilPi[%i %i] = %e\n", i, j, v(iTilPi(0,1,0),k,j,i));
-        }
-      }
-    });
-          /*Real Iold = 0.;
-          Real Inew = 0.;
-
-          for (int s = 0; s < num_species; s++) {
-            for (int bin = 0; bin < nu_bins; bin++) {
-              // TODO(BRR) shift in frequency
-              v(b, Inu0(s, bin), k, j, i) +=
-                  Inuinv(bin, s, nswarm) * pow(nusamp(bin), 3) / dOmega;
-              Iold += v(b, Inu0(s, bin), k, j, i);
-              Inew += v(b, Inu0(s, bin), k, j, i); // After frequency shift
-            }
-            // Normalize shifted spectrum
-            for (int bin = 0; bin < nu_bins; bin++) {
-              v(b, Inu0(s, bin), k, j, i) *= Iold / Inew;
+          for (int ii = 0; ii < 3; ii++) {
+            for (int jj = ii; jj < 3; jj++) {
+              v(iTilPi(s, ii, jj), k, j, i) /= energy[s];
             }
           }
+          v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
+          v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
+          v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
         }
-      });*/
+
+        if (i == 10) {
+          SPACELOOP2(ii, jj) {
+            printf("tilPi[%i %i] = %e\n", i, j, v(iTilPi(0, 1, 0), k, j, i));
+          }
+        }
+      });
+  /*Real Iold = 0.;
+  Real Inew = 0.;
+
+  for (int s = 0; s < num_species; s++) {
+    for (int bin = 0; bin < nu_bins; bin++) {
+      // TODO(BRR) shift in frequency
+      v(b, Inu0(s, bin), k, j, i) +=
+          Inuinv(bin, s, nswarm) * pow(nusamp(bin), 3) / dOmega;
+      Iold += v(b, Inu0(s, bin), k, j, i);
+      Inew += v(b, Inu0(s, bin), k, j, i); // After frequency shift
+    }
+    // Normalize shifted spectrum
+    for (int bin = 0; bin < nu_bins; bin++) {
+      v(b, Inu0(s, bin), k, j, i) *= Iold / Inew;
+    }
+  }
+}
+});*/
 
   return TaskStatus::complete;
 }
