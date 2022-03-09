@@ -16,6 +16,7 @@
 #include <utils/error_checking.hpp>
 
 #include "closure.hpp"
+#include "kd_grid.hpp"
 #include "geodesics.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
@@ -307,6 +308,10 @@ TaskStatus MOCMCReconstruction(T *rc) {
   const auto &z = swarm->template Get<Real>("z").Get();
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
   const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
+  const auto &mu_lo = swaarm->template Get<Real>("mu_lo").Get();
+  const auto &mu_hi = swaarm->template Get<Real>("mu_hi").Get();
+  const auto &phi_lo = swaarm->template Get<Real>("phi_lo").Get();
+  const auto &phi_hi = swaarm->template Get<Real>("phi_hi").Get();
   auto iTilPi = imap.GetFlatIdx(ir::tilPi);
 
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
@@ -323,12 +328,13 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
   auto mocmc_recon = rad->Param<MOCMCRecon>("mocmc_recon");
 
-  if (mocmc_recon == MOCMCRecon::constdmudphi) {
-    // TODO: Allocate dmu dphi grid of intensities per species
-
+  if (mocmc_recon == MOCMCRecon::kdgrid) {
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "MOCMC::ConstDmuDphi", DevExecSpace(), kb.s, kb.e, jb.s,
-        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(),
+      kb.s, kb.e,
+      jb.s, jb.e,
+      ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
           const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
           for (int n = 0; n < nsamp; n++) {
             const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
@@ -473,7 +479,155 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
         for (int n = 0; n < nsamp; n++) {
           const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
-          Real Iold = 0.;
+          if (n == 0) {
+            mu_lo(nswarm) = 0.0;
+            mu_hi(nswarm) = 2.0;
+            phi_lo(nswarm) = 0.0;
+            phi_hi(nswarm) = 2.0*M_PI;
+            continue;
+          }
+
+          // TODO(BRR): Convert ncov from lab frame to fluid frame
+          Real ncov_tetrad[4] = {-1., ncov(1, nswarm), ncov(2, nswarm), ncov(3, nswarm)};
+
+          const Real mu = 1.0 - ncov_tetrad[1];
+          const Real phi = atan2(ncov_tetrad[3], ncov_tetrad[2]);
+
+          for (int m = 0; m < n; m++) {
+            const int mswarm = sward_d.GetFullIndex(k, j, i, m);
+            if (mu > mu_lo(mswarm) && mu < mu_hi(mswarm) && phi > phi_lo(mswarm) && phi < phi_hi(mswarm)) {
+              Real mcov_tetrad[4] = {-1., ncov(1, mswarm), ncov(2, mswarm), ncov(3, mswarm)};
+              Real mu0 = mu_hi(mswarm) - mu_lo(mswarm);
+              Real phi0 = phi_hi(mswarm) - phi_lo(mswarm);
+              if (mu0 > phi0) {
+                const Real mu_m = 1.0 - ncov_tetrad[1];
+                mu0 = 0.5 * (mu + mu_m);
+                if (mu < mu0) {
+                  mu_lo(nswarm) = mu_lo(mswarm);
+                  mu_hi(nswarm) = mu0;
+                  mu_lo(mswarm) = mu0;
+                } else {
+                  mu_lo(nswarm) = mu0;
+                  mu_hi(nswarm) = mu_hi(mswarm)
+                  mu_hi(mswarm) = mu0;
+                }
+                phi_lo(nswarm) = phi_lo(mswarm);
+                phi_hi(nswarm) = phi_hi(mswarm);
+              } else {
+                const Real phi_m = atan2(ncov_tetrad[3], ncov_tetrad[2]);
+                phi0 = 0.5 * (phi + phi_m);
+                if (phi < phi0) {
+                  phi_lo(nswarm) = phi_lo(mswarm);
+                  phi_hi(nswarm) = phi0;
+                  phi_lo(mswarm) = phi0;
+                } else {
+                  phi_lo(nswarm) = phi0;
+                  phi_hi(nswarm) = phi_hi(mswarm);
+                  phi_hi(mswarm) = phi0;
+                }
+                mu_lo(nswarm) = mu_lo(mswarm);
+                mu_hi(nswarm) = mu_hi(mswarm);
+              }
+              break;
+            } // if inside
+          } // m = 0..n
+        } // n = 0..nsamp
+      });
+  }
+
+  return TaskStatus::complete;
+}
+
+template <class T>
+TaskStatus MOCMCEddington(T *rc) {
+  namespace ir = radmoment_internal;
+
+  auto *pmb = rc->GetParentPointer().get();
+  auto &sc = pmb->swarm_data.Get();
+  auto &swarm = sc->Get("mocmc");
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  std::vector<std::string> variables{ir::tilPi};
+  PackIndexMap imap;
+  auto v = rc->PackVariables(variables, imap);
+
+  const auto &Inu = swarm->template Get<Real>("Inu").Get();
+  const auto &mu_lo = swaarm->template Get<Real>("mu_lo").Get();
+  const auto &mu_hi = swaarm->template Get<Real>("mu_hi").Get();
+  const auto &phi_lo = swaarm->template Get<Real>("phi_lo").Get();
+  const auto &phi_hi = swaarm->template Get<Real>("phi_hi").Get();
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi);
+
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+  const int nu_bins = rad->Param<int>("nu_bins");
+  constexpr int MAX_SPECIES = 3;
+
+  // TODO(jcd): we don't need to sort again do we.  already did this in recon
+  //swarm->SortParticlesByCell();
+  auto swarm_d = swarm->GetDeviceContext();
+  parthenon::par_for(
+    DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(),
+    kb.s, kb.e,
+    jb.s, jb.e,
+    ib.s, ib.e,
+    KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      // initialize eddington to zero
+      for (int s = 0; s < num_species; s++) {
+        for (int ii = 0; ii < 3; ii++) {
+          for (int jj = ii; jj < 3; jj++) {
+            v(iTilPi(s,ii,jj), k, j, i) = 0.0;
+          }
+        }
+      }
+      Real energy[MAX_SPECIES] = {0.0};
+      const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+      for (int n = 0; n < nsamp; n++) {
+        const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+
+        // get the energy integrated intensity
+        // TODO(jcd): do we need a dlnu or something here
+        Real I[MAX_SPECIES] = {0.0};
+        for (int nubin = 0; nubin < nu_bins; nubin++) {
+          for (int s = 0; s < num_species; s++) {
+            I[s] += Inu(nubin, s, nswarm);
+          }
+        }
+
+        Real wgts[6];
+        kdgrid::integrate_ninj_domega_quad(mu_lo(nswarm), mu_hi(nswarm), phi_lo(nswarm), phi_hi(nswarm), wgts);
+        for (int ii = 0; ii < 3; ii++) {
+          for (int jj = ii; jj < 3; jj++) {
+            const int ind = geometry_utils::Flatten2(ii,jj,3);
+            for (int s = 0; s < num_species; s++) {
+              v(iTilPi(s,ii,jj), k, j, i) += wgts[ind] * I[s];
+            }
+          }
+        }
+        for (int s = 0; s < num_species; s++) {
+          energy[s] += (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm)) * I[s];
+        }
+      }
+      for (int s = 0; s < num_species; s++) {
+        for (int ii = 0; ii < 3; ii++) {
+          for (int jj = ii; jj < 3; jj++) {
+            v(iTili(s,ii,jj), k, j, i) /= energy[s];
+          }
+        }
+        v(iTilPi(s,1,0),k,j,i) = v(iTilPi(s,0,1),k,j,i);
+        v(iTilPi(s,2,0),k,j,i) = v(iTilPi(s,0,2),k,j,i);
+        v(iTilPi(s,2,1),k,j,i) = v(iTilPi(s,1,2),k,j,i);
+      }
+    });
+          /*Real Iold = 0.;
           Real Inew = 0.;
 
           for (int s = 0; s < num_species; s++) {
@@ -490,7 +644,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             }
           }
         }
-      });
+      });*/
 
   return TaskStatus::complete;
 }
