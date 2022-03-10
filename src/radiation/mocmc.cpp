@@ -24,6 +24,7 @@
 #include "kd_grid.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
+#include "phoebus_utils/root_find.hpp"
 
 namespace radiation {
 
@@ -490,6 +491,7 @@ class Residual {
   void operator()(const Real ug1, const Real Ye1, Real res[2]) {
     const Real &rho = var_(b_, iprho_, k_, j_, i_);
     const Real &ug0 = var_(b_, ipeng_, k_, j_, i_);
+    printf("b: %i peng: %i k j i: %i %i %i ug0: %e\n", b_, ipeng_, k_, j_, i_, ug0);
     Real lambda[2] = {Ye1, 0.};
     const Real temp1 = eos_.TemperatureFromDensityInternalEnergy(rho, ug1 / rho, lambda);
 
@@ -537,6 +539,12 @@ class Residual {
            (ug0 + ur0);
            // TODO(BRR) actually do Ye update
     res[1] = 0.;
+
+    if (i_ == 10) {
+      printf("ug1: %e ug0: %e ur0: %e Jem: %e kappaJ: %e dur: %e\n",
+        ug1, ug0, ur0, Jem, kappaJ, dur);
+      printf("resid: %e %e\n", res[0], res[1]);
+    }
   }
 
  private:
@@ -637,8 +645,15 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
         auto res = Residual(dtau, eos_d, opac_d, v, pdens, peng, pJ, Inu0, Inu1,
                             num_species, nu_bins, species_d, nusamp, dlnu, 0, k, j, i);
 
-        Real error[2];
-        res(v(pdens, k, j, i), v(pye, k, j, i), error);
+        Real guess[2] = {v(pdens, k, j, i), v(pye, k, j, i)};
+        root_find::RootFindStatus status;
+        root_find::broyden2(res, guess, 50, 1.e-10, &status);
+        if (i == 10) {
+          printf("status = %i\n", static_cast<int>(status));
+        }
+
+        //Real error[2];
+        //res(v(pdens, k, j, i), v(pye, k, j, i), error);
 
 
       });
