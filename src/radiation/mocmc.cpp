@@ -42,6 +42,7 @@ constexpr int MAX_SPECIES = 3;
 template <class T>
 void MOCMCAverageOpacities(T *rc);
 
+// TODO(BRR) add options
 KOKKOS_INLINE_FUNCTION
 int get_nsamp_per_zone(const int &k, const int &j, const int &i,
                        const Geometry::CoordSysMeshBlock &geom, const Real &rho,
@@ -184,10 +185,7 @@ void MOCMCInitSamples(T *rc) {
             const RadiationType type = species_d[s];
             for (int nubin = 0; nubin < nu_bins; nubin++) {
               const Real nu = nusamp(nubin) * TIME;
-              Inuinv(nubin, s, n) =
-                  d_opac.EmissivityPerNu(rho, Temp, Ye, type, nu, lambda) /
-                  d_opac.AbsorptionCoefficient(rho, Temp, Ye, type, nu, lambda) /
-                  pow(nu, 3);
+              Inuinv(nubin, s, n) = d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu,3);
               if (use_B_fake) Inuinv(nubin, s, n) = B_fake / pow(nu, 3);
             }
           }
