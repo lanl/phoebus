@@ -296,6 +296,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Fields for cell edge reconstruction
     /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense
     /// of more dependency
+    // TODO(BRR) if MOCMC, add 6 additional elements per species
     Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                std::vector<int>{NumRadiationTypes, 4, ndim});
     Metadata mrecon_v = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},

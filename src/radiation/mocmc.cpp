@@ -621,8 +621,39 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
     species_d[s] = species[s];
   }
 
+  if (true) {// update = lagged
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::AverageOpacities", DevExecSpace(), kb.s, kb.e, jb.s,
+      DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
+      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+        const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
+          // Set up the background state
+          Vec con_v{{v(iblock, pv(0), k, j, i),
+                     v(iblock, pv(1), k, j, i),
+                     v(iblock, pv(2), k, j, i)}};
+          Tens2 cov_gamma;
+          geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+          Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
+          Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
+          LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
+
+          /// TODO: (LFR) Move beyond Eddington for this update
+          ClosureMOCMC<Vec, Tens2> c(con_v, &g);
+
+          Real dE = 0;
+          Real cov_dF[3] = {0};
+          auto status = c.LinearSourceUpdate(Estar, cov_Fstart, con_tilPi, JBB, tauJ, tauH, *dE, cov_dF);
+
+          // Update E, F
+
+          // Update samples
+
+          // Recalculate pi
+      }
+  } else {
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
         const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
@@ -642,6 +673,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
 
       });
+  }
 
   return TaskStatus::complete;
 }
