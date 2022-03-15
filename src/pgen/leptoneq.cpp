@@ -23,7 +23,7 @@
 
 namespace leptoneq {
 
-parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
+using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   namespace p = fluid_prim;
@@ -52,10 +52,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &unit_conv = eospkg.get()->Param<phoebus::UnitConversions>("unit_conv");
 
   const Real rho0 = 1.e10 * unit_conv.GetMassDensityCGSToCode();
-  const Real T0 = 2.5*1.e6*pc.eV/pc.kb * unit_conv.GetTemperatureCGSToCode();
+  const Real T0 = 2.5*1.e6*pc::eV/pc::kb * unit_conv.GetTemperatureCGSToCode();
 
   pmb->par_for(
-      "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      "Phoebus::ProblemGenerator::LeptonEq", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const Real x = coords.x1v(i);
         const Real y = coords.x2v(j);
@@ -81,4 +81,4 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   fluid::PrimitiveToConserved(rc.get());
 }
 
-} // namespace thin_cooling
+} // namespace leptoneq
