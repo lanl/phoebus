@@ -219,6 +219,21 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   Real rhs[NHYPER];
   Real rhs_k[NHYPER];
 
+  // Print stuff to file for debugging
+  /*
+  FILE *pf;
+  pf = fopen("matter_last.dat", "w");
+  for (int i = 0; i < npoints; ++i) {
+	  Real r = radius.x(i);
+	  fprintf(pf,
+		  "%.14e %.14e %.14e\n",
+		  r,
+		  matter_h(0,i),
+		  matter_h(1,i));
+  }
+  fclose(pf);
+  */
+
   hypersurface_h(iA, 0) = 1.0;
   hypersurface_h(iK, 0) = 0.0;
   for (int i = 0; i < npoints - 1; ++i) {
@@ -231,7 +246,6 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
     for (int v = 0; v < NMAT_H; ++v) {
       src[v] = matter_h(v, i);
     }
-
     HypersurfaceRHS(r, state, src, rhs);
 #pragma omp simd
     for (int v = 0; v < NHYPER; ++v) {
@@ -245,6 +259,11 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
 #pragma omp simd
     for (int v = 0; v < NHYPER; ++v) {
       hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr * rhs_k[v];
+    }
+  }
+  for (int v = 0; v < NHYPER; ++v) {
+    if (std::isnan(hypersurface_h(v, npoints - 1))) {
+      PARTHENON_FAIL("Bad ODE integration.");
     }
   }
 
