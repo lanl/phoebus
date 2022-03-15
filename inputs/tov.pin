@@ -42,11 +42,11 @@ variables = p.density,  &
 	    src_terms
 
 file_type   = hdf5      # Tabular data dump
-dt          = 5         # time increment between outputs
+dt          = 1         # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 5000      # time limit
+tlim        = 1000      # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -99,7 +99,7 @@ rad = false
 
 <fluid>
 xorder = 2
-cfl = 0.75
+cfl = 0.25
 riemann = llf
 recon = weno5
 c2p_max_iter = 1000
@@ -125,7 +125,7 @@ gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
-npoints = 1024
+npoints = 4096
 rout = 250
 # Disables time derivatives. Runs only at initialization
 force_static = false
@@ -135,13 +135,13 @@ run_n_times = -1
 
 <tov>
 enabled = true
-Pc = 1e-2
+Pc = 1e-6
 entropy = 8
 # pressure below which we terminate the TOV solver and transition to atmosphere
-Pmin = 1e-9 
+Pmin = 1e-12 
 # The atmosphere values in the problem generator for density and energy
-rhomin = 1e-9
-epsmin = 1e-9
+rhomin = 1e-12
+epsmin = 1e-12
 # Velocity perturbation
 vpert_amp = 0
 vpert_radius = 5
