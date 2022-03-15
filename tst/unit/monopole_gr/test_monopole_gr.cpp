@@ -65,10 +65,6 @@ TEST_CASE("monopole_gr is disabled by default", "[MonopoleGR]") {
         auto &params = pkg->AllParams();
         bool enable_monopole_gr = params.Get<bool>("enable_monopole_gr");
         REQUIRE(!enable_monopole_gr);
-
-        REQUIRE(!params.hasKey("npoints"));
-        REQUIRE(!params.hasKey("rin"));
-        REQUIRE(!params.hasKey("rout"));
       }
     }
   }
