@@ -409,7 +409,6 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(fixup::Initialize(pin.get()));
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
   packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
-<<<<<<< HEAD
 
   // TODO(JMM): I need to do this before problem generators get
   // called. For now I'm hacking this in here. But in the long term,
@@ -445,9 +444,6 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
       MonopoleGR::DumpToTxt("tov.dat", monopole_pkg.get());
     }
   }
-=======
->>>>>>> main
-
   return packages;
 }
 
