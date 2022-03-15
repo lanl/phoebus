@@ -1,0 +1,148 @@
+# © 2021. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract 89233218CNA000001
+# for Los Alamos National Laboratory (LANL), which is operated by Triad
+# National Security, LLC for the U.S.  Department of Energy/National
+# Nuclear Security Administration. All rights in the program are
+# reserved by Triad National Security, LLC, and the U.S. Department of
+# Energy/National Nuclear Security Administration. The Government is
+# granted for itself and others acting on its behalf a nonexclusive,
+# paid-up, irrevocable worldwide license in this material to reproduce,
+# prepare derivative works, distribute copies to the public, perform
+# publicly and display publicly, and to permit others to do so.
+
+# Tohlmann-Oppenheimer-Volkov star in hydrostatic equilibrium
+
+<phoebus>
+problem = tov
+bc_ix1 = reflect
+bc_ox1 = reflect  # reflecting outer boundary a bit better behaved
+#bc_ox1 = outflow # but outflow and reflecting both work fine
+
+<parthenon/job>
+problem_id  = tov # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = p.density,  &
+      	    c.density,  &
+            p.velocity, &
+            c.momentum, &
+            p.energy,   &
+            c.energy,   &
+	    pressure,	&
+      	    cs, &
+      	    p.ye, &
+      	    g.c.coord, &
+     	    g.n.coord, &
+	    g.c.alpha, &
+	    g.c.detgam, &
+	    g.c.gcov, &
+	    g.c.dg, &
+	    g.c.dalpha, &
+	    flux_divergence, &
+	    src_terms
+
+file_type   = hdf5      # Tabular data dump
+dt          = 1         # time increment between outputs
+
+<parthenon/time>
+nlim        = -1        # cycle limit
+tlim        = 1000      # time limit
+integrator  = rk2       # time integration algorithm
+ncycle_out  = 1         # interval for stdout summary info
+dt_init_fact = 1.e-6
+
+<parthenon/mesh>
+nghost = 4
+#refinement = adaptive
+#numlevel = 3
+
+nx1         = 512         # Number of zones in X1-direction
+x1min       = 0           # minimum value of X1
+x1max       = 250         # maximum value of X1
+ix1_bc      = user        # Inner-X1 boundary condition flag
+ox1_bc      = user        # Outer-X1 boundary condition flag
+
+nx2         = 1             # Number of zones in X2-direction
+x2min       = 0             # minimum value of X2
+x2max       = 3.14159265359 # maximum value of X2. Pi
+ix2_bc      = reflecting    # Inner-X2 boundary condition flag
+ox2_bc      = reflecting    # Outer-X2 boundary condition flag
+
+nx3         = 1             # Number of zones in X3-direction
+x3min       = 0             # minimum value of X3
+x3max       = 6.28318530718 # maximum value of X3. 2*pi
+ix3_bc      = periodic      # Inner-X3 boundary condition flag
+ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
+
+num_threads = 1         # maximum number of OMP threads
+
+<parthenon/meshblock>
+nx1 = 512
+nx2 = 1
+nx3 = 1
+
+<parthenon/refinement0>
+field = c.c.bulk.rho
+method = derivative_order_1
+max_level = 3
+
+<eos>
+type = IdealGas
+Gamma = 2
+Cv = 1.0
+
+<physics>
+hydro = true
+he = false
+3t = false
+rad = false
+
+<fluid>
+xorder = 2
+cfl = 0.25
+riemann = llf
+recon = weno5
+c2p_max_iter = 1000
+Ye = false
+
+# Fixups aren't necessary for this problem,
+# especially with the Cowling approximation
+# and reflecting outer boundary.
+# But they also don't do any harm.
+<fixup>
+enable_floors = true
+enable_ceilings = true
+enable_flux_fixup = false
+enable_c2p_fixup = true
+floor_type = ConstantRhoSie
+rho0_floor = 1.0e-9
+sie0_floor = 1.0e-9
+rho_exp_floor = -2.0
+sie_exp_floor = -1.0
+ceiling_type = ConstantGamSie
+sie0_ceiling = 10.0;
+gam0_ceiling = 10.0;
+
+<monopole_gr>
+enabled = true
+npoints = 4096
+rout = 250
+# Disables time derivatives. Runs only at initialization
+force_static = false
+# Runs the first n subcycles. Then freezes. Source terms are not disabled.
+# -1 means it's always run.
+run_n_times = -1
+
+<tov>
+enabled = true
+Pc = 1e-6
+entropy = 8
+# pressure below which we terminate the TOV solver and transition to atmosphere
+Pmin = 1e-12 
+# The atmosphere values in the problem generator for density and energy
+rhomin = 1e-12
+epsmin = 1e-12
+# Velocity perturbation
+vpert_amp = 0
+vpert_radius = 5
+vpert_sigma = 1

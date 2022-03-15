@@ -27,11 +27,14 @@ using namespace parthenon::package::prelude;
 
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
+#include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
+
+#define CON2PRIM_ROBUST_PRINT_FAILURES 0
 
 namespace con2prim_robust {
 
@@ -305,14 +308,21 @@ class ConToPrim {
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g, const singularity::EOS &eos,
                         const Real x1, const Real x2, const Real x3) const {
     int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(ceng);
-    if (num_nans > 0) return ConToPrimStatus::failure;
-    const Real igdet = 1.0/g.gdet;
+    if (num_nans > 0) {
+#if CON2PRIM_ROBUST_PRINT_FAILURES
+      printf("con2prim robust(%e): NaNs produced in rho, mom, enrgy = %d %d %d!\n",
+	     x1, std::isnan(v(crho)), std::isnan(v(cmom_lo)), std::isnan(ceng));
+#endif // CON2PRIM_ROBUST_PRINT_FAILURES
+      return ConToPrimStatus::failure;
+    }
+    const Real igdet = ratio(1.0, std::abs(g.gdet));
 
     Real rhoflr = 0.0;
     Real epsflr;
     bounds.GetFloors(x1,x2,x3,rhoflr,epsflr);
     Real gam_max, eps_max;
     bounds.GetCeilings(x1,x2,x3,gam_max,eps_max);
+
     const Real D = v(crho)*igdet;
     #if USE_VALENCIA
     const Real tau = v(ceng)*igdet;
@@ -405,6 +415,7 @@ class ConToPrim {
     v(peng) *= v(prho);
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp), eos_lambda);
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp), eos_lambda)/v(prs);
+    PARTHENON_DEBUG_REQUIRE(P > robust::EPS(), "Pressure must be positive");
 
     Real vel[3];
     SPACELOOP(i) {

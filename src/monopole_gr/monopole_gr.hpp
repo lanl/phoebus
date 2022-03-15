@@ -14,21 +14,10 @@
 #ifndef MONOPOLE_GR_MONOPOLE_GR_HPP_
 #define MONOPOLE_GR_MONOPOLE_GR_HPP_
 
-// stdlib
-#include <memory>
-
-// Spiner
-#include <spiner/interpolation.hpp>
-
-// Parthenon
-#include <kokkos_abstraction.hpp>
-#include <parthenon/package.hpp>
-#include <utils/error_checking.hpp>
-
 // Phoebus
-#include "geometry/geometry_utils.hpp"
-
-using namespace parthenon::package::prelude;
+#include "monopole_gr/monopole_gr_base.hpp"
+#include "monopole_gr/monopole_gr_interface.hpp"
+#include "monopole_gr/interp_3d_to_1d.hpp"
 
 // TODO(JMM): Clean up notation? Or is it fine?
 /*
@@ -79,7 +68,7 @@ using namespace parthenon::package::prelude;
 
   K^i_j = K^r_r diag(1, -1/2, -1/2)
 
-  da/dr = a (4 + a^2 (-4 + r^2 (-3 (K^r_r)^2 + 32 pi rho)))/(8 r);
+  da/dr = a (4 + a^2 (-4 + r^2 (3 (K^r_r)^2 + 32 pi rho)))/(8 r);
 
   d K^r_r/dr = 8 pi a^2 j^r - (3/r) K^r_r
 
@@ -146,16 +135,16 @@ using namespace parthenon::package::prelude;
   j^i    = CONSERVED 3-momentum vector
   S_{ij} = 3-stress tensor
   ---------------------------------------
-  rho    = n^mu n^nu T_{mu nu} = tau + D
-  j^i    = - P^{i mu} n^nu T_{mu nu} = S^i
+  rho    = n^mu n^nu T_{mu nu}
+  j^i    = - P^{i mu} n^nu T_{mu nu}
   S_{ij} = P^mu_i P^nu_i T_{munu}
 
   where n^mu is unit normal of hypersurface, P^{i mu} is projector
 
   Translates to (in Valencia variables):
 
-  rho    = tau + D
-  j^i    = S^i
+  sqrt(g) rho    = tau + D
+  sqrt(g) j^i    = S^i
   Trc(S) = (rho_0 h + b^2)W^2 + 3(P + b^2/2) - b^i b_i
 
   In case of no B fields,
@@ -164,110 +153,17 @@ using namespace parthenon::package::prelude;
 
   where rho_0 here is primitive density and h is enthalpy.
 
-  We also need S^r_r = T^r_r for the Christoffel symbols:
-  T^r_r = (rho + u + P + b^2) u^r u_r + (P + (1/2) b^2) - b^r b_r
+  We also need S^r_r for the Christoffel symbols
+  -------
+  Note that if you construct T^mu_nu, then:
+  rho = alpha^2 T^{00}
+  j^i = -alpha*T^{0i} + beta^i T^{00}
+  S^i_j = T^i_j + beta^i T^0_j
+
+  because
+  n_mu = (-alpha, 0)
+  n^mu = (1/alpha, -beta/alpha)
+  P^mu_nu = delta^mu_nu + n^mu n_nu
  */
-
-namespace MonopoleGR {
-
-constexpr int MIN_NPOINTS = 5;
-
-/*
-  Array structure:
-  Slowest moving index is refinement level. 0 is finest.
-  Next index is variable (if appropriate)
-  Next index is grid point
- */
-using Matter_t = parthenon::ParArray2D<Real>;
-using Matter_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
-
-constexpr int NMAT = 4;
-constexpr int NMAT_H = NMAT - 2;
-enum Matter {
-  RHO = 0,  // Primitive density... (0,0)-component of Tmunu
-  J_R = 1,  // Radial momentum, (r,t)-component of Tmunu
-  trcS = 2, // Trace of the stress tensor: S = S^i_i
-  Srr = 3   // The r-r component of the stress tensor
-};
-
-namespace TOV {
-constexpr int NTOV = 2;
-
-using State_t = parthenon::ParArray2D<Real>;
-using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
-
-constexpr int M = 0;
-constexpr int P = 1;
-
-constexpr int NINTRINSIC = 2;
-
-constexpr int RHO0 = 0;
-constexpr int EPS = 1;
-  
-} // namespace TOV
-
-using Hypersurface_t = parthenon::ParArray2D<Real>;
-using Hypersurface_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
-
-constexpr int NHYPER = 2;
-enum Hypersurface {
-  A = 0, // (r,r)-component of metric
-  K = 1  // K^r_r, extrinsic curvature
-};
-
-using Alpha_t = parthenon::ParArray1D<Real>;
-using Alpha_host_t = typename parthenon::ParArray1D<Real>::HostMirror;
-
-using Beta_t = parthenon::ParArray1D<Real>;
-
-constexpr int NGRAD = 8;
-using Gradients_t = parthenon::ParArray2D<Real>;
-enum Gradients {
-  DADR = 0,     // dadr
-  DKDR = 1,     // dKdr
-  DALPHADR = 2, // dalphadr
-  DBETADR = 3,  // dbetadr
-  DADT = 4,     // dadt
-  DALPHADT = 5, // dalphadt
-  DKDT = 6,     // dKdt
-  DBETADT = 7   // dbetadt
-};
-
-// TODO(JMM): Do we want this?
-using Radius = Spiner::RegularGrid1D;
-
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-
-TaskStatus MatterToHost(StateDescriptor *pkg);
-
-TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
-
-TaskStatus IntegrateTov(StateDescriptor *monopolepkg, StateDescriptor *eospkg);
-
-TaskStatus LinearSolveForAlpha(StateDescriptor *pkg);
-
-TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
-
-template <typename Array_t>
-PORTABLE_INLINE_FUNCTION Real Interpolate(const Real r, const Array_t &A,
-                                          const Radius &rgrid) {
-  int ix;
-  Spiner::weights_t w;
-  rgrid.weights(r, ix, w);
-  return w[0] * A(ix) + w[1] * A(ix + 1);
-}
-
-template <typename Array_t>
-PORTABLE_INLINE_FUNCTION Real Interpolate(const Real r, const Array_t &A,
-                                          const Radius &rgrid, const int ivar) {
-  int ix;
-  Spiner::weights_t w;
-  rgrid.weights(r, ix, w);
-  return w[0] * A(ivar, ix) + w[1] * A(ivar, ix + 1);
-}
-
-void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
-
-} // namespace MonopoleGR
 
 #endif // MONOPOLE_GR_MONOPOLE_GR_HPP_

@@ -44,7 +44,8 @@ using namespace parthenon::package::prelude;
   PROBLEM(radiation_advection)                                                           \
   PROBLEM(radiation_equilibration)                                                       \
   PROBLEM(homogeneous_sphere)                                                            \
-  PROBLEM(torus)
+  PROBLEM(torus)                                                                         \
+  PROBLEM(tov)
 
 // if you need problem-specific modifications to inputs, add the name here
 #define FOREACH_MODIFIER                                                                 \

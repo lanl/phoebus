@@ -28,6 +28,8 @@
 
 using robust::ratio;
 
+#define FIXUP_PRINT_TOTAL_NFAIL 0
+
 namespace fixup {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
@@ -159,10 +161,12 @@ TaskStatus ApplyFloors(T *rc) {
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
-
-  const Real bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
-  const Real bsqou_max = fix_pkg->Param<Real>("bsqou_max");
-  const Real uorho_max = fix_pkg->Param<Real>("uorho_max");
+  Real bsqorho_max, bsqou_max, uorho_max;
+  if (enable_mhd_floors) {
+    bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
+    bsqou_max = fix_pkg->Param<Real>("bsqou_max");
+    uorho_max = fix_pkg->Param<Real>("uorho_max");
+  }
   
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(),
