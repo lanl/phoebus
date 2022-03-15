@@ -46,7 +46,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   bool enable_monopole_gr = pin->GetOrAddBoolean("monopole_gr", "enabled", false);
   params.Add("enable_monopole_gr", enable_monopole_gr);
-  if (!enable_monopole_gr) return monopole_gr; // Short-circuit with nothing
+
+  // Kill time derivatives. Only run on initialization
+  bool force_static = pin->GetOrAddBoolean("monopole_gr", "force_static", false);
+  params.Add("force_static", force_static);
+
+  // Only run the first n subcycles
+  int run_n_times = pin->GetOrAddInteger("monopole_gr", "run_n_times", -1);
+  params.Add("run_n_times", run_n_times);
+  int nth_call = 0;
+  params.Add("nth_call", nth_call, true); // mutable
 
   // Points
   int npoints = pin->GetOrAddInteger("monopole_gr", "npoints", 100);
@@ -56,6 +65,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_REQUIRE_THROWS(npoints >= MIN_NPOINTS, msg);
   }
   params.Add("npoints", npoints);
+
+  // Short-circuit without allocating any memory
+  if (!enable_monopole_gr) return monopole_gr;
 
   // Rin and Rout are not necessarily the same as
   // bounds for the fluid
@@ -78,16 +90,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("rin", rin);
   params.Add("rout", rout);
-
-  // Kill time derivatives. Only run on initialization
-  bool force_static = pin->GetOrAddBoolean("monopole_gr", "force_static", false);
-  params.Add("force_static", force_static);
-
-  // Only run the first n subcycles
-  int run_n_times = pin->GetOrAddInteger("monopole_gr", "run_n_times", -1);
-  params.Add("run_n_times", run_n_times);
-  int nth_call = 0;
-  params.Add("nth_call", nth_call, true); // mutable
 
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
