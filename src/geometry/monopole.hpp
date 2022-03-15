@@ -25,7 +25,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/cached_system.hpp"
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
-#include "monopole_gr/monopole_gr.hpp"
+#include "monopole_gr/monopole_gr_base.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/robust.hpp"
 
@@ -41,6 +41,26 @@ namespace Geometry {
  * modifier to fill in the missing functionality.
  */
 class MonopoleCart;
+
+namespace MonopoleCoordTransforms {
+KOKKOS_INLINE_FUNCTION
+void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph);
+
+KOKKOS_INLINE_FUNCTION
+void Cart2Sph(Real X1, Real X2, Real X3, Real dx1, Real dx2, Real dx3, Real &r,
+              Real &th, Real &ph, Real &dr, Real &dth, Real &dph);
+
+// These are dx^{mu'}/dx^{mu}
+// convention is mu' is first index, mu is second
+// S2C has x^{mu'} = {x,y,z}
+// C2S has x^{mu'} = {r,th,ph}
+KOKKOS_INLINE_FUNCTION
+void S2C(Real r, Real th, Real ph, Real J[NDFULL][NDFULL]);
+KOKKOS_INLINE_FUNCTION
+void C2S(Real x, Real y, Real z, Real r, Real J[NDFULL][NDFULL]);
+KOKKOS_INLINE_FUNCTION
+void Hessian(Real x, Real y, Real z, Real r, Real H[NDFULL][NDFULL][NDFULL]);
+} // namespace MonopoleCoordTransforms
 
 class MonopoleSph {
  public:
@@ -175,8 +195,9 @@ class MonopoleSph {
 
     LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
     // d/dt
-    dg[0][0][0] = -2 * alpha * dalphadt + 2 * a * beta * (beta * dadt + a * dbetadt);
-    dg[1][0][0] = dg[0][1][0] = a * (2 * beta * dadt + a * dbetadt);
+    dg[0][0][0] =
+        2 * a * beta * beta * dadt - 2 * alpha * dalphadt + 2 * a * a * beta * dbetadt;
+    dg[1][0][0] = dg[0][1][0] = 2 * a * beta * dadt + a * a * dbetadt;
     dg[1][1][0] = 2 * a * dadt;
     // d/dr
     dg[0][0][1] = -2 * alpha * dalphadr + 2 * a * beta * (beta * dadr + a * dbetadr);
@@ -189,39 +210,11 @@ class MonopoleSph {
     // d/dph = 0
   }
 
+  KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    const Real r = std::abs(X1);
-    const Real th = X2;
-    const Real cth = std::cos(th);
-    const Real sth = std::sin(th);
-    const Real alpha = MonopoleGR::Interpolate(r, alpha_, rgrid_);
-    const Real beta = MonopoleGR::Interpolate(r, beta_, rgrid_);
-    const Real a =
-        MonopoleGR::Interpolate(r, hypersurface_, rgrid_, MonopoleGR::Hypersurface::A);
-    const Real dalphadr =
-        MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DALPHADR);
-    const Real dbetadr =
-        MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DBETADR);
-    const Real dalphadt =
-        MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DALPHADT);
-    const Real dbetadt =
-        MonopoleGR::Interpolate(r, gradients_, rgrid_, MonopoleGR::Gradients::DBETADT);
-
-    LinearAlgebra::SetZero(Gamma, NDFULL, NDFULL, NDFULL);
-
-    Gamma[0][0][0] = -alpha * dalphadt;
-    Gamma[0][0][1] = Gamma[0][1][0] = -alpha * dalphadr;
-
-    Gamma[1][0][0] = alpha * dalphadr - beta * dbetadr + dbetadt;
-    Gamma[1][2][2] = -r;
-    Gamma[1][2][2] = -r * sth * sth;
-
-    Gamma[2][1][2] = Gamma[2][2][1] = r;
-    Gamma[2][3][3] = -r * cth * sth;
-
-    Gamma[3][1][3] = Gamma[3][3][1] = r * sth * sth;
-    Gamma[3][2][3] = Gamma[3][3][2] = r * r * cth * sth;
+    // This is less error prone than a hardcoded version.
+    Utils::SetConnectionCoeffByFD(*this, Gamma, X0, X1, X2, X3);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -266,18 +259,18 @@ class MonopoleCart {
                const MonopoleGR::Alpha_t &alpha, const MonopoleGR::Beta_t &beta,
                const MonopoleGR::Gradients_t &gradients, const MonopoleGR::Radius &rgrid)
       : sph_(hypersurface, alpha, beta, gradients, rgrid) {}
-  KOKKOS_INLINE_FUNCTION
 
+  KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
     Real r, th, ph;
-    Cart2Sph(X1, X2, X3, r, th, ph);
+    MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
     return sph_.Lapse(X0, r, th, ph);
   }
 
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     Real r, th, ph;
-    Cart2Sph(X1, X2, X3, r, th, ph);
+    MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
     const Real cth = std::cos(th);
     const Real sth = std::sin(th);
     const Real cph = std::cos(ph);
@@ -293,11 +286,11 @@ class MonopoleCart {
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
     Real r, th, ph;
-    Cart2Sph(X1, X2, X3, r, th, ph);
+    MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
     Real gsph[NDFULL][NDFULL];
     Real J[NDFULL][NDFULL];
     sph_.SpacetimeMetric(X0, r, th, ph, gsph);
-    C2S(X1, X2, X3, r, J);
+    MonopoleCoordTransforms::C2S(X1, X2, X3, r, J);
     SPACETIMELOOP2(mup, nup) {
       g[mup][nup] = 0;
       SPACETIMELOOP2(mu, nu) { g[mup][nup] += J[mu][mup] * J[nu][nup] * gsph[mu][nu]; }
@@ -308,11 +301,11 @@ class MonopoleCart {
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
     Real r, th, ph;
-    Cart2Sph(X1, X2, X3, r, th, ph);
+    MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
     Real gsph[NDFULL][NDFULL];
     Real J[NDFULL][NDFULL];
     sph_.SpacetimeMetricInverse(X0, r, th, ph, gsph);
-    S2C(r, th, ph, J);
+    MonopoleCoordTransforms::S2C(r, th, ph, J);
     SPACETIMELOOP2(mup, nup) {
       g[mup][nup] = 0;
       SPACETIMELOOP2(mu, nu) { g[mup][nup] += J[mup][mu] * J[nup][nu] * gsph[mu][nu]; }
@@ -322,11 +315,11 @@ class MonopoleCart {
   KOKKOS_INLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     Real r, th, ph;
-    Cart2Sph(X1, X2, X3, r, th, ph);
+    MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
     Real gsph[NDSPACE][NDSPACE];
     Real J[NDFULL][NDFULL];
     sph_.Metric(X0, r, th, ph, gsph);
-    C2S(X1, X2, X3, r, J);
+    MonopoleCoordTransforms::C2S(X1, X2, X3, r, J);
     SPACELOOP2(ip, jp) {
       g[ip][jp] = 0;
       SPACELOOP2(i, j) { g[ip][jp] += J[i + 1][ip + 1] * J[j + 1][jp + 1] * gsph[i][j]; }
@@ -336,11 +329,11 @@ class MonopoleCart {
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     Real r, th, ph;
-    Cart2Sph(X1, X2, X3, r, th, ph);
+    MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
     Real gsph[NDSPACE][NDSPACE];
     Real J[NDFULL][NDFULL];
     sph_.MetricInverse(X0, r, th, ph, gsph);
-    S2C(r, th, ph, J);
+    MonopoleCoordTransforms::S2C(r, th, ph, J);
     SPACELOOP2(ip, jp) {
       g[ip][jp] = 0;
       SPACELOOP2(i, j) { g[ip][jp] += J[ip + 1][i + 1] * J[jp + 1][j + 1] * gsph[i][j]; }
@@ -350,7 +343,7 @@ class MonopoleCart {
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
     Real r, th, ph;
-    Cart2Sph(X1, X2, X3, r, th, ph);
+    MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
     const Real a = MonopoleGR::Interpolate(r, sph_.hypersurface_, sph_.rgrid_,
                                            MonopoleGR::Hypersurface::A);
     return a;
@@ -373,14 +366,14 @@ class MonopoleCart {
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     Real r, th, ph;
-    Cart2Sph(X1, X2, X3, r, th, ph);
+    MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
     Real g[NDFULL][NDFULL];
     sph_.SpacetimeMetric(X0, r, th, ph, g);
 
     Real J[NDFULL][NDFULL];
-    C2S(X1, X2, X3, r, J);
+    MonopoleCoordTransforms::C2S(X1, X2, X3, r, J);
     Real H[NDFULL][NDFULL][NDFULL];
-    Hessian(X1, X2, X3, r, H);
+    MonopoleCoordTransforms::Hessian(X1, X2, X3, r, H);
 
     Real dgsph[NDFULL][NDFULL][NDFULL];
     sph_.MetricDerivative(X0, r, th, ph, dgsph);
@@ -417,114 +410,158 @@ class MonopoleCart {
     }
   }
 
+  KOKKOS_INLINE_FUNCTION
+  void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
+    Real r, th, ph;
+    MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
+
+    const Real alpha = MonopoleGR::Interpolate(r, sph_.alpha_, sph_.rgrid_);
+    const Real dalphadr = MonopoleGR::Interpolate(r, sph_.gradients_, sph_.rgrid_,
+                                                  MonopoleGR::Gradients::DALPHADR);
+    const Real dalphadt = MonopoleGR::Interpolate(r, sph_.gradients_, sph_.rgrid_,
+                                                  MonopoleGR::Gradients::DALPHADT);
+
+    Real J[NDFULL][NDFULL];
+    MonopoleCoordTransforms::C2S(X1, X2, X3, r, J);
+
+    Real da_sph[NDFULL];
+    LinearAlgebra::SetZero(da_sph, NDFULL);
+    LinearAlgebra::SetZero(da, NDFULL);
+    da[0] = dalphadt / alpha;
+    da[1] = dalphadr / alpha;
+
+    SPACETIMELOOP2(mup, mu) {
+      SPACELOOP2(i, j) { da[mup] += J[mu][mup] * da[mu]; }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void Coords(Real X0, Real X1, Real X2, Real X3, Real C[NDFULL]) const {
+    C[0] = X0;
+    C[1] = X1;
+    C[2] = X2;
+    C[3] = X3;
+  }
+
  private:
   MonopoleSph sph_;
 
-  KOKKOS_INLINE_FUNCTION
-  void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph) const {
-    r = std::sqrt(X1 * X1 + X2 * X2 + X3 * X3);
-    th = std::acos(robust::ratio(X3, r));
-    ph = std::atan2(X2, X1);
-  }
-
-  // These are dx^{mu'}/dx^{mu}
-  // convention is mu' is first index, mu is second
-  // S2C has x^{mu'} = {x,y,z}
-  // C2S has x^{mu'} = {r,th,ph}
-  KOKKOS_INLINE_FUNCTION
-  void S2C(Real r, Real th, Real ph, Real J[NDFULL][NDFULL]) const {
-    Real cth = std::cos(th);
-    Real sth = std::sin(th);
-    Real cph = std::cos(ph);
-    Real sph = std::sin(ph);
-    LinearAlgebra::SetZero(J, NDFULL, NDFULL);
-    J[0][0] = 1;
-    J[1][1] = sth * cph;
-    J[1][2] = r * cth * cph;
-    J[1][3] = -r * sth * sph;
-    J[2][1] = sth * sph;
-    J[2][2] = r * cth * sph;
-    J[2][3] = r * sth * cph;
-    J[3][1] = cth;
-    J[3][2] = -r * sth;
-    J[3][3] = 0;
-  }
-  KOKKOS_INLINE_FUNCTION
-  void C2S(Real x, Real y, Real z, Real r, Real J[NDFULL][NDFULL]) const {
-    using robust::ratio;
-    const Real r2 = r * r;
-    const Real rho2 = x * x + y * y;
-    const Real rho = std::sqrt(rho2);
-
-    LinearAlgebra::SetZero(J, NDFULL, NDFULL);
-    J[0][0] = 1;
-    J[1][1] = ratio(x, r);
-    J[1][2] = ratio(y, r);
-    J[1][3] = ratio(z, r);
-    J[2][1] = ratio(x * z, r2 * rho);
-    J[2][2] = ratio(y * z, r2 * rho2);
-    J[2][3] = -ratio(rho, r2);
-    J[3][1] = -ratio(y, rho2);
-    J[3][2] = ratio(x, rho2);
-    J[3][3] = 0;
-  }
-  // Hessian
-  // d^2 x^mu/dx^mu' dx^sigma'
-  // where x^mu = {r,th,ph}
-  // and x^mu' = {x,y,z}
-  KOKKOS_INLINE_FUNCTION
-  void Hessian(Real x, Real y, Real z, Real r, Real H[NDFULL][NDFULL][NDFULL]) const {
-    using robust::ratio;
-    const Real x2 = x * x;
-    const Real y2 = y * y;
-    const Real z2 = z * z;
-    const Real x4 = x2 * x2;
-    const Real y4 = y2 * y2;
-    const Real r2 = r * r;
-    const Real r3 = r2 * r;
-    const Real r4 = r3 * r;
-    const Real rho2 = x2 + y2;
-    const Real rho = std::sqrt(rho2);
-    const Real rho3 = rho2 * rho;
-    const Real rho4 = rho3 * rho;
-
-    const Real irho = ratio(1., rho);
-    const Real irho3 = ratio(1., rho3);
-    const Real irho4 = ratio(1., rho4);
-    const Real ir3 = ratio(1.,r3);
-    const Real ir4 = ratio(1., r4);
-
-    LinearAlgebra::SetZero(H, NDFULL, NDFULL, NDFULL);
-    H[1][1][1] = (y2 + z2) * ir3;
-    H[1][2][1] = -(x * y) * ir3;
-    H[1][3][1] = -(x * z) * ir3;
-    H[2][1][1] = (z * (-2 * x4 - x2 * y2 + y4 + y2 * z2)) * irho3 * ir4;
-    H[2][2][1] = -(x * y * z * (3 * rho2 + z2)) * irho3 * ir4;
-    H[2][3][1] = (x * (x2 + y2 - z2)) * irho * ir4;
-    H[3][1][1] = (2 * x * y) * irho4;
-    H[3][2][1] = (y2 - x2) * irho4;
-    // H[3][3][1] = 0;
-
-    H[1][1][2] = -(x * y) * ir3;
-    H[1][2][2] = (x2 + z2) * ir3;
-    H[1][3][2] = -(y * z) * ir3;
-    H[2][1][2] = -(x * y * z * (3 * rho2 + z2)) * irho3 * ir4;
-    H[2][2][2] = (z * (x4 - 2 * y4 + x2 * (z2 - y2))) * irho3 * ir4;
-    H[2][3][2] = (y * (x2 + y2 - z2)) * irho * ir4;
-    H[3][1][2] = (y2 - x2) * irho4;
-    H[3][2][2] = -(2 * x * y) * irho4;
-    // H[3][3][2] = 0;
-
-    H[1][1][3] = -(x * z) * irho3;
-    H[1][2][3] = -(y * z) * irho3;
-    H[1][3][3] = (x2 + y2) * irho3;
-    H[2][1][3] = x * (x2 + y2 - z2) * irho * ir4;
-    H[2][2][3] = y * (x2 + y2 - z2) * irho * ir4;
-    H[2][3][3] = 2 * rho * z * ir4;
-    // H[3][*][3] = 0;
-  }
 };
 
+namespace MonopoleCoordTransforms {
+KOKKOS_INLINE_FUNCTION
+void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph) {
+  r = std::sqrt(X1 * X1 + X2 * X2 + X3 * X3);
+  th = std::acos(robust::ratio(X3, r));
+  ph = std::atan2(X2, X1);
+}
+
+KOKKOS_INLINE_FUNCTION
+void Cart2Sph(Real X1, Real X2, Real X3, Real dx1, Real dx2, Real dx3, Real &r,
+              Real &th, Real &ph, Real &dr, Real &dth, Real &dph) {
+  Cart2Sph(X1, X2, X3, r, th, ph);
+  dr = dx3 * std::cos(th) + std::sin(th) * (dx1 * std::cos(ph) + dx2 * std::sin(ph));
+  dth = r * (-dx3 * std::sin(th) +
+             std::cos(th) * (dx1 * std::cos(ph) + dx2 * std::sin(ph)));
+  dph = r * std::sin(th) * (dx2 * std::cos(ph) - dx1 * std::sin(ph));
+}
+
+// These are dx^{mu'}/dx^{mu}
+// convention is mu' is first index, mu is second
+// S2C has x^{mu'} = {x,y,z}
+// C2S has x^{mu'} = {r,th,ph}
+KOKKOS_INLINE_FUNCTION
+void S2C(Real r, Real th, Real ph, Real J[NDFULL][NDFULL]) {
+  Real cth = std::cos(th);
+  Real sth = std::sin(th);
+  Real cph = std::cos(ph);
+  Real sph = std::sin(ph);
+  LinearAlgebra::SetZero(J, NDFULL, NDFULL);
+  J[0][0] = 1;
+  J[1][1] = sth * cph;
+  J[1][2] = r * cth * cph;
+  J[1][3] = -r * sth * sph;
+  J[2][1] = sth * sph;
+  J[2][2] = r * cth * sph;
+  J[2][3] = r * sth * cph;
+  J[3][1] = cth;
+  J[3][2] = -r * sth;
+  J[3][3] = 0;
+}
+KOKKOS_INLINE_FUNCTION
+void C2S(Real x, Real y, Real z, Real r, Real J[NDFULL][NDFULL]) {
+  const Real r2 = r * r;
+  const Real rho2 = x * x + y * y;
+  const Real rho = std::sqrt(rho2);
+
+  LinearAlgebra::SetZero(J, NDFULL, NDFULL);
+  J[0][0] = 1;
+  J[1][1] = robust::ratio(x, r);
+  J[1][2] = robust::ratio(y, r);
+  J[1][3] = robust::ratio(z, r);
+  J[2][1] = robust::ratio(x * z, r2 * rho);
+  J[2][2] = robust::ratio(y * z, r2 * rho2);
+  J[2][3] = -robust::ratio(rho, r2);
+  J[3][1] = -robust::ratio(y, rho2);
+  J[3][2] = robust::ratio(x, rho2);
+  J[3][3] = 0;
+}
+// Hessian
+// d^2 x^mu/dx^mu' dx^sigma'
+// where x^mu = {r,th,ph}
+// and x^mu' = {x,y,z}
+KOKKOS_INLINE_FUNCTION
+void Hessian(Real x, Real y, Real z, Real r, Real H[NDFULL][NDFULL][NDFULL]) {
+  const Real x2 = x * x;
+  const Real y2 = y * y;
+  const Real z2 = z * z;
+  const Real x4 = x2 * x2;
+  const Real y4 = y2 * y2;
+  const Real r2 = r * r;
+  const Real r3 = r2 * r;
+  const Real r4 = r3 * r;
+  const Real rho2 = x2 + y2;
+  const Real rho = std::sqrt(rho2);
+  const Real rho3 = rho2 * rho;
+  const Real rho4 = rho3 * rho;
+
+  const Real irho = robust::ratio(1., rho);
+  const Real irho3 = robust::ratio(1., rho3);
+  const Real irho4 = robust::ratio(1., rho4);
+  const Real ir3 = robust::ratio(1., r3);
+  const Real ir4 = robust::ratio(1., r4);
+
+  LinearAlgebra::SetZero(H, NDFULL, NDFULL, NDFULL);
+  H[1][1][1] = (y2 + z2) * ir3;
+  H[1][2][1] = -(x * y) * ir3;
+  H[1][3][1] = -(x * z) * ir3;
+  H[2][1][1] = (z * (-2 * x4 - x2 * y2 + y4 + y2 * z2)) * irho3 * ir4;
+  H[2][2][1] = -(x * y * z * (3 * rho2 + z2)) * irho3 * ir4;
+  H[2][3][1] = (x * (x2 + y2 - z2)) * irho * ir4;
+  H[3][1][1] = (2 * x * y) * irho4;
+  H[3][2][1] = (y2 - x2) * irho4;
+  // H[3][3][1] = 0;
+
+  H[1][1][2] = -(x * y) * ir3;
+  H[1][2][2] = (x2 + z2) * ir3;
+  H[1][3][2] = -(y * z) * ir3;
+  H[2][1][2] = -(x * y * z * (3 * rho2 + z2)) * irho3 * ir4;
+  H[2][2][2] = (z * (x4 - 2 * y4 + x2 * (z2 - y2))) * irho3 * ir4;
+  H[2][3][2] = (y * (x2 + y2 - z2)) * irho * ir4;
+  H[3][1][2] = (y2 - x2) * irho4;
+  H[3][2][2] = -(2 * x * y) * irho4;
+  // H[3][3][2] = 0;
+
+  H[1][1][3] = -(x * z) * irho3;
+  H[1][2][3] = -(y * z) * irho3;
+  H[1][3][3] = (x2 + y2) * irho3;
+  H[2][1][3] = x * (x2 + y2 - z2) * irho * ir4;
+  H[2][2][3] = y * (x2 + y2 - z2) * irho * ir4;
+  H[2][3][3] = 2 * rho * z * ir4;
+  // H[3][*][3] = 0;
+}
+} // namespace MonopoleCoordTransforms
+  
 using MplSphMeshBlock = Analytic<MonopoleSph, IndexerMeshBlock>;
 using MplCartMeshBlock = Analytic<MonopoleCart, IndexerMeshBlock>;
 
@@ -535,5 +572,17 @@ template <>
 void Initialize<MplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 template <>
 void Initialize<MplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+
+// TODO(JMM): The cached machinery will need to be revisited
+using CMplSphMeshBlock = CachedOverMeshBlock<Analytic<MonopoleSph, IndexerMeshBlock>>;
+using CMplCartMeshBlock = CachedOverMeshBlock<Analytic<MonopoleCart, IndexerMeshBlock>>;
+
+using CMplSphMesh = CachedOverMesh<Analytic<MonopoleSph, IndexerMesh>>;
+using CMplCartMesh = CachedOverMesh<Analytic<MonopoleCart, IndexerMesh>>;
+
+template <>
+void Initialize<CMplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+template <>
+void Initialize<CMplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 
 } // namespace Geometry

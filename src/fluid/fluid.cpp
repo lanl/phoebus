@@ -441,7 +441,6 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-
   auto fail = rc->Get(internal_variables::fail).data;
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
@@ -575,7 +574,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           Real Ta = 0.0;
           Real da[ND];
-          //Real *da = &gam[1][0][0];
+          // Real *da = &gam[1][0][0];
           geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
           for (int m = 0; m < ND; m++) {
             Ta += Tmunu[m][0] * da[m];

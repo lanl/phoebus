@@ -28,7 +28,8 @@
 // Phoebus
 #include "geometry/geometry_utils.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
-#include "monopole_gr/monopole_gr.hpp"
+#include "monopole_gr/monopole_gr_base.hpp"
+#include "monopole_gr/monopole_gr_interface.hpp"
 #include "monopole_gr/monopole_gr_utils.hpp"
 
 #include "tov.hpp"
@@ -39,7 +40,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto tov = std::make_shared<StateDescriptor>("tov");
   Params &params = tov->AllParams();
 
-  bool do_tov = pin->GetOrAddBoolean("TOV", "enabled", false);
+  bool do_tov = pin->GetOrAddBoolean("tov", "enabled", false);
   params.Add("enabled", do_tov);
   if (!do_tov) return tov; // short-circuit with nothing
 
@@ -62,15 +63,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("npoints", npoints);
 
   // Central pressure
-  Real pc = pin->GetOrAddReal("TOV", "Pc", 10);
+  Real pc = pin->GetOrAddReal("tov", "Pc", 10);
   params.Add("pc", pc);
 
   // Pressure floor
-  Real pmin = pin->GetOrAddReal("TOV", "Pmin", 1e-9);
+  Real pmin = pin->GetOrAddReal("tov", "Pmin", 1e-9);
   params.Add("pmin", pmin);
 
-  // Etnropy
-  Real s = pin->GetOrAddReal("TOV", "entropy", 8);
+  // Entropy
+  Real s = pin->GetOrAddReal("tov", "entropy", 8);
   params.Add("entropy", s);
 
   // Arrays for TOV stuff
@@ -93,7 +94,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   PARTHENON_REQUIRE_THROWS(tovpkg->label() == "tov", "Requires the tov package");
   PARTHENON_REQUIRE_THROWS(monopolepkg->label() == "monopole_gr",
                            "Requires the monopole_gr package");
-  PARTHENON_REQUIRE_THROWS(eospkg->label() == "eos", "REquires the eos package");
+  PARTHENON_REQUIRE_THROWS(eospkg->label() == "eos", "Requires the eos package");
 
   auto &params = tovpkg->AllParams();
 
@@ -155,6 +156,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     Real mass = state_h(TOV::M, i);
     Real press = state_h(TOV::P, i);
     Real rho, eps;
+    // needed for analytic solution. Bad for actual code.
     if (press <= 1.1 * Pmin) {
       press = rho = eps = 0;
     } else {
@@ -167,6 +169,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
     matter_h(MonopoleGR::Matter::Srr, i) = press;
   }
+  printf("TOV star constructed. Total mass = %.14e\n", state_h(TOV::M, npoints - 1));
 
   // Copy to device
   auto matter_d = monopolepkg->Param<MonopoleGR::Matter_t>("matter");

@@ -42,6 +42,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "geometry/minkowski.hpp"
 #include "geometry/modified_system.hpp"
+#include "geometry/monopole.hpp"
 #include "geometry/snake.hpp"
 #include "geometry/spherical_kerr_schild.hpp"
 #include "geometry/spherical_minkowski.hpp"

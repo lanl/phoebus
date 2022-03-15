@@ -11,32 +11,15 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifdef MPI_PARALLEL
-#include <mpi.h>
-#endif // MPI_PARALLEL
+#include "tmunu.hpp"
 
-#include <Kokkos_Core.hpp>
+namespace fluid {
 
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
-
-int main(int argc, char* argv[]) {
-  /* This currently calls Kokkos and MPI manually. It might
-   * make more sense to call parthenon::ParthenonManager::ParthenonInit/
-   * ParthenonFinalize but some work to break the parallel initialization apart
-   * from the rest will be required.
-   */
-#ifdef MPI_PARALLEL
-  MPI_Init(&argc, &argv);
-#endif // MPI_PARALLEL
-  Kokkos::initialize();
-  int result = 0;
-  {
-    result = Catch::Session().run(argc, argv);
-  }
-  Kokkos::finalize();
-#ifdef MPI_PARALLEL
-  MPI_Finalize();
-#endif // MPI_PARALLEL
-  return result;
+TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) {
+  return TmunuMesh(rc);
 }
+TmunuMeshBlock BuildStressEnergyTensor(MeshBlockData<Real> *rc) {
+  return TmunuMeshBlock(rc);
+}
+
+} // namespace fluid
