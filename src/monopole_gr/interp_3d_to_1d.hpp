@@ -186,6 +186,7 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom, const
 
   // Get rho and S before lowering T
   Real Scon[NS];
+  // rho0 = gdet * alpha * alpha * Tcon[0][0]; // TODO: This is a hack
   rho0 = alpha * alpha * Tcon[0][0];
   SPACELOOP(d) { Scon[d] = -alpha * Tcon[0][d+1] + beta[d] * Tcon[0][0]; }
 
@@ -230,6 +231,7 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom, const
     SPACELOOP(d) { trcs += ssph[d][d]; }
   } else {
     jr = Scon[0];
+    // jr = gdet*gcov[1][1]*Scon[0]; // TODO: this is a hack
     srr = TConCov[1][1] + beta[0] * TConCov[0][1];
     SPACELOOP(d) { trcs += (TConCov[d + 1][d + 1] + beta[d] * TConCov[0][d + 1]); }
   }
