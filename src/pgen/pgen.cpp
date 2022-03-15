@@ -44,6 +44,16 @@ void ProblemModifier(ParameterInput *pin) {
   f(pin);
 }
 
+void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+  std::string name = pin->GetString("phoebus", "problem");
+  if (name == "phoebus" || pinitmod_dict.count(name) == 0) {
+    return;
+  }
+
+  auto f = pinitmod_dict[name];
+  f(pin, pmesh);
+}
+
 class PressResidual {
  public:
   KOKKOS_INLINE_FUNCTION

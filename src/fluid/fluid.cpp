@@ -16,7 +16,9 @@
 #include "con2prim.hpp"
 #include "con2prim_robust.hpp"
 #include "geometry/geometry.hpp"
+#include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
 #include "reconstruction.hpp"
@@ -43,14 +45,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("fluid");
   Params &params = physics->AllParams();
 
-  // Check that we are actually evolving the fluid  
+  // Check that we are actually evolving the fluid
   const bool active = pin->GetBoolean("physics", "hydro");
   params.Add("active", active);
   if (active) { // Only set up these parameters if the fluid is evolved
 
+    const bool zero_fluxes = pin->GetOrAddBoolean("fluid", "zero_fluxes", false);
+    params.Add("zero_fluxes", zero_fluxes);
+
+    const bool zero_sources = pin->GetOrAddBoolean("fluid", "zero_sources", false);
+    params.Add("zero_sources", zero_sources);
+
     Real cfl = pin->GetOrAddReal("fluid", "cfl", 0.8);
     params.Add("cfl", cfl);
-    
+
     std::string c2p_method = pin->GetOrAddString("fluid", "c2p_method", "robust");
     params.Add("c2p_method", c2p_method);
     if (c2p_method == "robust") {
@@ -103,7 +111,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
     }
     params.Add("RiemannSolver", rs);
-  } 
+  }
   bool ye = pin->GetOrAddBoolean("fluid", "Ye", false);
   params.Add("Ye", ye);
 
@@ -129,7 +137,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
             Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
                three_vec);
-  
+
   if (bc_vars == "conserved") {
     mcons_scalar.Set(Metadata::FillGhost);
     mcons_threev.Set(Metadata::FillGhost);
@@ -176,10 +184,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
-  // Just want constant primitive fields around to serve as 
-  // background if we are not evolving the fluid, don't need 
+  // Just want constant primitive fields around to serve as
+  // background if we are not evolving the fluid, don't need
   // to do the rest.
-  if (!active) return physics; 
+  if (!active) return physics;
 
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
@@ -501,7 +509,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
+  auto &fluid = pmb->packages.Get("fluid");
+  if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_sources"))
     return TaskStatus::complete;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -523,22 +532,22 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
-      ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real Tmunu[ND][ND], gam[ND][ND][ND];
+      DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e,
+      jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        Real Tmunu[ND][ND], dg[ND][ND][ND], gam[ND][ND][ND];
         tmunu(Tmunu, k, j, i);
-        geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, gam);
-	Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
+	      Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
+
+        geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
+        Geometry::Utils::SetConnectionCoeffFromMetricDerivs(dg, gam);
         // momentum source terms
-        for (int l = 0; l < NS; l++) {
+        SPACELOOP(l) {
           Real src_mom = 0.0;
-          for (int m = 0; m < ND; m++) {
-            for (int n = 0; n < ND; n++) {
-              // gam is ALL INDICES DOWN
-              src_mom -= Tmunu[m][n] * gam[l + 1][n][m];
-            }
+          SPACETIMELOOP2(m,n) {
+            src_mom += Tmunu[m][n] * (dg[n][l+1][m] - gam[l+1][n][m]);
           }
-          src(cmom_lo + l, k, j, i) = gdet * src_mom;
+          src(cmom_lo + l, k, j, i) = gdet*src_mom;
         }
 
         // energy source term
@@ -546,13 +555,19 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           Real TGam = 0.0;
           #if USE_VALENCIA
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
-          Real gcon[4][4];
-          geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon);
+          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          const Real inv_alpha2 = robust::ratio(1,alpha*alpha);
+          Real shift[NS];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+          Real gcon0[4] = {-inv_alpha2,
+                           inv_alpha2*shift[0],
+                           inv_alpha2*shift[1],
+                           inv_alpha2*shift[2]};
           for (int m = 0; m < ND; m++) {
             for (int n = 0; n < ND; n++) {
               Real gam0 = 0;
               for (int r = 0; r < ND; r++) {
-                gam0 += gcon[0][r] * gam[r][m][n];
+                gam0 += gcon0[r] * gam[r][m][n];
               }
               TGam += Tmunu[m][n] * gam0;
             }
@@ -564,7 +579,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           for (int m = 0; m < ND; m++) {
             Ta += Tmunu[m][0] * da[m];
           }
-          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
           #else
           SPACETIMELOOP2(mu, nu) {
@@ -572,18 +586,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           src(ceng,k,j,i) = gdet * TGam;
           #endif // USE_VALENCIA
-        }
-
-        // re-use gam for metric derivative
-        geom.MetricDerivative(CellLocation::Cent, k, j, i, gam);
-        for (int l = 0; l < NS; l++) {
-          Real src_mom = 0.0;
-          for (int m = 0; m < ND; m++) {
-            for (int n = 0; n < ND; n++) {
-              src_mom += Tmunu[m][n] * gam[n][l + 1][m];
-            }
-          }
-          src(cmom_lo + l, k, j, i) += gdet*src_mom;
         }
 
 #if SET_FLUX_SRC_DIAGS
@@ -600,7 +602,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
+  auto &fluid = pmb->packages.Get("fluid");
+  if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
@@ -669,7 +672,8 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 
 TaskStatus FluxCT(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
-  if (!pmb->packages.Get("fluid")->Param<bool>("mhd"))
+  auto &fluid = pmb->packages.Get("fluid");
+  if (!fluid->Param<bool>("mhd") || !fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
 
   const int ndim = pmb->pmy_mesh->ndim;
