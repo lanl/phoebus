@@ -91,11 +91,6 @@ int main(int argc, char *argv[]) {
   // This line actually runs the simulation
   auto driver_status = driver.Execute();
 
-  // output some diagnostics
-  if (parthenon::Globals::my_rank == 0) {
-    MonopoleGR::DumpCurrentState(pman.pmesh->packages.Get("monopole_gr").get());
-  }
-
   // call MPI_Finalize and Kokkos::finalize if necessary
   pman.ParthenonFinalize();
 
