@@ -15,8 +15,8 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
-#include <string>
 #include <sstream>
+#include <string>
 
 // Parthenon
 #include <kokkos_abstraction.hpp>
@@ -359,7 +359,7 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   auto matter = params.Get<Matter_t>("matter");
   auto matter_h = params.Get<Matter_host_t>("matter_h");
   Kokkos::deep_copy(matter, matter_h);
-  
+
   // Fill device-side arrays
   auto npoints = params.Get<int>("npoints");
   auto radius = params.Get<MonopoleGR::Radius>("radius");
@@ -370,9 +370,9 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "monopole_gr gradients and shift",
       parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
-	if (force_static) {
+        if (force_static) {
           hypersurface(Hypersurface::K, i) = 0;
-	}
+        }
 
         Real r = radius.x(i);
         Real a = hypersurface(Hypersurface::A, i);
@@ -448,13 +448,13 @@ TaskStatus DivideVols(StateDescriptor *pkg) {
   // Divide by volumes
   for (int i = 0; i < npoints; ++i) {
     for (int v = 0; v < NMAT; ++v) {
-      matter_cells_h(v, i) = ratio(matter_cells_h(v,i), std::abs(vols_h(i)));
+      matter_cells_h(v, i) = ratio(matter_cells_h(v, i), std::abs(vols_h(i)));
     }
   }
   // Shift to the face-centered grid
   for (int i = 1; i < npoints; ++i) {
     for (int v = 0; v < NMAT; ++v) {
-      matter_h(v, i) = 0.5*(matter_cells_h(v, i) + matter_cells_h(v, i-1));
+      matter_h(v, i) = 0.5 * (matter_cells_h(v, i) + matter_cells_h(v, i - 1));
     }
   }
   matter_cells_h(Matter::J_R, 0) = 0;
@@ -503,7 +503,7 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
     fprintf(pf,
             "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e "
             "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e "
-	    "%.14e %.14e %.14e %.14e %.14e\n",
+            "%.14e %.14e %.14e %.14e %.14e\n",
             r, hypersurface_h(Hypersurface::A, i), hypersurface_h(Hypersurface::K, i),
             alpha_h(i), matter_h(Matter::RHO, i), matter_h(Matter::J_R, i),
             matter_h(Matter::trcS, i), matter_h(Matter::Srr, i),
@@ -511,9 +511,8 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
             gradients_h(Gradients::DALPHADR, i), gradients_h(Gradients::DBETADR, i),
             gradients_h(Gradients::DADT, i), gradients_h(Gradients::DALPHADT, i),
             gradients_h(Gradients::DKDR, i), gradients_h(Gradients::DBETADT, i),
-	    matter_cells_h(Matter::RHO, i), matter_cells_h(Matter::J_R, i),
-	    matter_cells_h(Matter::trcS, i), matter_cells_h(Matter::Srr, i),
-	    vols_h(i));
+            matter_cells_h(Matter::RHO, i), matter_cells_h(Matter::J_R, i),
+            matter_cells_h(Matter::trcS, i), matter_cells_h(Matter::Srr, i), vols_h(i));
   }
   fclose(pf);
 }

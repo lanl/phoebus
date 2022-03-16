@@ -43,7 +43,7 @@ constexpr int NDFULL = NDSPACE + 1;
 #define SPACELOOP2(i, j) SPACELOOP(i) SPACELOOP(j)
 #define SPACETIMELOOP2(mu, nu) SPACETIMELOOP(mu) SPACETIMELOOP(nu)
 #define SPACELOOP3(i, j, k) SPACELOOP(i) SPACELOOP(j) SPACELOOP(k)
-#define SPACETIMELOOP3(mu, nu, sigma)                                          \
+#define SPACETIMELOOP3(mu, nu, sigma)                                                    \
   SPACETIMELOOP(mu) SPACETIMELOOP(nu) SPACETIMELOOP(sigma)
 
 namespace Geometry {
@@ -59,12 +59,10 @@ struct MeshBlockShape {
 
     nx1 = pin->GetOrAddInteger("parthenon/meshblock", "nx1", mesh_nx1) + 2 * ng;
     nx2 = (ndim >= 2)
-              ? pin->GetOrAddInteger("parthenon/meshblock", "nx2", mesh_nx2) +
-                    2 * ng
+              ? pin->GetOrAddInteger("parthenon/meshblock", "nx2", mesh_nx2) + 2 * ng
               : 1;
     nx3 = (ndim >= 3)
-              ? pin->GetOrAddInteger("parthenon/meshblock", "nx3", mesh_nx3) +
-                    2 * ng
+              ? pin->GetOrAddInteger("parthenon/meshblock", "nx3", mesh_nx3) + 2 * ng
               : 1;
   }
   int nx1, nx2, nx3, ndim, ng;
@@ -73,15 +71,15 @@ struct MeshBlockShape {
 KOKKOS_INLINE_FUNCTION void
 SetConnectionCoeffFromMetricDerivs(const Real dg[NDFULL][NDFULL][NDFULL],
                                    Real Gamma[NDFULL][NDFULL][NDFULL]) {
-  SPACETIMELOOP3(a,b,c) {
+  SPACETIMELOOP3(a, b, c) {
     Gamma[a][b][c] = 0.5 * (dg[b][a][c] + dg[c][a][b] - dg[b][c][a]);
   }
 }
 
 template <typename System, typename... Args>
-KOKKOS_INLINE_FUNCTION void
-SetConnectionCoeffByFD(const System &s, Real Gamma[NDFULL][NDFULL][NDFULL],
-                       Args... args) {
+KOKKOS_INLINE_FUNCTION void SetConnectionCoeffByFD(const System &s,
+                                                   Real Gamma[NDFULL][NDFULL][NDFULL],
+                                                   Args... args) {
   Real dg[NDFULL][NDFULL][NDFULL];
   s.MetricDerivative(std::forward<Args>(args)..., dg);
   SetConnectionCoeffFromMetricDerivs(dg, Gamma);
@@ -89,10 +87,9 @@ SetConnectionCoeffByFD(const System &s, Real Gamma[NDFULL][NDFULL][NDFULL],
 
 // TODO(JMM) Currently assumes static metric
 template <typename System>
-KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
-                                               Real X0, Real X1, Real X2,
-                                               Real X3, Real da[NDFULL]) {
-  Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0/3.0);
+KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx, Real X0, Real X1,
+                                               Real X2, Real X3, Real da[NDFULL]) {
+  Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0 / 3.0);
   LinearAlgebra::SetZero(da, NDFULL);
   for (int d = 1; d < NDFULL; ++d) {
     Real X1p = X1;
@@ -102,15 +99,15 @@ KOKKOS_INLINE_FUNCTION void SetGradLnAlphaByFD(const System &s, Real dx,
     Real X3p = X3;
     Real X3m = X3;
     if (d == 1) {
-      dx = std::max(std::abs(X1),1.0)*EPS;
+      dx = std::max(std::abs(X1), 1.0) * EPS;
       X1p += dx;
       X1m -= dx;
     } else if (d == 2) {
-      dx = std::max(std::abs(X2),1.0)*EPS;
+      dx = std::max(std::abs(X2), 1.0) * EPS;
       X2p += dx;
       X2m -= dx;
     } else if (d == 3) {
-      dx = std::max(std::abs(X3),1.0)*EPS;
+      dx = std::max(std::abs(X3), 1.0) * EPS;
       X3p += dx;
       X3m -= dx;
     }
@@ -125,9 +122,7 @@ void Lower(const double Vcon[NDFULL], const double Gcov[NDFULL][NDFULL],
            double Vcov[NDFULL]) {
   SPACETIMELOOP(mu) {
     Vcov[mu] = 0.;
-    SPACETIMELOOP(nu) {
-      Vcov[mu] += Gcov[mu][nu]*Vcon[nu];
-    }
+    SPACETIMELOOP(nu) { Vcov[mu] += Gcov[mu][nu] * Vcon[nu]; }
   }
 }
 
@@ -136,9 +131,7 @@ void Raise(const double Vcov[NDFULL], const double Gcon[NDFULL][NDFULL],
            double Vcon[NDFULL]) {
   SPACETIMELOOP(mu) {
     Vcon[mu] = 0.;
-    SPACETIMELOOP(nu) {
-      Vcon[mu] += Gcon[mu][nu]*Vcov[nu];
-    }
+    SPACETIMELOOP(nu) { Vcon[mu] += Gcon[mu][nu] * Vcov[nu]; }
   }
 }
 
@@ -153,10 +146,10 @@ int KroneckerDelta(const int a, const int b) {
 
 // TODO(JMM): Currently assumes static metric
 template <typename System>
-KOKKOS_INLINE_FUNCTION void
-SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
-                      Real X3, Real dg[NDFULL][NDFULL][NDFULL]) {
-  Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0/3.0);
+KOKKOS_INLINE_FUNCTION void SetMetricGradientByFD(const System &s, Real dx, Real X0,
+                                                  Real X1, Real X2, Real X3,
+                                                  Real dg[NDFULL][NDFULL][NDFULL]) {
+  Real EPS = std::pow(std::numeric_limits<Real>::epsilon(), 1.0 / 3.0);
   LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
   Real gl[NDFULL][NDFULL];
   Real gr[NDFULL][NDFULL];
@@ -168,39 +161,40 @@ SetMetricGradientByFD(const System &s, Real dx, Real X0, Real X1, Real X2,
     Real X2R = X2;
     Real X3R = X3;
     if (d == 1) {
-      dx = std::max(std::abs(X1),1.0)*EPS;
+      dx = std::max(std::abs(X1), 1.0) * EPS;
       X1L -= dx;
       X1R += dx;
     }
     if (d == 2) {
-      dx = std::max(std::abs(X2),1.0)*EPS;
+      dx = std::max(std::abs(X2), 1.0) * EPS;
       X2L -= dx;
       X2R += dx;
     }
     if (d == 3) {
-      dx = std::max(std::abs(X3),1.0)*EPS;
+      dx = std::max(std::abs(X3), 1.0) * EPS;
       X3L -= dx;
       X3R += dx;
     }
     s.SpacetimeMetric(X0, X1R, X2R, X3R, gr);
     s.SpacetimeMetric(X0, X1L, X2L, X3L, gl);
     SPACETIMELOOP(mu) {
-      SPACETIMELOOP(nu) { dg[mu][nu][d] = robust::ratio(gr[mu][nu] - gl[mu][nu], 2*dx); }
+      SPACETIMELOOP(nu) {
+        dg[mu][nu][d] = robust::ratio(gr[mu][nu] - gl[mu][nu], 2 * dx);
+      }
     }
   }
 }
 KOKKOS_FORCEINLINE_FUNCTION
 int Flatten2(int m, int n, int size) {
-  static constexpr int ind[4][4] = {{0,1,3,6},
-                                    {1,2,4,7},
-                                    {3,4,5,8},
-                                    {6,7,8,9}};
+  static constexpr int ind[4][4] = {
+      {0, 1, 3, 6}, {1, 2, 4, 7}, {3, 4, 5, 8}, {6, 7, 8, 9}};
   PARTHENON_DEBUG_REQUIRE(0 <= m && 0 <= n && m < size && n < size, "bounds");
   return ind[m][n];
 }
 template <int size>
-KOKKOS_INLINE_FUNCTION
-int SymSize() { return size * size - (size * (size - 1)) / 2; }
+KOKKOS_INLINE_FUNCTION int SymSize() {
+  return size * size - (size * (size - 1)) / 2;
+}
 
 } // namespace Utils
 } // namespace Geometry

@@ -15,9 +15,7 @@
 
 namespace fluid {
 
-TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) {
-  return TmunuMesh(rc);
-}
+TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc) { return TmunuMesh(rc); }
 TmunuMeshBlock BuildStressEnergyTensor(MeshBlockData<Real> *rc) {
   return TmunuMeshBlock(rc);
 }

@@ -57,18 +57,16 @@ namespace Geometry {
   The user must also specify a MeshBlock or Mesh indexer.
  */
 class IndexerMeshBlock {
-public:
+ public:
   IndexerMeshBlock() = default;
-  IndexerMeshBlock(const Coordinates_t &coordinates)
-      : coordinates_(coordinates) {}
+  IndexerMeshBlock(const Coordinates_t &coordinates) : coordinates_(coordinates) {}
   KOKKOS_INLINE_FUNCTION
   void GetX(CellLocation loc, int b, int k, int j, int i, Real &X1, Real &X2,
             Real &X3) const {
     return GetX(loc, k, j, i, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
-  void GetX(CellLocation loc, int k, int j, int i, Real &X1, Real &X2,
-            Real &X3) const {
+  void GetX(CellLocation loc, int k, int j, int i, Real &X1, Real &X2, Real &X3) const {
     // defaults
     X1 = coordinates_.x1v(i);
     X2 = coordinates_.x2v(j);
@@ -95,7 +93,7 @@ public:
     return;
   }
 
-private:
+ private:
   Coordinates_t coordinates_;
 };
 inline IndexerMeshBlock GetIndexer(MeshBlockData<Real> *rc) {
@@ -105,13 +103,11 @@ inline IndexerMeshBlock GetIndexer(MeshBlockData<Real> *rc) {
 }
 
 class IndexerMesh {
-public:
+ public:
   IndexerMesh() = default;
-  IndexerMesh(const ParArray1D<Coordinates_t> &coordinates)
-      : coordinates_(coordinates) {}
+  IndexerMesh(const ParArray1D<Coordinates_t> &coordinates) : coordinates_(coordinates) {}
   KOKKOS_INLINE_FUNCTION
-  void GetX(CellLocation loc, int k, int j, int i, Real &X1, Real &X2,
-            Real &X3) const {
+  void GetX(CellLocation loc, int k, int j, int i, Real &X1, Real &X2, Real &X3) const {
     PARTHENON_FAIL("A MeshBlock index is required for indexing into the mesh");
   }
   KOKKOS_INLINE_FUNCTION
@@ -143,7 +139,7 @@ public:
     return;
   }
 
-private:
+ private:
   ParArray1D<Coordinates_t> coordinates_;
 };
 inline IndexerMesh GetIndexer(MeshData<Real> *rc) {
@@ -158,8 +154,9 @@ inline IndexerMesh GetIndexer(MeshData<Real> *rc) {
   return IndexerMesh(coords);
 }
 
-template <typename System, typename Indexer> class Analytic {
-public:
+template <typename System, typename Indexer>
+class Analytic {
+ public:
   Analytic() = default;
   template <typename... Args>
   Analytic(const Indexer &indexer, Args... args)
@@ -185,8 +182,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
-                          Real beta[NDSPACE]) const {
+  void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     return system_.ContravariantShift(X0, X1, X2, X3, beta);
   }
   KOKKOS_INLINE_FUNCTION
@@ -205,13 +201,11 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void Metric(Real X0, Real X1, Real X2, Real X3,
-              Real gamma[NDSPACE][NDSPACE]) const {
+  void Metric(Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
     return system_.Metric(X0, X1, X2, X3, gamma);
   }
   KOKKOS_INLINE_FUNCTION
-  void Metric(CellLocation loc, int k, int j, int i,
-              Real gamma[NDSPACE][NDSPACE]) const {
+  void Metric(CellLocation loc, int k, int j, int i, Real gamma[NDSPACE][NDSPACE]) const {
     Real X1, X2, X3;
     indexer_.GetX(loc, k, j, i, X1, X2, X3);
     return Metric(X0_, X1, X2, X3, gamma);
@@ -245,8 +239,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
-                       Real g[NDFULL][NDFULL]) const {
+  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
     return system_.SpacetimeMetric(X0, X1, X2, X3, g);
   }
   KOKKOS_INLINE_FUNCTION
@@ -362,15 +355,13 @@ public:
     return system_.GradLnAlpha(X0, X1, X2, X3, da);
   }
   KOKKOS_INLINE_FUNCTION
-  void GradLnAlpha(CellLocation loc, int k, int j, int i,
-                   Real da[NDFULL]) const {
+  void GradLnAlpha(CellLocation loc, int k, int j, int i, Real da[NDFULL]) const {
     Real X1, X2, X3;
     indexer_.GetX(loc, k, j, i, X1, X2, X3);
     return system_.GradLnAlpha(X0_, X1, X2, X3, da);
   }
   KOKKOS_INLINE_FUNCTION
-  void GradLnAlpha(CellLocation loc, int b, int k, int j, int i,
-                   Real da[NDFULL]) const {
+  void GradLnAlpha(CellLocation loc, int b, int k, int j, int i, Real da[NDFULL]) const {
     Real X1, X2, X3;
     indexer_.GetX(loc, b, k, j, i, X1, X2, X3);
     return system_.GradLnAlpha(X0_, X1, X2, X3, da);
@@ -387,14 +378,13 @@ public:
     return system_.Coords(X0_, X1, X2, X3, C);
   }
   KOKKOS_INLINE_FUNCTION
-  void Coords(CellLocation loc, int b, int k, int j, int i,
-              Real C[NDFULL]) const {
+  void Coords(CellLocation loc, int b, int k, int j, int i, Real C[NDFULL]) const {
     Real X1, X2, X3;
     indexer_.GetX(loc, b, k, j, i, X1, X2, X3);
     return system_.Coords(X0_, X1, X2, X3, C);
   }
 
-private:
+ private:
   Real X0_ = 0;
   Indexer indexer_;
   System system_;

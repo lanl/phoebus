@@ -20,7 +20,7 @@
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch.hpp>
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   /* This currently calls Kokkos and MPI manually. It might
    * make more sense to call parthenon::ParthenonManager::ParthenonInit/
    * ParthenonFinalize but some work to break the parallel initialization apart
@@ -31,9 +31,7 @@ int main(int argc, char* argv[]) {
 #endif // MPI_PARALLEL
   Kokkos::initialize();
   int result = 0;
-  {
-    result = Catch::Session().run(argc, argv);
-  }
+  { result = Catch::Session().run(argc, argv); }
   Kokkos::finalize();
 #ifdef MPI_PARALLEL
   MPI_Finalize();

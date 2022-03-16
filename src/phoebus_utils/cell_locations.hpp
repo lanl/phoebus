@@ -14,17 +14,15 @@
 #ifndef PHOEBUS_UTILS_CELL_LOCATIONS_HPP_
 #define PHOEBUS_UTILS_CELL_LOCATIONS_HPP_
 
-#include <kokkos_abstraction.hpp>
 #include <defs.hpp>
+#include <kokkos_abstraction.hpp>
 
-constexpr int NUM_CELL_LOCATIONS=5;
-enum class CellLocation{
-  Cent, Face1, Face2, Face3, Corn
-};
+constexpr int NUM_CELL_LOCATIONS = 5;
+enum class CellLocation { Cent, Face1, Face2, Face3, Corn };
 
 KOKKOS_FORCEINLINE_FUNCTION
 CellLocation DirectionToFaceID(int dir) {
-  switch(dir) {
+  switch (dir) {
   case parthenon::X1DIR:
     return CellLocation::Face1;
   case parthenon::X2DIR:
@@ -32,7 +30,7 @@ CellLocation DirectionToFaceID(int dir) {
   case parthenon::X3DIR:
     return CellLocation::Face3;
   }
-  //TODO(JCD): insert the appropriate parthenon fail thing that's safe on device
+  // TODO(JCD): insert the appropriate parthenon fail thing that's safe on device
   return CellLocation::Cent; // return the right type for the compiler
 }
 

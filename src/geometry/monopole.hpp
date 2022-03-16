@@ -47,8 +47,8 @@ KOKKOS_INLINE_FUNCTION
 void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph);
 
 KOKKOS_INLINE_FUNCTION
-void Cart2Sph(Real X1, Real X2, Real X3, Real dx1, Real dx2, Real dx3, Real &r,
-              Real &th, Real &ph, Real &dr, Real &dth, Real &dph);
+void Cart2Sph(Real X1, Real X2, Real X3, Real dx1, Real dx2, Real dx3, Real &r, Real &th,
+              Real &ph, Real &dr, Real &dth, Real &dph);
 
 // These are dx^{mu'}/dx^{mu}
 // convention is mu' is first index, mu is second
@@ -445,7 +445,6 @@ class MonopoleCart {
 
  private:
   MonopoleSph sph_;
-
 };
 
 namespace MonopoleCoordTransforms {
@@ -457,12 +456,12 @@ void Cart2Sph(Real X1, Real X2, Real X3, Real &r, Real &th, Real &ph) {
 }
 
 KOKKOS_INLINE_FUNCTION
-void Cart2Sph(Real X1, Real X2, Real X3, Real dx1, Real dx2, Real dx3, Real &r,
-              Real &th, Real &ph, Real &dr, Real &dth, Real &dph) {
+void Cart2Sph(Real X1, Real X2, Real X3, Real dx1, Real dx2, Real dx3, Real &r, Real &th,
+              Real &ph, Real &dr, Real &dth, Real &dph) {
   Cart2Sph(X1, X2, X3, r, th, ph);
   dr = dx3 * std::cos(th) + std::sin(th) * (dx1 * std::cos(ph) + dx2 * std::sin(ph));
-  dth = r * (-dx3 * std::sin(th) +
-             std::cos(th) * (dx1 * std::cos(ph) + dx2 * std::sin(ph)));
+  dth = r *
+        (-dx3 * std::sin(th) + std::cos(th) * (dx1 * std::cos(ph) + dx2 * std::sin(ph)));
   dph = r * std::sin(th) * (dx2 * std::cos(ph) - dx1 * std::sin(ph));
 }
 
@@ -561,7 +560,7 @@ void Hessian(Real x, Real y, Real z, Real r, Real H[NDFULL][NDFULL][NDFULL]) {
   // H[3][*][3] = 0;
 }
 } // namespace MonopoleCoordTransforms
-  
+
 using MplSphMeshBlock = Analytic<MonopoleSph, IndexerMeshBlock>;
 using MplCartMeshBlock = Analytic<MonopoleCart, IndexerMeshBlock>;
 

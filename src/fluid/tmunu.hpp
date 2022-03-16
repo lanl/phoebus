@@ -27,20 +27,21 @@
 
 namespace fluid {
 
-const std::vector<std::string> TMUNU_VARS = {
-    fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
-    fluid_prim::pressure, fluid_prim::bfield};
+const std::vector<std::string> TMUNU_VARS = {fluid_prim::density, fluid_prim::velocity,
+                                             fluid_prim::energy, fluid_prim::pressure,
+                                             fluid_prim::bfield};
 // Indices are upstairs
 template <typename CoordinateSystem, typename Pack>
 class StressEnergyTensorCon {
-public:
+ public:
   // TODO(JMM): Should these be moved out of Geometry?
   static constexpr int ND = Geometry::NDFULL;
   static constexpr CellLocation loc = CellLocation::Cent;
 
   StressEnergyTensorCon() = default;
 
-  template <typename Data> StressEnergyTensorCon(Data *rc) {
+  template <typename Data>
+  StressEnergyTensorCon(Data *rc) {
     PackIndexMap imap;
     pack_ = rc->PackVariables(TMUNU_VARS, imap);
     system_ = Geometry::GetCoordinateSystem(rc);
@@ -56,8 +57,7 @@ public:
   // signature needs to change.
   // TODO(JMM): Should I use enable_if or static asserts or anything?
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void operator()(Real T[ND][ND],
-                                         Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void operator()(Real T[ND][ND], Args &&... args) const {
     static_assert(sizeof...(Args) >= 3, "Must at least have k, j, i");
     static_assert(sizeof...(Args) <= 4, "Must have no more than b, k, j, i");
     Real u[ND], b[ND], g[ND][ND], bsq;
@@ -75,10 +75,9 @@ public:
     }
   }
 
-private:
+ private:
   KOKKOS_FORCEINLINE_FUNCTION
-  Real GetVar_(int v, const int b, const int k, const int j,
-               const int i) const {
+  Real GetVar_(int v, const int b, const int k, const int j, const int i) const {
     return pack_(b, v, k, j, i);
   }
   KOKKOS_FORCEINLINE_FUNCTION
@@ -98,23 +97,21 @@ private:
 
   template <typename... Args>
   KOKKOS_INLINE_FUNCTION void GetTmunuTerms_(Real u[ND], Real b[ND], Real &bsq,
-                                             Real gscratch[4][4],
-                                             Args &&... args) const {
+                                             Real gscratch[4][4], Args &&... args) const {
     Real beta[ND - 1];
     Real Bdotv = 0.0;
     Real Bsq = 0.0;
     auto gcov = reinterpret_cast<Real(*)[3]>(&gscratch[0][0]);
     system_.Metric(loc, std::forward<Args>(args)..., gcov);
-    Real vp[3] = {v_(1, std::forward<Args>(args)...),
-                  v_(2, std::forward<Args>(args)...),
+    Real vp[3] = {v_(1, std::forward<Args>(args)...), v_(2, std::forward<Args>(args)...),
                   v_(3, std::forward<Args>(args)...)};
     const Real W = phoebus::GetLorentzFactor(vp, gcov);
 
     SPACELOOP2(ii, jj) {
-        const Real &bi = b_(ii+1, std::forward<Args>(args)...);
-        const Real &bj = b_(jj+1, std::forward<Args>(args)...);
-        Bdotv += bi * vp[jj] / W * gcov[ii][jj];
-        Bsq += bi * bj * gcov[ii][jj];
+      const Real &bi = b_(ii + 1, std::forward<Args>(args)...);
+      const Real &bj = b_(jj + 1, std::forward<Args>(args)...);
+      Bdotv += bi * vp[jj] / W * gcov[ii][jj];
+      Bsq += bi * bj * gcov[ii][jj];
     }
     const Real iW = 1. / W;
 

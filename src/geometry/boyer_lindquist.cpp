@@ -30,8 +30,7 @@ namespace Geometry {
 
 // Don't need to overwrite SetGeometry
 template <>
-void Initialize<BoyerLindquistMeshBlock>(ParameterInput *pin,
-                                         StateDescriptor *geometry) {
+void Initialize<BoyerLindquistMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Params &params = geometry->AllParams();
   Real a = pin->GetOrAddReal("geometry", "a", 0);
   Real dxfd = pin->GetOrAddReal("geometry", "finite_differences_dx", 1e-8);
@@ -71,8 +70,7 @@ GetCoordinateSystem<CBoyerLindquistMeshBlock>(MeshBlockData<Real> *rc) {
   return GetCachedCoordinateSystem<BoyerLindquistMeshBlock>(rc);
 }
 template <>
-CBoyerLindquistMesh
-GetCoordinateSystem<CBoyerLindquistMesh>(MeshData<Real> *rc) {
+CBoyerLindquistMesh GetCoordinateSystem<CBoyerLindquistMesh>(MeshData<Real> *rc) {
   return GetCachedCoordinateSystem<BoyerLindquistMesh>(rc);
 }
 template <>
@@ -80,4 +78,4 @@ void SetGeometry<CBoyerLindquistMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<BoyerLindquistMeshBlock>(rc);
 }
 
-}  // namespace Geometry
+} // namespace Geometry

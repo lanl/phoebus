@@ -40,7 +40,7 @@ namespace Geometry {
 // Assumes WLOG that G = c = M = 1.
 // TODO(JMM): Should we modify to accept arbitrary M?
 class SphericalKerrSchild {
-public:
+ public:
   SphericalKerrSchild() = default;
   KOKKOS_INLINE_FUNCTION
   SphericalKerrSchild(Real a) : a_(a), a2_(a * a) {}
@@ -54,8 +54,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
-                          Real beta[NDSPACE]) const {
+  void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     using namespace Utils;
     using namespace robust;
     Real r, th, cth, sth;
@@ -66,8 +65,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
-                       Real g[NDFULL][NDFULL]) const {
+  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
     using namespace Utils;
     using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
@@ -103,8 +101,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void Metric(Real X0, Real X1, Real X2, Real X3,
-              Real g[NDSPACE][NDSPACE]) const {
+  void Metric(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     using namespace Utils;
     using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
@@ -118,8 +115,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void MetricInverse(Real X0, Real X1, Real X2, Real X3,
-                     Real g[NDSPACE][NDSPACE]) const {
+  void MetricInverse(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     using namespace Utils;
     using namespace robust;
     Real r, th, cth, sth, sth2, rho2;
@@ -147,11 +143,11 @@ public:
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    //Utils::SetConnectionCoeffByFD(*this, Gamma, X0, X1, X2, X3);
+    // Utils::SetConnectionCoeffByFD(*this, Gamma, X0, X1, X2, X3);
     Real dg[NDFULL][NDFULL][NDFULL];
     MetricDerivative(X0, X1, X2, X3, dg);
-    SPACETIMELOOP3(a,b,c) {
-      Gamma[c][b][a] = 0.5*(dg[c][a][b] + dg[c][b][a] - dg[a][b][c]);
+    SPACETIMELOOP3(a, b, c) {
+      Gamma[c][b][a] = 0.5 * (dg[c][a][b] + dg[c][b][a] - dg[a][b][c]);
     }
   }
 
@@ -172,7 +168,7 @@ public:
     const Real s2th = std::sin(2 * th);
     const Real c2th = std::cos(2 * th);
     LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
-    
+
     dg[0][0][1] = 2 * ratio(rho2 - 2 * r2, rho4);
     dg[0][1][1] = dg[1][0][1] = dg[0][0][1];
     dg[0][3][1] = dg[3][0][1] = ratio(2 * a_ * (r2 - a2_ * cth2) * sth2, rho4);
@@ -188,15 +184,13 @@ public:
     dg[0][1][2] = dg[1][0][2] = dg[0][0][2];
     dg[0][3][2] = dg[3][0][2] = -ratio(2 * a_ * r * (a2_ + r2) * s2th, rho4);
     dg[1][1][2] = dg[0][0][2];
-    dg[1][3][2] = dg[3][1][2] = -ratio(
-        2 * a_ * cth *
-            (r3 * (2 + r) + a4 * cth2 * cth2 + a2_ * r * (2 + r + r * c2th)) *
-            sth,
-        rho4);
+    dg[1][3][2] = dg[3][1][2] =
+        -ratio(2 * a_ * cth *
+                   (r3 * (2 + r) + a4 * cth2 * cth2 + a2_ * r * (2 + r + r * c2th)) * sth,
+               rho4);
     dg[2][2][2] = -a2_ * s2th;
     dg[3][3][2] =
-        (a2_ + r * (r - 2) + ratio(2 * r * (a2_ + r2) * (a2_ + r2), rho4)) *
-        s2th;
+        (a2_ + r * (r - 2) + ratio(2 * r * (a2_ + r2) * (a2_ + r2), rho4)) * s2th;
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -225,10 +219,10 @@ public:
     C[3] = r * cth;
   }
 
-private:
+ private:
   KOKKOS_INLINE_FUNCTION
-  void vars_(Real X1, Real X2, Real &r, Real &th, Real &cth, Real &sth,
-             Real &sth2, Real &rho2) const {
+  void vars_(Real X1, Real X2, Real &r, Real &th, Real &cth, Real &sth, Real &sth2,
+             Real &rho2) const {
     rth_(X1, X2, r, th, cth, sth);
     sth2 = sth * sth;
     rho2 = rho2_(r, cth);
