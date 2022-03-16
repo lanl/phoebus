@@ -81,6 +81,47 @@ TaskListStatus PhoebusDriver::Step() {
   return status;
 }
 
+void PhoebusDriver::PostInitializationCommunication() {
+  TaskCollection tc;
+  TaskID none(0);
+  BlockList_t &blocks = pmesh->block_list;
+
+  const auto &stage_name = integrator->stage_name;
+
+  auto rad = pmesh->packages.Get("radiation");
+  auto fluid = pmesh->packages.Get("fluid");
+  const auto rad_active = rad->Param<bool>("active");
+  const auto rad_moments_active = rad->Param<bool>("moments_active");
+  const auto fluid_active = fluid->Param<bool>("active");
+  const bool rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
+
+  TaskRegion &async_region = tc.AddRegion(blocks.size());
+  for (int ib = 0; ib < blocks.size(); ib++) {
+    auto pmb = blocks[ib].get();
+    auto &tl = async_region[ib];
+    auto &sc = pmb->meshblock_data.Get();
+    auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], ib);
+
+    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving,
+                                 sc.get(), BoundaryCommSubset::all);
+    auto send = tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
+    auto recv =
+        tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
+    auto fill_from_bufs =
+        tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
+    auto clear_comm_flags = tl.AddTask(fill_from_bufs, &MeshBlockData<Real>::ClearBoundary,
+                                       sc.get(), BoundaryCommSubset::all);
+
+    auto prolongBound = tl.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
+
+    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+
+    auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
+  }
+
+  tc.Execute();
+}
+
 TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   using namespace ::parthenon::Update;
   TaskCollection tc;
