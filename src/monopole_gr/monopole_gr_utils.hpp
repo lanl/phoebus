@@ -37,7 +37,7 @@ Real GetARHS(const Real a, const Real K, const Real r, const Real rho) {
 
 KOKKOS_INLINE_FUNCTION
 Real GetKRHS(Real a, Real K, Real r, Real j) {
-  return (r <= 0) ? 0 : 8 * M_PI * a * a * j - robust::ratio(3.*K, r);
+  return (r <= 0) ? 0 : 8 * M_PI * a * a * j - robust::ratio(3. * K, r);
   // return (r <= 0) ? 0 : 8 * M_PI * j - robust::ratio(3.*K, r);
   // if (r <= 0) return 0;
   // return robust::ratio(robust::ratio(8*M_PI*j, a) - 3*r*K,r*r);
@@ -89,20 +89,18 @@ Real GetVolIntersectHelper(const Real rsmall, const Real drsmall, const Real rbi
   bool interior_mask = left_in_bnds && right_in_bnds;
   bool left_mask = right_in_bnds && !left_in_bnds;
   bool right_mask = left_in_bnds && !right_in_bnds;
-  Real vol_intersect = interior_mask*(drsmall / drbig);
-  
+  Real vol_intersect = interior_mask * (drsmall / drbig);
+
   // divide by zero impossible because these are grid deltas
-  vol_intersect += left_mask*(rsmall + 0.5*drsmall - (rbig - 0.5*drbig))/drbig;
-  vol_intersect += right_mask*(rbig + 0.5*drbig - (rsmall - 0.5*drsmall))/drbig;
+  vol_intersect += left_mask * (rsmall + 0.5 * drsmall - (rbig - 0.5 * drbig)) / drbig;
+  vol_intersect += right_mask * (rbig + 0.5 * drbig - (rsmall - 0.5 * drsmall)) / drbig;
   return vol_intersect;
 }
 
 KOKKOS_INLINE_FUNCTION
 void GetCoordsAndDerivsSph(const int k, const int j, const int i,
-			   const parthenon::Coordinates_t &coords,
-			   Real &r , Real &th, Real &ph,
-			   Real &dr, Real &dth, Real &dph,
-			   Real &dv) {
+                           const parthenon::Coordinates_t &coords, Real &r, Real &th,
+                           Real &ph, Real &dr, Real &dth, Real &dph, Real &dv) {
   r = coords.x1v(k, j, i);
   th = coords.x2v(k, j, i);
   ph = coords.x3v(k, j, i);

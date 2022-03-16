@@ -32,10 +32,8 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 TaskStatus LinearSolveForAlpha(StateDescriptor *pkg);
 TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
-inline void DumpCurrentState(StateDescriptor *pkg) {
-  DumpToTxt("metric-last.dat", pkg);
-}
+inline void DumpCurrentState(StateDescriptor *pkg) { DumpToTxt("metric-last.dat", pkg); }
 TaskStatus DivideVols(StateDescriptor *pkg);
-} // MonopoleGR
+} // namespace MonopoleGR
 
 #endif // MONOPOLE_GR_MONOPOLE_GR_INTERFACE_HPP_
