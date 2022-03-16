@@ -33,18 +33,16 @@ using namespace parthenon::package::prelude;
 namespace Geometry {
 
 class Minkowski {
-public:
+ public:
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const { return 1.; }
   KOKKOS_INLINE_FUNCTION
-  void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
-                          Real beta[NDSPACE]) const {
+  void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     for (int i = 0; i < NDSPACE; ++i)
       beta[i] = 0;
   }
   KOKKOS_INLINE_FUNCTION
-  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
-                       Real g[NDFULL][NDFULL]) const {
+  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
     for (int mu = 0; mu < NDFULL; ++mu) {
       for (int nu = 0; nu < NDFULL; ++nu) {
         if (mu == nu) {
@@ -61,8 +59,7 @@ public:
     return SpacetimeMetric(X0, X1, X2, X3, g);
   }
   KOKKOS_INLINE_FUNCTION
-  void Metric(Real X0, Real X1, Real X2, Real X3,
-              Real gamma[NDSPACE][NDSPACE]) const {
+  void Metric(Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
     for (int i = 0; i < NDSPACE; ++i) {
       for (int j = 0; j < NDSPACE; ++j) {
         gamma[i][j] = (i == j ? 1 : 0);
@@ -124,8 +121,7 @@ using CMinkowskiMeshBlock = CachedOverMeshBlock<MinkowskiMeshBlock>;
 using CMinkowskiMesh = CachedOverMesh<MinkowskiMesh>;
 
 template <>
-void Initialize<CMinkowskiMeshBlock>(ParameterInput *pin,
-                                     StateDescriptor *geometry);
+void Initialize<CMinkowskiMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 
 } // namespace Geometry
 

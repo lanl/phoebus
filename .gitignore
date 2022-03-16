@@ -11,3 +11,4 @@ results
 .DS_Store 
 __pycache__
 *.swp
+*.png

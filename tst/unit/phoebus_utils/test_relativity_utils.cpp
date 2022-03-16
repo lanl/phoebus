@@ -81,7 +81,8 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
                   update += 1;
                 }
               }
-            }, n_wrong);
+            },
+            n_wrong);
         REQUIRE(n_wrong == 0);
       }
     }
@@ -91,10 +92,8 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
       v[0] *= Gamma_ref;
       v[1] *= Gamma_ref;
       v[2] *= Gamma_ref;
-      const Real ucon_ref[4] = {1.474419561548971247e+00,
-                                1.032093693084279895e+00,
-                                2.948839123097942716e-01,
-                                1.474419561548971358e-01};
+      const Real ucon_ref[4] = {1.474419561548971247e+00, 1.032093693084279895e+00,
+                                2.948839123097942716e-01, 1.474419561548971358e-01};
       THEN("The Lorentz factor and four-velocity are correctly calculated") {
         int n_wrong = 1;
         Kokkos::parallel_reduce(
@@ -123,7 +122,8 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
                   update += 1;
                 }
               }
-            }, n_wrong);
+            },
+            n_wrong);
         REQUIRE(n_wrong == 0);
       }
     }

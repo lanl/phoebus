@@ -81,7 +81,7 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
 
     pin->SetReal("parthenon/mesh", "x1max", ROUT);
     pin->SetReal("parthenon/mesh", "x2max", M_PI);
-    pin->SetReal("parthenon/mesh", "x3max", 2*M_PI);
+    pin->SetReal("parthenon/mesh", "x3max", 2 * M_PI);
 
     auto pkg = MonopoleGR::Initialize(pin);
     auto &params = pkg->AllParams();
@@ -221,7 +221,7 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
 
     pin->SetReal("parthenon/mesh", "x1max", ROUT);
     pin->SetReal("parthenon/mesh", "x2max", M_PI);
-    pin->SetReal("parthenon/mesh", "x3max", 2*M_PI);
+    pin->SetReal("parthenon/mesh", "x3max", 2 * M_PI);
 
     pin->SetBoolean("tov", "enabled", true);
     pin->SetReal("tov", "Pc", 1e-2);
@@ -248,7 +248,7 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
         MonopoleGR::LinearSolveForAlpha(monopole_pkg.get());
         MonopoleGR::SpacetimeToDevice(monopole_pkg.get());
         AND_THEN("The metric is the same as the TOV metric") {
-	  TOV::IntegrateTov(tov_pkg.get(), monopole_pkg.get(), eos_pkg.get());
+          TOV::IntegrateTov(tov_pkg.get(), monopole_pkg.get(), eos_pkg.get());
 
           using MonopoleGR::Alpha_t;
           using MonopoleGR::Gradients_t;
@@ -263,8 +263,8 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
           int npoints = monopole_pkg->Param<int>("npoints");
 
           int nwrong = 0;
-	  int im = TOV::M;
-	  int iphi = TOV::PHI;
+          int im = TOV::M;
+          int iphi = TOV::PHI;
           parthenon::par_reduce(
               parthenon::loop_pattern_flatrange_tag,
               "check TOV solution against monopole", parthenon::DevExecSpace(), 0,

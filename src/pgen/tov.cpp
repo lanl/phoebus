@@ -36,7 +36,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // amplitude
   const Real vpert_a = pin->GetOrAddReal("tov", "vpert_amp", 0);
   // center of vel pert
-  const Real vpert_r = pin->GetOrAddReal("tov","vpert_radius", 5);
+  const Real vpert_r = pin->GetOrAddReal("tov", "vpert_radius", 5);
   // standard deviation
   const Real vpert_s = pin->GetOrAddReal("tov", "vpert_sigma", 1);
 
@@ -115,7 +115,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // Perturbation in velocity for testing
         if (vpert_a > 0) {
           v(ivlo, k, j, i) =
-            vpert_a*r*std::exp(-(r-vpert_r)*(r-vpert_r)/(4*vpert_s*vpert_s));
+              vpert_a * r *
+              std::exp(-(r - vpert_r) * (r - vpert_r) / (4 * vpert_s * vpert_s));
         }
       });
 

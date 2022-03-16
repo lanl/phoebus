@@ -38,7 +38,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap[p::velocity].first;
   const int ivhi = imap[p::velocity].second;
   const int ieng = imap[p::energy].first;
-  const int iye  = imap[p::ye].first;
+  const int iye = imap[p::ye].first;
   const int iprs = imap[p::pressure].first;
   const int itmp = imap[p::temperature].first;
 
@@ -52,7 +52,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &unit_conv = eospkg.get()->Param<phoebus::UnitConversions>("unit_conv");
 
   const Real rho0 = 1.e10 * unit_conv.GetMassDensityCGSToCode();
-  const Real T0 = 2.5*1.e6*pc::eV/pc::kb * unit_conv.GetTemperatureCGSToCode();
+  const Real T0 = 2.5 * 1.e6 * pc::eV / pc::kb * unit_conv.GetTemperatureCGSToCode();
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::LeptonEq", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -71,7 +71,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         double lambda[2] = {v(iye, k, j, i), 0.};
-        v(ieng, k, j, i) = rho0*eos.InternalEnergyFromDensityTemperature(rho0, T0, lambda);
+        v(ieng, k, j, i) =
+            rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T0, lambda);
         v(iprs, k, j, i) = eos.PressureFromDensityTemperature(rho0, T0, lambda);
 
         for (int d = 0; d < 3; d++)

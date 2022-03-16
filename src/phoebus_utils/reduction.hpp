@@ -39,6 +39,6 @@ Real inline Min(const Real &x) { return x; }
 
 #endif // MPI_PARALLEL
 
-};
+}; // namespace reduction
 
 #endif // PHOEBUS_UTILS_REDUCTION_HPP_

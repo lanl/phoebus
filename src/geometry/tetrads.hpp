@@ -14,13 +14,13 @@
 #ifndef GEOMETRY_TETRADS_HPP_
 #define GEOMETRY_TETRADS_HPP_
 
-#include <parthenon/package.hpp>
 #include "phoebus_utils/robust.hpp"
+#include <parthenon/package.hpp>
 
 namespace Geometry {
 
 class Tetrads {
-public:
+ public:
   KOKKOS_FUNCTION
   Tetrads(const double Ucon[NDFULL], const double Trial[NDFULL],
           const double Gcov[NDFULL][NDFULL]) {
@@ -65,7 +65,7 @@ public:
     }
   }
 
-private:
+ private:
   KOKKOS_FUNCTION
   void ConstructTetrads_(const double Ucon[NDFULL], const double Trial[NDFULL],
                          const double Gcov[NDFULL][NDFULL]) {

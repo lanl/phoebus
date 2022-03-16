@@ -38,36 +38,38 @@ static struct ExpX1RhoUFloor {
 
 class Floors {
  public:
-  Floors() : Floors(constant_rho_sie_floor_tag, -std::numeric_limits<Real>::max(),
-                                                -std::numeric_limits<Real>::max()) {}
+  Floors()
+      : Floors(constant_rho_sie_floor_tag, -std::numeric_limits<Real>::max(),
+               -std::numeric_limits<Real>::max()) {}
   Floors(ConstantRhoSieFloor, const Real rho0, const Real sie0)
-    : r0_(rho0), s0_(sie0), floor_flag_(1) {}
+      : r0_(rho0), s0_(sie0), floor_flag_(1) {}
   Floors(ExpX1RhoSieFloor, const Real rho0, const Real sie0, const Real rp, const Real sp)
-    : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(2) {}
+      : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(2) {}
   Floors(ExpX1RhoUFloor, const Real rho0, const Real sie0, const Real rp, const Real sp)
-    : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(3) {
-      std::cout << "Initializing floor object!!!" << std::endl;
-    }
+      : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(3) {
+    std::cout << "Initializing floor object!!!" << std::endl;
+  }
 
   KOKKOS_INLINE_FUNCTION
-  void GetFloors(const Real x1, const Real x2, const Real x3, Real &rflr, Real &sflr) const {
+  void GetFloors(const Real x1, const Real x2, const Real x3, Real &rflr,
+                 Real &sflr) const {
     Real scratch;
-    switch(floor_flag_) {
-      case 1:
-        rflr = r0_;
-        sflr = s0_;
-        break;
-      case 2:
-        rflr = r0_*exp(ralpha_*x1);
-        sflr = s0_*exp(salpha_*x1);
-        break;
-      case 3:
-        scratch = r0_*exp(ralpha_*x1);
-        sflr = s0_*exp(salpha_*x1)/std::max(rflr,scratch);
-        rflr = scratch;
-        break;
-      default:
-        PARTHENON_FAIL("No valid floor set.");
+    switch (floor_flag_) {
+    case 1:
+      rflr = r0_;
+      sflr = s0_;
+      break;
+    case 2:
+      rflr = r0_ * exp(ralpha_ * x1);
+      sflr = s0_ * exp(salpha_ * x1);
+      break;
+    case 3:
+      scratch = r0_ * exp(ralpha_ * x1);
+      sflr = s0_ * exp(salpha_ * x1) / std::max(rflr, scratch);
+      rflr = scratch;
+      break;
+    default:
+      PARTHENON_FAIL("No valid floor set.");
     }
   }
 
@@ -76,27 +78,27 @@ class Floors {
   const int floor_flag_;
 };
 
-
 static struct ConstantGamSieCeiling {
 } constant_gam_sie_ceiling_tag;
 
 class Ceilings {
  public:
   Ceilings()
-    : Ceilings(constant_gam_sie_ceiling_tag, std::numeric_limits<Real>::max(),
-                                             std::numeric_limits<Real>::max()) {}
+      : Ceilings(constant_gam_sie_ceiling_tag, std::numeric_limits<Real>::max(),
+                 std::numeric_limits<Real>::max()) {}
   Ceilings(ConstantGamSieCeiling, const Real gam0, const Real sie0)
-    : g0_(gam0), s0_(sie0), ceiling_flag_(1) {}
+      : g0_(gam0), s0_(sie0), ceiling_flag_(1) {}
 
   KOKKOS_INLINE_FUNCTION
-  void GetCeilings(const Real x1, const Real x2, const Real x3, Real &gmax, Real &smax) const {
-    switch(ceiling_flag_) {
-      case 1:
-        gmax = g0_;
-        smax = s0_;
-        break;
-      default:
-        PARTHENON_FAIL("No valid floor set.");
+  void GetCeilings(const Real x1, const Real x2, const Real x3, Real &gmax,
+                   Real &smax) const {
+    switch (ceiling_flag_) {
+    case 1:
+      gmax = g0_;
+      smax = s0_;
+      break;
+    default:
+      PARTHENON_FAIL("No valid floor set.");
     }
   }
 
@@ -113,21 +115,19 @@ class Bounds {
   explicit Bounds(const Ceilings &cl) : floors_(Floors()), ceilings_(cl) {}
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION
-  void GetFloors(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetFloors(Args &&...args) const {
     floors_.GetFloors(std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION
-  void GetCeilings(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetCeilings(Args &&...args) const {
     ceilings_.GetCeilings(std::forward<Args>(args)...);
   }
+
  private:
   const Floors floors_;
   const Ceilings ceilings_;
 };
-
 
 } // namespace fixup
 

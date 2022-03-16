@@ -24,7 +24,7 @@ namespace phoebus {
 
 // Object for converting between cgs and code units, based on relativistic mass
 class UnitConversions {
-public:
+ public:
   UnitConversions(ParameterInput *pin);
 
   Real GetMassCodeToCGS() const { return mass_; }
@@ -48,7 +48,7 @@ public:
   Real GetTemperatureCodeToCGS() const { return temperature_; }
   Real GetTemperatureCGSToCode() const { return 1. / temperature_; }
 
-private:
+ private:
   Real mass_;
   Real length_;
   Real time_;
