@@ -297,10 +297,11 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   PackIndexMap imap_ql, imap_qr, imap;
   VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
   VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
-  std::vector<std::string> variables = {pr::J, pr::H, ir::dJ};
+  std::vector<std::string> variables = {pr::J, pr::H};
   if (eddington_known) {
     variables.push_back(ir::tilPi);
   }
+  variables.push_back(ir::dJ);
   VariablePack<Real> v = rc->PackVariables(variables, imap);
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_dJ = imap.GetFlatIdx(ir::dJ);
@@ -315,13 +316,22 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   auto qIdx = imap_ql.GetFlatIdx(ir::ql);
 
   const int nspec = qIdx.DimSize(1);
-  const int nrecon = 4*nspec;
+  int nrecon = 4*nspec;
+  if (eddington_known) {
+    //nrecon = (4 + 6)*nspec;
+    nrecon = (4 + 9)*nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
+  }
+  printf("dims: %i %i %i\n", qIdx.DimSize(1), qIdx.DimSize(2), qIdx.DimSize(3));
+  printf("vdims: %i %i %i %i %i\n",
+    v.GetDim(1), v.GetDim(2), v.GetDim(3), v.GetDim(4), v.GetDim(5));
 
   const int offset = imap_ql[ir::ql].first;
 
   const int nblock = ql_base.GetDim(5);
   const int ndim = pmb->pmy_mesh->ndim;
   auto& coords = pmb->coords;
+
+  printf("nrecon: %i offset: %i\n", nrecon, offset);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(),
@@ -331,10 +341,34 @@ TaskStatus ReconstructEdgeStates(T* rc) {
       jb.s - dj, jb.e + dj, // y-loop
       ib.s - di, ib.e + di, // x-loop
       KOKKOS_LAMBDA(const int iface, const int b, const int k, const int j, const int i) {
+        printf("[%i %i %i %i %i]\n", iface, b, k, j, i);
+        printf("%e %e %e %e | %e %e\n",
+          v(0,k,j,0),
+          v(0,k,j,1),
+          v(0,k,j,2),
+          v(0,k,j,3),
+          v(0,k,j,4),
+          v(0,k,j,5));
+        printf("%e %e %e %e | %e %e\n",
+          v(12,k,j,0),
+          v(12,k,j,1),
+          v(12,k,j,2),
+          v(12,k,j,3),
+          v(12,k,j,4),
+          v(12,k,j,5));
+          exit(-1);
+
         ReconstructionIndexer<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
         ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
         // Reconstruct radiation
         for (int ivar = 0; ivar<nrecon; ++ivar) {
+          if (i == 10) {
+          printf("v(%i %i %i %i) = %e\n", ivar,k,j,i, v(ivar,k,j,i));
+          //for (int s = 0; s < 3; s++) {
+          //  printf("iTilPi = %e %e %e\n", v(b, iTilPi(s, 0, 0), k, j, i), v(b,iTilPi(s,1,1),k,j,i),
+          //    v(b,iTilPi(s,2,2), k, j, i));
+          //}
+          }
           PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v, ql, qr);
         }
         // Reconstruct velocity for radiation
@@ -508,6 +542,21 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           // Fluxes in the asymptotic limit
           if (EDDINGTON_KNOWN) {
             // Use reconstructed values of tilPi
+            //con_tilPil(0,0) = 1.;
+            SPACELOOP2(ii, jj) {
+              con_tilPil(ii,jj) = v(idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i);
+              con_tilPir(ii,jj) = v(idx_qr(ispec, 4 + ii + 3*jj, idir), k, j, i);
+            printf("[%i %i %i %i %i] ql = %e\n", 0, idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i,
+              v(idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i));
+            }
+          //const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
+            SPACELOOP2(ii, jj) {
+              printf("[%i %i] pi: %e\n", ii, jj, con_tilPil(ii, jj));
+            }
+            printf("HERE!\n");
+            if (i == 10) {
+            exit(-1);
+            }
           } else {
             cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
             cr.GetCovTilPiFromPrim(Jr, HasymR, &con_tilPir);
@@ -516,9 +565,8 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           cr.getFluxesFromPrim(Jr, HasymR, con_tilPir, &conFr_asym, &Pr_asym);
 
           // Regular fluxes
-          if (EDDINGTON_KNOWN) {
-            // Use reconstructed values of tilPi
-          } else {
+          if (!EDDINGTON_KNOWN) {
+            // Recalculate Eddington if using J, H
             cl.GetCovTilPiFromPrim(Jl, Hl, &con_tilPil);
             cr.GetCovTilPiFromPrim(Jr, Hr, &con_tilPir);
           }

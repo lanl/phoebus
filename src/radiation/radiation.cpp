@@ -296,8 +296,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Fields for cell edge reconstruction
     /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense
     /// of more dependency
+    int nrecon = 4;
+    if (method == "mocmc") {
+      nrecon += 9; // Reconstruct conTilPi // TODO(BRR) Use 6 elements by symmetry
+    }
     Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-                               std::vector<int>{NumRadiationTypes, 4, ndim});
+                               std::vector<int>{NumRadiationTypes, nrecon, ndim});
     Metadata mrecon_v = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                  std::vector<int>{3, ndim});
     physics->AddField(i::ql, mrecon);
@@ -320,7 +324,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Make Eddington tensor an independent quantity for MOCMC to supply
     if (method == "mocmc") {
       Metadata mspecies_three_tensor =
-          Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
+          Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
+          //Metadata({Metadata::Cell, Metadata::Independent, Metadata::FillGhost},
                    std::vector<int>{NumRadiationTypes, 3, 3});
 
       physics->AddField(i::tilPi, mspecies_three_tensor);

@@ -21,32 +21,6 @@
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
 
-/*void test(Mesh *mesh, ParameterInput *pin) {
-  printf("test!\n");
-  exit(-1);
-
-  const std::string ix1_bc =
-      pin->GetOrAddString("phoebus", "ix1_bc", "outflow");
-  const std::string ox1_bc =
-      pin->GetOrAddString("phoebus", "ox1_bc", "outflow");
-  const std::string parth_ix1_bc =
-    pin->GetString("parthenon/mesh", "ix1_bc");
-  PARTHENON_REQUIRE(parth_ix1_bc == "user" || parth_ix1_bc == "periodic",
-    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ix1_bc");
-  const std::string parth_ox1_bc =
-    pin->GetString("parthenon/mesh", "ox1_bc");
-  PARTHENON_REQUIRE(parth_ox1_bc == "user" || parth_ox1_bc == "periodic",
-    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ox1_bc");
-
-  if (parth_ix1_bc == "user" && ix1_bc == "outflow") {
-    for (auto &block : mesh->block_list) {
-      auto &swarm = block.swarm_data.Get();
-      for (auto const &q : resolved_packaged->AllSwarms())
-    }
-
-  }
-}*/
-
 int main(int argc, char *argv[]) {
   parthenon::ParthenonManager pman;
 
@@ -115,6 +89,9 @@ int main(int argc, char *argv[]) {
   // Initialize the driver
   phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(),
                                 pman.pmesh.get());
+
+  // Communicate ghost buffers before executing
+  driver.PostInitializationCommunication();
 
   // This line actually runs the simulation
   auto driver_status = driver.Execute();

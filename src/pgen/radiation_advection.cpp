@@ -59,6 +59,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   int ndim = pmesh->ndim;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  //IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
@@ -103,12 +104,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(idJ(ispec), k, j, i) =
                 std::max(J * exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10);
           }
+          printf("[%i %i %i] J(%i) = %e\n", k, j, i, ispec, v(idJ(ispec),k,j,i));
 
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
           v(idH(2, ispec), k, j, i) = Hz;
         }
       });
+
+  printf("F: %e %e %e %e %e\n",
+    v(idJ(0), 0, 0, 0),
+    v(idJ(0), 0, 0, 1),
+    v(idJ(0), 0, 0, 2),
+    v(idJ(0), 0, 0, 3),
+    v(idJ(0), 0, 0, 4));
 
   // Initialize samples
   auto radpkg = pmb->packages.Get("radiation");

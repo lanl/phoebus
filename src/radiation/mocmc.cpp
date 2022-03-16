@@ -752,9 +752,23 @@ TaskStatus MOCMCEddington(T *rc) {
           v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
         }
 
+        for (int s = 0; s < 3; s++) {
+
+          // TEMPORARY
+          v(iTilPi(s, 0, 0), k, j, i) = 11;
+          v(iTilPi(s, 1, 0), k, j, i) = 21;
+          v(iTilPi(s, 0, 1), k, j, i) = 12;
+          v(iTilPi(s, 1, 1), k, j, i) = 22;
+          v(iTilPi(s, 2, 0), k, j, i) = 31;
+          v(iTilPi(s, 2, 1), k, j, i) = 32;
+          v(iTilPi(s, 2, 2), k, j, i) = 33;
+          v(iTilPi(s, 1, 2), k, j, i) = 23;
+          v(iTilPi(s, 0, 2), k, j, i) = 13;
+        }
+
         if (i == 10) {
           SPACELOOP2(ii, jj) {
-            printf("tilPi[%i %i] = %e\n", i, j, v(iTilPi(0, 1, 0), k, j, i));
+            printf("tilPi[%i %i] = %e\n", i, j, v(iTilPi(0, ii, jj), k, j, i));
           }
         }
       });
