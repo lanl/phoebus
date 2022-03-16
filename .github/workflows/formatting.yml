@@ -1,0 +1,24 @@
+name: Check Formatting
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+    formatting:
+      name: Check Formatting
+      runs-on: ubuntu-latest
+
+      steps:      
+        - name: Checkout code
+          uses: actions/checkout@v2
+        - name: Set system to non-interactive mode
+          run: export DEBIAN_FRONTEND=noninteractive
+        - name: install dependencies
+          run: |
+            sudo apt-get install -y --force-yes -qq git clang-format
+        - name: check formatting
+          continue-on-error: true
+          run: find . -regex '.*\.\(cpp\|hpp\)' | xargs clang-format -style=file -i && git diff --exit-code --ignore-submodules
