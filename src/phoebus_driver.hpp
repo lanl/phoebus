@@ -33,6 +33,7 @@ class PhoebusDriver : public EvolutionDriver {
   TaskListStatus MonteCarloStep();
 
   TaskListStatus Step();
+
  private:
   std::unique_ptr<StagedIntegrator> integrator;
   Real dt_init, dt_init_fact;

@@ -49,8 +49,7 @@ void SetGeometryDefault(MeshBlockData<Real> *rc, const System &system) {
   int icoord_c = imap["g.c.coord"].first;
   int icoord_n = imap["g.n.coord"].first;
 
-  auto lamb =
-      KOKKOS_LAMBDA(const int k, const int j, const int i, CellLocation loc) {
+  auto lamb = KOKKOS_LAMBDA(const int k, const int j, const int i, CellLocation loc) {
     Real C[NDFULL];
     int icoord = (loc == CellLocation::Cent) ? icoord_c : icoord_n;
     system.Coords(loc, k, j, i, C);
@@ -65,8 +64,8 @@ void SetGeometryDefault(MeshBlockData<Real> *rc, const System &system) {
         lamb(k, j, i, CellLocation::Cent);
       });
   pmb->par_for(
-      "SetGeometry::Set Cached data, Corn", kb.s, kb.e + 1, jb.s, jb.e + 1,
-      ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      "SetGeometry::Set Cached data, Corn", kb.s, kb.e + 1, jb.s, jb.e + 1, ib.s,
+      ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         lamb(k, j, i, CellLocation::Corn);
       });
   pmb->exec_space.fence(); // do not let users interact with coords
@@ -81,12 +80,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Always add coodinates fields
   Utils::MeshBlockShape dims(pin);
   std::vector<int> cell_shape = {4};
-  Metadata gcoord_cell = Metadata(
-      {Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, cell_shape);
+  Metadata gcoord_cell =
+      Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, cell_shape);
   // TODO(JMM): Make this actual node-centered data when available
   std::vector<int> node_shape = {dims.nx1 + 1, dims.nx2 + 1, dims.nx3 + 1, 4};
-  Metadata gcoord_node =
-      Metadata({Metadata::Derived, Metadata::OneCopy}, node_shape);
+  Metadata gcoord_node = Metadata({Metadata::Derived, Metadata::OneCopy}, node_shape);
   geometry->AddField(geometric_variables::cell_coords, gcoord_cell);
   geometry->AddField(geometric_variables::node_coords, gcoord_node);
 

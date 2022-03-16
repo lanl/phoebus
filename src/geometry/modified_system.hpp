@@ -43,8 +43,9 @@ namespace Geometry {
 //                 Real C[NDSPACE],
 //                 Real Jcov[NDSPACE][NDSPACE],
 //                 Real Jcon[NDSPACE][NDSPACE]) const;
-template <typename System, typename Transformation> class Modified {
-public:
+template <typename System, typename Transformation>
+class Modified {
+ public:
   Modified() = default;
   template <typename... Args>
   Modified(const Transformation &GetTransformation, Args... args)
@@ -52,8 +53,7 @@ public:
         s_(std::forward<Args>(args)...) {}
   template <typename... Args>
   Modified(Real dx, const Transformation &GetTransformation, Args... args)
-      : dx_(dx), GetTransformation_(GetTransformation),
-        s_(std::forward<Args>(args)...) {}
+      : dx_(dx), GetTransformation_(GetTransformation), s_(std::forward<Args>(args)...) {}
 
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
@@ -65,8 +65,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
-                          Real beta[NDSPACE]) const {
+  void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     Real beta0[NDSPACE];
     Real C[NDSPACE];
     Real Jcov[NDSPACE][NDSPACE];
@@ -80,8 +79,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
-                       Real g[NDFULL][NDFULL]) const {
+  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
 
     Real g0[NDFULL][NDFULL];
     Real C[NDSPACE];
@@ -94,8 +92,7 @@ public:
       SPACETIMELOOP(nu) {
         SPACETIMELOOP(lam) {
           SPACETIMELOOP(kap) {
-            g[mu][nu] +=
-                g0[lam][kap] * S2ST_(Jcov, lam, mu) * S2ST_(Jcov, kap, nu);
+            g[mu][nu] += g0[lam][kap] * S2ST_(Jcov, lam, mu) * S2ST_(Jcov, kap, nu);
           }
         }
       }
@@ -115,8 +112,7 @@ public:
       SPACETIMELOOP(nu) {
         SPACETIMELOOP(lam) {
           SPACETIMELOOP(kap) {
-            g[mu][nu] +=
-              g0[lam][kap] * S2ST_(Jcon, mu, lam) * S2ST_(Jcon, nu, kap);
+            g[mu][nu] += g0[lam][kap] * S2ST_(Jcon, mu, lam) * S2ST_(Jcon, nu, kap);
           }
         }
       }
@@ -124,8 +120,7 @@ public:
   }
 
   KOKKOS_INLINE_FUNCTION
-  void Metric(Real X0, Real X1, Real X2, Real X3,
-              Real g[NDSPACE][NDSPACE]) const {
+  void Metric(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
 
     Real g0[NDSPACE][NDSPACE];
     Real C[NDSPACE];
@@ -137,16 +132,13 @@ public:
     SPACELOOP(i) {
       SPACELOOP(j) {
         SPACELOOP(k) {
-          SPACELOOP(l) { 
-            g[i][j] += g0[k][l] * Jcov[k][i] * Jcov[l][j]; 
-          }
+          SPACELOOP(l) { g[i][j] += g0[k][l] * Jcov[k][i] * Jcov[l][j]; }
         }
       }
     }
   }
   KOKKOS_INLINE_FUNCTION
-  void MetricInverse(Real X0, Real X1, Real X2, Real X3,
-                     Real g[NDSPACE][NDSPACE]) const {
+  void MetricInverse(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
 
     Real g0[NDSPACE][NDSPACE];
     Real C[NDSPACE];
@@ -208,7 +200,7 @@ public:
     SPACELOOP(i) C[i] = Cnew[i];
   }
 
-private:
+ private:
   KOKKOS_INLINE_FUNCTION
   Real S2ST_(const Real A[NDSPACE][NDSPACE], int mu, int nu) const {
     if (mu == 0 || nu == 0) {

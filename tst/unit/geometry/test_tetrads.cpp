@@ -25,12 +25,12 @@
 #include <parameter_input.hpp>
 
 // phoebus includes
+#include "../../test_utils.hpp"
 #include "geometry/geometry_utils.hpp"
+#include "geometry/tetrads.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
-#include "geometry/tetrads.hpp"
 #include <geometry/minkowski.hpp>
-#include "../../test_utils.hpp"
 
 using namespace Geometry;
 using parthenon::Coordinates_t;
@@ -41,10 +41,10 @@ using parthenon::RegionSize;
 
 TEST_CASE("Tetrads", "[geometry][tetrads]") {
   GIVEN("A timelike observer Ucon") {
-    //CoordinateSystem system = Analytic<Minkowski, IndexerMeshBlock>();
+    // CoordinateSystem system = Analytic<Minkowski, IndexerMeshBlock>();
     THEN("We can boost into the frame of a timelike observer Ucon") {
-    //auto geom = Geometry::GetCoordinateSystem(rc);
-    Analytic<Minkowski, IndexerMeshBlock> system;
+      // auto geom = Geometry::GetCoordinateSystem(rc);
+      Analytic<Minkowski, IndexerMeshBlock> system;
 
       int n_wrong = 0;
       Kokkos::parallel_reduce(

@@ -15,9 +15,9 @@
 #define MONOPOLE_GR_MONOPOLE_GR_HPP_
 
 // Phoebus
+#include "monopole_gr/interp_3d_to_1d.hpp"
 #include "monopole_gr/monopole_gr_base.hpp"
 #include "monopole_gr/monopole_gr_interface.hpp"
-#include "monopole_gr/interp_3d_to_1d.hpp"
 
 // TODO(JMM): Clean up notation? Or is it fine?
 /*

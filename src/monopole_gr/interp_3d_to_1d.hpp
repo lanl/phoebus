@@ -49,9 +49,9 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom, const P
 // spherical coords.
 template <bool IS_CART, typename Pack>
 PORTABLE_INLINE_FUNCTION void
-GetCoordsAndCellWidthsHelper(const Pack &p, const int b,
-                             const int k, const int j, const int i, Real &r, Real &th,
-                             Real &ph, Real &dr, Real &dth, Real &dph, Real &dv);
+GetCoordsAndCellWidthsHelper(const Pack &p, const int b, const int k, const int j,
+                             const int i, Real &r, Real &th, Real &ph, Real &dr,
+                             Real &dth, Real &dph, Real &dv);
 
 } // namespace impl
 
@@ -100,9 +100,8 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   // I just need the pack for the coords object,
   // but I may want these quantities in a future
   // iteration, so I ask for them here.
-  std::vector<std::string> vars({fluid_cons::density,
-      fluid_cons::energy,
-      fluid_cons::momentum});
+  std::vector<std::string> vars(
+      {fluid_cons::density, fluid_cons::energy, fluid_cons::momentum});
   // PackIndexMap imap;
   auto pack = rc->PackVariables(vars);
 
@@ -125,14 +124,12 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
         // First compute the relevant conserved/prim vars
         Real matter_loc[4];
         GetMonopoleVarsHelper<is_monopole_cart>(
-          tmunu, geom, pack, b, k, j, i, matter_loc[Matter::RHO],
-          matter_loc[Matter::J_R], matter_loc[Matter::Srr],
-	  matter_loc[Matter::trcS]);
+            tmunu, geom, pack, b, k, j, i, matter_loc[Matter::RHO],
+            matter_loc[Matter::J_R], matter_loc[Matter::Srr], matter_loc[Matter::trcS]);
         // Next get coords and grid spacing
         Real r, th, ph, dr, dth, dph, dv;
-        GetCoordsAndCellWidthsHelper<is_monopole_cart>(pack,
-						       b, k, j, i, r, th, ph,
-                                                       dr, dth, dph, dv);
+        GetCoordsAndCellWidthsHelper<is_monopole_cart>(pack, b, k, j, i, r, th, ph, dr,
+                                                       dth, dph, dv);
 
         // Bounds in the 1d grid We're wasteful here because I'm
         // paranoid. Need to make sure we don't need miss any cells in
@@ -154,7 +151,7 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
           }
         }
       });
-  return TaskStatus::complete;  
+  return TaskStatus::complete;
 }
 
 // TODO(JMM): This doesn't really work with the hierarchical parallelism model,
@@ -188,7 +185,7 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom, const
   Real Scon[NS];
   // rho0 = gdet * alpha * alpha * Tcon[0][0]; // TODO: This is a hack
   rho0 = alpha * alpha * Tcon[0][0];
-  SPACELOOP(d) { Scon[d] = -alpha * Tcon[0][d+1] + beta[d] * Tcon[0][0]; }
+  SPACELOOP(d) { Scon[d] = -alpha * Tcon[0][d + 1] + beta[d] * Tcon[0][0]; }
 
   // Lower Tmunu
   Real TConCov[ND][ND] = {0};
@@ -239,19 +236,18 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom, const
 
 template <bool IS_CART, typename Pack>
 PORTABLE_INLINE_FUNCTION void
-GetCoordsAndCellWidthsHelper(const Pack &p, const int b,
-                             const int k, const int j, const int i, Real &r, Real &th,
-                             Real &ph, Real &dr, Real &dth, Real &dph, Real &dv) {
+GetCoordsAndCellWidthsHelper(const Pack &p, const int b, const int k, const int j,
+                             const int i, Real &r, Real &th, Real &ph, Real &dr,
+                             Real &dth, Real &dph, Real &dv) {
   const parthenon::Coordinates_t &coords = p.GetCoords(b);
   if (IS_CART) {
     Geometry::MonopoleCoordTransforms::Cart2Sph(
-      coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
-      coords.Dx(1, k, j, i), coords.Dx(2, k, j, i), coords.Dx(3, k, j, i), r,
-      th, ph, dr, dth, dph);
+        coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+        coords.Dx(1, k, j, i), coords.Dx(2, k, j, i), coords.Dx(3, k, j, i), r, th, ph,
+        dr, dth, dph);
     dv = coords.Volume(k, j, i);
   } else {
-    Interp3DTo1D::GetCoordsAndDerivsSph(k, j, i, coords,
-      r, th, ph, dr, dth, dph, dv);
+    Interp3DTo1D::GetCoordsAndDerivsSph(k, j, i, coords, r, th, ph, dr, dth, dph, dv);
   }
 }
 

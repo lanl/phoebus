@@ -58,13 +58,14 @@ class PressResidual {
  public:
   KOKKOS_INLINE_FUNCTION
   PressResidual(const singularity::EOS &eos, const Real rho, const Real P, const Real Ye)
-    : eos_(eos), rho_(rho), P_(P) {
+      : eos_(eos), rho_(rho), P_(P) {
     lambda_[0] = Ye;
   }
   KOKKOS_INLINE_FUNCTION
   Real operator()(const Real e) {
     return eos_.PressureFromDensityInternalEnergy(rho_, e, lambda_) - P_;
   }
+
  private:
   const singularity::EOS &eos_;
   Real rho_, P_;
@@ -73,11 +74,11 @@ class PressResidual {
 
 KOKKOS_FUNCTION
 Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P,
-		       const Real emin, const Real emax, const Real Ye) {
+                       const Real emin, const Real emax, const Real Ye) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
   PressResidual res(eos, rho, P, Ye);
-  Real eroot = root_find::itp(res, emin, emax, 1.e-10*P);
-  return rho*eroot;
+  Real eroot = root_find::itp(res, emin, emax, 1.e-10 * P);
+  return rho * eroot;
 }
 
-}
+} // namespace phoebus
