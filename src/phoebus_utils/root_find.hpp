@@ -115,11 +115,9 @@ struct RootFind {
       Real c = (a*yb - b*ya)/(yb - ya);
       // guard against roundoff because ya or yb is sufficiently close to zero
       if (c == a) {
-        //printf("abort1: %g %g %g  %g %g\n", a, c, b, ya, yb);
         b = a;
         continue;
       } else if (c == b) {
-        //printf("abort2: %g %g %g  %g %g\n", a, c, b, ya, yb);
         a = b;
         continue;
       }
@@ -129,14 +127,12 @@ struct RootFind {
         yb = yc;
         b1++;
         ya *= (b1 > 1 ? 0.5 : 1.0);
-        //b1 = (b1 > 1 ? 0 : b1);
         b2 = 0;
       } else if (yc < 0.0) {
         a = c;
         ya = yc;
         b2++;
         yb *= (b2 > 1 ? 0.5 : 1.0);
-        //b2 = (b2 > 1 ? 0 : b2);
         b1 = 0;
       } else {
         a = c;
