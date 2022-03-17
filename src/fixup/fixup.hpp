@@ -96,7 +96,7 @@ class Ceilings {
         smax = s0_;
         break;
       default:
-        PARTHENON_FAIL("No valid floor set.");
+        PARTHENON_FAIL("No valid ceiling set.");
     }
   }
 

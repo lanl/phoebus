@@ -359,7 +359,6 @@ class ConToPrim {
       }
       rsq += rcon[i] * rcov[i];
     }
-    //PARTHENON_REQUIRE(rsq >= 0.0, "rsq < 0");
     Real bu[] = {0.0, 0.0, 0.0};
     if (pb_hi > 0) {
       // first set the primitive b-fields
@@ -380,17 +379,6 @@ class ConToPrim {
     }
     const Real zsq = rsq/h0sq_;
     Real v0sq = std::min(zsq/(1.0 + zsq), 1.0 - 1.0/(gam_max*gam_max));
-    /*if (v0sq >= 1) {
-      printf("whoa: %g %g %g %g\n", rsq, h0sq_, zsq, v0sq);
-    }
-    if (!(bsq >= 0)) {
-      printf("bsq < 0: %e\n", bsq);
-      PARTHENON_FAIL("bsq < 0");
-    }
-    if (!(rbsq >= 0)) {
-      printf("rbsq < 0: %e\n", rbsq);
-      PARTHENON_FAIL("rbsq < 0");
-    }*/
 
     Residual res(D,q,bsq,bsq_rpsq,rsq,rbsq,v0sq,ye_local,eos,bounds,x1,x2,x3);
 
@@ -401,15 +389,6 @@ class ConToPrim {
     // solve
     root_find::RootFind root(max_iter);
     const Real mu = root.regula_falsi(res, 0.0, 1.0, rel_tolerance, v(c2p_mu));
-    //const Real mu = root.bisect(res, 0.0, 1.0, rel_tolerance);
-    root.iteration_count = 0;
-    const Real mu2 = root.itp(res, 0.0, 1.0, rel_tolerance, v(c2p_mu));
-    root.iteration_count = 0;
-    const Real mu3 = root.bisect(res, 0.0, 1.0, rel_tolerance);
-    if (std::abs(mu-mu3) > 2.0*rel_tolerance) {
-      printf("mu/mu2: %g %g  %g %g\n", mu, mu2, mu3, (mu3 - mu)/(2.0*rel_tolerance));
-      PARTHENON_FAIL("mus dont agree");
-    }
     v(c2p_mu) = mu;
 #if CON2PRIM_STATISTICS
     con2prim_statistics::Stats::add(root.iteration_count);
@@ -459,40 +438,6 @@ class ConToPrim {
 
       if (pye > 0) v(cye) = ye_cons;
     } else {
-      // test to see if old and new cons agree
-      const Real rho0 = v(crho);
-      const Real E0 = v(ceng);
-      const Real S0[] = {v(cmom_lo), v(cmom_lo+1), v(cmom_lo+2)};
-      
-
-      Real ye_prim = 0.0;
-      if (pye > 0) ye_prim = v(pye);
-      Real ye_cons;
-      Real S[3];
-      Real bcons[3];
-      prim2con::p2c(v(prho), vel, bu, v(peng), ye_prim, v(prs), v(gm1),
-                    g.gcov4, g.gcon, g.beta, g.lapse, g.gdet,
-                    v(crho), S, bcons, v(ceng), ye_cons, sig);
-      SPACELOOP(i) {
-        v(cmom_lo+i) = S[i];
-      }
-
-      if (pye > 0) v(cye) = ye_cons;
-
-
-      if (std::abs(rho0 - v(crho)) > 1.e-5*std::min(rho0,v(crho))) {
-        printf("rho disagreement: %g %g %g\n", rho0, v(crho), (v(crho)-rho0)/rho0);
-      }
-      if (std::abs(E0 - v(ceng)) > 1.e-5*std::min(E0,v(ceng))) {
-        printf("E disagreement: %g %g %g\n", E0, v(ceng), (v(ceng)-E0)/E0);
-      }
-      SPACELOOP(i) {
-        if (std::abs(S0[i] - S[i]) > 1.e-4*std::max(1.e-6,std::min(std::abs(S0[i]),std::abs(S[i])))) {
-          printf("S[%d] disagreement: %g %g %g\n", i, S0[i], S[i], (S[i]-S0[i])/S0[i]);
-        }
-      }
-      
-      /*
       // just compute signal speeds
       SPACELOOP(m) vel[m] *= iW;
       bsq = 0.0;
@@ -507,7 +452,7 @@ class ConToPrim {
       
       prim2con::signal_speeds(v(prho), v(peng), v(prs), bsq, vel, vsq, v(gm1),
                               g.lapse, g.beta, g.gcon, sig);
-      */
+      
     }
 
     for (int i = 0; i < sig_hi-sig_lo+1; i++) {

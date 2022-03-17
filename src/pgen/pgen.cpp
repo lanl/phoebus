@@ -77,7 +77,7 @@ Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
   PressResidual res(eos, rho, P, Ye);
   root_find::RootFind root;
-  Real eroot = root.itp(res, emin, emax, 1.e-10*P, emin-1.e10);
+  Real eroot = root.regula_falsi(res, emin, emax, 1.e-10*P, emin-1.e10);
   return rho*eroot;
 }
 
