@@ -43,20 +43,19 @@ namespace Geometry {
 // Usually applied to Kerr-Schild to form the FMKS coordinate system
 // Use in conjunction with the Modified coordinate system.
 class McKinneyGammieRyan {
-public:
+ public:
   McKinneyGammieRyan()
-      : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(0),
-        smooth_(0.5), norm_(GetNorm_(alpha_, xt_)) {}
+      : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(0), smooth_(0.5),
+        norm_(GetNorm_(alpha_, xt_)) {}
   McKinneyGammieRyan(Real x0) // this is the most common use-case
-      : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(x0),
-        smooth_(0.5), norm_(GetNorm_(alpha_, xt_)) {}
+      : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(x0), smooth_(0.5),
+        norm_(GetNorm_(alpha_, xt_)) {}
   McKinneyGammieRyan(bool derefine_poles, Real h, Real xt, Real alpha, Real x0,
                      Real smooth)
       : derefine_poles_(derefine_poles), h_(h), xt_(xt), alpha_(alpha), x0_(x0),
         smooth_(smooth), norm_(GetNorm_(alpha_, xt_)) {}
   KOKKOS_INLINE_FUNCTION
-  void operator()(Real X1, Real X2, Real X3, Real C[NDSPACE],
-                  Real Jcov[NDSPACE][NDSPACE],
+  void operator()(Real X1, Real X2, Real X3, Real C[NDSPACE], Real Jcov[NDSPACE][NDSPACE],
                   Real Jcon[NDSPACE][NDSPACE]) const {
     using robust::ratio;
     Real y, th, thJ;
@@ -88,12 +87,12 @@ public:
     Jcov[0][0] = drdX1;  // r
     Jcov[1][0] = dthdX1; // th
     Jcov[1][1] = dthdX2;
-    Jcov[2][2] = 1.;     // phi
+    Jcov[2][2] = 1.; // phi
     // Jcon
     Jcon[0][0] = ratio(1., drdX1);               // r
     Jcon[1][0] = -ratio(dthdX1, drdX1 * dthdX2); // th
     Jcon[1][1] = ratio(1., dthdX2);
-    Jcon[2][2] = 1.;                                    // phi
+    Jcon[2][2] = 1.; // phi
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -110,17 +109,15 @@ public:
     Real trans[NDFULL][NDFULL];
     LinearAlgebra::SetZero(trans, NDFULL, NDFULL);
     const Real r = r_(x1);
-    const Real idenom = 1.0/(r*r - 2.0*r + a*a);
+    const Real idenom = 1.0 / (r * r - 2.0 * r + a * a);
     trans[0][0] = 1.0;
-    trans[0][1] = 2.0*r*idenom;
+    trans[0][1] = 2.0 * r * idenom;
     trans[1][1] = 1.0;
     trans[2][2] = 1.0;
-    trans[3][1] = a*idenom;
+    trans[3][1] = a * idenom;
     trans[3][3] = 1.0;
     LinearAlgebra::SetZero(ucon_ks, NDFULL);
-    SPACETIMELOOP2(mu,nu) {
-      ucon_ks[mu] += trans[mu][nu]*ucon_bl[nu];
-    }
+    SPACETIMELOOP2(mu, nu) { ucon_ks[mu] += trans[mu][nu] * ucon_bl[nu]; }
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -136,16 +133,12 @@ public:
     Real trans[NDFULL][NDFULL];
     LinearAlgebra::SetZero(trans, NDFULL, NDFULL);
     trans[0][0] = 1.0;
-    SPACELOOP2(i,j) {
-      trans[i+1][j+1] = Jcon[i][j];
-    }
+    SPACELOOP2(i, j) { trans[i + 1][j + 1] = Jcon[i][j]; }
     LinearAlgebra::SetZero(ucon_fmks, NDFULL);
-    SPACETIMELOOP2(mu,nu) {
-      ucon_fmks[mu] += trans[mu][nu]*ucon_ks[nu];
-    }
+    SPACETIMELOOP2(mu, nu) { ucon_fmks[mu] += trans[mu][nu] * ucon_ks[nu]; }
   }
 
-private:
+ private:
   KOKKOS_INLINE_FUNCTION
   Real r_(const Real X1) const { return std::exp(X1); }
   KOKKOS_INLINE_FUNCTION
@@ -160,8 +153,7 @@ private:
       th = thG;
     }
     // coordinate singularity fix at the poles. Avoid theta = 0.
-    if (std::abs(th) < robust::EPS())
-      th = robust::sgn(th) * robust::EPS();
+    if (std::abs(th) < robust::EPS()) th = robust::sgn(th) * robust::EPS();
   }
   KOKKOS_INLINE_FUNCTION
   Real thG_(Real X2) const {
@@ -170,13 +162,11 @@ private:
   KOKKOS_INLINE_FUNCTION
   void thJ_(Real X2, Real &y, Real &thJ) const {
     y = 2. * X2 - 1.;
-    thJ = norm_ * y * (1. + std::pow(y / xt_, alpha_) / (alpha_ + 1.)) +
-          0.5 * M_PI;
+    thJ = norm_ * y * (1. + std::pow(y / xt_, alpha_) / (alpha_ + 1.)) + 0.5 * M_PI;
   }
   KOKKOS_INLINE_FUNCTION
   Real GetNorm_(Real alpha, Real xt) const {
-    return 0.5 * M_PI * 1. /
-           (1. + 1. / (alpha_ + 1.) * 1. / std::pow(xt_, alpha_));
+    return 0.5 * M_PI * 1. / (1. + 1. / (alpha_ + 1.) * 1. / std::pow(xt_, alpha_));
   }
   bool derefine_poles_ = true;
   Real h_ = 0.3;

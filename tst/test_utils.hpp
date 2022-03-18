@@ -40,8 +40,8 @@ bool SoftEquiv(const Real &val, const Real &ref, const Real tol = 1.e-8,
   }
 }
 
-/* Create a dummy MeshBlock with a single dummy package and field. 1D grid assumed. Useful for
- * constructing other objects e.g. MeshBlockData<Real> and CoordSysMeshBlock
+/* Create a dummy MeshBlock with a single dummy package and field. 1D grid assumed. Useful
+ * for constructing other objects e.g. MeshBlockData<Real> and CoordSysMeshBlock
  *
  * PARAM[IN] - nzones - Number of zones in x direction
  *
@@ -52,14 +52,15 @@ std::shared_ptr<MeshBlock> inline GetDummyMeshBlock(const int nzones = 8) {
 }
 
 /*
- * Create a dummy MeshBlockData with a single dummy package and field. 1D grid assumed. Useful for
- * constructing other objects e.g. CoordSysMeshBlocks.
+ * Create a dummy MeshBlockData with a single dummy package and field. 1D grid assumed.
+ * Useful for constructing other objects e.g. CoordSysMeshBlocks.
  *
  * PARAM[IN] - pmb - shared_ptr to existing MeshBlock
  *
  * RETURN Trivial MeshBlockData<Real>
  */
-std::shared_ptr<MeshBlockData<Real>> inline GetDummyMeshBlockData(std::shared_ptr<MeshBlock> pmb) {
+std::shared_ptr<MeshBlockData<Real>> inline GetDummyMeshBlockData(
+    std::shared_ptr<MeshBlock> pmb) {
   auto pkg = std::make_shared<StateDescriptor>("Dummy package");
   std::vector<int> scalar_shape{1, 1, 1};
   Metadata m({Metadata::Independent, Metadata::WithFluxes}, scalar_shape);

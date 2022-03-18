@@ -32,8 +32,7 @@
 #include <utils/error_checking.hpp>
 
 // statically defined vars from riemann.hpp
-std::vector<std::string> riemann::FluxState::recon_vars,
-    riemann::FluxState::flux_vars;
+std::vector<std::string> riemann::FluxState::recon_vars, riemann::FluxState::flux_vars;
 
 namespace fluid {
 
@@ -76,8 +75,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("c2p_max_iter", c2p_max_iter);
 
     std::string recon = pin->GetOrAddString("fluid", "recon", "linear");
-    PhoebusReconstruction::ReconType rt =
-        PhoebusReconstruction::ReconType::linear;
+    PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;
     if (recon == "weno5" || recon == "weno5z") {
       PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
                                "weno5 requires 4+ ghost cells");
@@ -96,8 +94,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     } else if (recon == "linear") {
       rt = PhoebusReconstruction::ReconType::linear;
     } else {
-      PARTHENON_THROW(
-          "Invalid Reconstruction option.  Choose from [linear,weno5]");
+      PARTHENON_THROW("Invalid Reconstruction option.  Choose from [linear,weno5]");
     }
     params.Add("Recon", rt);
 
@@ -124,18 +121,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const std::string bc_vars = pin->GetOrAddString("phoebus/mesh", "bc_vars", "conserved");
   params.Add("bc_vars", bc_vars);
 
-  Metadata  mprim_threev =
-      Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
-                Metadata::Derived, Metadata::OneCopy},
-               three_vec);
-  Metadata mprim_scalar = Metadata({Metadata::Cell, Metadata::Intensive,
-                                    Metadata::Derived, Metadata::OneCopy});
+  Metadata mprim_threev = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
+                                    Metadata::Derived, Metadata::OneCopy},
+                                   three_vec);
+  Metadata mprim_scalar = Metadata(
+      {Metadata::Cell, Metadata::Intensive, Metadata::Derived, Metadata::OneCopy});
   Metadata mcons_scalar =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::WithFluxes});
+                Metadata::Conserved, Metadata::WithFluxes});
   Metadata mcons_threev =
       Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-            Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
+                Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
                three_vec);
 
   if (bc_vars == "conserved") {
@@ -149,8 +145,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     mcons_scalar.Set(Metadata::FillGhost);
     mcons_threev.Set(Metadata::FillGhost);
   } else {
-    PARTHENON_REQUIRE_THROWS(bc_vars == "conserved" || bc_vars == "primitive",
-      "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
+    PARTHENON_REQUIRE_THROWS(
+        bc_vars == "conserved" || bc_vars == "primitive",
+        "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
 
   // TODO(BRR) Should these go in a "phoebus" package?
@@ -209,14 +206,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 #if SET_FLUX_SRC_DIAGS
   // DIAGNOSTIC STUFF FOR DEBUGGING
-  std::vector<int> five_vec(1,5);
+  std::vector<int> five_vec(1, 5);
   Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
-                             Metadata::Derived, Metadata::OneCopy},
-                             five_vec);
+                            Metadata::Derived, Metadata::OneCopy},
+                           five_vec);
   physics->AddField(diag::divf, mdiv);
   Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                              Metadata::Derived, Metadata::OneCopy},
-                             five_vec);
+                            five_vec);
   physics->AddField(diag::src_terms, mdiag);
 #endif
 
@@ -224,17 +221,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // add the base state for reconstruction/fluxes
   std::vector<std::string> rvars({p::density, p::velocity, p::energy});
   riemann::FluxState::ReconVars(rvars);
-  if (mhd)
-    riemann::FluxState::ReconVars(p::bfield);
-  if (ye)
-    riemann::FluxState::ReconVars(p::ye);
+  if (mhd) riemann::FluxState::ReconVars(p::bfield);
+  if (ye) riemann::FluxState::ReconVars(p::ye);
 
   std::vector<std::string> fvars({c::density, c::momentum, c::energy});
   riemann::FluxState::FluxVars(fvars);
-  if (mhd)
-    riemann::FluxState::FluxVars(c::bfield);
-  if (ye)
-    riemann::FluxState::FluxVars(c::ye);
+  if (mhd) riemann::FluxState::FluxVars(c::bfield);
+  if (ye) riemann::FluxState::FluxVars(c::ye);
 
   // add some extra fields for reconstruction
   rvars = std::vector<std::string>({p::pressure, p::gamma1});
@@ -253,22 +246,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   std::vector<int> recon_shape({nrecon, ndim});
-  Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-			     recon_shape);
+  Metadata mrecon =
+      Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, recon_shape);
   physics->AddField(impl::ql, mrecon);
   physics->AddField(impl::qr, mrecon);
 
   std::vector<int> signal_shape(1, ndim);
   Metadata msignal =
-	  Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-		   signal_shape);
+      Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, signal_shape);
   physics->AddField(impl::face_signal_speed, msignal);
   physics->AddField(impl::cell_signal_speed, msignal);
 
   std::vector<int> c2p_scratch_size(1, 5);
   Metadata c2p_meta =
-	  Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-		   c2p_scratch_size);
+      Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, c2p_scratch_size);
   physics->AddField(impl::c2p_scratch, c2p_meta);
 
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
@@ -277,7 +268,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return physics;
 }
 
-//template <typename T>
+// template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -287,16 +278,16 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
 }
 
 // template <typename T>
-TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange &ib, const IndexRange &jb, const IndexRange &kb) {
+TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange &ib,
+                                      const IndexRange &jb, const IndexRange &kb) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  const std::vector<std::string> vars({p::density, c::density, p::velocity,
-                                       c::momentum, p::energy, c::energy, p::bfield,
-                                       c::bfield, p::ye, c::ye, p::pressure, p::gamma1,
-                                       impl::cell_signal_speed});
+  const std::vector<std::string> vars(
+      {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
+       c::bfield, p::ye, c::ye, p::pressure, p::gamma1, impl::cell_signal_speed});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -323,10 +314,9 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(), 0, v.GetDim(5) - 1,
-      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
+      jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-
         Real gcov4[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
         Real gcon[3][3];
@@ -337,14 +327,13 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
 
         Real S[3];
-        const Real vel[] = {v(b, pvel_lo, k, j, i),
-                            v(b, pvel_lo+1, k, j, i),
+        const Real vel[] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
                             v(b, pvel_hi, k, j, i)};
         Real bcons[3];
         Real bp[3] = {0.0, 0.0, 0.0};
         if (pb_hi > 0) {
           bp[0] = v(b, pb_lo, k, j, i);
-          bp[1] = v(b, pb_lo+1, k, j, i);
+          bp[1] = v(b, pb_lo + 1, k, j, i);
           bp[2] = v(b, pb_hi, k, j, i);
         }
         Real ye_cons;
@@ -355,17 +344,17 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 
         Real sig[3];
         prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
-            v(b, prs, k, j, i), v(b, gm1, k, j, i),
-            gcov4, gcon, shift, lapse, gdet,
-            v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons, sig);
+                      v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov4, gcon, shift, lapse,
+                      gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,
+                      sig);
 
         v(b, cmom_lo, k, j, i) = S[0];
-        v(b, cmom_lo+1, k, j, i) = S[1];
+        v(b, cmom_lo + 1, k, j, i) = S[1];
         v(b, cmom_hi, k, j, i) = S[2];
 
         if (pb_hi > 0) {
           v(b, cb_lo, k, j, i) = bcons[0];
-          v(b, cb_lo+1, k, j, i) = bcons[1];
+          v(b, cb_lo + 1, k, j, i) = bcons[1];
           v(b, cb_hi, k, j, i) = bcons[2];
         }
 
@@ -374,7 +363,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         }
 
         for (int m = sig_lo; m <= sig_hi; m++) {
-          v(b, m, k, j, i) = sig[m-sig_lo];
+          v(b, m, k, j, i) = sig[m - sig_lo];
         }
       });
 
@@ -414,13 +403,13 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   auto fail = rc->Get(internal_variables::fail).data;
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
-      invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0, invert.NumBlocks() - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         auto status = invert(geom, eos, coords, k, j, i);
         fail(k, j, i) = (status == con2prim_robust::ConToPrimStatus::success
-                                 ? con2prim_robust::FailFlags::success
-                                 : con2prim_robust::FailFlags::fail);
+                             ? con2prim_robust::FailFlags::success
+                             : con2prim_robust::FailFlags::fail);
       });
 
   return TaskStatus::complete;
@@ -428,7 +417,7 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
 
 template <typename T>
 TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexRange &jb,
-                                      const IndexRange &kb) {
+                                       const IndexRange &kb) {
   using namespace con2prim;
   auto *pmb = rc->GetParentPointer().get();
 
@@ -452,18 +441,18 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   // TODO(JCD): revisit this.  don't think it's required anymore.  in fact the
   //            original performance thing was related to the loop being a reduce
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Setup", DevExecSpace(), 0,
-      invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Setup", DevExecSpace(), 0, invert.NumBlocks() - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         invert.Setup(geom, k, j, i);
       });
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0,
-      invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0, invert.NumBlocks() - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         auto status = invert(eos, k, j, i);
-        fail(k, j, i) = (status == ConToPrimStatus::success ? FailFlags::success
-                                                            : FailFlags::fail);
+        fail(k, j, i) =
+            (status == ConToPrimStatus::success ? FailFlags::success : FailFlags::fail);
       });
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Finalize", DevExecSpace(), 0,
@@ -483,7 +472,8 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> vars({fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
+  std::vector<std::string> vars(
+      {fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
   PackIndexMap imap;
   auto divf = rc->PackVariables(vars, imap);
   const int crho = imap[fluid_cons::density].first;
@@ -494,16 +484,14 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   auto diag = rc->PackVariables(diag_vars);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e,
-      jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        diag(0,k,j,i) = divf(crho,k,j,i);
-        diag(1,k,j,i) = divf(cmom_lo,k,j,i);
-        diag(2,k,j,i) = divf(cmom_lo+1,k,j,i);
-        diag(3,k,j,i) = divf(cmom_lo+2,k,j,i);
-        diag(4,k,j,i) = divf(ceng,k,j,i);
-      }
-  );
+      DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
+      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        diag(0, k, j, i) = divf(crho, k, j, i);
+        diag(1, k, j, i) = divf(cmom_lo, k, j, i);
+        diag(2, k, j, i) = divf(cmom_lo + 1, k, j, i);
+        diag(3, k, j, i) = divf(cmom_lo + 2, k, j, i);
+        diag(4, k, j, i) = divf(ceng, k, j, i);
+      });
   return TaskStatus::complete;
 }
 #endif
@@ -536,37 +524,34 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e,
-      jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
+      ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real Tmunu[ND][ND], dg[ND][ND][ND], gam[ND][ND][ND];
         tmunu(Tmunu, k, j, i);
-	      Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
+        Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
 
         geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
         Geometry::Utils::SetConnectionCoeffFromMetricDerivs(dg, gam);
         // momentum source terms
         SPACELOOP(l) {
           Real src_mom = 0.0;
-          SPACETIMELOOP2(m,n) {
-            src_mom += Tmunu[m][n] * (dg[n][l+1][m] - gam[l+1][n][m]);
+          SPACETIMELOOP2(m, n) {
+            src_mom += Tmunu[m][n] * (dg[n][l + 1][m] - gam[l + 1][n][m]);
           }
-          src(cmom_lo + l, k, j, i) = gdet*src_mom;
+          src(cmom_lo + l, k, j, i) = gdet * src_mom;
         }
 
         // energy source term
         {
           Real TGam = 0.0;
-          #if USE_VALENCIA
+#if USE_VALENCIA
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-          const Real inv_alpha2 = robust::ratio(1,alpha*alpha);
+          const Real inv_alpha2 = robust::ratio(1, alpha * alpha);
           Real shift[NS];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
-          Real gcon0[4] = {-inv_alpha2,
-                           inv_alpha2*shift[0],
-                           inv_alpha2*shift[1],
-                           inv_alpha2*shift[2]};
+          Real gcon0[4] = {-inv_alpha2, inv_alpha2 * shift[0], inv_alpha2 * shift[1],
+                           inv_alpha2 * shift[2]};
           for (int m = 0; m < ND; m++) {
             for (int n = 0; n < ND; n++) {
               Real gam0 = 0;
@@ -578,26 +563,26 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           Real Ta = 0.0;
           Real da[ND];
-          //Real *da = &gam[1][0][0];
+          // Real *da = &gam[1][0][0];
           geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
           for (int m = 0; m < ND; m++) {
             Ta += Tmunu[m][0] * da[m];
           }
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
-          #else
+#else
           SPACETIMELOOP2(mu, nu) {
             TGam += Tmunu[mu][nu] * gam[nu][0][mu];
           }
           src(ceng,k,j,i) = gdet * TGam;
-          #endif // USE_VALENCIA
+#endif // USE_VALENCIA
         }
 
 #if SET_FLUX_SRC_DIAGS
         src(idiag, k, j, i) = 0.0;
-        src(idiag+1, k, j, i) = src(cmom_lo, k, j, i);
-        src(idiag+2, k, j, i) = src(cmom_lo+1, k, j, i);
-        src(idiag+3, k, j, i) = src(cmom_lo+2, k, j, i);
-        src(idiag+4, k, j, i) = src(ceng, k, j, i);
+        src(idiag + 1, k, j, i) = src(cmom_lo, k, j, i);
+        src(idiag + 2, k, j, i) = src(cmom_lo + 1, k, j, i);
+        src(idiag + 3, k, j, i) = src(cmom_lo + 2, k, j, i);
+        src(idiag + 4, k, j, i) = src(ceng, k, j, i);
 #endif
       });
 
@@ -620,18 +605,15 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   const int dk = (pmb->pmy_mesh->ndim == 3 ? 1 : 0);
   const int dj = (pmb->pmy_mesh->ndim > 1 ? 1 : 0);
   const int nrecon = flux.ql.GetDim(4) - 1;
-  auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>(
-      "Recon");
+  auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>("Recon");
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
-#define RECON(method)                                                          \
-  parthenon::par_for(                                                          \
-      DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(), X1DIR,              \
-      pmb->pmy_mesh->ndim, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj,         \
-      jb.e + dj, ib.s - 1, ib.e + 1,                                           \
-      KOKKOS_LAMBDA(const int d, const int n, const int k, const int j,        \
-                    const int i) {                                             \
-        method(d, n, k, j, i, flux.v, flux.ql, flux.qr);                       \
+#define RECON(method)                                                                    \
+  parthenon::par_for(                                                                    \
+      DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(), X1DIR, pmb->pmy_mesh->ndim,   \
+      0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj, ib.s - 1, ib.e + 1,         \
+      KOKKOS_LAMBDA(const int d, const int n, const int k, const int j, const int i) {   \
+        method(d, n, k, j, i, flux.v, flux.ql, flux.qr);                                 \
       });
   switch (rt) {
   case PhoebusReconstruction::ReconType::weno5z:
@@ -651,13 +633,12 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   }
 #undef RECON
 
-#define FLUX(method)                                                           \
-  parthenon::par_for(                                                          \
-      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(), X1DIR,          \
-      pmb->pmy_mesh->ndim, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,         \
-      ib.s - 1, ib.e + 1,                                                      \
-      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {      \
-        sig(d - 1, k, j, i) = method(flux, d, k, j, i);                        \
+#define FLUX(method)                                                                     \
+  parthenon::par_for(                                                                    \
+      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(), X1DIR,                    \
+      pmb->pmy_mesh->ndim, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj, ib.s - 1,         \
+      ib.e + 1, KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {      \
+        sig(d - 1, k, j, i) = method(flux, d, k, j, i);                                  \
       });
   switch (st) {
   case riemann::solver::LLF:
@@ -677,12 +658,12 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 TaskStatus FluxCT(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
   auto &fluid = pmb->packages.Get("fluid");
-  if (!fluid->Param<bool>("mhd") || !fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
+  if (!fluid->Param<bool>("mhd") || !fluid->Param<bool>("active") ||
+      fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
 
   const int ndim = pmb->pmy_mesh->ndim;
-  if (ndim == 1)
-    return TaskStatus::complete;
+  if (ndim == 1) return TaskStatus::complete;
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -694,16 +675,14 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
 
   if (ndim == 2) {
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FluxCT::EMF::2D", DevExecSpace(), kb.s, kb.e,
-        jb.s, jb.e + 1, ib.s, ib.e + 1,
-        KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          emf(k, j, i) = 0.25 * (f1(1, k, j, i) + f1(1, k, j - 1, i) -
-                                 f2(0, k, j, i) - f2(0, k, j, i - 1));
+        DEFAULT_LOOP_PATTERN, "FluxCT::EMF::2D", DevExecSpace(), kb.s, kb.e, jb.s,
+        jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          emf(k, j, i) = 0.25 * (f1(1, k, j, i) + f1(1, k, j - 1, i) - f2(0, k, j, i) -
+                                 f2(0, k, j, i - 1));
         });
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FluxCT::Flux::2D", DevExecSpace(), kb.s, kb.e,
-        jb.s, jb.e + 1, ib.s, ib.e + 1,
-        KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        DEFAULT_LOOP_PATTERN, "FluxCT::Flux::2D", DevExecSpace(), kb.s, kb.e, jb.s,
+        jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           f1(0, k, j, i) = 0.0;
           f1(1, k, j, i) = 0.5 * (emf(k, j, i) + emf(k, j + 1, i));
           f2(0, k, j, i) = -0.5 * (emf(k, j, i) + emf(k, j, i + 1));
@@ -711,20 +690,18 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
         });
   } else if (ndim == 3) {
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FluxCT::EMF::3D", DevExecSpace(), kb.s, kb.e + 1,
-        jb.s, jb.e + 1, ib.s, ib.e + 1,
-        KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          emf(0, k, j, i) = 0.25 * (f2(2, k, j, i) + f2(2, k - 1, j, i) -
-                                    f3(1, k, j, i) - f3(1, k, j - 1, i));
+        DEFAULT_LOOP_PATTERN, "FluxCT::EMF::3D", DevExecSpace(), kb.s, kb.e + 1, jb.s,
+        jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          emf(0, k, j, i) = 0.25 * (f2(2, k, j, i) + f2(2, k - 1, j, i) - f3(1, k, j, i) -
+                                    f3(1, k, j - 1, i));
           emf(1, k, j, i) = -0.25 * (f1(2, k, j, i) + f1(2, k - 1, j, i) -
                                      f3(0, k, j, i) - f3(0, k, j, i - 1));
-          emf(2, k, j, i) = 0.25 * (f1(1, k, j, i) + f1(1, k, j - 1, i) -
-                                    f2(0, k, j, i) - f2(0, k, j, i - 1));
+          emf(2, k, j, i) = 0.25 * (f1(1, k, j, i) + f1(1, k, j - 1, i) - f2(0, k, j, i) -
+                                    f2(0, k, j, i - 1));
         });
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FluxCT::Flux::3D", DevExecSpace(), kb.s,
-        kb.e + 1, jb.s, jb.e + 1, ib.s, ib.e + 1,
-        KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        DEFAULT_LOOP_PATTERN, "FluxCT::Flux::3D", DevExecSpace(), kb.s, kb.e + 1, jb.s,
+        jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           f1(0, k, j, i) = 0.0;
           f1(1, k, j, i) = 0.5 * (emf(2, k, j, i) + emf(2, k, j + 1, i));
           f1(2, k, j, i) = -0.5 * (emf(1, k, j, i) + emf(1, k + 1, j, i));
@@ -742,10 +719,8 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
 
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetBlockPointer();
-  if (!pmb->packages.Get("fluid")->Param<bool>("active"))
-    return TaskStatus::complete;
-  if (!pmb->packages.Get("fluid")->Param<bool>("mhd"))
-    return TaskStatus::complete;
+  if (!pmb->packages.Get("fluid")->Param<bool>("active")) return TaskStatus::complete;
+  if (!pmb->packages.Get("fluid")->Param<bool>("mhd")) return TaskStatus::complete;
 
   const int ndim = pmb->pmy_mesh->ndim;
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -759,41 +734,38 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
     // todo(jcd): these are supposed to be node centered, and this misses the
     // high boundaries
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "DivB::2D", DevExecSpace(), kb.s, kb.e, jb.s,
-        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        DEFAULT_LOOP_PATTERN, "DivB::2D", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           divb(k, j, i) = 0.5 *
-                              (b(0, k, j, i) + b(0, k, j - 1, i) -
-                               b(0, k, j, i - 1) - b(0, k, j - 1, i - 1)) /
+                              (b(0, k, j, i) + b(0, k, j - 1, i) - b(0, k, j, i - 1) -
+                               b(0, k, j - 1, i - 1)) /
                               coords.Dx(X1DIR, k, j, i) +
                           0.5 *
-                              (b(1, k, j, i) + b(1, k, j, i - 1) -
-                               b(1, k, j - 1, i) - b(1, k, j - 1, i - 1)) /
+                              (b(1, k, j, i) + b(1, k, j, i - 1) - b(1, k, j - 1, i) -
+                               b(1, k, j - 1, i - 1)) /
                               coords.Dx(X2DIR, k, j, i);
         });
   } else if (ndim == 3) {
     // todo(jcd): these are supposed to be node centered, and this misses the
     // high boundaries
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "DivB::3D", DevExecSpace(), kb.s, kb.e, jb.s,
-        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        DEFAULT_LOOP_PATTERN, "DivB::3D", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           divb(k, j, i) =
               0.25 *
                   (b(0, k, j, i) + b(0, k, j - 1, i) + b(0, k - 1, j, i) +
-                   b(0, k - 1, j - 1, i) - b(0, k, j, i - 1) -
-                   b(0, k, j - 1, i - 1) - b(0, k - 1, j, i - 1) -
-                   b(0, k - 1, j - 1, i - 1)) /
+                   b(0, k - 1, j - 1, i) - b(0, k, j, i - 1) - b(0, k, j - 1, i - 1) -
+                   b(0, k - 1, j, i - 1) - b(0, k - 1, j - 1, i - 1)) /
                   coords.Dx(X1DIR, k, j, i) +
               0.25 *
                   (b(1, k, j, i) + b(1, k, j, i - 1) + b(1, k - 1, j, i) +
-                   b(1, k - 1, j, i - 1) - b(1, k, j - 1, i) -
-                   b(1, k, j - 1, i - 1) - b(1, k - 1, j - 1, i) -
-                   b(1, k - 1, j - 1, i - 1)) /
+                   b(1, k - 1, j, i - 1) - b(1, k, j - 1, i) - b(1, k, j - 1, i - 1) -
+                   b(1, k - 1, j - 1, i) - b(1, k - 1, j - 1, i - 1)) /
                   coords.Dx(X2DIR, k, j, i) +
               0.25 *
                   (b(2, k, j, i) + b(2, k, j, i - 1) + b(2, k, j - 1, i) +
-                   b(2, k, j - 1, i - 1) - b(2, k - 1, j, i) -
-                   b(2, k - 1, j, i - 1) - b(2, k - 1, j - 1, i) -
-                   b(2, k - 1, j - 1, i - 1)) /
+                   b(2, k, j - 1, i - 1) - b(2, k - 1, j, i) - b(2, k - 1, j, i - 1) -
+                   b(2, k - 1, j - 1, i) - b(2, k - 1, j - 1, i - 1)) /
                   coords.Dx(X3DIR, k, j, i);
         });
   }
@@ -822,9 +794,9 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
             const int di = (d == 0);
             const int dj = (d == 1);
             const int dk = (d == 2);
-            const Real max_s = std::max(
-                csig(d, k, j, i),
-                std::max(fsig(d, k, j, i), fsig(d, k + dk, j + dj, i + di)));
+            const Real max_s =
+                std::max(csig(d, k, j, i),
+                         std::max(fsig(d, k, j, i), fsig(d, k + dk, j + dj, i + di)));
             ldt += max_s / coords.Dx(X1DIR + d, k, j, i);
           }
           lmin_dt = std::min(lmin_dt, 1.0 / (ldt + 1.e-50));
@@ -846,6 +818,5 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   const auto &cfl = pars.Get<Real>("cfl");
   return cfl * min_dt;
 }
-
 
 } // namespace fluid

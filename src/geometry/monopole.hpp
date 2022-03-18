@@ -491,7 +491,7 @@ class MonopoleCart {
     const Real irho = ratio(1., rho);
     const Real irho3 = ratio(1., rho3);
     const Real irho4 = ratio(1., rho4);
-    const Real ir3 = ratio(1.,r3);
+    const Real ir3 = ratio(1., r3);
     const Real ir4 = ratio(1., r4);
 
     LinearAlgebra::SetZero(H, NDFULL, NDFULL, NDFULL);

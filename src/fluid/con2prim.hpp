@@ -41,17 +41,17 @@ struct FailFlags {
 };
 
 class Residual {
-public:
+ public:
   KOKKOS_FUNCTION
-  Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
-           const Real BdotS, const singularity::EOS &eos)
+  Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq, const Real BdotS,
+           const singularity::EOS &eos)
       : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
         Ye_(std::numeric_limits<Real>::signaling_NaN()), eos_(eos) {}
   KOKKOS_FUNCTION
-  Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq,
-           const Real BdotS, const Real Ye, const singularity::EOS &eos)
-      : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
-        Ye_(Ye), eos_(eos) {
+  Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq, const Real BdotS,
+           const Real Ye, const singularity::EOS &eos)
+      : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS), Ye_(Ye),
+        eos_(eos) {
     lambda_[0] = Ye_;
   }
   KOKKOS_FORCEINLINE_FUNCTION
@@ -62,8 +62,7 @@ public:
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real taufunc(const Real z, const Real Wp, const Real p) {
-    return (tau_ + D_ - z - Bsq_ + BdotSsq_ / (2.0 * z * z) + p) * Wp * Wp +
-           0.5 * Bsq_;
+    return (tau_ + D_ - z - Bsq_ + BdotSsq_ / (2.0 * z * z) + p) * Wp * Wp + 0.5 * Bsq_;
   }
   KOKKOS_FORCEINLINE_FUNCTION
   void operator()(const Real rho, const Real Temp, Real res[2]) {
@@ -77,18 +76,19 @@ public:
 #ifndef NDEBUG
   KOKKOS_INLINE_FUNCTION
   void print() {
-    printf("Residual Report: %16.14g %16.14g %16.14g %16.14g %16.14g\n", D_,
-           tau_, Bsq_, Ssq_, BdotSsq_);
+    printf("Residual Report: %16.14g %16.14g %16.14g %16.14g %16.14g\n", D_, tau_, Bsq_,
+           Ssq_, BdotSsq_);
   }
 #endif
-private:
+ private:
   const singularity::EOS &eos_;
   const Real D_, tau_, Bsq_, Ssq_, BdotSsq_, Ye_;
   Real lambda_[2] = {0., 0.};
 };
 
-template <typename T> class VarAccessor {
-public:
+template <typename T>
+class VarAccessor {
+ public:
   KOKKOS_FUNCTION
   VarAccessor(const T &var, const int k, const int j, const int i)
       : var_(var), b_(0), k_(k), j_(j), i_(i) {}
@@ -97,15 +97,15 @@ public:
   KOKKOS_FORCEINLINE_FUNCTION
   Real &operator()(const int n) const { return var_(b_, n, k_, j_, i_); }
 
-private:
+ private:
   const T &var_;
   const int b_, i_, j_, k_;
 };
 
 struct CellGeom {
   template <typename CoordinateSystem>
-  KOKKOS_FUNCTION CellGeom(const CoordinateSystem &geom, const int k,
-                           const int j, const int i)
+  KOKKOS_FUNCTION CellGeom(const CoordinateSystem &geom, const int k, const int j,
+                           const int i)
       : gdet(geom.DetGamma(CellLocation::Cent, k, j, i)),
         lapse(geom.Lapse(CellLocation::Cent, k, j, i)) {
     geom.Metric(CellLocation::Cent, k, j, i, gcov);
@@ -128,27 +128,21 @@ struct CellGeom {
   const Real lapse;
 };
 
-template <typename Data_t, typename T> class ConToPrim {
-public:
+template <typename Data_t, typename T>
+class ConToPrim {
+ public:
   ConToPrim(Data_t *rc, const Real tol, const int max_iterations)
       : ConToPrim(rc, PackIndexMap(), tol, max_iterations) {}
-  ConToPrim(Data_t *rc, PackIndexMap imap, const Real tol,
-            const int max_iterations)
-      : var(rc->PackVariables(Vars(), imap)),
-        prho(imap[fluid_prim::density].first),
-        crho(imap[fluid_cons::density].first),
-        pvel_lo(imap[fluid_prim::velocity].first),
+  ConToPrim(Data_t *rc, PackIndexMap imap, const Real tol, const int max_iterations)
+      : var(rc->PackVariables(Vars(), imap)), prho(imap[fluid_prim::density].first),
+        crho(imap[fluid_cons::density].first), pvel_lo(imap[fluid_prim::velocity].first),
         pvel_hi(imap[fluid_prim::velocity].second),
         cmom_lo(imap[fluid_cons::momentum].first),
-        cmom_hi(imap[fluid_cons::momentum].second),
-        peng(imap[fluid_prim::energy].first),
-        ceng(imap[fluid_cons::energy].first),
-        pb_lo(imap[fluid_prim::bfield].first),
-        pb_hi(imap[fluid_prim::bfield].second),
-        cb_lo(imap[fluid_cons::bfield].first),
-        cb_hi(imap[fluid_cons::bfield].second),
-        pye(imap[fluid_prim::ye].second), cye(imap[fluid_cons::ye].second),
-        prs(imap[fluid_prim::pressure].first),
+        cmom_hi(imap[fluid_cons::momentum].second), peng(imap[fluid_prim::energy].first),
+        ceng(imap[fluid_cons::energy].first), pb_lo(imap[fluid_prim::bfield].first),
+        pb_hi(imap[fluid_prim::bfield].second), cb_lo(imap[fluid_cons::bfield].first),
+        cb_hi(imap[fluid_cons::bfield].second), pye(imap[fluid_prim::ye].second),
+        cye(imap[fluid_cons::ye].second), prs(imap[fluid_prim::pressure].first),
         tmp(imap[fluid_prim::temperature].first),
         sig_lo(imap[internal_variables::cell_signal_speed].first),
         sig_hi(imap[internal_variables::cell_signal_speed].second),
@@ -159,16 +153,14 @@ public:
   std::vector<std::string> Vars() {
     return std::vector<std::string>(
         {fluid_prim::density, fluid_cons::density, fluid_prim::velocity,
-         fluid_cons::momentum, fluid_prim::energy, fluid_cons::energy,
-         fluid_prim::bfield, fluid_cons::bfield, fluid_prim::ye, fluid_cons::ye,
-         fluid_prim::pressure, fluid_prim::temperature,
-         internal_variables::cell_signal_speed, fluid_prim::gamma1,
-         internal_variables::c2p_scratch});
+         fluid_cons::momentum, fluid_prim::energy, fluid_cons::energy, fluid_prim::bfield,
+         fluid_cons::bfield, fluid_prim::ye, fluid_cons::ye, fluid_prim::pressure,
+         fluid_prim::temperature, internal_variables::cell_signal_speed,
+         fluid_prim::gamma1, internal_variables::c2p_scratch});
   }
 
   template <typename CoordinateSystem, class... Args>
-  KOKKOS_INLINE_FUNCTION void Setup(const CoordinateSystem &geom,
-                                    Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void Setup(const CoordinateSystem &geom, Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
     setup(v, g);
@@ -176,7 +168,7 @@ public:
 
   template <class... Args>
   KOKKOS_INLINE_FUNCTION ConToPrimStatus operator()(const singularity::EOS &eos,
-                                                    Args &&... args) const {
+                                                    Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     return solve(v, eos);
   }
@@ -184,7 +176,7 @@ public:
   template <typename CoordinateSystem, class... Args>
   KOKKOS_INLINE_FUNCTION void Finalize(const singularity::EOS &eos,
                                        const CoordinateSystem &geom,
-                                       Args &&... args) const {
+                                       Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
     finalize(v, g, eos);
@@ -192,7 +184,7 @@ public:
 
   int NumBlocks() { return var.GetDim(5); }
 
-private:
+ private:
   const T var;
   const int prho, crho;
   const int pvel_lo, pvel_hi;
@@ -224,8 +216,8 @@ private:
       lambda[0] = v(pye);
     }
     v(prs) = eos.PressureFromDensityTemperature(rho_guess, T_guess, lambda);
-    v(peng) = rho_guess *
-              eos.InternalEnergyFromDensityTemperature(rho_guess, T_guess, lambda);
+    v(peng) =
+        rho_guess * eos.InternalEnergyFromDensityTemperature(rho_guess, T_guess, lambda);
     const Real H = rho_guess + v(peng) + v(prs);
     v(gm1) = eos.BulkModulusFromDensityTemperature(rho_guess, T_guess, lambda) / v(prs);
 
@@ -235,9 +227,7 @@ private:
     const Real izbsq = 1. / (z + Bsq);
     SPACELOOP(i) {
       Real sconi = 0.0;
-      SPACELOOP(j) {
-        sconi += g.gcon[i][j] * v(cmom_lo + j);
-      }
+      SPACELOOP(j) { sconi += g.gcon[i][j] * v(cmom_lo + j); }
       sconi *= igdet;
       if (pb_lo > 0) {
         v(pvel_lo + i) = izbsq * (sconi + BdotS * v(pb_lo + i) / z);
@@ -264,17 +254,15 @@ private:
     }
 
     // Convert from three-velocity to phoebus primitive veloity
-    SPACELOOP(ii) {
-      v(pvel_lo + ii) = W*v(pvel_lo + ii);
-    }
+    SPACELOOP(ii) { v(pvel_lo + ii) = W * v(pvel_lo + ii); }
   }
 
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const singularity::EOS &eos,
                         bool print = false) const {
-    using robust::sgn;
-    using robust::ratio;
     using robust::make_positive;
+    using robust::ratio;
+    using robust::sgn;
     Real &D = v(scr_lo + iD);
     Real &tau = v(scr_lo + itau);
     Real &Bsq = v(scr_lo + iBsq);
@@ -297,12 +285,12 @@ private:
     Real delta_fact = delta_fact_min;
     constexpr Real delta_adj = 1.2;
     constexpr Real idelta_adj = 1. / delta_adj;
-    const Real delta_min = make_positive(rel_tolerance*delta_fact_min);
+    const Real delta_min = make_positive(rel_tolerance * delta_fact_min);
     Rfunc(rho_guess, T_guess, res);
     do {
       Real drho = delta_fact * rho_guess;
       if (std::abs(drho) < delta_min) { // deltas cannot be 0
-        drho = sgn(drho)*delta_min;
+        drho = sgn(drho) * delta_min;
       }
       Real idrho = ratio(1., drho);
       Rfunc(rho_guess + drho, T_guess, resp);
@@ -310,7 +298,7 @@ private:
       jac[1][0] = (resp[1] - res[1]) * idrho;
       Real dT = delta_fact * T_guess;
       if (std::abs(dT) < delta_min) { // deltas cannot be 0
-        dT = sgn(dT)*delta_min;
+        dT = sgn(dT) * delta_min;
       }
       Real idT = ratio(1., dT);
       Rfunc(rho_guess, T_guess + dT, resp);
@@ -333,8 +321,8 @@ private:
       }
 #ifndef NDEBUG
       if (print) {
-        printf("%d %g %g %g %g %g %g\n", iter, rho_guess, T_guess, delta_rho,
-               delta_T, res[0], res[1]);
+        printf("%d %g %g %g %g %g %g\n", iter, rho_guess, T_guess, delta_rho, delta_T,
+               res[0], res[1]);
       }
 #endif
 
@@ -369,11 +357,9 @@ private:
 
     if (!converged) {
 #ifndef NDEBUG
-      printf("ConToPrim failed state: %g %g %g %g %g %g %g\n", rho_guess,
-             T_guess, v(crho), v(cmom_lo), v(cmom_lo + 1), v(cmom_lo + 2),
-             v(ceng));
-      if (!print)
-        solve(v, eos, true);
+      printf("ConToPrim failed state: %g %g %g %g %g %g %g\n", rho_guess, T_guess,
+             v(crho), v(cmom_lo), v(cmom_lo + 1), v(cmom_lo + 2), v(ceng));
+      if (!print) solve(v, eos, true);
 #endif
       return ConToPrimStatus::failure;
     }
@@ -381,8 +367,7 @@ private:
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void setup(const VarAccessor<T> &v,
-                                    const CellGeom &g) const {
+  KOKKOS_INLINE_FUNCTION void setup(const VarAccessor<T> &v, const CellGeom &g) const {
     Real &D = v(scr_lo + iD);
     Real &tau = v(scr_lo + itau);
     Real &Bsq = v(scr_lo + iBsq);
@@ -393,8 +378,7 @@ private:
     tau = v(ceng) * igdet;
 
     // electron fraction
-    if (pye > 0)
-      v(pye) = v(cye) / v(crho);
+    if (pye > 0) v(pye) = v(cye) / v(crho);
 
     BdotS = 0.0;
     Bsq = 0.0;

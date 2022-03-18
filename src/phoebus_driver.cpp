@@ -110,8 +110,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   }
   src_w_diag = src_names;
 #if SET_FLUX_SRC_DIAGS
-  if (fluid_active)
-    src_w_diag.push_back(diagnostic_variables::src_terms);
+  if (fluid_active) src_w_diag.push_back(diagnostic_variables::src_terms);
 #endif
 
   auto num_independent_task_lists = blocks.size();
@@ -141,8 +140,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // pull out a container for the geometric source terms
     auto &gsrc = pmb->meshblock_data.Get("geometric source terms");
 
-    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving,
-                                 sc1.get(), BoundaryCommSubset::all);
+    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc1.get(),
+                                 BoundaryCommSubset::all);
     TaskID geom_src(0);
     TaskID sndrcv_flux_depend(0);
 
@@ -150,26 +149,31 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
       auto fix_flux = tl.AddTask(hydro_flux, fixup::FixFluxes, sc0.get());
       auto hydro_flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
-      auto hydro_geom_src = tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
+      auto hydro_geom_src =
+          tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
       sndrcv_flux_depend = sndrcv_flux_depend | hydro_flux_ct;
       geom_src = geom_src | hydro_geom_src;
     }
 
     if (rad_moments_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-      auto moment_recon = tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get());
-      auto get_opacities = tl.AddTask(moment_recon, radiation::MomentCalculateOpacities<MDT>, sc0.get());
-      auto moment_flux = tl.AddTask(get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());
-      auto moment_geom_src =  tl.AddTask(none, radiation::CalculateGeometricSource<MDT>, sc0.get(), gsrc.get());
+      auto moment_recon =
+          tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get());
+      auto get_opacities =
+          tl.AddTask(moment_recon, radiation::MomentCalculateOpacities<MDT>, sc0.get());
+      auto moment_flux =
+          tl.AddTask(get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());
+      auto moment_geom_src = tl.AddTask(none, radiation::CalculateGeometricSource<MDT>,
+                                        sc0.get(), gsrc.get());
       sndrcv_flux_depend = sndrcv_flux_depend | moment_flux;
       geom_src = geom_src | moment_geom_src;
     }
 
-    auto send_flux =
-        tl.AddTask(sndrcv_flux_depend, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
+    auto send_flux = tl.AddTask(sndrcv_flux_depend,
+                                &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
 
-    auto recv_flux = tl.AddTask(
-        sndrcv_flux_depend, &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
+    auto recv_flux = tl.AddTask(sndrcv_flux_depend,
+                                &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
 
     // compute the divergence of fluxes of conserved variables
     auto flux_div =
@@ -211,7 +215,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (rad_moments_active) {
       auto impl_update = tl.AddTask(update, radiation::MomentFluidSource<MeshData<Real>>,
-                                  sc1.get(), beta*dt, fluid_active);
+                                    sc1.get(), beta * dt, fluid_active);
       update = impl_update | update;
     }
 
@@ -489,8 +493,9 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
                ? tl.AddTask(
                      finish_resolution_reduce,
                      [](std::vector<Real> *res) {
-                       std::cout << "particles made = " << (*res)[0] << " abs = " << (*res)[1]
-                                 << " scatt = " << (*res)[2] << " total = " << (*res)[3] << std::endl;
+                       std::cout << "particles made = " << (*res)[0]
+                                 << " abs = " << (*res)[1] << " scatt = " << (*res)[2]
+                                 << " total = " << (*res)[3] << std::endl;
                        return TaskStatus::complete;
                      },
                      &particle_resolution.val)

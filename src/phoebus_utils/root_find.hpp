@@ -21,24 +21,25 @@ enum class RootFindStatus { success, failure };
 struct RootFind {
   KOKKOS_INLINE_FUNCTION
   RootFind(int max_iterations = std::numeric_limits<int>::max())
-    : iteration_count(0), max_iter(max_iterations) {}
+      : iteration_count(0), max_iter(max_iterations) {}
 
   KOKKOS_INLINE_FUNCTION
-  bool check_bracket(const Real a, const Real b, const Real ya, const Real yb, RootFindStatus *status = nullptr) {
+  bool check_bracket(const Real a, const Real b, const Real ya, const Real yb,
+                     RootFindStatus *status = nullptr) {
     if (ya * yb > 0.0) {
       if (status != nullptr) {
         *status = RootFindStatus::failure;
       }
-      printf("Root not bracketed in find_root. a, b, ya, yb = %g %g %g %g\n",
-             a, b, ya, yb);
+      printf("Root not bracketed in find_root. a, b, ya, yb = %g %g %g %g\n", a, b, ya,
+             yb);
       return false;
     }
     return true;
   }
 
   template <typename F>
-  KOKKOS_INLINE_FUNCTION
-  void refine_bracket(F &func, const Real guess, Real &a, Real &b, Real &ya, Real &yb) {
+  KOKKOS_INLINE_FUNCTION void refine_bracket(F &func, const Real guess, Real &a, Real &b,
+                                             Real &ya, Real &yb) {
     if (a <= guess && b >= guess) {
       ya = func(guess);
       yb = func(b);
@@ -53,15 +54,14 @@ struct RootFind {
       ya = func(a);
       yb = func(b);
     }
-
   }
 
   template <typename F>
-  KOKKOS_INLINE_FUNCTION
-  Real secant(F &func, Real a, Real b, const Real tol, const Real guess) {
+  KOKKOS_INLINE_FUNCTION Real secant(F &func, Real a, Real b, const Real tol,
+                                     const Real guess) {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
-    Real x1,x2,y1,y2;
+    Real x1, x2, y1, y2;
     if (a == guess) {
       x1 = a;
       y1 = ya;
@@ -77,8 +77,8 @@ struct RootFind {
     y1 *= sign;
     y2 *= sign;
 
-    while (std::abs(x2-x1) > 2.0*tol && iteration_count < max_iter) {
-      Real x0 = (x1*y2 - x2*y1)/(y2 - y1);
+    while (std::abs(x2 - x1) > 2.0 * tol && iteration_count < max_iter) {
+      Real x0 = (x1 * y2 - x2 * y1) / (y2 - y1);
       // guard against roundoff because ya or yb is sufficiently close to zero
       if (x0 == x1) {
         x2 = x1;
@@ -87,19 +87,18 @@ struct RootFind {
         x1 = x2;
         continue;
       }
-      Real y0 = sign*func(x0);
+      Real y0 = sign * func(x0);
       x2 = x1;
       y2 = y1;
       x1 = x0;
       y1 = y0;
     }
-    return 0.5*(x1+x2);
+    return 0.5 * (x1 + x2);
   }
 
-
   template <typename F>
-  KOKKOS_INLINE_FUNCTION
-  Real regula_falsi(F &func, Real a, Real b, const Real tol, const Real guess) {
+  KOKKOS_INLINE_FUNCTION Real regula_falsi(F &func, Real a, Real b, const Real tol,
+                                           const Real guess) {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
     if (!check_bracket(a, b, ya, yb)) {
@@ -111,8 +110,8 @@ struct RootFind {
 
     int b1 = 0;
     int b2 = 0;
-    while (b-a > 2.0*tol && iteration_count < max_iter) {
-      Real c = (a*yb - b*ya)/(yb - ya);
+    while (b - a > 2.0 * tol && iteration_count < max_iter) {
+      Real c = (a * yb - b * ya) / (yb - ya);
       // guard against roundoff because ya or yb is sufficiently close to zero
       if (c == a) {
         b = a;
@@ -121,7 +120,7 @@ struct RootFind {
         a = b;
         continue;
       }
-      Real yc = sign*func(c);
+      Real yc = sign * func(c);
       if (yc > 0.0) {
         b = c;
         yb = yc;
@@ -141,22 +140,23 @@ struct RootFind {
       iteration_count++;
     }
     if (iteration_count == max_iter) {
-      PARTHENON_WARN("root finding reached the maximum number of iterations.  likely not converged");
-      //PARTHENON_FAIL("Aborting after root find failed to converge");
+      PARTHENON_WARN(
+          "root finding reached the maximum number of iterations.  likely not converged");
+      // PARTHENON_FAIL("Aborting after root find failed to converge");
     }
-    return 0.5*(a+b);
+    return 0.5 * (a + b);
   }
 
   template <typename F>
-  KOKKOS_INLINE_FUNCTION
-  Real itp(F &func, Real a, Real b, const Real tol, const Real guess, RootFindStatus *status = nullptr) {
+  KOKKOS_INLINE_FUNCTION Real itp(F &func, Real a, Real b, const Real tol,
+                                  const Real guess, RootFindStatus *status = nullptr) {
     constexpr Real kappa1 = 0.1;
     constexpr Real kappa2 = 2.0;
     constexpr int n0 = 0;
 
-    const int nmax = std::ceil(std::log2(0.5*(b-a)/tol)) + n0;
+    const int nmax = std::ceil(std::log2(0.5 * (b - a) / tol)) + n0;
 
-    Real ya,yb;
+    Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
     if (!check_bracket(a, b, ya, yb)) {
       PARTHENON_FAIL("Aborting with unbracketed root.");
@@ -165,16 +165,16 @@ struct RootFind {
     ya *= sign;
     yb *= sign;
 
-    while (b-a > 2.0*tol && iteration_count < max_iter) {
-      const Real xh = 0.5*(a + b);
-      const Real xf = (yb*a - ya*b)/(yb - ya);
+    while (b - a > 2.0 * tol && iteration_count < max_iter) {
+      const Real xh = 0.5 * (a + b);
+      const Real xf = (yb * a - ya * b) / (yb - ya);
       const Real xhxf = xh - xf;
-      const Real delta = std::min(kappa1*std::pow(b-a,kappa2),std::abs(xhxf));
+      const Real delta = std::min(kappa1 * std::pow(b - a, kappa2), std::abs(xhxf));
       const Real sigma = (xhxf > 0 ? 1.0 : -1.0);
-      const Real xt = (delta <= sigma*xhxf ? xf + sigma*delta : xh);
-      const Real r = tol*std::pow(2.0,nmax-iteration_count) - 0.5*(b - a);
-      const Real xitp = (std::fabs(xt - xh) > r ? xh - sigma*r : xt);
-      const Real yitp = sign*func(xitp);
+      const Real xt = (delta <= sigma * xhxf ? xf + sigma * delta : xh);
+      const Real r = tol * std::pow(2.0, nmax - iteration_count) - 0.5 * (b - a);
+      const Real xitp = (std::fabs(xt - xh) > r ? xh - sigma * r : xt);
+      const Real yitp = sign * func(xitp);
       if (yitp > 0.0) {
         b = xitp;
         yb = yitp;
@@ -191,13 +191,13 @@ struct RootFind {
       *status = RootFindStatus::success;
     }
     if (iteration_count == max_iter)
-      PARTHENON_WARN("root finding reached the maximum number of iterations.  likely not converged");
-    return 0.5*(a+b);
+      PARTHENON_WARN(
+          "root finding reached the maximum number of iterations.  likely not converged");
+    return 0.5 * (a + b);
   }
 
   template <typename F>
-  KOKKOS_INLINE_FUNCTION
-  Real bisect(F func, Real a, Real b, const Real tol) {
+  KOKKOS_INLINE_FUNCTION Real bisect(F func, Real a, Real b, const Real tol) {
 
     Real ya = func(a);
     Real yb = func(b);
@@ -208,9 +208,9 @@ struct RootFind {
     ya *= sign;
     yb *= sign;
 
-    while (b-a > tol && iteration_count < max_iter) {
-      const Real xh = 0.5*(a + b);
-      const Real yh = sign*func(xh);
+    while (b - a > tol && iteration_count < max_iter) {
+      const Real xh = 0.5 * (a + b);
+      const Real yh = sign * func(xh);
       if (yh > 0.0) {
         b = xh;
         yb = yh;
@@ -224,11 +224,12 @@ struct RootFind {
       iteration_count++;
     }
     if (iteration_count == max_iter)
-      PARTHENON_WARN("root finding reached the maximum number of iterations.  likely not converged");
-    return 0.5*(a+b);
+      PARTHENON_WARN(
+          "root finding reached the maximum number of iterations.  likely not converged");
+    return 0.5 * (a + b);
   }
 
-  int iteration_count, max_iter;  
+  int iteration_count, max_iter;
 };
 } // namespace root_find
 
