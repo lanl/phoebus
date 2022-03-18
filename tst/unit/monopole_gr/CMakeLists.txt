@@ -12,6 +12,7 @@
 
 add_library(monopole_gr_unit_tests OBJECT
   test_monopole_gr.cpp
+  test_interp_3d_to_1d.cpp
 
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/monopole_gr/monopole_gr_utils.hpp
