@@ -355,7 +355,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           return inv_mask_sum*v(b,iv,k,j,i);
         };
         if (v(b,ifail,k,j,i) == con2prim_robust::FailFlags::fail) {
-          printf("fail! %i %i %i\n", k, j, i);
+          //printf("fail! %i %i %i\n", k, j, i);
           Real num_valid = v(b,ifail,k,j,i-1) + v(b,ifail,k,j,i+1);
           if (ndim > 1) num_valid += v(b,ifail,k,j-1,i) + v(b,ifail,k,j+1,i);
           if (ndim == 3) num_valid += v(b,ifail,k-1,j,i)  + v(b,ifail,k+1,j,i);

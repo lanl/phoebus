@@ -18,7 +18,7 @@ else()
   set(USE_VALENCIA 0 CACHE BOOL "Covariant formulation of GRMHD")
 endif()
 
-option(PHOEBUS_C2P_ROBUST_FLOORS "Use full floors for c2p robust" OFF)
+option(PHOEBUS_C2P_ROBUST_FLOORS "Use full floors for c2p robust" ON)
 
 if(PHOEBUS_C2P_ROBUST_FLOORS)
   set(USE_C2P_ROBUST_FLOORS 1 CACHE BOOL "Use regular floors for c2p robust")
@@ -33,7 +33,7 @@ else()
   set(SET_FLUX_SRC_DIAGS 0 CACHE BOOL "Skip these diagnostics")
 endif()
 
-option(PHOEBUS_CON2PRIM_STATISTICS "Gather and report a histogram of iteration counts")
+option(PHOEBUS_CON2PRIM_STATISTICS "Gather and report a histogram of iteration counts" OFF)
 if(PHOEBUS_CON2PRIM_STATISTICS)
   set(CON2PRIM_STATISTICS 1 CACHE BOOL "Allocate, set, and report")
 else()

@@ -21,7 +21,7 @@ namespace prim2con {
 KOKKOS_INLINE_FUNCTION
 void signal_speeds(const Real &rho, const Real &u, const Real &p, const Real &bsq,
                    const Real v[], const Real &vsq, const Real &gam1, const Real &alpha,
-                   const Real beta[], const Real gcon[3][3], Real sig[]) {
+                   const Real beta[], const Real gcon[3][3], Real *sig) {
   const Real rho_rel = rho + u + p;
   const Real vasq = bsq/(rho_rel + bsq);
   Real cssq = gam1*p/rho_rel;
@@ -40,7 +40,7 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
          const Real &ye_prim, const Real &p, const Real gam1,
          const Real gcov[4][4], const Real gcon[3][3], const Real beta[],
          const Real &alpha, const Real &gdet,
-         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real sig[]) {
+         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig == nullptr) {
   Real vsq = 0.0;
   Real Bsq = 0.0;
   Real Bdotv = 0.0;
@@ -97,7 +97,8 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
 
   ye_cons = D * ye_prim;
 
-  signal_speeds(rho, u, p, bsq, v, vsq, gam1, alpha, beta, gcon, sig);
+  if (sig != nullptr)
+    signal_speeds(rho, u, p, bsq, v, vsq, gam1, alpha, beta, gcon, sig);
 }
 
 }
