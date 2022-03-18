@@ -16,7 +16,7 @@
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch.hpp>
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   /* This currently only calls to Kokkos::initialize()/finalize().
    * If MPI unit tests are desired in the future, it probably
    * makes more sense to call parthenon::ParthenonManager::ParthenonInit/
@@ -25,9 +25,7 @@ int main(int argc, char* argv[]) {
    */
   Kokkos::initialize();
   int result = 0;
-  {
-    result = Catch::Session().run(argc, argv);
-  }
+  { result = Catch::Session().run(argc, argv); }
   Kokkos::finalize();
   return result;
 }

@@ -45,8 +45,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto dlnu = rad->Param<Real>("dlnu");
   const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const auto num_particles = rad->Param<int>("num_particles");
-  const auto remove_emitted_particles =
-      rad->Param<bool>("remove_emitted_particles");
+  const auto remove_emitted_particles = rad->Param<bool>("remove_emitted_particles");
 
   const auto d_opacity = opac->Param<Opacity>("d.opacity");
 
@@ -61,12 +60,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
   const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
   const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
-  const Real &dx_i =
-      pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
-  const Real &dx_j =
-      pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
-  const Real &dx_k =
-      pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
+  const Real &dx_i = pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
+  const Real &dx_j = pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
+  const Real &dx_k = pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
   const Real &minx_i = pmb->coords.x1f(ib.s);
   const Real &minx_j = pmb->coords.x2f(jb.s);
   const Real &minx_k = pmb->coords.x3f(kb.s);
@@ -80,11 +76,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   const Real d3x = dx_i * dx_j * dx_k;
 
-  const Real h_code = pc::h*TIME/(MASS*LENGTH*LENGTH);
+  const Real h_code = pc::h * TIME / (MASS * LENGTH * LENGTH);
 
   std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
-                                 "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov,
-                                 iv::Gye});
+                                 "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int iye = imap[p::ye].first;
@@ -129,7 +124,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Real nu = nusamp(n);
               Real ener = h_code * nu * TIME;
               Real wgt = GetWeight(wgtC, nu);
-              Real Jnu = d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu * TIME);
+              Real Jnu = d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
+                                                   ye, s, nu * TIME);
 
               dN += Jnu / (ener * wgt) * (nu * dlnu * TIME);
 
@@ -148,10 +144,14 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             // Trapezoidal rule
             Real nu0 = nusamp[0];
             Real nu1 = nusamp[nu_bins];
-            dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu0 * TIME) /
-              (h_code * GetWeight(wgtC, nu0)) * dlnu;
-            dN -= 0.5 * d_opacity.EmissivityPerNu(v(pdens,k,j,i), v(ptemp,k,j,i), ye, s, nu1 * TIME) /
-              (h_code * GetWeight(wgtC, nu1)) * dlnu;
+            dN -= 0.5 *
+                  d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
+                                            nu0 * TIME) /
+                  (h_code * GetWeight(wgtC, nu0)) * dlnu;
+            dN -= 0.5 *
+                  d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
+                                            nu1 * TIME) /
+                  (h_code * GetWeight(wgtC, nu1)) * dlnu;
             dN *= d3x * detG * dt;
 
             v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
@@ -174,18 +174,19 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   parthenon::par_reduce(
       parthenon::loop_pattern_mdrange_tag, "MonteCarloReduceParticleCreation",
       DevExecSpace(), 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i,
-                    Real &dNtot) {
+      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i, Real &dNtot) {
         if (do_species[sidx]) {
           dNtot += v(idN + sidx, k, j, i);
         }
       },
       Kokkos::Sum<Real>(dNtot));
 
-  //Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
+  // Real wgtCfac = static_cast<Real>(num_particles) / dNtot;
   Real wgtCfac = rad->Param<Real>("tune_emission");
 
-  PARTHENON_DEBUG_REQUIRE(wgtCfac*dNtot < 1.e8, "tune_emission*dNtot is very large, you wouldn't want to overflow an integer");
+  PARTHENON_DEBUG_REQUIRE(
+      wgtCfac * dNtot < 1.e8,
+      "tune_emission*dNtot is very large, you wouldn't want to overflow an integer");
 
   pmb->par_for(
       "MonteCarlodiNsEval", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -208,8 +209,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   parthenon::par_reduce(
       parthenon::loop_pattern_mdrange_tag, "MonteCarloReduceParticleCreationNs",
       DevExecSpace(), 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i,
-                    int &Nstot) {
+      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i, int &Nstot) {
         if (do_species[sidx]) {
           Nstot += static_cast<int>(v(iNs + sidx, k, j, i));
         }
@@ -267,9 +267,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real Gcov[4][4];
             geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
             Real Ucon[4];
-            Real vel[3] = {v(pvlo, k, j, i),
-                           v(pvlo + 1, k, j, i),
-                           v(pvlo + 2, k, j, i)};
+            Real vel[3] = {v(pvlo, k, j, i), v(pvlo + 1, k, j, i), v(pvlo + 2, k, j, i)};
             GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
             Geometry::Tetrads Tetrads(Ucon, Gcov);
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
@@ -277,8 +275,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
             // Loop over particles to create in this zone
             for (int n = 0; n < static_cast<int>(dNs); n++) {
-              const int m = new_indices(
-                  starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
+              const int m =
+                  new_indices(starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
               auto rng_gen = rng_pool.get_state();
 
               // Set particle species
@@ -298,9 +296,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               do {
                 nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
                 counter++;
-              } while (rng_gen.drand() > LogLinearInterp(nu, sidx, k, j, i,
-                                                         dNdlnu, lnu_min,
-                                                         dlnu));
+              } while (rng_gen.drand() >
+                       LogLinearInterp(nu, sidx, k, j, i, dNdlnu, lnu_min, dlnu));
 
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
@@ -320,12 +317,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
               for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
                 // detG is in both numerator and denominator
-                v(mu, k, j, i) +=
-                    1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
+                v(mu, k, j, i) += 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
               }
               // TODO(BRR) lepton sign
-              v(Gye, k, j, i) -=
-                  1. / (d3x * dt) * Ucon[0] * weight(m) * pc::mp / MASS;
+              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * pc::mp / MASS;
 
               rng_pool.free_state(rng_gen);
             }
@@ -335,15 +330,14 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   if (remove_emitted_particles) {
     pmb->par_for(
-        "MonteCarloRemoveEmittedParticles", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s,
-        ib.e,
+        "MonteCarloRemoveEmittedParticles", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
           if (do_species[sidx]) {
             int dNs = v(iNs + sidx, k, j, i);
             // Loop over particles to create in this zone
             for (int n = 0; n < static_cast<int>(dNs); n++) {
-              const int m = new_indices(
-                  starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
+              const int m =
+                  new_indices(starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
               swarm_d.MarkParticleForRemoval(m);
             }
           }
@@ -355,8 +349,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 }
 
 TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
-                               SwarmContainer *sc, const double t0,
-                               const double dt) {
+                               SwarmContainer *sc, const double t0, const double dt) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -374,12 +367,9 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-  const Real &dx_i =
-      pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
-  const Real &dx_j =
-      pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
-  const Real &dx_k =
-      pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
+  const Real &dx_i = pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
+  const Real &dx_j = pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
+  const Real &dx_k = pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
   const Real d4x = dx_i * dx_j * dx_k * dt;
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto &t = swarm->Get<Real>("t").Get();
@@ -400,7 +390,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
 
-  const Real h_code = pc::h*TIME/(MASS*LENGTH*LENGTH);
+  const Real h_code = pc::h * TIME / (MASS * LENGTH * LENGTH);
 
   std::vector<std::string> vars(
       {p::density, p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});
@@ -418,8 +408,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   ParArray1D<Real> num_interactions("Number interactions", 2);
 
   pmb->par_for(
-      "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(),
-      KOKKOS_LAMBDA(const int n) {
+      "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
           auto rng_gen = rng_pool.get_state();
 
@@ -435,8 +424,9 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
 
-          Real alphanu =
-              4.*M_PI * d_opacity.AbsorptionCoefficient(v(prho,k,j,i), v(itemp,k,j,i), v(iye,k,j,i), s, nu);
+          Real alphanu = 4. * M_PI *
+                         d_opacity.AbsorptionCoefficient(
+                             v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units
 
@@ -448,8 +438,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real xabs = -log(rng_gen.drand());
             if (xabs <= dtau_abs) {
               // Deposit energy-momentum and lepton number in fluid
-              Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)),
-                                 -1. / d4x * weight(n) * k0(n));
+              Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)), -1. / d4x * weight(n) * k0(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 1, k, j, i)),
                                  -1. / d4x * weight(n) * k1(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 2, k, j, i)),
@@ -461,19 +450,16 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                  1. / d4x * weight(n) * pc::mp / MASS);
 
               absorbed = true;
-              Kokkos::atomic_add(&(num_interactions[0]),
-                1.);
+              Kokkos::atomic_add(&(num_interactions[0]), 1.);
               swarm_d.MarkParticleForRemoval(n);
             }
           }
 
           if (absorbed == false) {
-            PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt,
-                         geom);
+            PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt, geom);
 
             bool on_current_mesh_block = true;
-            swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n),
-                                          on_current_mesh_block);
+            swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
           }
 
           rng_pool.free_state(rng_gen);
@@ -499,9 +485,10 @@ TaskStatus MonteCarloStopCommunication(const BlockList_t &blocks) {
   return TaskStatus::complete;
 }
 
-// Reduce particle sampling resolution statistics from per-mesh to global as part of global
-// reduction.
-TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *resolution) {
+// Reduce particle sampling resolution statistics from per-mesh to global as part of
+// global reduction.
+TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh,
+                                              std::vector<Real> *resolution) {
   auto rad = pmesh->packages.Get("radiation");
   const auto num_emitted = rad->Param<Real>("num_emitted");
   const auto num_absorbed = rad->Param<Real>("num_absorbed");
@@ -514,9 +501,10 @@ TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh, std::vector<Real> *re
   return TaskStatus::complete;
 }
 
-// Update particle resolution tuning parameters and reset counters if it is time for an update.
+// Update particle resolution tuning parameters and reset counters if it is time for an
+// update.
 TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
-  const double t0, const double dt) {
+                                  const double t0, const double dt) {
   auto rad = pmesh->packages.Get("radiation");
   const auto tuning = rad->Param<std::string>("tuning");
   const auto t_tune_emission = rad->Param<Real>("t_tune_emission");
@@ -535,28 +523,31 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
     const Real L = 1.;
 
     printf("t_tune_emission: %e t0 + dt: %e\n", t_tune_emission, t0 + dt);
-      const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
-      const auto num_absorbed = (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
-      printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
+    const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
+    const auto num_absorbed =
+        (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
+    printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
 
     if (t_tune_emission < t0 + dt) {
-      const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
-      const auto num_absorbed = (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
+      const auto num_emitted =
+          (*resolution)[static_cast<int>(ParticleResolution::emitted)];
+      const auto num_absorbed =
+          (*resolution)[static_cast<int>(ParticleResolution::absorbed)];
       printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
 
       const Real real = num_emitted - num_absorbed;
-      const Real ideal = dt_tune_emission*num_particles;
-      Real correction = ideal/real;
+      const Real ideal = dt_tune_emission * num_particles;
+      Real correction = ideal / real;
 
       printf("real: %e ideal: %e correction: %e\n", real, ideal, correction);
 
       // Limit strength of correction
-      correction = robust::make_bounded(correction, 3./4., 4./3.);
+      correction = robust::make_bounded(correction, 3. / 4., 4. / 3.);
 
       printf("bounded correction: %e\n", correction);
 
       const auto tune_emission = rad->Param<Real>("tune_emission");
-      rad->UpdateParam<Real>("tune_emission", correction*tune_emission);
+      rad->UpdateParam<Real>("tune_emission", correction * tune_emission);
 
       rad->UpdateParam<Real>("num_emitted", 0.);
       rad->UpdateParam<Real>("num_absorbed", 0.);
@@ -564,17 +555,18 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
     }
 
     if (t_tune_scattering < t0 + dt) {
-      const auto num_scattered = (*resolution)[static_cast<int>(ParticleResolution::scattered)];
+      const auto num_scattered =
+          (*resolution)[static_cast<int>(ParticleResolution::scattered)];
 
       const Real real = num_scattered;
-      const Real ideal = dt_tune_scattering*num_particles;
-      Real correction = ideal/real;
+      const Real ideal = dt_tune_scattering * num_particles;
+      Real correction = ideal / real;
 
       // Limit strength of correction
       robust::make_bounded(correction, 0.5, 2.);
 
       const auto tune_scattering = rad->Param<Real>("tune_scattering");
-      rad->UpdateParam<Real>("tune_scattering", correction*tune_scattering);
+      rad->UpdateParam<Real>("tune_scattering", correction * tune_scattering);
 
       rad->UpdateParam<Real>("num_scattered", 0.);
       rad->UpdateParam<Real>("t_tune_scattering", t_tune_scattering + dt_tune_scattering);
@@ -586,7 +578,8 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
   return TaskStatus::complete;
 }
 
-TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_outstanding) {
+TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb,
+                                                int *particles_outstanding) {
   auto &swarm = pmb->swarm_data.Get()->Get("monte_carlo");
 
   *particles_outstanding += swarm->num_particles_sent_;
@@ -600,17 +593,18 @@ TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb, int *particles_o
 #endif // MPI_PARALLEL
   }
 
-  #ifdef MPI_PARALLEL
+#ifdef MPI_PARALLEL
   pmb->exec_space.fence();
   for (int n = 0; n < pmb->pbval->nneighbor; n++) {
     auto &nb = pmb->pbval->neighbor[n];
     if (nb.snb.rank != Globals::my_rank) {
-      PARTHENON_MPI_CHECK(MPI_Wait(&(swarm->vbswarm->bd_var_.req_send[nb.bufid]), MPI_STATUS_IGNORE));
+      PARTHENON_MPI_CHECK(
+          MPI_Wait(&(swarm->vbswarm->bd_var_.req_send[nb.bufid]), MPI_STATUS_IGNORE));
     }
     swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
   }
 
-  #endif
+#endif
 
   return TaskStatus::complete;
 }
@@ -623,9 +617,9 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
     auto swarm = block->swarm_data.Get()->Get(swarmName);
     for (int n = 0; n < block->pbval->nneighbor; n++) {
       auto &nb = block->pbval->neighbor[n];
-      #ifdef MPI_PARALLEL
-        swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
-      #endif
+#ifdef MPI_PARALLEL
+      swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
+#endif
     }
   }
 #endif // MPI_PARALLEL

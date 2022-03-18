@@ -29,20 +29,22 @@ using namespace parthenon::package::prelude;
 
 namespace Debug {
 
-template <typename T> TaskStatus PrintRHS(T *rc) {
+template <typename T>
+TaskStatus PrintRHS(T *rc) {
   auto pm = rc->GetParentPointer();
-  const std::vector<std::string> vars = {
-      fluid_cons::density, fluid_cons::momentum, fluid_cons::energy};
+  const std::vector<std::string> vars = {fluid_cons::density, fluid_cons::momentum,
+                                         fluid_cons::energy};
   auto pack = rc->PackVariables(vars);
   printf("Right hand side:\n");
-  printf("Dimensions = %d %d %d %d %d\n", pack.GetDim(5), pack.GetDim(4),
-         pack.GetDim(3), pack.GetDim(2), pack.GetDim(1));
+  printf("Dimensions = %d %d %d %d %d\n", pack.GetDim(5), pack.GetDim(4), pack.GetDim(3),
+         pack.GetDim(2), pack.GetDim(1));
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "print RHS", DevExecSpace(), 0, pack.GetDim(5) - 1,
-      0, pack.GetDim(4) - 1, 0, pack.GetDim(3) - 1, 0, pack.GetDim(2) - 1, 0,
+      DEFAULT_LOOP_PATTERN, "print RHS", DevExecSpace(), 0, pack.GetDim(5) - 1, 0,
+      pack.GetDim(4) - 1, 0, pack.GetDim(3) - 1, 0, pack.GetDim(2) - 1, 0,
       pack.GetDim(1) - 1,
-      KOKKOS_LAMBDA(const int b, const int v, const int k, const int j,
-                    const int i) { printf("%g, ", pack(b, v, k, j, i)); });
+      KOKKOS_LAMBDA(const int b, const int v, const int k, const int j, const int i) {
+        printf("%g, ", pack(b, v, k, j, i));
+      });
   printf("\n");
   return TaskStatus::complete;
 }

@@ -203,7 +203,7 @@ constexpr int NINTRINSIC = 2;
 
 constexpr int RHO0 = 0;
 constexpr int EPS = 1;
-  
+
 } // namespace TOV
 
 using Hypersurface_t = parthenon::ParArray2D<Real>;

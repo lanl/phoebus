@@ -22,4 +22,4 @@
 
 #define PRINT_RHS 0
 
-#endif //COMPILE_CONSTANTS_HPP_
+#endif // COMPILE_CONSTANTS_HPP_
