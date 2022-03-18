@@ -28,6 +28,8 @@
 
 using robust::ratio;
 
+#define FIXUP_PRINT_TOTAL_NFAIL 0
+
 namespace fixup {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
@@ -163,10 +165,12 @@ TaskStatus ApplyFloors(T *rc) {
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
-
-  const Real bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
-  const Real bsqou_max = fix_pkg->Param<Real>("bsqou_max");
-  const Real uorho_max = fix_pkg->Param<Real>("uorho_max");
+  Real bsqorho_max, bsqou_max, uorho_max;
+  if (enable_mhd_floors) {
+    bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
+    bsqou_max = fix_pkg->Param<Real>("bsqou_max");
+    uorho_max = fix_pkg->Param<Real>("uorho_max");
+  }
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
@@ -363,7 +367,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           return inv_mask_sum * v(b, iv, k, j, i);
         };
         if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
-          // printf("fail! %i %i %i\n", k, j, i);
           Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);

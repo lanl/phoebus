@@ -28,11 +28,14 @@ using namespace parthenon::package::prelude;
 #include "con2prim_statistics.hpp"
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
+#include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
+
+#define CON2PRIM_ROBUST_PRINT_FAILURES 0
 
 namespace con2prim_robust {
 
@@ -298,6 +301,7 @@ class ConToPrim {
     bounds.GetFloors(x1, x2, x3, rhoflr, epsflr);
     Real gam_max, eps_max;
     bounds.GetCeilings(x1, x2, x3, gam_max, eps_max);
+
     const Real D = v(crho) * igdet;
 #if USE_VALENCIA
     const Real tau = v(ceng) * igdet;

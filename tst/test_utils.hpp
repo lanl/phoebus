@@ -14,6 +14,12 @@
 #ifndef TEST_UTILS_HPP_
 #define TEST_UTILS_HPP_
 
+#include <cmath>
+#include <memory>
+
+#include <parthenon/package.hpp>
+using namespace parthenon::package::prelude;
+
 /*
  * Test for near-machine-precision equivalence of Real values
  *
@@ -28,12 +34,12 @@ KOKKOS_INLINE_FUNCTION
 bool SoftEquiv(const Real &val, const Real &ref, const Real tol = 1.e-8,
                const bool ignore_small = true) {
   if (ignore_small) {
-    if (fabs(val) < tol && fabs(ref) < tol) {
+    if (std::fabs(val) < tol && std::fabs(ref) < tol) {
       return true;
     }
   }
 
-  if (fabs(val - ref) < tol * fabs(ref) / 2) {
+  if (std::fabs(val - ref) < tol * std::fabs(ref) / 2) {
     return true;
   } else {
     return false;

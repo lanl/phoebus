@@ -14,10 +14,12 @@
 //========================================================================================
 
 #include <defs.hpp>
+#include <globals.hpp>
 #include <parthenon_manager.hpp>
 
 #include "fluid/con2prim_statistics.hpp"
 #include "geometry/geometry.hpp"
+#include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
