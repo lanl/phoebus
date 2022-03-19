@@ -95,7 +95,6 @@ struct RootFind {
     }
     return 0.5 * (x1 + x2);
   }
-<<<<<<< HEAD
 
   template <typename F>
   KOKKOS_INLINE_FUNCTION Real regula_falsi(F &func, Real a, Real b, const Real tol,

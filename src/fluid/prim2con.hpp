@@ -42,7 +42,7 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
          const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
          const Real gcon[3][3], const Real beta[], const Real &alpha, const Real &gdet,
          Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons,
-         Real *sig == nullptr) {
+         Real *sig = nullptr) {
   Real vsq = 0.0;
   Real Bsq = 0.0;
   Real Bdotv = 0.0;
