@@ -117,6 +117,10 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
 
     auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
+
+    // Radiation should actually be included in ConvertBoundaryConditions
+    //using MDT = std::remove_pointer<decltype(sc.get())>::type;
+    //auto momentp2c = tl.AddTask(convert_bc, radiation::MomentPrim2Con<MDT>, sc.get(), IndexDomain::entire);
   }
 
   tc.Execute();

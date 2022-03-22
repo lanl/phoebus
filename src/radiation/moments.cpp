@@ -113,16 +113,6 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
                     v(b, cF(ispec, 2), k, j, i) * isdetgam}};
                     printf("C2P[%i %i %i %i %i] E = %e covF = %e %e %e\n", b, ispec, k, j, i, E, covF(0), covF(1), covF(2));
 
-        Real xi = 0.0;
-        Real phi = pi;
-        if (STORE_GUESS) {
-          xi = v(b, iXi(ispec), k, j, i);
-          phi = 1.0001*v(b, iPhi(ispec), k, j, i);
-        }
-        if (STORE_GUESS) {
-          v(b, iXi(ispec), k, j, i) = xi;
-          v(b, iPhi(ispec), k, j, i) = phi;
-        }
         if (EDDINGTON_KNOWN) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
           if (i == 128) {
@@ -131,7 +121,19 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
             }
           }
         } else {
+          Real xi = 0.0;
+          Real phi = pi;
+          if (STORE_GUESS) {
+            xi = v(b, iXi(ispec), k, j, i);
+            phi = 1.0001*v(b, iPhi(ispec), k, j, i);
+          }
+          printf("%s:%i [%i %i %i %i %i]\n", __FILE__, __LINE__, b, ispec, k, j, i);
+          printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
           c.GetCovTilPiFromCon(E, covF, xi, phi, &conTilPi);
+          if (STORE_GUESS) {
+            v(b, iXi(ispec), k, j, i) = xi;
+            v(b, iPhi(ispec), k, j, i) = phi;
+          }
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
         if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
@@ -201,6 +203,8 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
 
+  printf("specB: %i %i\n", specB.s, specB.e);
+
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(
@@ -236,6 +240,11 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
           c.GetCovTilPiFromPrim(J, covH, &conTilPi);
         }
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
+
+        v(b, cE(ispec), k, j, i) = sdetgam * E;
+        for (int idir = dirB.s; idir <= dirB.e; ++idir) {
+          v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
+        }
         printf("[%i %i %i %i %i]\n", b, ispec, k, j, i);
         printf("J: %e covH: %e %e %e conTilPi: %e %e %e %e %e %e %e %e %e\n",
           J, covH(0), covH(1), covH(2),
@@ -243,11 +252,7 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
           conTilPi(1,0), conTilPi(1,1), conTilPi(1,2),
           conTilPi(2,0), conTilPi(2,1), conTilPi(2,2));
         printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
-
-        v(b, cE(ispec), k, j, i) = sdetgam * E;
-        for (int idir = dirB.s; idir <= dirB.e; ++idir) {
-          v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
-        }
+        //if (i > 10) { exit(-1); }
       });
 
   return TaskStatus::complete;
