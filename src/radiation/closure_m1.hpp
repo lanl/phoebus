@@ -173,6 +173,7 @@ namespace radiation
     Vec cov_HEdd;
     // Con2Prim deals with which E is being passed (number or energy conserving),
     // so we need to make no transformation here
+    printf("%s:%i\n", __FILE__, __LINE__);
     Con2Prim(E, cov_F, con_PiEdd, &JEdd, &cov_HEdd);
     Real vHEdd = gamma->contractConCov3Vectors(con_v, cov_HEdd);
     Real HEdd = sqrt(gamma->contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd * vHEdd);
@@ -282,6 +283,7 @@ namespace radiation
     M1FluidPressureTensor(cov_F, xi, phi, con_tilg, con_tild, &con_tilPi, &con_tilf);
     Real J;
     Vec cov_tilH;
+    printf("%s:%i\n", __FILE__, __LINE__);
     Con2Prim(E, cov_F, con_tilPi, &J, &cov_tilH);
 
     // Construct the residual functions

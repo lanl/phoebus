@@ -58,8 +58,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto pmesh = pmb->pmy_mesh;
   int ndim = pmesh->ndim;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  //IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  //IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 

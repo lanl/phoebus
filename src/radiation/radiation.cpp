@@ -325,7 +325,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     if (method == "mocmc") {
       Metadata mspecies_three_tensor =
           Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
-          //Metadata({Metadata::Cell, Metadata::Independent, Metadata::FillGhost},
                    std::vector<int>{NumRadiationTypes, 3, 3});
 
       physics->AddField(i::tilPi, mspecies_three_tensor);
