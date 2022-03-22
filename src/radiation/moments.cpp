@@ -61,6 +61,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
   std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi};
+    printf("Eddington known??? %i\n", static_cast<int>(EDDINGTON_KNOWN));
   if (EDDINGTON_KNOWN) {
     variables.push_back(ir::tilPi);
   }
@@ -110,6 +111,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         Vec covF ={{v(b, cF(ispec, 0), k, j, i) * isdetgam,
                     v(b, cF(ispec, 1), k, j, i) * isdetgam,
                     v(b, cF(ispec, 2), k, j, i) * isdetgam}};
+                    printf("C2P[%i %i %i %i %i] E = %e covF = %e %e %e\n", b, ispec, k, j, i, E, covF(0), covF(1), covF(2));
 
         Real xi = 0.0;
         Real phi = pi;
@@ -234,6 +236,13 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
           c.GetCovTilPiFromPrim(J, covH, &conTilPi);
         }
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
+        printf("[%i %i %i %i %i]\n", b, ispec, k, j, i);
+        printf("J: %e covH: %e %e %e conTilPi: %e %e %e %e %e %e %e %e %e\n",
+          J, covH(0), covH(1), covH(2),
+          conTilPi(0,0), conTilPi(0,1), conTilPi(0,2),
+          conTilPi(1,0), conTilPi(1,1), conTilPi(1,2),
+          conTilPi(2,0), conTilPi(2,1), conTilPi(2,2));
+        printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
 
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
@@ -341,34 +350,17 @@ TaskStatus ReconstructEdgeStates(T* rc) {
       jb.s - dj, jb.e + dj, // y-loop
       ib.s - di, ib.e + di, // x-loop
       KOKKOS_LAMBDA(const int iface, const int b, const int k, const int j, const int i) {
-        printf("[%i %i %i %i %i]\n", iface, b, k, j, i);
-        printf("%e %e %e %e | %e %e\n",
-          v(0,k,j,0),
-          v(0,k,j,1),
-          v(0,k,j,2),
-          v(0,k,j,3),
-          v(0,k,j,4),
-          v(0,k,j,5));
-        printf("%e %e %e %e | %e %e\n",
-          v(12,k,j,0),
-          v(12,k,j,1),
-          v(12,k,j,2),
-          v(12,k,j,3),
-          v(12,k,j,4),
-          v(12,k,j,5));
-          exit(-1);
-
         ReconstructionIndexer<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
         ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
         // Reconstruct radiation
         for (int ivar = 0; ivar<nrecon; ++ivar) {
-          if (i == 10) {
-          printf("v(%i %i %i %i) = %e\n", ivar,k,j,i, v(ivar,k,j,i));
+          //if (i == 10) {
+          //printf("v(%i %i %i %i) = %e\n", ivar,k,j,i, v(ivar,k,j,i));
           //for (int s = 0; s < 3; s++) {
           //  printf("iTilPi = %e %e %e\n", v(b, iTilPi(s, 0, 0), k, j, i), v(b,iTilPi(s,1,1),k,j,i),
           //    v(b,iTilPi(s,2,2), k, j, i));
           //}
-          }
+          //}
           PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v, ql, qr);
         }
         // Reconstruct velocity for radiation
@@ -546,17 +538,14 @@ TaskStatus CalculateFluxesImpl(T* rc) {
             SPACELOOP2(ii, jj) {
               con_tilPil(ii,jj) = v(idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i);
               con_tilPir(ii,jj) = v(idx_qr(ispec, 4 + ii + 3*jj, idir), k, j, i);
-            printf("[%i %i %i %i %i] ql = %e\n", 0, idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i,
-              v(idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i));
+            //printf("[%i %i %i %i %i] ql = %e\n", 0, idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i,
+            //  v(idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i));
             }
           //const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
-            SPACELOOP2(ii, jj) {
-              printf("[%i %i] pi: %e\n", ii, jj, con_tilPil(ii, jj));
-            }
-            printf("HERE!\n");
-            if (i == 10) {
-            exit(-1);
-            }
+            //SPACELOOP2(ii, jj) {
+            //  printf("[%i %i] pi: %e\n", ii, jj, con_tilPil(ii, jj));
+            //}
+            //printf("HERE!\n");
           } else {
             cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
             cr.GetCovTilPiFromPrim(Jr, HasymR, &con_tilPir);

@@ -491,7 +491,7 @@ class Residual {
   void operator()(const Real ug1, const Real Ye1, Real res[2]) {
     const Real &rho = var_(b_, iprho_, k_, j_, i_);
     const Real &ug0 = var_(b_, ipeng_, k_, j_, i_);
-    printf("b: %i peng: %i k j i: %i %i %i ug0: %e\n", b_, ipeng_, k_, j_, i_, ug0);
+    //printf("b: %i peng: %i k j i: %i %i %i ug0: %e\n", b_, ipeng_, k_, j_, i_, ug0);
     Real lambda[2] = {Ye1, 0.};
     const Real temp1 = eos_.TemperatureFromDensityInternalEnergy(rho, ug1 / rho, lambda);
 
@@ -636,7 +636,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
         const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
         const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
           // Set up the background state
-          Vec con_v{{v(iblock, pv(0), k, j, i),
+          /*Vec con_v{{v(iblock, pv(0), k, j, i),
                      v(iblock, pv(1), k, j, i),
                      v(iblock, pv(2), k, j, i)}};
           Tens2 cov_gamma;
@@ -651,13 +651,13 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
           Real dE = 0;
           Real cov_dF[3] = {0};
           auto status = c.LinearSourceUpdate(Estar, cov_Fstart, con_tilPi, JBB, tauJ, tauH, *dE, cov_dF);
-
+*/
           // Update E, F
 
           // Update samples
 
           // Recalculate pi
-      }
+      });
   } else {
 
   parthenon::par_for(
@@ -753,9 +753,9 @@ TaskStatus MOCMCEddington(T *rc) {
               I[s] += Inuinv(nubin, s, nswarm) * pow(nusamp(nubin), 3);
             }
           }
-          if (i == 10) {
-            printf("I: %e %e %e\n", I[0], I[1], I[2]);
-          }
+          //if (i == 10) {
+          //  printf("I: %e %e %e\n", I[0], I[1], I[2]);
+          //}
 
           Real wgts[6];
           kdgrid::integrate_ninj_domega_quad(mu_lo(nswarm), mu_hi(nswarm), phi_lo(nswarm),
@@ -778,30 +778,11 @@ TaskStatus MOCMCEddington(T *rc) {
             for (int jj = ii; jj < 3; jj++) {
               v(iTilPi(s, ii, jj), k, j, i) /= energy[s];
             }
+            v(iTilPi(s, ii, ii), k, j, i) -= 1./3.;
           }
-          v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
-          v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
-          v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
-        }
-
-        for (int s = 0; s < 3; s++) {
-
-          // TEMPORARY
-          v(iTilPi(s, 0, 0), k, j, i) = 11;
-          v(iTilPi(s, 1, 0), k, j, i) = 21;
-          v(iTilPi(s, 0, 1), k, j, i) = 12;
-          v(iTilPi(s, 1, 1), k, j, i) = 22;
-          v(iTilPi(s, 2, 0), k, j, i) = 31;
-          v(iTilPi(s, 2, 1), k, j, i) = 32;
-          v(iTilPi(s, 2, 2), k, j, i) = 33;
-          v(iTilPi(s, 1, 2), k, j, i) = 23;
-          v(iTilPi(s, 0, 2), k, j, i) = 13;
-        }
-
-        if (i == 10) {
-          SPACELOOP2(ii, jj) {
-            printf("tilPi[%i %i] = %e\n", i, j, v(iTilPi(0, ii, jj), k, j, i));
-          }
+          //v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
+          //v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
+          //v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
         }
       });
   /*Real Iold = 0.;
