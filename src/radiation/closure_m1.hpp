@@ -76,12 +76,16 @@ namespace radiation
 
     KOKKOS_FUNCTION
     ClosureStatus GetCovTilPiFromCon(Real E, const Vec cov_F, Real& xi, Real& phi, Tens2 *con_tilPi) {
+      printf("%s:%i\n", __FILE__, __LINE__);
+    printf("E: %e F: %e %e %e\n", E, cov_F(0), cov_F(1), cov_F(2));
 
       if (SET::eqn_type == ClosureEquation::number_conserve) {
         double vF = 0.0;
         SPACELOOP(i) vF += con_v(i)*cov_F(i);
         E = E/W + vF;
       }
+      printf("%s:%i\n", __FILE__, __LINE__);
+    printf("E: %e F: %e %e %e\n", E, cov_F(0), cov_F(1), cov_F(2));
 
       Vec con_tilf;
       auto status = SolveClosure(E, cov_F, &xi, &phi, xi, phi);
@@ -189,6 +193,7 @@ namespace radiation
   KOKKOS_FUNCTION
   M1Result ClosureM1<Vec, Tens2, SET>::SolveClosure(Real E, Vec cov_F, Real *xi_out, Real *phi_out,
                                              const Real xi_guess, const Real phi_guess) {
+    printf("%s:%i\n", __FILE__, __LINE__);
     const int max_iter = 30;
     const Real tol = 1.e6 * std::numeric_limits<Real>::epsilon();
     const Real eps = std::sqrt(10 * std::numeric_limits<Real>::epsilon());
@@ -212,6 +217,9 @@ namespace radiation
     Real xi = xi_guess;
     Real phi = phi_guess;
     phi = acos(-1.0);
+
+    printf("xi: %e phi: %e\n", xi, phi);
+    printf("E: %e F: %e %e %e\n", E, cov_F(0), cov_F(1), cov_F(2));
     do {
       Real fPhi_up, fPhi_lo;
       Real fXi_up, fXi_lo;

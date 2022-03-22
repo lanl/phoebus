@@ -59,9 +59,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   int ndim = pmesh->ndim;
 
   //IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  //IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  //IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   // auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
   const Real gamma = 1 / sqrt(1 - vx * vx);
@@ -127,7 +129,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     }
   }
 
-  radiation::MomentPrim2Con(rc.get());
+  radiation::MomentPrim2Con(rc.get(), IndexDomain::interior);
 }
 
 } // namespace radiation_advection
