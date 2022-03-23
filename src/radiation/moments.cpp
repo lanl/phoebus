@@ -64,7 +64,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
 
   std::vector<std::string> variables{cr::E,  cr::F,  pr::J, pr::H, fluid_prim::velocity,
                                      ir::xi, ir::phi};
-  //if (EDDINGTON_KNOWN) {
+  // if (EDDINGTON_KNOWN) {
   if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
     variables.push_back(ir::tilPi);
   }
