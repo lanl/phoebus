@@ -109,8 +109,8 @@ void MOCMCInitSamples(T *rc) {
   // TODO(BRR) make this a separate function and use it to update dnsamp which is then
   // used to decide whether to refine/derefine
   parthenon::par_reduce(
-      DEFAULT_LOOP_PATTERN, "MOCMC::Init::NumSamples", DevExecSpace(), 0, nblock - 1,
-      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      parthenon::loop_pattern_mdrange_tag, "MOCMC::Init::NumSamples", DevExecSpace(), 0,
+      nblock - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nsamp) {
         Real Jtot = 0.;
         for (int s = 0; s < 3; s++) {
