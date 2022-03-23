@@ -168,7 +168,7 @@ class ConToPrim {
 
   template <class... Args>
   KOKKOS_INLINE_FUNCTION ConToPrimStatus operator()(const singularity::EOS &eos,
-                                                    Args &&... args) const {
+                                                    Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     return solve(v, eos);
   }
@@ -176,7 +176,7 @@ class ConToPrim {
   template <typename CoordinateSystem, class... Args>
   KOKKOS_INLINE_FUNCTION void Finalize(const singularity::EOS &eos,
                                        const CoordinateSystem &geom,
-                                       Args &&... args) const {
+                                       Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
     finalize(v, g, eos);
