@@ -29,7 +29,7 @@ KOKKOS_INLINE_FUNCTION void broyden2(F &func, Real v[2], const int max_iter = 50
   Real J[2][2] = {0.};
 
   int niter = 0;
-  while (sqrt(pow(fabs(resid[0]),2) + pow(fabs(resid[1]),2)) > tol) {
+  while (sqrt(pow(fabs(resid[0]), 2) + pow(fabs(resid[1]), 2)) > tol) {
     Real s[2] = {0.};
     // Solve J.s = -f
 

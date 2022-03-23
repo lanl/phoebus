@@ -14,9 +14,9 @@
 #ifndef GEOMETRY_TETRADS_HPP_
 #define GEOMETRY_TETRADS_HPP_
 
+#include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/robust.hpp"
 #include <parthenon/package.hpp>
-#include "geometry/geometry_utils.hpp"
 
 namespace Geometry {
 

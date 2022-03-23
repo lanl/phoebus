@@ -117,7 +117,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("mu_hi", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("phi_lo", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("phi_hi", swarm_name, real_swarmvalue_metadata);
-    Metadata fourv_swarmvalue_metadata({Metadata::Real, Metadata::Particle}, std::vector<int>{4});
+    Metadata fourv_swarmvalue_metadata({Metadata::Real, Metadata::Particle},
+                                       std::vector<int>{4});
     physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
     Metadata Inu_swarmvalue_metadata({Metadata::Real, Metadata::Particle},
                                      std::vector<int>{NumRadiationTypes, nu_bins});
@@ -135,7 +136,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Kokkos::deep_copy(nusamp, nusamp_h);
     params.Add("nusamp", nusamp);
 
-    std::string mocmc_recon_str = pin->GetOrAddString("radiation/mocmc", "recon", "kdgrid");
+    std::string mocmc_recon_str =
+        pin->GetOrAddString("radiation/mocmc", "recon", "kdgrid");
     MOCMCRecon mocmc_recon;
     if (mocmc_recon_str == "kdgrid") {
       mocmc_recon = MOCMCRecon::kdgrid;
@@ -323,9 +325,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     // Make Eddington tensor an independent quantity for MOCMC to supply
     if (method == "mocmc") {
-      Metadata mspecies_three_tensor =
-          Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
-                   std::vector<int>{NumRadiationTypes, 3, 3});
+      Metadata mspecies_three_tensor = Metadata(
+          {Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
+          std::vector<int>{NumRadiationTypes, 3, 3});
 
       physics->AddField(i::tilPi, mspecies_three_tensor);
       physics->AddField(mocmc_internal::dnsamp, mscalar);
