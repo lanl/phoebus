@@ -15,6 +15,7 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
+#include "phoebus_utils/programming_utils.hpp"
 #include "radiation/closure.hpp"
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
@@ -63,7 +64,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
 
   std::vector<std::string> variables{cr::E,  cr::F,  pr::J, pr::H, fluid_prim::velocity,
                                      ir::xi, ir::phi};
-  if (EDDINGTON_KNOWN) {
+  //if (EDDINGTON_KNOWN) {
+  if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
     variables.push_back(ir::tilPi);
   }
   PackIndexMap imap;
