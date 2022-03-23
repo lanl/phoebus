@@ -110,16 +110,12 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         Vec covF = {{v(b, cF(ispec, 0), k, j, i) * isdetgam,
                      v(b, cF(ispec, 1), k, j, i) * isdetgam,
                      v(b, cF(ispec, 2), k, j, i) * isdetgam}};
-        printf("C2P[%i %i %i %i %i] E = %e covF = %e %e %e\n", b, ispec, k, j, i, E,
-               covF(0), covF(1), covF(2));
+
+        // printf("C2P [%i %i %i %i %i] E: %e covF: %e %e %e\n", b, ispec, k, j, i, E,
+        // covF(0), covF(1), covF(2));
 
         if (EDDINGTON_KNOWN) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
-          if (i == 128) {
-            SPACELOOP2(ii, jj) {
-              printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi(ii, jj));
-            }
-          }
         } else {
           Real xi = 0.0;
           Real phi = pi;
@@ -127,8 +123,12 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
             xi = v(b, iXi(ispec), k, j, i);
             phi = 1.0001 * v(b, iPhi(ispec), k, j, i);
           }
-          printf("%s:%i [%i %i %i %i %i]\n", __FILE__, __LINE__, b, ispec, k, j, i);
-          printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
+          if (fabs(covF(1)) > E) {
+            printf("[%i][%i %i %i]\n", Globals::my_rank, k, j, i);
+            printf("%s:%i [%i %i %i %i %i]\n", __FILE__, __LINE__, b, ispec, k, j, i);
+            printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
+            exit(-1);
+          }
           c.GetCovTilPiFromCon(E, covF, xi, phi, &conTilPi);
           if (STORE_GUESS) {
             v(b, iXi(ispec), k, j, i) = xi;
@@ -207,8 +207,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(1);
 
-  printf("specB: %i %i\n", specB.s, specB.e);
-
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(
@@ -242,13 +240,15 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
         }
-        printf("[%i %i %i %i %i]\n", b, ispec, k, j, i);
+        /*printf("[%i %i %i %i %i]\n", b, ispec, k, j, i);
         printf("J: %e covH: %e %e %e conTilPi: %e %e %e %e %e %e %e %e %e\n", J, covH(0),
                covH(1), covH(2), conTilPi(0, 0), conTilPi(0, 1), conTilPi(0, 2),
                conTilPi(1, 0), conTilPi(1, 1), conTilPi(1, 2), conTilPi(2, 0),
                conTilPi(2, 1), conTilPi(2, 2));
-        printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
+        printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));*/
         // if (i > 10) { exit(-1); }
+        printf("P2C [%i %i %i %i %i] E: %e covF: %e %e %e\n", b, ispec, k, j, i, E,
+               covF(0), covF(1), covF(2));
       });
 
   return TaskStatus::complete;
@@ -279,7 +279,7 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
+  printf("%s:%i %s\n", __FILE__, __LINE__, "ReconstructEdgeStates");
 
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -770,7 +770,7 @@ template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
-  printf("%s:%i\n", __FILE__, __LINE__);
+  printf("%s:%i %s\n", __FILE__, __LINE__, "MomentFluidSource");
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
@@ -891,7 +891,7 @@ template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *
 
 template <class T>
 TaskStatus MomentCalculateOpacities(T *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
+  printf("%s:%i %s\n", __FILE__, __LINE__, "MomentCalculateOpacities");
 
   auto *pmb = rc->GetParentPointer().get();
 
