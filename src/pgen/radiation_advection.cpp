@@ -28,8 +28,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PackIndexMap imap;
   auto v = rc->PackVariables(
       std::vector<std::string>({radmoment_prim::J, radmoment_prim::H, fluid_prim::density,
-                                fluid_prim::temperature, fluid_prim::energy, fluid_prim::velocity,
-                                radmoment_internal::xi, radmoment_internal::phi}),
+                                fluid_prim::temperature, fluid_prim::energy,
+                                fluid_prim::velocity, radmoment_internal::xi,
+                                radmoment_internal::phi}),
       imap);
 
   auto idJ = imap.GetFlatIdx(radmoment_prim::J);
@@ -109,12 +110,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
       });
 
-  printf("F: %e %e %e %e %e\n",
-    v(idJ(0), 0, 0, 0),
-    v(idJ(0), 0, 0, 1),
-    v(idJ(0), 0, 0, 2),
-    v(idJ(0), 0, 0, 3),
-    v(idJ(0), 0, 0, 4));
+  printf("F: %e %e %e %e %e\n", v(idJ(0), 0, 0, 0), v(idJ(0), 0, 0, 1),
+         v(idJ(0), 0, 0, 2), v(idJ(0), 0, 0, 3), v(idJ(0), 0, 0, 4));
 
   // Initialize samples
   auto radpkg = pmb->packages.Get("radiation");

@@ -22,9 +22,9 @@
 #include "closure.hpp"
 #include "geodesics.hpp"
 #include "kd_grid.hpp"
+#include "phoebus_utils/root_find.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
-#include "phoebus_utils/root_find.hpp"
 
 namespace radiation {
 
@@ -186,7 +186,8 @@ void MOCMCInitSamples(T *rc) {
             const RadiationType type = species_d[s];
             for (int nubin = 0; nubin < nu_bins; nubin++) {
               const Real nu = nusamp(nubin) * TIME;
-              Inuinv(nubin, s, n) = d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu,3);
+              Inuinv(nubin, s, n) =
+                  d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3);
               if (use_B_fake) Inuinv(nubin, s, n) = B_fake / pow(nu, 3);
             }
           }
@@ -491,7 +492,7 @@ class Residual {
   void operator()(const Real ug1, const Real Ye1, Real res[2]) {
     const Real &rho = var_(b_, iprho_, k_, j_, i_);
     const Real &ug0 = var_(b_, ipeng_, k_, j_, i_);
-    //printf("b: %i peng: %i k j i: %i %i %i ug0: %e\n", b_, ipeng_, k_, j_, i_, ug0);
+    // printf("b: %i peng: %i k j i: %i %i %i ug0: %e\n", b_, ipeng_, k_, j_, i_, ug0);
     Real lambda[2] = {Ye1, 0.};
     const Real temp1 = eos_.TemperatureFromDensityInternalEnergy(rho, ug1 / rho, lambda);
 
@@ -536,13 +537,13 @@ class Residual {
     const Real dur = 0.;
 
     res[0] = ((ug1 - ug0) + (ur0 + dtau_ * Jem) / (1. + dtau_ * kappaJ) - ur0 + dur) /
-           (ug0 + ur0);
-           // TODO(BRR) actually do Ye update
+             (ug0 + ur0);
+    // TODO(BRR) actually do Ye update
     res[1] = 0.;
 
     if (i_ == 10) {
-      printf("ug1: %e ug0: %e ur0: %e Jem: %e kappaJ: %e dur: %e\n",
-        ug1, ug0, ur0, Jem, kappaJ, dur);
+      printf("ug1: %e ug0: %e ur0: %e Jem: %e kappaJ: %e dur: %e\n", ug1, ug0, ur0, Jem,
+             kappaJ, dur);
       printf("resid: %e %e\n", res[0], res[1]);
     }
   }
@@ -629,65 +630,64 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
     species_d[s] = species[s];
   }
 
-  if (true) {// update = lagged
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
-        const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
-          // Set up the background state
-          /*Vec con_v{{v(iblock, pv(0), k, j, i),
-                     v(iblock, pv(1), k, j, i),
-                     v(iblock, pv(2), k, j, i)}};
-          Tens2 cov_gamma;
-          geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
-          Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
-          Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-          LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
-
-          /// TODO: (LFR) Move beyond Eddington for this update
-          ClosureMOCMC<Vec, Tens2> c(con_v, &g);
-
-          Real dE = 0;
-          Real cov_dF[3] = {0};
-          auto status = c.LinearSourceUpdate(Estar, cov_Fstart, con_tilPi, JBB, tauJ, tauH, *dE, cov_dF);
-*/
-          // Update E, F
+  if (true) { // update = lagged
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
+        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+          const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
+                                // Set up the background state
+                                /*Vec con_v{{v(iblock, pv(0), k, j, i),
+                                           v(iblock, pv(1), k, j, i),
+                                           v(iblock, pv(2), k, j, i)}};
+                                Tens2 cov_gamma;
+                                geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+                                Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
+                                Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
+                                LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
+                      
+                                /// TODO: (LFR) Move beyond Eddington for this update
+                                ClosureMOCMC<Vec, Tens2> c(con_v, &g);
+                      
+                                Real dE = 0;
+                                Real cov_dF[3] = {0};
+                                auto status = c.LinearSourceUpdate(Estar, cov_Fstart, con_tilPi, JBB, tauJ,
+                                tauH, *dE, cov_dF);
+                      */
+                                // Update E, F
 
           // Update samples
 
           // Recalculate pi
-      });
+        });
   } else {
 
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
-        const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
+        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+          const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
 
-        // Angle-average samples
-        for (int n = 0; n < nsamp; n++) {
-          const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
-          const Real dOmega =
-              (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm));
-        }
+          // Angle-average samples
+          for (int n = 0; n < nsamp; n++) {
+            const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+            const Real dOmega =
+                (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm));
+          }
 
-        auto res = Residual(dtau, eos_d, opac_d, v, pdens, peng, pJ, Inu0, Inu1,
-                            num_species, nu_bins, species_d, nusamp, dlnu, 0, k, j, i);
+          auto res = Residual(dtau, eos_d, opac_d, v, pdens, peng, pJ, Inu0, Inu1,
+                              num_species, nu_bins, species_d, nusamp, dlnu, 0, k, j, i);
 
-        Real guess[2] = {v(pdens, k, j, i), v(pye, k, j, i)};
-        root_find::RootFindStatus status;
-        root_find::broyden2(res, guess, 50, 1.e-10, &status);
-        if (i == 10) {
-          printf("status = %i\n", static_cast<int>(status));
-        }
+          Real guess[2] = {v(pdens, k, j, i), v(pye, k, j, i)};
+          root_find::RootFindStatus status;
+          root_find::broyden2(res, guess, 50, 1.e-10, &status);
+          if (i == 10) {
+            printf("status = %i\n", static_cast<int>(status));
+          }
 
-        //Real error[2];
-        //res(v(pdens, k, j, i), v(pye, k, j, i), error);
-
-
-      });
+          // Real error[2];
+          // res(v(pdens, k, j, i), v(pye, k, j, i), error);
+        });
   }
 
   return TaskStatus::complete;
@@ -753,7 +753,7 @@ TaskStatus MOCMCEddington(T *rc) {
               I[s] += Inuinv(nubin, s, nswarm) * pow(nusamp(nubin), 3);
             }
           }
-          //if (i == 10) {
+          // if (i == 10) {
           //  printf("I: %e %e %e\n", I[0], I[1], I[2]);
           //}
 
@@ -778,11 +778,11 @@ TaskStatus MOCMCEddington(T *rc) {
             for (int jj = ii; jj < 3; jj++) {
               v(iTilPi(s, ii, jj), k, j, i) /= energy[s];
             }
-            v(iTilPi(s, ii, ii), k, j, i) -= 1./3.;
+            v(iTilPi(s, ii, ii), k, j, i) -= 1. / 3.;
           }
-          //v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
-          //v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
-          //v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
+          // v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
+          // v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
+          // v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
         }
       });
   /*Real Iold = 0.;

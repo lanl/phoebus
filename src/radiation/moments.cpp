@@ -48,7 +48,7 @@ class ReconstructionIndexer {
 };
 
 template <class T, class CLOSURE, bool STORE_GUESS, bool EDDINGTON_KNOWN>
-TaskStatus MomentCon2PrimImpl(T* rc) {
+TaskStatus MomentCon2PrimImpl(T *rc) {
   printf("%s:%i\n", __FILE__, __LINE__);
 
   namespace cr = radmoment_cons;
@@ -61,7 +61,8 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi};
+  std::vector<std::string> variables{cr::E,  cr::F,  pr::J, pr::H, fluid_prim::velocity,
+                                     ir::xi, ir::phi};
   if (EDDINGTON_KNOWN) {
     variables.push_back(ir::tilPi);
   }
@@ -106,16 +107,17 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         Vec covH;
         Tens2 conTilPi;
         Real E = v(b, cE(ispec), k, j, i) * isdetgam;
-        Vec covF ={{v(b, cF(ispec, 0), k, j, i) * isdetgam,
-                    v(b, cF(ispec, 1), k, j, i) * isdetgam,
-                    v(b, cF(ispec, 2), k, j, i) * isdetgam}};
-                    printf("C2P[%i %i %i %i %i] E = %e covF = %e %e %e\n", b, ispec, k, j, i, E, covF(0), covF(1), covF(2));
+        Vec covF = {{v(b, cF(ispec, 0), k, j, i) * isdetgam,
+                     v(b, cF(ispec, 1), k, j, i) * isdetgam,
+                     v(b, cF(ispec, 2), k, j, i) * isdetgam}};
+        printf("C2P[%i %i %i %i %i] E = %e covF = %e %e %e\n", b, ispec, k, j, i, E,
+               covF(0), covF(1), covF(2));
 
         if (EDDINGTON_KNOWN) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
           if (i == 128) {
             SPACELOOP2(ii, jj) {
-             printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi(ii, jj));
+              printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi(ii, jj));
             }
           }
         } else {
@@ -123,7 +125,7 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
           Real phi = pi;
           if (STORE_GUESS) {
             xi = v(b, iXi(ispec), k, j, i);
-            phi = 1.0001*v(b, iPhi(ispec), k, j, i);
+            phi = 1.0001 * v(b, iPhi(ispec), k, j, i);
           }
           printf("%s:%i [%i %i %i %i %i]\n", __FILE__, __LINE__, b, ispec, k, j, i);
           printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
@@ -134,7 +136,8 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
           }
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
-        if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
+        if (std::isnan(J) || std::isnan(covH(0)))
+          PARTHENON_FAIL("Radiation Con2Prim NaN.");
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -153,11 +156,11 @@ TaskStatus MomentCon2Prim(T *rc) {
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
 
-  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
     return MomentCon2PrimImpl<T, ClosureM1<Vec, Tens2, settings>, true, false>(rc);
-  }
-  else if (method == "moment_eddington") {
+  } else if (method == "moment_eddington") {
     return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, settings>, false, false>(rc);
   } else if (method == "mocmc") {
     return MomentCon2PrimImpl<T, ClosureMOCMC<Vec, Tens2, settings>, false, true>(rc);
@@ -170,7 +173,7 @@ TaskStatus MomentCon2Prim(T *rc) {
 template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
-TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
+TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   printf("%s:%i\n", __FILE__, __LINE__);
 
   namespace cr = radmoment_cons;
@@ -183,7 +186,8 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
   IndexRange jb = pm->cellbounds.GetBoundsJ(domain);
   IndexRange kb = pm->cellbounds.GetBoundsK(domain);
 
-  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::tilPi};
+  std::vector<std::string> variables{cr::E,    cr::F, pr::J, pr::H, fluid_prim::velocity,
+                                     ir::tilPi};
   if (EDDINGTON_KNOWN) {
     variables.push_back(ir::tilPi);
   }
@@ -239,35 +243,32 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
         }
         printf("[%i %i %i %i %i]\n", b, ispec, k, j, i);
-        printf("J: %e covH: %e %e %e conTilPi: %e %e %e %e %e %e %e %e %e\n",
-          J, covH(0), covH(1), covH(2),
-          conTilPi(0,0), conTilPi(0,1), conTilPi(0,2),
-          conTilPi(1,0), conTilPi(1,1), conTilPi(1,2),
-          conTilPi(2,0), conTilPi(2,1), conTilPi(2,2));
+        printf("J: %e covH: %e %e %e conTilPi: %e %e %e %e %e %e %e %e %e\n", J, covH(0),
+               covH(1), covH(2), conTilPi(0, 0), conTilPi(0, 1), conTilPi(0, 2),
+               conTilPi(1, 0), conTilPi(1, 1), conTilPi(1, 2), conTilPi(2, 0),
+               conTilPi(2, 1), conTilPi(2, 2));
         printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
-        //if (i > 10) { exit(-1); }
+        // if (i > 10) { exit(-1); }
       });
 
   return TaskStatus::complete;
 }
 
-template<class T>
-TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
+template <class T>
+TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
   printf("%s:%i\n", __FILE__, __LINE__);
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
-  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
     return MomentPrim2ConImpl<T, ClosureM1<Vec, Tens2, settings>, false>(rc, domain);
-  }
-  else if (method == "moment_eddington") {
+  } else if (method == "moment_eddington") {
     return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc, domain);
-  }
-  else if (method == "mocmc") {
+  } else if (method == "mocmc") {
     return MomentPrim2ConImpl<T, ClosureMOCMC<Vec, Tens2, settings>, true>(rc, domain);
-  }
-  else {
+  } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
   return TaskStatus::fail;
@@ -277,7 +278,7 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
                                                         IndexDomain);
 
 template <class T>
-TaskStatus ReconstructEdgeStates(T* rc) {
+TaskStatus ReconstructEdgeStates(T *rc) {
   printf("%s:%i\n", __FILE__, __LINE__);
 
   auto *pmb = rc->GetParentPointer().get();
@@ -302,8 +303,10 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   namespace ir = radmoment_internal;
 
   PackIndexMap imap_ql, imap_qr, imap;
-  VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
-  VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
+  VariablePack<Real> ql_base =
+      rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
+  VariablePack<Real> qr_base =
+      rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
   std::vector<std::string> variables = {pr::J, pr::H};
   if (eddington_known) {
     variables.push_back(ir::tilPi);
@@ -324,14 +327,14 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   auto qIdx = imap_ql.GetFlatIdx(ir::ql);
 
   const int nspec = qIdx.DimSize(1);
-  int nrecon = 4*nspec;
+  int nrecon = 4 * nspec;
   if (eddington_known) {
-    //nrecon = (4 + 6)*nspec;
-    nrecon = (4 + 9)*nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
+    // nrecon = (4 + 6)*nspec;
+    nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
   }
   printf("dims: %i %i %i\n", qIdx.DimSize(1), qIdx.DimSize(2), qIdx.DimSize(3));
-  printf("vdims: %i %i %i %i %i\n",
-    v.GetDim(1), v.GetDim(2), v.GetDim(3), v.GetDim(4), v.GetDim(5));
+  printf("vdims: %i %i %i %i %i\n", v.GetDim(1), v.GetDim(2), v.GetDim(3), v.GetDim(4),
+         v.GetDim(5));
 
   const int offset = imap_ql[ir::ql].first;
 
@@ -407,9 +410,10 @@ TaskStatus ReconstructEdgeStates(T* rc) {
 }
 template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
-// This really only works for MeshBlockData right now since fluxes don't have a block index
+// This really only works for MeshBlockData right now since fluxes don't have a block
+// index
 template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
-TaskStatus CalculateFluxesImpl(T* rc) {
+TaskStatus CalculateFluxesImpl(T *rc) {
   printf("%s:%i\n", __FILE__, __LINE__);
 
   auto *pmb = rc->GetParentPointer().get();
@@ -532,18 +536,19 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           // Fluxes in the asymptotic limit
           if (EDDINGTON_KNOWN) {
             // Use reconstructed values of tilPi
-            //con_tilPil(0,0) = 1.;
+            // con_tilPil(0,0) = 1.;
             SPACELOOP2(ii, jj) {
-              con_tilPil(ii,jj) = v(idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i);
-              con_tilPir(ii,jj) = v(idx_qr(ispec, 4 + ii + 3*jj, idir), k, j, i);
-            //printf("[%i %i %i %i %i] ql = %e\n", 0, idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i,
-            //  v(idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i));
+              con_tilPil(ii, jj) = v(idx_ql(ispec, 4 + ii + 3 * jj, idir), k, j, i);
+              con_tilPir(ii, jj) = v(idx_qr(ispec, 4 + ii + 3 * jj, idir), k, j, i);
+              // printf("[%i %i %i %i %i] ql = %e\n", 0, idx_ql(ispec, 4 + ii + 3*jj,
+              // idir), k, j, i,
+              //  v(idx_ql(ispec, 4 + ii + 3*jj, idir), k, j, i));
             }
-          //const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
-            //SPACELOOP2(ii, jj) {
+            // const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
+            // SPACELOOP2(ii, jj) {
             //  printf("[%i %i] pi: %e\n", ii, jj, con_tilPil(ii, jj));
             //}
-            //printf("HERE!\n");
+            // printf("HERE!\n");
           } else {
             cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
             cr.GetCovTilPiFromPrim(Jr, HasymR, &con_tilPir);
@@ -602,13 +607,14 @@ TaskStatus CalculateFluxes(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
-  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings>, false >(rc);
+    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings>, false>(rc);
   } else if (method == "moment_eddington") {
-    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings>, false >(rc);
+    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc);
   } else if (method == "mocmc") {
-    return CalculateFluxesImpl<T, ClosureMOCMC<Vec, Tens2, settings>, true >(rc);
+    return CalculateFluxesImpl<T, ClosureMOCMC<Vec, Tens2, settings>, true>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -721,8 +727,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           c.getConPFromPrim(J, covH, con_tilPi, &conP);
 
           Real srcE = 0.0;
-          SPACELOOP2(ii, jj) srcE += K(ii,jj)*conP(ii, jj);
-          SPACELOOP(ii) srcE -= dlnalp[ii+1]*conF(ii);
+          SPACELOOP2(ii, jj) srcE += K(ii, jj) * conP(ii, jj);
+          SPACELOOP(ii) srcE -= dlnalp[ii + 1] * conF(ii);
           srcE *= alp;
 
           Vec srcF{0, 0, 0};
@@ -743,17 +749,18 @@ TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
-  using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings>, false>(rc, rc_src);
-  }
-  else if (method == "moment_eddington") {
-    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc, rc_src);
-  }
-  else if (method == "mocmc") {
-    return CalculateGeometricSourceImpl<T, ClosureMOCMC<Vec, Tens2, settings>, true>(rc, rc_src);
-  }
-  else {
+    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings>, false>(
+        rc, rc_src);
+  } else if (method == "moment_eddington") {
+    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(
+        rc, rc_src);
+  } else if (method == "mocmc") {
+    return CalculateGeometricSourceImpl<T, ClosureMOCMC<Vec, Tens2, settings>, true>(
+        rc, rc_src);
+  } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
   return TaskStatus::fail;
@@ -947,18 +954,22 @@ TaskStatus MomentCalculateOpacities(T *rc) {
       jb.s, jb.e, // y-loop
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
-        for (int ispec = 0; ispec<nspec; ++ispec) {
-          /// TODO: (LFR) Need to make a grid variable holding the energy integrated opacity so that we can
-          ///             create a task to fill the opacity based on MoCMC or some other rule.
+        for (int ispec = 0; ispec < nspec; ++ispec) {
+          /// TODO: (LFR) Need to make a grid variable holding the energy integrated
+          /// opacity so that we can
+          ///             create a task to fill the opacity based on MoCMC or some other
+          ///             rule.
           /// TOMAYBENOTDO: (BRR) Can't we just use kappaH and kappaJ?
-          const Real enu = 10.0; // Assume we are gray for now or can take the peak opacity at enu = 10 MeV
-          const Real rho =  v(iblock, prho, k, j, i);
-          const Real Temp =  v(iblock, pT, k, j, i);
+          const Real enu = 10.0; // Assume we are gray for now or can take the peak
+                                 // opacity at enu = 10 MeV
+          const Real rho = v(iblock, prho, k, j, i);
+          const Real Temp = v(iblock, pT, k, j, i);
           const Real Ye = v(iblock, pYe, k, j, i);
 
-          Real kappa = d_opacity.AbsorptionCoefficient(rho, Temp, Ye, dev_species[ispec], enu);
-          //const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
-          //Real B = emis/kappa;
+          Real kappa =
+              d_opacity.AbsorptionCoefficient(rho, Temp, Ye, dev_species[ispec], enu);
+          // const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
+          // Real B = emis/kappa;
           Real B = d_opacity.ThermalDistributionOfT(Temp, dev_species[ispec]);
           if (use_B_fake) B = B_fake;
 

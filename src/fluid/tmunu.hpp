@@ -57,7 +57,7 @@ class StressEnergyTensorCon {
   // signature needs to change.
   // TODO(JMM): Should I use enable_if or static asserts or anything?
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void operator()(Real T[ND][ND], Args &&...args) const {
+  KOKKOS_INLINE_FUNCTION void operator()(Real T[ND][ND], Args &&... args) const {
     static_assert(sizeof...(Args) >= 3, "Must at least have k, j, i");
     static_assert(sizeof...(Args) <= 4, "Must have no more than b, k, j, i");
     Real u[ND], b[ND], g[ND][ND], bsq;
@@ -86,18 +86,18 @@ class StressEnergyTensorCon {
   }
 
   template <typename... Args>
-  KOKKOS_FORCEINLINE_FUNCTION Real v_(int l, Args &&...args) const {
+  KOKKOS_FORCEINLINE_FUNCTION Real v_(int l, Args &&... args) const {
     return GetVar_(iv_ + l - 1, std::forward<Args>(args)...);
   }
 
   template <typename... Args>
-  KOKKOS_FORCEINLINE_FUNCTION Real b_(int l, Args &&...args) const {
+  KOKKOS_FORCEINLINE_FUNCTION Real b_(int l, Args &&... args) const {
     return (ib_ > 0 ? GetVar_(ib_ + l - 1, std::forward<Args>(args)...) : 0.0);
   }
 
   template <typename... Args>
   KOKKOS_INLINE_FUNCTION void GetTmunuTerms_(Real u[ND], Real b[ND], Real &bsq,
-                                             Real gscratch[4][4], Args &&...args) const {
+                                             Real gscratch[4][4], Args &&... args) const {
     Real beta[ND - 1];
     Real Bdotv = 0.0;
     Real Bsq = 0.0;

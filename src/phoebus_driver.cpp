@@ -107,15 +107,17 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto &sc = pmb->meshblock_data.Get();
     auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], ib);
 
-    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving,
-                                 sc.get(), BoundaryCommSubset::all);
-    auto send = tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
+    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
+                                 BoundaryCommSubset::all);
+    auto send =
+        tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
     auto recv =
         tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
     auto fill_from_bufs =
         tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
-    auto clear_comm_flags = tl.AddTask(fill_from_bufs, &MeshBlockData<Real>::ClearBoundary,
-                                       sc.get(), BoundaryCommSubset::all);
+    auto clear_comm_flags =
+        tl.AddTask(fill_from_bufs, &MeshBlockData<Real>::ClearBoundary, sc.get(),
+                   BoundaryCommSubset::all);
 
     auto prolongBound = tl.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
 
@@ -124,8 +126,9 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
 
     // Radiation should actually be included in ConvertBoundaryConditions
-    //using MDT = std::remove_pointer<decltype(sc.get())>::type;
-    //auto momentp2c = tl.AddTask(convert_bc, radiation::MomentPrim2Con<MDT>, sc.get(), IndexDomain::entire);
+    // using MDT = std::remove_pointer<decltype(sc.get())>::type;
+    // auto momentp2c = tl.AddTask(convert_bc, radiation::MomentPrim2Con<MDT>, sc.get(),
+    // IndexDomain::entire);
   }
 
   tc.Execute();
@@ -253,15 +256,18 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (rad_mocmc_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-      auto samples_transport = tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get(), dt);
-      auto sample_recon = tl.AddTask(samples_transport, radiation::MOCMCReconstruction<MDT>, sc0.get());
-      auto eddington = tl.AddTask(sample_recon, radiation::MOCMCEddington<MDT>, sc0.get());
+      auto samples_transport =
+          tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get(), dt);
+      auto sample_recon =
+          tl.AddTask(samples_transport, radiation::MOCMCReconstruction<MDT>, sc0.get());
+      auto eddington =
+          tl.AddTask(sample_recon, radiation::MOCMCEddington<MDT>, sc0.get());
 
       geom_src = geom_src | eddington;
     }
 
-    auto send_flux =
-        tl.AddTask(sndrcv_flux_depend, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
+    auto send_flux = tl.AddTask(sndrcv_flux_depend,
+                                &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
 
     auto recv_flux = tl.AddTask(sndrcv_flux_depend,
                                 &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
@@ -320,8 +326,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (rad_mocmc_active) {
       auto impl_update = tl.AddTask(update, radiation::MOCMCFluidSource<MeshData<Real>>,
-        sc1.get(), beta*dt, fluid_active);
-      //for (int nblock = 0; nblock sc1.NumBlocks(); nblock++) {
+                                    sc1.get(), beta * dt, fluid_active);
+      // for (int nblock = 0; nblock sc1.NumBlocks(); nblock++) {
       //  auto &mbd = sc1.GetBlockData(nblock);
       //  auto impl_update =
       //}
