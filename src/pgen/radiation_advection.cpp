@@ -28,7 +28,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PackIndexMap imap;
   auto v = rc->PackVariables(
       std::vector<std::string>({radmoment_prim::J, radmoment_prim::H, fluid_prim::density,
+//<<<<<<< HEAD
                                 fluid_prim::temperature, fluid_prim::energy, fluid_prim::velocity,
+//=======
+//                                fluid_prim::temperature, fluid_prim::velocity,
+//>>>>>>> origin/main
                                 radmoment_internal::xi, radmoment_internal::phi}),
       imap);
 
@@ -39,9 +43,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto iphi = imap.GetFlatIdx(radmoment_internal::phi);
   const int prho = imap[fluid_prim::density].first;
   const int pT = imap[fluid_prim::temperature].first;
+//<<<<<<< HEAD
   const int peng = imap[fluid_prim::energy].first;
 
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+//=======
+//>>>>>>> origin/main
 
   const auto specB = idJ.GetBounds(1);
   const Real J = pin->GetOrAddReal("radiation_advection", "J", 1.0);
@@ -106,7 +113,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(idJ(ispec), k, j, i) =
                 std::max(J * exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10);
           }
-          printf("[%i %i %i] J(%i) = %e\n", k, j, i, ispec, v(idJ(ispec),k,j,i));
+//<<<<<<< HEAD
+//          printf("[%i %i %i] J(%i) = %e\n", k, j, i, ispec, v(idJ(ispec),k,j,i));
+//=======
+//>>>>>>> origin/main
 
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;

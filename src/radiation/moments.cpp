@@ -11,35 +11,36 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
-#include "radiation/radiation.hpp"
-#include "reconstruction.hpp"
-#include "radiation/local_three_geometry.hpp"
 #include "radiation/closure.hpp"
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
+#include "radiation/local_three_geometry.hpp"
+#include "radiation/radiation.hpp"
+#include "reconstruction.hpp"
 
 namespace radiation {
 
 template <class T>
-  class ReconstructionIndexer  {
+class ReconstructionIndexer {
  public:
   KOKKOS_INLINE_FUNCTION
-  ReconstructionIndexer(const T& v, const int chunk_size, const int offset, const int block = 0) :
-      v_(v), chunk_size_(chunk_size), offset_(offset), block_(block) {}
+  ReconstructionIndexer(const T &v, const int chunk_size, const int offset,
+                        const int block = 0)
+      : v_(v), chunk_size_(chunk_size), offset_(offset), block_(block) {}
 
   KOKKOS_FORCEINLINE_FUNCTION
-  Real& operator()(const int idir, const int ivar, const int k, const int j, const int i) const {
-    const int idx = idir*chunk_size_ + ivar + offset_;
+  Real &operator()(const int idir, const int ivar, const int k, const int j,
+                   const int i) const {
+    const int idx = idir * chunk_size_ + ivar + offset_;
     return v_(block_, idx, k, j, i);
   }
 
  private:
-  const T& v_;
+  const T &v_;
   const int ntot_ = 1;
   const int chunk_size_;
   const int offset_;
@@ -61,7 +62,6 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
   std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi};
-    printf("Eddington known??? %i\n", static_cast<int>(EDDINGTON_KNOWN));
   if (EDDINGTON_KNOWN) {
     variables.push_back(ir::tilPi);
   }
@@ -87,27 +87,32 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
   const Real pi = acos(-1);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(),
-      0, v.GetDim(5)-1, // Loop over meshblocks
+      DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 0,
+      v.GetDim(5) - 1,  // Loop over meshblocks
       specB.s, specB.e, // Loop over species
-      kb.s, kb.e, // z-loop
-      jb.s, jb.e, // y-loop
-      ib.s, ib.e, // x-loop
+      kb.s, kb.e,       // z-loop
+      jb.s, jb.e,       // y-loop
+      ib.s, ib.e,       // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
-        Vec con_v{{v(b, pv(0), k, j, i),
-                   v(b, pv(1), k, j, i),
-                   v(b, pv(2), k, j, i)}};
+        Vec con_v{{v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)}};
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
-        const Real isdetgam = 1.0/geom.DetGamma(CellLocation::Cent, b, k, j, i);
+        const Real isdetgam = 1.0 / geom.DetGamma(CellLocation::Cent, b, k, j, i);
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
         CLOSURE c(con_v, &g);
 
+//<<<<<<< HEAD
+        //typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
+        //CLOSURE c(con_v, &g);
+
+//=======
+//>>>>>>> origin/main
         Real J;
         Vec covH;
         Tens2 conTilPi;
         Real E = v(b, cE(ispec), k, j, i) * isdetgam;
+//<<<<<<< HEAD
         Vec covF ={{v(b, cF(ispec, 0), k, j, i) * isdetgam,
                     v(b, cF(ispec, 1), k, j, i) * isdetgam,
                     v(b, cF(ispec, 2), k, j, i) * isdetgam}};
@@ -137,18 +142,40 @@ TaskStatus MomentCon2PrimImpl(T* rc) {
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
         if (std::isnan(J) || std::isnan(covH(0))) PARTHENON_FAIL("Radiation Con2Prim NaN.");
+/*=======
+        Vec covF = {{v(b, cF(ispec, 0), k, j, i) * isdetgam,
+                     v(b, cF(ispec, 1), k, j, i) * isdetgam,
+                     v(b, cF(ispec, 2), k, j, i) * isdetgam}};
+
+        Real xi = 0.0;
+        Real phi = pi;
+        if (STORE_GUESS) {
+          xi = v(b, iXi(ispec), k, j, i);
+          phi = 1.0001 * v(b, iPhi(ispec), k, j, i);
+        }
+        c.GetCovTilPiFromCon(E, covF, xi, phi, &conTilPi);
+        if (STORE_GUESS) {
+          v(b, iXi(ispec), k, j, i) = xi;
+          v(b, iPhi(ispec), k, j, i) = phi;
+        }
+        c.Con2Prim(E, covF, conTilPi, &J, &covH);
+        if (std::isnan(J) || std::isnan(covH(0)))
+          PARTHENON_FAIL("Radiation Con2Prim NaN.");
+>>>>>>> origin/main*/
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
-          v(b, pH(ispec, idir), k, j, i) = covH(idir)/J; // Used the scaled value of the rest frame flux for reconstruction
+          v(b, pH(ispec, idir), k, j, i) =
+              covH(idir) /
+              J; // Used the scaled value of the rest frame flux for reconstruction
         }
       });
 
   return TaskStatus::complete;
 }
 
-template<class T>
-TaskStatus MomentCon2Prim(T* rc) {
+template <class T>
+TaskStatus MomentCon2Prim(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
@@ -166,12 +193,17 @@ TaskStatus MomentCon2Prim(T* rc) {
   }
   return TaskStatus::fail;
 }
-//template TaskStatus MomentCon2Prim<MeshData<Real>>(MeshData<Real> *);
+// template TaskStatus MomentCon2Prim<MeshData<Real>>(MeshData<Real> *);
 template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
+//<<<<<<< HEAD
 template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
 TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
   printf("%s:%i\n", __FILE__, __LINE__);
+//=======
+//template <class T, class CLOSURE>
+//TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
+//>>>>>>> origin/main
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
@@ -208,17 +240,15 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::Prim2Con", DevExecSpace(),
-      0, v.GetDim(5)-1, // Loop over meshblocks
+      DEFAULT_LOOP_PATTERN, "RadMoments::Prim2Con", DevExecSpace(), 0,
+      v.GetDim(5) - 1,  // Loop over meshblocks
       specB.s, specB.e, // Loop over species
-      kb.s, kb.e, // z-loop
-      jb.s, jb.e, // y-loop
-      ib.s, ib.e, // x-loop
+      kb.s, kb.e,       // z-loop
+      jb.s, jb.e,       // y-loop
+      ib.s, ib.e,       // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
         // Set up the background
-        Vec con_v{{v(b, pv(0), k, j, i),
-                   v(b, pv(1), k, j, i),
-                   v(b, pv(2), k, j, i)}};
+        Vec con_v{{v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)}};
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
@@ -230,6 +260,7 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
         Vec covF;
         Tens2 conTilPi;
         Real J = v(b, pJ(ispec), k, j, i);
+/*<<<<<<< HEAD
         Vec covH ={{v(b, pH(ispec, 0), k, j, i)*J,
                     v(b, pH(ispec, 1), k, j, i)*J,
                     v(b, pH(ispec, 2), k, j, i)*J}};
@@ -239,6 +270,12 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
         } else {
           c.GetCovTilPiFromPrim(J, covH, &conTilPi);
         }
+=======*/
+        Vec covH = {{v(b, pH(ispec, 0), k, j, i) * J, v(b, pH(ispec, 1), k, j, i) * J,
+                     v(b, pH(ispec, 2), k, j, i) * J}};
+
+        c.GetCovTilPiFromPrim(J, covH, &conTilPi);
+//>>>>>>> origin/main
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
         v(b, cE(ispec), k, j, i) = sdetgam * E;
@@ -258,6 +295,7 @@ TaskStatus MomentPrim2ConImpl(T* rc, IndexDomain domain) {
   return TaskStatus::complete;
 }
 
+//<<<<<<< HEAD
 
 template<class T>
 TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
@@ -277,15 +315,33 @@ TaskStatus MomentPrim2Con(T* rc, IndexDomain domain) {
   }
   else {
     PARTHENON_FAIL("Radiation method unknown!");
+/*=======
+template <class T>
+TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
+  auto *pm = rc->GetParentPointer().get();
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
+  auto method = rad->Param<std::string>("method");
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  if (method == "moment_m1") {
+    return MomentPrim2ConImpl<T, ClosureM1<Vec, Tens2, settings>>(rc, domain);
+  } else if (method == "moment_eddington") {
+    return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, domain);
+>>>>>>> origin/main*/
   }
   return TaskStatus::fail;
 }
 
-template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *, IndexDomain);
+template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
+                                                        IndexDomain);
 
 template <class T>
+//<<<<<<< HEAD
 TaskStatus ReconstructEdgeStates(T* rc) {
   printf("%s:%i\n", __FILE__, __LINE__);
+//=======
+//TaskStatus ReconstructEdgeStates(T *rc) {
+//>>>>>>> origin/main
 
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -296,19 +352,20 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   }
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  const int di = ( pmb->pmy_mesh->ndim > 0 ? 1 : 0);
+  const int di = (pmb->pmy_mesh->ndim > 0 ? 1 : 0);
 
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  const int dj = ( pmb->pmy_mesh->ndim > 1 ? 1 : 0);
+  const int dj = (pmb->pmy_mesh->ndim > 1 ? 1 : 0);
 
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-  const int dk = ( pmb->pmy_mesh->ndim > 2 ? 1 : 0);
+  const int dk = (pmb->pmy_mesh->ndim > 2 ? 1 : 0);
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
 
   PackIndexMap imap_ql, imap_qr, imap;
+//<<<<<<< HEAD
   VariablePack<Real> ql_base = rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
   VariablePack<Real> qr_base = rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
   std::vector<std::string> variables = {pr::J, pr::H};
@@ -317,6 +374,14 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   }
   variables.push_back(ir::dJ);
   VariablePack<Real> v = rc->PackVariables(variables, imap);
+/*=======
+  VariablePack<Real> ql_base =
+      rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
+  VariablePack<Real> qr_base =
+      rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
+  VariablePack<Real> v =
+      rc->PackVariables(std::vector<std::string>{pr::J, pr::H, ir::dJ}, imap);
+>>>>>>> origin/main*/
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_dJ = imap.GetFlatIdx(ir::dJ);
   vpack_types::FlatIdx iTilPi({-1}, -1);
@@ -326,10 +391,12 @@ TaskStatus ReconstructEdgeStates(T* rc) {
 
   ParArrayND<Real> ql_v = rc->Get(ir::ql_v).data;
   ParArrayND<Real> qr_v = rc->Get(ir::qr_v).data;
-  VariablePack<Real> v_vel = rc->PackVariables(std::vector<std::string>{fluid_prim::velocity});
+  VariablePack<Real> v_vel =
+      rc->PackVariables(std::vector<std::string>{fluid_prim::velocity});
   auto qIdx = imap_ql.GetFlatIdx(ir::ql);
 
   const int nspec = qIdx.DimSize(1);
+//<<<<<<< HEAD
   int nrecon = 4*nspec;
   if (eddington_known) {
     //nrecon = (4 + 6)*nspec;
@@ -338,19 +405,22 @@ TaskStatus ReconstructEdgeStates(T* rc) {
   printf("dims: %i %i %i\n", qIdx.DimSize(1), qIdx.DimSize(2), qIdx.DimSize(3));
   printf("vdims: %i %i %i %i %i\n",
     v.GetDim(1), v.GetDim(2), v.GetDim(3), v.GetDim(4), v.GetDim(5));
+//=======
+//  const int nrecon = 4 * nspec;
+//>>>>>>> origin/main
 
   const int offset = imap_ql[ir::ql].first;
 
   const int nblock = ql_base.GetDim(5);
   const int ndim = pmb->pmy_mesh->ndim;
-  auto& coords = pmb->coords;
+  auto &coords = pmb->coords;
 
   printf("nrecon: %i offset: %i\n", nrecon, offset);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(),
-      X1DIR, ndim, // Loop over directions for reconstruction
-      0, nblock-1, // Loop over blocks
+      DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), X1DIR,
+      ndim,                 // Loop over directions for reconstruction
+      0, nblock - 1,        // Loop over blocks
       kb.s - dk, kb.e + dk, // z-loop
       jb.s - dj, jb.e + dj, // y-loop
       ib.s - di, ib.e + di, // x-loop
@@ -358,18 +428,11 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         ReconstructionIndexer<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
         ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
         // Reconstruct radiation
-        for (int ivar = 0; ivar<nrecon; ++ivar) {
-          //if (i == 10) {
-          //printf("v(%i %i %i %i) = %e\n", ivar,k,j,i, v(ivar,k,j,i));
-          //for (int s = 0; s < 3; s++) {
-          //  printf("iTilPi = %e %e %e\n", v(b, iTilPi(s, 0, 0), k, j, i), v(b,iTilPi(s,1,1),k,j,i),
-          //    v(b,iTilPi(s,2,2), k, j, i));
-          //}
-          //}
+        for (int ivar = 0; ivar < nrecon; ++ivar) {
           PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v, ql, qr);
         }
         // Reconstruct velocity for radiation
-        for (int ivar = 0; ivar<3; ++ivar) {
+        for (int ivar = 0; ivar < 3; ++ivar) {
           PhoebusReconstruction::PiecewiseLinear(iface, ivar, k, j, i, v_vel, ql_v, qr_v);
         }
 
@@ -392,48 +455,64 @@ TaskStatus ReconstructEdgeStates(T* rc) {
         const int st_k[3] = {0, 0, 1};
         const int st_j[3] = {0, 1, 0};
         const int st_i[3] = {1, 0, 0};
-        for (int ispec=0; ispec<nspec; ++ispec) {
+        for (int ispec = 0; ispec < nspec; ++ispec) {
           for (int idir = X1DIR; idir <= ndim; ++idir) {
-            // Calculate the derivatives in the plane of the face (and put junk in the derivative perpendicular to the face)
+            // Calculate the derivatives in the plane of the face (and put junk in the
+            // derivative perpendicular to the face)
             const Real dy = coords.Dx(idir, k, j, i);
-            v(b, idx_dJ(ispec, idir-1, iface-1), k, j, i) = (v(b, idx_J(ispec), k+st_k[idir-1], j+st_j[idir-1], i+st_i[idir-1])
-                                                              -v(b, idx_J(ispec), k-st_k[idir-1], j-st_j[idir-1], i-st_i[idir-1])
-                                                              +v(b, idx_J(ispec), k+st_k[idir-1]-off_k, j+st_j[idir-1]-off_j, i+st_i[idir-1]-off_i)
-                                                              -v(b, idx_J(ispec), k-st_k[idir-1]-off_k, j-st_j[idir-1]-off_j, i-st_i[idir-1]-off_i))/(4*dy);
-
+            v(b, idx_dJ(ispec, idir - 1, iface - 1), k, j, i) =
+                (v(b, idx_J(ispec), k + st_k[idir - 1], j + st_j[idir - 1],
+                   i + st_i[idir - 1]) -
+                 v(b, idx_J(ispec), k - st_k[idir - 1], j - st_j[idir - 1],
+                   i - st_i[idir - 1]) +
+                 v(b, idx_J(ispec), k + st_k[idir - 1] - off_k,
+                   j + st_j[idir - 1] - off_j, i + st_i[idir - 1] - off_i) -
+                 v(b, idx_J(ispec), k - st_k[idir - 1] - off_k,
+                   j - st_j[idir - 1] - off_j, i - st_i[idir - 1] - off_i)) /
+                (4 * dy);
           }
           // Overwrite the derivative perpendicular to the face
           const Real dx = coords.Dx(iface, k, j, i);
-          v(b, idx_dJ(ispec, iface-1, iface-1), k, j, i) =  (v(b, idx_J(ispec), k, j, i) - v(b, idx_J(ispec), k-off_k, j-off_j, i-off_i))/dx;
+          v(b, idx_dJ(ispec, iface - 1, iface - 1), k, j, i) =
+              (v(b, idx_J(ispec), k, j, i) -
+               v(b, idx_J(ispec), k - off_k, j - off_j, i - off_i)) /
+              dx;
         }
       });
   return TaskStatus::complete;
 }
 template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
+//<<<<<<< HEAD
 // This really only works for MeshBlockData right now since fluxes don't have a block index
 template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
 TaskStatus CalculateFluxesImpl(T* rc) {
   printf("%s:%i\n", __FILE__, __LINE__);
+/*=======
+// This really only works for MeshBlockData right now since fluxes don't have a block
+// index
+template <class T, class CLOSURE>
+TaskStatus CalculateFluxesImpl(T *rc) {
+>>>>>>> origin/main*/
 
   auto *pmb = rc->GetParentPointer().get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  const int di = ( pmb->pmy_mesh->ndim > 0 ? 1 : 0);
+  const int di = (pmb->pmy_mesh->ndim > 0 ? 1 : 0);
 
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  const int dj = ( pmb->pmy_mesh->ndim > 1 ? 1 : 0);
+  const int dj = (pmb->pmy_mesh->ndim > 1 ? 1 : 0);
 
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-  const int dk = ( pmb->pmy_mesh->ndim > 2 ? 1 : 0);
+  const int dk = (pmb->pmy_mesh->ndim > 2 ? 1 : 0);
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
 
   PackIndexMap imap_ql, imap_qr, imap;
-  std::vector<std::string> vars {ir::ql, ir::qr, ir::ql_v, ir::qr_v, ir::dJ, ir::kappaH};
-  std::vector<std::string> flxs {cr::E, cr::F};
+  std::vector<std::string> vars{ir::ql, ir::qr, ir::ql_v, ir::qr_v, ir::dJ, ir::kappaH};
+  std::vector<std::string> flxs{cr::E, cr::F};
 
   auto v = rc->PackVariablesAndFluxes(vars, flxs, imap);
 
@@ -455,17 +534,16 @@ TaskStatus CalculateFluxesImpl(T* rc) {
 
   const Real kappaH_min = 1.e-20;
 
-  auto& coords = pmb->coords;
+  auto &coords = pmb->coords;
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(),
-      X1DIR, pmb->pmy_mesh->ndim, // Loop over directions
-      //0, nblock-1, // Loop over reconstructed variables
+      DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(), X1DIR,
+      pmb->pmy_mesh->ndim, // Loop over directions
+      // 0, nblock-1, // Loop over reconstructed variables
       kb.s - dk, kb.e + dk, // z-loop
       jb.s - dj, jb.e + dj, // y-loop
       ib.s - di, ib.e + di, // x-loop
       KOKKOS_LAMBDA(const int idir_in, const int k, const int j, const int i) {
-
         const int idir = idir_in - 1;
 
         const int koff = (idir_in == 3 ? 1 : 0);
@@ -473,6 +551,7 @@ TaskStatus CalculateFluxesImpl(T* rc) {
         const int ioff = (idir_in == 1 ? 1 : 0);
 
         CellLocation face;
+/*<<<<<<< HEAD
           switch (idir) {
             case(0):
               face = CellLocation::Face1;
@@ -484,6 +563,19 @@ TaskStatus CalculateFluxesImpl(T* rc) {
               face = CellLocation::Face3;
               break;
           }
+=======*/
+        switch (idir) {
+        case (0):
+          face = CellLocation::Face1;
+          break;
+        case (1):
+          face = CellLocation::Face2;
+          break;
+        case (2):
+          face = CellLocation::Face3;
+          break;
+        }
+//>>>>>>> origin/main
 
         Vec con_beta;
         Tens2 cov_gamma;
@@ -492,8 +584,9 @@ TaskStatus CalculateFluxesImpl(T* rc) {
         const Real sdetgam = geom.DetGamma(face, k, j, i);
         typename CLOSURE::LocalGeometryType g(geom, face, 0, k, j, i);
 
-        const Real dx = coords.Dx(idir_in, k, j, i)*sqrt(cov_gamma(idir, idir));
+        const Real dx = coords.Dx(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
 
+/*<<<<<<< HEAD
         for (int ispec = 0; ispec<nspec; ++ispec) {
 
           const Real& Jl = v(idx_ql(ispec, 0, idir), k, j, i);
@@ -504,19 +597,29 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           const Vec Hr = {Jr*v(idx_qr(ispec, 1, idir), k, j, i),
                           Jr*v(idx_qr(ispec, 2, idir), k, j, i),
                           Jr*v(idx_qr(ispec, 3, idir), k, j, i)};
+=======*/
+        for (int ispec = 0; ispec < nspec; ++ispec) {
+//>>>>>>> origin/main
 
+          const Real &Jl = v(idx_ql(ispec, 0, idir), k, j, i);
+          const Real &Jr = v(idx_qr(ispec, 0, idir), k, j, i);
+          const Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
+                          Jl * v(idx_ql(ispec, 2, idir), k, j, i),
+                          Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
+          const Vec Hr = {Jr * v(idx_qr(ispec, 1, idir), k, j, i),
+                          Jr * v(idx_qr(ispec, 2, idir), k, j, i),
+                          Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
 
-          Vec con_vl{{v(idx_qlv(0, idir), k, j, i),
-                      v(idx_qlv(1, idir), k, j, i),
+          Vec con_vl{{v(idx_qlv(0, idir), k, j, i), v(idx_qlv(1, idir), k, j, i),
                       v(idx_qlv(2, idir), k, j, i)}};
-          Vec con_vr{{v(idx_qrv(0, idir), k, j, i),
-                      v(idx_qrv(1, idir), k, j, i),
+          Vec con_vr{{v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
                       v(idx_qrv(2, idir), k, j, i)}};
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
+/*<<<<<<< HEAD
           // Calculate the geometric mean of the opacity on either side of the interface, this
           // is necessary for handling the asymptotic limit near sharp surfaces
           Real kappaH = sqrt((v(idx_kappaH(ispec), k, j, i)*v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
@@ -526,6 +629,18 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           // Calculate the observer frame quantities on either side of the interface
           /// TODO: (LFR) Add other contributions to the asymptotic flux
           Vec HasymL = -cov_dJ/(3*kappaH + 3*kappaH_min);
+=======*/
+          // Calculate the geometric mean of the opacity on either side of the interface,
+          // this is necessary for handling the asymptotic limit near sharp surfaces
+          Real kappaH = sqrt((v(idx_kappaH(ispec), k, j, i) *
+                              v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
+
+          const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
+
+          // Calculate the observer frame quantities on either side of the interface
+          /// TODO: (LFR) Add other contributions to the asymptotic flux
+          Vec HasymL = -cov_dJ / (3 * kappaH + 3 * kappaH_min);
+//>>>>>>> origin/main
           Vec HasymR = HasymL;
           CLOSURE cl(con_vl, &g);
           CLOSURE cr(con_vr, &g);
@@ -537,6 +652,7 @@ TaskStatus CalculateFluxesImpl(T* rc) {
           Tens2 Pr, Pr_asym; // P^i_j on the right side of the interface
 
           // Fluxes in the asymptotic limit
+//<<<<<<< HEAD
           if (EDDINGTON_KNOWN) {
             // Use reconstructed values of tilPi
             //con_tilPil(0,0) = 1.;
@@ -555,15 +671,24 @@ TaskStatus CalculateFluxesImpl(T* rc) {
             cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
             cr.GetCovTilPiFromPrim(Jr, HasymR, &con_tilPir);
           }
+/*=======
+          cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
+          cr.GetCovTilPiFromPrim(Jr, HasymR, &con_tilPir);
+//>>>>>>> origin/main*/
           cl.getFluxesFromPrim(Jl, HasymL, con_tilPil, &conFl_asym, &Pl_asym);
           cr.getFluxesFromPrim(Jr, HasymR, con_tilPir, &conFr_asym, &Pr_asym);
 
           // Regular fluxes
+//<<<<<<< HEAD
           if (!EDDINGTON_KNOWN) {
             // Recalculate Eddington if using J, H
             cl.GetCovTilPiFromPrim(Jl, Hl, &con_tilPil);
             cr.GetCovTilPiFromPrim(Jr, Hr, &con_tilPir);
           }
+/*=======
+          cl.GetCovTilPiFromPrim(Jl, Hl, &con_tilPil);
+          cr.GetCovTilPiFromPrim(Jr, Hr, &con_tilPir);
+>>>>>>> origin/main*/
           cl.getFluxesFromPrim(Jl, Hl, con_tilPil, &conFl, &Pl);
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
@@ -571,27 +696,30 @@ TaskStatus CalculateFluxesImpl(T* rc) {
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
-          const Real speed = a*1.0 + (1-a)*std::max(sqrt(cl.v2), sqrt(cr.v2));
-          conFl = a*conFl + (1-a)*conFl_asym;
-          conFr = a*conFr + (1-a)*conFr_asym;
-          Pl = a*Pl + (1-a)*Pl_asym;
-          Pr = a*Pr + (1-a)*Pr_asym;
+          const Real speed = a * 1.0 + (1 - a) * std::max(sqrt(cl.v2), sqrt(cr.v2));
+          conFl = a * conFl + (1 - a) * conFl_asym;
+          conFr = a * conFr + (1 - a) * conFr_asym;
+          Pl = a * Pl + (1 - a) * Pl_asym;
+          Pr = a * Pr + (1 - a) * Pr_asym;
 
           // Correct the fluxes with the shift terms
-          conFl(idir) -= con_beta(idir)*El;
-          conFr(idir) -= con_beta(idir)*Er;
+          conFl(idir) -= con_beta(idir) * El;
+          conFr(idir) -= con_beta(idir) * Er;
 
           SPACELOOP(ii) {
-            Pl(idir, ii) -= con_beta(idir)*covFl(ii);
-            Pr(idir, ii) -= con_beta(idir)*covFr(ii);
+            Pl(idir, ii) -= con_beta(idir) * covFl(ii);
+            Pr(idir, ii) -= con_beta(idir) * covFr(ii);
           }
 
           // Calculate the numerical flux using LLF
-          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.5*sdetgam*(conFl(idir) + conFr(idir) + speed*(El - Er));
+          v.flux(idir_in, idx_Ef(ispec), k, j, i) =
+              0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
 
-          SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.5*sdetgam*(Pl(idir, ii) + Pr(idir, ii)
-                                                                                + speed*(covFl(ii) - covFr(ii)));
-          if (sdetgam < std::numeric_limits<Real>::min()*10) {
+          SPACELOOP(ii)
+          v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
+              0.5 * sdetgam *
+              (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
+          if (sdetgam < std::numeric_limits<Real>::min() * 10) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
@@ -601,11 +729,12 @@ TaskStatus CalculateFluxesImpl(T* rc) {
   return TaskStatus::complete;
 }
 
-template<class T>
-TaskStatus CalculateFluxes(T* rc) {
+template <class T>
+TaskStatus CalculateFluxes(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
+//<<<<<<< HEAD
   using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
     return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings>, false >(rc);
@@ -615,17 +744,30 @@ TaskStatus CalculateFluxes(T* rc) {
     return CalculateFluxesImpl<T, ClosureMOCMC<Vec, Tens2, settings>, true >(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
+/*=======
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  if (method == "moment_m1") {
+    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings>>(rc);
+  } else if (method == "moment_eddington") {
+    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc);
+>>>>>>> origin/main*/
   }
   return TaskStatus::fail;
 }
 template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
+//<<<<<<< HEAD
 template <class T, class CLOSURE, bool EDDINGTON_KNOWN>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   printf("%s:%i\n", __FILE__, __LINE__);
+/*=======
+template <class T, class CLOSURE>
+TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
+>>>>>>> origin/main*/
 
   constexpr int ND = Geometry::NDFULL;
-  //constexpr int NS = Geometry::NDSPACE;
+  // constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
   namespace cr = radmoment_cons;
@@ -663,18 +805,24 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
   int nblock = v.GetDim(5);
   int nspec = idx_E.DimSize(1);
+/*<<<<<<< HEAD
   printf("%s:%i\n", __FILE__, __LINE__);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::GeometricSource", DevExecSpace(),
       0, nblock-1, // Loop over blocks
+=======*/
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "RadMoments::GeometricSource", DevExecSpace(), 0,
+      nblock - 1, // Loop over blocks
+//>>>>>>> origin/main
       kb.s, kb.e, // z-loop
       jb.s, jb.e, // y-loop
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
         // Set up the background state
-        Vec con_v{{v(iblock, pv(0), k, j, i),
-                   v(iblock, pv(1), k, j, i),
+        Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                    v(iblock, pv(2), k, j, i)}};
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
@@ -687,7 +835,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Vec con_beta;
         geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
         Real beta2 = 0.0;
-        SPACELOOP2(ii,jj) beta2 += con_beta(ii)*con_beta(jj)*cov_gamma(ii,jj);
+        SPACELOOP2(ii, jj) beta2 += con_beta(ii) * con_beta(jj) * cov_gamma(ii, jj);
 
         Real dlnalp[ND];
         Real Gamma[ND][ND][ND];
@@ -698,31 +846,30 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         // Get the extrinsic curvature from the Christoffel symbols of the first kind
         // All indices are covariant
         Tens2 dbeta, K;
-        const Real iFac = 1.0/(alp + beta2/alp);
+        const Real iFac = 1.0 / (alp + beta2 / alp);
         SPACELOOP2(ii, jj) {
-          dbeta(ii,jj) = Gamma[ii+1][jj+1][0] + Gamma[ii+1][0][jj+1];
-          K(ii,jj) = Gamma[ii+1][0][jj+1];
-          SPACELOOP(kk) K(ii,jj) -= Gamma[ii+1][kk+1][jj+1]*con_beta(kk);
-          K(ii,jj) *= iFac;
+          dbeta(ii, jj) = Gamma[ii + 1][jj + 1][0] + Gamma[ii + 1][0][jj + 1];
+          K(ii, jj) = Gamma[ii + 1][0][jj + 1];
+          SPACELOOP(kk) K(ii, jj) -= Gamma[ii + 1][kk + 1][jj + 1] * con_beta(kk);
+          K(ii, jj) *= iFac;
         }
 
-
-
-        for (int ispec = 0; ispec<nspec; ++ispec) {
-          Real E = v(iblock, idx_E(ispec), k, j, i)/sdetgam;
+        for (int ispec = 0; ispec < nspec; ++ispec) {
+          Real E = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
           Real J = v(iblock, idx_J(ispec), k, j, i);
-          Vec covF{{v(iblock, idx_F(ispec, 0), k, j, i)/sdetgam,
-                     v(iblock, idx_F(ispec, 1), k, j, i)/sdetgam,
-                     v(iblock, idx_F(ispec, 2), k, j, i)/sdetgam}};
-          Vec covH{{J*v(iblock, idx_H(ispec, 0), k, j, i),
-                    J*v(iblock, idx_H(ispec, 1), k, j, i),
-                    J*v(iblock, idx_H(ispec, 2), k, j, i)}};
+          Vec covF{{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
+                    v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
+                    v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam}};
+          Vec covH{{J * v(iblock, idx_H(ispec, 0), k, j, i),
+                    J * v(iblock, idx_H(ispec, 1), k, j, i),
+                    J * v(iblock, idx_H(ispec, 2), k, j, i)}};
           Vec conF;
           g.raise3Vector(covF, &conF);
           Tens2 conP, con_tilPi;
 
+//<<<<<<< HEAD
           if (EDDINGTON_KNOWN) {
-
+            // TODO(BRR) Add Pij here!
           } else {
             c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
           }
@@ -731,26 +878,40 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Real srcE = 0.0;
           SPACELOOP2(ii, jj) srcE += K(ii,jj)*conP(ii, jj);
           SPACELOOP(ii) srcE -= dlnalp[ii+1]*conF(ii);
+/*=======
+          c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+          c.getConPFromPrim(J, covH, con_tilPi, &conP);
+
+          Real srcE = 0.0;
+          SPACELOOP2(ii, jj) srcE += K(ii, jj) * conP(ii, jj);
+          SPACELOOP(ii) srcE -= dlnalp[ii + 1] * conF(ii);
+>>>>>>> origin/main*/
           srcE *= alp;
 
-          Vec srcF{0,0,0};
+          Vec srcF{0, 0, 0};
           SPACELOOP(ii) {
-            SPACELOOP(jj) srcF(ii) += covF(jj)*dbeta(ii,jj);
-            srcF(ii) -= alp*E*dlnalp[ii+1];
-            SPACELOOP2(jj, kk) srcF(ii) += alp*conP(jj,kk)*Gamma[jj+1][kk+1][ii+1];
+            SPACELOOP(jj) srcF(ii) += covF(jj) * dbeta(ii, jj);
+            srcF(ii) -= alp * E * dlnalp[ii + 1];
+            SPACELOOP2(jj, kk)
+            srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
           }
-          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam*srcE;
-          SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam*srcF(ii);
+          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
+          SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
         }
+/*<<<<<<< HEAD
   });
   printf("%s:%i\n", __FILE__, __LINE__);
+=======*/
+      });
+//>>>>>>> origin/main
   return TaskStatus::complete;
 }
-template<class T>
-TaskStatus CalculateGeometricSource(T* rc, T* rc_src) {
+template <class T>
+TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
+//<<<<<<< HEAD
   using settings = ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
     return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings>, false>(rc, rc_src);
@@ -763,10 +924,19 @@ TaskStatus CalculateGeometricSource(T* rc, T* rc_src) {
   }
   else {
     PARTHENON_FAIL("Radiation method unknown!");
+/*=======
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  if (method == "moment_m1") {
+    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings>>(rc, rc_src);
+  } else if (method == "moment_eddington") {
+    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, rc_src);
+>>>>>>> origin/main*/
   }
   return TaskStatus::fail;
 }
-template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<Real> *, MeshBlockData<Real> *);
+template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<Real> *,
+                                                                  MeshBlockData<Real> *);
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
@@ -777,8 +947,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E, cr::F, p::density, p::temperature, p::ye, p::velocity,
-                                pr::J, pr::H, ir::kappaJ, ir::kappaH, ir::JBB};
+  std::vector<std::string> vars{cr::E,      cr::F,       p::density, p::temperature,
+                                p::ye,      p::velocity, pr::J,      pr::H,
+                                ir::kappaJ, ir::kappaH,  ir::JBB};
   if (update_fluid) {
     vars.push_back(c::energy);
     vars.push_back(c::momentum);
@@ -819,17 +990,16 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   int nspec = idx_E.DimSize(1);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(),
-      0, nblock-1, // Loop over blocks
+      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
+      nblock - 1, // Loop over blocks
       kb.s, kb.e, // z-loop
       jb.s, jb.e, // y-loop
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
-        for (int ispec = 0; ispec<nspec; ++ispec) {
+        for (int ispec = 0; ispec < nspec; ++ispec) {
 
           // Set up the background state
-          Vec con_v{{v(iblock, pv(0), k, j, i),
-                     v(iblock, pv(1), k, j, i),
+          Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                      v(iblock, pv(2), k, j, i)}};
           Tens2 cov_gamma;
           geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
@@ -840,54 +1010,69 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           /// TODO: (LFR) Move beyond Eddington for this update
           ClosureEdd<Vec, Tens2> c(con_v, &g);
 
+/*<<<<<<< HEAD
           Real Estar = v(iblock, idx_E(ispec), k, j, i)/sdetgam;
           Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i)/sdetgam,
                         v(iblock, idx_F(ispec, 1), k, j, i)/sdetgam,
                         v(iblock, idx_F(ispec, 2), k, j, i)/sdetgam};
+=======*/
+          Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+          Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
+                        v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
+                        v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
+//>>>>>>> origin/main
 
           Real dE;
           Vec cov_dF;
 
-
           // Treat the Eddington tensor explicitly for now
+/*<<<<<<< HEAD
           Real& J = v(iblock, idx_J(ispec), k, j, i);
           Vec cov_H{{J*v(iblock, idx_H(ispec, 0), k, j, i),
                      J*v(iblock, idx_H(ispec, 1), k, j, i),
                      J*v(iblock, idx_H(ispec, 2), k, j, i),
                     }};
+=======*/
+          Real &J = v(iblock, idx_J(ispec), k, j, i);
+          Vec cov_H{{
+              J * v(iblock, idx_H(ispec, 0), k, j, i),
+              J * v(iblock, idx_H(ispec, 1), k, j, i),
+              J * v(iblock, idx_H(ispec, 2), k, j, i),
+          }};
+//>>>>>>> origin/main
           Tens2 con_tilPi;
 
+          // TODO(BRR) Use stored value if Eddington is known
           c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
 
           Real B = v(iblock, idx_JBB(ispec), k, j, i);
-          Real tauJ = alpha*dt*v(iblock, idx_kappaJ(ispec), k, j, i);
-          Real tauH = alpha*dt*v(iblock, idx_kappaH(ispec), k, j, i);
-          Real kappaH =  v(iblock, idx_kappaH(ispec), k, j, i);
-          c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B,
-                               tauJ, tauH, &dE, &cov_dF);
+          Real tauJ = alpha * dt * v(iblock, idx_kappaJ(ispec), k, j, i);
+          Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
+          Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
+          c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
 
           // Add source corrections to conserved iration variables
-          v(iblock, idx_E(ispec), k, j, i) += sdetgam*dE;
-          for (int idir=0; idir<3; ++idir) {
-            v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam*cov_dF(idir);
+          v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
+          for (int idir = 0; idir < 3; ++idir) {
+            v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
           }
 
           // Add source corrections to conserved fluid variables
           if (update_fluid) {
-            v(iblock, cye, k, j, i) -= sdetgam*0.0;
-            v(iblock, ceng, k, j, i) -= sdetgam*dE;
-            v(iblock, cmom_lo + 0, k, j, i) -= sdetgam*cov_dF(0);
-            v(iblock, cmom_lo + 1, k, j, i) -= sdetgam*cov_dF(1);
-            v(iblock, cmom_lo + 2, k, j, i) -= sdetgam*cov_dF(2);
+            v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+            v(iblock, ceng, k, j, i) -= sdetgam * dE;
+            v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
+            v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
+            v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
           }
-
         }
       });
 
   return TaskStatus::complete;
 }
 template TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *, Real, bool);
-template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real, bool);
+template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real,
+                                                           bool);
 
 template <class T>
 TaskStatus MomentCalculateOpacities(T *rc) {
@@ -909,7 +1094,8 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{p::density, p::temperature, p::ye, p::velocity, ir::kappaJ, ir::kappaH, ir::JBB};
+  std::vector<std::string> vars{p::density, p::temperature, p::ye,  p::velocity,
+                                ir::kappaJ, ir::kappaH,     ir::JBB};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -927,7 +1113,8 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  // Mainly for testing purposes, probably should be able to do this with the opacity code itself
+  // Mainly for testing purposes, probably should be able to do this with the opacity code
+  // itself
   const auto B_fake = rad->Param<Real>("B_fake");
   const auto use_B_fake = rad->Param<bool>("use_B_fake");
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
@@ -946,12 +1133,13 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   RadiationType dev_species[3] = {species[0], species[1], species[2]};
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(),
-      0, nblock-1, // Loop over blocks
+      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
+      nblock - 1, // Loop over blocks
       kb.s, kb.e, // z-loop
       jb.s, jb.e, // y-loop
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
+//<<<<<<< HEAD
         for (int ispec = 0; ispec<nspec; ++ispec) {
           /// TODO: (LFR) Need to make a grid variable holding the energy integrated opacity so that we can
           ///             create a task to fill the opacity based on MoCMC or some other rule.
@@ -965,16 +1153,33 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           //const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
           //Real B = emis/kappa;
           Real B = d_opacity.ThermalDistributionOfT(Temp, dev_species[ispec]);
+/*=======
+        for (int ispec = 0; ispec < nspec; ++ispec) {
+          /// TODO: (LFR) Need to make a grid variable holding the energy integrated
+          /// opacity so that we can
+          ///             create a task to fill the opacity based on MoCMC or some other
+          ///             rule.
+          const Real enu = 10.0; // Assume we are gray for now or can take the peak
+                                 // opacity at enu = 10 MeV
+          const Real rho = v(iblock, prho, k, j, i);
+          const Real Temp = v(iblock, pT, k, j, i);
+          const Real Ye = v(iblock, pYe, k, j, i);
+          const Real T_code = v(iblock, pT, k, j, i);
+
+          Real kappa =
+              d_opacity.AbsorptionCoefficient(rho, Temp, Ye, dev_species[ispec], enu);
+          const Real emis = d_opacity.Emissivity(rho, Temp, Ye, dev_species[ispec]);
+          Real B = emis / kappa;
+>>>>>>> origin/main*/
           if (use_B_fake) B = B_fake;
 
           v(iblock, idx_JBB(ispec), k, j, i) = B;
-          v(iblock, idx_kappaJ(ispec), k, j, i) = kappa*(1.0 - scattering_fraction);
+          v(iblock, idx_kappaJ(ispec), k, j, i) = kappa * (1.0 - scattering_fraction);
           v(iblock, idx_kappaH(ispec), k, j, i) = kappa;
-
         }
       });
 
   return TaskStatus::complete;
 }
 template TaskStatus MomentCalculateOpacities<MeshBlockData<Real>>(MeshBlockData<Real> *);
-} //namespace irationMoments
+} // namespace radiation

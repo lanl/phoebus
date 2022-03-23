@@ -11,23 +11,30 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+#ifdef MPI_PARALLEL
+#include <mpi.h>
+#endif // MPI_PARALLEL
+
 #include <Kokkos_Core.hpp>
 
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch.hpp>
 
-int main(int argc, char* argv[]) {
-  /* This currently only calls to Kokkos::initialize()/finalize().
-   * If MPI unit tests are desired in the future, it probably
-   * makes more sense to call parthenon::ParthenonManager::ParthenonInit/
+int main(int argc, char *argv[]) {
+  /* This currently calls Kokkos and MPI manually. It might
+   * make more sense to call parthenon::ParthenonManager::ParthenonInit/
    * ParthenonFinalize but some work to break the parallel initialization apart
    * from the rest will be required.
    */
+#ifdef MPI_PARALLEL
+  MPI_Init(&argc, &argv);
+#endif // MPI_PARALLEL
   Kokkos::initialize();
   int result = 0;
-  {
-    result = Catch::Session().run(argc, argv);
-  }
+  { result = Catch::Session().run(argc, argv); }
   Kokkos::finalize();
+#ifdef MPI_PARALLEL
+  MPI_Finalize();
+#endif // MPI_PARALLEL
   return result;
 }

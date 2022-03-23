@@ -25,7 +25,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/cached_system.hpp"
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
-#include "monopole_gr/monopole_gr.hpp"
+#include "monopole_gr/monopole_gr_base.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 
 #include "geometry/monopole.hpp"
@@ -108,6 +108,47 @@ MplCartMesh GetCoordinateSystem<MplCartMesh>(MeshData<Real> *rc) {
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
   return MplCartMesh(indexer, hypersurface, alpha, beta, gradients, rgrid);
+}
+
+// TODO(JMM): These cached coordinate system calls may need to be revisited.
+
+template <>
+void Initialize<CMplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
+  InitializeCachedCoordinateSystem<MplSphMeshBlock>(pin, geometry);
+}
+template <>
+void Initialize<CMplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
+  InitializeCachedCoordinateSystem<MplCartMeshBlock>(pin, geometry);
+}
+
+template <>
+CMplSphMeshBlock GetCoordinateSystem<CMplSphMeshBlock>(MeshBlockData<Real> *rc) {
+  return GetCachedCoordinateSystem<MplSphMeshBlock>(rc);
+}
+
+template <>
+CMplCartMeshBlock GetCoordinateSystem<CMplCartMeshBlock>(MeshBlockData<Real> *rc) {
+  return GetCachedCoordinateSystem<MplCartMeshBlock>(rc);
+}
+
+template <>
+CMplSphMesh GetCoordinateSystem<CMplSphMesh>(MeshData<Real> *rc) {
+  return GetCachedCoordinateSystem<MplSphMesh>(rc);
+}
+
+template <>
+CMplCartMesh GetCoordinateSystem<CMplCartMesh>(MeshData<Real> *rc) {
+  return GetCachedCoordinateSystem<MplCartMesh>(rc);
+}
+
+template <>
+void SetGeometry<CMplSphMeshBlock>(MeshBlockData<Real> *rc) {
+  SetCachedCoordinateSystem<MplSphMeshBlock>(rc);
+}
+
+template <>
+void SetGeometry<CMplCartMeshBlock>(MeshBlockData<Real> *rc) {
+  SetCachedCoordinateSystem<MplCartMeshBlock>(rc);
 }
 
 } // namespace Geometry

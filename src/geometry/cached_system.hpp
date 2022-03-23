@@ -55,16 +55,16 @@ const std::vector<std::string> GEOMETRY_CACHED_VARS = {
 
     "g.n.alpha",   "g.n.dalpha",  "g.n.bcon",  "g.n.gcov",
     "g.n.gamcon",  "g.n.detgam",  "g.n.dg",    "g.n.coord"};
-const std::vector<std::string> GEOMETRY_LOC_NAMES = {"c", "f1", "f2", "f3",
-                                                     "n"};
+const std::vector<std::string> GEOMETRY_LOC_NAMES = {"c", "f1", "f2", "f3", "n"};
 
 // Support class. Accesses a pack on cells or faces as appropriate
 namespace Impl {
 struct GeomPackIndices {
   int alpha, dalpha, bcon, gcov, gamcon, detgam, dg;
 };
-template <typename T> class LocArray {
-public:
+template <typename T>
+class LocArray {
+ public:
   KOKKOS_INLINE_FUNCTION
   T &operator[](int i) { return a_[i]; }
   KOKKOS_INLINE_FUNCTION
@@ -74,7 +74,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   const T &operator[](CellLocation loc) const { return (*this)[icast_(loc)]; }
 
-private:
+ private:
   KOKKOS_INLINE_FUNCTION
   int icast_(CellLocation loc) const { return static_cast<int>(loc); }
   T a_[NUM_CELL_LOCATIONS];
@@ -83,8 +83,9 @@ private:
 } // namespace Impl
 
 // TODO(JMM): Store corners when available if needed
-template <typename Pack, typename System> class Cached {
-public:
+template <typename Pack, typename System>
+class Cached {
+ public:
   Cached() = default;
   template <typename Data>
   Cached(Data *rc, const System &s, bool axisymmetric = false)
@@ -93,32 +94,26 @@ public:
     pack_ = rc->PackVariables(GEOMETRY_CACHED_VARS, imap);
     int i = 0;
     for (auto &loc : GEOMETRY_LOC_NAMES) {
-      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".alpha"].second >= 0,
-                              "variable exists");
-      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".alpha"].second -
-                                      imap["g." + loc + ".alpha"].first ==
-                                  0,
-                              "variable shape correct");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".alpha"].second >= 0, "variable exists");
+      PARTHENON_DEBUG_REQUIRE(
+          imap["g." + loc + ".alpha"].second - imap["g." + loc + ".alpha"].first == 0,
+          "variable shape correct");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second >= 0,
                               "variable exists");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second -
                                       imap["g." + loc + ".dalpha"].first + 1 ==
                                   3,
                               "variable shape correct");
-      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second >= 0,
-                              "variable exists");
-      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second -
-                                      imap["g." + loc + ".bcon"].first + 1 ==
-                                  3,
-                              "variable shape correct");
-      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gcov"].second >= 0,
-                              "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second >= 0, "variable exists");
+      PARTHENON_DEBUG_REQUIRE(
+          imap["g." + loc + ".bcon"].second - imap["g." + loc + ".bcon"].first + 1 == 3,
+          "variable shape correct");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gcov"].second >= 0, "variable exists");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gamcon"].second >= 0,
                               "variable exists");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".detgam"].second >= 0,
                               "variable exists");
-      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dg"].second >= 0,
-                              "variable exists");
+      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dg"].second >= 0, "variable exists");
       idx_[i].alpha = imap["g." + loc + ".alpha"].first;
       idx_[i].dalpha = imap["g." + loc + ".dalpha"].first;
       idx_[i].bcon = imap["g." + loc + ".bcon"].first;
@@ -137,8 +132,7 @@ public:
   }
   KOKKOS_INLINE_FUNCTION
   Real Lapse(CellLocation loc, int b, int k, int j, int i) const {
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     return pack_(b, idx_[loc].alpha, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
@@ -146,15 +140,13 @@ public:
     return Lapse(loc, b_, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
-  void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
-                          Real beta[NDSPACE]) const {
+  void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     s_.ContravariantShift(X0, X1, X2, X3, beta);
   }
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(CellLocation loc, int b, int k, int j, int i,
                           Real beta[NDSPACE]) const {
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     SPACELOOP(d) { beta[d] = pack_(b, idx_[loc].bcon + d, k, j, i); }
   }
   KOKKOS_INLINE_FUNCTION
@@ -163,23 +155,20 @@ public:
     ContravariantShift(loc, b_, k, j, i, beta);
   }
   KOKKOS_INLINE_FUNCTION
-  void Metric(Real X0, Real X1, Real X2, Real X3,
-              Real gamma[NDSPACE][NDSPACE]) const {
+  void Metric(Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
     return s_.Metric(X0, X1, X2, X3, gamma);
   }
   KOKKOS_INLINE_FUNCTION
   void Metric(CellLocation loc, int b, int k, int j, int i,
               Real gamma[NDSPACE][NDSPACE]) const {
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     SPACELOOP2(m, n) { // gamma_{ij} = g_{ij}
       int offst = Utils::Flatten2(m + 1, n + 1, NDFULL);
       gamma[m][n] = pack_(b, idx_[loc].gcov + offst, k, j, i);
     }
   }
   KOKKOS_INLINE_FUNCTION
-  void Metric(CellLocation loc, int k, int j, int i,
-              Real gamma[NDSPACE][NDSPACE]) const {
+  void Metric(CellLocation loc, int k, int j, int i, Real gamma[NDSPACE][NDSPACE]) const {
     Metric(loc, b_, k, j, i, gamma);
   }
   KOKKOS_INLINE_FUNCTION
@@ -190,8 +179,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(CellLocation loc, int b, int k, int j, int i,
                      Real gamma[NDSPACE][NDSPACE]) const {
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     SPACELOOP2(m, n) {
       int offst = Utils::Flatten2(m, n, NDSPACE);
       gamma[m][n] = pack_(b, idx_[loc].gamcon + offst, k, j, i);
@@ -203,15 +191,13 @@ public:
     MetricInverse(loc, b_, k, j, i, gamma);
   }
   KOKKOS_INLINE_FUNCTION
-  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
-                       Real g[NDFULL][NDFULL]) const {
+  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
     return s_.SpacetimeMetric(X0, X1, X2, X3, g);
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(CellLocation loc, int b, int k, int j, int i,
                        Real g[NDFULL][NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     SPACETIMELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDFULL);
       g[mu][nu] = pack_(b, idx_[loc].gcov + offst, k, j, i);
@@ -231,15 +217,13 @@ public:
   void SpacetimeMetricInverse(CellLocation loc, int b, int k, int j, int i,
                               Real g[NDFULL][NDFULL]) const {
     using robust::ratio;
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     auto &idx = idx_[loc];
     Real alpha2 = Lapse(loc, b, k, j, i);
     alpha2 *= alpha2;
     g[0][0] = -ratio(1, alpha2);
     SPACELOOP(mu) {
-      g[mu + 1][0] = g[0][mu + 1] =
-          ratio(pack_(b, idx.bcon + mu, k, j, i), alpha2);
+      g[mu + 1][0] = g[0][mu + 1] = ratio(pack_(b, idx.bcon + mu, k, j, i), alpha2);
     }
     SPACELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDSPACE);
@@ -258,8 +242,7 @@ public:
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(CellLocation loc, int b, int k, int j, int i) const {
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     return pack_(b, idx_[loc].detgam, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
@@ -268,8 +251,7 @@ public:
   }
   template <typename... Args>
   KOKKOS_INLINE_FUNCTION Real DetG(Args... args) const {
-    return Lapse(std::forward<Args>(args)...) *
-           DetGamma(std::forward<Args>(args)...);
+    return Lapse(std::forward<Args>(args)...) * DetGamma(std::forward<Args>(args)...);
   }
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
@@ -279,15 +261,13 @@ public:
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int bid, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, bid, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
@@ -298,10 +278,9 @@ public:
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(CellLocation loc, int b, int k, int j, int i,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
+    if (axisymmetric_) k = k_;
     SPACETIMELOOP2(mu, nu) {
-      const int flat = 3*Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - 1;
+      const int flat = 3 * Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - 1;
       dg[mu][nu][0] = 0.0;
       for (int sigma = 1; sigma < NDFULL; sigma++) {
         dg[mu][nu][sigma] = pack_(b, flat + sigma, k, j, i);
@@ -318,16 +297,13 @@ public:
     return s_.GradLnAlpha(X0, X1, X2, X3, da);
   }
   KOKKOS_INLINE_FUNCTION
-  void GradLnAlpha(CellLocation loc, int b, int k, int j, int i,
-                   Real da[NDFULL]) const {
-    if (axisymmetric_)
-      k = k_;
+  void GradLnAlpha(CellLocation loc, int b, int k, int j, int i, Real da[NDFULL]) const {
+    if (axisymmetric_) k = k_;
     da[0] = 0;
     SPACELOOP(d) { da[d + 1] = pack_(b, idx_[loc].dalpha + d, k, j, i); }
   }
   KOKKOS_INLINE_FUNCTION
-  void GradLnAlpha(CellLocation loc, int k, int j, int i,
-                   Real da[NDFULL]) const {
+  void GradLnAlpha(CellLocation loc, int k, int j, int i, Real da[NDFULL]) const {
     return GradLnAlpha(loc, b_, k, j, i, da);
   }
   KOKKOS_INLINE_FUNCTION
@@ -335,8 +311,7 @@ public:
     return s_.Coords(X0, X1, X2, X3, C);
   }
   KOKKOS_INLINE_FUNCTION
-  void Coords(CellLocation loc, int b, int k, int j, int i,
-              Real C[NDFULL]) const {
+  void Coords(CellLocation loc, int b, int k, int j, int i, Real C[NDFULL]) const {
     if ((loc == CellLocation::Cent) || (loc == CellLocation::Corn)) {
       C[0] = X0_;
       int icoord = (loc == CellLocation::Cent) ? icoord_c_ : icoord_n_;
@@ -356,7 +331,7 @@ public:
     }
   }
 
-private:
+ private:
   bool axisymmetric_ = false;
   System s_;
   int icoord_c_; // don't bother with face coords for now.
@@ -374,8 +349,7 @@ template <typename System>
 using CachedOverMesh = Cached<parthenon::MeshBlockVarPack<Real>, System>;
 
 template <typename System>
-void InitializeCachedCoordinateSystem(ParameterInput *pin,
-                                      StateDescriptor *geometry) {
+void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geometry) {
   using parthenon::MetadataFlag;
 
   Initialize<System>(pin, geometry);
@@ -421,8 +395,7 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin,
     for (int i = 0; i < var_sizes.size(); ++i) {
       shape = {dims.nx1, dims.nx2, dims.nx3, var_sizes[i]};
       shape[d - 1] += 1;
-      if (axisymmetric)
-        shape[2] = 1;
+      if (axisymmetric) shape[2] = 1;
       m = Metadata(flags_o, shape);
       geometry->AddField("g." + GEOMETRY_LOC_NAMES[d] + "." + var_names[i], m);
     }
@@ -430,8 +403,7 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin,
   // node variables
   for (int i = 0; i < var_sizes.size(); ++i) {
     shape = {dims.nx1 + 1, dims.nx2 + 1, dims.nx3 + 1, var_sizes[i]};
-    if (axisymmetric)
-      shape[2] = 1;
+    if (axisymmetric) shape[2] = 1;
     m = Metadata(flags_o, shape);
     geometry->AddField("g.n." + var_names[i], m);
   }
@@ -467,18 +439,12 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
   for (auto &loc : GEOMETRY_LOC_NAMES) {
     // These are not DEBUG because this isn't performance critical,
     // and because it got me in trouble. ~JMM
-    PARTHENON_REQUIRE(imap["g." + loc + ".alpha"].second >= 0,
-                      "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".dalpha"].second >= 0,
-                      "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".bcon"].second >= 0,
-                      "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".gcov"].second >= 0,
-                      "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".gamcon"].second >= 0,
-                      "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".detgam"].second >= 0,
-                      "Variable exists");
+    PARTHENON_REQUIRE(imap["g." + loc + ".alpha"].second >= 0, "Variable exists");
+    PARTHENON_REQUIRE(imap["g." + loc + ".dalpha"].second >= 0, "Variable exists");
+    PARTHENON_REQUIRE(imap["g." + loc + ".bcon"].second >= 0, "Variable exists");
+    PARTHENON_REQUIRE(imap["g." + loc + ".gcov"].second >= 0, "Variable exists");
+    PARTHENON_REQUIRE(imap["g." + loc + ".gamcon"].second >= 0, "Variable exists");
+    PARTHENON_REQUIRE(imap["g." + loc + ".detgam"].second >= 0, "Variable exists");
     PARTHENON_REQUIRE(imap["g." + loc + ".dg"].second >= 0, "Variable exists");
     idx[i].alpha = imap["g." + loc + ".alpha"].first;
     idx[i].dalpha = imap["g." + loc + ".dalpha"].first;
@@ -496,8 +462,8 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
   // int icoord_c = imap["g.c.coord"].first;
   // int icoord_n = imap["g.n.coord"].first;
 
-  auto lamb = KOKKOS_LAMBDA(const int k, const int j, const int i,
-                            const CellLocation loc) {
+  auto lamb =
+      KOKKOS_LAMBDA(const int k, const int j, const int i, const CellLocation loc) {
     Real da[NDFULL];
     Real beta[NDSPACE];
     Real gcov[NDFULL][NDFULL];
@@ -527,7 +493,7 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
     for (int sigma = 1; sigma < NDFULL; ++sigma) {
       for (int mu = 0; mu < NDFULL; ++mu) {
         for (int nu = mu; nu < NDFULL; ++nu) {
-          int offst = idx[loc].dg + 3*Utils::Flatten2(mu, nu, NDFULL) + sigma - 1;
+          int offst = idx[loc].dg + 3 * Utils::Flatten2(mu, nu, NDFULL) + sigma - 1;
           pack(offst, k, j, i) = dg[mu][nu][sigma];
         }
       }
@@ -554,28 +520,27 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
         lamb(k, j, i, CellLocation::Cent);
       });
   pmb->par_for(
-      "SetGeometry::Set Cached data, Face1", kbs, kbe, jb.s, jb.e, ib.s,
-      ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      "SetGeometry::Set Cached data, Face1", kbs, kbe, jb.s, jb.e, ib.s, ib.e + 1,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
         lamb(k, j, i, CellLocation::Face1);
       });
   pmb->par_for(
-      "SetGeometry::Set Cached data, Face2", kbs, kbe, jb.s, jb.e + 1, ib.s,
-      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      "SetGeometry::Set Cached data, Face2", kbs, kbe, jb.s, jb.e + 1, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
         lamb(k, j, i, CellLocation::Face2);
       });
-  if (!axisymmetric)
-    kbe = kb.e + 1;
+  if (!axisymmetric) kbe = kb.e + 1;
   pmb->par_for(
       "SetGeometry::Set Cached data, Face3", kbs, kbe, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         lamb(k, j, i, CellLocation::Face3);
       });
   pmb->par_for(
-      "SetGeometry::Set Cached data, Corn", kbs, kbe, jb.s, jb.e + 1, ib.s,
-      ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      "SetGeometry::Set Cached data, Corn", kbs, kbe, jb.s, jb.e + 1, ib.s, ib.e + 1,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
         lamb(k, j, i, CellLocation::Corn);
       });
-    
+
   // don't let other kernels launch until geometry is set
   pmb->exec_space.fence();
 }

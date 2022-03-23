@@ -71,7 +71,7 @@ void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, const R
   Real P = in[TOV::P];
   // Real phi = in[TOV::PHI];
   if (P < Pmin) P = 0;
-  
+
   Real rho, eps;
   // TODO(JMM): THIS ASSUMES A POLYTROPIC EOS.
   // More generality requires exposing entropy in singularity-eos
