@@ -187,7 +187,6 @@ void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
       });
 }
 
-//<<<<<<< HEAD
 std::unique_ptr<parthenon::ParticleBound, parthenon::DeviceDeleter<parthenon::DevMemSpace>> SetSwarmIx1Outflow() {
   return DeviceAllocate<ParticleBoundIX1Outflow>();
 }
@@ -195,10 +194,7 @@ std::unique_ptr<parthenon::ParticleBound, parthenon::DeviceDeleter<parthenon::De
   return DeviceAllocate<ParticleBoundOX1Outflow>();
 }
 
-//TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc) {
-//=======
 TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
-//>>>>>>> origin/main
 
   auto pmb = rc->GetBlockPointer();
   const int ndim = pmb->pmy_mesh->ndim;

@@ -253,15 +253,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddParam<>("rng_pool", rng_pool);
   }
 
-//<<<<<<< HEAD
-//=======
-  //  physics->AddField(c::E, mspecies_scalar_cons);
-  //  physics->AddField(c::F, mspecies_three_vector_cons);
-
-  //  physics->AddField(p::J, mspecies_scalar);
-  //  physics->AddField(p::H, mspecies_three_vector);
-
-//>>>>>>> origin/main
   bool moments_active = false;
   if ((method == "mocmc") || (method == "moment_m1") || (method == "moment_eddington")) {
     moments_active = true;
@@ -305,17 +296,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Fields for cell edge reconstruction
     /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense
     /// of more dependency
-//<<<<<<< HEAD
     int nrecon = 4;
     if (method == "mocmc") {
       nrecon += 9; // Reconstruct conTilPi // TODO(BRR) Use 6 elements by symmetry
     }
     Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                std::vector<int>{NumRadiationTypes, nrecon, ndim});
-//=======
-//    Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-//                               std::vector<int>{NumRadiationTypes, 4, ndim});
-//>>>>>>> origin/main
     Metadata mrecon_v = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                  std::vector<int>{3, ndim});
     physics->AddField(i::ql, mrecon);
