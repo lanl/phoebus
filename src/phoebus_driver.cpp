@@ -238,13 +238,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (rad_moments_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-/*<<<<<<< HEAD
-      auto moment_recon = tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get());
-      // TODO(BRR) Remove from task list if not using due to MOCMC
-      auto get_opacities = tl.AddTask(moment_recon, radiation::MomentCalculateOpacities<MDT>, sc0.get());
-      auto moment_flux = tl.AddTask(get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());
-      auto moment_geom_src =  tl.AddTask(none, radiation::CalculateGeometricSource<MDT>, sc0.get(), gsrc.get());
-//=======*/
       auto moment_recon =
           tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get());
       // TODO(BRR) Remove from task list if not using due to MOCMC
@@ -254,12 +247,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
           tl.AddTask(get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());
       auto moment_geom_src = tl.AddTask(none, radiation::CalculateGeometricSource<MDT>,
                                         sc0.get(), gsrc.get());
-//>>>>>>> origin/main
       sndrcv_flux_depend = sndrcv_flux_depend | moment_flux;
       geom_src = geom_src | moment_geom_src;
     }
 
-//<<<<<<< HEAD
     if (rad_mocmc_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       auto samples_transport = tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get(), dt);
@@ -271,10 +262,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto send_flux =
         tl.AddTask(sndrcv_flux_depend, &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
-/*=======
-    auto send_flux = tl.AddTask(sndrcv_flux_depend,
-                                &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
->>>>>>> origin/main*/
 
     auto recv_flux = tl.AddTask(sndrcv_flux_depend,
                                 &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
