@@ -87,6 +87,7 @@ TaskListStatus PhoebusDriver::Step() {
 }
 
 void PhoebusDriver::PostInitializationCommunication() {
+  return;
   TaskCollection tc;
   TaskID none(0);
   BlockList_t &blocks = pmesh->block_list;
@@ -105,7 +106,7 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto pmb = blocks[ib].get();
     auto &tl = async_region[ib];
     auto &sc = pmb->meshblock_data.Get();
-    auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], ib);
+    auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], ib); // TODO(BRR) This gives an empty md
 
     auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
                                  BoundaryCommSubset::all);
