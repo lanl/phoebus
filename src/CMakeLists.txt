@@ -23,6 +23,7 @@ add_executable(phoebus
   fluid/fluid.cpp
   fluid/fluid.hpp
   fluid/riemann.hpp
+  fluid/tmunu.cpp
   fluid/tmunu.hpp
 
   geometry/analytic_system.hpp
@@ -61,7 +62,10 @@ add_executable(phoebus
   microphysics/opac_phoebus/opac_phoebus.hpp
   microphysics/opac_phoebus/opac_phoebus.cpp
 
+  monopole_gr/interp_3d_to_1d.hpp
   monopole_gr/monopole_gr.hpp
+  monopole_gr/monopole_gr_base.hpp
+  monopole_gr/monopole_gr_interface.hpp
   monopole_gr/monopole_gr_utils.hpp
   monopole_gr/monopole_gr.cpp
 
@@ -81,6 +85,7 @@ add_executable(phoebus
   pgen/thin_cooling.cpp
   pgen/sedov.cpp
   pgen/torus.cpp
+  pgen/tov.cpp
 
   phoebus_boundaries/phoebus_boundaries.hpp
   phoebus_boundaries/phoebus_boundaries.cpp
@@ -91,7 +96,6 @@ add_executable(phoebus
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
-  phoebus_utils/debug_utils.hpp
   phoebus_utils/linear_algebra.hpp
   phoebus_utils/reduction.hpp
   phoebus_utils/relativity_utils.hpp

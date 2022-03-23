@@ -14,6 +14,12 @@
 #ifndef TEST_UTILS_HPP_
 #define TEST_UTILS_HPP_
 
+#include <cmath>
+#include <memory>
+
+#include <parthenon/package.hpp>
+using namespace parthenon::package::prelude;
+
 /*
  * Test for near-machine-precision equivalence of Real values
  *
@@ -28,20 +34,20 @@ KOKKOS_INLINE_FUNCTION
 bool SoftEquiv(const Real &val, const Real &ref, const Real tol = 1.e-8,
                const bool ignore_small = true) {
   if (ignore_small) {
-    if (fabs(val) < tol && fabs(ref) < tol) {
+    if (std::fabs(val) < tol && std::fabs(ref) < tol) {
       return true;
     }
   }
 
-  if (fabs(val - ref) < tol * fabs(ref) / 2) {
+  if (std::fabs(val - ref) < tol * std::fabs(ref) / 2) {
     return true;
   } else {
     return false;
   }
 }
 
-/* Create a dummy MeshBlock with a single dummy package and field. 1D grid assumed. Useful for
- * constructing other objects e.g. MeshBlockData<Real> and CoordSysMeshBlock
+/* Create a dummy MeshBlock with a single dummy package and field. 1D grid assumed. Useful
+ * for constructing other objects e.g. MeshBlockData<Real> and CoordSysMeshBlock
  *
  * PARAM[IN] - nzones - Number of zones in x direction
  *
@@ -52,14 +58,15 @@ std::shared_ptr<MeshBlock> inline GetDummyMeshBlock(const int nzones = 8) {
 }
 
 /*
- * Create a dummy MeshBlockData with a single dummy package and field. 1D grid assumed. Useful for
- * constructing other objects e.g. CoordSysMeshBlocks.
+ * Create a dummy MeshBlockData with a single dummy package and field. 1D grid assumed.
+ * Useful for constructing other objects e.g. CoordSysMeshBlocks.
  *
  * PARAM[IN] - pmb - shared_ptr to existing MeshBlock
  *
  * RETURN Trivial MeshBlockData<Real>
  */
-std::shared_ptr<MeshBlockData<Real>> inline GetDummyMeshBlockData(std::shared_ptr<MeshBlock> pmb) {
+std::shared_ptr<MeshBlockData<Real>> inline GetDummyMeshBlockData(
+    std::shared_ptr<MeshBlock> pmb) {
   auto pkg = std::make_shared<StateDescriptor>("Dummy package");
   std::vector<int> scalar_shape{1, 1, 1};
   Metadata m({Metadata::Independent, Metadata::WithFluxes}, scalar_shape);

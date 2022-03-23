@@ -95,6 +95,8 @@ TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb,
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks);
 
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
+
 // Moment tasks
 template <class T>
 TaskStatus MomentCon2Prim(T *rc);
