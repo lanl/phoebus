@@ -20,5 +20,4 @@ jobs:
           run: |
             sudo apt-get install -y --force-yes -qq git clang-format-12
         - name: check formatting
-          continue-on-error: true
           run: find . -regex '.*\.\(cpp\|hpp\)' | xargs clang-format-12 -style=file -i && git diff --exit-code --ignore-submodules
