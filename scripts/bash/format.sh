@@ -15,12 +15,13 @@
 #------------------------------------------------------------------------------
 
 
-: ${CFM:=$(command -v clang-format)}
+: ${CFM:=clang-format}
 
 if ! command -v ${CFM} &> /dev/null; then
     >&2 echo "Error: No clang format found! Looked for ${CFM}"
     exit 1
 else
+    CFM=$(command -v ${CFM})
     echo "Clang format found: ${CFM}"
 fi
 
