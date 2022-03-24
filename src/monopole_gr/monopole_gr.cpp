@@ -211,7 +211,7 @@ Real EstimateTimeStep(StateDescriptor *pkg) {
       KOKKOS_LAMBDA(const int i, Real &lmin_dt) {
         Real alpha_tscale =
             std::abs(robust::ratio(alpha, gradients(Gradients::DALPHADT, i)));
-        lmin_dt = std::min(ldt, alpha_tscale);
+        lmin_dt = std::min(lmin_dt, alpha_tscale);
       },
       Kokkos::Min<Real>(min_dt));
   return dtfac * min_dt;
