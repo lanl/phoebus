@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -50,8 +50,6 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
-
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -167,8 +165,6 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
-  printf("%s:%i\n", __FILE__, __LINE__);
-
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -244,7 +240,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
 
 template <class T>
 TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
@@ -267,8 +262,6 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
-  printf("%s:%i %s\n", __FILE__, __LINE__, "ReconstructEdgeStates");
-
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
@@ -317,20 +310,14 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   const int nspec = qIdx.DimSize(1);
   int nrecon = 4 * nspec;
   if (eddington_known) {
-    // nrecon = (4 + 6)*nspec;
     nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
   }
-  printf("dims: %i %i %i\n", qIdx.DimSize(1), qIdx.DimSize(2), qIdx.DimSize(3));
-  printf("vdims: %i %i %i %i %i\n", v.GetDim(1), v.GetDim(2), v.GetDim(3), v.GetDim(4),
-         v.GetDim(5));
 
   const int offset = imap_ql[ir::ql].first;
 
   const int nblock = ql_base.GetDim(5);
   const int ndim = pmb->pmy_mesh->ndim;
   auto &coords = pmb->coords;
-
-  printf("nrecon: %i offset: %i\n", nrecon, offset);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), X1DIR,
@@ -402,8 +389,6 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
-
   auto *pmb = rc->GetParentPointer().get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -603,8 +588,6 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
-  printf("%s:%i\n", __FILE__, __LINE__);
-
   constexpr int ND = Geometry::NDFULL;
   // constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -747,8 +730,6 @@ template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
-  printf("%s:%i %s\n", __FILE__, __LINE__, "MomentFluidSource");
-
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -868,8 +849,6 @@ template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *
 
 template <class T>
 TaskStatus MomentCalculateOpacities(T *rc) {
-  printf("%s:%i %s\n", __FILE__, __LINE__, "MomentCalculateOpacities");
-
   auto *pmb = rc->GetParentPointer().get();
 
   StateDescriptor *opac = pmb->packages.Get("opacity").get();

@@ -107,15 +107,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
           v(idH(2, ispec), k, j, i) = Hz;
-
-          printf("INIT [%i %i %i %i] J = %e H = %e %e %e\n", ispec, k, j, i,
-                 v(idJ(ispec), k, j, i), v(idH(0, ispec), k, j, i),
-                 v(idH(1, ispec), k, j, i), v(idH(2, ispec), k, j, i));
         }
       });
-
-  printf("F: %e %e %e %e %e\n", v(idJ(0), 0, 0, 0), v(idJ(0), 0, 0, 1),
-         v(idJ(0), 0, 0, 2), v(idJ(0), 0, 0, 3), v(idJ(0), 0, 0, 4));
 
   // Initialize samples
   auto radpkg = pmb->packages.Get("radiation");
