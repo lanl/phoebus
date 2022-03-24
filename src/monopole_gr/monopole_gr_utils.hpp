@@ -31,7 +31,6 @@ namespace ShootingMethod {
 KOKKOS_INLINE_FUNCTION
 Real GetARHS(const Real a, const Real K, const Real r, const Real rho) {
   bool mask = (r > 0);
-  // return mask*robust::ratio(a*(4 - 4*a*a + 3*r*r*a*a*K*K + 32*M_PI*a*rho),8*r);
   return mask *
          robust::ratio(a * (4 + a * a * (-4 + r * r * (3 * K * K + 32 * M_PI * rho))),
                        8 * r);
@@ -41,9 +40,6 @@ KOKKOS_INLINE_FUNCTION
 Real GetKRHS(Real a, Real K, Real r, Real j) {
   bool mask = (r > 0);
   return mask * (8 * M_PI * a * a * j - robust::ratio(3. * K, r));
-  // return (r <= 0) ? 0 : 8 * M_PI * j - robust::ratio(3.*K, r);
-  // if (r <= 0) return 0;
-  // return robust::ratio(robust::ratio(8*M_PI*j, a) - 3*r*K,r*r);
 }
 
 KOKKOS_INLINE_FUNCTION

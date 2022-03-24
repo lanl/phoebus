@@ -132,6 +132,14 @@ force_static = false
 # Runs the first n subcycles. Then freezes. Source terms are not disabled.
 # -1 means it's always run.
 run_n_times = -1
+# dtfac is for time step control. 0 < dtfac <= 1.
+# time step will be <= dtfac*(time rate of change of lapse)
+dtfac = 0.9
+# dtwarn tries to estimate if first-order operator split is sufficiently accurate.
+# Compares (dalpha/dt) computed analytically with numerical difference
+# between two subcycles. Warns if difference is larger than dtwarn_eps
+dtwarn = false
+dtwarn_eps = 1e-5
 
 <tov>
 enabled = true
