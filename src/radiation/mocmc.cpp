@@ -449,6 +449,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
 template <class T>
 TaskStatus MOCMCTransport(T *rc, const Real dt) {
+  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
@@ -460,6 +461,8 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
   auto &z = swarm->template Get<Real>("z").Get();
   auto &ncov = swarm->template Get<Real>("ncov").Get();
   auto swarm_d = swarm->GetDeviceContext();
+
+  printf("num_active: %i max_active_index: %i\n", swarm->GetNumActive(), swarm->GetMaxActiveIndex());
 
   pmb->par_for(
       "MOCMC::Transport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
@@ -645,10 +648,10 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                                 Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
                                 Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
                                 LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
-                      
+
                                 /// TODO: (LFR) Move beyond Eddington for this update
                                 ClosureMOCMC<Vec, Tens2> c(con_v, &g);
-                      
+
                                 Real dE = 0;
                                 Real cov_dF[3] = {0};
                                 auto status = c.LinearSourceUpdate(Estar, cov_Fstart, con_tilPi, JBB, tauJ,
