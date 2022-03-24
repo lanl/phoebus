@@ -135,10 +135,10 @@ run_n_times = -1
 # dtfac is for time step control. 0 < dtfac <= 1.
 # time step will be <= dtfac*(time rate of change of lapse)
 dtfac = 0.9
-# dtwarn tries to estimate if first-order operator split is sufficiently accurate.
+# warn_on_dt tries to estimate if first-order operator split is sufficiently accurate.
 # Compares (dalpha/dt) computed analytically with numerical difference
 # between two subcycles. Warns if difference is larger than dtwarn_eps
-dtwarn = false
+warn_on_dt = false
 dtwarn_eps = 1e-5
 
 <tov>

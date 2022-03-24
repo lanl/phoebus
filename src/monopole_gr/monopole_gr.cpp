@@ -528,7 +528,8 @@ TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt) {
     if (err > dtwarn_eps) {
       std::cerr
           << "\tWarning! (alpha^i+1 - alpha^i)/dt is very different from dalpha/dt.\n"
-          << "\t\tTolerance set to " << dtwarn_eps << std::endl;
+          << "\t\tTolerance set to " << dtwarn_eps << " but value is " << err << "."
+          << std::endl;
     }
   }
   return TaskStatus::complete;
