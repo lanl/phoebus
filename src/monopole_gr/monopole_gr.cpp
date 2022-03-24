@@ -14,9 +14,9 @@
 // stdlib
 #include <cmath>
 #include <cstdio>
-#include <memory>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -62,7 +62,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("nth_call", nth_call, true); // mutable
 
   // Time step control. Equivalent to CFL
-  // Empirical. controls 
+  // Empirical. controls
   Real dtfac = pin->GetOrAddReal("monopole_gr", "dtfac", 0.9);
   params.Add("dtfac", dtfac);
 
@@ -209,11 +209,12 @@ Real EstimateTimeStep(StateDescriptor *pkg) {
       parthenon::loop_pattern_flatrange_tag, "monopole_gr time step",
       parthenon::DevExecSpace(), 0, npoints - 1,
       KOKKOS_LAMBDA(const int i, Real &lmin_dt) {
-        Real alpha_tscale = std::abs(robust::ratio(alpha, gradients(Gradients::DALPHADT, i)));
+        Real alpha_tscale =
+            std::abs(robust::ratio(alpha, gradients(Gradients::DALPHADT, i)));
         lmin_dt = std::min(ldt, alpha_tscale);
       },
       Kokkos::Min<Real>(min_dt));
-  return dtfac * min_dt;  
+  return dtfac * min_dt;
 }
 
 // Could template this but whatever. I'd only save like 4 lines.
@@ -443,13 +444,13 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
         auto mask = !(force_static);
         Real r = radius.x(i);
         Real a = hypersurface(Hypersurface::A, i);
-        Real K = mask*hypersurface(Hypersurface::K, i);
+        Real K = mask * hypersurface(Hypersurface::K, i);
         Real rho = matter(Matter::RHO, i);
         Real j = matter(Matter::J_R, i);
         Real S = matter(Matter::trcS, i);
         Real Srr = matter(Matter::Srr, i);
         Real dadr = ShootingMethod::GetARHS(a, K, r, rho);
-        Real dKdr = mask*ShootingMethod::GetKRHS(a, K, r, j);
+        Real dKdr = mask * ShootingMethod::GetKRHS(a, K, r, j);
 
         Real a2 = a * a;
         Real a3 = a2 * a;
@@ -466,9 +467,9 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
           d2alphadr2 = (alpha(i - 1) + alpha(i + 1) - 2 * alpha(i)) / dr2;
         }
 
-        beta(i) = mask*( -0.5 * alpha(i) * r * K);
+        beta(i) = mask * (-0.5 * alpha(i) * r * K);
         Real dbetadr =
-          mask*( -0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr));
+            mask * (-0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr));
         Real beta2 = beta(i) * beta(i);
         Real beta3 = beta(i) * beta2;
 
@@ -490,10 +491,10 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
         Real dbetadt = -0.5 * r * (alpha(i) * dKdt + K * dalphadt);
 
         // printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
-        gradients(Gradients::DADT, i) = mask*dadt;
-        gradients(Gradients::DALPHADT, i) = mask*dalphadt;
-        gradients(Gradients::DKDT, i) = mask*dKdt;
-        gradients(Gradients::DBETADT, i) = mask*dbetadt;
+        gradients(Gradients::DADT, i) = mask * dadt;
+        gradients(Gradients::DALPHADT, i) = mask * dalphadt;
+        gradients(Gradients::DKDT, i) = mask * dKdt;
+        gradients(Gradients::DBETADT, i) = mask * dbetadt;
       });
 
   return TaskStatus::complete;
@@ -510,18 +511,18 @@ TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt) {
 
     Real err;
     parthenon::par_reduce(
-      parthenon::loop_pattern_flatrange_tag, "monopole_gr check evolution time scales",
-      parthenon::DevExecSpace(), 0, npoints - 1,
-      KOKKOS_LAMBDA(const int i, Real &lmax_err) {
-        Real diff_alpha = (alpha(i) - alpha_last(i))/dt;
-        Real diff_dalpha = std::abs(diff_alpha - gradients(Gradients::DALPHADT, i));
-        lmax_err = std::max(lmax_err, diff_dalpha);
-      },
-      Kokkos::max<Real>(err));
+        parthenon::loop_pattern_flatrange_tag, "monopole_gr check evolution time scales",
+        parthenon::DevExecSpace(), 0, npoints - 1,
+        KOKKOS_LAMBDA(const int i, Real &lmax_err) {
+          Real diff_alpha = (alpha(i) - alpha_last(i)) / dt;
+          Real diff_dalpha = std::abs(diff_alpha - gradients(Gradients::DALPHADT, i));
+          lmax_err = std::max(lmax_err, diff_dalpha);
+        },
+        Kokkos::max<Real>(err));
     if (err > dtwarn_eps) {
-      stc::cerr << "\tWarning! (alpha^i+1 - alpha^i)/dt is very different from dalpha/dt.\n"
-                << "\t\tTolerance set to " << dtwarn_eps
-                << std::endl;
+      stc::cerr
+          << "\tWarning! (alpha^i+1 - alpha^i)/dt is very different from dalpha/dt.\n"
+          << "\t\tTolerance set to " << dtwarn_eps << std::endl;
     }
   }
   return TaskStatus::complete;
