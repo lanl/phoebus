@@ -210,7 +210,7 @@ Real EstimateTimeStep(StateDescriptor *pkg) {
       parthenon::DevExecSpace(), 0, npoints - 1,
       KOKKOS_LAMBDA(const int i, Real &lmin_dt) {
         Real alpha_tscale =
-            std::abs(robust::ratio(alpha, gradients(Gradients::DALPHADT, i)));
+            std::abs(robust::ratio(alpha(i), gradients(Gradients::DALPHADT, i)));
         lmin_dt = std::min(lmin_dt, alpha_tscale);
       },
       Kokkos::Min<Real>(min_dt));
@@ -218,14 +218,14 @@ Real EstimateTimeStep(StateDescriptor *pkg) {
 }
 
 // Could template this but whatever. I'd only save like 4 lines.
-TaskStatus EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetParentPointer();
   StateDescriptor *pkg = pmb->packages.Get("monopole_gr").get();
   return EstimateTimeStep(pkg);
 }
-TaskStatus EstimateTimeStepMesh(MeshData<Real> *rc) {
+Real EstimateTimeStepMesh(MeshData<Real> *rc) {
   auto pmesh = rc->GetParentPointer();
-  StateDescriptor *pkg = pmb->packages.Get("monopole_gr").get();
+  StateDescriptor *pkg = pmesh->packages.Get("monopole_gr").get();
   return EstimateTimeStep(pkg);
 }
 
@@ -501,6 +501,12 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
 }
 
 TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
+  auto &params = pkg->AllParams();
+  auto enabled = params.Get<bool>("enable_monopole_gr");
+  if (!enabled) return TaskStatus::complete;
+
   auto dtwarn = params.Get<bool>("dtwarn");
   if (dtwarn && parthenon::Globals::my_rank == 0) {
     auto alpha = params.Get<Alpha_t>("lapse");
@@ -518,9 +524,9 @@ TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt) {
           Real diff_dalpha = std::abs(diff_alpha - gradients(Gradients::DALPHADT, i));
           lmax_err = std::max(lmax_err, diff_dalpha);
         },
-        Kokkos::max<Real>(err));
+        Kokkos::Max<Real>(err));
     if (err > dtwarn_eps) {
-      stc::cerr
+      std::cerr
           << "\tWarning! (alpha^i+1 - alpha^i)/dt is very different from dalpha/dt.\n"
           << "\t\tTolerance set to " << dtwarn_eps << std::endl;
     }
