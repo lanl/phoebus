@@ -132,7 +132,7 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   Real Lapse(CellLocation loc, int b, int k, int j, int i) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     return pack_(b, idx_[loc].alpha, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
@@ -146,7 +146,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(CellLocation loc, int b, int k, int j, int i,
                           Real beta[NDSPACE]) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACELOOP(d) { beta[d] = pack_(b, idx_[loc].bcon + d, k, j, i); }
   }
   KOKKOS_INLINE_FUNCTION
@@ -161,7 +161,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void Metric(CellLocation loc, int b, int k, int j, int i,
               Real gamma[NDSPACE][NDSPACE]) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACELOOP2(m, n) { // gamma_{ij} = g_{ij}
       int offst = Utils::Flatten2(m + 1, n + 1, NDFULL);
       gamma[m][n] = pack_(b, idx_[loc].gcov + offst, k, j, i);
@@ -179,7 +179,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(CellLocation loc, int b, int k, int j, int i,
                      Real gamma[NDSPACE][NDSPACE]) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACELOOP2(m, n) {
       int offst = Utils::Flatten2(m, n, NDSPACE);
       gamma[m][n] = pack_(b, idx_[loc].gamcon + offst, k, j, i);
@@ -197,7 +197,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(CellLocation loc, int b, int k, int j, int i,
                        Real g[NDFULL][NDFULL]) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACETIMELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDFULL);
       g[mu][nu] = pack_(b, idx_[loc].gcov + offst, k, j, i);
@@ -217,7 +217,7 @@ class Cached {
   void SpacetimeMetricInverse(CellLocation loc, int b, int k, int j, int i,
                               Real g[NDFULL][NDFULL]) const {
     using robust::ratio;
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     auto &idx = idx_[loc];
     Real alpha2 = Lapse(loc, b, k, j, i);
     alpha2 *= alpha2;
@@ -242,7 +242,7 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(CellLocation loc, int b, int k, int j, int i) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     return pack_(b, idx_[loc].detgam, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
@@ -261,13 +261,13 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int bid, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, bid, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
@@ -278,7 +278,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(CellLocation loc, int b, int k, int j, int i,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACETIMELOOP2(mu, nu) {
       const int flat = 3 * Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - 1;
       dg[mu][nu][0] = 0.0;
@@ -298,7 +298,7 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int b, int k, int j, int i, Real da[NDFULL]) const {
-    if (axisymmetric_) k = k_;
+    k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     da[0] = 0;
     SPACELOOP(d) { da[d + 1] = pack_(b, idx_[loc].dalpha + d, k, j, i); }
   }
@@ -340,7 +340,6 @@ class Cached {
   Impl::LocArray<Impl::GeomPackIndices> idx_;
   static constexpr Real X0_ = 0;
   static constexpr int b_ = 0;
-  static constexpr int k_ = 0;
 };
 
 template <typename System>
