@@ -281,10 +281,11 @@ class Cached {
   void MetricDerivative(CellLocation loc, int b, int k, int j, int i,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
+    const int offset = !time_dependent_;
     SPACETIMELOOP2(mu, nu) {
-      const int flat = 3 * Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - 1;
-      dg[mu][nu][0] = 0.0;
-      for (int sigma = 1; sigma < NDFULL; sigma++) {
+      const int flat = nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - offset;
+      dg[mu][nu][0] = 0.0; // gets overwritten if time-dependent metric
+      for (int sigma = offset; sigma < NDFULL; sigma++) {
         dg[mu][nu][sigma] = pack_(b, flat + sigma, k, j, i);
       }
     }
@@ -301,8 +302,8 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int b, int k, int j, int i, Real da[NDFULL]) const {
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
-    const int offset = time_dependent_;
-    da[0] = 0;
+    const int offset = !time_dependent_;
+    da[0] = 0; // gets overwritten if time-dependent metric
     for (int d = offset; d < NDFULL; ++d) {
       da[d] = pack_(b, idx_[loc].dalpha + d - offset, k, j, i);
     }
@@ -318,7 +319,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void Coords(CellLocation loc, int b, int k, int j, int i, Real C[NDFULL]) const {
     if ((loc == CellLocation::Cent) || (loc == CellLocation::Corn)) {
-      C[0] = X0_;
+      C[0] = X0_; // TODO(JMM): Should these be updated for time-dep metrics?
       int icoord = (loc == CellLocation::Cent) ? icoord_c_ : icoord_n_;
       SPACELOOP(d) { C[d + 1] = pack_(b, icoord + d, k, j, i); }
     } else {
@@ -328,7 +329,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void Coords(CellLocation loc, int k, int j, int i, Real C[NDFULL]) const {
     if ((loc == CellLocation::Cent) || (loc == CellLocation::Corn)) {
-      C[0] = X0_;
+      C[0] = X0_; // TODO(JMM): Should these be updated for time-dep metrics?
       int icoord = (loc == CellLocation::Cent) ? icoord_c_ : icoord_n_;
       SPACELOOP(d) { C[d + 1] = pack_(b_, icoord + d, k, j, i); }
     } else {
@@ -358,9 +359,20 @@ template <typename System>
 void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geometry) {
   using parthenon::MetadataFlag;
 
+  // Initialize underlying system
   Initialize<System>(pin, geometry);
 
+  // Get params
   Params &params = geometry->AllParams();
+
+  // Geometries which are time-dependent and wish to hook in to the
+  // caching machinery are expected to set a parameter, "time_dependent",
+  // in their params during initialization.
+  // If it's available it will be read out and returned here.
+  // Otherwise it is set to false.
+  bool time_dependent = params.Get("time_dependent", false);
+  const int nvar_deriv = time_dependent ? NDFULL : NDSPACE;
+
   bool axisymmetric = pin->GetOrAddBoolean("geometry", "axisymmetric", false);
   params.Add("axisymmetric", axisymmetric);
 
@@ -374,12 +386,12 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
   std::vector<MetadataFlag> flags_o = {Metadata::Derived, Metadata::OneCopy};
 
   std::vector<int> var_sizes = {1,
-                                NDSPACE,
+                                nvar_deriv,
                                 NDSPACE,
                                 Utils::SymSize<NDFULL>(),
                                 Utils::SymSize<NDSPACE>(),
                                 1,
-                                NDSPACE * Utils::SymSize<NDFULL>(),
+                                nvar_deriv * Utils::SymSize<NDFULL>(),
                                 NDFULL};
   std::vector<std::string> var_names = {"alpha",  "dalpha", "bcon", "gcov",
                                         "gamcon", "detgam", "dg",   "coord"};
@@ -439,21 +451,21 @@ void SetCachedCoordinateSystem(Data *rc) {
   auto &pkg = pparent->packages.Get("geometry");
   parthenon::Params &params = pkg->AllParams();
   bool axisymmetric = params.Get<bool>("axisymmetric");
+  bool time_dependent = params.Get<bool>("time_dependent");
+  const int nvar_deriv = time_dependent ? NDFULL : NDSPACE;
 
   Impl::LocArray<Impl::GeomPackIndices> idx;
   PackIndexMap imap;
   auto pack = rc->PackVariables(GEOMETRY_CACHED_VARS, imap);
   int i = 0;
   for (auto &loc : GEOMETRY_LOC_NAMES) {
-    // These are not DEBUG because this isn't performance critical,
-    // and because it got me in trouble. ~JMM
-    PARTHENON_REQUIRE(imap["g." + loc + ".alpha"].second >= 0, "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".dalpha"].second >= 0, "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".bcon"].second >= 0, "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".gcov"].second >= 0, "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".gamcon"].second >= 0, "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".detgam"].second >= 0, "Variable exists");
-    PARTHENON_REQUIRE(imap["g." + loc + ".dg"].second >= 0, "Variable exists");
+    PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".alpha"].second >= 0, "Variable exists");
+    PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second >= 0, "Variable exists");
+    PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second >= 0, "Variable exists");
+    PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gcov"].second >= 0, "Variable exists");
+    PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gamcon"].second >= 0, "Variable exists");
+    PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".detgam"].second >= 0, "Variable exists");
+    PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dg"].second >= 0, "Variable exists");
     idx[i].alpha = imap["g." + loc + ".alpha"].first;
     idx[i].dalpha = imap["g." + loc + ".dalpha"].first;
     idx[i].bcon = imap["g." + loc + ".bcon"].first;
@@ -466,16 +478,24 @@ void SetCachedCoordinateSystem(Data *rc) {
 
   auto lamb = KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
                             const CellLocation loc) {
-    Real da[NDFULL];
-    Real beta[NDSPACE];
-    Real gcov[NDFULL][NDFULL];
-    Real gamcon[NDSPACE][NDSPACE];
-    Real dg[NDFULL][NDFULL][NDFULL];
+
     pack(b, idx[loc].alpha, k, j, i) = system.Lapse(loc, b, k, j, i);
-    system.GradLnAlpha(loc, b, k, j, i, da);
-    SPACELOOP(d) { pack(b, idx[loc].dalpha + d, k, j, i) = da[d + 1]; }
+    pack(b, idx[loc].detgam, k, j, i) = system.DetGamma(loc, b, k, j, i);
+
+    {
+      int offset = !time_dependent;
+      Real da[NDFULL];
+      system.GradLnAlpha(loc, b, k, j, i, da);
+      for (int d = offset; d < NDFULL; ++d) {
+        pack(b, idx[loc].dalpha + d - offset, k, j, i) = da[d];
+      }
+    }
+
+    Real beta[NDSPACE];
     system.ContravariantShift(loc, b, k, j, i, beta);
     SPACELOOP(d) { pack(b, idx[loc].bcon + d, k, j, i) = beta[d]; }
+
+    Real gcov[NDFULL][NDFULL];
     system.SpacetimeMetric(loc, b, k, j, i, gcov);
     for (int mu = 0; mu < NDFULL; ++mu) {
       for (int nu = mu; nu < NDFULL; ++nu) {
@@ -483,6 +503,8 @@ void SetCachedCoordinateSystem(Data *rc) {
         pack(b, offst, k, j, i) = gcov[mu][nu];
       }
     }
+
+    Real gamcon[NDSPACE][NDSPACE];
     system.MetricInverse(loc, b, k, j, i, gamcon);
     for (int mu = 0; mu < NDSPACE; ++mu) {
       for (int nu = mu; nu < NDSPACE; ++nu) {
@@ -490,13 +512,17 @@ void SetCachedCoordinateSystem(Data *rc) {
         pack(b, offst, k, j, i) = gamcon[mu][nu];
       }
     }
-    pack(b, idx[loc].detgam, k, j, i) = system.DetGamma(loc, b, k, j, i);
+
+    Real dg[NDFULL][NDFULL][NDFULL];
     system.MetricDerivative(loc, b, k, j, i, dg);
-    for (int sigma = 1; sigma < NDFULL; ++sigma) {
-      for (int mu = 0; mu < NDFULL; ++mu) {
-        for (int nu = mu; nu < NDFULL; ++nu) {
-          int offst = idx[loc].dg + 3 * Utils::Flatten2(mu, nu, NDFULL) + sigma - 1;
-          pack(b, offst, k, j, i) = dg[mu][nu][sigma];
+    {
+      int offset = !time_dependent;
+      for (int sigma = offset; sigma < NDFULL; ++sigma) {
+        for (int mu = 0; mu < NDFULL; ++mu) {
+          for (int nu = mu; nu < NDFULL; ++nu) {
+            int flat = idx[loc].dg + nvar_deriv * Utils::Flatten2(mu, nu, NDFULL) + sigma - offset;
+            pack(b, flat, k, j, i) = dg[mu][nu][sigma];
+          }
         }
       }
     }
