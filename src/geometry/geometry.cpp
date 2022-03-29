@@ -33,6 +33,7 @@ using parthenon::ParArray1D;
 
 namespace Geometry {
 
+namespace impl {
 template <typename Data, typename System>
 void SetGeometryDefault(Data *rc, const System &system) {
   std::vector<std::string> coord_names = {geometric_variables::cell_coords,
@@ -72,6 +73,7 @@ void SetGeometryDefault(Data *rc, const System &system) {
       });
   Kokkos::fence(); // do not let users interact with coords unless meshblock data is set
 }
+} // namespace impl
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
@@ -103,7 +105,26 @@ void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin) {
   MeshBlockData<Real> *rc = pmb->meshblock_data.Get().get();
   auto system = GetCoordinateSystem(rc);
   SetGeometry<CoordSysMeshBlock>(rc);
-  SetGeometryDefault(rc, system);
+  impl::SetGeometryDefault(rc, system);
 }
+
+template<>
+TaskStatus UpdateGeometry<MeshBlockData<Real>>(MeshBlockData<Real> *rc) {
+  auto system = GetCoordinateSystem(rc);
+  SetGeometry<CoordSysMeshBlock>(rc);
+  impl::SetGeometryDefault(rc, system);
+  return TaskStatus::complete;
+}
+
+/*
+// This needs to exist
+// Requires SetGeometry<CoordSysMesh> defined.
+template<>
+TaskStatus UpdateGeometry<MeshData<Real>>(MeshData<Real> *rc) {
+  auto system = GetCoordinateSystem(rc);
+  SetGeometry<CordSysMesh>(rc);
+  impl::SetGeometryDefault(rc, system);
+}
+*/
 
 } // namespace Geometry
