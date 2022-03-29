@@ -64,12 +64,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Time step control. Equivalent to CFL
   // Empirical. controls
   Real dtfac = pin->GetOrAddReal("monopole_gr", "dtfac", 0.9);
+  PARTHENON_REQUIRE_THROWS(0 < dtfac && dtfac <= 1.,
+                           "dtfac must be between 0 and 1");
   params.Add("dtfac", dtfac);
 
   // Warn if the change in lapse is too different from dalpha/dt
-  bool dtwarn = pin->GetOrAddBoolean("monopole_gr", "warn_on_dt", false);
+  bool warn_on_dt = pin->GetOrAddBoolean("monopole_gr", "warn_on_dt", false);
   Real dtwarn_eps = pin->GetOrAddReal("monopole_gr", "dtwarn_eps", 1e-5);
-  params.Add("dtwarn", dtwarn);
+  params.Add("warn_on_dt", warn_on_dt);
   params.Add("dtwarn_eps", dtwarn_eps);
 
   // Points
@@ -507,8 +509,8 @@ TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt) {
   auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
-  auto dtwarn = params.Get<bool>("dtwarn");
-  if (dtwarn && parthenon::Globals::my_rank == 0) {
+  auto warn_on_dt = params.Get<bool>("warn_on_dt");
+  if (warn_on_dt && parthenon::Globals::my_rank == 0) {
     auto alpha = params.Get<Alpha_t>("lapse");
     auto alpha_last = params.Get<Alpha_t>("lapse_last");
     auto npoints = params.Get<int>("npoints");
@@ -521,7 +523,8 @@ TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt) {
         parthenon::DevExecSpace(), 0, npoints - 1,
         KOKKOS_LAMBDA(const int i, Real &lmax_err) {
           Real diff_alpha = (alpha(i) - alpha_last(i)) / dt;
-          Real diff_dalpha = std::abs(diff_alpha - gradients(Gradients::DALPHADT, i));
+          Real diff_dalpha = robust::ratio(
+              std::abs(diff_alpha - gradients(Gradients::DALPHADT, i)), alpha(i));
           lmax_err = std::max(lmax_err, diff_dalpha);
         },
         Kokkos::Max<Real>(err));
