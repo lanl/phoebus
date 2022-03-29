@@ -80,10 +80,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
                                "weno5 requires 4+ ghost cells");
       rt = PhoebusReconstruction::ReconType::weno5z;
-    } else if (recon == "weno5a") {
-      PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
-                               "weno5 requires 4+ ghost cells");
-      rt = PhoebusReconstruction::ReconType::weno5a;
     } else if (recon == "mp5") {
       PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
                                "mp5 requires 4+ ghost cells");
@@ -93,6 +89,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       rt = PhoebusReconstruction::ReconType::mp5;
     } else if (recon == "linear") {
       rt = PhoebusReconstruction::ReconType::linear;
+    } else if (recon == "constant") {
+      rt = PhoebusReconstruction::ReconType::constant;
     } else {
       PARTHENON_THROW("Invalid Reconstruction option.  Choose from [linear,weno5]");
     }
@@ -586,6 +584,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 }
 
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
+  using namespace PhoebusReconstruction;
   auto *pmb = rc->GetParentPointer().get();
   auto &fluid = pmb->packages.Get("fluid");
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
@@ -598,36 +597,39 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  const int dk = (pmb->pmy_mesh->ndim == 3 ? 1 : 0);
-  const int dj = (pmb->pmy_mesh->ndim > 1 ? 1 : 0);
+  const int ndim = pmb->pmy_mesh->ndim;
+  const int dk = (ndim == 3 ? 1 : 0);
+  const int dj = (ndim > 1 ? 1 : 0);
   const int nrecon = flux.ql.GetDim(4) - 1;
   auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>("Recon");
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
-#define RECON(method)                                                                    \
-  parthenon::par_for(                                                                    \
-      DEFAULT_LOOP_PATTERN, "Reconstruct", DevExecSpace(), X1DIR, pmb->pmy_mesh->ndim,   \
-      0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj, ib.s - 1, ib.e + 1,         \
-      KOKKOS_LAMBDA(const int d, const int n, const int k, const int j, const int i) {   \
-        method(d, n, k, j, i, flux.v, flux.ql, flux.qr);                                 \
-      });
-  switch (rt) {
-  case PhoebusReconstruction::ReconType::weno5z:
-    RECON(PhoebusReconstruction::WENO5Z);
-    break;
-  case PhoebusReconstruction::ReconType::weno5a:
-    RECON(PhoebusReconstruction::WENO5A);
-    break;
-  case PhoebusReconstruction::ReconType::mp5:
-    RECON(PhoebusReconstruction::MP5);
-    break;
-  case PhoebusReconstruction::ReconType::linear:
-    RECON(PhoebusReconstruction::PiecewiseLinear);
-    break;
-  default:
-    PARTHENON_THROW("Invalid recon option.");
-  }
-#undef RECON
+  parthenon::par_for_outer(
+    DEFAULT_OUTER_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
+    0, 0, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
+    KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int n, const int k, const int j) {
+      Real *pv = &flux.v(n,k,j,0);
+      Real *vi_l = &flux.ql(0,n,k,j,1);
+      Real *vi_r = &flux.qr(0,n,k,j,0);
+
+      Real *pvjm2 = &flux.v(n,k,j-2,0);
+      Real *pvjm1 = &flux.v(n,k,j-1,0);
+      Real *pvjp1 = &flux.v(n,k,j+1,0);
+      Real *pvjp2 = &flux.v(n,k,j+2,0);
+      Real *vj_l = &flux.ql(1,n,k,j+1,0);
+      Real *vj_r = &flux.ql(1,n,k,j,0);
+
+      Real *pvkm2 = &flux.v(n,k-2,j,0);
+      Real *pvkm1 = &flux.v(n,k-1,j,0);
+      Real *pvkp1 = &flux.v(n,k+1,j,0);
+      Real *pvkp2 = &flux.v(n,k+2,j,0);
+      Real *vk_l = &flux.ql(2,n,k+1,j,0);
+      Real *vk_r = &flux.ql(2,n,k,j,0);
+
+      ReconLoop(rt, member, ib.s-1, ib.e+1, pv-2, pv-1, pv, pv+1, pv+2, vi_l, vi_r);
+      if (ndim > 1) ReconLoop(rt, member, ib.s-1, ib.e+1, pvjm2, pvjm1, pv, pvjp1, pvjp2, vj_l, vj_r);
+      if (ndim > 2) ReconLoop(rt, member, ib.s-1, ib.e+1, pvkm2, pvkm1, pv, pvkp1, pvkp2, vk_l, vk_r);
+    });
 
 #define FLUX(method)                                                                     \
   parthenon::par_for(                                                                    \

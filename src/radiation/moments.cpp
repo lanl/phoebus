@@ -270,6 +270,42 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   const int nblock = ql_base.GetDim(5);
   const int ndim = pmb->pmy_mesh->ndim;
   auto &coords = pmb->coords;
+/*
+  parthenon::par_for_outer(
+    DEFAULT_OUTER_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(),
+    0, 0, 0, nblock-1, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
+    KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int b, const int n,
+                  const int k, const int j) {
+      ReconstructionIndexer<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
+      ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
+
+      Real *pv = &v(b, n, k, j, 0);
+      Real *vi_l = &ql(0, n, k, j, 1);
+      Real *vi_r = &qr(0, n, k, j, 0);
+
+      Real *pvjm2 = &v(b, n, k, j-2, 0);
+      Real *pvjm1 = &v(b, n, k, j-1, 0);
+      Real *pvjp1 = &v(b, n, k, j+1, 0);
+      Real *pvjp2 = &v(b, n, k, j+2, 0);
+      Real *vj_l = &ql(1, n, k, j+1, 0);
+      Real *vj_r = &ql(1, n, k, j, 0);
+
+      Real *pvkm2 = &v(b, n, k-2, j, 0);
+      Real *pvkm1 = &v(b, n, k-1, j, 0);
+      Real *pvkp1 = &v(b, n, k+1, j, 0);
+      Real *pvkp2 = &v(b, n, k+2, j, 0);
+      Real *vk_l = &ql(2, n, k+1, j, 0);
+      Real *vk_r = &ql(2, n, k, j, 0);
+
+      auto rt = PhoebusReconstruction::ReconType::linear;
+      ReconLoop(rt, member, ib.s-1, ib.e+1, pv-2, pv-1, pv, pv+1, pv+2, vi_l, vi_r);
+      if (ndim > 1) ReconLoop(rt, member, ib.s, ib.e, pvjm2, pvjm1, pv, pvjp1, pvjp2, vj_l, vj_r);
+      if (ndim > 2) ReconLoop(rt, member, ib.s, ib.e, pvkm2, pvkm1, pv, pvkp1, pvkp2, vk_l, vk_r);
+
+
+
+    });
+
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), X1DIR,
@@ -333,6 +369,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
               dx;
         }
       });
+      */
   return TaskStatus::complete;
 }
 template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Real> *);
