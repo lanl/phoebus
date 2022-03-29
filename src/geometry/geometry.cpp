@@ -116,15 +116,12 @@ TaskStatus UpdateGeometry<MeshBlockData<Real>>(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-/*
-// This needs to exist
-// Requires SetGeometry<CoordSysMesh> defined.
 template<>
 TaskStatus UpdateGeometry<MeshData<Real>>(MeshData<Real> *rc) {
   auto system = GetCoordinateSystem(rc);
-  SetGeometry<CordSysMesh>(rc);
+  SetGeometry<CoordSysMesh>(rc);
   impl::SetGeometryDefault(rc, system);
+  return TaskStatus::complete;
 }
-*/
 
 } // namespace Geometry

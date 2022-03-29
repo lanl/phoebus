@@ -37,8 +37,11 @@ void Initialize<SphericalKSMeshBlock>(ParameterInput *pin, StateDescriptor *geom
   Real a = pin->GetOrAddReal("geometry", "a", 0);
   params.Add("a", a);
 }
+
 template <>
 void SetGeometry<SphericalKSMeshBlock>(MeshBlockData<Real> *rc) {}
+template <>
+void SetGeometry<SphericalKSMesh>(MeshData<Real> *rc) {}
 
 template <>
 SphericalKSMeshBlock GetCoordinateSystem<SphericalKSMeshBlock>(MeshBlockData<Real> *rc) {
@@ -71,6 +74,10 @@ CSphericalKSMesh GetCoordinateSystem<CSphericalKSMesh>(MeshData<Real> *rc) {
 template <>
 void SetGeometry<CSphericalKSMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<SphericalKSMeshBlock>(rc);
+}
+template <>
+void SetGeometry<CSphericalKSMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<SphericalKSMesh>(rc);
 }
 
 } // namespace Geometry

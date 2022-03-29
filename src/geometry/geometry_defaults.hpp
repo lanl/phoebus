@@ -24,6 +24,8 @@ template <typename System> System GetCoordinateSystem(MeshData<Real> *rc);
 
 template <typename System> void SetGeometry(MeshBlockData<Real> *rc);
 
+template <typename System> void SetGeometry(MeshData<Real> *rc);
+
 template <typename Transformation>
 Transformation GetTransformation(StateDescriptor *pkg);
 
