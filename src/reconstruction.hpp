@@ -233,44 +233,35 @@ void MP5(const Real q0, const Real q1, const Real q2, const Real q3, const Real 
   qr = mp5_subcalc(q4, q3, q2, q1, q0);
 }
 
-template <typename T, typename U>
-KOKKOS_INLINE_FUNCTION
-void ReconLoop(ReconType rt, parthenon::team_mbr_t &member, const int s, const int e,
-               T && pm2, T && pm1, U && p, T && pp1,
-               T && pp2, U && l, U && r) {
-  switch(rt) {
-    case ReconType::weno5z:
-      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
-        [=](const int i) {
-        WENO5Z(pm2[i], pm1[i], p[i], pp1[i], pp2[i], l[i], r[i]);
-      });
-      break;
-    case ReconType::mp5:
-      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
-        [=](const int i) {
-        MP5(pm2[i], pm1[i], p[i], pp1[i], pp2[i], l[i], r[i]);
-      });
-      break;
-    case ReconType::linear:
-      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
-        [=](const int i) {
-        PiecewiseLinear(pm1[i], p[i], pp1[i], l[i], r[i]);
-      });
-      break;
-    case ReconType::constant:
-      parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
-        [=](const int i) {
-        PiecewiseConstant(p[i], l[i], r[i]);
-      });
-      break;
-  }
-}
-template <typename F>
+using WENO_LIKE = decltype(WENO5Z);
+template <WENO_LIKE F, typename T, typename U>
 KOKKOS_INLINE_FUNCTION
 void ReconLoop(parthenon::team_mbr_t &member, const int s, const int e,
-               Real *&& pm1, Real *&& p, Real *&& pp1, Real *&& l, Real *&& r) {
+               T && pm2, T && pm1, U && p, T && pp1,
+               T && pp2, U && l, U && r) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
+    [=](const int i) {
+      F(pm2[i], pm1[i], p[i], pp1[i], pp2[i], l[i], r[i]);
+    });
+}
+
+using LINEAR_LIKE = decltype(PiecewiseLinear);
+template <LINEAR_LIKE F, typename T, typename U>
+KOKKOS_INLINE_FUNCTION
+void ReconLoop(parthenon::team_mbr_t &member, const int s, const int e,
+               T && pm1, U && p, T && pp1, U && l, U && r) {
   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e, [=](const int i) {
     F(pm1[i], p[i], pp1[i], l[i], r[i]);
+  });
+}
+
+using CONST_LIKE = decltype(PiecewiseConstant);
+template <CONST_LIKE F, typename T>
+KOKKOS_INLINE_FUNCTION
+void ReconLoop(parthenon::team_mbr_t &member, const int s, const int e,
+               T && p, T && l, T && r) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e, [=](const int i) {
+    F(p[i], l[i], r[i]);
   });
 }
 
