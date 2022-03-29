@@ -58,6 +58,8 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
 }
 template <>
 void SetGeometry<FMKSMeshBlock>(MeshBlockData<Real> *rc) {}
+template <>
+void SetGeometry<FMKSMesh>(MeshData<Real> *rc) {}
 
 template <>
 FMKSMeshBlock GetCoordinateSystem<FMKSMeshBlock>(MeshBlockData<Real> *rc) {
@@ -94,5 +96,8 @@ template <>
 void SetGeometry<CFMKSMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<FMKSMeshBlock>(rc);
 }
-
+template <>
+void SetGeometry<CFMKSMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<FMKSMesh>(rc);
+}
 } // namespace Geometry

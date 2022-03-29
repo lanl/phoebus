@@ -423,14 +423,16 @@ CachedOverMesh<System> GetCachedCoordinateSystem(MeshData<Real> *rc) {
   bool axisymmetric = pkg->Param<bool>("axisymmetric");
   return CachedOverMesh<System>(rc, system, axisymmetric);
 }
-template <typename System>
-void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
-  auto pmb = rc->GetParentPointer();
-  auto system = GetCoordinateSystem<System>(rc);
-  auto coords = pmb->coords;
 
-  auto &pkg = pmb->packages.Get("geometry");
-  bool axisymmetric = pkg->Param<bool>("axisymmetric");
+// We rely on SetGeometryDefault for coords
+template <typename System, typename Data>
+void SetCachedCoordinateSystem(Data *rc) {
+  auto pparent = rc->GetParentPointer();
+  auto system = GetCoordinateSystem<System>(rc);
+
+  auto &pkg = pparent->packages.Get("geometry");
+  parthenon::Params &params = pkg->AllParams();
+  bool axisymmetric = params.Get<bool>("axisymmetric");
 
   Impl::LocArray<Impl::GeomPackIndices> idx;
   PackIndexMap imap;
@@ -456,93 +458,83 @@ void SetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
     i++;
   }
 
-  // We rely on SetGeometryDefault for this.
-  // PARTHENON_DEBUG_REQUIRE(imap["g.c.coord"].second >= 0, "Variable exists");
-  // PARTHENON_DEBUG_REQUIRE(imap["g.n.coord"].second >= 0, "Variable exists");
-  // int icoord_c = imap["g.c.coord"].first;
-  // int icoord_n = imap["g.n.coord"].first;
-
-  auto lamb =
-      KOKKOS_LAMBDA(const int k, const int j, const int i, const CellLocation loc) {
+  auto lamb = KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
+                            const CellLocation loc) {
     Real da[NDFULL];
     Real beta[NDSPACE];
     Real gcov[NDFULL][NDFULL];
     Real gamcon[NDSPACE][NDSPACE];
     Real dg[NDFULL][NDFULL][NDFULL];
-    pack(idx[loc].alpha, k, j, i) = system.Lapse(loc, k, j, i);
-    system.GradLnAlpha(loc, k, j, i, da);
-    SPACELOOP(d) { pack(idx[loc].dalpha + d, k, j, i) = da[d + 1]; }
-    system.ContravariantShift(loc, k, j, i, beta);
-    SPACELOOP(d) { pack(idx[loc].bcon + d, k, j, i) = beta[d]; }
-    system.SpacetimeMetric(loc, k, j, i, gcov);
+    pack(b, idx[loc].alpha, k, j, i) = system.Lapse(loc, b, k, j, i);
+    system.GradLnAlpha(loc, b, k, j, i, da);
+    SPACELOOP(d) { pack(b, idx[loc].dalpha + d, k, j, i) = da[d + 1]; }
+    system.ContravariantShift(loc, b, k, j, i, beta);
+    SPACELOOP(d) { pack(b, idx[loc].bcon + d, k, j, i) = beta[d]; }
+    system.SpacetimeMetric(loc, b, k, j, i, gcov);
     for (int mu = 0; mu < NDFULL; ++mu) {
       for (int nu = mu; nu < NDFULL; ++nu) {
         int offst = idx[loc].gcov + Utils::Flatten2(mu, nu, NDFULL);
-        pack(offst, k, j, i) = gcov[mu][nu];
+        pack(b, offst, k, j, i) = gcov[mu][nu];
       }
     }
-    system.MetricInverse(loc, k, j, i, gamcon);
+    system.MetricInverse(loc, b, k, j, i, gamcon);
     for (int mu = 0; mu < NDSPACE; ++mu) {
       for (int nu = mu; nu < NDSPACE; ++nu) {
         int offst = idx[loc].gamcon + Utils::Flatten2(mu, nu, NDSPACE);
-        pack(offst, k, j, i) = gamcon[mu][nu];
+        pack(b, offst, k, j, i) = gamcon[mu][nu];
       }
     }
-    pack(idx[loc].detgam, k, j, i) = system.DetGamma(loc, k, j, i);
-    system.MetricDerivative(loc, k, j, i, dg);
+    pack(b, idx[loc].detgam, k, j, i) = system.DetGamma(loc, b, k, j, i);
+    system.MetricDerivative(loc, b, k, j, i, dg);
     for (int sigma = 1; sigma < NDFULL; ++sigma) {
       for (int mu = 0; mu < NDFULL; ++mu) {
         for (int nu = mu; nu < NDFULL; ++nu) {
           int offst = idx[loc].dg + 3 * Utils::Flatten2(mu, nu, NDFULL) + sigma - 1;
-          pack(offst, k, j, i) = dg[mu][nu][sigma];
+          pack(b, offst, k, j, i) = dg[mu][nu][sigma];
         }
       }
     }
-
-    /*
-    if ((loc == CellLocation::Cent) || (loc == CellLocation::Corn)) {
-      Real C[NDFULL];
-      int icoord = (loc == CellLocation::Cent) ? icoord_c : icoord_n;
-      system.Coords(loc, k, j, i, C);
-      SPACETIMELOOP(mu) pack(icoord + mu, k, j, i) = C[mu];
-    }
-    */
   };
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
   int kbs = axisymmetric ? 0 : kb.s;
   int kbe = axisymmetric ? 0 : kb.e;
-  pmb->par_for(
-      "SetGeometry::Set Cached data, Cent", kbs, kbe, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        lamb(k, j, i, CellLocation::Cent);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Cent", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Cent);
       });
-  pmb->par_for(
-      "SetGeometry::Set Cached data, Face1", kbs, kbe, jb.s, jb.e, ib.s, ib.e + 1,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        lamb(k, j, i, CellLocation::Face1);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face1", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e + 1,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Face1);
       });
-  pmb->par_for(
-      "SetGeometry::Set Cached data, Face2", kbs, kbe, jb.s, jb.e + 1, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        lamb(k, j, i, CellLocation::Face2);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face2", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e + 1, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Face2);
       });
   if (!axisymmetric) kbe = kb.e + 1;
-  pmb->par_for(
-      "SetGeometry::Set Cached data, Face3", kbs, kbe, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        lamb(k, j, i, CellLocation::Face3);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face3", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Face3);
       });
-  pmb->par_for(
-      "SetGeometry::Set Cached data, Corn", kbs, kbe, jb.s, jb.e + 1, ib.s, ib.e + 1,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        lamb(k, j, i, CellLocation::Corn);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Corn", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e + 1, ib.s, ib.e + 1,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Corn);
       });
 
   // don't let other kernels launch until geometry is set
-  pmb->exec_space.fence();
+  Kokkos::fence();
 }
 
 } // namespace Geometry

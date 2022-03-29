@@ -47,6 +47,10 @@ template <>
 void SetGeometry<MplSphMeshBlock>(MeshBlockData<Real> *rc) {}
 template <>
 void SetGeometry<MplCartMeshBlock>(MeshBlockData<Real> *rc) {}
+template <>
+void SetGeometry<MplSphMesh>(MeshData<Real> *rc) {}
+template <>
+void SetGeometry<MplCartMesh>(MeshData<Real> *rc) {}
 
 template <>
 MplSphMeshBlock GetCoordinateSystem<MplSphMeshBlock>(MeshBlockData<Real> *rc) {
@@ -149,6 +153,16 @@ void SetGeometry<CMplSphMeshBlock>(MeshBlockData<Real> *rc) {
 template <>
 void SetGeometry<CMplCartMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<MplCartMeshBlock>(rc);
+}
+
+template <>
+void SetGeometry<CMplSphMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<MplSphMesh>(rc);
+}
+
+template <>
+void SetGeometry<CMplCartMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<MplCartMesh>(rc);
 }
 
 } // namespace Geometry

@@ -86,8 +86,16 @@ template <>
 void SetGeometry<BoostedMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {}
 
 template <>
+void SetGeometry<BoostedMinkowskiMesh>(MeshData<Real> *rc) {}
+
+template <>
 void SetGeometry<CBoostedMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<BoostedMinkowskiMeshBlock>(rc);
+}
+
+template <>
+void SetGeometry<CBoostedMinkowskiMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<BoostedMinkowskiMesh>(rc);
 }
 
 } // namespace Geometry
