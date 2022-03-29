@@ -88,8 +88,10 @@ class Cached {
  public:
   Cached() = default;
   template <typename Data>
-  Cached(Data *rc, const System &s, bool axisymmetric = false)
-      : s_(s), axisymmetric_(axisymmetric) {
+  Cached(Data *rc, const System &s, bool axisymmetric = false,
+         bool time_dependent = false)
+      : s_(s), axisymmetric_(axisymmetric), time_dependent_(time_dependent),
+        nvar_deriv_(time_dependent ? NDFULL : NDSPACE) {
     PackIndexMap imap;
     pack_ = rc->PackVariables(GEOMETRY_CACHED_VARS, imap);
     int i = 0;
@@ -102,7 +104,7 @@ class Cached {
                               "variable exists");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second -
                                       imap["g." + loc + ".dalpha"].first + 1 ==
-                                  3,
+                                  nvar_deriv_,
                               "variable shape correct");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second >= 0, "variable exists");
       PARTHENON_DEBUG_REQUIRE(
@@ -162,7 +164,7 @@ class Cached {
   void Metric(CellLocation loc, int b, int k, int j, int i,
               Real gamma[NDSPACE][NDSPACE]) const {
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
-    SPACELOOP2(m, n) { // gamma_{ij} = g_{ij}
+    SPACELOOP2(m, n) {     // gamma_{ij} = g_{ij}
       int offst = Utils::Flatten2(m + 1, n + 1, NDFULL);
       gamma[m][n] = pack_(b, idx_[loc].gcov + offst, k, j, i);
     }
@@ -299,8 +301,11 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int b, int k, int j, int i, Real da[NDFULL]) const {
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
+    const int offset = time_dependent_;
     da[0] = 0;
-    SPACELOOP(d) { da[d + 1] = pack_(b, idx_[loc].dalpha + d, k, j, i); }
+    for (int d = offset; d < NDFULL; ++d) {
+      da[d] = pack_(b, idx_[loc].dalpha + d - offset, k, j, i);
+    }
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int k, int j, int i, Real da[NDFULL]) const {
@@ -333,6 +338,8 @@ class Cached {
 
  private:
   bool axisymmetric_ = false;
+  bool time_dependent_ = false;
+  int nvar_deriv_ = 3;
   System s_;
   int icoord_c_; // don't bother with face coords for now.
   int icoord_n_;
