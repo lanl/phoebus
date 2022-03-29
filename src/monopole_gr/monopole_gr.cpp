@@ -64,8 +64,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Time step control. Equivalent to CFL
   // Empirical. controls
   Real dtfac = pin->GetOrAddReal("monopole_gr", "dtfac", 0.9);
-  PARTHENON_REQUIRE_THROWS(0 < dtfac && dtfac <= 1.,
-                           "dtfac must be between 0 and 1");
+  PARTHENON_REQUIRE_THROWS(0 < dtfac && dtfac <= 1., "dtfac must be between 0 and 1");
   params.Add("dtfac", dtfac);
 
   // Warn if the change in lapse is too different from dalpha/dt
