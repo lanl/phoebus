@@ -306,6 +306,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
           (ib == 0 ? tl.AddTask(lin_solve_for_lapse, MonopoleGR::SpacetimeToDevice,
                                 monopole.get())
                    : none);
+      auto check_monopole_dt =
+          (ib == 0 ? tl.AddTask(spacetime_to_device, MonopoleGR::CheckRateOfChange,
+                                monopole.get(), tm.dt / 2)
+                   : none);
     }
 
     // update ghost cells
