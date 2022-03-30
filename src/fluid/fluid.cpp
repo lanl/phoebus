@@ -612,19 +612,19 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
       Real *vi_l = &flux.ql(0,n,k,j,1);
       Real *vi_r = &flux.qr(0,n,k,j,0);
 
-      Real *pvjm2 = &flux.v(n,k,j-2,0);
-      Real *pvjm1 = &flux.v(n,k,j-1,0);
-      Real *pvjp1 = &flux.v(n,k,j+1,0);
-      Real *pvjp2 = &flux.v(n,k,j+2,0);
-      Real *vj_l = &flux.ql(1,n,k,j+1,0);
-      Real *vj_r = &flux.ql(1,n,k,j,0);
+      Real *pvjm2 = &flux.v(n,k,j-2*dj,0);
+      Real *pvjm1 = &flux.v(n,k,j-dj,0);
+      Real *pvjp1 = &flux.v(n,k,j+dj,0);
+      Real *pvjp2 = &flux.v(n,k,j+2*dj,0);
+      Real *vj_l = &flux.ql(1%ndim,n,k,j+dj,0);
+      Real *vj_r = &flux.ql(1%ndim,n,k,j,0);
 
-      Real *pvkm2 = &flux.v(n,k-2,j,0);
-      Real *pvkm1 = &flux.v(n,k-1,j,0);
-      Real *pvkp1 = &flux.v(n,k+1,j,0);
-      Real *pvkp2 = &flux.v(n,k+2,j,0);
-      Real *vk_l = &flux.ql(2,n,k+1,j,0);
-      Real *vk_r = &flux.ql(2,n,k,j,0);
+      Real *pvkm2 = &flux.v(n,k-2*dk,j,0);
+      Real *pvkm1 = &flux.v(n,k-dk,j,0);
+      Real *pvkp1 = &flux.v(n,k+dk,j,0);
+      Real *pvkp2 = &flux.v(n,k+2*dk,j,0);
+      Real *vk_l = &flux.ql(2%ndim,n,k+dk,j,0);
+      Real *vk_r = &flux.ql(2%ndim,n,k,j,0);
 
       switch(rt) {
         case ReconType::weno5z:

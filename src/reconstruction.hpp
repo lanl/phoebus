@@ -98,6 +98,7 @@ Real phifunc(const Real mind, const Real maxd, const Real gx, const Real gy,
   return 1.0;
 }
 
+#pragma omp declare simd
 KOKKOS_FORCEINLINE_FUNCTION
 Real mc(const Real dm, const Real dp) {
   //const Real r = (std::abs(dp) > 0. ? dm / dp : 0.0);
@@ -106,12 +107,14 @@ Real mc(const Real dm, const Real dp) {
   return std::copysign(std::min(std::fabs(dc),2.0*std::min(std::fabs(dm),std::fabs(dp))), dc);
 }
 
+#pragma omp declare simd
 KOKKOS_INLINE_FUNCTION
 void PiecewiseConstant(const Real q0, Real &ql, Real &qr) {
   ql = q0;
   qr = q0;
 }
 
+#pragma omp declare simd
 KOKKOS_INLINE_FUNCTION
 void PiecewiseLinear(const Real qm, const Real q0, const Real qp,
                      Real &ql, Real &qr) {
@@ -121,6 +124,7 @@ void PiecewiseLinear(const Real qm, const Real q0, const Real qp,
   qr = q0 - 0.5*dq;
 }
 
+#pragma omp declare simd
 KOKKOS_INLINE_FUNCTION
 void WENO5Z(const Real q0, const Real q1, const Real q2, const Real q3, const Real q4,
             Real  &ql, Real &qr) {
@@ -178,6 +182,7 @@ void WENO5Z(const Real q0, const Real q1, const Real q2, const Real q3, const Re
 #define MINMOD(a, b) ((a) * (b) > 0.0 ? (fabs(a) < fabs(b) ? (a) : (b)) : 0.0)
 KOKKOS_INLINE_FUNCTION
 double Median(double a, double b, double c) { return (a + MINMOD(b - a, c - a)); }
+#pragma omp declare simd
 KOKKOS_INLINE_FUNCTION
 double mp5_subcalc(double Fjm2, double Fjm1, double Fj, double Fjp1, double Fjp2) {
   double f, d2, d2p, d2m;
@@ -226,6 +231,7 @@ double mp5_subcalc(double Fjm2, double Fjm1, double Fj, double Fjp1, double Fjp2
 }
 #undef MINMOD
 
+#pragma omp declare simd
 KOKKOS_INLINE_FUNCTION
 void MP5(const Real q0, const Real q1, const Real q2, const Real q3, const Real q4,
          Real &ql, Real &qr) {
