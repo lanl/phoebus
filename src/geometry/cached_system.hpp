@@ -432,14 +432,16 @@ CachedOverMeshBlock<System> GetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
   auto system = GetCoordinateSystem<System>(rc);
   auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
   bool axisymmetric = pkg->Param<bool>("axisymmetric");
-  return CachedOverMeshBlock<System>(rc, system, axisymmetric);
+  bool time_dependent = pkg->Param<bool>("time_dependent");
+  return CachedOverMeshBlock<System>(rc, system, axisymmetric, time_dependent);
 }
 template <typename System>
 CachedOverMesh<System> GetCachedCoordinateSystem(MeshData<Real> *rc) {
   auto system = GetCoordinateSystem<System>(rc);
   auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
   bool axisymmetric = pkg->Param<bool>("axisymmetric");
-  return CachedOverMesh<System>(rc, system, axisymmetric);
+  bool time_dependent = pkg->Param<bool>("time_dependent");
+  return CachedOverMesh<System>(rc, system, axisymmetric, time_dependent);
 }
 
 // We rely on SetGeometryDefault for coords
