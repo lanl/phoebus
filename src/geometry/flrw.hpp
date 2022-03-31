@@ -30,9 +30,11 @@ namespace Geometry {
 
 // A simplified toy cosmology for testing time-dependent metrics
 // Assumes ds^2 = -dt^2 + a^2 delta_{ij} dx^i dx^j for delta = Chronicker Delta
-// We also assume da/dt = const = C, i.e., d^2a/dt^2 = 0 and hubble param H = C/a
+// We also assume da/dt = const = C, i.e., d^2a/dt^2 = 0
+// and hubble param H = (1/a)(da/dt) = C/a
 // This also implies vanishing spatial curvature... i.e., flat spacetime.
-// This implies drho/dt = -3 rho_0 W H for P = (Gamma - 1) rho (assuming ideal gas)
+// This implies d ln(rho)/dt = -3 (rho + P) H
+// where here rho is the rho_0 + u, i.e., the total energy density.
 // Beware this spacetime has cosmological horizons and a singularity.
 // For example, t = -a0/dadt produces a = 0, i.e., the Big Bang.
 // Treatment taken from Chapter 8 of Carroll

@@ -148,6 +148,15 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     pmono_vol_red = monopole->MutableParam<MonoVolRed_t>("volumes_reducer");
   }
 
+  // Hack to update time for time-dependent geometries
+  auto geometry = pmesh->packages.Get("geometry");
+  auto &geom_params = geometry->AllParams();
+  // tm = SimTime field in EvolutionDriver. See parthenon/src/driver/driver.hpp
+  if (geom_params.hasKey("time")) {
+    const Real tstage = tm.time + (stage - 1) * tm.dt / (integrator->nstages);
+    geom_params.Update("time", tstage);
+  }
+
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {

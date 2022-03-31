@@ -41,7 +41,7 @@ void Initialize<FLRWMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   params.Add("dadt", dadt);
 
   Real t = 0;
-  params.Add("time", t); // Will need updates from simulation
+  params.Add("time", t, true); // Will need updates from simulation
 
   // Registers with the caching machinery that the metric evolves in time
   bool time_dependent = true;
