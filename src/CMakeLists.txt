@@ -76,6 +76,7 @@ add_executable(phoebus
   pgen/advection.cpp
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
+  pgen/friedmann.cpp
   pgen/homogeneous_sphere.cpp
   pgen/kh.cpp
   pgen/leptoneq.cpp
