@@ -33,6 +33,8 @@ add_executable(phoebus
   geometry/boyer_lindquist.cpp
   geometry/cached_system.hpp
   geometry/coordinate_systems.hpp
+  geometry/flrw.hpp
+  geometry/flrw.cpp
   geometry/fmks.hpp
   geometry/fmks.cpp
   geometry/geometry.cpp
