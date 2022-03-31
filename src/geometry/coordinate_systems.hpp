@@ -37,6 +37,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/boosted_minkowski.hpp"
 #include "geometry/boyer_lindquist.hpp"
 #include "geometry/cached_system.hpp"
+#include "geometry/flrw.hpp"
 #include "geometry/fmks.hpp"
 #include "geometry/inchworm.hpp"
 #include "geometry/mckinney_gammie_ryan.hpp"
