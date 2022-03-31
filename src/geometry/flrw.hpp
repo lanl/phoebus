@@ -65,14 +65,14 @@ class FLRW {
   }
   KOKKOS_INLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
-    LinearAlgebra::SetZero(gamma, NDFULL, NDFULL);
+    LinearAlgebra::SetZero(gamma, NDSPACE, NDSPACE);
     const Real a = a_(X0);
     gamma[0][0] = gamma[1][1] = gamma[2][2] = a * a;
   }
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
                      Real gamma[NDSPACE][NDSPACE]) const {
-    LinearAlgebra::SetZero(gamma, NDFULL, NDFULL);
+    LinearAlgebra::SetZero(gamma, NDSPACE, NDSPACE);
     const Real a = a_(X0);
     gamma[0][0] = gamma[1][1] = gamma[2][2] = robust::ratio(1, a * a);
   }
