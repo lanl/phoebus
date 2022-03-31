@@ -18,6 +18,8 @@ add_library(geometry_unit_tests OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/boyer_lindquist.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/boyer_lindquist.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/cached_system.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/flrw.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/flrw.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/fmks.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/fmks.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/geometry_defaults.hpp
