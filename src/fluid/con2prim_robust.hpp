@@ -324,8 +324,9 @@ class ConToPrim {
     Real bdotr = 0.0;
     Real rcon[3];
     // r_i
-    Real rcov[] = {v(cmom_lo) / v(crho), v(cmom_lo + 1) / v(crho),
-                   v(cmom_lo + 2) / v(crho)};
+    Real rcov[] = {robust::ratio(v(cmom_lo), v(crho)),
+                   robust::ratio(v(cmom_lo + 1), v(crho)),
+                   robust::ratio(v(cmom_lo + 2), v(crho))};
     SPACELOOP(i) {
       rcon[i] = 0.0;
       SPACELOOP(j) { rcon[i] += g.gcon[i][j] * rcov[j]; }

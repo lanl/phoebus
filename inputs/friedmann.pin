@@ -11,7 +11,7 @@
 # publicly and display publicly, and to permit others to do so.
 
 <phoebus>
-problem = shock_tube
+problem = friedmann
 
 <parthenon/job>
 problem_id = flrw # problem ID: basename of output filenames
@@ -26,11 +26,11 @@ variables = p.density,  &
 	    p.ye
 
 file_type   = hdf5      # Tabular data dump
-dt          = 0.01      # time increment between outputs
+dt          = 0.1       # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 0.4       # time limit
+tlim        = 1.0       # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -78,10 +78,11 @@ Cv = 1.0
 
 <physics>
 hydro = true
+rad = false
 
 <fluid>
 xorder = 2
-cfl = 0.8
+cfl = 0.1 # cfl set here not for stability reasons but for accuracy
 riemann = hll
 recon = weno5
 c2p_max_iter = 100
