@@ -40,8 +40,8 @@ namespace Geometry {
 // Treatment taken from Chapter 8 of Carroll
 class FLRW {
  public:
-  FLRW() : a0_(1), dadt_(1) {}
-  FLRW(const Real a0, const Real dadt) : a0_(a0), dadt_(dadt) {}
+  FLRW() : a0_(1.), dadt_(1.) {}
+  FLRW(const Real &a0, const Real &dadt) : a0_(a0), dadt_(dadt) {}
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const { return 1.; }
   KOKKOS_INLINE_FUNCTION
@@ -121,8 +121,8 @@ class FLRW {
  private:
   KOKKOS_INLINE_FUNCTION
   Real a_(const Real t) const { return a0_ + dadt_ * t; }
-  const Real a0_;
-  const Real dadt_;
+  Real a0_; // These cannot be const, or the compiler deletes the copy assignment operator
+  Real dadt_;
 };
 
 using FLRWMeshBlock = Analytic<FLRW, IndexerMeshBlock>;
