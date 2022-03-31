@@ -52,7 +52,7 @@ class FLRW {
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
     const Real a = a_(X0);
-    g[0][0] = 1;
+    g[0][0] = -1;
     g[1][1] = g[2][2] = g[3][3] = a * a;
   }
   KOKKOS_INLINE_FUNCTION
@@ -60,7 +60,7 @@ class FLRW {
                               Real g[NDFULL][NDFULL]) const {
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
     const Real a = a_(X0);
-    g[0][0] = 1;
+    g[0][0] = -1;
     g[1][1] = g[2][2] = g[3][3] = robust::ratio(1, a * a);
   }
   KOKKOS_INLINE_FUNCTION
