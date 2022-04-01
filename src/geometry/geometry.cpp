@@ -108,7 +108,7 @@ void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin) {
   impl::SetGeometryDefault(rc, system);
 }
 
-template<>
+template <>
 TaskStatus UpdateGeometry<MeshBlockData<Real>>(MeshBlockData<Real> *rc) {
   auto *pparent = rc->GetParentPointer().get();
   StateDescriptor *pkg = pparent->packages.Get("geometry").get();
@@ -119,7 +119,7 @@ TaskStatus UpdateGeometry<MeshBlockData<Real>>(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-template<>
+template <>
 TaskStatus UpdateGeometry<MeshData<Real>>(MeshData<Real> *rc) {
   auto *pparent = rc->GetParentPointer();
   StateDescriptor *pkg = pparent->packages.Get("geometry").get();

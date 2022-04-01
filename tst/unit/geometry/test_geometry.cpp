@@ -253,15 +253,15 @@ TEST_CASE("FLRW Coordinates", "[geometry]") {
               //  metric
               Real gamma[NDSPACE][NDSPACE];
               system.Metric(t, x, y, z, gamma);
-              SPACELOOP2(i,j) {
+              SPACELOOP2(i, j) {
                 if ((i != j) && gamma[i][j] != 0) update += 1;
                 if ((i == j) && GetDifference(gamma[i][j], 4) > EPS) update += 1;
               }
               // Inverse metric
               system.MetricInverse(t, x, y, z, gamma);
-              SPACELOOP2(i,j) {
+              SPACELOOP2(i, j) {
                 if ((i != j) && gamma[i][j] != 0) update += 1;
-                if ((i == j) && GetDifference(gamma[i][j], 1./4.) > EPS) update += 1;
+                if ((i == j) && GetDifference(gamma[i][j], 1. / 4.) > EPS) update += 1;
               }
             },
             n_wrong);

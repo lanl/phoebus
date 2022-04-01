@@ -36,7 +36,7 @@ void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin);
 // Same as SetGeometryBlock, but a task for the task list.
 // Supports MeshBlockData or MeshData.
 // Template specializations are in geometry.cpp
-template<typename Data>
+template <typename Data>
 TaskStatus UpdateGeometry(Data *rc);
 
 CoordSysMeshBlock GetCoordinateSystem(MeshBlockData<Real> *rc);
