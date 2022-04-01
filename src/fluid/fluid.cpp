@@ -634,7 +634,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 
       switch(rt) {
         case ReconType::weno5z:
-          ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvim2, pvim1, pv, pvip1, pvip1, vi_l, vi_r);
+          ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvim2, pvim1, pv, pvip1, pvip2, vi_l, vi_r);
           if (ndim > 1) ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvjm2, pvjm1, pv, pvjp1, pvjp2, vj_l, vj_r);
           if (ndim > 2) ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvkm2, pvkm1, pv, pvkp1, pvkp2, vk_l, vk_r);
           break;
