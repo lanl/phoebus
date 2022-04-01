@@ -301,11 +301,11 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         vk_r = &qr(2%ndim, n, k, j, 0);
       } else {
         vi_l = &ql_v(0, var_id, k, j, 1);
-        vi_l = &qr_v(0, var_id, k, j, 0);
+        vi_r = &qr_v(0, var_id, k, j, 0);
         vj_l = &ql_v(1%ndim, var_id, k, j+dj, 0);
-        vj_l = &qr_v(1%ndim, var_id, k, j, 0);
+        vj_r = &qr_v(1%ndim, var_id, k, j, 0);
         vk_l = &ql_v(2%ndim, var_id, k+dk, j, 0);
-        vk_l = &qr_v(2%ndim, var_id, k, j, 0);
+        vk_r = &qr_v(2%ndim, var_id, k, j, 0);
       }
 
       // TODO(JCD): do we want to enable other recon methods like weno5?
