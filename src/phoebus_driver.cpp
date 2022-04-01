@@ -158,6 +158,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                                 static_cast<Real>(integrator->nstages));
     geom_params.Update("time", tstage);
   }
+  bool time_dependent_geom = geom_params.Get("time_dependent", false);
 
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
@@ -356,6 +357,13 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
     auto floors = tl.AddTask(fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+
+    // TODO(JMM): Should this be at the beginning of a cycle? The end?
+    // After the monopole solver is done?
+    // Update cached metric if needed
+    if (time_dependent_geom) {
+      auto update_geom = tl.AddTask(none, Geometry::UpdateGeometry<MeshBlockData<Real>>, sc1.get());
+    }
 
     // estimate next time step
     if (stage == integrator->nstages) {
