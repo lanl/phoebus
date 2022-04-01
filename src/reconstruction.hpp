@@ -100,11 +100,9 @@ Real phifunc(const Real mind, const Real maxd, const Real gx, const Real gy,
 
 #pragma omp declare simd
 KOKKOS_FORCEINLINE_FUNCTION
-Real mc(const Real dm, const Real dp) {
-  //const Real r = (std::abs(dp) > 0. ? dm / dp : 0.0);
-  //return std::max(0.0, std::min(2.0, std::min(2.0 * r, 0.5 * (1 + r))));
+Real mc(const Real dm, const Real dp, const Real alpha) {
   const Real dc = (dm*dp > 0.0) * 0.5 * (dm + dp);
-  return std::copysign(std::min(std::fabs(dc),2.0*std::min(std::fabs(dm),std::fabs(dp))), dc);
+  return std::copysign(std::min(std::fabs(dc),1.5*std::min(std::fabs(dm),std::fabs(dp))), dc);
 }
 
 #pragma omp declare simd
@@ -119,7 +117,7 @@ KOKKOS_INLINE_FUNCTION
 void PiecewiseLinear(const Real qm, const Real q0, const Real qp,
                      Real &ql, Real &qr) {
   Real dq = qp - q0;
-  dq = mc(q0 - qm, dq);
+  dq = mc(q0 - qm, dq, 1.5);
   ql = q0 + 0.5*dq;
   qr = q0 - 0.5*dq;
 }
@@ -171,7 +169,7 @@ void WENO5Z(const Real q0, const Real q1, const Real q2, const Real q3, const Re
   const Real alpha_r = 3.0 * wsum * w0 * w1 * w2/(w5gamma[2]*w0*w1 + w5gamma[1]*w0*w2 + w5gamma[0]*w1*w2) + eps;
 
   Real dq = q3 - q2;
-  dq = mc(q2 - q1, dq);
+  dq = mc(q2 - q1, dq, 2.0);
 
   const Real alpha_lin = 2.0 * alpha_l * alpha_r / (alpha_l + alpha_r);
   ql = alpha_lin * ql + (1.0 - alpha_lin) * (q2 + 0.5 * dq);
