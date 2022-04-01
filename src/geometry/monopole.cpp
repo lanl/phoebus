@@ -34,12 +34,16 @@ namespace Geometry {
 
 template <>
 void Initialize<MplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
-  // All initialization done by MonopoleGR machinery
+  Params &params = geometry->AllParams();
+  bool time_dependent = true;
+  params.Add("time_dependent", time_dependent);
   return;
 }
 template <>
 void Initialize<MplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
-  // All initialization done by MonopoleGR machinery
+  Params &params = geometry->AllParams();
+  bool time_dependent = true;
+  params.Add("time_dependent", time_dependent);
   return;
 }
 // TODO(JMM): Might need to figure this out more carefully
