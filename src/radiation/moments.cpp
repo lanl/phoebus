@@ -284,10 +284,9 @@ TaskStatus ReconstructEdgeStates(T *rc) {
 
       const VariablePack<Real> &var = (n < nrecon ? v : v_vel);
       const int var_id = n % nrecon;
-
       Real *pv = &var(b, var_id, k, j, 0);
-      Real *pvim1 = &var(b, var_id, k, j, -1);
-      Real *pvip1 = &var(b, var_id, k, j, 1);
+      Real *pvim1 = pv-1;
+      Real *pvip1 = pv+1;
       Real *pvjm1 = &var(b, var_id, k, j-dj, 0);
       Real *pvjp1 = &var(b, var_id, k, j+dj, 0);
       Real *pvkm1 = &var(b, var_id, k-dk, j, 0);
@@ -354,6 +353,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
             dJdy[i] = (Jjp1[i] + Jjp1[i-1] - Jjm1[i] - Jjm1[i-1]) * idy4;
             dJdz[i] = (Jkp1[i] + Jkp1[i-1] - Jkm1[i] - Jkm1[i-1]) * idz4;
           });
+        if (ndim > 1) {
         // y-direction faces
         dJdx = &v(b, idx_dJ(n, 0, 1), k, j, 0);
         dJdy = &v(b, idx_dJ(n, 1, 1), k, j, 0);
@@ -364,6 +364,8 @@ TaskStatus ReconstructEdgeStates(T *rc) {
             dJdy[i] = (J[i] - Jjm1[i]) * idy;
             dJdz[i] = (Jkp1[i] + Jkp1jm1[i] - Jkm1[i] - Jkm1jm1[i]) * idz4;
           });
+        }
+        if (ndim > 2) {
         // z-direction faces
         dJdx = &v(b, idx_dJ(n, 0, 2), k, j, 0);
         dJdy = &v(b, idx_dJ(n, 1, 2), k, j, 0);
@@ -374,6 +376,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
             dJdy[i] = (Jjp1[i] + Jkm1jp1[i] - Jjm1[i] - Jkm1jm1[i]) * idy4;
             dJdz[i] = (J[i] - Jkm1[i]) * idz;
           });
+        }
       }
     });
 
