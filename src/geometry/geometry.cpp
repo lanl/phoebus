@@ -110,17 +110,23 @@ void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin) {
 
 template<>
 TaskStatus UpdateGeometry<MeshBlockData<Real>>(MeshBlockData<Real> *rc) {
+  auto *pparent = rc->GetParentPointer().get();
+  StateDescriptor *pkg = pparent->packages.Get("geometry").get();
+  bool update_coords = pkg->AllParams().Get("update_coords", false);
   auto system = GetCoordinateSystem(rc);
   SetGeometry<CoordSysMeshBlock>(rc);
-  impl::SetGeometryDefault(rc, system);
+  if (update_coords) impl::SetGeometryDefault(rc, system);
   return TaskStatus::complete;
 }
 
 template<>
 TaskStatus UpdateGeometry<MeshData<Real>>(MeshData<Real> *rc) {
+  auto *pparent = rc->GetParentPointer();
+  StateDescriptor *pkg = pparent->packages.Get("geometry").get();
+  bool update_coords = pkg->AllParams().Get("update_coords", false);
   auto system = GetCoordinateSystem(rc);
   SetGeometry<CoordSysMesh>(rc);
-  impl::SetGeometryDefault(rc, system);
+  if (update_coords) impl::SetGeometryDefault(rc, system);
   return TaskStatus::complete;
 }
 
