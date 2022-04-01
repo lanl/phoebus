@@ -283,7 +283,8 @@ class Cached {
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     const int offset = !time_dependent_;
     SPACETIMELOOP2(mu, nu) {
-      const int flat = nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - offset;
+      const int flat =
+          nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - offset;
       dg[mu][nu][0] = 0.0; // gets overwritten if time-dependent metric
       for (int sigma = offset; sigma < NDFULL; sigma++) {
         dg[mu][nu][sigma] = pack_(b, flat + sigma, k, j, i);
@@ -522,7 +523,8 @@ void SetCachedCoordinateSystem(Data *rc) {
       for (int sigma = offset; sigma < NDFULL; ++sigma) {
         for (int mu = 0; mu < NDFULL; ++mu) {
           for (int nu = mu; nu < NDFULL; ++nu) {
-            int flat = idx[loc].dg + nvar_deriv * Utils::Flatten2(mu, nu, NDFULL) + sigma - offset;
+            int flat = idx[loc].dg + nvar_deriv * Utils::Flatten2(mu, nu, NDFULL) +
+                       sigma - offset;
             pack(b, flat, k, j, i) = dg[mu][nu][sigma];
           }
         }

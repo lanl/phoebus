@@ -362,7 +362,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // After the monopole solver is done?
     // Update cached metric if needed
     if (time_dependent_geom) {
-      auto update_geom = tl.AddTask(none, Geometry::UpdateGeometry<MeshBlockData<Real>>, sc1.get());
+      auto update_geom =
+          tl.AddTask(none, Geometry::UpdateGeometry<MeshBlockData<Real>>, sc1.get());
     }
 
     // estimate next time step
