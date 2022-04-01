@@ -142,7 +142,7 @@ void WENO5Z(const Real q0, const Real q1, const Real q2, const Real q3, const Re
   a = q2 - 2.0 * q3 + q4;
   b = q4 - 4.0 * q3 + 3.0 * q2;
   Real beta2 = thirteen_thirds * a * a + b * b + eps;
-  const Real tau5 = std::abs(beta2 - beta0);
+  const Real tau5 = std::fabs(beta2 - beta0);
 
   beta0 = (beta0 + tau5) / beta0;
   beta1 = (beta1 + tau5) / beta1;

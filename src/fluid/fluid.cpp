@@ -611,10 +611,10 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
       // this approach (pullilng out pointers) depends on i being the fastest moving index
       Real *pv = &flux.v(n,k,j,0);
 
-      Real *pvim2 = &flux.v(n,k,j,-2);
-      Real *pvim1 = &flux.v(n,k,j,-1);
-      Real *pvip1 = &flux.v(n,k,j,1);
-      Real *pvip2 = &flux.v(n,k,j,2);
+      Real *pvim2 = pv-2;
+      Real *pvim1 = pv-1;
+      Real *pvip1 = pv+1;
+      Real *pvip2 = pv+2;
       Real *vi_l = &flux.ql(0,n,k,j,1);
       Real *vi_r = &flux.qr(0,n,k,j,0);
 
