@@ -608,7 +608,13 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     DEFAULT_OUTER_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
     0, 0, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
     KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int n, const int k, const int j) {
+      // this approach (pullilng out pointers) depends on i being the fastest moving index
       Real *pv = &flux.v(n,k,j,0);
+
+      Real *pvim2 = &flux.v(n,k,j,-2);
+      Real *pvim1 = &flux.v(n,k,j,-1);
+      Real *pvip1 = &flux.v(n,k,j,1);
+      Real *pvip2 = &flux.v(n,k,j,2);
       Real *vi_l = &flux.ql(0,n,k,j,1);
       Real *vi_r = &flux.qr(0,n,k,j,0);
 
@@ -628,17 +634,17 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 
       switch(rt) {
         case ReconType::weno5z:
-          ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pv-2, pv-1, pv, pv+1, pv+2, vi_l, vi_r);
+          ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvim2, pvim1, pv, pvip1, pvip1, vi_l, vi_r);
           if (ndim > 1) ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvjm2, pvjm1, pv, pvjp1, pvjp2, vj_l, vj_r);
           if (ndim > 2) ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvkm2, pvkm1, pv, pvkp1, pvkp2, vk_l, vk_r);
           break;
         case ReconType::mp5:
-          ReconLoop<MP5>(member, ib.s-1, ib.e+1, pv-2, pv-1, pv, pv+1, pv+2, vi_l, vi_r);
+          ReconLoop<MP5>(member, ib.s-1, ib.e+1, pvim2, pvim1, pv, pvip1, pvip2, vi_l, vi_r);
           if (ndim > 1) ReconLoop<MP5>(member, ib.s-1, ib.e+1, pvjm2, pvjm1, pv, pvjp1, pvjp2, vj_l, vj_r);
           if (ndim > 2) ReconLoop<MP5>(member, ib.s-1, ib.e+1, pvkm2, pvkm1, pv, pvkp1, pvkp2, vk_l, vk_r);
           break;
         case ReconType::linear:
-          ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pv-1, pv, pv+1, vi_l, vi_r);
+          ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pvim1, pv, pvip1, vi_l, vi_r);
           if (ndim > 1) ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pvjm1, pv, pvjp1, vj_l, vj_r);
           if (ndim > 2) ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pvkm1, pv, pvkp1, vk_l, vk_r);
           break;
