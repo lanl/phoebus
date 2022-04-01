@@ -26,7 +26,7 @@ variables = p.density,  &
 	    p.ye
 
 file_type   = hdf5      # Tabular data dump
-dt          = 0.1       # time increment between outputs
+dt          = 0.01       # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
@@ -82,7 +82,7 @@ rad = false
 
 <fluid>
 xorder = 2
-cfl = 0.1 # cfl set here not for stability reasons but for accuracy
+cfl = 0.01 # cfl set here not for stability reasons but for accuracy
 riemann = hll
 recon = weno5
 c2p_max_iter = 100
