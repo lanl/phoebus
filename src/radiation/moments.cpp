@@ -286,6 +286,8 @@ TaskStatus ReconstructEdgeStates(T *rc) {
       const int var_id = n % nrecon;
 
       Real *pv = &var(b, var_id, k, j, 0);
+      Real *pvim1 = &var(b, var_id, k, j, -1);
+      Real *pvip1 = &var(b, var_id, k, j, 1);
       Real *pvjm1 = &var(b, var_id, k, j-dj, 0);
       Real *pvjp1 = &var(b, var_id, k, j+dj, 0);
       Real *pvkm1 = &var(b, var_id, k-dk, j, 0);
@@ -309,7 +311,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
 
       // TODO(JCD): do we want to enable other recon methods like weno5?
       // x-direction
-      ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pv-1, pv, pv+1, vi_l, vi_r);
+      ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pvim1, pv, pvip1, vi_l, vi_r);
       // y-direction
       if (ndim > 1) ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
       // z-direction
