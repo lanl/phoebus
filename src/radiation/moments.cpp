@@ -297,9 +297,9 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         vi_l = &ql(0, n, k, j, 1);
         vi_r = &qr(0, n, k, j, 0);
         vj_l = &ql(1%ndim, n, k, j+dj, 0);
-        vj_r = &ql(1%ndim, n, k, j, 0);
+        vj_r = &qr(1%ndim, n, k, j, 0);
         vk_l = &ql(2%ndim, n, k+dk, j, 0);
-        vk_r = &ql(2%ndim, n, k, j, 0);
+        vk_r = &qr(2%ndim, n, k, j, 0);
       } else {
         vi_l = &ql_v(0, var_id, k, j, 1);
         vi_l = &qr_v(0, var_id, k, j, 0);
