@@ -33,8 +33,8 @@ namespace Geometry {
 // We also assume da/dt = const = C, i.e., d^2a/dt^2 = 0
 // and hubble param H = (1/a)(da/dt) = C/a
 // This also implies vanishing spatial curvature... i.e., flat spacetime.
-// This implies d ln(rho)/dt = -3 (rho + P) H
-// where here rho is the rho_0 + u, i.e., the total energy density.
+// This implies d rho/dt = -3 (rho + P) H
+// where here rho is rho_0 + u, i.e., the total energy density.
 // Beware this spacetime has cosmological horizons and a singularity.
 // For example, t = -a0/dadt produces a = 0, i.e., the Big Bang.
 // Treatment taken from Chapter 8 of Carroll
