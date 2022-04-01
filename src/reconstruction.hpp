@@ -102,7 +102,7 @@ Real phifunc(const Real mind, const Real maxd, const Real gx, const Real gy,
 KOKKOS_FORCEINLINE_FUNCTION
 Real mc(const Real dm, const Real dp, const Real alpha) {
   const Real dc = (dm*dp > 0.0) * 0.5 * (dm + dp);
-  return std::copysign(std::min(std::fabs(dc),1.5*std::min(std::fabs(dm),std::fabs(dp))), dc);
+  return std::copysign(std::min(std::fabs(dc),alpha*std::min(std::fabs(dm),std::fabs(dp))), dc);
 }
 
 #pragma omp declare simd
