@@ -329,11 +329,11 @@ TaskStatus ReconstructEdgeStates(T *rc) {
       //  dJ/dx (@ Q) = (d - c)/dx
       //  dJ/dy (@ Q) = (a + b - e - f)/(4*dy)
       if (n < nspec) {
-        const Real idx = coords.Dx(0, k, j, 0);
+        const Real idx = 1.0/coords.Dx(X1DIR, k, j, 0);
         const Real idx4 = 0.25*idx;
-        const Real idy = coords.Dx(1, k, j, 0);
+        const Real idy = 1.0/coords.Dx(X2DIR, k, j, 0);
         const Real idy4 = 0.25*idy;
-        const Real idz = coords.Dx(2, k, j, 0);
+        const Real idz = 1.0/coords.Dx(X3DIR, k, j, 0);
         const Real idz4 = 0.25*idz;
         Real *J = &v(b, idx_J(n), k, j, 0);
         Real *Jjm1 = &v(b, idx_J(n), k, j-dj, 0);
