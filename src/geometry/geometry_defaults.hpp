@@ -16,13 +16,16 @@ using namespace parthenon::package::prelude;
 namespace Geometry {
 
 template <typename System>
-void Initialize(ParameterInput *pin, StateDescriptor *geometry) { }
+void Initialize(ParameterInput *pin, StateDescriptor *geometry) {}
 
-template <typename System> System GetCoordinateSystem(MeshBlockData<Real> *rc);
+template <typename System>
+System GetCoordinateSystem(MeshBlockData<Real> *rc);
 
-template <typename System> System GetCoordinateSystem(MeshData<Real> *rc);
+template <typename System>
+System GetCoordinateSystem(MeshData<Real> *rc);
 
-template <typename System> void SetGeometry(MeshBlockData<Real> *rc);
+template <typename System>
+void SetGeometry(MeshBlockData<Real> *rc);
 
 template <typename System> void SetGeometry(MeshData<Real> *rc);
 
