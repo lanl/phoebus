@@ -15,23 +15,26 @@
 #------------------------------------------------------------------------------
 
 
-: ${CFM:=$(command -v clang-format)}
+: ${CFM:=clang-format}
 
 if ! command -v ${CFM} &> /dev/null; then
-    >&2 echo "Error: No clang format found!"
+    >&2 echo "Error: No clang format found! Looked for ${CFM}"
     exit 1
+else
+    CFM=$(command -v ${CFM})
+    echo "Clang format found: ${CFM}"
 fi
 
 # clang format major version
 TARGET_CF_VRSN=12
-CF_VRSN=$(${CFM} --version | cut -d ' ' -f 4 | cut -d '.' -f 1)
+CF_VRSN=$(${CFM} --version)
+echo "Note we assume clang format version ${TARGET_CF_VRSN}."
+echo "You are using ${CF_VRSN}."
+echo "If these differ, results may not be stable."
 
-if [ "${CF_VRSN}" != "${TARGET_CF_VRSN}" ]; then
-    >&2 echo "Warning! Your clang format version ${CF_VRSN} is not the same as the pinned version ${TARGET_CF_VRSN}."
-    >&2 echo "Results may be unstable."
-fi
-
+echo "Formatting..."
 REPO=$(git rev-parse --show-toplevel)
 for f in $(git grep --cached -Il res -- :/*.hpp :/*.cpp); do
     ${CFM} -i ${REPO}/${f}
 done
+echo "...Done"

@@ -27,10 +27,14 @@ using namespace parthenon::package::prelude;
 
 namespace MonopoleGR {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+Real EstimateTimeStep(StateDescriptor *pkg);
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
+Real EstimateTimestepMesh(MeshBlockData<Real> *rc);
 TaskStatus MatterToHost(StateDescriptor *pkg, bool do_vols);
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg);
 TaskStatus LinearSolveForAlpha(StateDescriptor *pkg);
 TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
+TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt);
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 inline void DumpCurrentState(StateDescriptor *pkg) { DumpToTxt("metric-last.dat", pkg); }
 TaskStatus DivideVols(StateDescriptor *pkg);
