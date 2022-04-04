@@ -568,9 +568,6 @@ void SetCachedCoordinateSystem(Data *rc) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         lamb(b, k, j, i, CellLocation::Corn);
       });
-
-  // don't let other kernels launch until geometry is set
-  Kokkos::fence();
 }
 
 } // namespace Geometry
