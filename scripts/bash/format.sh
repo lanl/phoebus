@@ -16,6 +16,7 @@
 
 
 : ${CFM:=clang-format}
+: ${VERBOSE:=0}
 
 if ! command -v ${CFM} &> /dev/null; then
     >&2 echo "Error: No clang format found! Looked for ${CFM}"
@@ -35,6 +36,9 @@ echo "If these differ, results may not be stable."
 echo "Formatting..."
 REPO=$(git rev-parse --show-toplevel)
 for f in $(git grep --cached -Il res -- :/*.hpp :/*.cpp); do
+    if [ ${VERBOSE} -ge 1 ]; then
+       echo ${f}
+    fi
     ${CFM} -i ${REPO}/${f}
 done
 echo "...Done"
