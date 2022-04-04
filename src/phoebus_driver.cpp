@@ -154,7 +154,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   auto &geom_params = geometry->AllParams();
   // tm = SimTime field in EvolutionDriver. See parthenon/src/driver/driver.hpp
   if (geom_params.hasKey("time")) {
-    const Real tstage = tm.time + (stage > 1 ? (integrator->beta[stage-2]) : 0)*tm.dt;
+    const Real tstage = tm.time + (stage > 1 ? (integrator->beta[stage - 2]) : 0) * tm.dt;
     geom_params.Update("time", tstage);
   }
   bool time_dependent_geom = geom_params.Get("time_dependent", false);
