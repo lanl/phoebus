@@ -14,11 +14,15 @@
 // stdlib
 #include <cmath>
 #include <cstdio>
+#include <iostream>
+#include <limits>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <utility>
 
 // Parthenon
+#include <globals.hpp>
 #include <kokkos_abstraction.hpp>
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
@@ -56,6 +60,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("run_n_times", run_n_times);
   int nth_call = 0;
   params.Add("nth_call", nth_call, true); // mutable
+
+  // Time step control. Equivalent to CFL
+  // Empirical. controls
+  Real dtfac = pin->GetOrAddReal("monopole_gr", "dtfac", 0.9);
+  PARTHENON_REQUIRE_THROWS(0 < dtfac && dtfac <= 1., "dtfac must be between 0 and 1");
+  params.Add("dtfac", dtfac);
+
+  // Warn if the change in lapse is too different from dalpha/dt
+  bool warn_on_dt = pin->GetOrAddBoolean("monopole_gr", "warn_on_dt", false);
+  Real dtwarn_eps = pin->GetOrAddReal("monopole_gr", "dtwarn_eps", 1e-5);
+  params.Add("warn_on_dt", warn_on_dt);
+  params.Add("dtwarn_eps", dtwarn_eps);
 
   // Points
   int npoints = pin->GetOrAddInteger("monopole_gr", "npoints", 100);
@@ -100,7 +116,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Matter_t matter_cells("monopole_gr matter grid. cell centered.", NMAT, npoints);
   Volumes_t integration_volumes("monopole_gr matter integration volumes", npoints);
   Hypersurface_t hypersurface("monopole_gr hypersurface grid", NHYPER, npoints);
+
+  // Keep two copies of alpha around... one from this cycle and one
+  // from the last. They'll be swapped every cycle.
   Alpha_t alpha("monopole_gr lapse grid", npoints);
+  Alpha_t alpha_last("monopole_gr lapse grid", npoints);
 
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "monopole_gr initialize grids",
@@ -113,6 +133,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         hypersurface(Hypersurface::K, i) = 0;
         integration_volumes(i) = 0;
         alpha(i) = 1;
+        alpha_last(i) = 1;
       });
 
   // Host mirrors
@@ -148,6 +169,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("hypersurface_h", hypersurface_h);
   params.Add("lapse", alpha);
   params.Add("lapse_h", alpha_h);
+  params.Add("lapse_last", alpha_last);
   // mutable because the reducer is stateful
   params.Add("matter_reducer", matter_reducer, true);
   params.Add("volumes_reducer", volumes_reducer, true);
@@ -164,7 +186,48 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Radius radius(rin, rout, npoints);
   params.Add("radius", radius);
 
+  monopole_gr->EstimateTimestepBlock = EstimateTimestepBlock;
+
   return monopole_gr;
+}
+
+Real EstimateTimeStep(StateDescriptor *pkg) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
+  auto &params = pkg->AllParams();
+  const auto force_static = params.Get<bool>("force_static");
+  if (force_static) {
+    return std::numeric_limits<Real>::max();
+  }
+
+  const auto dtfac = params.Get<Real>("dtfac");
+  const auto npoints = params.Get<int>("npoints");
+  auto alpha = params.Get<Alpha_t>("lapse");
+  auto gradients = params.Get<Gradients_t>("gradients");
+
+  Real min_dt;
+  parthenon::par_reduce(
+      parthenon::loop_pattern_flatrange_tag, "monopole_gr time step",
+      parthenon::DevExecSpace(), 0, npoints - 1,
+      KOKKOS_LAMBDA(const int i, Real &lmin_dt) {
+        Real alpha_tscale =
+            std::abs(robust::ratio(alpha(i), gradients(Gradients::DALPHADT, i)));
+        lmin_dt = std::min(lmin_dt, alpha_tscale);
+      },
+      Kokkos::Min<Real>(min_dt));
+  return dtfac * min_dt;
+}
+
+// Could template this but whatever. I'd only save like 4 lines.
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+  auto pmb = rc->GetParentPointer();
+  StateDescriptor *pkg = pmb->packages.Get("monopole_gr").get();
+  return EstimateTimeStep(pkg);
+}
+Real EstimateTimeStepMesh(MeshData<Real> *rc) {
+  auto pmesh = rc->GetParentPointer();
+  StateDescriptor *pkg = pmesh->packages.Get("monopole_gr").get();
+  return EstimateTimeStep(pkg);
 }
 
 TaskStatus MatterToHost(StateDescriptor *pkg, bool do_vols) {
@@ -353,6 +416,11 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   Kokkos::deep_copy(hypersurface, hypersurface_h);
 
   auto alpha = params.Get<Alpha_t>("lapse");
+
+  // Copy old data from alpha into alpha_last
+  auto alpha_last = params.Get<Alpha_t>("lapse_last");
+  std::swap(alpha, alpha_last);
+
   auto alpha_h = params.Get<Alpha_host_t>("lapse_h");
   Kokkos::deep_copy(alpha, alpha_h);
 
@@ -374,15 +442,16 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
           hypersurface(Hypersurface::K, i) = 0;
         }
 
+        auto mask = !(force_static);
         Real r = radius.x(i);
         Real a = hypersurface(Hypersurface::A, i);
-        Real K = force_static ? 0 : hypersurface(Hypersurface::K, i);
+        Real K = mask * hypersurface(Hypersurface::K, i);
         Real rho = matter(Matter::RHO, i);
         Real j = matter(Matter::J_R, i);
         Real S = matter(Matter::trcS, i);
         Real Srr = matter(Matter::Srr, i);
         Real dadr = ShootingMethod::GetARHS(a, K, r, rho);
-        Real dKdr = force_static ? 0 : ShootingMethod::GetKRHS(a, K, r, j);
+        Real dKdr = mask * ShootingMethod::GetKRHS(a, K, r, j);
 
         Real a2 = a * a;
         Real a3 = a2 * a;
@@ -399,10 +468,9 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
           d2alphadr2 = (alpha(i - 1) + alpha(i + 1) - 2 * alpha(i)) / dr2;
         }
 
-        beta(i) = force_static ? 0 : -0.5 * alpha(i) * r * K;
+        beta(i) = mask * (-0.5 * alpha(i) * r * K);
         Real dbetadr =
-            force_static ? 0
-                         : -0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr);
+            mask * (-0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr));
         Real beta2 = beta(i) * beta(i);
         Real beta3 = beta(i) * beta2;
 
@@ -424,12 +492,48 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
         Real dbetadt = -0.5 * r * (alpha(i) * dKdt + K * dalphadt);
 
         // printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
-        gradients(Gradients::DADT, i) = force_static ? 0 : dadt;
-        gradients(Gradients::DALPHADT, i) = force_static ? 0 : dalphadt;
-        gradients(Gradients::DKDT, i) = force_static ? 0 : dKdt;
-        gradients(Gradients::DBETADT, i) = force_static ? 0 : dbetadt;
+        gradients(Gradients::DADT, i) = mask * dadt;
+        gradients(Gradients::DALPHADT, i) = mask * dalphadt;
+        gradients(Gradients::DKDT, i) = mask * dKdt;
+        gradients(Gradients::DBETADT, i) = mask * dbetadt;
       });
 
+  return TaskStatus::complete;
+}
+
+TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
+  auto &params = pkg->AllParams();
+  auto enabled = params.Get<bool>("enable_monopole_gr");
+  if (!enabled) return TaskStatus::complete;
+
+  auto warn_on_dt = params.Get<bool>("warn_on_dt");
+  if (warn_on_dt && parthenon::Globals::my_rank == 0) {
+    auto alpha = params.Get<Alpha_t>("lapse");
+    auto alpha_last = params.Get<Alpha_t>("lapse_last");
+    auto npoints = params.Get<int>("npoints");
+    auto gradients = params.Get<Gradients_t>("gradients");
+    auto dtwarn_eps = params.Get<Real>("dtwarn_eps");
+
+    Real err;
+    parthenon::par_reduce(
+        parthenon::loop_pattern_flatrange_tag, "monopole_gr check evolution time scales",
+        parthenon::DevExecSpace(), 0, npoints - 1,
+        KOKKOS_LAMBDA(const int i, Real &lmax_err) {
+          Real diff_alpha = (alpha(i) - alpha_last(i)) / dt;
+          Real diff_dalpha = robust::ratio(
+              std::abs(diff_alpha - gradients(Gradients::DALPHADT, i)), alpha(i));
+          lmax_err = std::max(lmax_err, diff_dalpha);
+        },
+        Kokkos::Max<Real>(err));
+    if (err > dtwarn_eps) {
+      std::cerr
+          << "\tWarning! (alpha^i+1 - alpha^i)/dt is very different from dalpha/dt.\n"
+          << "\t\tTolerance set to " << dtwarn_eps << " but value is " << err << "."
+          << std::endl;
+    }
+  }
   return TaskStatus::complete;
 }
 
