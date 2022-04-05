@@ -274,111 +274,113 @@ TaskStatus ReconstructEdgeStates(T *rc) {
 
   // TODO(JCD): par_for_outer doesn't have a 4d loop pattern which is needed for blocks
   parthenon::par_for_outer(
-    DEFAULT_OUTER_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(),
-    0, 0, 0, nrecon+2, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
-    KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int n,
-                  const int k, const int j) {
-      const int b = 0; // this will be replaced by the block arg to the lambda
-      ReconstructionIndexer<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
-      ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
+      DEFAULT_OUTER_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), 0, 0, 0,
+      nrecon + 2, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
+      KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int n, const int k, const int j) {
+        const int b = 0; // this will be replaced by the block arg to the lambda
+        ReconstructionIndexer<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
+        ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
 
-      const VariablePack<Real> &var = (n < nrecon ? v : v_vel);
-      const int var_id = n % nrecon;
-      Real *pv = &var(b, var_id, k, j, 0);
-      Real *pvim1 = pv-1;
-      Real *pvip1 = pv+1;
-      Real *pvjm1 = &var(b, var_id, k, j-dj, 0);
-      Real *pvjp1 = &var(b, var_id, k, j+dj, 0);
-      Real *pvkm1 = &var(b, var_id, k-dk, j, 0);
-      Real *pvkp1 = &var(b, var_id, k+dk, j, 0);
-      Real *vi_l, *vi_r, *vj_l, *vj_r, *vk_l, *vk_r;
-      if (n < nrecon) {
-        vi_l = &ql(0, n, k, j, 1);
-        vi_r = &qr(0, n, k, j, 0);
-        vj_l = &ql(1%ndim, n, k, j+dj, 0);
-        vj_r = &qr(1%ndim, n, k, j, 0);
-        vk_l = &ql(2%ndim, n, k+dk, j, 0);
-        vk_r = &qr(2%ndim, n, k, j, 0);
-      } else {
-        vi_l = &ql_v(0, var_id, k, j, 1);
-        vi_r = &qr_v(0, var_id, k, j, 0);
-        vj_l = &ql_v(1%ndim, var_id, k, j+dj, 0);
-        vj_r = &qr_v(1%ndim, var_id, k, j, 0);
-        vk_l = &ql_v(2%ndim, var_id, k+dk, j, 0);
-        vk_r = &qr_v(2%ndim, var_id, k, j, 0);
-      }
-
-      // TODO(JCD): do we want to enable other recon methods like weno5?
-      // x-direction
-      ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pvim1, pv, pvip1, vi_l, vi_r);
-      // y-direction
-      if (ndim > 1) ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
-      // z-direction
-      if (ndim > 2) ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
-
-      // Calculate spatial derivatives of J at zone faces for diffusion limit
-      //    x-->
-      //    +---+---+
-      //    | a | b |
-      //    +---+---+
-      //    | c Q d |
-      //  ^ +---+---+
-      //  | | e | f |
-      //  y +---+---+
-      //
-      //  dJ/dx (@ Q) = (d - c)/dx
-      //  dJ/dy (@ Q) = (a + b - e - f)/(4*dy)
-      if (n < nspec) {
-        const Real idx = 1.0/coords.Dx(X1DIR, k, j, 0);
-        const Real idx4 = 0.25*idx;
-        const Real idy = 1.0/coords.Dx(X2DIR, k, j, 0);
-        const Real idy4 = 0.25*idy;
-        const Real idz = 1.0/coords.Dx(X3DIR, k, j, 0);
-        const Real idz4 = 0.25*idz;
-        Real *J = &v(b, idx_J(n), k, j, 0);
-        Real *Jjm1 = &v(b, idx_J(n), k, j-dj, 0);
-        Real *Jjp1 = &v(b, idx_J(n), k, j+dj, 0);
-        Real *Jkm1 = &v(b, idx_J(n), k-dk, j, 0);
-        Real *Jkp1 = &v(b, idx_J(n), k+dk, j, 0);
-        Real *Jkp1jm1 = &v(b, idx_J(n), k+dk, j-dj, 0);
-        Real *Jkm1jm1 = &v(b, idx_J(n), k-dk, j-dj, 0);
-        Real *Jkm1jp1 = &v(b, idx_J(n), k-dk, j+dj, 0);
-        // x-direction faces
-        Real *dJdx = &v(b, idx_dJ(n, 0, 0), k, j, 0);
-        Real *dJdy = &v(b, idx_dJ(n, 1, 0), k, j, 0);
-        Real *dJdz = &v(b, idx_dJ(n, 2, 0), k, j, 0);
-        parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ib.e+1,
-          [&](const int i) {
-            dJdx[i] = (J[i] - J[i-1]) * idx;
-            dJdy[i] = (Jjp1[i] + Jjp1[i-1] - Jjm1[i] - Jjm1[i-1]) * idy4;
-            dJdz[i] = (Jkp1[i] + Jkp1[i-1] - Jkm1[i] - Jkm1[i-1]) * idz4;
-          });
-        if (ndim > 1) {
-        // y-direction faces
-        dJdx = &v(b, idx_dJ(n, 0, 1), k, j, 0);
-        dJdy = &v(b, idx_dJ(n, 1, 1), k, j, 0);
-        dJdz = &v(b, idx_dJ(n, 2, 1), k, j, 0);
-        parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ib.e,
-          [&](const int i) {
-            dJdx[i] = (J[i+1] + Jjm1[i+1] - J[i-1] - Jjm1[i-1]) * idx4;
-            dJdy[i] = (J[i] - Jjm1[i]) * idy;
-            dJdz[i] = (Jkp1[i] + Jkp1jm1[i] - Jkm1[i] - Jkm1jm1[i]) * idz4;
-          });
+        const VariablePack<Real> &var = (n < nrecon ? v : v_vel);
+        const int var_id = n % nrecon;
+        Real *pv = &var(b, var_id, k, j, 0);
+        Real *pvim1 = pv - 1;
+        Real *pvip1 = pv + 1;
+        Real *pvjm1 = &var(b, var_id, k, j - dj, 0);
+        Real *pvjp1 = &var(b, var_id, k, j + dj, 0);
+        Real *pvkm1 = &var(b, var_id, k - dk, j, 0);
+        Real *pvkp1 = &var(b, var_id, k + dk, j, 0);
+        Real *vi_l, *vi_r, *vj_l, *vj_r, *vk_l, *vk_r;
+        if (n < nrecon) {
+          vi_l = &ql(0, n, k, j, 1);
+          vi_r = &qr(0, n, k, j, 0);
+          vj_l = &ql(1 % ndim, n, k, j + dj, 0);
+          vj_r = &qr(1 % ndim, n, k, j, 0);
+          vk_l = &ql(2 % ndim, n, k + dk, j, 0);
+          vk_r = &qr(2 % ndim, n, k, j, 0);
+        } else {
+          vi_l = &ql_v(0, var_id, k, j, 1);
+          vi_r = &qr_v(0, var_id, k, j, 0);
+          vj_l = &ql_v(1 % ndim, var_id, k, j + dj, 0);
+          vj_r = &qr_v(1 % ndim, var_id, k, j, 0);
+          vk_l = &ql_v(2 % ndim, var_id, k + dk, j, 0);
+          vk_r = &qr_v(2 % ndim, var_id, k, j, 0);
         }
-        if (ndim > 2) {
-        // z-direction faces
-        dJdx = &v(b, idx_dJ(n, 0, 2), k, j, 0);
-        dJdy = &v(b, idx_dJ(n, 1, 2), k, j, 0);
-        dJdz = &v(b, idx_dJ(n, 2, 2), k, j, 0);
-        parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ib.e,
-          [&](const int i) {
-            dJdx[i] = (J[i+1] + Jkm1[i+1] - J[i-1] - Jkm1[i-1]) * idx4;
-            dJdy[i] = (Jjp1[i] + Jkm1jp1[i] - Jjm1[i] - Jkm1jm1[i]) * idy4;
-            dJdz[i] = (J[i] - Jkm1[i]) * idz;
-          });
+
+        // TODO(JCD): do we want to enable other recon methods like weno5?
+        // x-direction
+        ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
+                                   vi_r);
+        // y-direction
+        if (ndim > 1)
+          ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
+        // z-direction
+        if (ndim > 2)
+          ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
+
+        // Calculate spatial derivatives of J at zone faces for diffusion limit
+        //    x-->
+        //    +---+---+
+        //    | a | b |
+        //    +---+---+
+        //    | c Q d |
+        //  ^ +---+---+
+        //  | | e | f |
+        //  y +---+---+
+        //
+        //  dJ/dx (@ Q) = (d - c)/dx
+        //  dJ/dy (@ Q) = (a + b - e - f)/(4*dy)
+        if (n < nspec) {
+          const Real idx = 1.0 / coords.Dx(X1DIR, k, j, 0);
+          const Real idx4 = 0.25 * idx;
+          const Real idy = 1.0 / coords.Dx(X2DIR, k, j, 0);
+          const Real idy4 = 0.25 * idy;
+          const Real idz = 1.0 / coords.Dx(X3DIR, k, j, 0);
+          const Real idz4 = 0.25 * idz;
+          Real *J = &v(b, idx_J(n), k, j, 0);
+          Real *Jjm1 = &v(b, idx_J(n), k, j - dj, 0);
+          Real *Jjp1 = &v(b, idx_J(n), k, j + dj, 0);
+          Real *Jkm1 = &v(b, idx_J(n), k - dk, j, 0);
+          Real *Jkp1 = &v(b, idx_J(n), k + dk, j, 0);
+          Real *Jkp1jm1 = &v(b, idx_J(n), k + dk, j - dj, 0);
+          Real *Jkm1jm1 = &v(b, idx_J(n), k - dk, j - dj, 0);
+          Real *Jkm1jp1 = &v(b, idx_J(n), k - dk, j + dj, 0);
+          // x-direction faces
+          Real *dJdx = &v(b, idx_dJ(n, 0, 0), k, j, 0);
+          Real *dJdy = &v(b, idx_dJ(n, 1, 0), k, j, 0);
+          Real *dJdz = &v(b, idx_dJ(n, 2, 0), k, j, 0);
+          parthenon::par_for_inner(
+              DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ib.e + 1, [&](const int i) {
+                dJdx[i] = (J[i] - J[i - 1]) * idx;
+                dJdy[i] = (Jjp1[i] + Jjp1[i - 1] - Jjm1[i] - Jjm1[i - 1]) * idy4;
+                dJdz[i] = (Jkp1[i] + Jkp1[i - 1] - Jkm1[i] - Jkm1[i - 1]) * idz4;
+              });
+          if (ndim > 1) {
+            // y-direction faces
+            dJdx = &v(b, idx_dJ(n, 0, 1), k, j, 0);
+            dJdy = &v(b, idx_dJ(n, 1, 1), k, j, 0);
+            dJdz = &v(b, idx_dJ(n, 2, 1), k, j, 0);
+            parthenon::par_for_inner(
+                DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ib.e, [&](const int i) {
+                  dJdx[i] = (J[i + 1] + Jjm1[i + 1] - J[i - 1] - Jjm1[i - 1]) * idx4;
+                  dJdy[i] = (J[i] - Jjm1[i]) * idy;
+                  dJdz[i] = (Jkp1[i] + Jkp1jm1[i] - Jkm1[i] - Jkm1jm1[i]) * idz4;
+                });
+          }
+          if (ndim > 2) {
+            // z-direction faces
+            dJdx = &v(b, idx_dJ(n, 0, 2), k, j, 0);
+            dJdy = &v(b, idx_dJ(n, 1, 2), k, j, 0);
+            dJdz = &v(b, idx_dJ(n, 2, 2), k, j, 0);
+            parthenon::par_for_inner(
+                DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ib.e, [&](const int i) {
+                  dJdx[i] = (J[i + 1] + Jkm1[i + 1] - J[i - 1] - Jkm1[i - 1]) * idx4;
+                  dJdy[i] = (Jjp1[i] + Jkm1jp1[i] - Jjm1[i] - Jkm1jm1[i]) * idy4;
+                  dJdz[i] = (J[i] - Jkm1[i]) * idz;
+                });
+          }
         }
-      }
-    });
+      });
 
   return TaskStatus::complete;
 }

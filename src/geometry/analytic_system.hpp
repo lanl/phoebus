@@ -160,10 +160,10 @@ class Analytic {
   Analytic() = default;
   template <typename... Args>
   Analytic(const Indexer &indexer, Args... args)
-      : indexer_(indexer), system_(std::forward<Args>(args)...) {}
+      : X0_(0), indexer_(indexer), system_(std::forward<Args>(args)...) {}
   template <typename... Args>
   Analytic(Real X0, const Indexer &indexer, Args... args)
-      : X0_(X0_), indexer_(indexer), system_(std::forward<Args>(args)...) {}
+      : X0_(X0), indexer_(indexer), system_(std::forward<Args>(args)...) {}
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
     return system_.Lapse(X0, X1, X2, X3);
