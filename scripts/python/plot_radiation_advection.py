@@ -33,9 +33,11 @@ def BoostedDiffusion(kappa, x0p, v, t0p, J0, x, t):
   return J0*np.sqrt(t0p/tp)*np.exp(-3*kappa*(xp-x0p)**2/(4*tp)) 
 
 parser = argparse.ArgumentParser(description='Plot a boosted diffusion wave.')
+parser.add_argument('-f', '--files', dest='files', nargs='*', default='rad_adv*.phdf', help='List of input Parthenon hdf files to plot')
+parser.add_argument('-o', '--out', dest='out_file', default='rad_adv_J.pdf', help='Plot output file')
 
 # Set the parameters defining the initial conditions 
-# Defaults should be consistent with inputs/radiation_advection.pin 
+# Defaults should be consistent with inputs/radiation_advection.pin  
 parser.add_argument('-v', dest='v', default=0.3, action="store", type=float)
 parser.add_argument('-k', '--kappa', dest='kappa', default=1e3, action="store", type=float, 
                     help='Background opacity in comoving frame')
@@ -44,7 +46,6 @@ parser.add_argument('-s', '--sigma', dest='sigma', default=0.03333, action="stor
 parser.add_argument('--J0', dest='J0', default=1.0, action="store", type=float, 
                     help='Height of pulse at t=t0 in comoving frame')
 
-parser.add_argument('-d', '--dir', dest='dir', default='./', action="store", type=str, help='Directory containing rad_adv*.phdf files') 
 
 parser.add_argument('--savefig', type=bool, default=True, help='Whether to save figure')
 parser.add_argument('--analytic', type=bool, default=True, help='Whether to include analytic boosted diffusion in plot')
@@ -68,10 +69,10 @@ x0p = (0.5 - v*t0)/np.sqrt(1-v*v)
 W = 1/np.sqrt(1-v*v)
 
 # Read in the files 
-base_dir = './'
-work_dir = '/'
-files = sorted(glob.glob(args.dir + 'rad_adv*.phdf'))
-plot_tmax = 100000
+files = [] 
+for file in args.files:
+  files += glob.glob(file)
+files = sorted(files) 
 
 # Find the minimum and maximum times of the data
 minTime = sys.float_info.max
@@ -80,9 +81,7 @@ for file in files:
   dfile = phdf.phdf(file)
   minTime = min([dfile.Time, minTime]) 
   maxTime = max([dfile.Time, maxTime]) 
-
 maxTime = max([maxTime, minTime + 0.01])
-maxTime = min([plot_tmax, maxTime])
 
 # Set up the axes with a time colorbar
 cmap = cm.get_cmap('viridis')
@@ -131,6 +130,6 @@ plt_ax.set_ylim([yl, yh])
 plt_ax.text(0.05*(xh-xl)+xl, 0.95*(xh-xl)+xl, '$\kappa={}$'.format(kappa))
 
 if args.savefig:
-  plt.savefig('rad_adv_J.pdf')
+  plt.savefig(args.out_file)
 else:
   plt.show() 
