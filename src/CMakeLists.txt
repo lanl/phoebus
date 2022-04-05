@@ -33,6 +33,8 @@ add_executable(phoebus
   geometry/boyer_lindquist.cpp
   geometry/cached_system.hpp
   geometry/coordinate_systems.hpp
+  geometry/flrw.hpp
+  geometry/flrw.cpp
   geometry/fmks.hpp
   geometry/fmks.cpp
   geometry/geometry.cpp
@@ -74,6 +76,7 @@ add_executable(phoebus
   pgen/advection.cpp
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
+  pgen/friedmann.cpp
   pgen/homogeneous_sphere.cpp
   pgen/kh.cpp
   pgen/leptoneq.cpp
