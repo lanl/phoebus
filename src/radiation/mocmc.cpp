@@ -20,6 +20,7 @@
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
 #include "closure.hpp"
+#include "closure_mocmc.hpp"
 #include "geodesics.hpp"
 #include "kd_grid.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -382,40 +383,41 @@ TaskStatus MOCMCReconstruction(T *rc) {
   auto mocmc_recon = rad->Param<MOCMCRecon>("mocmc_recon");
 
   // Hack in hohlraum boundaries here
-  pmb->par_for("Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
-    KOKKOS_LAMBDA(const int n) {
-      if (swarm_d.IsActive(n)) {
+  pmb->par_for(
+      "Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
+      KOKKOS_LAMBDA(const int n) {
+        if (swarm_d.IsActive(n)) {
 
-        if (x(n) < swarm_d.x_min_global_) {
-          // Reflect particle across boundary
-          x(n) = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x(n));
-          ncov(1, n) = -ncov(1, n);
+          if (x(n) < swarm_d.x_min_global_) {
+            // Reflect particle across boundary
+            x(n) = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x(n));
+            ncov(1, n) = -ncov(1, n);
 
-          // Reset intensities
-          for (int nubin = 0; nubin < nu_bins; nubin++) {
-            for (int s = 0; s < num_species; s++) {
-              Inuinv(nubin, s, n) = robust::SMALL();
+            // Reset intensities
+            for (int nubin = 0; nubin < nu_bins; nubin++) {
+              for (int s = 0; s < num_species; s++) {
+                Inuinv(nubin, s, n) = robust::SMALL();
+              }
             }
           }
-        }
 
-        if (x(n) > swarm_d.x_max_global_) {
-          // Reflect particle across boundary
-          x(n) = swarm_d.x_max_global_ - (x(n) - swarm_d.x_max_global_);
-          ncov(1, n) = -ncov(1, n);
+          if (x(n) > swarm_d.x_max_global_) {
+            // Reflect particle across boundary
+            x(n) = swarm_d.x_max_global_ - (x(n) - swarm_d.x_max_global_);
+            ncov(1, n) = -ncov(1, n);
 
-          // Reset intensities
-          for (int nubin = 0; nubin < nu_bins; nubin++) {
-            for (int s = 0; s < num_species; s++) {
-              Inuinv(nubin, s, n) = robust::SMALL();
+            // Reset intensities
+            for (int nubin = 0; nubin < nu_bins; nubin++) {
+              for (int s = 0; s < num_species; s++) {
+                Inuinv(nubin, s, n) = robust::SMALL();
+              }
             }
           }
-        }
 
-        bool on_current_mesh_block = true;
-        swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
-      }
-    });
+          bool on_current_mesh_block = true;
+          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+        }
+      });
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
@@ -498,7 +500,8 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
   auto &ncov = swarm->template Get<Real>("ncov").Get();
   auto swarm_d = swarm->GetDeviceContext();
 
-  printf("num_active: %i max_active_index: %i\n", swarm->GetNumActive(), swarm->GetMaxActiveIndex());
+  printf("num_active: %i max_active_index: %i\n", swarm->GetNumActive(),
+         swarm->GetMaxActiveIndex());
 
   pmb->par_for(
       "MOCMC::Transport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
@@ -637,8 +640,9 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const Real TIME = unit_conv.GetTimeCodeToCGS();
 
   std::vector<std::string> variables{
-      pr::J,  pr::H,     pf::density, pf::energy, pf::velocity, pf::temperature,
-      pf::ye, ir::tilPi, im::dnsamp,  im::Inu0,   im::Inu1};
+      cr::E,      cr::F,        pr::J,           pr::H,  pf::density,
+      pf::energy, pf::velocity, pf::temperature, pf::ye, ir::tilPi,
+      im::dnsamp, im::Inu0,     im::Inu1};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -652,6 +656,8 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const auto Inu0 = imap.GetFlatIdx(im::Inu0);
   const auto Inu1 = imap.GetFlatIdx(im::Inu1);
   const auto iTilPi = imap.GetFlatIdx(ir::tilPi);
+  auto idx_E = imap.GetFlatIdx(cr::E);
+  auto idx_F = imap.GetFlatIdx(cr::F);
 
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
   const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
@@ -671,35 +677,73 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
     species_d[s] = species[s];
   }
 
+  const int iblock = 0; // No meshblockpacks right now
+  int nspec = idx_E.DimSize(1);
+
+  /// TODO: (LFR) Fix this junk
+  RadiationType dev_species[3] = {species[0], species[1], species[2]};
+
   if (true) { // update = lagged
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
         jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
-          const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
-                                // Set up the background state
-                                /*Vec con_v{{v(iblock, pv(0), k, j, i),
-                                           v(iblock, pv(1), k, j, i),
-                                           v(iblock, pv(2), k, j, i)}};
-                                Tens2 cov_gamma;
-                                geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
-                                Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
-                                Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-                                LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
+          for (int ispec = 0; ispec < nspec; ++ispec) {
+            const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+            const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
 
-                                /// TODO: (LFR) Move beyond Eddington for this update
-                                ClosureMOCMC<Vec, Tens2> c(con_v, &g);
+            // Set up the background state
+            Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                       v(iblock, pv(2), k, j, i)}};
+            Tens2 cov_gamma;
+            geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+            Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
+            Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
+            LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
+            Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+            Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
+                          v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
+                          v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
+            Tens2 con_tilPi;
+            SPACELOOP2(ii, jj) {
+              con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+            }
+            Real JBB =
+                opac_d.ThermalDistributionOfT(v(iblock, pT, k, j, i), dev_species[ispec]);
 
-                                Real dE = 0;
-                                Real cov_dF[3] = {0};
-                                auto status = c.LinearSourceUpdate(Estar, cov_Fstart, con_tilPi, JBB, tauJ,
-                                tauH, *dE, cov_dF);
-                      */
-                                // Update E, F
+            Real tauJ = 0.;
+            Real tauH = 0.;
 
-          // Update samples
+            ClosureMOCMC<Vec, Tens2> c(con_v, &g);
 
-          // Recalculate pi
+            Real dE = 0;
+            Vec cov_dF;
+            auto status = c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ,
+                                               tauH, &dE, &cov_dF);
+
+            // Update E, F
+
+            // Update samples
+            // Calculate Inu0
+            for (int bin = 0; bin < nu_bins; bin++) {
+              v(iblock, Inu0(ispec, bin), k, j, i) = 0.;
+            }
+            for (int n = 0; n < nsamp; n++) {
+              const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+              const Real dOmega = (mu_hi(nswarm) - mu_lo(nswarm)) *
+                                  (phi_hi(nswarm) - phi_lo(nswarm)) / (4. * M_PI);
+              for (int bin = 0; bin < nu_bins; bin++) {
+                v(iblock, Inu0(ispec, bin), k, j, i) +=
+                    Inuinv(bin, ispec, nswarm) * pow(nusamp(bin), 3) * dOmega;
+              }
+            }
+
+            // Calculate effective scattering emissivity
+
+            // Recalculate pi
+
+            printf("HERE!\n");
+            exit(-1);
+          }
         });
   } else {
 
@@ -828,17 +872,6 @@ TaskStatus MOCMCEddington(T *rc) {
           v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
           v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
           v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
-        }
-
-        for (int s = 0; s < num_species; s++) {
-          for (int ii = 0; ii < 3; ii++) {
-            for (int jj = ii; jj < 3; jj++) {
-              if (isnan(v(iTilPi(s, ii, jj), k, j, i))) {
-                printf("nsamp: %i\n", nsamp);
-                printf("NAN pi! %i %i %i %i %i %i\n", s, ii, jj, k, j, i);
-              }
-            }
-          }
         }
       });
   /*Real Iold = 0.;
