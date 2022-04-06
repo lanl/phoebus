@@ -381,6 +381,42 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
   auto mocmc_recon = rad->Param<MOCMCRecon>("mocmc_recon");
 
+  // Hack in hohlraum boundaries here
+  pmb->par_for("Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
+    KOKKOS_LAMBDA(const int n) {
+      if (swarm_d.IsActive(n)) {
+
+        if (x(n) < swarm_d.x_min_global_) {
+          // Reflect particle across boundary
+          x(n) = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x(n));
+          ncov(1, n) = -ncov(1, n);
+
+          // Reset intensities
+          for (int nubin = 0; nubin < nu_bins; nubin++) {
+            for (int s = 0; s < num_species; s++) {
+              Inuinv(nubin, s, n) = robust::SMALL();
+            }
+          }
+        }
+
+        if (x(n) > swarm_d.x_max_global_) {
+          // Reflect particle across boundary
+          x(n) = swarm_d.x_max_global_ - (x(n) - swarm_d.x_max_global_);
+          ncov(1, n) = -ncov(1, n);
+
+          // Reset intensities
+          for (int nubin = 0; nubin < nu_bins; nubin++) {
+            for (int s = 0; s < num_species; s++) {
+              Inuinv(nubin, s, n) = robust::SMALL();
+            }
+          }
+        }
+
+        bool on_current_mesh_block = true;
+        swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+      }
+    });
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
       ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -467,6 +503,8 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
   pmb->par_for(
       "MOCMC::Transport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
+          Real y0 = y(n);
+          Real z0 = z(n);
           PushParticle(t(n), x(n), y(n), z(n), ncov(0, n), ncov(1, n), ncov(2, n),
                        ncov(3, n), dt, geom);
 
@@ -745,6 +783,7 @@ TaskStatus MOCMCEddington(T *rc) {
         }
         Real energy[MAX_SPECIES] = {0.0};
         const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+
         for (int n = 0; n < nsamp; n++) {
           const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
 
@@ -756,9 +795,6 @@ TaskStatus MOCMCEddington(T *rc) {
               I[s] += Inuinv(nubin, s, nswarm) * pow(nusamp(nubin), 3);
             }
           }
-          // if (i == 10) {
-          //  printf("I: %e %e %e\n", I[0], I[1], I[2]);
-          //}
 
           Real wgts[6];
           kdgrid::integrate_ninj_domega_quad(mu_lo(nswarm), mu_hi(nswarm), phi_lo(nswarm),
@@ -776,16 +812,33 @@ TaskStatus MOCMCEddington(T *rc) {
                          (phi_hi(nswarm) - phi_lo(nswarm)) * I[s];
           }
         }
+
+        if (nsamp > 0) {
+          for (int s = 0; s < num_species; s++) {
+            for (int ii = 0; ii < 3; ii++) {
+              for (int jj = ii; jj < 3; jj++) {
+                v(iTilPi(s, ii, jj), k, j, i) /= energy[s];
+              }
+              v(iTilPi(s, ii, ii), k, j, i) -= 1. / 3.;
+            }
+          }
+        }
+
+        for (int s = 0; s < num_species; s++) {
+          v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
+          v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
+          v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
+        }
+
         for (int s = 0; s < num_species; s++) {
           for (int ii = 0; ii < 3; ii++) {
             for (int jj = ii; jj < 3; jj++) {
-              v(iTilPi(s, ii, jj), k, j, i) /= energy[s];
+              if (isnan(v(iTilPi(s, ii, jj), k, j, i))) {
+                printf("nsamp: %i\n", nsamp);
+                printf("NAN pi! %i %i %i %i %i %i\n", s, ii, jj, k, j, i);
+              }
             }
-            v(iTilPi(s, ii, ii), k, j, i) -= 1. / 3.;
           }
-          // v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
-          // v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
-          // v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
         }
       });
   /*Real Iold = 0.;

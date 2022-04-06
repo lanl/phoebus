@@ -22,6 +22,7 @@
 #include "pgen/pgen.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
+#include "radiation/radiation.hpp"
 
 int main(int argc, char *argv[]) {
   parthenon::ParthenonManager pman;
@@ -63,8 +64,11 @@ int main(int argc, char *argv[]) {
   } else if (ix1_bc == "outflow") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
         Boundaries::OutflowInnerX1;
+    //pman.app_input->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x1] =
+    //    Boundaries::SetSwarmIX1Outflow;
+    // TODO(BRR) only for MOCMC
     pman.app_input->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x1] =
-        Boundaries::SetSwarmIx1Outflow;
+        radiation::SetSwarmNoWorkBC;
   } // else, parthenon periodic boundaries
   if (ox1_bc == "reflect") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
@@ -72,8 +76,11 @@ int main(int argc, char *argv[]) {
   } else if (ox1_bc == "outflow") {
     pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
         Boundaries::OutflowOuterX1;
+    //pman.app_input->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x1] =
+    //    Boundaries::SetSwarmOX1Outflow;
+    // TODO(BRR) Only for MOCMC
     pman.app_input->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-        Boundaries::SetSwarmOx1Outflow;
+        radiation::SetSwarmNoWorkBC;
   } // else, parthenon periodic boundaries
 
   phoebus::ProblemModifier(pman.pinput.get());

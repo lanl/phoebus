@@ -127,8 +127,14 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
-        if (std::isnan(J) || std::isnan(covH(0)))
+        if (std::isnan(J) || std::isnan(covH(0))) {
+          printf("E: %e covF: %e %e %e pi: %e %e %e %e %e %e %e %e %e\n",
+            E, covF(0), covF(1), covF(2),
+            conTilPi(0,0), conTilPi(0,1), conTilPi(0,2),
+            conTilPi(1,0), conTilPi(1,1), conTilPi(1,2),
+            conTilPi(2,0), conTilPi(2,1), conTilPi(2,2));
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
+        }
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
