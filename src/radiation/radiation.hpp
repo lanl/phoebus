@@ -16,9 +16,11 @@
 
 #include "Kokkos_Random.hpp"
 
+#include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
-#include <utils/error_checking.hpp>
+using namespace parthenon::driver::prelude;
 using namespace parthenon::package::prelude;
+using namespace parthenon;
 
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
@@ -30,11 +32,7 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 
-#include <parthenon/driver.hpp>
-#include <parthenon/package.hpp>
-using namespace parthenon::driver::prelude;
-using namespace parthenon::package::prelude;
-using namespace parthenon;
+#include "radiation/mocmc.hpp"
 
 using namespace phoebus;
 
