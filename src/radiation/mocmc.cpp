@@ -741,8 +741,8 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
             // Recalculate pi
 
-            printf("HERE!\n");
-            exit(-1);
+            //printf("HERE!\n");
+            //exit(-1);
           }
         });
   } else {
