@@ -259,17 +259,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
         Real shift[NDSPACE];
         geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
-        Real ucon[NDFULL] = {Gamma/alpha, // alpha = 1 in Minkowski
-                             v(ivlo, k, j, i) - Gamma*shift[0]/alpha,  // beta^i = 0 in Minkowski
-                             v(ivlo+1, k, j, i) - Gamma*shift[1]/alpha,
-                             v(ivlo+2, k, j, i) - Gamma*shift[2]/alpha};
+        Real ucon[NDFULL] = {Gamma, // alpha = 1 in Minkowski
+                             v(ivlo, k, j, i),  // beta^i = 0 in Minkowski
+                             v(ivlo+1, k, j, i),
+                             v(ivlo+2, k, j, i)};
         Real Bdotv = 0.0;
         for(int d = ib_lo; d <= ib_hi; d++){
           Bdotv += v(d, k, j, i) * v(ivlo + d - ib_lo, k, j, i)/Gamma;
         }
-        Real bcon[NDFULL] = {Gamma*Bdotv/alpha, 0.0,0.0,0.0};
+        Real bcon[NDFULL] = {Gamma*Bdotv, 0.0,0.0,0.0};
         for(int d =ib_lo; d <= ib_hi; d++){
-          bcon[d-ib_lo+1] = (v(d, k, j, i) + alpha*bcon[0]*ucon[d-ib_lo+1]) / Gamma;
+          bcon[d-ib_lo+1] = (v(d, k, j, i) + bcon[0]*ucon[d-ib_lo+1]) / Gamma;
         }
         Real J[NDFULL][NDFULL] = {0};
         if (is_snake) {
