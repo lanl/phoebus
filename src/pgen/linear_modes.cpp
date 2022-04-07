@@ -295,13 +295,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           bcon_transformed[mu] += J[mu][nu]*bcon[nu];
         }
 
-        const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
-        Gamma = lapse * ucon_transformed[0];
-        v(ivlo, k, j, i) = ucon_transformed[1] + Gamma*shift[0]/lapse;
-        v(ivlo+1, k, j, i) = ucon_transformed[2] + Gamma*shift[1]/lapse;
-        v(ivlo+2, k, j, i) = ucon_transformed[3] + Gamma*shift[2]/lapse;
+        Gamma = alpha * ucon_transformed[0];
+        v(ivlo, k, j, i) = ucon_transformed[1] + Gamma*shift[0]/alpha;
+        v(ivlo+1, k, j, i) = ucon_transformed[2] + Gamma*shift[1]/alpha;
+        v(ivlo+2, k, j, i) = ucon_transformed[3] + Gamma*shift[2]/alpha;
         for(int d = ib_lo; d <= ib_hi; d++){
-          v(d, k, j, i) = bcon_transformed[d-ib_lo+1]*Gamma - lapse*bcon_transformed[0]*ucon_transformed[d-ib_lo+1];
+          v(d, k, j, i) = bcon_transformed[d-ib_lo+1]*Gamma - alpha*bcon_transformed[0]*ucon_transformed[d-ib_lo+1];
         }
       }
     });
