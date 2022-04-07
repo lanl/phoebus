@@ -99,17 +99,17 @@ class StressEnergyTensorCon {
     Real beta[ND - 1];
     Real Bdotv = 0.0;
     Real Bsq = 0.0;
-    auto gcov = reinterpret_cast<Real(*)[3]>(&gscratch[0][0]);
-    system_.Metric(loc, std::forward<Args>(args)..., gcov);
+    auto gammacov = reinterpret_cast<Real(*)[3]>(&gscratch[0][0]);
+    system_.Metric(loc, std::forward<Args>(args)..., gammacov);
     Real vp[3] = {v_(1, std::forward<Args>(args)...), v_(2, std::forward<Args>(args)...),
                   v_(3, std::forward<Args>(args)...)};
-    const Real W = phoebus::GetLorentzFactor(vp, gcov);
+    const Real W = phoebus::GetLorentzFactor(vp, gammacov);
 
     SPACELOOP2(ii, jj) {
       const Real &bi = b_(ii + 1, std::forward<Args>(args)...);
       const Real &bj = b_(jj + 1, std::forward<Args>(args)...);
-      Bdotv += bi * (vp[jj] / W) * gcov[ii][jj];
-      Bsq += bi * bj * gcov[ii][jj];
+      Bdotv += bi * (vp[jj] / W) * gammacov[ii][jj];
+      Bsq += bi * bj * gammacov[ii][jj];
     }
     const Real iW = robust::ratio(1., W);
 
