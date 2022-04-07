@@ -78,6 +78,25 @@
   beta^r = -(1/2) alpha r K^r_r
 
 
+  USING DENSITIZED CONSERVED VARS
+  --------------------------------
+
+  If we define:
+
+    rhob = sqrt(gamma) (tau + D)
+    Srb  = sqrt(gamma) S_r
+
+  then we can rewrite the eqns for a and K as
+
+  da/dr = a (4 - 4 a^2 + 3 a^2 (r K^r_r)^2 + 32 pi rhob)/(8 r)
+
+  d K^r_r = (8 pi Srb/a - 3 r K^r_r)/(r^2)
+
+  and the equation for alpha as
+
+  a^2 r alpha ((3/2) (K^r_r)^2 + 4 pi ((rho/(a r^2) + S)) +
+  ((1/a)(da/dr)r-2)dalpha/dr
+
   BOUNDARY CONDITIONS
   -------------------
   at r = 0:
@@ -145,7 +164,14 @@
 
   sqrt(g) rho    = tau + D
   sqrt(g) j^i    = S^i
-  Trc(S) = (rho_0 h + b^2)W^2 + 3(P + b^2/2) - b^i b_i
+  Trc(S) = (tau + D) + 3 P + b^2 - (rho + u) - (P b)^i (P b)_i
+  S^r_r  = tau + D + P - (rho + u) - (P b)^i (P b)_i
+
+  where
+
+  (P b)^i = P^i_mu b^mu
+
+  is the projection of the magnetic four-vector onto the hypersurface.
 
   In case of no B fields,
 

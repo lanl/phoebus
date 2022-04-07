@@ -64,6 +64,9 @@ jobs:
             ./linear_modes.py --executable build_minkowski_debug/src/phoebus
             ./thincooling.py --executable build_minkowski_debug/src/phoebus
             ./thincooling_coolingfunction.py --executable build_minkowski_debug/src/phoebus
+
+            # Custom builds
+            ./friedmann.py
         - name: Build code for unit testing
           run: |
             mkdir build

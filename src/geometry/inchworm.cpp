@@ -44,6 +44,9 @@ template <>
 void SetGeometry<InchwormMeshBlock>(MeshBlockData<Real> *rc) {}
 
 template <>
+void SetGeometry<InchwormMesh>(MeshData<Real> *rc) {}
+
+template <>
 InchwormMeshBlock GetCoordinateSystem<InchwormMeshBlock>(MeshBlockData<Real> *rc) {
   auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
@@ -76,5 +79,8 @@ template <>
 void SetGeometry<CInchwormMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<InchwormMeshBlock>(rc);
 }
-
+template <>
+void SetGeometry<CInchwormMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<InchwormMesh>(rc);
+}
 } // namespace Geometry
