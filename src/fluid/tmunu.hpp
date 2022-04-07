@@ -118,7 +118,7 @@ class StressEnergyTensorCon {
     u[0] = robust::ratio(W, std::abs(alpha));
     b[0] = u[0] * Bdotv;
     for (int l = 1; l < ND; ++l) {
-      u[l] = vp[l-1] - u[0] * beta[l - 1];
+      u[l] = vp[l - 1] - u[0] * beta[l - 1];
       b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha * b[0] * u[l]);
     }
 
