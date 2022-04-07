@@ -54,26 +54,33 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
     Bsq += gcov[ii + 1][jj + 1] * b[ii] * b[jj];
     Bdotv += gcov[ii + 1][jj + 1] * b[ii] * v[jj];
   }
-  Real bcon[] = {W * Bdotv / alpha, 0.0, 0.0, 0.0};
-  SPACELOOP(m) { bcon[m + 1] = b[m] * iW + Bdotv * W * (v[m] - beta[m] / alpha); }
-  const Real bsq = (Bsq + alpha * alpha * bcon[0] * bcon[0]) * iW * iW;
-  Real bcov[3] = {0.0, 0.0, 0.0};
+  const Real b0 = W * Bdotv;
+  Real Bcov[3], vcov[3];
   SPACELOOP(m) {
-    SPACETIMELOOP(n) { bcov[m] += gcov[m + 1][n] * bcon[n]; }
+    Bcov[m] = 0.0;
+    vcov[m] = 0.0;
+    SPACELOOP(n) {
+      Bcov[m] += gcov[m+1][n+1] * b[n];
+      vcov[m] *= gcov[m+1][n+1] * v[n];
+    }
   }
+  Real bcov[3];
+  SPACELOOP(m) {
+    bcov[m] = Bcov[m]*iW + W * Bdotv * vcov[m];
+  }
+
+  const Real bsq = Bsq * iW * iW + Bdotv*Bdotv;
 
   D = gdet * rho * W;
 
   const Real rho_rel = (rho + u + p + bsq) * W * W;
   SPACELOOP(m) {
-    Real vcov = 0.0;
-    SPACELOOP(n) { vcov += gcov[m + 1][n + 1] * v[n]; }
-    S[m] = gdet * (rho_rel * vcov - alpha * bcon[0] * bcov[m]);
+    S[m] = gdet * (rho_rel * vcov[m] - b0 * bcov[m]);
     bcons[m] = gdet * b[m];
   }
 
 #if USE_VALENCIA
-  tau = gdet * (rho_rel - (p + 0.5 * bsq) - alpha * alpha * bcon[0] * bcon[0]) - D;
+  tau = gdet * (rho_rel - (p + 0.5 * bsq) - b0*b0) - D;
 #else
   Real ucon[4] = {W / alpha, vp[0] - beta[0] * W / alpha, vp[1] - beta[1] * W / alpha,
                   vp[2] - beta[2] * W / alpha};
