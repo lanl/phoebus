@@ -121,8 +121,7 @@ class FluxState {
       for (int m = 0; m < 3; m++)
         vcon[m] *= scale;
     }
-    const Real iW = sqrt(1 - vsq);
-    W = 1.0 / iW;
+    W = 1.0 / sqrt(1 - vsq);
 
     const Real vtil = vel - g.beta[dir] / g.alpha;
 
@@ -137,29 +136,24 @@ class FluxState {
     }
 
     Real b0 = W * Bdotv; // this is really b0*alpha
-    const Real bsq = (BdotB + b0 * b0) * iW * iW;
-    Real Bcov[3], vcov[3];
-    SPACELOOP(m) {
-      Bcov[m] = 0.0;
-      vcov[m] = 0.0;
-      SPACELOOP(n) {
-        Bcov[m] += g.gcov[m+1][n+1] * Bcon[n];
-        vcov[m] *= g.gcov[m+1][n+1] * vcon[n];
-      }
-    }
-    Real bcov[3];
-    SPACELOOP(m) {
-      bcov[m] = Bcov[m] * iW + W * Bdotv * vcov[m];
-    }
+    const Real bsq = (BdotB + b0 * b0) / (W * W);
 
     // conserved momentum
     const Real rhohWsq = (rho + u + P) * W * W;
     const Real bsqWsq = bsq * W * W;
 
     for (int m = 0; m < 3; m++) {
-      U[cmom_lo + m] = (rhohWsq + bsqWsq) * vcov[m] - b0 * bcov[m];
+      Real bcovm = g.gcov[m + 1][0] * b0 / g.alpha;
+      Real vcovm = 0.0;
+      for (int n = 1; n < 4; n++) {
+        bcovm += g.gcov[m + 1][n] *
+                 (Bcon[n - 1] / W + b0 * (vcon[n - 1] - g.beta[n - 1] / g.alpha));
+        vcovm += g.gcov[m + 1][n] * vcon[n - 1];
+      }
+
+      U[cmom_lo + m] = (rhohWsq + bsqWsq) * vcovm - b0 * bcovm;
       F[cmom_lo + m] =
-          U[cmom_lo + m] * vtil + (P + 0.5 * bsq) * Delta(dir, m) - bcov[m] * Bcon[dir] * iW;
+          U[cmom_lo + m] * vtil + (P + 0.5 * bsq) * Delta(dir, m) - bcovm * Bcon[dir] / W;
     }
 
 // energy
@@ -200,6 +194,7 @@ class FluxState {
                                                 (g.gdd * (1.0 - vsq * cmsq) - vel * v0)));
     vp = vcoff * (v0 + vpm) - g.beta[dir];
     vm = vcoff * (v0 - vpm) - g.beta[dir];
+
   }
 
   const VariableFluxPack<Real> v;
