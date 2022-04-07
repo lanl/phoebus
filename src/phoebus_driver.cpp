@@ -346,10 +346,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (rad_mocmc_active) {
       auto impl_update = tl.AddTask(update, radiation::MOCMCFluidSource<MeshData<Real>>,
                                     sc1.get(), beta * dt, fluid_active);
-      // for (int nblock = 0; nblock sc1.NumBlocks(); nblock++) {
-      //  auto &mbd = sc1.GetBlockData(nblock);
-      //  auto impl_update =
-      //}
       update = impl_update | update;
     } else if (rad_moments_active) {
       auto impl_update = tl.AddTask(update, radiation::MomentFluidSource<MeshData<Real>>,
