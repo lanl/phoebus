@@ -755,8 +755,8 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                   opac_d.AngleAveragedAbsorptionCoefficient(
                       v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                       v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin) * TIME) *
-                  v(iblock, Inu0(ispec, bin), k, j, i);
-              Itot += v(iblock, Inu0(ispec, bin), k, j, i);
+                  v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin)*TIME;
+              Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin)*TIME;
             }
 
             // Trapezoidal rule
@@ -764,15 +764,15 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                       opac_d.AngleAveragedAbsorptionCoefficient(
                           v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                           v(iblock, pye, k, j, i), dev_species[ispec], nusamp(0) * TIME) *
-                      v(iblock, Inu0(ispec, 0), k, j, i);
+                      v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0)*TIME;
             kappaJ -= 0.5 *
                       opac_d.AngleAveragedAbsorptionCoefficient(
                           v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                           v(iblock, pye, k, j, i), dev_species[ispec],
                           nusamp(nu_bins - 1) * TIME) *
-                      v(iblock, Inu0(ispec, nu_bins - 1), k, j, i);
-            Itot -= 0.5 * (v(iblock, Inu0(ispec, 0), k, j, i) +
-                           v(iblock, Inu0(ispec, nu_bins - 1), k, j, i));
+                      v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1)*TIME;
+            Itot -= 0.5 * (v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0)*TIME +
+                           v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1)*TIME);
             kappaJ = robust::ratio(kappaJ, Itot);
             kappaH = kappaJ;
             kappaJ *= (1. - scattering_fraction);
@@ -806,23 +806,28 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             for (int n = 0; n < nsamp; n++) {
               const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
               for (int bin = 0; bin < nu_bins; bin++) {
-                // Reset sample intensities to mean
-                // Inuinv(bin, ispec, nswarm) =
-                //    v(iblock, Inu0(ispec, bin), k, j, i) / pow(nusamp(bin), 3);
-
-                // Calculate effective scattering emissivity
-                const Real nu = nusamp(bin)*TIME;
+                const Real nu = nusamp(bin) * TIME;
                 const Real ds = dt / nu;
+                const Real alphainv_a =
+                    nu * (1. - scattering_fraction) *
+                    opac_d.AngleAveragedAbsorptionCoefficient(
+                        v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                        v(iblock, pye, k, j, i), dev_species[ispec], nu);
                 const Real alphainv_s =
                     nu * scattering_fraction *
                     opac_d.AngleAveragedAbsorptionCoefficient(
                         v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                         v(iblock, pye, k, j, i), dev_species[ispec], nu);
+                const Real jinv_a = opac_d.ThermalDistributionOfT(v(iblock, pT, k, j, i),
+                                                                  dev_species[ispec]) /
+                                    (nu * nu * nu) * alphainv_a;
+                // Calculate effective scattering emissivity from angle-averaged intensity
+                // TODO(BRR) include dI/ds in this calculation for inelastic scattering
                 const Real jinv_s =
                     v(iblock, Inu0(ispec, bin), k, j, i) / (nu * nu * nu) * alphainv_s;
-                    Real TEMPOLD = Inuinv(bin, ispec, nswarm);
                 Inuinv(bin, ispec, nswarm) =
-                    (Inuinv(bin, ispec, nswarm) + ds * jinv_s) / (1. + ds * alphainv_s);
+                    (Inuinv(bin, ispec, nswarm) + ds * (jinv_a + jinv_s)) /
+                    (1. + ds * (alphainv_a + alphainv_s));
               }
             }
           }
@@ -924,7 +929,7 @@ TaskStatus MOCMCEddington(T *rc) {
           Real I[MAX_SPECIES] = {0.0};
           for (int nubin = 0; nubin < nu_bins; nubin++) {
             for (int s = 0; s < num_species; s++) {
-              I[s] += Inuinv(nubin, s, nswarm) * pow(nusamp(nubin), 3);
+              I[s] += Inuinv(nubin, s, nswarm) * pow(nusamp(nubin), 4);
             }
           }
 
@@ -960,17 +965,6 @@ TaskStatus MOCMCEddington(T *rc) {
           v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
           v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
           v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
-        }
-
-        if (i == 5) {
-          printf("PIJ:\n");
-          SPACELOOP(ii)
-          {
-            SPACELOOP(jj){
-              printf("%e  ", v(iTilPi(0, ii, jj), k, j, i));
-            }
-            printf("\n");
-          }
         }
       });
   /*Real Iold = 0.;
