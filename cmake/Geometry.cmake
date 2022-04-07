@@ -22,6 +22,7 @@ set(PHOEBUS_ANALYTIC_GEOMETRIES
     "SphericalMinkowski"
     "BoyerLindquist"
     "SphericalKerrSchild"
+    "FLRW"
     "FMKS"
     "Snake"
     "Inchworm"

@@ -14,23 +14,31 @@
 # publicly and display publicly, and to permit others to do so.
 #------------------------------------------------------------------------------
 
-: ${CFM:=$(command -v clang-format)}
 
-if ! command -v clang-format &> /dev/null; then
-    >&2 echo "Error: No clang format found!"
+: ${CFM:=clang-format}
+: ${VERBOSE:=0}
+
+if ! command -v ${CFM} &> /dev/null; then
+    >&2 echo "Error: No clang format found! Looked for ${CFM}"
     exit 1
+else
+    CFM=$(command -v ${CFM})
+    echo "Clang format found: ${CFM}"
 fi
 
 # clang format major version
 TARGET_CF_VRSN=12
-CF_VRSN=$(${CFM} --version | cut -d ' ' -f 4 | cut -d '.' -f 1)
+CF_VRSN=$(${CFM} --version)
+echo "Note we assume clang format version ${TARGET_CF_VRSN}."
+echo "You are using ${CF_VRSN}."
+echo "If these differ, results may not be stable."
 
-if [ "${CF_VRSN}" != "${TARGET_CF_VRSN}" ]; then
-    >&2 echo "Warning! Your clang format version ${CF_VRSN} is not the same as the pinned version ${TARGET_CF_VRSN}."
-    >&2 echo "Results may be unstable."
-fi
-
+echo "Formatting..."
 REPO=$(git rev-parse --show-toplevel)
-for f in $(git grep --cached -Il res -- :/*.hpp :/*.cpp); do
+for f in $(git grep --untracked -ail res -- :/*.hpp :/*.cpp); do
+    if [ ${VERBOSE} -ge 1 ]; then
+       echo ${f}
+    fi
     ${CFM} -i ${REPO}/${f}
 done
+echo "...Done"

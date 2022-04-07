@@ -33,6 +33,8 @@ namespace Geometry {
 
 template <>
 void SetGeometry<MinkowskiMeshBlock>(MeshBlockData<Real> *rc) {}
+template <>
+void SetGeometry<MinkowskiMesh>(MeshData<Real> *rc) {}
 
 template <>
 MinkowskiMeshBlock GetCoordinateSystem<MinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
@@ -61,5 +63,8 @@ template <>
 void SetGeometry<CMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<MinkowskiMeshBlock>(rc);
 }
-
+template <>
+void SetGeometry<CMinkowskiMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<MinkowskiMesh>(rc);
+}
 } // namespace Geometry

@@ -20,7 +20,7 @@
 
 namespace PhoebusReconstruction {
 
-enum class ReconType { linear, weno5z, weno5a, mp5 };
+enum class ReconType { constant, linear, weno5z, mp5 };
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real koren(const Real dm, const Real dp) {
@@ -29,7 +29,7 @@ Real koren(const Real dm, const Real dp) {
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
-Real mc(const Real dm, const Real dp) {
+Real mc_lim(const Real dm, const Real dp) {
   const Real r = (std::abs(dp) > 0. ? dm / dp : 0.0);
   return std::max(0.0, std::min(2.0, std::min(2.0 * r, 0.5 * (1 + r))));
 }
@@ -98,52 +98,40 @@ Real phifunc(const Real mind, const Real maxd, const Real gx, const Real gy,
   return 1.0;
 }
 
-template <typename T, typename Tq>
-KOKKOS_INLINE_FUNCTION void PiecewiseConstant(const int d, const int n, const int k,
-                                              const int j, const int i, const T &v,
-                                              const Tq &ql, const Tq &qr) {
-  const int dir = d - 1;
-  const int di = (d == X1DIR ? 1 : 0);
-  const int dj = (d == X2DIR ? 1 : 0);
-  const int dk = (d == X3DIR ? 1 : 0);
-  ql(dir, n, k + dk, j + dj, i + di) = v(n, k, j, i);
-  qr(dir, n, k, j, i) = v(n, k, j, i);
+#pragma omp declare simd
+KOKKOS_FORCEINLINE_FUNCTION
+Real mc(const Real dm, const Real dp, const Real alpha) {
+  const Real dc = (dm * dp > 0.0) * 0.5 * (dm + dp);
+  return std::copysign(
+      std::min(std::fabs(dc), alpha * std::min(std::fabs(dm), std::fabs(dp))), dc);
 }
 
-template <typename T, typename Tq>
-KOKKOS_INLINE_FUNCTION void PiecewiseLinear(const int d, const int n, const int k,
-                                            const int j, const int i, const T &v,
-                                            const Tq &ql, const Tq &qr) {
-  const int dir = d - 1;
-  const int di = (d == X1DIR ? 1 : 0);
-  const int dj = (d == X2DIR ? 1 : 0);
-  const int dk = (d == X3DIR ? 1 : 0);
-  Real dq = v(n, k + dk, j + dj, i + di) - v(n, k, j, i);
-  dq = minmod(v(n, k, j, i) - v(n, k - dk, j - dj, i - di), dq) * dq;
-  ql(dir, n, k + dk, j + dj, i + di) = v(n, k, j, i) + 0.5 * dq;
-  qr(dir, n, k, j, i) = v(n, k, j, i) - 0.5 * dq;
+#pragma omp declare simd
+KOKKOS_INLINE_FUNCTION
+void PiecewiseConstant(const Real q0, Real &ql, Real &qr) {
+  ql = q0;
+  qr = q0;
 }
 
-template <typename T>
-KOKKOS_INLINE_FUNCTION void WENO5Z(const int d, const int n, const int k, const int j,
-                                   const int i, const T &v, const ParArrayND<Real> &q_l,
-                                   const ParArrayND<Real> &q_r) {
+#pragma omp declare simd
+KOKKOS_INLINE_FUNCTION
+void PiecewiseLinear(const Real qm, const Real q0, const Real qp, Real &ql, Real &qr) {
+  Real dq = qp - q0;
+  dq = mc(q0 - qm, dq, 1.5);
+  ql = q0 + 0.5 * dq;
+  qr = q0 - 0.5 * dq;
+}
+
+#pragma omp declare simd
+KOKKOS_INLINE_FUNCTION
+void WENO5Z(const Real q0, const Real q1, const Real q2, const Real q3, const Real q4,
+            Real &ql, Real &qr) {
   constexpr Real w5alpha[3][3] = {{1.0 / 3.0, -7.0 / 6.0, 11.0 / 6.0},
                                   {-1.0 / 6.0, 5.0 / 6.0, 1.0 / 3.0},
                                   {1.0 / 3.0, 5.0 / 6.0, -1.0 / 6.0}};
   constexpr Real w5gamma[3] = {0.1, 0.6, 0.3};
   constexpr Real eps = 1e-100;
   constexpr Real thirteen_thirds = 13.0 / 3.0;
-
-  const int di = d == X1DIR;
-  const int dj = d == X2DIR;
-  const int dk = d == X3DIR;
-
-  const Real q0 = v(n, k - 2 * dk, j - 2 * dj, i - 2 * di);
-  const Real q1 = v(n, k - dk, j - dj, i - di);
-  const Real q2 = v(n, k, j, i);
-  const Real q3 = v(n, k + dk, j + dj, i + di);
-  const Real q4 = v(n, k + 2 * dk, j + 2 * dj, i + 2 * di);
 
   Real a = q0 - 2 * q1 + q2;
   Real b = q0 - 4.0 * q1 + 3.0 * q2;
@@ -159,112 +147,46 @@ KOKKOS_INLINE_FUNCTION void WENO5Z(const int d, const int n, const int k, const 
   beta0 = (beta0 + tau5) / beta0;
   beta1 = (beta1 + tau5) / beta1;
   beta2 = (beta2 + tau5) / beta2;
-  Real w0 = w5gamma[0] * beta0;
-  Real w1 = w5gamma[1] * beta1;
-  Real w2 = w5gamma[2] * beta2;
+
+  Real w0 = w5gamma[0] * beta0 + eps;
+  Real w1 = w5gamma[1] * beta1 + eps;
+  Real w2 = w5gamma[2] * beta2 + eps;
   Real wsum = 1.0 / (w0 + w1 + w2);
-  Real ql = wsum * (w0 * (w5alpha[0][0] * q0 + w5alpha[0][1] * q1 + w5alpha[0][2] * q2) +
-                    w1 * (w5alpha[1][0] * q1 + w5alpha[1][1] * q2 + w5alpha[1][2] * q3) +
-                    w2 * (w5alpha[2][0] * q2 + w5alpha[2][1] * q3 + w5alpha[2][2] * q4));
-
+  ql = w0 * (w5alpha[0][0] * q0 + w5alpha[0][1] * q1 + w5alpha[0][2] * q2);
+  ql += w1 * (w5alpha[1][0] * q1 + w5alpha[1][1] * q2 + w5alpha[1][2] * q3);
+  ql += w2 * (w5alpha[2][0] * q2 + w5alpha[2][1] * q3 + w5alpha[2][2] * q4);
+  ql *= wsum;
   const Real alpha_l =
-      3.0 * wsum /
-      (w5gamma[0] / (w0 + eps) + w5gamma[1] / (w1 + eps) + w5gamma[2] / (w2 + eps));
+      3.0 * wsum * w0 * w1 * w2 /
+          (w5gamma[2] * w0 * w1 + w5gamma[1] * w0 * w2 + w5gamma[0] * w1 * w2) +
+      eps;
 
-  w0 = w5gamma[0] * beta2;
-  w1 = w5gamma[1] * beta1;
-  w2 = w5gamma[2] * beta0;
+  w0 = w5gamma[0] * beta2 + eps;
+  w1 = w5gamma[1] * beta1 + eps;
+  w2 = w5gamma[2] * beta0 + eps;
   wsum = 1.0 / (w0 + w1 + w2);
-  Real qr = wsum * (w0 * (w5alpha[0][0] * q4 + w5alpha[0][1] * q3 + w5alpha[0][2] * q2) +
-                    w1 * (w5alpha[1][0] * q3 + w5alpha[1][1] * q2 + w5alpha[1][2] * q1) +
-                    w2 * (w5alpha[2][0] * q2 + w5alpha[2][1] * q1 + w5alpha[2][2] * q0));
+  qr = w0 * (w5alpha[0][0] * q4 + w5alpha[0][1] * q3 + w5alpha[0][2] * q2);
+  qr += w1 * (w5alpha[1][0] * q3 + w5alpha[1][1] * q2 + w5alpha[1][2] * q1);
+  qr += w2 * (w5alpha[2][0] * q2 + w5alpha[2][1] * q1 + w5alpha[2][2] * q0);
+  qr *= wsum;
   const Real alpha_r =
-      3.0 * wsum /
-      (w5gamma[0] / (w0 + eps) + w5gamma[1] / (w1 + eps) + w5gamma[2] / (w2 + eps));
+      3.0 * wsum * w0 * w1 * w2 /
+          (w5gamma[2] * w0 * w1 + w5gamma[1] * w0 * w2 + w5gamma[0] * w1 * w2) +
+      eps;
 
   Real dq = q3 - q2;
-  dq = mc(q2 - q1, dq) * dq;
+  dq = mc(q2 - q1, dq, 2.0);
 
-  const Real alpha_lin = 2.0 / (1.0 / (alpha_l + eps) + 1.0 / (alpha_r + eps));
+  const Real alpha_lin = 2.0 * alpha_l * alpha_r / (alpha_l + alpha_r);
   ql = alpha_lin * ql + (1.0 - alpha_lin) * (q2 + 0.5 * dq);
   qr = alpha_lin * qr + (1.0 - alpha_lin) * (q2 - 0.5 * dq);
-
-  q_l(d - 1, n, k + dk, j + dj, i + di) = ql;
-  q_r(d - 1, n, k, j, i) = qr;
-}
-
-template <typename T, typename Tq>
-KOKKOS_INLINE_FUNCTION void WENO5A(const int d, const int n, const int k, const int j,
-                                   const int i, const T &v, const Tq &ql, const Tq &qr) {
-
-  constexpr Real w5alpha[3][3] = {{1.0 / 3.0, -7.0 / 6.0, 11.0 / 6.0},
-                                  {-1.0 / 6.0, 5.0 / 6.0, 1.0 / 3.0},
-                                  {1.0 / 3.0, 5.0 / 6.0, -1.0 / 6.0}};
-  constexpr Real w5gamma[3] = {0.1, 0.6, 0.3};
-  // for WENO-Z type weights. The higher the number, the more diffusive
-  // and the more aggressively the method approaches ENO in discontinuous regions
-  constexpr Real p = 13;
-
-  const int dir = d - 1;
-  const int di = (d == X1DIR ? 1 : 0);
-  const int dj = (d == X2DIR ? 1 : 0);
-  const int dk = (d == X3DIR ? 1 : 0);
-  Real q[5];
-  Real tl[3];
-  Real tr[3];
-  Real beta[3];
-  Real wl[3];
-  Real wr[3];
-  for (int l = 0; l < 5; l++) {
-    q[l] = v(n, k + (l - 2) * dk, j + (l - 2) * dj, i + (l - 2) * di);
-  }
-
-  // ENO polynomials
-  tl[0] = w5alpha[0][0] * q[0] + w5alpha[0][1] * q[1] + w5alpha[0][2] * q[2];
-  tl[1] = w5alpha[1][0] * q[1] + w5alpha[1][1] * q[2] + w5alpha[1][2] * q[3];
-  tl[2] = w5alpha[2][0] * q[2] + w5alpha[2][1] * q[3] + w5alpha[2][2] * q[4];
-
-  tr[0] = w5alpha[0][0] * q[4] + w5alpha[0][1] * q[3] + w5alpha[0][2] * q[2];
-  tr[1] = w5alpha[1][0] * q[3] + w5alpha[1][1] * q[2] + w5alpha[1][2] * q[1];
-  tr[2] = w5alpha[2][0] * q[2] + w5alpha[2][1] * q[1] + w5alpha[2][2] * q[0];
-
-  // Smoothness indicators from Tchekhovskoy et al. 2007
-  beta[0] = (13. / 12.) * std::pow(q[0] - 2. * q[1] + q[2], 2) +
-            0.25 * std::pow(q[0] - 4. * q[1] + 3. * q[2], 2);
-  beta[1] = (13. / 12.) * std::pow(q[1] - 2. * q[2] + q[3], 2) +
-            0.25 * std::pow(q[3] - q[1], 2);
-  beta[2] = (13. / 12.) * std::pow(q[2] - 2. * q[3] + q[4], 2) +
-            0.25 * std::pow(q[4] - 4. * q[3] + 3. * q[2], 2);
-
-  // Nonlinearity/shock detectors for WENO-A
-  Real phi = std::sqrt(std::abs(beta[0] - 2 * beta[1] + beta[2]));
-  Real PHI = std::min(1.0, phi);
-  Real tau5 = std::fabs(beta[2] - beta[0]);
-
-  // Normalizations
-  Real wsuml = 0.0;
-  Real wsumr = 0.0;
-
-  // WENO-A scheme introduced in Wang, Wang, and Don, 2019.
-  for (int l = 0; l < 3; l++) {
-    wl[l] = w5gamma[l] * std::max(1., PHI * std::pow(tau5 / beta[l], p));
-    wr[l] = w5gamma[l] * std::max(1., PHI * std::pow(tau5 / beta[2 - l], p));
-    wsuml += wl[l];
-    wsumr += wr[l];
-  }
-  for (int l = 0; l < 3; l++) {
-    wl[l] /= wsuml;
-    wr[l] /= wsumr;
-  }
-
-  ql(dir, n, k + dk, j + dj, i + di) = wl[0] * tl[0] + wl[1] * tl[1] + wl[2] * tl[2];
-  qr(dir, n, k, j, i) = wr[0] * tr[0] + wr[1] * tr[1] + wr[2] * tr[2];
 }
 
 // MP5, lifted shamelessly from nubhlight, which was lifted shamelessly from PLUTO
 #define MINMOD(a, b) ((a) * (b) > 0.0 ? (fabs(a) < fabs(b) ? (a) : (b)) : 0.0)
 KOKKOS_INLINE_FUNCTION
 double Median(double a, double b, double c) { return (a + MINMOD(b - a, c - a)); }
+#pragma omp declare simd
 KOKKOS_INLINE_FUNCTION
 double mp5_subcalc(double Fjm2, double Fjm1, double Fj, double Fjp1, double Fjp2) {
   double f, d2, d2p, d2m;
@@ -313,21 +235,39 @@ double mp5_subcalc(double Fjm2, double Fjm1, double Fj, double Fjp1, double Fjp2
 }
 #undef MINMOD
 
-template <typename T, typename Tq>
-KOKKOS_INLINE_FUNCTION void MP5(const int d, const int n, const int k, const int j,
-                                const int i, const T &v, const Tq &ql, const Tq &qr) {
-  const int dir = d - 1;
-  const int di = (d == X1DIR ? 1 : 0);
-  const int dj = (d == X2DIR ? 1 : 0);
-  const int dk = (d == X3DIR ? 1 : 0);
-  ql(dir, n, k + dk, j + dj, i + di) =
-      mp5_subcalc(v(n, k - 2 * dk, j - 2 * dj, i - 2 * di), v(n, k - dk, j - dj, i - di),
-                  v(n, k, j, i), v(n, k + dk, j + dj, i + di),
-                  v(n, k + 2 * dk, j + 2 * dj, i + 2 * di));
-  qr(dir, n, k, j, i) =
-      mp5_subcalc(v(n, k + 2 * dk, j + 2 * dj, i + 2 * di), v(n, k + dk, j + dj, i + di),
-                  v(n, k, j, i), v(n, k - dk, j - dj, i - di),
-                  v(n, k - 2 * dk, j - 2 * dj, i - 2 * di));
+#pragma omp declare simd
+KOKKOS_INLINE_FUNCTION
+void MP5(const Real q0, const Real q1, const Real q2, const Real q3, const Real q4,
+         Real &ql, Real &qr) {
+  ql = mp5_subcalc(q0, q1, q2, q3, q4);
+  qr = mp5_subcalc(q4, q3, q2, q1, q0);
+}
+
+using WENO_LIKE = decltype(WENO5Z);
+template <WENO_LIKE F, typename T, typename U>
+KOKKOS_INLINE_FUNCTION void ReconLoop(parthenon::team_mbr_t &member, const int s,
+                                      const int e, T &&pm2, T &&pm1, U &&p, T &&pp1,
+                                      T &&pp2, U &&l, U &&r) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e, [=](const int i) {
+    F(pm2[i], pm1[i], p[i], pp1[i], pp2[i], l[i], r[i]);
+  });
+}
+
+using LINEAR_LIKE = decltype(PiecewiseLinear);
+template <LINEAR_LIKE F, typename T, typename U>
+KOKKOS_INLINE_FUNCTION void ReconLoop(parthenon::team_mbr_t &member, const int s,
+                                      const int e, T &&pm1, U &&p, T &&pp1, U &&l,
+                                      U &&r) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
+                           [=](const int i) { F(pm1[i], p[i], pp1[i], l[i], r[i]); });
+}
+
+using CONST_LIKE = decltype(PiecewiseConstant);
+template <CONST_LIKE F, typename T>
+KOKKOS_INLINE_FUNCTION void ReconLoop(parthenon::team_mbr_t &member, const int s,
+                                      const int e, T &&p, T &&l, T &&r) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
+                           [=](const int i) { F(p[i], l[i], r[i]); });
 }
 
 } // namespace PhoebusReconstruction

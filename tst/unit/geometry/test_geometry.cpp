@@ -33,6 +33,7 @@
 #include <geometry/analytic_system.hpp>
 #include <geometry/boyer_lindquist.hpp>
 #include <geometry/cached_system.hpp>
+#include <geometry/flrw.hpp>
 #include <geometry/fmks.hpp>
 #include <geometry/geometry_defaults.hpp>
 #include <geometry/mckinney_gammie_ryan.hpp>
@@ -213,6 +214,54 @@ TEST_CASE("Minkowski Coordinates", "[geometry]") {
               system.GradLnAlpha(CellLocation::Corn, b, 0, 0, 0, grada);
               for (int mu = 0; mu < NDFULL; ++mu) {
                 if (grada[mu] != 0.0) update += 1;
+              }
+            },
+            n_wrong);
+        REQUIRE(n_wrong == 0);
+      }
+    }
+  }
+}
+
+TEST_CASE("FLRW Coordinates", "[geometry]") {
+  GIVEN("A coords object") {
+    Coordinates_t coords;
+    WHEN("We create an FLRW object") {
+      Real t = 1.0;
+      Real a0 = 1;
+      Real dadt = 1;
+      Real x, y, z;
+      x = y = z = 0;
+      IndexerMeshBlock indexer(coords);
+      Analytic<FLRW, IndexerMeshBlock> system(t, indexer, a0, dadt);
+      THEN("The coordinate system can be called on device") {
+        int n_wrong = 100;
+        Kokkos::parallel_reduce(
+            "get n wrong", NTRIALS,
+            KOKKOS_LAMBDA(const int i, int &update) {
+              // lapse
+              Real alpha = system.Lapse(t, x, y, z);
+              if (alpha != 1) update += 1;
+              // shift
+              Real beta[NDSPACE];
+              system.ContravariantShift(t, x, y, z, beta);
+              SPACELOOP(m) {
+                if (beta[m] != 0) {
+                  update += 1;
+                }
+              }
+              //  metric
+              Real gamma[NDSPACE][NDSPACE];
+              system.Metric(t, x, y, z, gamma);
+              SPACELOOP2(i, j) {
+                if ((i != j) && gamma[i][j] != 0) update += 1;
+                if ((i == j) && GetDifference(gamma[i][j], 4) > EPS) update += 1;
+              }
+              // Inverse metric
+              system.MetricInverse(t, x, y, z, gamma);
+              SPACELOOP2(i, j) {
+                if ((i != j) && gamma[i][j] != 0) update += 1;
+                if ((i == j) && GetDifference(gamma[i][j], 1. / 4.) > EPS) update += 1;
               }
             },
             n_wrong);
