@@ -43,6 +43,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(bondi)                                                                         \
   PROBLEM(radiation_advection)                                                           \
   PROBLEM(radiation_equilibration)                                                       \
+  PROBLEM(rotor)                                                                         \
   PROBLEM(homogeneous_sphere)                                                            \
   PROBLEM(torus)                                                                         \
   PROBLEM(p2c2p)                                                                         \

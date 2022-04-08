@@ -84,6 +84,7 @@ add_executable(phoebus
   pgen/radiation_advection.cpp
   pgen/radiation_equilibration.cpp
   pgen/rhs_tester.cpp
+  pgen/rotor.cpp
   pgen/shock_tube.cpp
   pgen/thin_cooling.cpp
   pgen/sedov.cpp
