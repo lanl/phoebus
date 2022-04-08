@@ -21,7 +21,7 @@ variables = p.density,       &
             c.momentum,      &
             p.energy,        &
             c.energy,        &
-            pressure,      	 &
+            pressure,        &
             g.c.coord,       &
             g.n.coord,       &
             g.c.detgam,      &

@@ -140,6 +140,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
+  IndexRange iib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange ijb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange ikb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  const int NI = pmb->cellbounds.ncellsi(IndexDomain::entire);
+  const int NJ = pmb->cellbounds.ncellsj(IndexDomain::entire);
+  const int NK = pmb->cellbounds.ncellsk(IndexDomain::entire);
+
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
@@ -242,23 +250,27 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       });
 
   // get vector potential
-  ParArrayND<Real> A("vector potential", jb.e + 1, ib.e + 1);
+  ParArrayND<Real> A("vector potential", NJ, NI);
   pmb->par_for(
-      "Phoebus::ProblemGenerator::Torus2", jb.s + 1, jb.e, ib.s + 1, ib.e,
+      "Phoebus::ProblemGenerator::Torus2", ijb.s, ijb.e + 1, iib.s, iib.e + 1,
       KOKKOS_LAMBDA(const int j, const int i) {
         const Real rho_av =
-            0.25 * (v(irho, kb.s, j, i) + v(irho, kb.s, j, i - 1) +
-                    v(irho, kb.s, j - 1, i) + v(irho, kb.s, j - 1, i - 1));
-        const Real q = rho_av / rho_rmax - 0.2;
+            0.25 * (v(irho, ikb.s, j, i) + v(irho, ikb.s, j, i - 1) +
+                    v(irho, ikb.s, j - 1, i) + v(irho, ikb.s, j - 1, i - 1));
+        // At this point, rho_max = 1, so should not divide by rho_rmax.
+        // const Real q = rho_av / rho_rmax - 0.2;
+        const Real q = rho_av - 0.2;
         A(j, i) = (q > 0 ? q : 0.0);
+        // printf("%d %d %.14e %.14e %.14e\n", i, j, rho_av, q, A(j,i));
       });
 
   // Initialize B field lines, to be normalized in PostInitializationModifier
   if (ibhi > 0) {
     pmb->par_for(
-        "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
+        "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, ijb.s, ijb.e, iib.s, iib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
           const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+          // const Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
           v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
                              (2.0 * coords.Dx(X2DIR, k, j, i) * gdet);
           v(iblo + 1, k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
@@ -268,7 +280,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 
   fluid::PrimitiveToConserved(rc);
-  printf("Problem initialized!\n");
 }
 
 void ProblemModifier(ParameterInput *pin) {
@@ -354,6 +365,8 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
   const Real beta_min_global = reduction::Min(beta_min);
   const Real B_field_fac = magnetized ? sqrt(beta_min_global / beta_min_target) : 0;
 
+  printf("Normalization Factor = %.14e\n", B_field_fac);
+
   for (auto &pmb : pmesh->block_list) {
     auto &rc = pmb->meshblock_data.Get();
     auto geom = Geometry::GetCoordinateSystem(rc.get());
@@ -364,29 +377,31 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
     PackIndexMap imap;
     auto v = rc->PackVariables({fluid_prim::density, fluid_prim::energy,
+        fluid_prim::velocity,
         fluid_prim::pressure, fluid_prim::bfield}, imap);
     const int irho = imap[fluid_prim::density].first;
+    const int ivlo = imap[fluid_prim::velocity].first;
+    const int ivhi = imap[fluid_prim::velocity].second;
     const int ieng = imap[fluid_prim::energy].first;
     const int iprs = imap[fluid_prim::pressure].first;
     const int iblo = imap[fluid_prim::bfield].first;
     const int ibhi = imap[fluid_prim::bfield].second;
 
-    Real beta_min_local;
+    /*
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          for (int ib = iblo; ib < ibhi; ib++) {
-            v(ib, k, j, i) *= B_field_fac;
+          SPACELOOP(d) {
+            v(iblo + d, k, j, i) *= B_field_fac;
           }
         });
-    fluid::PrimitiveToConserved(rc.get());
+    */
 
     constexpr int ND = Geometry::NDFULL;
     auto coords = pmb->coords;
     auto tmunu = fluid::BuildStressEnergyTensor(rc.get());
     int j = jb.s + (jb.e - jb.s)/2 + 1;
     int k = kb.s;
-    printf("#i\tj\tX1\tX2\trho\tu\tP\tB1\tB2\tT00\tT01\tT02\tT03\tT11\tT12\tT13\tT22\tT23\tT33\n");
     pmb->par_for("Print Tmunu lol", ib.s, ib.e, KOKKOS_LAMBDA(const int i) {
         Real X1 = coords.x1v(i);
         Real X2 = coords.x2v(j);
@@ -395,10 +410,27 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
         Real r = v(irho, k, j, i);
         Real u = v(ieng, k, j, i);
         Real pres = v(iprs, k, j, i);
-        printf("%d\t%d\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\n",
-               i,j,X1,X2,r, u, pres, v(iblo, k, j, i), v(iblo + 1, k, j, i), T[0][0],T[0][1],T[0][2],T[0][3],T[1][1],T[1][2],T[1][3],
+        Real w = pres + r + u;
+        Real Bsq = 0.0;
+        Real Bdotv = 0.0;
+        Real gcov[3][3];
+        geom.Metric(CellLocation::Cent, k, j, i, gcov);
+        Real vp[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+        const Real W = phoebus::GetLorentzFactor(vp, gcov);
+        SPACELOOP2(m, n) {
+          Bdotv += gcov[m][n] * vp[m] / W * v(iblo + n, k, j, i);
+          Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
+        }
+        const Real bsq = (Bsq) / (W*W) + Bdotv*Bdotv;
+
+        Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+
+        printf("%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\n",
+               X1,v(iblo, k, j, i)/alpha, v(iblo + 1, k, j, i)/alpha, w, bsq, T[0][0],T[0][1],T[0][2],T[0][3],T[1][1],T[1][2],T[1][3],
                T[2][2],T[2][3],T[3][3]);
       });
+
+    fluid::PrimitiveToConserved(rc.get());
   }
 }
 
