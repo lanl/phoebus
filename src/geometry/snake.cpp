@@ -50,6 +50,9 @@ template <>
 void SetGeometry<SnakeMeshBlock>(MeshBlockData<Real> *rc) {}
 
 template <>
+void SetGeometry<SnakeMesh>(MeshData<Real> *rc) {}
+
+template <>
 SnakeMeshBlock GetCoordinateSystem<SnakeMeshBlock>(MeshBlockData<Real> *rc) {
   auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
@@ -85,6 +88,10 @@ CSnakeMesh GetCoordinateSystem<CSnakeMesh>(MeshData<Real> *rc) {
 template <>
 void SetGeometry<CSnakeMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<SnakeMeshBlock>(rc);
+}
+template <>
+void SetGeometry<CSnakeMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<SnakeMesh>(rc);
 }
 
 } // namespace Geometry

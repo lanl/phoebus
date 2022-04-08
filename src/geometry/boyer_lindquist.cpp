@@ -42,6 +42,9 @@ template <>
 void SetGeometry<BoyerLindquistMeshBlock>(MeshBlockData<Real> *rc) {}
 
 template <>
+void SetGeometry<BoyerLindquistMesh>(MeshData<Real> *rc) {}
+
+template <>
 BoyerLindquistMeshBlock
 GetCoordinateSystem<BoyerLindquistMeshBlock>(MeshBlockData<Real> *rc) {
   auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
@@ -77,5 +80,8 @@ template <>
 void SetGeometry<CBoyerLindquistMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<BoyerLindquistMeshBlock>(rc);
 }
-
+template <>
+void SetGeometry<CBoyerLindquistMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<BoyerLindquistMesh>(rc);
+}
 } // namespace Geometry

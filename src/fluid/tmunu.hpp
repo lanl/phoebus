@@ -68,10 +68,8 @@ class StressEnergyTensorCon {
     Real P = GetVar_(ip_, std::forward<Args>(args)...);
     Real A = rho + uu + P + bsq;
     Real B = P + 0.5 * bsq;
-    for (int mu = 0; mu < ND; ++mu) {
-      for (int nu = 0; nu < ND; ++nu) {
-        T[mu][nu] = A * u[mu] * u[nu] + B * g[mu][nu] - b[mu] * b[nu];
-      }
+    SPACETIMELOOP2(mu, nu) {
+      T[mu][nu] = A * u[mu] * u[nu] + B * g[mu][nu] - b[mu] * b[nu];
     }
   }
 
@@ -92,7 +90,7 @@ class StressEnergyTensorCon {
 
   template <typename... Args>
   KOKKOS_FORCEINLINE_FUNCTION Real b_(int l, Args &&...args) const {
-    return (ib_ > 0 ? GetVar_(ib_ + l - 1, std::forward<Args>(args)...) : 0.0);
+    return (ib_ >= 0 ? GetVar_(ib_ + l - 1, std::forward<Args>(args)...) : 0.0);
   }
 
   template <typename... Args>
@@ -101,26 +99,26 @@ class StressEnergyTensorCon {
     Real beta[ND - 1];
     Real Bdotv = 0.0;
     Real Bsq = 0.0;
-    auto gcov = reinterpret_cast<Real(*)[3]>(&gscratch[0][0]);
-    system_.Metric(loc, std::forward<Args>(args)..., gcov);
+    auto gammacov = reinterpret_cast<Real(*)[3]>(&gscratch[0][0]);
+    system_.Metric(loc, std::forward<Args>(args)..., gammacov);
     Real vp[3] = {v_(1, std::forward<Args>(args)...), v_(2, std::forward<Args>(args)...),
                   v_(3, std::forward<Args>(args)...)};
-    const Real W = phoebus::GetLorentzFactor(vp, gcov);
+    const Real W = phoebus::GetLorentzFactor(vp, gammacov);
 
     SPACELOOP2(ii, jj) {
       const Real &bi = b_(ii + 1, std::forward<Args>(args)...);
       const Real &bj = b_(jj + 1, std::forward<Args>(args)...);
-      Bdotv += bi * vp[jj] / W * gcov[ii][jj];
-      Bsq += bi * bj * gcov[ii][jj];
+      Bdotv += bi * (vp[jj] / W) * gammacov[ii][jj];
+      Bsq += bi * bj * gammacov[ii][jj];
     }
-    const Real iW = 1. / W;
+    const Real iW = robust::ratio(1., W);
 
     Real alpha = system_.Lapse(loc, std::forward<Args>(args)...);
     system_.ContravariantShift(loc, std::forward<Args>(args)..., beta);
     u[0] = robust::ratio(W, std::abs(alpha));
     b[0] = u[0] * Bdotv;
     for (int l = 1; l < ND; ++l) {
-      u[l] = v_(l, std::forward<Args>(args)...) - u[0] * beta[l - 1];
+      u[l] = vp[l - 1] - u[0] * beta[l - 1];
       b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha * b[0] * u[l]);
     }
 

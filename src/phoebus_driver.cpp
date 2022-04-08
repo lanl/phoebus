@@ -33,6 +33,7 @@
 #include "monopole_gr/monopole_gr.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
 
@@ -147,6 +148,16 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     pmono_mat_red = monopole->MutableParam<MonoMatRed_t>("matter_reducer");
     pmono_vol_red = monopole->MutableParam<MonoVolRed_t>("volumes_reducer");
   }
+
+  // Hack to update time for time-dependent geometries
+  auto geometry = pmesh->packages.Get("geometry");
+  auto &geom_params = geometry->AllParams();
+  // tm = SimTime field in EvolutionDriver. See parthenon/src/driver/driver.hpp
+  if (geom_params.hasKey("time")) {
+    const Real tstage = tm.time + (stage > 1 ? (integrator->beta[stage - 2]) : 0) * tm.dt;
+    geom_params.Update("time", tstage);
+  }
+  bool time_dependent_geom = geom_params.Get("time_dependent", false);
 
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
@@ -345,6 +356,14 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
     auto floors = tl.AddTask(fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+
+    // TODO(JMM): Should this be at the beginning of a cycle? The end?
+    // After the monopole solver is done?
+    // Update cached metric if needed
+    if (time_dependent_geom) {
+      auto update_geom =
+          tl.AddTask(none, Geometry::UpdateGeometry<MeshBlockData<Real>>, sc1.get());
+    }
 
     // estimate next time step
     if (stage == integrator->nstages) {
