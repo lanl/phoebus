@@ -194,7 +194,6 @@ class FluxState {
                                                 (g.gdd * (1.0 - vsq * cmsq) - vel * v0)));
     vp = vcoff * (v0 + vpm) - g.beta[dir];
     vm = vcoff * (v0 - vpm) - g.beta[dir];
-
   }
 
   const VariableFluxPack<Real> v;

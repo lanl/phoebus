@@ -41,8 +41,7 @@ KOKKOS_INLINE_FUNCTION
 void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
          const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
          const Real gcon[3][3], const Real beta[], const Real &alpha, const Real &gdet,
-         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons,
-         Real *sig = nullptr) {
+         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig = nullptr) {
   Real vsq = 0.0;
   Real Bsq = 0.0;
   Real Bdotv = 0.0;
@@ -57,7 +56,7 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
   const Real b0 = W * Bdotv;
   Real bcon[] = {W * Bdotv / alpha, 0.0, 0.0, 0.0};
   SPACELOOP(m) { bcon[m + 1] = b[m] * iW + Bdotv * W * (v[m] - beta[m] / alpha); }
-  const Real bsq = Bsq * iW * iW + Bdotv*Bdotv;
+  const Real bsq = Bsq * iW * iW + Bdotv * Bdotv;
   Real bcov[3] = {0.0, 0.0, 0.0};
   SPACELOOP(m) {
     SPACETIMELOOP(n) { bcov[m] += gcov[m + 1][n] * bcon[n]; }
@@ -74,7 +73,7 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
   }
 
 #if USE_VALENCIA
-  tau = gdet * (rho_rel - (p + 0.5 * bsq) - b0*b0) - D;
+  tau = gdet * (rho_rel - (p + 0.5 * bsq) - b0 * b0) - D;
 #else
   Real ucon[4] = {W / alpha, vp[0] - beta[0] * W / alpha, vp[1] - beta[1] * W / alpha,
                   vp[2] - beta[2] * W / alpha};
