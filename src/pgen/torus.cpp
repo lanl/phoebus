@@ -125,7 +125,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real kappa = pin->GetOrAddReal("torus", "kappa", 1.e-2);
   const Real u_jitter = pin->GetOrAddReal("torus", "u_jitter", 1.e-2);
   const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
-  const Real bnorm = pin->GetOrAddReal("torus", "Bnorm", 1.e-2);
   const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
   const Real Ye = pin->GetOrAddReal("torus", "Ye", 0.5);
 
@@ -299,6 +298,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
   const Real beta_min_target = pin->GetOrAddReal("torus", "beta_min", 100.);
   const Real rho_min_bnorm = pin->GetOrAddReal("torus", "rho_min_bnorm", 1.e-4);
+  const bool magnetized = pin->GetOrAddBoolean("torus", "magnetized", true);
 
   Real beta_min = 1.e100;
 
@@ -353,7 +353,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
   }
 
   const Real beta_min_global = reduction::Min(beta_min);
-  const Real B_field_fac = sqrt(beta_min_global / beta_min_target);
+  const Real B_field_fac = magnetized ? sqrt(beta_min_global / beta_min_target) : 0;
 
   for (auto &pmb : pmesh->block_list) {
     auto &rc = pmb->meshblock_data.Get();
