@@ -326,8 +326,9 @@ class ConToPrim {
     Real bdotr = 0.0;
     Real rcon[3];
     // r_i
-    Real rcov[] = {v(cmom_lo) / v(crho), v(cmom_lo + 1) / v(crho),
-                   v(cmom_lo + 2) / v(crho)};
+    Real rcov[] = {robust::ratio(v(cmom_lo), v(crho)),
+                   robust::ratio(v(cmom_lo + 1), v(crho)),
+                   robust::ratio(v(cmom_lo + 2), v(crho))};
     SPACELOOP(i) {
       rcon[i] = 0.0;
       SPACELOOP(j) { rcon[i] += g.gcon[i][j] * rcov[j]; }
@@ -382,6 +383,7 @@ class ConToPrim {
     v(peng) *= v(prho);
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp), eos_lambda);
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp), eos_lambda) / v(prs);
+    PARTHENON_DEBUG_REQUIRE(v(prs) > robust::EPS(), "Pressure must be positive");
 
     Real vel[3];
     SPACELOOP(i) {

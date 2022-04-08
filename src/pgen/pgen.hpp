@@ -33,6 +33,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(phoebus)                                                                       \
   PROBLEM(advection)                                                                     \
   PROBLEM(shock_tube)                                                                    \
+  PROBLEM(friedmann)                                                                     \
   PROBLEM(linear_modes)                                                                  \
   PROBLEM(thin_cooling)                                                                  \
   PROBLEM(leptoneq)                                                                      \

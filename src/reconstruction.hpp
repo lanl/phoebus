@@ -101,8 +101,9 @@ Real phifunc(const Real mind, const Real maxd, const Real gx, const Real gy,
 #pragma omp declare simd
 KOKKOS_FORCEINLINE_FUNCTION
 Real mc(const Real dm, const Real dp, const Real alpha) {
-  const Real dc = (dm*dp > 0.0) * 0.5 * (dm + dp);
-  return std::copysign(std::min(std::fabs(dc),alpha*std::min(std::fabs(dm),std::fabs(dp))), dc);
+  const Real dc = (dm * dp > 0.0) * 0.5 * (dm + dp);
+  return std::copysign(
+      std::min(std::fabs(dc), alpha * std::min(std::fabs(dm), std::fabs(dp))), dc);
 }
 
 #pragma omp declare simd
@@ -114,18 +115,17 @@ void PiecewiseConstant(const Real q0, Real &ql, Real &qr) {
 
 #pragma omp declare simd
 KOKKOS_INLINE_FUNCTION
-void PiecewiseLinear(const Real qm, const Real q0, const Real qp,
-                     Real &ql, Real &qr) {
+void PiecewiseLinear(const Real qm, const Real q0, const Real qp, Real &ql, Real &qr) {
   Real dq = qp - q0;
   dq = mc(q0 - qm, dq, 1.5);
-  ql = q0 + 0.5*dq;
-  qr = q0 - 0.5*dq;
+  ql = q0 + 0.5 * dq;
+  qr = q0 - 0.5 * dq;
 }
 
 #pragma omp declare simd
 KOKKOS_INLINE_FUNCTION
 void WENO5Z(const Real q0, const Real q1, const Real q2, const Real q3, const Real q4,
-            Real  &ql, Real &qr) {
+            Real &ql, Real &qr) {
   constexpr Real w5alpha[3][3] = {{1.0 / 3.0, -7.0 / 6.0, 11.0 / 6.0},
                                   {-1.0 / 6.0, 5.0 / 6.0, 1.0 / 3.0},
                                   {1.0 / 3.0, 5.0 / 6.0, -1.0 / 6.0}};
@@ -152,21 +152,27 @@ void WENO5Z(const Real q0, const Real q1, const Real q2, const Real q3, const Re
   Real w1 = w5gamma[1] * beta1 + eps;
   Real w2 = w5gamma[2] * beta2 + eps;
   Real wsum = 1.0 / (w0 + w1 + w2);
-  ql  = w0 * (w5alpha[0][0] * q0 + w5alpha[0][1] * q1 + w5alpha[0][2] * q2);
+  ql = w0 * (w5alpha[0][0] * q0 + w5alpha[0][1] * q1 + w5alpha[0][2] * q2);
   ql += w1 * (w5alpha[1][0] * q1 + w5alpha[1][1] * q2 + w5alpha[1][2] * q3);
   ql += w2 * (w5alpha[2][0] * q2 + w5alpha[2][1] * q3 + w5alpha[2][2] * q4);
   ql *= wsum;
-  const Real alpha_l = 3.0 * wsum * w0 * w1 * w2/(w5gamma[2]*w0*w1 + w5gamma[1]*w0*w2 + w5gamma[0]*w1*w2) + eps;
+  const Real alpha_l =
+      3.0 * wsum * w0 * w1 * w2 /
+          (w5gamma[2] * w0 * w1 + w5gamma[1] * w0 * w2 + w5gamma[0] * w1 * w2) +
+      eps;
 
   w0 = w5gamma[0] * beta2 + eps;
   w1 = w5gamma[1] * beta1 + eps;
   w2 = w5gamma[2] * beta0 + eps;
   wsum = 1.0 / (w0 + w1 + w2);
-  qr  = w0 * (w5alpha[0][0] * q4 + w5alpha[0][1] * q3 + w5alpha[0][2] * q2);
+  qr = w0 * (w5alpha[0][0] * q4 + w5alpha[0][1] * q3 + w5alpha[0][2] * q2);
   qr += w1 * (w5alpha[1][0] * q3 + w5alpha[1][1] * q2 + w5alpha[1][2] * q1);
   qr += w2 * (w5alpha[2][0] * q2 + w5alpha[2][1] * q1 + w5alpha[2][2] * q0);
   qr *= wsum;
-  const Real alpha_r = 3.0 * wsum * w0 * w1 * w2/(w5gamma[2]*w0*w1 + w5gamma[1]*w0*w2 + w5gamma[0]*w1*w2) + eps;
+  const Real alpha_r =
+      3.0 * wsum * w0 * w1 * w2 /
+          (w5gamma[2] * w0 * w1 + w5gamma[1] * w0 * w2 + w5gamma[0] * w1 * w2) +
+      eps;
 
   Real dq = q3 - q2;
   dq = mc(q2 - q1, dq, 2.0);
@@ -239,34 +245,29 @@ void MP5(const Real q0, const Real q1, const Real q2, const Real q3, const Real 
 
 using WENO_LIKE = decltype(WENO5Z);
 template <WENO_LIKE F, typename T, typename U>
-KOKKOS_INLINE_FUNCTION
-void ReconLoop(parthenon::team_mbr_t &member, const int s, const int e,
-               T && pm2, T && pm1, U && p, T && pp1,
-               T && pp2, U && l, U && r) {
-  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
-    [=](const int i) {
-      F(pm2[i], pm1[i], p[i], pp1[i], pp2[i], l[i], r[i]);
-    });
+KOKKOS_INLINE_FUNCTION void ReconLoop(parthenon::team_mbr_t &member, const int s,
+                                      const int e, T &&pm2, T &&pm1, U &&p, T &&pp1,
+                                      T &&pp2, U &&l, U &&r) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e, [=](const int i) {
+    F(pm2[i], pm1[i], p[i], pp1[i], pp2[i], l[i], r[i]);
+  });
 }
 
 using LINEAR_LIKE = decltype(PiecewiseLinear);
 template <LINEAR_LIKE F, typename T, typename U>
-KOKKOS_INLINE_FUNCTION
-void ReconLoop(parthenon::team_mbr_t &member, const int s, const int e,
-               T && pm1, U && p, T && pp1, U && l, U && r) {
-  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e, [=](const int i) {
-    F(pm1[i], p[i], pp1[i], l[i], r[i]);
-  });
+KOKKOS_INLINE_FUNCTION void ReconLoop(parthenon::team_mbr_t &member, const int s,
+                                      const int e, T &&pm1, U &&p, T &&pp1, U &&l,
+                                      U &&r) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
+                           [=](const int i) { F(pm1[i], p[i], pp1[i], l[i], r[i]); });
 }
 
 using CONST_LIKE = decltype(PiecewiseConstant);
 template <CONST_LIKE F, typename T>
-KOKKOS_INLINE_FUNCTION
-void ReconLoop(parthenon::team_mbr_t &member, const int s, const int e,
-               T && p, T && l, T && r) {
-  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e, [=](const int i) {
-    F(p[i], l[i], r[i]);
-  });
+KOKKOS_INLINE_FUNCTION void ReconLoop(parthenon::team_mbr_t &member, const int s,
+                                      const int e, T &&p, T &&l, T &&r) {
+  parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, s, e,
+                           [=](const int i) { F(p[i], l[i], r[i]); });
 }
 
 } // namespace PhoebusReconstruction

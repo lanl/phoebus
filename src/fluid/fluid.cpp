@@ -608,58 +608,76 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
   parthenon::par_for_outer(
-    DEFAULT_OUTER_LOOP_PATTERN, "Reconstruct", DevExecSpace(),
-    0, 0, 0, nrecon, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
-    KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int n, const int k, const int j) {
-      // this approach (pullilng out pointers) depends on i being the fastest moving index
-      Real *pv = &flux.v(n,k,j,0);
+      DEFAULT_OUTER_LOOP_PATTERN, "Reconstruct", DevExecSpace(), 0, 0, 0, nrecon,
+      kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
+      KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int n, const int k, const int j) {
+        // this approach (pullilng out pointers) depends on i being the fastest moving
+        // index
+        Real *pv = &flux.v(n, k, j, 0);
 
-      Real *pvim2 = pv-2;
-      Real *pvim1 = pv-1;
-      Real *pvip1 = pv+1;
-      Real *pvip2 = pv+2;
-      Real *vi_l = &flux.ql(0,n,k,j,1);
-      Real *vi_r = &flux.qr(0,n,k,j,0);
+        Real *pvim2 = pv - 2;
+        Real *pvim1 = pv - 1;
+        Real *pvip1 = pv + 1;
+        Real *pvip2 = pv + 2;
+        Real *vi_l = &flux.ql(0, n, k, j, 1);
+        Real *vi_r = &flux.qr(0, n, k, j, 0);
 
-      Real *pvjm2 = &flux.v(n,k,j-2*dj,0);
-      Real *pvjm1 = &flux.v(n,k,j-dj,0);
-      Real *pvjp1 = &flux.v(n,k,j+dj,0);
-      Real *pvjp2 = &flux.v(n,k,j+2*dj,0);
-      Real *vj_l = &flux.ql(1%ndim,n,k,j+dj,0);
-      Real *vj_r = &flux.qr(1%ndim,n,k,j,0);
+        Real *pvjm2 = &flux.v(n, k, j - 2 * dj, 0);
+        Real *pvjm1 = &flux.v(n, k, j - dj, 0);
+        Real *pvjp1 = &flux.v(n, k, j + dj, 0);
+        Real *pvjp2 = &flux.v(n, k, j + 2 * dj, 0);
+        Real *vj_l = &flux.ql(1 % ndim, n, k, j + dj, 0);
+        Real *vj_r = &flux.qr(1 % ndim, n, k, j, 0);
 
-      Real *pvkm2 = &flux.v(n,k-2*dk,j,0);
-      Real *pvkm1 = &flux.v(n,k-dk,j,0);
-      Real *pvkp1 = &flux.v(n,k+dk,j,0);
-      Real *pvkp2 = &flux.v(n,k+2*dk,j,0);
-      Real *vk_l = &flux.ql(2%ndim,n,k+dk,j,0);
-      Real *vk_r = &flux.qr(2%ndim,n,k,j,0);
+        Real *pvkm2 = &flux.v(n, k - 2 * dk, j, 0);
+        Real *pvkm1 = &flux.v(n, k - dk, j, 0);
+        Real *pvkp1 = &flux.v(n, k + dk, j, 0);
+        Real *pvkp2 = &flux.v(n, k + 2 * dk, j, 0);
+        Real *vk_l = &flux.ql(2 % ndim, n, k + dk, j, 0);
+        Real *vk_r = &flux.qr(2 % ndim, n, k, j, 0);
 
-      switch(rt) {
+        switch (rt) {
         case ReconType::weno5z:
-          ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvim2, pvim1, pv, pvip1, pvip2, vi_l, vi_r);
-          if (ndim > 1) ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvjm2, pvjm1, pv, pvjp1, pvjp2, vj_l, vj_r);
-          if (ndim > 2) ReconLoop<WENO5Z>(member, ib.s-1, ib.e+1, pvkm2, pvkm1, pv, pvkp1, pvkp2, vk_l, vk_r);
+          ReconLoop<WENO5Z>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2,
+                            vi_l, vi_r);
+          if (ndim > 1)
+            ReconLoop<WENO5Z>(member, ib.s - 1, ib.e + 1, pvjm2, pvjm1, pv, pvjp1, pvjp2,
+                              vj_l, vj_r);
+          if (ndim > 2)
+            ReconLoop<WENO5Z>(member, ib.s - 1, ib.e + 1, pvkm2, pvkm1, pv, pvkp1, pvkp2,
+                              vk_l, vk_r);
           break;
         case ReconType::mp5:
-          ReconLoop<MP5>(member, ib.s-1, ib.e+1, pvim2, pvim1, pv, pvip1, pvip2, vi_l, vi_r);
-          if (ndim > 1) ReconLoop<MP5>(member, ib.s-1, ib.e+1, pvjm2, pvjm1, pv, pvjp1, pvjp2, vj_l, vj_r);
-          if (ndim > 2) ReconLoop<MP5>(member, ib.s-1, ib.e+1, pvkm2, pvkm1, pv, pvkp1, pvkp2, vk_l, vk_r);
+          ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2, vi_l,
+                         vi_r);
+          if (ndim > 1)
+            ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvjm2, pvjm1, pv, pvjp1, pvjp2,
+                           vj_l, vj_r);
+          if (ndim > 2)
+            ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvkm2, pvkm1, pv, pvkp1, pvkp2,
+                           vk_l, vk_r);
           break;
         case ReconType::linear:
-          ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pvim1, pv, pvip1, vi_l, vi_r);
-          if (ndim > 1) ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pvjm1, pv, pvjp1, vj_l, vj_r);
-          if (ndim > 2) ReconLoop<PiecewiseLinear>(member, ib.s-1, ib.e+1, pvkm1, pv, pvkp1, vk_l, vk_r);
+          ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
+                                     vi_r);
+          if (ndim > 1)
+            ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvjm1, pv, pvjp1, vj_l,
+                                       vj_r);
+          if (ndim > 2)
+            ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvkm1, pv, pvkp1, vk_l,
+                                       vk_r);
           break;
         case ReconType::constant:
-          ReconLoop<PiecewiseConstant>(member, ib.s-1, ib.e+1, pv, vi_l, vi_r);
-          if (ndim > 1) ReconLoop<PiecewiseConstant>(member, ib.s-1, ib.e+1, pv, vj_l, vj_r);
-          if (ndim > 2) ReconLoop<PiecewiseConstant>(member, ib.s-1, ib.e+1, pv, vk_l, vk_r);
+          ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vi_l, vi_r);
+          if (ndim > 1)
+            ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vj_l, vj_r);
+          if (ndim > 2)
+            ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vk_l, vk_r);
           break;
         default:
           PARTHENON_FAIL("Invalid recon option.");
-      }
-    });
+        }
+      });
 
 #define FLUX(method)                                                                     \
   parthenon::par_for(                                                                    \
