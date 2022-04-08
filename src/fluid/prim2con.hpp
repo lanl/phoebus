@@ -35,8 +35,8 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
     Bdotv += gcov[ii + 1][jj + 1] * b[ii] * v[jj];
   }
   Real bcon[] = {W * Bdotv / alpha, 0.0, 0.0, 0.0};
-  SPACELOOP(m) { bcon[m + 1] = b[m] * iW + bcon[0] * (v[m] - beta[m] / alpha); }
-  const Real bsq = (Bsq + alpha * alpha * bcon[0] * bcon[0]) * iW * iW;
+  SPACELOOP(m) { bcon[m + 1] = b[m] * iW + Bdotv * W * (v[m] - beta[m] / alpha); }
+  const Real bsq = Bsq * iW * iW + Bdotv*Bdotv;
   Real bcov[3] = {0.0, 0.0, 0.0};
   SPACELOOP(m) {
     SPACETIMELOOP(n) { bcov[m] += gcov[m + 1][n] * bcon[n]; }

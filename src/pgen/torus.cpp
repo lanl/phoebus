@@ -13,6 +13,8 @@
 
 #include "Kokkos_Random.hpp"
 #include "fluid/con2prim_robust.hpp"
+#include "fluid/tmunu.hpp"
+#include "geometry/geometry_utils.hpp"
 #include "geometry/boyer_lindquist.hpp"
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "pgen/pgen.hpp"
@@ -272,7 +274,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 void ProblemModifier(ParameterInput *pin) {
   Real router = pin->GetOrAddReal("coordinates", "r_outer", 40.0);
   Real x1max = log(router);
-  pin->SetReal("parthenon/mesh", "x1max", x1max);
+  // pin->SetReal("parthenon/mesh", "x1max", x1max);
 
   Real a = pin->GetReal("geometry", "a");
   Real Rh = 1.0 + sqrt(1.0 - a * a);
@@ -291,13 +293,13 @@ void ProblemModifier(ParameterInput *pin) {
     Real dx = (x1max - xh) / (nx1 - ninside);
     x1min = xh - ninside * dx;
   }
-  pin->SetReal("parthenon/mesh", "x1min", x1min);
+  // pin->SetReal("parthenon/mesh", "x1min", x1min);
 }
 
 void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
   const Real beta_min_target = pin->GetOrAddReal("torus", "beta_min", 100.);
-  const Real rho_min_bnorm = pin->GetOrAddReal("torus", "rho_min_bnorm", 1.e-4);
+  const Real rho_min_bnorm = pin->GetOrAddReal("torus", "rho_min_bnorm", 1.e-8);
   const bool magnetized = pin->GetOrAddBoolean("torus", "magnetized", true);
 
   Real beta_min = 1.e100;
@@ -330,7 +332,6 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
         ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
           // compute bsq for max
-          Real vsq = 0.0;
           Real Bsq = 0.0;
           Real Bdotv = 0.0;
           Real gcov[3][3];
@@ -338,12 +339,10 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           Real vp[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
           const Real W = phoebus::GetLorentzFactor(vp, gcov);
           SPACELOOP2(m, n) {
-            vsq += gcov[m][n] * v(ivlo + m, k, j, i) / W * v(ivlo + n, k, j, i) / W;
             Bdotv += gcov[m][n] * v(ivlo + m, k, j, i) / W * v(iblo + n, k, j, i);
             Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
           }
-          const Real b0 = W * Bdotv;
-          const Real bsq = (Bsq + b0 * b0) / (W * W);
+          const Real bsq = (Bsq) / (W*W) + Bdotv*Bdotv;
           const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
           if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
         },
@@ -364,7 +363,11 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    auto v = rc->PackVariables({fluid_prim::bfield}, imap);
+    auto v = rc->PackVariables({fluid_prim::density, fluid_prim::energy,
+        fluid_prim::pressure, fluid_prim::bfield}, imap);
+    const int irho = imap[fluid_prim::density].first;
+    const int ieng = imap[fluid_prim::energy].first;
+    const int iprs = imap[fluid_prim::pressure].first;
     const int iblo = imap[fluid_prim::bfield].first;
     const int ibhi = imap[fluid_prim::bfield].second;
 
@@ -377,6 +380,25 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           }
         });
     fluid::PrimitiveToConserved(rc.get());
+
+    constexpr int ND = Geometry::NDFULL;
+    auto coords = pmb->coords;
+    auto tmunu = fluid::BuildStressEnergyTensor(rc.get());
+    int j = jb.s + (jb.e - jb.s)/2 + 1;
+    int k = kb.s;
+    printf("#i\tj\tX1\tX2\trho\tu\tP\tB1\tB2\tT00\tT01\tT02\tT03\tT11\tT12\tT13\tT22\tT23\tT33\n");
+    pmb->par_for("Print Tmunu lol", ib.s, ib.e, KOKKOS_LAMBDA(const int i) {
+        Real X1 = coords.x1v(i);
+        Real X2 = coords.x2v(j);
+        Real T[ND][ND];
+        tmunu(T, k, j, i);
+        Real r = v(irho, k, j, i);
+        Real u = v(ieng, k, j, i);
+        Real pres = v(iprs, k, j, i);
+        printf("%d\t%d\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\n",
+               i,j,X1,X2,r, u, pres, v(iblo, k, j, i), v(iblo + 1, k, j, i), T[0][0],T[0][1],T[0][2],T[0][3],T[1][1],T[1][2],T[1][3],
+               T[2][2],T[2][3],T[3][3]);
+      });
   }
 }
 
