@@ -85,17 +85,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real x = coords.x1v(i);
         Real y = coords.x2v(j);
         if (is_snake) {
-          y = y - a_snake*sin(k_snake*x);
+          y = y - a_snake * sin(k_snake * x);
         }
 
-        const Real r = std::sqrt(x*x + y*y);
+        const Real r = std::sqrt(x * x + y * y);
         const Real rho = r < r0 ? rho0 : rho1;
         const Real P = press;
         const Real w = r < r0 ? omega : 0.0;
 
         const Real vx = -y * w;
         const Real vy = x * w;
-        Real Gamma = 1.0/sqrt(1.0 - vx*vx - vy*vy);
+        Real Gamma = 1.0 / sqrt(1.0 - vx * vx - vy * vy);
 
         Real eos_lambda[2];
         if (iye > 0) {
@@ -111,13 +111,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             rho, v(ieng, k, j, i) / rho,
             eos_lambda); // this doesn't have to be exact, just a reasonable guess
 
-        Real u_mink[] = {Gamma, Gamma*vx, Gamma*vy, 0.0};
+        Real u_mink[] = {Gamma, Gamma * vx, Gamma * vy, 0.0};
         Real B_mink[3] = {B0, 0.0, 0.0};
 
         Real Bdotv = 0.0;
-        SPACELOOP(m) Bdotv += B_mink[m] * u_mink[m+1]/Gamma;
-        Real bcon[4] = {Gamma*Bdotv, 0.0, 0.0, 0.0};
-        SPACELOOP(m) bcon[m+1] = (B_mink[m] + bcon[0] * u_mink[m+1])/Gamma;
+        SPACELOOP(m) Bdotv += B_mink[m] * u_mink[m + 1] / Gamma;
+        Real bcon[4] = {Gamma * Bdotv, 0.0, 0.0, 0.0};
+        SPACELOOP(m) bcon[m + 1] = (B_mink[m] + bcon[0] * u_mink[m + 1]) / Gamma;
 
         Real gcov[NDFULL][NDFULL] = {0};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
@@ -126,33 +126,32 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
         Real J[NDFULL][NDFULL] = {0};
         if (is_snake) {
-          J[0][0] = 1/alpha;
-          J[2][0] = -betay/alpha;
-          J[2][1] = a_snake*k_snake*cos(k_snake*x);
+          J[0][0] = 1 / alpha;
+          J[2][0] = -betay / alpha;
+          J[2][1] = a_snake * k_snake * cos(k_snake * x);
           J[1][1] = J[2][2] = J[3][3] = 1;
         } else if (is_minkowski) {
           J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1.0;
         }
 
         Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
-        SPACETIMELOOP(mu) SPACETIMELOOP(nu){
-          ucon_transformed[mu] += J[mu][nu]*u_mink[nu];
+        SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
+          ucon_transformed[mu] += J[mu][nu] * u_mink[nu];
         }
         Real bcon_transformed[NDFULL] = {0, 0, 0, 0};
-        SPACETIMELOOP(mu) SPACETIMELOOP(nu){
-          bcon_transformed[mu] += J[mu][nu]*bcon[nu];
+        SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
+          bcon_transformed[mu] += J[mu][nu] * bcon[nu];
         }
 
         Gamma = alpha * ucon_transformed[0];
-        v(ivlo, k, j, i) = ucon_transformed[1] + Gamma*shift[0]/alpha;
-        v(ivlo+1, k, j, i) = ucon_transformed[2] + Gamma*shift[1]/alpha;
-        v(ivlo+2, k, j, i) = ucon_transformed[3] + Gamma*shift[2]/alpha;
-        for(int d = ib_lo; d <= ib_hi; d++){
-          v(d, k, j, i) = bcon_transformed[d-ib_lo+1]*Gamma - alpha*bcon_transformed[0]*ucon_transformed[d-ib_lo+1];
-          //v(d, k, j, i) = B_mink[d-ib_lo];
+        v(ivlo, k, j, i) = ucon_transformed[1] + Gamma * shift[0] / alpha;
+        v(ivlo + 1, k, j, i) = ucon_transformed[2] + Gamma * shift[1] / alpha;
+        v(ivlo + 2, k, j, i) = ucon_transformed[3] + Gamma * shift[2] / alpha;
+        for (int d = ib_lo; d <= ib_hi; d++) {
+          v(d, k, j, i) = bcon_transformed[d - ib_lo + 1] * Gamma -
+                          alpha * bcon_transformed[0] * ucon_transformed[d - ib_lo + 1];
+          // v(d, k, j, i) = B_mink[d-ib_lo];
         }
-
-
       });
 
   fluid::PrimitiveToConserved(rc.get());

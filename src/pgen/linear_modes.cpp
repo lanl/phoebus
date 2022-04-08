@@ -23,9 +23,9 @@
 // Relativistic hydro linear modes.
 // TODO: Make this 3D instead of 2D.
 
-using Kokkos::complex;
 using Geometry::NDFULL;
 using Geometry::NDSPACE;
+using Kokkos::complex;
 
 namespace linear_modes {
 
@@ -43,10 +43,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ndim = pmb->pmy_mesh->ndim;
 
   PackIndexMap imap;
-  std::vector<std::string> vars({fluid_prim::density, fluid_prim::velocity,
-                                 fluid_prim::energy, fluid_prim::bfield,
-                                 fluid_prim::pressure, fluid_prim::temperature,
-                                 fluid_prim::ye});
+  std::vector<std::string> vars(
+      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
+       fluid_prim::pressure, fluid_prim::temperature, fluid_prim::ye});
   auto v = rc->PackVariables(vars, imap);
 
   const int irho = imap[fluid_prim::density].first;
@@ -79,7 +78,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double B30 = 0.;
 
   // Wavevector
-  constexpr double kk = 2*M_PI;
+  constexpr double kk = 2 * M_PI;
   double k1 = kk;
   double k2 = kk;
 
@@ -95,11 +94,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   if (physics == "hydro") {
     if (mode == "entropy") {
-      omega = complex<double>(0, 2.*M_PI/10.);
+      omega = complex<double>(0, 2. * M_PI / 10.);
       drho = 1.;
       dug = 0.;
       du1 = 0.;
-      //u10 = 0.1; // Uniform advection
+      // u10 = 0.1; // Uniform advection
     } else if (mode == "sound") {
       if (ndim == 1) {
         omega = complex<double>(0., 2.7422068833892093);
@@ -152,8 +151,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     msg << "Physics option \"" << physics << "\" not recognized!";
     PARTHENON_FAIL(msg);
   }
-  Real tf = 2.*M_PI/omega.imag();
-  Real cs = omega.imag() / (std::sqrt(2)*kk);
+  Real tf = 2. * M_PI / omega.imag();
+  Real cs = omega.imag() / (std::sqrt(2) * kk);
 
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
@@ -187,123 +186,117 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Set final time to be one period
   pin->SetReal("parthenon/time", "tlim", tf);
   tf = pin->GetReal("parthenon/time", "tlim");
-  std::cout << "Resetting final time to 1 wave period: "
-	    << tf
-	    << std::endl;
-  std::cout << "Wave frequency is: "
-	    << 1./tf
-	    << std::endl;
-  std::cout << "Wave speed is: "
-	    << cs
-	    << std::endl;
+  std::cout << "Resetting final time to 1 wave period: " << tf << std::endl;
+  std::cout << "Wave frequency is: " << 1. / tf << std::endl;
+  std::cout << "Wave speed is: " << cs << std::endl;
 
   pmb->par_for(
-    "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-    KOKKOS_LAMBDA(const int k, const int j, const int i) {
-      Real x = coords.x1v(i);
-      Real y = coords.x2v(j);
+      "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        Real x = coords.x1v(i);
+        Real y = coords.x2v(j);
 
-      if (is_snake) {
-        y = y - a_snake*sin(k_snake*x);
-      }
-      if (is_inchworm) {
-        x = x - a_snake*sin(k_snake*x);
-      }
-
-      const double mode = amp*cos(k1*x + k2*y);
-
-      double rho = rho0 + (drho*mode).real();
-      v(irho, k, j, i) = rho;
-      double ug = ug0 + (dug*mode).real();
-      double Pg = (gam - 1.)*ug;
-      v(ieng, k, j, i) = ug;
-      v(iprs, k, j, i) = Pg;
-
-      Real eos_lambda[2];
-      if (iye > 0) {
-	      v(iye, k, j, i) = 0.5;
-	      eos_lambda[0] = v(iye, k, j, i);
-      }
-      // This line causes NaNs and I don't know why
-      //v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho);
-      v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, v(ieng, k, j, i)/rho, eos_lambda);
-      if (ivhi > 0) {
-        v(ivlo, k, j, i) = u10 + (du1*mode).real();
-      }
-      if (ivhi >= 2) {
-        v(ivlo + 1, k, j, i) = u20 + (du2*mode).real();
-      }
-      if (ivhi >= 3) {
-        v(ivlo + 2, k, j, i) = u30 + (du3*mode).real();
-      }
-      if (ib_hi >= 1) {
-        v(ib_lo, k, j, i) = B10 + (dB1*mode).real();
-      }
-      if (ib_hi >= 2) {
-        v(ib_lo + 1, k, j, i) = B20 + (dB2*mode).real();
-      }
-      if (ib_hi >= 3) {
-        v(ib_lo + 2, k, j, i) = B30 + (dB3*mode).real();
-      }
-
-      Real vsq = 0.;
-      SPACELOOP2(ii, jj) {
-        vsq += v(ivlo + ii, k, j, i)*v(ivlo + jj, k, j, i);
-      }
-      Real Gamma = sqrt(1. + vsq);
-
-      if (is_snake || is_inchworm || is_boosted_minkowski) {
-        PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
-        // Transform velocity
-        Real gcov[NDFULL][NDFULL] = {0};
-        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-        Real shift[NDSPACE];
-        geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
-        Real ucon[NDFULL] = {Gamma, // alpha = 1 in Minkowski
-                             v(ivlo, k, j, i),  // beta^i = 0 in Minkowski
-                             v(ivlo+1, k, j, i),
-                             v(ivlo+2, k, j, i)};
-        Real Bdotv = 0.0;
-        for(int d = ib_lo; d <= ib_hi; d++){
-          Bdotv += v(d, k, j, i) * v(ivlo + d - ib_lo, k, j, i)/Gamma;
-        }
-        Real bcon[NDFULL] = {Gamma*Bdotv, 0.0,0.0,0.0};
-        for(int d =ib_lo; d <= ib_hi; d++){
-          bcon[d-ib_lo+1] = (v(d, k, j, i) + bcon[0]*ucon[d-ib_lo+1]) / Gamma;
-        }
-        Real J[NDFULL][NDFULL] = {0};
         if (is_snake) {
-          J[0][0] = 1/alpha;
-          J[2][0] = -betay/alpha;
-          J[2][1] = a_snake*k_snake*cos(k_snake*x);
-          J[1][1] = J[2][2] = J[3][3] = 1;
-        } else if (is_boosted_minkowski) {
-          J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
-          J[1][0] = -betax;
-          J[2][0] = -betay;
-          J[3][0] = -betaz;
-        } else if (is_inchworm) {
-          J[0][0] = J[2][2] = J[3][3] = 1;
-          J[1][1] = 1 + a_snake*k_snake*cos(k_snake*x);
+          y = y - a_snake * sin(k_snake * x);
         }
-        Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
-        SPACETIMELOOP(mu) SPACETIMELOOP(nu){
-          ucon_transformed[mu] += J[mu][nu]*ucon[nu];
-        }
-        Real bcon_transformed[NDFULL] = {0, 0, 0, 0};
-        SPACETIMELOOP(mu) SPACETIMELOOP(nu){
-          bcon_transformed[mu] += J[mu][nu]*bcon[nu];
+        if (is_inchworm) {
+          x = x - a_snake * sin(k_snake * x);
         }
 
-        Gamma = alpha * ucon_transformed[0];
-        v(ivlo, k, j, i) = ucon_transformed[1] + Gamma*shift[0]/alpha;
-        v(ivlo+1, k, j, i) = ucon_transformed[2] + Gamma*shift[1]/alpha;
-        v(ivlo+2, k, j, i) = ucon_transformed[3] + Gamma*shift[2]/alpha;
-        for(int d = ib_lo; d <= ib_hi; d++){
-          v(d, k, j, i) = bcon_transformed[d-ib_lo+1]*Gamma - alpha*bcon_transformed[0]*ucon_transformed[d-ib_lo+1];
+        const double mode = amp * cos(k1 * x + k2 * y);
+
+        double rho = rho0 + (drho * mode).real();
+        v(irho, k, j, i) = rho;
+        double ug = ug0 + (dug * mode).real();
+        double Pg = (gam - 1.) * ug;
+        v(ieng, k, j, i) = ug;
+        v(iprs, k, j, i) = Pg;
+
+        Real eos_lambda[2];
+        if (iye > 0) {
+          v(iye, k, j, i) = 0.5;
+          eos_lambda[0] = v(iye, k, j, i);
         }
-      }
-    });
+        // This line causes NaNs and I don't know why
+        // v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho, v(ieng, k, j,
+        // i)/rho);
+        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+            rho, v(ieng, k, j, i) / rho, eos_lambda);
+        if (ivhi > 0) {
+          v(ivlo, k, j, i) = u10 + (du1 * mode).real();
+        }
+        if (ivhi >= 2) {
+          v(ivlo + 1, k, j, i) = u20 + (du2 * mode).real();
+        }
+        if (ivhi >= 3) {
+          v(ivlo + 2, k, j, i) = u30 + (du3 * mode).real();
+        }
+        if (ib_hi >= 1) {
+          v(ib_lo, k, j, i) = B10 + (dB1 * mode).real();
+        }
+        if (ib_hi >= 2) {
+          v(ib_lo + 1, k, j, i) = B20 + (dB2 * mode).real();
+        }
+        if (ib_hi >= 3) {
+          v(ib_lo + 2, k, j, i) = B30 + (dB3 * mode).real();
+        }
+
+        Real vsq = 0.;
+        SPACELOOP2(ii, jj) { vsq += v(ivlo + ii, k, j, i) * v(ivlo + jj, k, j, i); }
+        Real Gamma = sqrt(1. + vsq);
+
+        if (is_snake || is_inchworm || is_boosted_minkowski) {
+          PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
+          // Transform velocity
+          Real gcov[NDFULL][NDFULL] = {0};
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          Real shift[NDSPACE];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+          Real ucon[NDFULL] = {Gamma,            // alpha = 1 in Minkowski
+                               v(ivlo, k, j, i), // beta^i = 0 in Minkowski
+                               v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+          Real Bdotv = 0.0;
+          for (int d = ib_lo; d <= ib_hi; d++) {
+            Bdotv += v(d, k, j, i) * v(ivlo + d - ib_lo, k, j, i) / Gamma;
+          }
+          Real bcon[NDFULL] = {Gamma * Bdotv, 0.0, 0.0, 0.0};
+          for (int d = ib_lo; d <= ib_hi; d++) {
+            bcon[d - ib_lo + 1] = (v(d, k, j, i) + bcon[0] * ucon[d - ib_lo + 1]) / Gamma;
+          }
+          Real J[NDFULL][NDFULL] = {0};
+          if (is_snake) {
+            J[0][0] = 1 / alpha;
+            J[2][0] = -betay / alpha;
+            J[2][1] = a_snake * k_snake * cos(k_snake * x);
+            J[1][1] = J[2][2] = J[3][3] = 1;
+          } else if (is_boosted_minkowski) {
+            J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
+            J[1][0] = -betax;
+            J[2][0] = -betay;
+            J[3][0] = -betaz;
+          } else if (is_inchworm) {
+            J[0][0] = J[2][2] = J[3][3] = 1;
+            J[1][1] = 1 + a_snake * k_snake * cos(k_snake * x);
+          }
+          Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
+          SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
+            ucon_transformed[mu] += J[mu][nu] * ucon[nu];
+          }
+          Real bcon_transformed[NDFULL] = {0, 0, 0, 0};
+          SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
+            bcon_transformed[mu] += J[mu][nu] * bcon[nu];
+          }
+
+          Gamma = alpha * ucon_transformed[0];
+          v(ivlo, k, j, i) = ucon_transformed[1] + Gamma * shift[0] / alpha;
+          v(ivlo + 1, k, j, i) = ucon_transformed[2] + Gamma * shift[1] / alpha;
+          v(ivlo + 2, k, j, i) = ucon_transformed[3] + Gamma * shift[2] / alpha;
+          for (int d = ib_lo; d <= ib_hi; d++) {
+            v(d, k, j, i) = bcon_transformed[d - ib_lo + 1] * Gamma -
+                            alpha * bcon_transformed[0] * ucon_transformed[d - ib_lo + 1];
+          }
+        }
+      });
 
   fluid::PrimitiveToConserved(rc.get());
 }
