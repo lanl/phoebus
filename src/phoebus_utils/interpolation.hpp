@@ -47,7 +47,7 @@ template <int DIR>
 KOKKOS_INLINE_FUNCTION void GetWeights(const Real x, const int nx,
                                        const Coordinates_t &coords, int &ix,
                                        weights_t &w) {
-  const Real min = Coordniates::GetXf<DIR>(0, coords);
+  const Real min = Coordinates::GetXf<DIR>(0, coords);
   const Real dx = coords.Dx(DIR);
   ix = std::min(std::max(0, static_cast<int>(robust::ratio(x - min, dx))), nx - 2);
   const Real floor = min + ix * dx;
@@ -58,20 +58,18 @@ KOKKOS_INLINE_FUNCTION void GetWeights(const Real x, const int nx,
 /*
  * Trilinear interpolation on a variable or meshblock pack
  * PARAM[IN] - X3, X2, X1: Coordinate locations
- * PARAM[IN] - nx3, nx2, nx1 - number of points along each direction
- * PARAM[IN] - coords - parthenon coords object
  * PARAM[IN] - p - Variable or MeshBlockPack
  * PARAM[IN] - b, v, variable and meshblock index
  */
 template <typename Pack>
-KOKKOS_INLINE_FUNCTION Real Do(const Real X3, const Real X2, const Real X1,
-                               const int nx3, const int nx2, const int nx1,
-                               const Coordinates_t &coords, const Pack &p, int b, int v) {
+KOKKOS_INLINE_FUNCTION Real Do(const Real X3, const Real X2, const Real X1, const Pack &p,
+                               int b, int v) {
+  const auto &coords = p.GetCoords(b);
   int ix[3];
   weights_t w[3];
-  GetWeights(X1, nx1, coords, ix[0], w[0]);
-  GetWeights(X2, nx2, coords, ix[1], w[1]);
-  GetWeights(X3, nx3, coords, ix[2], w[2]);
+  GetWeights(X1, p.GetDim(1), coords, ix[0], w[0]);
+  GetWeights(X2, p.GetDim(2), coords, ix[1], w[1]);
+  GetWeights(X3, p.GetDim(3), coords, ix[2], w[2]);
   return (w[2][0] * (w[1][0] * (w[0][0] * p(b, v, ix[2], ix[1], ix[0]) +
                                 w[0][1] * p(b, v, ix[2], ix[1], ix[0] + 1)) +
                      w[1][1] * (w[0][0] * p(b, v, ix[2], ix[1] + 1, ix[0]) +
@@ -83,18 +81,49 @@ KOKKOS_INLINE_FUNCTION Real Do(const Real X3, const Real X2, const Real X1,
 }
 
 /*
- * Trilinear interpolation on a variable or meshblock pack
+ * Trilinear interpolation on a variable pack
  * PARAM[IN] - X3, X2, X1: Coordinate locations
- * PARAM[IN] - nx3, nx2, nx1 - number of points along each direction
- * PARAM[IN] - coords - parthenon coords object
- * PARAM[IN] - p - Variable or MeshBlockPack
- * PARAM[IN] - b, v, variable and meshblock index
+ * PARAM[IN] - p - pack
+ * PARAM[IN] - v, variable index
  */
-template <typename Pack>
 KOKKOS_INLINE_FUNCTION Real Do(const Real X3, const Real X2, const Real X1,
-                               const int nx3, const int nx2, const int nx1,
-                               const Coordinates_t &coords, const Pack &p, int v) {
-  return Do(x3, x2, x1, nx3, nx2, nx1, coords, p, v);
+                               const VariablePack<Real> &p, int v) {
+  return Do(x3, x2, x1, p, 0, v);
+}
+
+/*
+ * Trilinear interpolation on a meshblock pack
+ * PARAM[IN] - X3, X2, X1: Coordinate locations
+ * PARAM[IN] - p - pack
+ * PARAM[IN] - v, variable index
+ */
+// WARNING: This function will be MUCH slower than the MeshBlock version,
+// since there's no ordering to meshblocks.
+KOKKOS_INLINE_FUNCTION Real Do(const Real X3, const Real X2, const Real X1,
+                               const MeshBlockPack<VariablePack<Real>> &p, int v) {
+  const int nx1 = p.GetDim(1);
+  const int nx2 = p.GetDim(2);
+  const int nx3 = p.GetDim(3);
+
+  // First we need to search for the relevant meshblock
+  int b;
+  bool found false;
+  for (b = 0; b < p.GetDim(5); b++) {
+    const auto &coords = p.GetCoords(b);
+    const Real x1min = Coordinates::GetXf<X1DIR>(0, coords);
+    const Real x1max = Coordinates::GetXf<X1DIR>(nx1, coords);
+    const Real x2min = Coordinates::GetXf<X2DIR>(0, coords);
+    const Real x2max = Coordinates::GetXf<X2DIR>(nx2, coords);
+    const Real x3min = Coordinates::GetXf<X3DIR>(0, coords);
+    const Real x3max = Coordinates::GetXf<X3DIR>(nx3, coords);
+    if ((x1min <= X1 && X1 <= x2max) && (x2min <= X2 && X2 <= x2max)
+        && (x3min <= X3 && X3 <= x3max)) {
+      found = true;
+      break;
+    }
+  }
+  PARTHENON_REQUIRE(found, "Interpolation in bounds");
+  return Do(X3, X2, X1, p, b, v);
 }
 
 } // namespace Linear
