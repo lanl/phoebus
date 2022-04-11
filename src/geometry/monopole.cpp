@@ -34,12 +34,16 @@ namespace Geometry {
 
 template <>
 void Initialize<MplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
-  // All initialization done by MonopoleGR machinery
+  Params &params = geometry->AllParams();
+  bool time_dependent = true;
+  params.Add("time_dependent", time_dependent);
   return;
 }
 template <>
 void Initialize<MplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
-  // All initialization done by MonopoleGR machinery
+  Params &params = geometry->AllParams();
+  bool time_dependent = true;
+  params.Add("time_dependent", time_dependent);
   return;
 }
 // TODO(JMM): Might need to figure this out more carefully
@@ -47,6 +51,10 @@ template <>
 void SetGeometry<MplSphMeshBlock>(MeshBlockData<Real> *rc) {}
 template <>
 void SetGeometry<MplCartMeshBlock>(MeshBlockData<Real> *rc) {}
+template <>
+void SetGeometry<MplSphMesh>(MeshData<Real> *rc) {}
+template <>
+void SetGeometry<MplCartMesh>(MeshData<Real> *rc) {}
 
 template <>
 MplSphMeshBlock GetCoordinateSystem<MplSphMeshBlock>(MeshBlockData<Real> *rc) {
@@ -149,6 +157,16 @@ void SetGeometry<CMplSphMeshBlock>(MeshBlockData<Real> *rc) {
 template <>
 void SetGeometry<CMplCartMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<MplCartMeshBlock>(rc);
+}
+
+template <>
+void SetGeometry<CMplSphMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<MplSphMesh>(rc);
+}
+
+template <>
+void SetGeometry<CMplCartMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<MplCartMesh>(rc);
 }
 
 } // namespace Geometry
