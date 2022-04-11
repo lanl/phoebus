@@ -20,6 +20,8 @@ add_executable(phoebus
 
   fluid/con2prim.hpp
   fluid/con2prim_robust.hpp
+  fluid/con2prim_statistics.cpp
+  fluid/con2prim_statistics.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
   fluid/riemann.hpp
@@ -81,9 +83,11 @@ add_executable(phoebus
   pgen/kh.cpp
   pgen/leptoneq.cpp
   pgen/linear_modes.cpp
+  pgen/p2c2p.cpp
   pgen/radiation_advection.cpp
   pgen/radiation_equilibration.cpp
   pgen/rhs_tester.cpp
+  pgen/rotor.cpp
   pgen/shock_tube.cpp
   pgen/thin_cooling.cpp
   pgen/sedov.cpp
