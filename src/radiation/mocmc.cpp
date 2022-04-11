@@ -30,6 +30,7 @@
 namespace radiation {
 
 namespace pf = fluid_prim;
+namespace cf = fluid_cons;
 namespace cr = radmoment_cons;
 namespace pr = radmoment_prim;
 namespace ir = radmoment_internal;
@@ -639,10 +640,18 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
   const Real TIME = unit_conv.GetTimeCodeToCGS();
 
+  // TODO(BRR) Add singularity-scat
+  const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
+
   std::vector<std::string> variables{
-      cr::E,      cr::F,        pr::J,           pr::H,  pf::density,
-      pf::energy, pf::velocity, pf::temperature, pf::ye, ir::tilPi,
-      im::dnsamp, im::Inu0,     im::Inu1};
+      cr::E,      cr::F,        pr::J,           pr::H,   pf::density,
+      pf::energy, pf::velocity, pf::temperature, pf::ye,  ir::tilPi,
+      ir::kappaH, im::dnsamp,   im::Inu0,        im::Inu1};
+  if (update_fluid) {
+    variables.push_back(cf::energy);
+    variables.push_back(cf::momentum);
+    variables.push_back(cf::ye);
+  }
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -658,6 +667,13 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const auto iTilPi = imap.GetFlatIdx(ir::tilPi);
   auto idx_E = imap.GetFlatIdx(cr::E);
   auto idx_F = imap.GetFlatIdx(cr::F);
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
+  int ceng(-1), cmom_lo(-1), cye(-1);
+  if (update_fluid) {
+    ceng = imap[cf::energy].first;
+    cmom_lo = imap[cf::momentum].first;
+    cye = imap[cf::ye].first;
+  }
 
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
   const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
@@ -710,19 +726,11 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             Real JBB =
                 opac_d.ThermalDistributionOfT(v(iblock, pT, k, j, i), dev_species[ispec]);
 
-            Real tauJ = 0.;
-            Real tauH = 0.;
-
             ClosureMOCMC<Vec, Tens2> c(con_v, &g);
 
             Real dE = 0;
             Vec cov_dF;
-            auto status = c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ,
-                                               tauH, &dE, &cov_dF);
 
-            // Update E, F
-
-            // Update samples
             // Calculate Inu0
             for (int bin = 0; bin < nu_bins; bin++) {
               v(iblock, Inu0(ispec, bin), k, j, i) = 0.;
@@ -737,15 +745,96 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
               }
             }
 
-            // Calculate effective scattering emissivity
+            // Frequency-average opacities
+            Real kappaJ = 0.;
+            Real kappaH = 0.;
 
-            // Recalculate pi
+            Real Itot = 0.;
+            for (int bin = 0; bin < nu_bins; bin++) {
+              kappaJ +=
+                  opac_d.AngleAveragedAbsorptionCoefficient(
+                      v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                      v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin) * TIME) *
+                  v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin)*TIME;
+              Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin)*TIME;
+            }
 
-            //printf("HERE!\n");
-            //exit(-1);
+            // Trapezoidal rule
+            kappaJ -= 0.5 *
+                      opac_d.AngleAveragedAbsorptionCoefficient(
+                          v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                          v(iblock, pye, k, j, i), dev_species[ispec], nusamp(0) * TIME) *
+                      v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0)*TIME;
+            kappaJ -= 0.5 *
+                      opac_d.AngleAveragedAbsorptionCoefficient(
+                          v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                          v(iblock, pye, k, j, i), dev_species[ispec],
+                          nusamp(nu_bins - 1) * TIME) *
+                      v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1)*TIME;
+            Itot -= 0.5 * (v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0)*TIME +
+                           v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1)*TIME);
+            kappaJ = robust::ratio(kappaJ, Itot);
+            kappaH = kappaJ;
+            kappaJ *= (1. - scattering_fraction);
+
+            Real tauJ = alpha * dt * kappaJ;
+            Real tauH = alpha * dt * kappaH;
+
+            // Store kappaH for asymptotic fluxes
+            // TODO(BRR) what about flux at first timestep?
+            v(iblock, idx_kappaH(ispec), k, j, i) = kappaH;
+
+            auto status = c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ,
+                                               tauH, &dE, &cov_dF);
+
+            // Add source corrections to conserved radiation variables
+            v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
+            for (int idir = 0; idir < 3; ++idir) {
+              v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
+            }
+
+            // Add source corrections to conserved fluid variables
+            if (update_fluid) {
+              v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+              v(iblock, ceng, k, j, i) -= sdetgam * dE;
+              v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
+              v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
+              v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
+            }
+
+            // Update sample intensities
+            for (int n = 0; n < nsamp; n++) {
+              const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+              for (int bin = 0; bin < nu_bins; bin++) {
+                const Real nu = nusamp(bin) * TIME;
+                const Real ds = dt / nu;
+                const Real alphainv_a =
+                    nu * (1. - scattering_fraction) *
+                    opac_d.AngleAveragedAbsorptionCoefficient(
+                        v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                        v(iblock, pye, k, j, i), dev_species[ispec], nu);
+                const Real alphainv_s =
+                    nu * scattering_fraction *
+                    opac_d.AngleAveragedAbsorptionCoefficient(
+                        v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                        v(iblock, pye, k, j, i), dev_species[ispec], nu);
+                const Real jinv_a = opac_d.ThermalDistributionOfT(v(iblock, pT, k, j, i),
+                                                                  dev_species[ispec]) /
+                                    (nu * nu * nu) * alphainv_a;
+                // Calculate effective scattering emissivity from angle-averaged intensity
+                // TODO(BRR) include dI/ds in this calculation for inelastic scattering
+                const Real jinv_s =
+                    v(iblock, Inu0(ispec, bin), k, j, i) / (nu * nu * nu) * alphainv_s;
+                Inuinv(bin, ispec, nswarm) =
+                    (Inuinv(bin, ispec, nswarm) + ds * (jinv_a + jinv_s)) /
+                    (1. + ds * (alphainv_a + alphainv_s));
+              }
+            }
           }
         });
   } else {
+
+    // 2D solve for T, Ye
 
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
@@ -763,7 +852,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
           auto res = Residual(dtau, eos_d, opac_d, v, pdens, peng, pJ, Inu0, Inu1,
                               num_species, nu_bins, species_d, nusamp, dlnu, 0, k, j, i);
 
-          Real guess[2] = {v(pdens, k, j, i), v(pye, k, j, i)};
+          Real guess[2] = {v(pT, k, j, i), v(pye, k, j, i)};
           root_find::RootFindStatus status;
           root_find::broyden2(res, guess, 50, 1.e-10, &status);
           if (i == 10) {
@@ -773,7 +862,11 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
           // Real error[2];
           // res(v(pdens, k, j, i), v(pye, k, j, i), error);
         });
-  }
+  } // else else: 5D solve for T, Ye, Momentum
+
+  // Recalculate pi given updated sample intensities
+  // TODO(BRR) make this a separate task?
+  MOCMCEddington(rc);
 
   return TaskStatus::complete;
 }
@@ -836,7 +929,7 @@ TaskStatus MOCMCEddington(T *rc) {
           Real I[MAX_SPECIES] = {0.0};
           for (int nubin = 0; nubin < nu_bins; nubin++) {
             for (int s = 0; s < num_species; s++) {
-              I[s] += Inuinv(nubin, s, nswarm) * pow(nusamp(nubin), 3);
+              I[s] += Inuinv(nubin, s, nswarm) * pow(nusamp(nubin), 4);
             }
           }
 
