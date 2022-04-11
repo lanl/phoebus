@@ -179,6 +179,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) {
     physics->AddField(p::ye, mprim_scalar);
   }
+  if (pin->GetOrAddString("fluid", "c2p_method", "robust") == "robust") {
+    physics->AddField(impl::c2p_mu, mprim_scalar);
+  }
   // Just want constant primitive fields around to serve as
   // background if we are not evolving the fluid, don't need
   // to do the rest.
