@@ -58,6 +58,28 @@ class UnitConversions {
   Real temperature_;
 };
 
+// Object for holding physical constants in code units for convenience
+class CodeConstants {
+  using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
+
+ public:
+  CodeConstants(UnitConversions unit_conv) {
+    const Real TIME = unit_conv.GetTimeCGSToCode();
+    const Real MASS = unit_conv.GetMassCGSToCode();
+    const Real LENGTH = unit_conv.GetLengthCGSToCode();
+    h_code_ = pc::h * MASS * LENGTH * LENGTH / TIME;
+    c_code_ = pc::c * LENGTH / TIME;
+  }
+
+  Real h() const { return h_code_; }
+
+  Real c() const { return c_code_; }
+
+ private:
+  Real h_code_;
+  Real c_code_;
+};
+
 constexpr Real solar_mass = 1.989e33; // g
 
 } // namespace phoebus
