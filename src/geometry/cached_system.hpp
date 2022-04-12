@@ -115,9 +115,9 @@ class Cached {
     }
     // These variables only exist at cell centers
     PARTHENON_DEBUG_REQUIRE(imap["g.c.dalpha"].second >= 0, "variable exists");
-    PARTHENON_DEBUG_REQUIRE(
-        imap["g.c.dalpha"].second - imap["g.c.dalpha"].first + 1 == nvar_deriv_,
-        "variable shape correct");
+    PARTHENON_DEBUG_REQUIRE(imap["g.c.dalpha"].second - imap["g.c.dalpha"].first + 1 ==
+                                nvar_deriv_,
+                            "variable shape correct");
     idx_[CellLocation::Cent].dalpha = imap["g.c.dalpha"].first;
     PARTHENON_DEBUG_REQUIRE(imap["g.c.dg"].second >= 0, "variable exists");
     idx_[CellLocation::Cent].dg = imap["g.c.dg"].first;
