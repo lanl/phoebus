@@ -116,11 +116,11 @@ class Cached {
     // These variables only exist at cell centers
     PARTHENON_DEBUG_REQUIRE(imap["g.c.dalpha"].second >= 0, "variable exists");
     PARTHENON_DEBUG_REQUIRE(
-        imap["g.c.dalpha"].second - imap["g." + loc + ".dalpha"].first + 1 == nvar_deriv_,
+        imap["g.c.dalpha"].second - imap["g.c.dalpha"].first + 1 == nvar_deriv_,
         "variable shape correct");
-    idx_[CellLocation::Cent].dalpha = imap["g." + loc + ".dalpha"].first;
+    idx_[CellLocation::Cent].dalpha = imap["g.c.dalpha"].first;
     PARTHENON_DEBUG_REQUIRE(imap["g.c.dg"].second >= 0, "variable exists");
-    idx_[CellLocation::Cent].dg = imap["g." + loc + ".dg"].first;
+    idx_[CellLocation::Cent].dg = imap["g.c.dg"].first;
     icoord_c_ = imap["g.c.coord"].first;
     // This variable only exists at cell corners
     icoord_n_ = imap["g.n.coord"].first;
@@ -405,7 +405,7 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
   std::vector<std::string> cent_only_names = {"dalpha", "dg"};
   PARTHENON_REQUIRE_THROWS(var_sizes.size() == var_names.size(),
                            "Same number of variables as sizes");
-  PARTHENON_REQUIRE_THROWS(cent_only_sizes.size() == cent_names.size(),
+  PARTHENON_REQUIRE_THROWS(cent_only_sizes.size() == cent_only_names.size(),
                            "Same number of variables as sizes");
   // Cell variables
   for (int i = 0; i < var_sizes.size(); ++i) {
@@ -419,16 +419,16 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
     geometry->AddField("g.c." + var_names[i], m);
   }
   // Do metric derivative and lapse derivative separately, as
-  // they're only available on nodes
-  for (int i = 0; i < node_only_sizes.size(); ++i) {
+  // they're only available on cell centers
+  for (int i = 0; i < cent_only_sizes.size(); ++i) {
     if (axisymmetric) {
-      shape = {dims.nx1, dims.nx2, 1, node_only_sizes[i]};
+      shape = {dims.nx1, dims.nx2, 1, cent_only_sizes[i]};
       m = Metadata(flags_o, shape);
     } else {
-      shape = {node_only_sizes[i]};
+      shape = {cent_only_sizes[i]};
       m = Metadata(flags_c, shape);
     }
-    geometry->AddField("g.c." + node_only_names[i], m);
+    geometry->AddField("g.c." + cent_only_names[i], m);
   }
   // face variables
   for (int d = 1; d <= 3; ++d) {
