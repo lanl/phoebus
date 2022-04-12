@@ -57,6 +57,31 @@ class PiecewiseConstant : public Interpolation {
   int constexpr StencilSize() override { return 1; }
 };
 
+class Linear : public Interpolation {
+  public:
+  KOKKOS_FUNCTION
+  Linear(const int nSupport, const Real dx, const Real shift) : Interpolation(nSupport, dx, shift) {}
+
+  KOKKOS_INLINE_FUNCTION
+  void GetIndicesAndWeights(const int i, int *idx, Real *wgt) override {
+    idx[0] = std::floor(i + shift_);
+    idx[1] = idx[0] + 1;
+
+    wgt[0] =
+    wgt[1] = 1. - wgt[0];
+
+    for (int nsup = 0; nsup < 2; nsup++) {
+      if (idx[nsup] < 0 || idx[nsup] >= nSupport_) {
+        idx[nsup] = 0;
+        wgt[nsup] = 0.;
+      }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  int constexpr StencilSize() override { return 2; }
+};
+
 } // namespace interpolation
 
 #endif // PHOEBUS_UTILS_INTERPOLATION_
