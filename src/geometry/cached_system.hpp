@@ -147,7 +147,8 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(CellLocation loc, int b, int k, int j, int i,
                           Real beta[NDSPACE]) const {
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACELOOP(d) { beta[d] = pack_(b, idx_[loc].bcon + d, k, j, i); }
   }
@@ -163,7 +164,8 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void Metric(CellLocation loc, int b, int k, int j, int i,
               Real gamma[NDSPACE][NDSPACE]) const {
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACELOOP2(m, n) {     // gamma_{ij} = g_{ij}
       int offst = Utils::Flatten2(m + 1, n + 1, NDFULL);
@@ -182,7 +184,8 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(CellLocation loc, int b, int k, int j, int i,
                      Real gamma[NDSPACE][NDSPACE]) const {
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACELOOP2(m, n) {
       int offst = Utils::Flatten2(m, n, NDSPACE);
@@ -201,7 +204,8 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(CellLocation loc, int b, int k, int j, int i,
                        Real g[NDFULL][NDFULL]) const {
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACETIMELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDFULL);
@@ -222,7 +226,8 @@ class Cached {
   void SpacetimeMetricInverse(CellLocation loc, int b, int k, int j, int i,
                               Real g[NDFULL][NDFULL]) const {
     using robust::ratio;
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     auto &idx = idx_[loc];
     Real alpha2 = Lapse(loc, b, k, j, i);
@@ -248,7 +253,8 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(CellLocation loc, int b, int k, int j, int i) const {
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     return pack_(b, idx_[loc].detgam, k, j, i);
   }
@@ -268,14 +274,16 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int bid, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, bid, k, j, i);
   }
@@ -287,7 +295,8 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(CellLocation loc, int b, int k, int j, int i,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     const int offset = !time_dependent_;
     SPACETIMELOOP2(mu, nu) {
@@ -310,7 +319,8 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int b, int k, int j, int i, Real da[NDFULL]) const {
-    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     const int offset = !time_dependent_;
     da[0] = 0; // gets overwritten if time-dependent metric
@@ -490,6 +500,8 @@ void SetCachedCoordinateSystem(Data *rc) {
   }
   PARTHENON_DEBUG_REQUIRE(imap["g.c.dalpha"].second >= 0, "Variable exists");
   PARTHENON_DEBUG_REQUIRE(imap["g.c.dg"].second >= 0, "Variable exists");
+  idx[CellLocation::Cent].dg = imap["g.c.dg"].first;
+  idx[CellLocation::Cent].dalpha = imap["g.c.dalpha"].first;
 
   auto lamb = KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
                             const CellLocation loc) {
