@@ -41,21 +41,17 @@ namespace Geometry {
 // are stored at cell centers and cell faces. If a request is made for
 // a node or for off-grid, the original analytic system is used.
 const std::vector<std::string> GEOMETRY_CACHED_VARS = {
-    "g.c.alpha",   "g.c.dalpha",  "g.c.bcon",  "g.c.gcov",
-    "g.c.gamcon",  "g.c.detgam",  "g.c.dg",    "g.c.coord",
+    "g.c.alpha",  "g.c.dalpha", "g.c.bcon",  "g.c.gcov",    "g.c.gamcon",
+    "g.c.detgam", "g.c.dg",     "g.c.coord",
 
-    "g.f1.alpha",  "g.f1.dalpha", "g.f1.bcon", "g.f1.gcov",
-    "g.f1.gamcon", "g.f1.detgam", "g.f1.dg",
+    "g.f1.alpha", "g.f1.bcon",  "g.f1.gcov", "g.f1.gamcon", "g.f1.detgam",
 
-    "g.f2.alpha",  "g.f2.dalpha", "g.f2.bcon", "g.f2.gcov",
-    "g.f2.gamcon", "g.f2.detgam", "g.f2.dg",
+    "g.f2.alpha", "g.f2.bcon",  "g.f2.gcov", "g.f2.gamcon", "g.f2.detgam",
 
-    "g.f3.alpha",  "g.f3.dalpha", "g.f3.bcon", "g.f3.gcov",
-    "g.f3.gamcon", "g.f3.detgam", "g.f3.dg",
+    "g.f3.alpha", "g.f3.bcon",  "g.f3.gcov", "g.f3.gamcon", "g.f3.detgam",
 
-    "g.n.alpha",   "g.n.dalpha",  "g.n.bcon",  "g.n.gcov",
-    "g.n.gamcon",  "g.n.detgam",  "g.n.dg",    "g.n.coord"};
-const std::vector<std::string> GEOMETRY_LOC_NAMES = {"c", "f1", "f2", "f3", "n"};
+    "g.n.coord"};
+const std::vector<std::string> GEOMETRY_LOC_NAMES = {"c", "f1", "f2", "f3"};
 
 // Support class. Accesses a pack on cells or faces as appropriate
 namespace Impl {
@@ -95,17 +91,12 @@ class Cached {
     PackIndexMap imap;
     pack_ = rc->PackVariables(GEOMETRY_CACHED_VARS, imap);
     int i = 0;
+    // These variables exist everywhere
     for (auto &loc : GEOMETRY_LOC_NAMES) {
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".alpha"].second >= 0, "variable exists");
       PARTHENON_DEBUG_REQUIRE(
           imap["g." + loc + ".alpha"].second - imap["g." + loc + ".alpha"].first == 0,
           "variable shape correct");
-      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second >= 0,
-                              "variable exists");
-      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second -
-                                      imap["g." + loc + ".dalpha"].first + 1 ==
-                                  nvar_deriv_,
-                              "variable shape correct");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second >= 0, "variable exists");
       PARTHENON_DEBUG_REQUIRE(
           imap["g." + loc + ".bcon"].second - imap["g." + loc + ".bcon"].first + 1 == 3,
@@ -115,17 +106,23 @@ class Cached {
                               "variable exists");
       PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".detgam"].second >= 0,
                               "variable exists");
-      PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dg"].second >= 0, "variable exists");
       idx_[i].alpha = imap["g." + loc + ".alpha"].first;
-      idx_[i].dalpha = imap["g." + loc + ".dalpha"].first;
       idx_[i].bcon = imap["g." + loc + ".bcon"].first;
       idx_[i].gcov = imap["g." + loc + ".gcov"].first;
       idx_[i].gamcon = imap["g." + loc + ".gamcon"].first;
       idx_[i].detgam = imap["g." + loc + ".detgam"].first;
-      idx_[i].dg = imap["g." + loc + ".dg"].first;
       i++;
     }
+    // These variables only exist at cell centers
+    PARTHENON_DEBUG_REQUIRE(imap["g.c.dalpha"].second >= 0, "variable exists");
+    PARTHENON_DEBUG_REQUIRE(
+        imap["g.c.dalpha"].second - imap["g." + loc + ".dalpha"].first + 1 == nvar_deriv_,
+        "variable shape correct");
+    idx_[CellLocation::Cent].dalpha = imap["g." + loc + ".dalpha"].first;
+    PARTHENON_DEBUG_REQUIRE(imap["g.c.dg"].second >= 0, "variable exists");
+    idx_[CellLocation::Cent].dg = imap["g." + loc + ".dg"].first;
     icoord_c_ = imap["g.c.coord"].first;
+    // This variable only exists at cell corners
     icoord_n_ = imap["g.n.coord"].first;
   }
   KOKKOS_INLINE_FUNCTION
@@ -134,6 +131,8 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   Real Lapse(CellLocation loc, int b, int k, int j, int i) const {
+    PARTHENON_DEBUG_REQUIRE(loc != CellLocation::Corn,
+                            "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     return pack_(b, idx_[loc].alpha, k, j, i);
   }
@@ -148,6 +147,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(CellLocation loc, int b, int k, int j, int i,
                           Real beta[NDSPACE]) const {
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACELOOP(d) { beta[d] = pack_(b, idx_[loc].bcon + d, k, j, i); }
   }
@@ -163,6 +163,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void Metric(CellLocation loc, int b, int k, int j, int i,
               Real gamma[NDSPACE][NDSPACE]) const {
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACELOOP2(m, n) {     // gamma_{ij} = g_{ij}
       int offst = Utils::Flatten2(m + 1, n + 1, NDFULL);
@@ -181,6 +182,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(CellLocation loc, int b, int k, int j, int i,
                      Real gamma[NDSPACE][NDSPACE]) const {
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACELOOP2(m, n) {
       int offst = Utils::Flatten2(m, n, NDSPACE);
@@ -199,6 +201,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(CellLocation loc, int b, int k, int j, int i,
                        Real g[NDFULL][NDFULL]) const {
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     SPACETIMELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDFULL);
@@ -219,6 +222,7 @@ class Cached {
   void SpacetimeMetricInverse(CellLocation loc, int b, int k, int j, int i,
                               Real g[NDFULL][NDFULL]) const {
     using robust::ratio;
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     auto &idx = idx_[loc];
     Real alpha2 = Lapse(loc, b, k, j, i);
@@ -244,6 +248,7 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(CellLocation loc, int b, int k, int j, int i) const {
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     return pack_(b, idx_[loc].detgam, k, j, i);
   }
@@ -263,12 +268,14 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int bid, int k, int j, int i,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, bid, k, j, i);
   }
@@ -280,6 +287,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(CellLocation loc, int b, int k, int j, int i,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     const int offset = !time_dependent_;
     SPACETIMELOOP2(mu, nu) {
@@ -302,6 +310,7 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int b, int k, int j, int i, Real da[NDFULL]) const {
+    PARTHENON_DEBUG_REQUIRE(CellLocation != Corn, "Node-centered values not available.");
     k *= (!axisymmetric_); // maps k -> 0 for axisymmetric spacetimes. Otherwise no-op
     const int offset = !time_dependent_;
     da[0] = 0; // gets overwritten if time-dependent metric
@@ -343,7 +352,7 @@ class Cached {
   bool time_dependent_ = false;
   int nvar_deriv_ = 3;
   System s_;
-  int icoord_c_; // don't bother with face coords for now.
+  int icoord_c_;
   int icoord_n_;
   Pack pack_;
   Impl::LocArray<Impl::GeomPackIndices> idx_;
@@ -386,17 +395,17 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
                                        Metadata::OneCopy};
   std::vector<MetadataFlag> flags_o = {Metadata::Derived, Metadata::OneCopy};
 
-  std::vector<int> var_sizes = {1,
-                                nvar_deriv,
-                                NDSPACE,
-                                Utils::SymSize<NDFULL>(),
-                                Utils::SymSize<NDSPACE>(),
-                                1,
-                                nvar_deriv * Utils::SymSize<NDFULL>(),
-                                NDFULL};
-  std::vector<std::string> var_names = {"alpha",  "dalpha", "bcon", "gcov",
-                                        "gamcon", "detgam", "dg",   "coord"};
+  // JMM: Coords arrays are always provided by the geometry machinery,
+  // for use with 3D vis software. No special logic in caching
+  // required.
+  std::vector<int> var_sizes = {1, NDSPACE, Utils::SymSize<NDFULL>(),
+                                Utils::SymSize<NDSPACE>(), 1};
+  std::vector<std::string> var_names = {"alpha", "bcon", "gcov", "gamcon", "detgam"};
+  std::vector<int> cent_only_sizes = {nvar_deriv, nvar_deriv * Utils::SymSize<NDFULL>()};
+  std::vector<std::string> cent_only_names = {"dalpha", "dg"};
   PARTHENON_REQUIRE_THROWS(var_sizes.size() == var_names.size(),
+                           "Same number of variables as sizes");
+  PARTHENON_REQUIRE_THROWS(cent_only_sizes.size() == cent_names.size(),
                            "Same number of variables as sizes");
   // Cell variables
   for (int i = 0; i < var_sizes.size(); ++i) {
@@ -409,6 +418,18 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
     }
     geometry->AddField("g.c." + var_names[i], m);
   }
+  // Do metric derivative and lapse derivative separately, as
+  // they're only available on nodes
+  for (int i = 0; i < node_only_sizes.size(); ++i) {
+    if (axisymmetric) {
+      shape = {dims.nx1, dims.nx2, 1, node_only_sizes[i]};
+      m = Metadata(flags_o, shape);
+    } else {
+      shape = {node_only_sizes[i]};
+      m = Metadata(flags_c, shape);
+    }
+    geometry->AddField("g.c." + node_only_names[i], m);
+  }
   // face variables
   for (int d = 1; d <= 3; ++d) {
     for (int i = 0; i < var_sizes.size(); ++i) {
@@ -418,13 +439,6 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
       m = Metadata(flags_o, shape);
       geometry->AddField("g." + GEOMETRY_LOC_NAMES[d] + "." + var_names[i], m);
     }
-  }
-  // node variables
-  for (int i = 0; i < var_sizes.size(); ++i) {
-    shape = {dims.nx1 + 1, dims.nx2 + 1, dims.nx3 + 1, var_sizes[i]};
-    if (axisymmetric) shape[2] = 1;
-    m = Metadata(flags_o, shape);
-    geometry->AddField("g.n." + var_names[i], m);
   }
 }
 
@@ -463,36 +477,25 @@ void SetCachedCoordinateSystem(Data *rc) {
   int i = 0;
   for (auto &loc : GEOMETRY_LOC_NAMES) {
     PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".alpha"].second >= 0, "Variable exists");
-    PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dalpha"].second >= 0, "Variable exists");
     PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".bcon"].second >= 0, "Variable exists");
     PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gcov"].second >= 0, "Variable exists");
     PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".gamcon"].second >= 0, "Variable exists");
     PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".detgam"].second >= 0, "Variable exists");
-    PARTHENON_DEBUG_REQUIRE(imap["g." + loc + ".dg"].second >= 0, "Variable exists");
     idx[i].alpha = imap["g." + loc + ".alpha"].first;
-    idx[i].dalpha = imap["g." + loc + ".dalpha"].first;
     idx[i].bcon = imap["g." + loc + ".bcon"].first;
     idx[i].gcov = imap["g." + loc + ".gcov"].first;
     idx[i].gamcon = imap["g." + loc + ".gamcon"].first;
     idx[i].detgam = imap["g." + loc + ".detgam"].first;
-    idx[i].dg = imap["g." + loc + ".dg"].first;
     i++;
   }
+  PARTHENON_DEBUG_REQUIRE(imap["g.c.dalpha"].second >= 0, "Variable exists");
+  PARTHENON_DEBUG_REQUIRE(imap["g.c.dg"].second >= 0, "Variable exists");
 
   auto lamb = KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
                             const CellLocation loc) {
 
     pack(b, idx[loc].alpha, k, j, i) = system.Lapse(loc, b, k, j, i);
     pack(b, idx[loc].detgam, k, j, i) = system.DetGamma(loc, b, k, j, i);
-
-    {
-      int offset = !time_dependent;
-      Real da[NDFULL];
-      system.GradLnAlpha(loc, b, k, j, i, da);
-      for (int d = offset; d < NDFULL; ++d) {
-        pack(b, idx[loc].dalpha + d - offset, k, j, i) = da[d];
-      }
-    }
 
     Real beta[NDSPACE];
     system.ContravariantShift(loc, b, k, j, i, beta);
@@ -515,7 +518,19 @@ void SetCachedCoordinateSystem(Data *rc) {
         pack(b, offst, k, j, i) = gamcon[mu][nu];
       }
     }
+  };
 
+  // Derivatives
+  auto lamb_derivs = KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+    auto loc = CellLocation::Cent;
+    {
+      int offset = !time_dependent;
+      Real da[NDFULL];
+      system.GradLnAlpha(loc, b, k, j, i, da);
+      for (int d = offset; d < NDFULL; ++d) {
+        pack(b, idx[loc].dalpha + d - offset, k, j, i) = da[d];
+      }
+    }
     Real dg[NDFULL][NDFULL][NDFULL];
     system.MetricDerivative(loc, b, k, j, i, dg);
     {
@@ -544,6 +559,12 @@ void SetCachedCoordinateSystem(Data *rc) {
         lamb(b, k, j, i, CellLocation::Cent);
       });
   parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, derivs", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb_derivs(b, k, j, i);
+      });
+  parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face1", DevExecSpace(), 0,
       pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e + 1,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
@@ -561,12 +582,6 @@ void SetCachedCoordinateSystem(Data *rc) {
       pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         lamb(b, k, j, i, CellLocation::Face3);
-      });
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Corn", DevExecSpace(), 0,
-      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e + 1, ib.s, ib.e + 1,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        lamb(b, k, j, i, CellLocation::Corn);
       });
 }
 
