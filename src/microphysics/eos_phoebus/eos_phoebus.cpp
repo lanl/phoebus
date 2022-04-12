@@ -128,6 +128,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("unit_conv", phoebus::UnitConversions(pin));
   auto &unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
 
+  params.Add("code_constants", phoebus::CodeConstants(unit_conv));
+
   // Store unit conversions mainly for dump file output
   params.Add("length_unit", unit_conv.GetLengthCodeToCGS());
   params.Add("time_unit", unit_conv.GetTimeCodeToCGS());

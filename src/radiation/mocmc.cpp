@@ -206,14 +206,29 @@ void MOCMCInitSamples(T *rc) {
 
           SPACETIMELOOP(mu) { ncov(mu, n) = ncov_coord[mu]; }
 
+          Real ndu = 0.;
+          SPACETIMELOOP(nu) { ndu -= ncov(nu, n) * ucon[nu]; }
+
           for (int s = 0; s < num_species; s++) {
+            // Get radiation temperature
+            const Real J = v(pJ(s), k, j, i);
+            const int NSPEC = 3;
+            const Real Tr = pow(15.*pow(pc::c,3)*pow(pc::h,3)*J/(7.*pow(M_PI,5)*pow(pc::kb,4)*NSPEC),1./4.);
+            printf("J = %e Tr = %e\n", J, Tr);
+
+
             const RadiationType type = species_d[s];
             for (int nubin = 0; nubin < nu_bins; nubin++) {
-              const Real nu = nusamp(nubin) * TIME;
+              const Real nu = nusamp(nubin) * TIME * ndu;
+
               Inuinv(nubin, s, n) =
-                  d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3);
+                  std::max<Real>(robust::SMALL(), d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3));
+                  if (s == 0) {
+                    printf("[%i] Inu[%i] = %e temp = %e nu = %e\n", n, nubin, Inuinv(nubin, s, n)*pow(nu,3), Temp, nu);
+                  }
               if (use_B_fake) Inuinv(nubin, s, n) = B_fake / pow(nu, 3);
             }
+            exit(-1);
           }
         }
 
@@ -671,7 +686,11 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                       v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin) * TIME) *
                   v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin) * TIME;
               Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin) * TIME;
+                  if (ispec == 0) {
+                    printf("CELL Inu[%i] = %e\n", bin, v(iblock, Inu0(ispec, bin), k, j, i));
+                  }
             }
+            exit(-1);
 
             // Trapezoidal rule
             kappaJ -= 0.5 *

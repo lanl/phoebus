@@ -18,6 +18,8 @@
 
 namespace radiation_advection {
 
+using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
+
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski),
@@ -43,9 +45,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int peng = imap[fluid_prim::energy].first;
 
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  const auto opac_d = pmb->packages.Get("opacity")->template Param<singularity::neutrinos::Opacity>("d.opacity");
 
   const auto specB = idJ.GetBounds(1);
-  const Real J = pin->GetOrAddReal("radiation_advection", "J", 1.0);
+  //const Real J = pin->GetOrAddReal("radiation_advection", "J", 1.0);
   const Real Hx = pin->GetOrAddReal("radiation_advection", "Hx", 0.0);
   const Real Hy = pin->GetOrAddReal("radiation_advection", "Hy", 0.0);
   const Real Hz = pin->GetOrAddReal("radiation_advection", "Hz", 0.0);
@@ -63,6 +66,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
+  auto &unit_conv = pmb->packages.Get("eos")->Param<phoebus::UnitConversions>("unit_conv");
+  auto &constants = pmb->packages.Get("eos")->Param<phoebus::CodeConstants>("code_constants");
+  const Real RHO = unit_conv.GetMassDensityCGSToCode();
+  const Real TEMP = unit_conv.GetTemperatureCGSToCode();
+  const Real UU = unit_conv.GetEnergyCGSToCode()*unit_conv.GetNumberDensityCGSToCode();
+  const Real rho0 = 1.e10*RHO;
+  const Real T0 = 1.e10*TEMP;
+  const Real c_code = constants.c();
+
+  auto rad = pmb->packages.Get("radiation").get();
+  auto species = rad->Param<std::vector<singularity::RadiationType>>("species");
+  auto num_species = rad->Param<int>("num_species");
+  singularity::RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+
   const Real gamma = 1 / sqrt(1 - vx * vx);
   const Real t0p = 1.5 * kappa * width * width;
   const Real t0 = t0p;
@@ -76,12 +96,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
 
-        v(prho, k, j, i) = 1.0;
-        v(pT, k, j, i) = 1.0;
+        v(prho, k, j, i) = rho0; //1.0;
+        v(pT, k, j, i) = T0; //1.0;
         Real lambda[2] = {0.};
         v(peng, k, j, i) =
             v(prho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
                                    v(prho, k, j, i), v(pT, k, j, i), lambda);
+
+            printf("rho: %e T: %e u: %e\n", v(prho,k,j,i), v(pT,k,j,i), v(peng, k, j, i));
 
         v(idv(0), k, j, i) = vx;
         v(idv(1), k, j, i) = 0.0;
@@ -92,17 +114,24 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real xp = gamma * (x - vx * t0);
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
 
+          const Real J = opac_d.ThermalDistributionOfT(T0, species_d[ispec])/c_code;
+          printf("T0: %e J0: %e\n", T0, J);
+          //exit(-1);
+
           v(ixi(ispec), k, j, i) = 0.0;
           v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
 
           if (boost) {
             v(idJ(ispec), k, j, i) = std::max(
                 J * sqrt(t0p / tp) * exp(-3 * kappa * std::pow(xp - x0p, 2) / (4 * tp)),
-                1.e-10);
+                1.e-10*J);
           } else {
             v(idJ(ispec), k, j, i) =
-                std::max(J * exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10);
+                std::max(J * exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10*J);
           }
+
+if (ispec == 0)
+          printf("J(%i) = %e\n", i, v(idJ(ispec), k, j, i));
 
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
