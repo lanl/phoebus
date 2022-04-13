@@ -396,6 +396,11 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
   bool axisymmetric = pin->GetOrAddBoolean("geometry", "axisymmetric", false);
   params.Add("axisymmetric", axisymmetric);
 
+  // This tells the goemetry infrastructure not to call
+  // SetGeometryDefault, because the cached geometry will handle it.
+  bool do_defaults = false;
+  params.Add("do_defaults", do_defaults);
+
   // Request fields for cache
   Utils::MeshBlockShape dims(pin);
 
@@ -469,7 +474,6 @@ CachedOverMesh<System> GetCachedCoordinateSystem(MeshData<Real> *rc) {
   return CachedOverMesh<System>(rc, system, axisymmetric, time_dependent);
 }
 
-// We rely on SetGeometryDefault for coords
 template <typename System, typename Data>
 void SetCachedCoordinateSystem(Data *rc) {
   auto pparent = rc->GetParentPointer();
@@ -595,6 +599,9 @@ void SetCachedCoordinateSystem(Data *rc) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         lamb(b, k, j, i, CellLocation::Face3);
       });
+
+  // Call SetGeometryDefault to set the coords objects.
+  impl::SetGeometryDefault(rc, system);
 }
 
 } // namespace Geometry
