@@ -87,7 +87,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real t0p = 1.5 * kappa * width * width;
   const Real t0 = t0p;
   const Real x0p = (0.5 - vx * t0) * gamma;
-  printf("t0 = %e kappa = %e width = %e gamma = %e \n", t0, kappa, width, gamma);
   pmb->par_for(
       "Phoebus::ProblemGenerator::radiation_advection", kb.s, kb.e, jb.s, jb.e, ib.s,
       ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -103,8 +102,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(prho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
                                    v(prho, k, j, i), v(pT, k, j, i), lambda);
 
-            printf("rho: %e T: %e u: %e\n", v(prho,k,j,i), v(pT,k,j,i), v(peng, k, j, i));
-
         v(idv(0), k, j, i) = vx;
         v(idv(1), k, j, i) = 0.0;
         v(idv(2), k, j, i) = 0.0;
@@ -114,9 +111,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real xp = gamma * (x - vx * t0);
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
 
-          const Real J = opac_d.ThermalDistributionOfT(T0, species_d[ispec])/c_code;
-          printf("T0: %e J0: %e\n", T0, J);
-          //exit(-1);
+          const Real J = opac_d.EnergyDensityFromTemperature(T0, species_d[ispec]);
 
           v(ixi(ispec), k, j, i) = 0.0;
           v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
@@ -129,9 +124,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(idJ(ispec), k, j, i) =
                 std::max(J * exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10*J);
           }
-
-if (ispec == 0)
-          printf("J(%i) = %e\n", i, v(idJ(ispec), k, j, i));
 
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
@@ -148,6 +140,14 @@ if (ispec == 0)
   }
 
   radiation::MomentPrim2Con(rc.get(), IndexDomain::interior);
+}
+
+void ProblemModifier(ParameterInput *pin) {
+  const Real tau = pin->GetOrAddReal("radiation_advection", "tau", 1.e3);
+  const Real dx = pin->GetReal("parthenon/mesh", "x1max") - pin->GetReal("parthenon/mesh", "x1min");
+  const Real L_unit = pin->GetReal("units", "geom_length_cm");
+  const Real kappa = tau/1.e10/(dx*L_unit);
+  pin->SetReal("opacity", "gray_kappa", kappa);
 }
 
 } // namespace radiation_advection
