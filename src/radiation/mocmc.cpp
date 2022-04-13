@@ -83,6 +83,10 @@ void MOCMCInitSamples(T *rc) {
   const auto d_opac = opac->template Param<Opacity>("d.opacity");
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  auto &constants = eos->Param<phoebus::CodeConstants>("code_constants");
+  const Real c_code = constants.c();
+  const Real h_code = constants.h();
+  const Real kb_code = constants.kb();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
 
   // auto &dnsamp = rc->Get(mocmc_internal::dnsamp);
@@ -169,18 +173,18 @@ void MOCMCInitSamples(T *rc) {
         const int start_idx = starting_index(k - kb.s, j - jb.s, i - ib.s);
         auto rng_gen = rng_pool.get_state();
 
-          Real cov_g[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, cov_g);
-          Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-          Real con_beta[3];
-          geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta);
-          const Real vpcon[] = {v(pv(0), k, j, i), v(pv(1), k, j, i), v(pv(2), k, j, i)};
-          const Real W = phoebus::GetLorentzFactor(vpcon, cov_g);
-          const Real ucon[4] = {W / alpha, vpcon[0] - con_beta[0] * W / alpha,
-                                vpcon[1] - con_beta[1] * W / alpha,
-                                vpcon[2] - con_beta[2] * W / alpha};
-          const Real trial[4] = {0., 1., 0., 0.};
-          Geometry::Tetrads tetrads(ucon, trial, cov_g);
+        Real cov_g[4][4];
+        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, cov_g);
+        Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+        Real con_beta[3];
+        geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta);
+        const Real vpcon[] = {v(pv(0), k, j, i), v(pv(1), k, j, i), v(pv(2), k, j, i)};
+        const Real W = phoebus::GetLorentzFactor(vpcon, cov_g);
+        const Real ucon[4] = {W / alpha, vpcon[0] - con_beta[0] * W / alpha,
+                              vpcon[1] - con_beta[1] * W / alpha,
+                              vpcon[2] - con_beta[2] * W / alpha};
+        const Real trial[4] = {0., 1., 0., 0.};
+        Geometry::Tetrads tetrads(ucon, trial, cov_g);
 
         for (int nsamp = 0; nsamp < static_cast<int>(v(b, dn, k, j, i)); nsamp++) {
           const int n = new_indices(start_idx + nsamp);
@@ -212,23 +216,23 @@ void MOCMCInitSamples(T *rc) {
           for (int s = 0; s < num_species; s++) {
             // Get radiation temperature
             const Real J = v(pJ(s), k, j, i);
+            // TODO(BRR) Need T(E) inside singularity for NSPEC?
             const int NSPEC = 3;
-            const Real Tr = pow(15.*pow(pc::c,3)*pow(pc::h,3)*J/(7.*pow(M_PI,5)*pow(pc::kb,4)*NSPEC),1./4.);
-            printf("J = %e Tr = %e\n", J, Tr);
-
+            const Real Tr = pow(15. * pow(c_code, 3) * pow(h_code, 3) * J /
+                                    (7. * pow(M_PI, 5) * pow(kb_code, 4) * NSPEC),
+                                1. / 4.);
+            printf("Tr: %e Temp: %e\n", Tr, Temp);
+            exit(-1);
 
             const RadiationType type = species_d[s];
             for (int nubin = 0; nubin < nu_bins; nubin++) {
               const Real nu = nusamp(nubin) * TIME * ndu;
 
-              Inuinv(nubin, s, n) =
-                  std::max<Real>(robust::SMALL(), d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3));
-                  if (s == 0) {
-                    printf("[%i] Inu[%i] = %e temp = %e nu = %e\n", n, nubin, Inuinv(nubin, s, n)*pow(nu,3), Temp, nu);
-                  }
+              Inuinv(nubin, s, n) = std::max<Real>(
+                  robust::SMALL(),
+                  d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3));
               if (use_B_fake) Inuinv(nubin, s, n) = B_fake / pow(nu, 3);
             }
-            exit(-1);
           }
         }
 
@@ -350,7 +354,8 @@ TaskStatus MOCMCReconstruction(T *rc) {
           const Real trial[4] = {0., 1., 0., 0.};
           Geometry::Tetrads tetrads(ucon, trial, cov_g);
 
-          Real ncov_coord[4] = {ncov(0, nswarm), ncov(1, nswarm), ncov(2, nswarm), ncov(3, nswarm)};
+          Real ncov_coord[4] = {ncov(0, nswarm), ncov(1, nswarm), ncov(2, nswarm),
+                                ncov(3, nswarm)};
           Real ncov_tetrad[4];
           tetrads.CoordToTetradCov(ncov_coord, ncov_tetrad);
 
@@ -437,7 +442,7 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
   return TaskStatus::complete;
 }
 
-//class Residual {
+// class Residual {
 // public:
 //  KOKKOS_FUNCTION
 //  Residual(const Real &dtau, const EOS &eos, const Opacity &opac,
@@ -456,7 +461,8 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
 //    const Real &ug0 = var_(b_, ipeng_, k_, j_, i_);
 //    // printf("b: %i peng: %i k j i: %i %i %i ug0: %e\n", b_, ipeng_, k_, j_, i_, ug0);
 //    Real lambda[2] = {Ye1, 0.};
-//    const Real temp1 = eos_.TemperatureFromDensityInternalEnergy(rho, ug1 / rho, lambda);
+//    const Real temp1 = eos_.TemperatureFromDensityInternalEnergy(rho, ug1 / rho,
+//    lambda);
 //
 //    // Update Inu1 from Inu0, use Inu1 to average opacities
 //    Real Jem = 0.;
@@ -686,9 +692,9 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                       v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin) * TIME) *
                   v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin) * TIME;
               Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin) * TIME;
-                  if (ispec == 0) {
-                    printf("CELL Inu[%i] = %e\n", bin, v(iblock, Inu0(ispec, bin), k, j, i));
-                  }
+              if (ispec == 0) {
+                printf("CELL Inu[%i] = %e nu = %e\n", bin, v(iblock, Inu0(ispec, bin), k, j, i), nusamp(bin));
+              }
             }
             exit(-1);
 
@@ -761,7 +767,8 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                         v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                         v(iblock, pye, k, j, i), dev_species[ispec], nu_fluid);
                 v(iblock, ijinvs(ispec, bin), k, j, i) =
-                    v(iblock, Inu0(ispec, bin), k, j, i) / (nu_fluid * nu_fluid * nu_fluid) * alphainv_s;
+                    v(iblock, Inu0(ispec, bin), k, j, i) /
+                    (nu_fluid * nu_fluid * nu_fluid) * alphainv_s;
               }
 
               for (int bin = 0; bin < nu_bins; bin++) {
@@ -801,32 +808,34 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
     // 2D solve for T, Ye
 
-//    parthenon::par_for(
-//        DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
-//        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-//          const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
-//          const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
-//
-//          // Angle-average samples
-//          for (int n = 0; n < nsamp; n++) {
-//            const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
-//            const Real dOmega =
-//                (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm));
-//          }
-//
-//          auto res = Residual(dtau, eos_d, opac_d, v, pdens, peng, pJ, Inu0, Inu1,
-//                              num_species, nu_bins, species_d, nusamp, dlnu, 0, k, j, i);
-//
-//          Real guess[2] = {v(pT, k, j, i), v(pye, k, j, i)};
-//          root_find::RootFindStatus status;
-//          root_find::broyden2(res, guess, 50, 1.e-10, &status);
-//          if (i == 10) {
-//            printf("status = %i\n", static_cast<int>(status));
-//          }
-//
-//          // Real error[2];
-//          // res(v(pdens, k, j, i), v(pye, k, j, i), error);
-//        });
+    //    parthenon::par_for(
+    //        DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e,
+    //        jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i)
+    //        {
+    //          const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
+    //          const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
+    //
+    //          // Angle-average samples
+    //          for (int n = 0; n < nsamp; n++) {
+    //            const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+    //            const Real dOmega =
+    //                (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm));
+    //          }
+    //
+    //          auto res = Residual(dtau, eos_d, opac_d, v, pdens, peng, pJ, Inu0, Inu1,
+    //                              num_species, nu_bins, species_d, nusamp, dlnu, 0, k,
+    //                              j, i);
+    //
+    //          Real guess[2] = {v(pT, k, j, i), v(pye, k, j, i)};
+    //          root_find::RootFindStatus status;
+    //          root_find::broyden2(res, guess, 50, 1.e-10, &status);
+    //          if (i == 10) {
+    //            printf("status = %i\n", static_cast<int>(status));
+    //          }
+    //
+    //          // Real error[2];
+    //          // res(v(pdens, k, j, i), v(pye, k, j, i), error);
+    //        });
   } // else else: 5D solve for T, Ye, Momentum
 
   // Recalculate pi given updated sample intensities

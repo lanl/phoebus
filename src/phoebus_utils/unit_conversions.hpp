@@ -67,17 +67,23 @@ class CodeConstants {
     const Real TIME = unit_conv.GetTimeCGSToCode();
     const Real MASS = unit_conv.GetMassCGSToCode();
     const Real LENGTH = unit_conv.GetLengthCGSToCode();
+    const Real ENERGY = MASS * LENGTH * LENGTH / (TIME * TIME);
+    const Real TEMPERATURE = unit_conv.GetTemperatureCGSToCode();
     h_code_ = pc::h * MASS * LENGTH * LENGTH / TIME;
     c_code_ = pc::c * LENGTH / TIME;
+    kb_code_ = pc::kb * ENERGY / TEMPERATURE;
   }
 
   Real h() const { return h_code_; }
 
   Real c() const { return c_code_; }
 
+  Real kb() const { return kb_code_; }
+
  private:
   Real h_code_;
   Real c_code_;
+  Real kb_code_;
 };
 
 constexpr Real solar_mass = 1.989e33; // g
