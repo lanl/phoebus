@@ -215,16 +215,8 @@ void MOCMCInitSamples(T *rc) {
 
           for (int s = 0; s < num_species; s++) {
             // Get radiation temperature
-            const Real J = v(pJ(s), k, j, i);
-            // TODO(BRR) Need T(E) inside singularity for NSPEC?
-            const int NSPEC = 3;
-            const Real Tr = pow(15. * pow(c_code, 3) * pow(h_code, 3) * J /
-                                    (7. * pow(M_PI, 5) * pow(kb_code, 4) * NSPEC),
-                                1. / 4.);
-            printf("Tr: %e Temp: %e\n", Tr, Temp);
-            exit(-1);
-
             const RadiationType type = species_d[s];
+            const Real Tr = d_opac.TemperatureFromEnergyDensity(v(pJ(s), k, j, i), type);
             for (int nubin = 0; nubin < nu_bins; nubin++) {
               const Real nu = nusamp(nubin) * TIME * ndu;
 
@@ -232,8 +224,10 @@ void MOCMCInitSamples(T *rc) {
                   robust::SMALL(),
                   d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3));
               if (use_B_fake) Inuinv(nubin, s, n) = B_fake / pow(nu, 3);
+              printf("[%i] Inuinv(%i) = %e\n", s, nubin, Inuinv(nubin, s, n));
             }
           }
+          exit(-1);
         }
 
         rng_pool.free_state(rng_gen);
