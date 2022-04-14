@@ -11,6 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+#include <limits>
+
 #include "Kokkos_Random.hpp"
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/tmunu.hpp"
@@ -319,7 +321,8 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
   const Real rho_min_bnorm = pin->GetOrAddReal("torus", "rho_min_bnorm", 1.e-8);
   const bool magnetized = pin->GetOrAddBoolean("torus", "magnetized", true);
 
-  Real beta_min = 1.e100;
+  Real Pmax = -std::numeric_limits<Real>::infinity();
+  Real bsq_max = -std::numeric_limits<Real>::infinity();
 
   for (auto &pmb : pmesh->block_list) {
     auto &rc = pmb->meshblock_data.Get();
@@ -343,11 +346,11 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
     if (ibhi < 0) return;
 
-    Real beta_min_local;
+    Real Pmax_local, bsq_max_local;
     pmb->par_reduce(
-        "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm::b2max", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e,
-        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bsq_max) {
           // compute bsq for max
           Real Bsq = 0.0;
           Real Bdotv = 0.0;
@@ -360,39 +363,24 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
           }
           const Real bsq = Bsq / (W * W) + Bdotv * Bdotv;
-          const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
-          if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
+          bsq_max = std::max(bsq, bsq_max);
         },
-        Kokkos::Min<Real>(beta_min_local));
-    /*
-    Real Pmax_local, bsq_max_local;
+        Kokkos::Max<Real>(bsq_max_local));
+    bsq_max = std::max<Real>(bsq_max, bsq_max_local);
+
     pmb->par_reduce(
         "Phoebus::ProblemGenerator::Torus::BFieldNorm::Pmax", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e,
-        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
-          // compute bsq for max
-          Real Bsq = 0.0;
-          Real Bdotv = 0.0;
-          Real gcov[3][3];
-          geom.Metric(CellLocation::Cent, k, j, i, gcov);
-          Real vp[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
-          const Real W = phoebus::GetLorentzFactor(vp, gcov);
-          SPACELOOP2(m, n) {
-            Bdotv += gcov[m][n] * v(ivlo + m, k, j, i) / W * v(iblo + n, k, j, i);
-            Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
-          }
-          const Real bsq = Bsq / (W * W) + Bdotv * Bdotv;
-          const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
-          if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &P_max) {
+          P_max = std::max(v(iprs, k, j, i), P_max);
         },
-        Kokkos::Min<Real>(beta_min_local));
-    */
-    
-
-    beta_min = std::min<Real>(beta_min_local, beta_min);
+        Kokkos::Max<Real>(Pmax_local));
+    Pmax = std::max<Real>(Pmax, Pmax_local);
   }
+  const Real bsq_max_global = reduction::Max(bsq_max);
+  const Real Pmax_global = reduction::Max(Pmax);
+  Real beta_min_global = robust::ratio(Pmax_global, 0.5*bsq_max_global);
 
-  const Real beta_min_global = reduction::Min(beta_min);
   const Real B_field_fac = magnetized ? sqrt(beta_min_global / beta_min_target) : 0;
 
   printf("Normalization Factor = %.14e\n", B_field_fac);
@@ -424,13 +412,81 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             v(iblo + d, k, j, i) *= B_field_fac;
           }
         });
+  }
+
+  Real beta_min = std::numeric_limits<Real>::infinity();
+  for (auto &pmb : pmesh->block_list) {
+    auto &rc = pmb->meshblock_data.Get();
+    auto geom = Geometry::GetCoordinateSystem(rc.get());
+
+    auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+    auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+    auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+    PackIndexMap imap;
+    auto v = rc->PackVariables({fluid_prim::density, fluid_prim::energy,
+        fluid_prim::velocity,
+        fluid_prim::pressure, fluid_prim::bfield}, imap);
+    const int irho = imap[fluid_prim::density].first;
+    const int ivlo = imap[fluid_prim::velocity].first;
+    const int ivhi = imap[fluid_prim::velocity].second;
+    const int ieng = imap[fluid_prim::energy].first;
+    const int iprs = imap[fluid_prim::pressure].first;
+    const int iblo = imap[fluid_prim::bfield].first;
+    const int ibhi = imap[fluid_prim::bfield].second;
+
+    Real beta_min_local;
+    pmb->par_reduce(
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
+          // compute bsq for max
+          Real Bsq = 0.0;
+          Real Bdotv = 0.0;
+          Real gcov[3][3];
+          geom.Metric(CellLocation::Cent, k, j, i, gcov);
+          Real vp[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+          const Real W = phoebus::GetLorentzFactor(vp, gcov);
+          SPACELOOP2(m, n) {
+            Bdotv += gcov[m][n] * v(ivlo + m, k, j, i) / W * v(iblo + n, k, j, i);
+            Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
+          }
+          const Real bsq = Bsq / (W * W) + Bdotv * Bdotv;
+          const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
+          beta_min = beta;
+        },
+        Kokkos::Min<Real>(beta_min_local));
+    beta_min = std::min<Real>(beta_min_local, beta_min);
+  }
+  beta_min_global = reduction::Min(beta_min);
+  printf("Beta min global = %.14e\n");
+
+  for (auto &pmb : pmesh->block_list) {
+    auto &rc = pmb->meshblock_data.Get();
+    auto geom = Geometry::GetCoordinateSystem(rc.get());
+
+    auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+    auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+    auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+    PackIndexMap imap;
+    auto v = rc->PackVariables({fluid_prim::density, fluid_prim::energy,
+        fluid_prim::velocity,
+        fluid_prim::pressure, fluid_prim::bfield}, imap);
+    const int irho = imap[fluid_prim::density].first;
+    const int ivlo = imap[fluid_prim::velocity].first;
+    const int ivhi = imap[fluid_prim::velocity].second;
+    const int ieng = imap[fluid_prim::energy].first;
+    const int iprs = imap[fluid_prim::pressure].first;
+    const int iblo = imap[fluid_prim::bfield].first;
+    const int ibhi = imap[fluid_prim::bfield].second;
 
     constexpr int ND = Geometry::NDFULL;
     auto coords = pmb->coords;
     auto tmunu = fluid::BuildStressEnergyTensor(rc.get());
     int j = jb.s + (jb.e - jb.s)/2 + 1;
     int k = kb.s;
-    pmb->par_for("Print Tmunu lol", ib.s, ib.e, KOKKOS_LAMBDA(const int i) {
+    pmb->par_for("Print Tmunu", ib.s, ib.e, KOKKOS_LAMBDA(const int i) {
         Real X1 = coords.x1v(i);
         Real X2 = coords.x2v(j);
         Real T[ND][ND];
@@ -450,12 +506,13 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
         }
         const Real bsq = (Bsq) / (W*W) + Bdotv*Bdotv;
+        const Real beta = robust::ratio(pres, 0.5*bsq);
 
         Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
 
-        printf("%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\n",
+        printf("%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\n",
                X1,v(iblo, k, j, i)/alpha, v(iblo + 1, k, j, i)/alpha, w, bsq, T[0][0],T[0][1],T[0][2],T[0][3],T[1][1],T[1][2],T[1][3],
-               T[2][2],T[2][3],T[3][3]);
+               T[2][2],T[2][3],T[3][3], beta);
       });
 
     fluid::PrimitiveToConserved(rc.get());

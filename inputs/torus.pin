@@ -36,7 +36,7 @@ file_type   = hdf5      # Tabular data dump
 dt          = 5.0       # time increment between outputs
 
 <parthenon/time>
-nlim        = -1        # cycle limit
+nlim        = 1        # cycle limit
 tlim        = 2000.0    # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
@@ -100,7 +100,7 @@ Ye = false
 mhd = true
 
 <geometry>
-a = 0.9375
+a = 0.8
 
 <coordinates>
 derefine_poles = false
@@ -122,7 +122,7 @@ sie0_ceiling = 1.0;
 gam0_ceiling = 10.0;
 
 <torus>
-u_jitter = 0.05
+u_jitter = 0 #0.05
 kappa = 0.01
 rin = 6.0
 rmax = 12.0
