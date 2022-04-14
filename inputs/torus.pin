@@ -4,6 +4,9 @@ problem = torus
 ix1_bc = outflow
 ox1_bc = outflow
 
+<phoebus/mesh>
+bc_vars = primitive
+
 <parthenon/job>
 problem_id  = torus       # problem ID: basename of output filenames
 
@@ -86,7 +89,6 @@ he = false
 rad = false
 
 <fluid>
-bc_vars = primitive
 xorder = 2
 cfl = 0.8
 riemann = llf
@@ -121,8 +123,8 @@ gam0_ceiling = 10.0;
 
 <torus>
 u_jitter = 0.05
-Bnorm = 0.02 # beta_min ~ 200
 kappa = 0.01
 rin = 6.0
 rmax = 12.0
 n_inside_horizon = 4
+magnetized = true
