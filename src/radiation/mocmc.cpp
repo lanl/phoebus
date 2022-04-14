@@ -785,10 +785,10 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                             v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin)) *
                         v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
               Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
-              printf("[%i] I = %e abs: %e\n", bin, v(iblock, Inu0(ispec, bin), k, j, i),
-                     opac_d.AngleAveragedAbsorptionCoefficient(
-                         v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                         v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin)));
+              //printf("[%i] I = %e abs: %e\n", bin, v(iblock, Inu0(ispec, bin), k, j, i),
+              //       opac_d.AngleAveragedAbsorptionCoefficient(
+              //           v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+              //           v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin)));
             }
 
             // Trapezoidal rule
@@ -812,9 +812,6 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
             Real tauJ = alpha * dt * kappaJ;
             Real tauH = alpha * dt * kappaH;
-
-            printf("tauJ: %e tauH: %e\n", tauJ, tauH);
-            if (dt > 1.e-6) exit(-1);
 
             // Store kappaH for asymptotic fluxes
             v(iblock, idx_kappaH(ispec), k, j, i) = kappaH;

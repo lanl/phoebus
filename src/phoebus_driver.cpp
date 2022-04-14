@@ -504,6 +504,7 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   parthenon::Packages_t packages;
 
+  packages.Add(phoebus::Initialize(pin.get()));
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
   packages.Add(Microphysics::Opacity::Initialize(pin.get()));
   packages.Add(Geometry::Initialize(pin.get()));
@@ -743,6 +744,25 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
   }
 
   return status;
+}
+
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+  auto pkg = std::make_shared<StateDescriptor>("phoebus");
+  Params &params = pkg->AllParams();
+
+  params.Add("unit_conv", phoebus::UnitConversions(pin));
+  auto &unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
+  const Real MassCodeToCGS = unit_conv.GetMassCodeToCGS();
+  params.Add("MassCodeToCGS", MassCodeToCGS);
+  const Real LengthCodeToCGS = unit_conv.GetLengthCodeToCGS();
+  params.Add("LengthCodeToCGS", LengthCodeToCGS);
+  const Real TimeCodeToCGS = unit_conv.GetTimeCodeToCGS();
+  params.Add("TimeCodeToCGS", TimeCodeToCGS);
+
+  auto code_constants = CodeConstants(unit_conv);
+  params.Add("code_constants", phoebus::CodeConstants(unit_conv));
+
+  return pkg;
 }
 
 } // namespace phoebus
