@@ -45,18 +45,24 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int peng = imap[fluid_prim::energy].first;
 
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
-  const auto opac_d = pmb->packages.Get("opacity")->template Param<singularity::neutrinos::Opacity>("d.opacity");
+  const auto opac_d =
+      pmb->packages.Get("opacity")->template Param<singularity::neutrinos::Opacity>(
+          "d.opacity");
 
   const auto specB = idJ.GetBounds(1);
-  //const Real J = pin->GetOrAddReal("radiation_advection", "J", 1.0);
+  const bool scale_free = pin->GetOrAddReal("units", "scale_free", false);
+  const Real J0 = pin->GetOrAddReal("radiation_advection", "J", 1.0);
   const Real Hx = pin->GetOrAddReal("radiation_advection", "Hx", 0.0);
   const Real Hy = pin->GetOrAddReal("radiation_advection", "Hy", 0.0);
   const Real Hz = pin->GetOrAddReal("radiation_advection", "Hz", 0.0);
   const Real vx = pin->GetOrAddReal("radiation_advection", "vx", 0.0);
+  PARTHENON_REQUIRE(std::fabs(vx) < 1., "Subluminal velocity required!");
   const Real width = pin->GetOrAddReal("radiation_advection", "width", sqrt(2.0));
   const Real kappa = pin->GetOrAddReal("radiation_advection", "kappas_init", 1.e3);
   const bool boost = pin->GetOrAddBoolean("radiation_advection", "boost_profile", false);
   const int shapedim = pin->GetOrAddInteger("radiation_advection", "shapedim", 1);
+  // Optical depth over the entire X1 simulation region
+  const Real tau = pin->GetOrAddReal("radiation_advection", "tau", 1.e3);
 
   auto &coords = pmb->coords;
   auto pmesh = pmb->pmy_mesh;
@@ -66,14 +72,29 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  auto &unit_conv = pmb->packages.Get("eos")->Param<phoebus::UnitConversions>("unit_conv");
-  auto &constants = pmb->packages.Get("eos")->Param<phoebus::CodeConstants>("code_constants");
+  auto &unit_conv =
+      pmb->packages.Get("eos")->Param<phoebus::UnitConversions>("unit_conv");
+  auto &constants =
+      pmb->packages.Get("eos")->Param<phoebus::CodeConstants>("code_constants");
+  const Real LENGTH = unit_conv.GetLengthCGSToCode();
   const Real RHO = unit_conv.GetMassDensityCGSToCode();
   const Real TEMP = unit_conv.GetTemperatureCGSToCode();
-  const Real UU = unit_conv.GetEnergyCGSToCode()*unit_conv.GetNumberDensityCGSToCode();
-  const Real rho0 = 1.e10*RHO;
-  const Real T0 = 1.e10*TEMP;
-  const Real c_code = constants.c();
+  const Real dx =
+      pin->GetReal("parthenon/mesh", "x1max") - pin->GetReal("parthenon/mesh", "x1min");
+  Real rho0;
+  Real T0;
+  Real kappa;
+  if (scale_free) {
+    rho0 = 1.;
+    T0 = 1.;
+    pin->SetReal("eos", "Cv", 1.0);
+  } else {
+    rho0 = 1.e10 * RHO;
+    T0 = 1.e10 * TEMP;
+    pin->SetReal("eos", "Cv", (pin->GetReal("eos", "Gamma") - 1.) * pc::kb / pc::mp);
+  }
+  const Real kappa = tau / (rho0 / RHO) / (dx / LENGTH);
+  pin->SetReal("opacity", "gray_kappa", kappa);
 
   auto rad = pmb->packages.Get("radiation").get();
   auto species = rad->Param<std::vector<singularity::RadiationType>>("species");
@@ -83,10 +104,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     species_d[s] = species[s];
   }
 
-  const Real gamma = 1 / sqrt(1 - vx * vx);
+  const Real W = 1 / sqrt(1 - vx * vx);
   const Real t0p = 1.5 * kappa * width * width;
   const Real t0 = t0p;
-  const Real x0p = (0.5 - vx * t0) * gamma;
+  const Real x0p = (0.5 - vx * t0) * W;
   pmb->par_for(
       "Phoebus::ProblemGenerator::radiation_advection", kb.s, kb.e, jb.s, jb.e, ib.s,
       ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -95,8 +116,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
 
-        v(prho, k, j, i) = rho0; //1.0;
-        v(pT, k, j, i) = T0; //1.0;
+        v(prho, k, j, i) = rho0;
+        v(pT, k, j, i) = T0;
         Real lambda[2] = {0.};
         v(peng, k, j, i) =
             v(prho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
@@ -107,11 +128,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(idv(2), k, j, i) = 0.0;
 
         // Write down boosted diffusion initial condition
-        Real tp = gamma * (t0 - vx * x);
-        Real xp = gamma * (x - vx * t0);
+        Real tp = W * (t0 - vx * x);
+        Real xp = W * (x - vx * t0);
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
 
-          const Real J = opac_d.EnergyDensityFromTemperature(T0, species_d[ispec]);
+          Real J;
+          if (scale_free) {
+            J = J0;
+          } else {
+            J = opac_d.EnergyDensityFromTemperature(T0, species_d[ispec]);
+          }
 
           v(ixi(ispec), k, j, i) = 0.0;
           v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
@@ -119,11 +145,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           if (boost) {
             v(idJ(ispec), k, j, i) = std::max(
                 J * sqrt(t0p / tp) * exp(-3 * kappa * std::pow(xp - x0p, 2) / (4 * tp)),
-                1.e-10*J);
+                1.e-10 * J);
           } else {
             v(idJ(ispec), k, j, i) =
-                std::max(J * exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10*J);
+                std::max(J * exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10 * J);
           }
+
+          PARTHENON_DEBUG_REQUIRE(std::fabs(Hx) < J && std::fabs(Hy) < J &&
+                                      std::face(Hz) < J,
+                                  "Fluxes are incorrectly normalized!");
 
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
@@ -140,14 +170,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 
   radiation::MomentPrim2Con(rc.get(), IndexDomain::interior);
-}
-
-void ProblemModifier(ParameterInput *pin) {
-  const Real tau = pin->GetOrAddReal("radiation_advection", "tau", 1.e3);
-  const Real dx = pin->GetReal("parthenon/mesh", "x1max") - pin->GetReal("parthenon/mesh", "x1min");
-  const Real L_unit = pin->GetReal("units", "geom_length_cm");
-  const Real kappa = tau/1.e10/(dx*L_unit);
-  pin->SetReal("opacity", "gray_kappa", kappa);
 }
 
 } // namespace radiation_advection
