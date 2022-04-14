@@ -125,7 +125,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real kappa = pin->GetOrAddReal("torus", "kappa", 1.e-2);
   const Real u_jitter = pin->GetOrAddReal("torus", "u_jitter", 1.e-2);
   const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
-  const Real bnorm = pin->GetOrAddReal("torus", "Bnorm", 1.e-2);
   const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
   const Real Ye = pin->GetOrAddReal("torus", "Ye", 0.5);
 
@@ -248,7 +247,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real rho_av =
             0.25 * (v(irho, kb.s, j, i) + v(irho, kb.s, j, i - 1) +
                     v(irho, kb.s, j - 1, i) + v(irho, kb.s, j - 1, i - 1));
-        const Real q = rho_av / rho_rmax - 0.2;
+        // JMM: Classic HARM divides by rho_max here, to normalize rho_av.
+        // However, we have already normalized rho, and thus rho_av. So
+        // we should not renormalize.
+        // This will change in the case of realistic EOS, when we
+        // can't simply renormalize by density and must instead do
+        // something clever with units.
+        // const Real q = rho_av / rho_rmax - 0.2;
+        const Real q = rho_av - 0.2;
         A(j, i) = (q > 0 ? q : 0.0);
       });
 
@@ -257,17 +263,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+          // JMM: HARM/bhlight divides by gdet, not gamdet.
+          // This means the HARM primitives are smaller than the Phoebus primitives by
+          // a factor of alpha.
+          const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
           v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
-                             (2.0 * coords.Dx(X2DIR, k, j, i) * gdet);
+                             (2.0 * coords.Dx(X2DIR, k, j, i) * gamdet);
           v(iblo + 1, k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
-                                 (2.0 * coords.Dx(X1DIR, k, j, i) * gdet);
+                                 (2.0 * coords.Dx(X1DIR, k, j, i) * gamdet);
           v(ibhi, k, j, i) = 0.0;
         });
   }
 
   fluid::PrimitiveToConserved(rc);
-  printf("Problem initialized!\n");
 }
 
 void ProblemModifier(ParameterInput *pin) {
@@ -299,6 +307,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
   const Real beta_min_target = pin->GetOrAddReal("torus", "beta_min", 100.);
   const Real rho_min_bnorm = pin->GetOrAddReal("torus", "rho_min_bnorm", 1.e-4);
+  const bool magnetized = pin->GetOrAddBoolean("torus", "magnetized", true);
 
   Real beta_min = 1.e100;
 
@@ -330,7 +339,6 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
         ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
           // compute bsq for max
-          Real vsq = 0.0;
           Real Bsq = 0.0;
           Real Bdotv = 0.0;
           Real gcov[3][3];
@@ -338,12 +346,10 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           Real vp[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
           const Real W = phoebus::GetLorentzFactor(vp, gcov);
           SPACELOOP2(m, n) {
-            vsq += gcov[m][n] * v(ivlo + m, k, j, i) / W * v(ivlo + n, k, j, i) / W;
             Bdotv += gcov[m][n] * v(ivlo + m, k, j, i) / W * v(iblo + n, k, j, i);
             Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
           }
-          const Real b0 = W * Bdotv;
-          const Real bsq = (Bsq + b0 * b0) / (W * W);
+          const Real bsq = Bsq / (W * W) + Bdotv * Bdotv;
           const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
           if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
         },
@@ -353,7 +359,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
   }
 
   const Real beta_min_global = reduction::Min(beta_min);
-  const Real B_field_fac = sqrt(beta_min_global / beta_min_target);
+  const Real B_field_fac = magnetized ? sqrt(beta_min_global / beta_min_target) : 0;
 
   for (auto &pmb : pmesh->block_list) {
     auto &rc = pmb->meshblock_data.Get();

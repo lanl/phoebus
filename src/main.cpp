@@ -17,6 +17,7 @@
 #include <globals.hpp>
 #include <parthenon_manager.hpp>
 
+#include "fluid/con2prim_statistics.hpp"
 #include "geometry/geometry.hpp"
 #include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
@@ -100,6 +101,10 @@ int main(int argc, char *argv[]) {
 
   // This line actually runs the simulation
   auto driver_status = driver.Execute();
+
+#if CON2PRIM_STATISTICS
+  con2prim_statistics::Stats::report();
+#endif
 
   // call MPI_Finalize and Kokkos::finalize if necessary
   pman.ParthenonFinalize();

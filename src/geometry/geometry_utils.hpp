@@ -28,6 +28,7 @@
 using namespace parthenon::package::prelude;
 
 // Phoebus includes
+#include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -197,6 +198,48 @@ KOKKOS_INLINE_FUNCTION int SymSize() {
 }
 
 } // namespace Utils
+
+namespace impl {
+template <typename Data, typename System>
+void SetGeometryDefault(Data *rc, const System &system) {
+  std::vector<std::string> coord_names = {geometric_variables::cell_coords,
+                                          geometric_variables::node_coords};
+  PackIndexMap imap;
+  auto pack = rc->PackVariables(coord_names, imap);
+  PARTHENON_REQUIRE(imap["g.c.coord"].second >= 0, "g.c.coord exists");
+  PARTHENON_REQUIRE(imap["g.n.coord"].second >= 0, "g.n.coord exists");
+  PARTHENON_REQUIRE(imap["g.c.coord"].second - imap["g.c.coord"].first + 1 == 4,
+                    "g.c.coord has correct shape");
+  PARTHENON_REQUIRE(imap["g.n.coord"].second - imap["g.n.coord"].first + 1 == 4,
+                    "g.n.coord has correct shape");
+  int icoord_c = imap["g.c.coord"].first;
+  int icoord_n = imap["g.n.coord"].first;
+
+  auto lamb = KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
+                            CellLocation loc) {
+    Real C[NDFULL];
+    int icoord = (loc == CellLocation::Cent) ? icoord_c : icoord_n;
+    system.Coords(loc, b, k, j, i, C);
+    SPACETIMELOOP(mu) pack(b, icoord + mu, k, j, i) = C[mu];
+  };
+  IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Cent", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Cent);
+      });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Corn", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kb.s, kb.e + 1, jb.s, jb.e + 1, ib.s, ib.e + 1,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Corn);
+      });
+}
+} // namespace impl
+
 } // namespace Geometry
 
 #endif // GEOMETRY_GEOMETRY_UTILS_HPP_
