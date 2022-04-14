@@ -45,6 +45,9 @@ class PhoebusDriver : public EvolutionDriver {
   AllReduce<int> particles_outstanding;
 };
 
+// Simple package for storing simulation- and problem-wide objects and parameters for I/O
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
 
 } // namespace phoebus

@@ -74,6 +74,18 @@ for file in args.files:
   files += glob.glob(file)
 files = sorted(files)
 
+# Set up unit conversions
+file0 = phdf.phdf(files[0])
+L_unit = file0.Params['eos/length_unit']
+T_unit = file0.Params['eos/time_unit']
+M_unit = file0.Params['eos/mass_unit']
+E_unit = M_unit*L_unit**2/T_unit**2
+UE_unit = E_unit / L_unit**3
+for param in file0.Params:
+  print(param)
+sys.exit()
+#J0 *= UE_unit
+
 # Find the minimum and maximum times of the data
 minTime = sys.float_info.max
 maxTime = -sys.float_info.max
@@ -101,7 +113,9 @@ iz = 0
 iy = 0
 for file in files[0::1]:
   dfile = phdf.phdf(file)
-  J = dfile.Get("r.p.J", flatten=False)
+  J = dfile.Get("r.p.J", flatten=False)*UE_unit
+  print(J)
+  print(UE_unit)
   x = dfile.x
   t = dfile.Time
 
@@ -121,7 +135,7 @@ for file in files[0::1]:
 xl = v # 0.3
 xh = 1.0
 yl = -0.1
-yh = 1.05
+yh = 1.05*J0
 plt_ax.set_ylabel('J (arb. units)')
 plt_ax.set_xlabel('x (arb. units)')
 plt_ax.set_xlim([xl, xh])

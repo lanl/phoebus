@@ -140,9 +140,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                             unit_conv.GetTemperatureCGSToCode();
       params.Add("ix1_temp", ix1_temp);
     }
+
     const std::string ox1_bc = pin->GetOrAddString("phoebus", "ox1_bc", "None");
-    params.Add("ox1_bc", ox1_bc);
-    if (ix1_bc == "fixed_temp") {
+    if (ox1_bc == "outflow") {
+      params.Add("ox1_bc", MOCMCBoundaries::outflow);
+    } else if (ox1_bc == "fixed_temp") {
+      params.Add("ox1_bc", MOCMCBoundaries::fixed_temp);
+    } else {
+      params.Add("ox1_bc", MOCMCBoundaries::periodic);
+    }
+    if (ox1_bc == "fixed_temp") {
       const Real ox1_temp = pin->GetOrAddReal("phoebus", "ox1_temp", 0.) *
                             unit_conv.GetTemperatureCGSToCode();
       params.Add("ox1_temp", ox1_temp);
