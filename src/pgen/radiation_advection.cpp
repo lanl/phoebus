@@ -21,6 +21,9 @@ namespace radiation_advection {
 
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
+constexpr Real rho0_cgs = 1.e10;
+constexpr Real T0_cgs = 1.e10;
+
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski),
@@ -51,7 +54,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           "d.opacity");
 
   const auto specB = idJ.GetBounds(1);
-  const bool scale_free = pin->GetOrAddReal("units", "scale_free", true);
+  const bool scale_free = pin->GetOrAddBoolean("units", "scale_free", true);
   const Real J0 = pin->GetOrAddReal("radiation_advection", "J", 1.0);
   const Real Hx = pin->GetOrAddReal("radiation_advection", "Hx", 0.0);
   const Real Hy = pin->GetOrAddReal("radiation_advection", "Hy", 0.0);
@@ -59,11 +62,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real vx = pin->GetOrAddReal("radiation_advection", "vx", 0.0);
   PARTHENON_REQUIRE(std::fabs(vx) < 1., "Subluminal velocity required!");
   const Real width = pin->GetOrAddReal("radiation_advection", "width", sqrt(2.0));
-  // const Real kappa = pin->GetOrAddReal("radiation_advection", "kappas_init", 1.e3);
+  const Real kappa = pin->GetReal("opacity", "gray_kappa");
   const bool boost = pin->GetOrAddBoolean("radiation_advection", "boost_profile", false);
   const int shapedim = pin->GetOrAddInteger("radiation_advection", "shapedim", 1);
-  // Optical depth over the entire X1 simulation region
-  const Real tau = pin->GetOrAddReal("radiation_advection", "tau", 1.e3);
 
   auto &coords = pmb->coords;
   auto pmesh = pmb->pmy_mesh;
@@ -91,18 +92,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     PARTHENON_REQUIRE(programming::soft_equiv(pin->GetReal("eos", "Cv"), 1.0),
                       "Specific heat is incorrect!");
   } else {
-    rho0 = 1.e10 * RHO;
-    T0 = 1.e10 * TEMP;
+    rho0 = rho0_cgs * RHO;
+    T0 = T0_cgs * TEMP;
     // pin->SetReal("eos", "Cv", (pin->GetReal("eos", "Gamma") - 1.) * pc::kb / pc::mp);
     PARTHENON_REQUIRE(
         programming::soft_equiv(pin->GetReal("eos", "Cv"),
                                 (pin->GetReal("eos", "Gamma") - 1.) * pc::kb / pc::mp),
         "Specific heat is incorrect!");
   }
-  const Real kappa = tau / (rho0 / RHO) / (dx / LENGTH);
-  //pin->SetReal("opacity", "gray_kappa", kappa);
-  printf("kappa: %e\n", kappa);
-  printf("J0: %e\n", J0);
+  // const Real kappa = tau / (rho0 / RHO) / (dx / LENGTH);
 
   auto rad = pmb->packages.Get("radiation").get();
   auto species = rad->Param<std::vector<singularity::RadiationType>>("species");
@@ -178,6 +176,28 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 
   radiation::MomentPrim2Con(rc.get(), IndexDomain::interior);
+}
+
+void ProblemModifier(ParameterInput *pin) {
+  auto unit_conv = phoebus::UnitConversions(pin);
+  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
+  const bool scale_free = pin->GetOrAddBoolean("units", "scale_free", true);
+  const Real rho0 = scale_free ? 1. : rho0_cgs;
+
+  const Real Gamma = pin->GetReal("eos", "Gamma");
+  const Real cv = scale_free ? 1. : (Gamma - 1.) * pc::kb / pc::mp;
+  pin->SetReal("eos", "Cv", cv);
+
+  const Real dx1 = (pin->GetReal("parthenon/mesh", "x1max") -
+                    pin->GetReal("parthenon/mesh", "x1min")) *
+                   LENGTH;
+
+  // Optical depth over the entire X1 simulation region
+  const Real tau = pin->GetOrAddReal("radiation_advection", "tau", 1.e3);
+
+  const Real kappa = tau / (rho0 * dx1);
+
+  pin->SetReal("opacity", "gray_kappa", kappa);
 }
 
 } // namespace radiation_advection

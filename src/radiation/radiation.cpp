@@ -13,8 +13,8 @@
 
 #include "radiation.hpp"
 #include "geometry/geometry.hpp"
-#include "phoebus_utils/variables.hpp"
 #include "phoebus_utils/programming_utils.hpp"
+#include "phoebus_utils/variables.hpp"
 
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
@@ -35,6 +35,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return physics;
   }
 
+  auto unit_conv = phoebus::UnitConversions(pin);
+
   std::vector<int> four_vec(1, 4);
   Metadata mfourforce = Metadata({Metadata::Cell, Metadata::OneCopy}, four_vec);
   physics->AddField(iv::Gcov, mfourforce);
@@ -47,7 +49,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   std::vector<std::string> known_methods = {"cooling_function", "moment_m1",
                                             "moment_eddington", "monte_carlo", "mocmc"};
-  if (!ContainedInVector(method, known_methods)) {
+  if (!programming::ContainedInVector(method, known_methods)) {
     std::stringstream msg;
     msg << "Radiation method \"" << method << "\" not recognized!";
     PARTHENON_FAIL(msg);
@@ -125,18 +127,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("Inuinv", swarm_name, Inu_swarmvalue_metadata);
 
     // Boundary temperatures for outflow sample boundary conditions
-    const Real ix1_T = pin->GetOrAddString("radiation/mocmc", "ix1_T", 0.);
-    const Real ox1_T = pin->GetOrAddString("radiation/mocmc", "ox1_T", 0.);
-    const Real ix2_T = pin->GetOrAddString("radiation/mocmc", "ix2_T", 0.);
-    const Real ox2_T = pin->GetOrAddString("radiation/mocmc", "ox2_T", 0.);
-    const Real ix3_T = pin->GetOrAddString("radiation/mocmc", "ix3_T", 0.);
-    const Real ox3_T = pin->GetOrAddString("radiation/mocmc", "ox3_T", 0.);
-    params.Add("ix1_T", ix1_T);
-    params.Add("ox1_T", ox1_T);
-    params.Add("ix2_T", ix2_T);
-    params.Add("ox2_T", ox2_T);
-    params.Add("ix3_T", ix3_T);
-    params.Add("ox3_T", ox3_T);
+    const std::string ix1_bc = pin->GetOrAddString("phoebus", "ix1_bc", "None");
+    if (ix1_bc == "outflow") {
+      params.Add("ix1_bc", MOCMCBoundaries::outflow);
+    } else if (ix1_bc == "fixed_temp") {
+      params.Add("ix1_bc", MOCMCBoundaries::fixed_temp);
+    } else {
+      params.Add("ix1_bc", MOCMCBoundaries::periodic);
+    }
+    if (ix1_bc == "fixed_temp") {
+      const Real ix1_temp = pin->GetOrAddReal("phoebus", "ix1_temp", 0.) *
+                            unit_conv.GetTemperatureCGSToCode();
+      params.Add("ix1_temp", ix1_temp);
+    }
+    const std::string ox1_bc = pin->GetOrAddString("phoebus", "ox1_bc", "None");
+    params.Add("ox1_bc", ox1_bc);
+    if (ix1_bc == "fixed_temp") {
+      const Real ox1_temp = pin->GetOrAddReal("phoebus", "ox1_temp", 0.) *
+                            unit_conv.GetTemperatureCGSToCode();
+      params.Add("ox1_temp", ox1_temp);
+    }
 
     const int nsamp_per_zone =
         pin->GetOrAddInteger("radiation/mocmc", "nsamp_per_zone", 32);
@@ -145,7 +155,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     ParArray1D<Real> nusamp("Frequency grid", nu_bins);
     auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
     for (int n = 0; n < nu_bins; n++) {
-      nusamp_h(n) = exp(log(nu_min) + (n + 0.5) * dlnu);
+      nusamp_h(n) = exp(log(nu_min) + (n + 0.5) * dlnu) / unit_conv.GetTimeCGSToCode();
     }
     Kokkos::deep_copy(nusamp, nusamp_h);
     params.Add("nusamp", nusamp);

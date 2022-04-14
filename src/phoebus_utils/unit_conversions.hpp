@@ -72,6 +72,7 @@ class CodeConstants {
     h_code_ = pc::h * MASS * LENGTH * LENGTH / TIME;
     c_code_ = pc::c * LENGTH / TIME;
     kb_code_ = pc::kb * ENERGY / TEMPERATURE;
+    mp_code_ = pc::mp * MASS;
   }
 
   Real h() const { return h_code_; }
@@ -80,10 +81,13 @@ class CodeConstants {
 
   Real kb() const { return kb_code_; }
 
+  Real mp() const { return mp_code_; }
+
  private:
   Real h_code_;
   Real c_code_;
   Real kb_code_;
+  Real mp_code_;
 };
 
 constexpr Real solar_mass = 1.989e33; // g

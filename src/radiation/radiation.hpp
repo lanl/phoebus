@@ -42,6 +42,8 @@ enum class ParticleResolution { emitted = 0, absorbed = 1, scattered = 2, total 
 
 enum class MOCMCRecon { kdgrid };
 
+enum class MOCMCBoundaries { outflow, fixed_temp, periodic };
+
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
 
