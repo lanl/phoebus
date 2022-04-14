@@ -14,6 +14,7 @@
 #include "radiation.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
+#include "phoebus_utils/programming_utils.hpp"
 
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
@@ -46,8 +47,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   std::vector<std::string> known_methods = {"cooling_function", "moment_m1",
                                             "moment_eddington", "monte_carlo", "mocmc"};
-  if (std::find(known_methods.begin(), known_methods.end(), method) ==
-      known_methods.end()) {
+  if (!ContainedInVector(method, known_methods)) {
     std::stringstream msg;
     msg << "Radiation method \"" << method << "\" not recognized!";
     PARTHENON_FAIL(msg);
@@ -123,6 +123,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata Inu_swarmvalue_metadata({Metadata::Real, Metadata::Particle},
                                      std::vector<int>{NumRadiationTypes, nu_bins});
     physics->AddSwarmValue("Inuinv", swarm_name, Inu_swarmvalue_metadata);
+
+    // Boundary temperatures for outflow sample boundary conditions
+    const Real ix1_T = pin->GetOrAddString("radiation/mocmc", "ix1_T", 0.);
+    const Real ox1_T = pin->GetOrAddString("radiation/mocmc", "ox1_T", 0.);
+    const Real ix2_T = pin->GetOrAddString("radiation/mocmc", "ix2_T", 0.);
+    const Real ox2_T = pin->GetOrAddString("radiation/mocmc", "ox2_T", 0.);
+    const Real ix3_T = pin->GetOrAddString("radiation/mocmc", "ix3_T", 0.);
+    const Real ox3_T = pin->GetOrAddString("radiation/mocmc", "ox3_T", 0.);
+    params.Add("ix1_T", ix1_T);
+    params.Add("ox1_T", ox1_T);
+    params.Add("ix2_T", ix2_T);
+    params.Add("ox2_T", ox2_T);
+    params.Add("ix3_T", ix3_T);
+    params.Add("ox3_T", ox3_T);
 
     const int nsamp_per_zone =
         pin->GetOrAddInteger("radiation/mocmc", "nsamp_per_zone", 32);

@@ -22,7 +22,7 @@ problem_id  = rad_adv   # problem ID: basename of output filenames
 variables = r.c.E, &
             r.c.F, &
             r.p.J, &
-            r.p.H 
+            r.p.H
 
 file_type   = hdf5      # Tabular data dump
 dt          = 1.e-1     # time increment between outputs
@@ -59,7 +59,7 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-bc_vars = primitive 
+bc_vars = primitive
 
 <parthenon/meshblock>
 nx1 = 512
@@ -74,7 +74,7 @@ max_level = 3
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
-Cv = 1.0 
+Cv = 1.0
 
 <physics>
 hydro = false
@@ -91,7 +91,7 @@ c2p_max_iter = 100
 Ye = true
 
 <radiation>
-cfl = 0.5 
+cfl = 0.5
 method = moment_m1
 nu_min = 1.e15
 nu_max = 1.e22
@@ -101,13 +101,16 @@ do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
 
-scattering_fraction = 1.0 
+scattering_fraction = 1.0
 B_fake = 0.5
 use_B_fake = true
 
-<opacity> 
-type = gray 
-gray_kappa = 1.e3 
+<opacity>
+type = gray
+gray_kappa = 1.e3
+
+#<units>
+#scale_free = true
 
 <radiation_advection>
 J = 1.0
@@ -116,5 +119,5 @@ Hy = 0.0
 Hz = 0.0
 vx = 0.3
 width = 0.0333
-kappas_init = 1.e3
+tau = 1.e3
 boost_profile = true

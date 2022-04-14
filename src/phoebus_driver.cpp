@@ -277,8 +277,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                              BoundaryCommSubset::all);
       auto receive =
           tl.AddTask(send, &SwarmContainer::Receive, sd0.get(), BoundaryCommSubset::all);
+      auto sample_bounds = tl.AddTask(receive, radiation::MOCMCSampleBoundaries<MDT>, sc0.get());
       auto sample_recon =
-          tl.AddTask(receive, radiation::MOCMCReconstruction<MDT>, sc0.get());
+          tl.AddTask(sample_bounds, radiation::MOCMCReconstruction<MDT>, sc0.get());
       auto eddington =
           tl.AddTask(sample_recon, radiation::MOCMCEddington<MDT>, sc0.get());
 

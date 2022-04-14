@@ -234,10 +234,84 @@ void MOCMCInitSamples(T *rc) {
 }
 
 template <class T>
+TaskStatus MOCMCSampleBoundaries(T *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+  auto &sc = pmb->swarm_data.Get();
+  auto &swarm = sc->Get("mocmc");
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+
+  const auto geom = Geometry::GetCoordinateSystem(rc);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  std::vector<std::string> variables{pf::velocity, ir::tilPi};
+  PackIndexMap imap;
+  auto v = rc->PackVariables(variables, imap);
+
+  const auto &x = swarm->template Get<Real>("x").Get();
+  const auto &y = swarm->template Get<Real>("y").Get();
+  const auto &z = swarm->template Get<Real>("z").Get();
+  const auto &ncov = swarm->template Get<Real>("ncov").Get();
+  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
+  const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
+  const auto &mu_hi = swarm->template Get<Real>("mu_hi").Get();
+  const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
+  const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
+  auto pv = imap.GetFlatIdx(pf::velocity);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi);
+
+  auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  const int nu_bins = rad->Param<int>("nu_bins");
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[MAX_SPECIES] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+
+  auto swarm_d = swarm->GetDeviceContext();
+
+  // Hack in hohlraum boundaries here
+  pmb->par_for(
+      "Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
+      KOKKOS_LAMBDA(const int n) {
+        if (swarm_d.IsActive(n)) {
+
+          if (x(n) < swarm_d.x_min_global_) {
+            // Reflect particle across boundary
+            x(n) = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x(n));
+            ncov(1, n) = -ncov(1, n);
+
+            // Reset intensities
+            for (int nubin = 0; nubin < nu_bins; nubin++) {
+              for (int s = 0; s < num_species; s++) {
+                Inuinv(nubin, s, n) = robust::SMALL();
+              }
+            }
+          }
+
+          if (x(n) > swarm_d.x_max_global_) {
+            // Reflect particle across boundary
+            x(n) = swarm_d.x_max_global_ - (x(n) - swarm_d.x_max_global_);
+            ncov(1, n) = -ncov(1, n);
+
+            // Reset intensities
+            for (int nubin = 0; nubin < nu_bins; nubin++) {
+              for (int s = 0; s < num_species; s++) {
+                Inuinv(nubin, s, n) = robust::SMALL();
+              }
+            }
+          }
+
+          bool on_current_mesh_block = true;
+          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+        }
+      });
+}
+
+template <class T>
 TaskStatus MOCMCReconstruction(T *rc) {
-
-  namespace ir = radmoment_internal;
-
   auto *pmb = rc->GetParentPointer().get();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
