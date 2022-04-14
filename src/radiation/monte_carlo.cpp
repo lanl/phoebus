@@ -69,13 +69,12 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  const Real MASS = unit_conv.GetMassCodeToCGS();
-  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
-  const Real TIME = unit_conv.GetTimeCodeToCGS();
+  auto code_constants = CodeConstants(unit_conv);
 
   const Real d3x = dx_i * dx_j * dx_k;
 
-  const Real h_code = pc::h * TIME / (MASS * LENGTH * LENGTH);
+  const Real h_code = code_constants.h();
+  const Real mp_code = code_constants.mp();
 
   std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
                                  "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
@@ -121,12 +120,12 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real dNdlnu_max = 0.;
             for (int n = 0; n <= nu_bins; n++) {
               Real nu = nusamp(n);
-              Real ener = h_code * nu * TIME;
+              Real ener = h_code * nu;
               Real wgt = GetWeight(wgtC, nu);
               Real Jnu = d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
-                                                   ye, s, nu * TIME);
+                                                   ye, s, nu);
 
-              dN += Jnu / (ener * wgt) * (nu * dlnu * TIME);
+              dN += Jnu / (ener * wgt) * (nu * dlnu);
 
               // Note that factors of nu in numerator and denominator cancel
               Real dNdlnu = Jnu * d3x * detG / (h_code * wgt);
@@ -145,11 +144,11 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real nu1 = nusamp[nu_bins];
             dN -= 0.5 *
                   d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
-                                            nu0 * TIME) /
+                                            nu0) /
                   (h_code * GetWeight(wgtC, nu0)) * dlnu;
             dN -= 0.5 *
                   d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
-                                            nu1 * TIME) /
+                                            nu1) /
                   (h_code * GetWeight(wgtC, nu1)) * dlnu;
             dN *= d3x * detG * dt;
 
@@ -301,7 +300,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
               // Encode frequency and randomly sample direction
-              Real E = nu * TIME * h_code;
+              Real E = nu * h_code;
               Real theta = acos(2. * rng_gen.drand() - 1.);
               Real phi = 2. * M_PI * rng_gen.drand();
               Real K_tetrad[4] = {-E, E * cos(theta), E * cos(phi) * sin(theta),
@@ -319,7 +318,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 v(mu, k, j, i) += 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
               }
               // TODO(BRR) lepton sign
-              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * pc::mp / MASS;
+              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
 
               rng_pool.free_state(rng_gen);
             }
@@ -385,11 +384,10 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  const Real MASS = unit_conv.GetMassCodeToCGS();
-  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
-  const Real TIME = unit_conv.GetTimeCodeToCGS();
+  auto code_constants = CodeConstants(unit_conv);
 
-  const Real h_code = pc::h * TIME / (MASS * LENGTH * LENGTH);
+  const Real h_code = code_constants.h();
+  const Real mp_code = code_constants.mp();
 
   std::vector<std::string> vars(
       {p::density, p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});
@@ -445,8 +443,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
                                  -1. / d4x * weight(n) * k3(n));
               // TODO(BRR) Add Ucon[0] in the below
-              Kokkos::atomic_add(&(v(iGye, k, j, i)),
-                                 1. / d4x * weight(n) * pc::mp / MASS);
+              Kokkos::atomic_add(&(v(iGye, k, j, i)), 1. / d4x * weight(n) * mp_code);
 
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]), 1.);

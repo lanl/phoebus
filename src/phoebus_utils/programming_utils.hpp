@@ -27,7 +27,6 @@ struct is_specialization_of<TEMPL<TPARAMS...>, TEMPL> : public std::true_type {}
 
 template <typename T>
 bool soft_equiv(const T x, const T y, const T tolerance = static_cast<T>(1.e-10f)) {
-
   bool equivalent = false;
   if (2. * fabs(y - x) < tolerance * (std::fabs(x) + std::fabs(y))) {
     equivalent = true;
@@ -38,7 +37,7 @@ bool soft_equiv(const T x, const T y, const T tolerance = static_cast<T>(1.e-10f
 
 template <typename T>
 bool ContainedInVector(T &item, std::vector<T> &container) {
-  if (std::find(container.being(), container.end(), item) == container.end()) {
+  if (std::find(container.begin(), container.end(), item) == container.end()) {
     std::stringstream msg;
     return false;
   }

@@ -82,12 +82,6 @@ void MOCMCInitSamples(T *rc) {
   auto opac = pmb->packages.Get("opacity");
   const auto d_opac = opac->template Param<Opacity>("d.opacity");
   StateDescriptor *eos = pmb->packages.Get("eos").get();
-  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  auto &constants = eos->Param<phoebus::CodeConstants>("code_constants");
-  const Real c_code = constants.c();
-  const Real h_code = constants.h();
-  const Real kb_code = constants.kb();
-  const Real TIME = unit_conv.GetTimeCodeToCGS();
 
   // auto &dnsamp = rc->Get(mocmc_internal::dnsamp);
   std::vector<std::string> variables{pr::J,           pr::H,  pf::density, pf::velocity,
@@ -215,7 +209,7 @@ void MOCMCInitSamples(T *rc) {
             const RadiationType type = species_d[s];
             const Real Tr = d_opac.TemperatureFromEnergyDensity(v(pJ(s), k, j, i), type);
             for (int nubin = 0; nubin < nu_bins; nubin++) {
-              const Real nu = nusamp(nubin) * TIME * ndu;
+              const Real nu = nusamp(nubin) * ndu;
 
               Inuinv(nubin, s, n) = std::max<Real>(
                   robust::SMALL(),
@@ -245,9 +239,13 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> variables{pf::velocity, ir::tilPi};
+  std::vector<std::string> variables{pr::J, pf::velocity, ir::tilPi};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
+
+  // Microphysics
+  auto opac = pmb->packages.Get("opacity");
+  const auto opac_d = opac->template Param<Opacity>("d.opacity");
 
   const auto &x = swarm->template Get<Real>("x").Get();
   const auto &y = swarm->template Get<Real>("y").Get();
@@ -260,6 +258,7 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
   auto pv = imap.GetFlatIdx(pf::velocity);
   auto iTilPi = imap.GetFlatIdx(ir::tilPi);
+  auto iJ = imap.GetFlatIdx(pr::J);
 
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const int nu_bins = rad->Param<int>("nu_bins");
@@ -270,23 +269,56 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
     species_d[s] = species[s];
   }
 
+  /// TODO: (LFR) Fix this junk
+  RadiationType dev_species[3] = {species[0], species[1], species[2]};
+
   auto swarm_d = swarm->GetDeviceContext();
 
-  // Hack in hohlraum boundaries here
+  auto ix1_bc = rad->Param<MOCMCBoundaries>("ix1_bc");
+  auto ox1_bc = rad->Param<MOCMCBoundaries>("ox1_bc");
+
+  Real ix1_temp = 0.;
+  Real ox1_temp = 0.;
+  if (ix1_bc == MOCMCBoundaries::fixed_temp) {
+    ix1_temp = rad->Param<Real>("ix1_temp");
+  }
+  if (ox1_bc == MOCMCBoundaries::fixed_temp) {
+    ox1_temp = rad->Param<Real>("ox1_temp");
+  }
+
   pmb->par_for(
       "Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
       KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
 
+          // Store zone before reflections
+          int i, j, k;
+          swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+
           if (x(n) < swarm_d.x_min_global_) {
             // Reflect particle across boundary
             x(n) = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x(n));
+            // TODO(BRR) normalized in relativity?
             ncov(1, n) = -ncov(1, n);
 
-            // Reset intensities
-            for (int nubin = 0; nubin < nu_bins; nubin++) {
-              for (int s = 0; s < num_species; s++) {
-                Inuinv(nubin, s, n) = robust::SMALL();
+            for (int s = 0; s < num_species; s++) {
+              Real temp = 0.;
+              if (ix1_bc == MOCMCBoundaries::outflow) {
+                // Temperature from J in ghost zone
+                temp = opac_d.TemperatureFromEnergyDensity(v(iJ(s), k, j, i),
+                                                           dev_species[s]);
+              } else {
+                // Fixed temperature
+                temp = ix1_temp;
+              }
+
+              // Reset intensities
+              for (int nubin = 0; nubin < nu_bins; nubin++) {
+                const Real nu = nusamp(nubin);
+                Inuinv(nubin, s, n) =
+                    std::max<Real>(robust::SMALL(), opac_d.ThermalDistributionOfTNu(
+                                                        temp, dev_species[s], nu)) /
+                    std::pow(nu, 3);
               }
             }
           }
@@ -308,6 +340,8 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
         }
       });
+
+  return TaskStatus::complete;
 }
 
 template <class T>
@@ -622,8 +656,6 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const auto opac_d = opac->template Param<Opacity>("d.opacity");
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   const auto eos_d = eos->template Param<EOS>("d.EOS");
-  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  const Real TIME = unit_conv.GetTimeCodeToCGS();
 
   // TODO(BRR) Add singularity-scat
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
@@ -720,8 +752,8 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             SPACELOOP2(ii, jj) {
               con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
             }
-            Real JBB =
-                opac_d.EnergyDensityFromTemperature(v(iblock, pT, k, j, i), dev_species[ispec]);
+            Real JBB = opac_d.EnergyDensityFromTemperature(v(iblock, pT, k, j, i),
+                                                           dev_species[ispec]);
 
             ClosureMOCMC<Vec, Tens2> c(con_v, &g);
 
@@ -748,35 +780,32 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
             Real Itot = 0.;
             for (int bin = 0; bin < nu_bins; bin++) {
-              kappaJ +=
-                  opac_d.AngleAveragedAbsorptionCoefficient(
-                      v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                      v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin) * TIME) *
-                  v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin) * TIME;
-              Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin) * TIME;
+              kappaJ += opac_d.AngleAveragedAbsorptionCoefficient(
+                            v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                            v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin)) *
+                        v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
+              Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
               printf("[%i] I = %e abs: %e\n", bin, v(iblock, Inu0(ispec, bin), k, j, i),
-                  opac_d.AngleAveragedAbsorptionCoefficient(
-                      v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                      v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin) * TIME));
-
+                     opac_d.AngleAveragedAbsorptionCoefficient(
+                         v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                         v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin)));
             }
 
             // Trapezoidal rule
             kappaJ -= 0.5 *
                       opac_d.AngleAveragedAbsorptionCoefficient(
                           v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                          v(iblock, pye, k, j, i), dev_species[ispec], nusamp(0) * TIME) *
-                      v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0) * TIME;
-            kappaJ -= 0.5 *
-                      opac_d.AngleAveragedAbsorptionCoefficient(
-                          v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                          v(iblock, pye, k, j, i), dev_species[ispec],
-                          nusamp(nu_bins - 1) * TIME) *
-                      v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1) *
-                      TIME;
-            Itot -= 0.5 * (v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0) * TIME +
-                           v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) *
-                               nusamp(nu_bins - 1) * TIME);
+                          v(iblock, pye, k, j, i), dev_species[ispec], nusamp(0)) *
+                      v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0);
+            kappaJ -=
+                0.5 *
+                opac_d.AngleAveragedAbsorptionCoefficient(
+                    v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                    v(iblock, pye, k, j, i), dev_species[ispec], nusamp(nu_bins - 1)) *
+                v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
+            Itot -= 0.5 *
+                    (v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0) +
+                     v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1));
             kappaJ = robust::ratio(kappaJ, Itot);
             kappaH = kappaJ;
             kappaJ *= (1. - scattering_fraction);
@@ -785,8 +814,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             Real tauH = alpha * dt * kappaH;
 
             printf("tauJ: %e tauH: %e\n", tauJ, tauH);
-            if (dt > 1.e-6)
-            exit(-1);
+            if (dt > 1.e-6) exit(-1);
 
             // Store kappaH for asymptotic fluxes
             v(iblock, idx_kappaH(ispec), k, j, i) = kappaH;
@@ -826,7 +854,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
               // Calculate effective scattering emissivity from angle-averaged intensity
               // TODO(BRR) include dI/ds in this calculation for inelastic scattering
               for (int bin = 0; bin < nu_bins; bin++) {
-                const Real nu_fluid = nusamp(bin) * TIME;
+                const Real nu_fluid = nusamp(bin);
                 const Real alphainv_s =
                     nu_fluid * scattering_fraction *
                     opac_d.AngleAveragedAbsorptionCoefficient(
@@ -838,7 +866,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
               }
 
               for (int bin = 0; bin < nu_bins; bin++) {
-                const Real nu_fluid = nusamp(bin) * TIME;
+                const Real nu_fluid = nusamp(bin);
                 const Real nu_lab = std::exp(std::log(nu_fluid) - dlnu * shift);
                 const Real ds = dt / ucon[0] / nu_fluid;
                 const Real alphainv_a =
@@ -851,9 +879,10 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                     opac_d.AngleAveragedAbsorptionCoefficient(
                         v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                         v(iblock, pye, k, j, i), dev_species[ispec], nu_fluid);
-                const Real jinv_a = opac_d.ThermalDistributionOfTNu(v(iblock, pT, k, j, i),
-                                                                  dev_species[ispec], nu_fluid) /
-                                    (nu_fluid * nu_fluid * nu_fluid) * alphainv_a;
+                const Real jinv_a =
+                    opac_d.ThermalDistributionOfTNu(v(iblock, pT, k, j, i),
+                                                    dev_species[ispec], nu_fluid) /
+                    (nu_fluid * nu_fluid * nu_fluid) * alphainv_a;
 
                 // Interpolate invariant scattering emissivity to lab frame
                 Real jinv_s = 0.;
@@ -1045,6 +1074,7 @@ TaskStatus MOCMCEddington(T *rc) {
   return TaskStatus::complete;
 }
 
+template TaskStatus MOCMCSampleBoundaries<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template TaskStatus MOCMCReconstruction<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template TaskStatus MOCMCEddington<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 template void MOCMCInitSamples<MeshBlockData<Real>>(MeshBlockData<Real> *);
