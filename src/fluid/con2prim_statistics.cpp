@@ -11,23 +11,11 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef COMPILE_CONSTANTS_HPP_
-#define COMPILE_CONSTANTS_HPP_
+#include "con2prim_statistics.hpp"
 
-#define NCONS_MAX @MAX_NUMBER_CONSERVED_VARS@
+namespace con2prim_statistics {
 
-#define PHOEBUS_GEOMETRY Geometry::@PHOEBUS_GEOMETRY@
-#define GEOMETRY_MESH @GEOMETRY_MESH@
-#define GEOMETRY_MESH_BLOCK @GEOMETRY_MESH_BLOCK@
+std::map<int, int> Stats::hist = {};
+int Stats::max_val = -1;
 
-#define USE_VALENCIA @USE_VALENCIA@
-
-#define USE_C2P_ROBUST_FLOORS @USE_C2P_ROBUST_FLOORS@
-
-#define SET_FLUX_SRC_DIAGS @SET_FLUX_SRC_DIAGS@
-
-#define CON2PRIM_STATISTICS @CON2PRIM_STATISTICS@
-
-#define PRINT_RHS @PRINT_RHS@
-
-#endif //COMPILE_CONSTANTS_HPP_
+} // namespace con2prim_statistics

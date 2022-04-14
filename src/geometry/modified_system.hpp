@@ -196,8 +196,7 @@ class Modified {
     Real Jcov[NDSPACE][NDSPACE];
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, Cnew, Jcov, Jcon);
-    C[0] = X0;
-    SPACELOOP(i) C[i] = Cnew[i];
+    s_.Coords(X0, Cnew[0], Cnew[1], Cnew[2], C);
   }
 
  private:

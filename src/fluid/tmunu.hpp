@@ -122,7 +122,7 @@ class StressEnergyTensorCon {
       b[l] = iW * (b_(l, std::forward<Args>(args)...) + alpha * b[0] * u[l]);
     }
 
-    bsq = Bsq*iW*iW + Bdotv*Bdotv;
+    bsq = Bsq * iW * iW + Bdotv * Bdotv;
   }
 
   Pack pack_;

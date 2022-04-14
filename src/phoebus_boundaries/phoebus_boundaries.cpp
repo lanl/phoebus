@@ -66,7 +66,8 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           // Enforce u^1 <= 0
           Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
                           q(pv_lo + 2, k, j, i)};
-          Real gammacov[3][3] = {0};
+          Real gammacov[3][3];
+          geom.Metric(CellLocation::Cent, k, j, i, gammacov);
           Real W = phoebus::GetLorentzFactor(vcon, gammacov);
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
@@ -122,7 +123,8 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           // Enforce u^1 >= 0
           Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
                           q(pv_lo + 2, k, j, i)};
-          Real gammacov[3][3] = {0};
+          Real gammacov[3][3];
+          geom.Metric(CellLocation::Cent, k, j, i, gammacov);
           Real W = phoebus::GetLorentzFactor(vcon, gammacov);
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];

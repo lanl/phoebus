@@ -1,6 +1,7 @@
 #PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
 #PHDF_PATH = '/home/brryan/github/phoebus/external/parthenon/scripts/python/'
-DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
+#DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
+DUMP_NAMES = 'torus.out1.*.phdf'
 
 import argparse
 import numpy as np
@@ -101,16 +102,21 @@ Bcon = dfile1.Get("p.bfield", flatten=False)
 flatgcov = dfile1.Get("g.c.gcov", flatten=False)
 alpha = dfile1.Get("g.c.alpha", flatten=False)
 gcov = np.zeros([nb,nz,ny,nx,4,4])
+
+def flatten(m,n):
+    ind = [[0,1,3,6],[1,2,4,7],[3,4,5,8],[6,7,8,9]]
+    return ind[m][n]
+
 for mu in range(4):
-  gcov[:,:,:,:,mu,0] = flatgcov[:,:,:,:,mu]
-  gcov[:,:,:,:,0,mu] = flatgcov[:,:,:,:,mu]
+  gcov[:,:,:,:,mu,0] = flatgcov[:,:,:,:,flatten(mu,0)]
+  gcov[:,:,:,:,0,mu] = flatgcov[:,:,:,:,flatten(0,mu)]
 for mu in range(1,4):
-  gcov[:,:,:,:,mu,1] = flatgcov[:,:,:,:,3+mu]
-  gcov[:,:,:,:,1,mu] = flatgcov[:,:,:,:,3+mu]
+  gcov[:,:,:,:,mu,1] = flatgcov[:,:,:,:,flatten(mu,1)]
+  gcov[:,:,:,:,1,mu] = flatgcov[:,:,:,:,flatten(1,mu)]
 for mu in range(2,4):
-  gcov[:,:,:,:,mu,2] = flatgcov[:,:,:,:,3+2+mu]
-  gcov[:,:,:,:,2,mu] = flatgcov[:,:,:,:,3+2+mu]
-gcov[:,:,:,:,3,3] = flatgcov[:,:,:,:,9]
+  gcov[:,:,:,:,mu,2] = flatgcov[:,:,:,:,flatten(mu,2)]
+  gcov[:,:,:,:,2,mu] = flatgcov[:,:,:,:,flatten(2,mu)]
+gcov[:,:,:,:,3,3] = flatgcov[:,:,:,:,flatten(3,3)]
 
 Bcov = np.zeros([nb,nz,ny,nx,3])
 vcov = np.zeros([nb,nz,ny,nx,3])
@@ -150,8 +156,9 @@ var = density
 vmin = -5
 vmax = 0
 
-var1 = dfile1.Get("p.density", flatten=False)
+#var1 = dfile1.Get("p.density", flatten=False)
 #var1 = dfile1.Get("p.energy", flatten=False)
+var1 = density
 
 #var = np.fabs(v1)
 #vmin=-4

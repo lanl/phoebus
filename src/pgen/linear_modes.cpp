@@ -43,18 +43,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ndim = pmb->pmy_mesh->ndim;
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({"p.density", "p.velocity", "p.energy", fluid_prim::bfield,
-                              fluid_prim::ye, "pressure", "temperature", "gamma1", "cs"},
-                             imap);
+  std::vector<std::string> vars(
+      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
+       fluid_prim::pressure, fluid_prim::temperature, fluid_prim::ye});
+  auto v = rc->PackVariables(vars, imap);
 
-  const int irho = imap["p.density"].first;
-  const int ivlo = imap["p.velocity"].first;
-  const int ivhi = imap["p.velocity"].second;
-  const int ieng = imap["p.energy"].first;
+  const int irho = imap[fluid_prim::density].first;
+  const int ivlo = imap[fluid_prim::velocity].first;
+  const int ivhi = imap[fluid_prim::velocity].second;
+  const int ieng = imap[fluid_prim::energy].first;
   const int ib_lo = imap[fluid_prim::bfield].first;
   const int ib_hi = imap[fluid_prim::bfield].second;
-  const int iprs = imap["pressure"].first;
-  const int itmp = imap["temperature"].first;
+  const int iprs = imap[fluid_prim::pressure].first;
+  const int itmp = imap[fluid_prim::temperature].first;
   const int iye = imap[fluid_prim::ye].second;
   const int nv = ivhi - ivlo + 1;
 
@@ -71,7 +72,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   double ug0 = 1.;
   double u10 = 0.;
   double u20 = 0.;
-  double u30 = 0.;
+  double u30 = 0.0;
   double B10 = 0.;
   double B20 = 0.;
   double B30 = 0.;
@@ -249,9 +250,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // Transform velocity
           Real gcov[NDFULL][NDFULL] = {0};
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          Real shift[NDSPACE];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
           Real ucon[NDFULL] = {Gamma,            // alpha = 1 in Minkowski
                                v(ivlo, k, j, i), // beta^i = 0 in Minkowski
                                v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+          Real Bdotv = 0.0;
+          for (int d = ib_lo; d <= ib_hi; d++) {
+            Bdotv += v(d, k, j, i) * v(ivlo + d - ib_lo, k, j, i) / Gamma;
+          }
+          Real bcon[NDFULL] = {Gamma * Bdotv, 0.0, 0.0, 0.0};
+          for (int d = ib_lo; d <= ib_hi; d++) {
+            bcon[d - ib_lo + 1] = (v(d, k, j, i) + bcon[0] * ucon[d - ib_lo + 1]) / Gamma;
+          }
           Real J[NDFULL][NDFULL] = {0};
           if (is_snake) {
             J[0][0] = 1 / alpha;
@@ -264,25 +275,25 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             J[2][0] = -betay;
             J[3][0] = -betaz;
           } else if (is_inchworm) {
-            PARTHENON_FAIL("This geometry isn't supported with a J!");
+            J[0][0] = J[2][2] = J[3][3] = 1;
+            J[1][1] = 1 + a_snake * k_snake * cos(k_snake * x);
           }
           Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
           SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
             ucon_transformed[mu] += J[mu][nu] * ucon[nu];
           }
-          const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
-          Gamma = lapse * ucon_transformed[0];
-          Real shift[NDSPACE];
-          geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
-          v(ivlo, k, j, i) = ucon_transformed[1] + Gamma * shift[0] / lapse;
-          v(ivlo + 1, k, j, i) = ucon_transformed[2] + Gamma * shift[1] / lapse;
-          v(ivlo + 2, k, j, i) = ucon_transformed[3] + Gamma * shift[2] / lapse;
+          Real bcon_transformed[NDFULL] = {0, 0, 0, 0};
+          SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
+            bcon_transformed[mu] += J[mu][nu] * bcon[nu];
+          }
 
-          // Enforce zero B fields for now
-          if (ib_hi >= 3) {
-            v(ib_lo, k, j, i) = 0.;
-            v(ib_lo + 1, k, j, i) = 0.;
-            v(ib_lo + 2, k, j, i) = 0.;
+          Gamma = alpha * ucon_transformed[0];
+          v(ivlo, k, j, i) = ucon_transformed[1] + Gamma * shift[0] / alpha;
+          v(ivlo + 1, k, j, i) = ucon_transformed[2] + Gamma * shift[1] / alpha;
+          v(ivlo + 2, k, j, i) = ucon_transformed[3] + Gamma * shift[2] / alpha;
+          for (int d = ib_lo; d <= ib_hi; d++) {
+            v(d, k, j, i) = bcon_transformed[d - ib_lo + 1] * Gamma -
+                            alpha * bcon_transformed[0] * ucon_transformed[d - ib_lo + 1];
           }
         }
       });

@@ -255,13 +255,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "Phoebus::ProblemGenerator::Torus2", ijb.s, ijb.e + 1, iib.s, iib.e + 1,
       KOKKOS_LAMBDA(const int j, const int i) {
         const Real rho_av =
-            0.25 * (v(irho, ikb.s, j, i) + v(irho, ikb.s, j, i - 1) +
-                    v(irho, ikb.s, j - 1, i) + v(irho, ikb.s, j - 1, i - 1));
-        // At this point, rho_max = 1, so should not divide by rho_rmax.
+            0.25 * (v(irho, kb.s, j, i) + v(irho, kb.s, j, i - 1) +
+                    v(irho, kb.s, j - 1, i) + v(irho, kb.s, j - 1, i - 1));
+        // JMM: Classic HARM divides by rho_max here, to normalize rho_av.
+        // However, we have already normalized rho, and thus rho_av. So
+        // we should not renormalize.
+        // This will change in the case of realistic EOS, when we
+        // can't simply renormalize by density and must instead do
+        // something clever with units.
         // const Real q = rho_av / rho_rmax - 0.2;
         const Real q = rho_av - 0.2;
         A(j, i) = (q > 0 ? q : 0.0);
-        // printf("%d %d %.14e %.14e %.14e\n", i, j, rho_av, q, A(j,i));
       });
 
   // Initialize B field lines, to be normalized in PostInitializationModifier
@@ -269,12 +273,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, ijb.s, ijb.e, iib.s, iib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-          // const Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
+          // JMM: HARM/bhlight divides by gdet, not gamdet.
+          // This means the HARM primitives are smaller than the Phoebus primitives by
+          // a factor of alpha.
+          const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
           v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
-                             (2.0 * coords.Dx(X2DIR, k, j, i) * gdet);
+                             (2.0 * coords.Dx(X2DIR, k, j, i) * gamdet);
           v(iblo + 1, k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
-                                 (2.0 * coords.Dx(X1DIR, k, j, i) * gdet);
+                                 (2.0 * coords.Dx(X1DIR, k, j, i) * gamdet);
           v(ibhi, k, j, i) = 0.0;
         });
   }
@@ -353,11 +359,35 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             Bdotv += gcov[m][n] * v(ivlo + m, k, j, i) / W * v(iblo + n, k, j, i);
             Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
           }
-          const Real bsq = (Bsq) / (W*W) + Bdotv*Bdotv;
+          const Real bsq = Bsq / (W * W) + Bdotv * Bdotv;
           const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
           if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
         },
         Kokkos::Min<Real>(beta_min_local));
+    /*
+    Real Pmax_local, bsq_max_local;
+    pmb->par_reduce(
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm::Pmax", kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
+          // compute bsq for max
+          Real Bsq = 0.0;
+          Real Bdotv = 0.0;
+          Real gcov[3][3];
+          geom.Metric(CellLocation::Cent, k, j, i, gcov);
+          Real vp[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+          const Real W = phoebus::GetLorentzFactor(vp, gcov);
+          SPACELOOP2(m, n) {
+            Bdotv += gcov[m][n] * v(ivlo + m, k, j, i) / W * v(iblo + n, k, j, i);
+            Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
+          }
+          const Real bsq = Bsq / (W * W) + Bdotv * Bdotv;
+          const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
+          if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
+        },
+        Kokkos::Min<Real>(beta_min_local));
+    */
+    
 
     beta_min = std::min<Real>(beta_min_local, beta_min);
   }
@@ -387,7 +417,6 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     const int iblo = imap[fluid_prim::bfield].first;
     const int ibhi = imap[fluid_prim::bfield].second;
 
-    /*
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -395,7 +424,6 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             v(iblo + d, k, j, i) *= B_field_fac;
           }
         });
-    */
 
     constexpr int ND = Geometry::NDFULL;
     auto coords = pmb->coords;
