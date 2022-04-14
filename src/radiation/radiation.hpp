@@ -125,6 +125,9 @@ template <class T>
 TaskStatus MOCMCTransport(T *rc, const Real dt);
 
 template <class T>
+TaskStatus MOCMCSampleBoundaries(T *rc);
+
+template <class T>
 TaskStatus MOCMCReconstruction(T *rc);
 
 template <class T>

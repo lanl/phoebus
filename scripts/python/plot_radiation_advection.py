@@ -83,9 +83,6 @@ for file in files:
   maxTime = max([dfile.Time, maxTime])
 maxTime = max([maxTime, minTime + 0.01])
 
-print(minTime)
-print(maxTime)
-
 # Set up the axes with a time colorbar
 cmap = cm.get_cmap('viridis')
 fig = plt.figure(figsize=[20,8])
