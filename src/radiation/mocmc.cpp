@@ -163,9 +163,6 @@ void MOCMCInitSamples(T *rc) {
     species_d[s] = species[s];
   }
 
-  const auto B_fake = rad->Param<Real>("B_fake");
-  const auto use_B_fake = rad->Param<bool>("use_B_fake");
-
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::Init::Sample", DevExecSpace(), 0, nblock - 1, kb.s,
       kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -215,23 +212,14 @@ void MOCMCInitSamples(T *rc) {
 
           for (int s = 0; s < num_species; s++) {
             // Get radiation temperature
-            const Real J = v(pJ(s), k, j, i);
-            // TODO(BRR) Need T(E) inside singularity for NSPEC?
-            const int NSPEC = 3;
-            const Real Tr = pow(15. * pow(c_code, 3) * pow(h_code, 3) * J /
-                                    (7. * pow(M_PI, 5) * pow(kb_code, 4) * NSPEC),
-                                1. / 4.);
-            printf("Tr: %e Temp: %e\n", Tr, Temp);
-            exit(-1);
-
             const RadiationType type = species_d[s];
+            const Real Tr = d_opac.TemperatureFromEnergyDensity(v(pJ(s), k, j, i), type);
             for (int nubin = 0; nubin < nu_bins; nubin++) {
               const Real nu = nusamp(nubin) * TIME * ndu;
 
               Inuinv(nubin, s, n) = std::max<Real>(
                   robust::SMALL(),
                   d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3));
-              if (use_B_fake) Inuinv(nubin, s, n) = B_fake / pow(nu, 3);
             }
           }
         }
@@ -659,7 +647,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
               con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
             }
             Real JBB =
-                opac_d.ThermalDistributionOfT(v(iblock, pT, k, j, i), dev_species[ispec]);
+                opac_d.EnergyDensityFromTemperature(v(iblock, pT, k, j, i), dev_species[ispec]);
 
             ClosureMOCMC<Vec, Tens2> c(con_v, &g);
 
@@ -692,11 +680,12 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                       v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin) * TIME) *
                   v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin) * TIME;
               Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin) * TIME;
-              if (ispec == 0) {
-                printf("CELL Inu[%i] = %e nu = %e\n", bin, v(iblock, Inu0(ispec, bin), k, j, i), nusamp(bin));
-              }
+              printf("[%i] I = %e abs: %e\n", bin, v(iblock, Inu0(ispec, bin), k, j, i),
+                  opac_d.AngleAveragedAbsorptionCoefficient(
+                      v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                      v(iblock, pye, k, j, i), dev_species[ispec], nusamp(bin) * TIME));
+
             }
-            exit(-1);
 
             // Trapezoidal rule
             kappaJ -= 0.5 *
@@ -721,8 +710,11 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             Real tauJ = alpha * dt * kappaJ;
             Real tauH = alpha * dt * kappaH;
 
+            printf("tauJ: %e tauH: %e\n", tauJ, tauH);
+            if (dt > 1.e-6)
+            exit(-1);
+
             // Store kappaH for asymptotic fluxes
-            // TODO(BRR) what about flux at first timestep?
             v(iblock, idx_kappaH(ispec), k, j, i) = kappaH;
 
             auto status = c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ,
@@ -785,8 +777,8 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                     opac_d.AngleAveragedAbsorptionCoefficient(
                         v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                         v(iblock, pye, k, j, i), dev_species[ispec], nu_fluid);
-                const Real jinv_a = opac_d.ThermalDistributionOfT(v(iblock, pT, k, j, i),
-                                                                  dev_species[ispec]) /
+                const Real jinv_a = opac_d.ThermalDistributionOfTNu(v(iblock, pT, k, j, i),
+                                                                  dev_species[ispec], nu_fluid) /
                                     (nu_fluid * nu_fluid * nu_fluid) * alphainv_a;
 
                 // Interpolate invariant scattering emissivity to lab frame
