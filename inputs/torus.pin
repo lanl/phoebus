@@ -67,10 +67,10 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-<parthenon/meshblock>
-nx1 = 128
-nx2 = 128
-nx3 = 1
+# <parthenon/meshblock>
+# nx1 = 128
+# nx2 = 128
+# nx3 = 1
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -104,7 +104,7 @@ a = 0.9375
 
 <coordinates>
 derefine_poles = false
-r_outer = 100.0
+r_outer = 250
 
 <fixup>
 enable_floors = true
@@ -118,13 +118,15 @@ sie0_floor = 1.0e-3
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
-sie0_ceiling = 1.0;
-gam0_ceiling = 10.0;
+sie0_ceiling = 1.0
+gam0_ceiling = 10.0
 
 <torus>
+target_beta = 100.
+harm_beta_normalization = true
 u_jitter = 0.05
 kappa = 0.01
 rin = 6.0
 rmax = 12.0
-n_inside_horizon = 4
+n_inside_horizon = 5
 magnetized = true
