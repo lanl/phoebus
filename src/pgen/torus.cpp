@@ -41,6 +41,30 @@ using namespace radiation;
 using namespace singularity;
 using namespace singularity::neutrinos;
 
+class Residual {
+ public:
+  KOKKOS_FUNCTION
+  Residual(const Real Ptot, const Real rho, const Opacity &opac, const EOS &eos, RadiationType type,
+           const Real Ye)
+      : Ptot_(Ptot), rho_(rho), opac_(opac), eos_(eos), type_(type), Ye_(Ye)
+  {}
+
+  KOKKOS_INLINE_FUNCTION
+  Real operator()(const Real T) {
+    Real lambda[2] = {Ye_, 0.0};
+    return Ptot_ - (4. / 3. - 1.) * opac_.EnergyDensityFromTemperature(T, type_) -
+           eos_.PressureFromDensityTemperature(rho_, T, lambda);
+  }
+
+ private:
+  const Real Ptot_;
+  const Real rho_;
+  const Opacity opac_;
+  const EOS eos_;
+  const RadiationType type_;
+  const Real Ye_;
+};
+
 enum class InitialRadiation { none, thermal };
 
 // Prototypes
@@ -66,11 +90,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   bool do_rad = pmb->packages.Get("radiation")->Param<bool>("active");
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
-                              fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
-                              fluid_prim::pressure, fluid_prim::temperature,
-                              radmoment_prim::J},
-                             imap);
+  auto v = rc->PackVariables(
+      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
+       fluid_prim::ye, fluid_prim::pressure, fluid_prim::temperature, radmoment_prim::J,
+       radmoment_prim::H},
+      imap);
 
   const int irho = imap[fluid_prim::density].first;
   const int ivlo = imap[fluid_prim::velocity].first;
@@ -83,8 +107,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int itmp = imap[fluid_prim::temperature].first;
 
   vpack_types::FlatIdx iJ({-1}, -1);
+  vpack_types::FlatIdx iH({-1}, -1);
   if (do_rad) {
     iJ = imap.GetFlatIdx(radmoment_prim::J);
+    iH = imap.GetFlatIdx(radmoment_prim::H);
   }
   const auto specB = iJ.GetBounds(1);
 
@@ -126,7 +152,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
   const auto d_opacity = opac->Param<Opacity>("d.opacity");
   if (do_rad) {
-    const std::string init_rad_str = pin->GetOrAddString("torus", "initial_radiation", "None");
+    const std::string init_rad_str =
+        pin->GetOrAddString("torus", "initial_radiation", "None");
     if (init_rad_str == "None") {
       init_rad = InitialRadiation::none;
     } else if (init_rad_str == "thermal") {
@@ -137,7 +164,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
   /// TODO: (LFR) Fix this junk
   RadiationType d_species[3] = {species[0], species[1], species[2]};
-  auto &unit_conv = pmb->packages.Get("eos")->Param<phoebus::UnitConversions>("unit_conv");
+  auto &unit_conv =
+      pmb->packages.Get("eos")->Param<phoebus::UnitConversions>("unit_conv");
 
   // set up transformation stuff
   auto gpkg = pmb->packages.Get("geometry");
@@ -240,28 +268,40 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           for (int ispec = specB.s; ispec < 1; ispec++) {
             printf("ispec: %i\n", ispec);
             printf("iJ(ispec): %i\n", iJ(ispec));
-            v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(v(itmp, k, j, i), d_species[ispec]);
-            v(idH(0, ispec), k, j, i) = 0.0;
-            v(idH(1, ispec), k, j, i) = 0.0;
-            v(idH(2, ispec), k, j, i) = 0.0;
-            const Real T = v(itmp, k, j, i) * unit_conv.GetTemperatureCodeToCGS();
-            const Real rho = v(irho, k, j, i) * unit_conv.GetMassDensityCodeToCGS();
-            const Real UU = unit_conv.GetEnergyCodeToCGS() * unit_conv.GetNumberDensityCodeToCGS();
-            const Real u = v(ieng, k, j, i) * UU;
-            const Real J = v(iJ(ispec), k, j, i)*UU;
-            printf("T: %e K rho: %e u: %e J: %e\n",
-              T, rho, u, J);
 
-            printf("rho: %e u: %e T: %e J: %e\n",
-              v(irho, k, j, i),
-              v(ieng, k, j, i),
-              v(itmp, k, j, i),
-              v(iJ(ispec), k, j, i));
+            // Given total pressure, calculate temperature such that fluid and radiation
+            // pressures sum to total pressure
+            // TODO(BRR) Generalize to all neutrino species
+            const Real Ptot = v(iprs, k, j, i);
+            const Real T = v(itmp, k, j, i);
+            const Real Ye = iye > 0 ? v(iye, k, j, i) : 0.;
+
+            root_find::RootFind root_find;
+            Residual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity, eos, d_species[ispec], Ye);
+            const Real Teq = root_find.secant(res, 0, T, 1.e-8, 0.5*T);
+            printf("Teq = %e\n", Teq);
+
+            // TODO(BRR) fluid u/P/T and rad J using equilibrium temp
+
+            v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
+                v(itmp, k, j, i), d_species[ispec]);
+            v(iH(0, ispec), k, j, i) = 0.0;
+            v(iH(1, ispec), k, j, i) = 0.0;
+            v(iH(2, ispec), k, j, i) = 0.0;
+            //const Real T = v(itmp, k, j, i) * unit_conv.GetTemperatureCodeToCGS();
+            const Real rho = v(irho, k, j, i) * unit_conv.GetMassDensityCodeToCGS();
+            const Real UU =
+                unit_conv.GetEnergyCodeToCGS() * unit_conv.GetNumberDensityCodeToCGS();
+            const Real u = v(ieng, k, j, i) * UU;
+            const Real J = v(iJ(ispec), k, j, i) * UU;
+            printf("T: %e K rho: %e u: %e J: %e\n", T, rho, u, J);
+
+            printf("rho: %e u: %e T: %e J: %e\n", v(irho, k, j, i), v(ieng, k, j, i),
+                   v(itmp, k, j, i), v(iJ(ispec), k, j, i));
             if (v(irho, k, j, i) > 0.1) {
               exit(-1);
             }
           }
-
         }
 
         rng_pool.free_state(rng_gen);
