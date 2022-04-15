@@ -44,10 +44,9 @@ using namespace singularity::neutrinos;
 class Residual {
  public:
   KOKKOS_FUNCTION
-  Residual(const Real Ptot, const Real rho, const Opacity &opac, const EOS &eos, RadiationType type,
-           const Real Ye)
-      : Ptot_(Ptot), rho_(rho), opac_(opac), eos_(eos), type_(type), Ye_(Ye)
-  {}
+  Residual(const Real Ptot, const Real rho, const Opacity &opac, const EOS &eos,
+           RadiationType type, const Real Ye)
+      : Ptot_(Ptot), rho_(rho), opac_(opac), eos_(eos), type_(type), Ye_(Ye) {}
 
   KOKKOS_INLINE_FUNCTION
   Real operator()(const Real T) {
@@ -90,11 +89,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   bool do_rad = pmb->packages.Get("radiation")->Param<bool>("active");
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(
-      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
-       fluid_prim::ye, fluid_prim::pressure, fluid_prim::temperature, radmoment_prim::J,
-       radmoment_prim::H},
-      imap);
+  auto v =
+      rc->PackVariables({fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
+                         fluid_prim::bfield, fluid_prim::ye, fluid_prim::pressure,
+                         fluid_prim::temperature, radmoment_prim::J, radmoment_prim::H},
+                        imap);
 
   const int irho = imap[fluid_prim::density].first;
   const int ivlo = imap[fluid_prim::velocity].first;
@@ -264,42 +263,47 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
         // Radiation
         if (do_rad) {
-          // TODO(BRR) only first species right now
-          for (int ispec = specB.s; ispec < 1; ispec++) {
-            printf("ispec: %i\n", ispec);
-            printf("iJ(ispec): %i\n", iJ(ispec));
 
-            // Given total pressure, calculate temperature such that fluid and radiation
-            // pressures sum to total pressure
-            // TODO(BRR) Generalize to all neutrino species
-            const Real Ptot = v(iprs, k, j, i);
-            const Real T = v(itmp, k, j, i);
-            const Real Ye = iye > 0 ? v(iye, k, j, i) : 0.;
+          Real r = tr.bl_radius(x1v);
+          Real th = tr.bl_theta(x1v, x2v);
+          Real lnh = -1.0;
+          Real uphi;
+          if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
 
-            root_find::RootFind root_find;
-            Residual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity, eos, d_species[ispec], Ye);
-            const Real Teq = root_find.secant(res, 0, T, 1.e-8, 0.5*T);
-            printf("Teq = %e\n", Teq);
+          // Only set radiation inside the disk
+          if (lnh > 0.0) {
 
-            // TODO(BRR) fluid u/P/T and rad J using equilibrium temp
+            // TODO(BRR) only first species right now
+            for (int ispec = specB.s; ispec < 1; ispec++) {
+              printf("ispec: %i\n", ispec);
+              printf("iJ(ispec): %i\n", iJ(ispec));
 
-            v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
-                v(itmp, k, j, i), d_species[ispec]);
-            v(iH(0, ispec), k, j, i) = 0.0;
-            v(iH(1, ispec), k, j, i) = 0.0;
-            v(iH(2, ispec), k, j, i) = 0.0;
-            //const Real T = v(itmp, k, j, i) * unit_conv.GetTemperatureCodeToCGS();
-            const Real rho = v(irho, k, j, i) * unit_conv.GetMassDensityCodeToCGS();
-            const Real UU =
-                unit_conv.GetEnergyCodeToCGS() * unit_conv.GetNumberDensityCodeToCGS();
-            const Real u = v(ieng, k, j, i) * UU;
-            const Real J = v(iJ(ispec), k, j, i) * UU;
-            printf("T: %e K rho: %e u: %e J: %e\n", T, rho, u, J);
+              // Given total pressure, calculate temperature such that fluid and radiation
+              // pressures sum to total pressure
+              // TODO(BRR) Generalize to all neutrino species
+              const Real Ptot = v(iprs, k, j, i);
+              const Real T = v(itmp, k, j, i);
+              const Real Ye = iye > 0 ? v(iye, k, j, i) : 0.5;
 
-            printf("rho: %e u: %e T: %e J: %e\n", v(irho, k, j, i), v(ieng, k, j, i),
-                   v(itmp, k, j, i), v(iJ(ispec), k, j, i));
-            if (v(irho, k, j, i) > 0.1) {
-              exit(-1);
+              root_find::RootFind root_find;
+              Residual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity, eos,
+                           d_species[ispec], Ye);
+              v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-8, 0.5 * T);
+
+              // Set fluid u/P/T and radiation J using equilibrium temperature
+              v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
+                  v(itmp, k, j, i), d_species[ispec]);
+              Real lambda[2] = {Ye, 0.0};
+              v(ieng, k, j, i) =
+                  v(irho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
+                                         v(irho, k, j, i), v(itmp, k, j, i), lambda);
+              v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
+                  v(irho, k, j, i), v(itmp, k, j, i), lambda);
+
+              // Zero comoving frame fluxes
+              v(iH(0, ispec), k, j, i) = 0.0;
+              v(iH(1, ispec), k, j, i) = 0.0;
+              v(iH(2, ispec), k, j, i) = 0.0;
             }
           }
         }
@@ -347,7 +351,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   if (do_rad) {
     radiation::MomentPrim2Con(rc);
   }
-  PARTHENON_FAIL("isuhdf");
 }
 
 void ProblemModifier(ParameterInput *pin) {
