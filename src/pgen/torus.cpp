@@ -29,10 +29,17 @@
 #include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
+#include "radiation/radiation.hpp"
 
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 namespace torus {
+
+using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
+
+using namespace radiation;
+using namespace singularity;
+using namespace singularity::neutrinos;
 
 enum class InitialRadiation { none, thermal };
 
@@ -56,6 +63,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto rc = pmb->meshblock_data.Get().get();
 
+  bool do_rad = pmb->packages.Get("radiation")->Param<bool>("active");
+
   PackIndexMap imap;
   auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
                               fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
@@ -73,7 +82,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
 
-  auto iJ = imap.GetFlatIdx(radmoment_prim::J);
+  vpack_types::FlatIdx iJ({-1}, -1);
+  if (do_rad) {
+    iJ = imap.GetFlatIdx(radmoment_prim::J);
+  }
   const auto specB = iJ.GetBounds(1);
 
   // this only works with ideal gases
@@ -93,17 +105,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
   const Real Ye = pin->GetOrAddReal("torus", "Ye", 0.5);
 
-  bool do_rad = pmb->packages.Get("radiation")->Param<bool>("active");
-  const std::string init_rad_str = pin->GetOrAddString("torus", "initial_radiation", "None");
-  InitialRadiation init_rad;
-  if (init_rad_str == "None") {
-    init_rad = InitialRadiation::none;
-  } else if (init_rad_str == "thermal") {
-    init_rad = InitialRadiation::thermal;
-  } else {
-    PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
-  }
-
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
 
@@ -119,6 +120,24 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
 
   auto geom = Geometry::GetCoordinateSystem(rc);
+
+  // Initialize radiation, if active
+  InitialRadiation init_rad;
+  StateDescriptor *opac = pmb->packages.Get("opacity").get();
+  const auto d_opacity = opac->Param<Opacity>("d.opacity");
+  if (do_rad) {
+    const std::string init_rad_str = pin->GetOrAddString("torus", "initial_radiation", "None");
+    if (init_rad_str == "None") {
+      init_rad = InitialRadiation::none;
+    } else if (init_rad_str == "thermal") {
+      init_rad = InitialRadiation::thermal;
+    } else {
+      PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
+    }
+  }
+  /// TODO: (LFR) Fix this junk
+  RadiationType d_species[3] = {species[0], species[1], species[2]};
+  auto &unit_conv = pmb->packages.Get("eos")->Param<phoebus::UnitConversions>("unit_conv");
 
   // set up transformation stuff
   auto gpkg = pmb->packages.Get("geometry");
@@ -219,7 +238,28 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         if (do_rad) {
           // TODO(BRR) only first species right now
           for (int ispec = specB.s; ispec < 1; ispec++) {
-            v(iJ(ispec), k, j, i) = 1.;
+            printf("ispec: %i\n", ispec);
+            printf("iJ(ispec): %i\n", iJ(ispec));
+            v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(v(itmp, k, j, i), d_species[ispec]);
+            v(idH(0, ispec), k, j, i) = 0.0;
+            v(idH(1, ispec), k, j, i) = 0.0;
+            v(idH(2, ispec), k, j, i) = 0.0;
+            const Real T = v(itmp, k, j, i) * unit_conv.GetTemperatureCodeToCGS();
+            const Real rho = v(irho, k, j, i) * unit_conv.GetMassDensityCodeToCGS();
+            const Real UU = unit_conv.GetEnergyCodeToCGS() * unit_conv.GetNumberDensityCodeToCGS();
+            const Real u = v(ieng, k, j, i) * UU;
+            const Real J = v(iJ(ispec), k, j, i)*UU;
+            printf("T: %e K rho: %e u: %e J: %e\n",
+              T, rho, u, J);
+
+            printf("rho: %e u: %e T: %e J: %e\n",
+              v(irho, k, j, i),
+              v(ieng, k, j, i),
+              v(itmp, k, j, i),
+              v(iJ(ispec), k, j, i));
+            if (v(irho, k, j, i) > 0.1) {
+              exit(-1);
+            }
           }
 
         }
@@ -297,6 +337,17 @@ void ProblemModifier(ParameterInput *pin) {
     printf("Torus: Setting inner radius to %g\n"
            "\tThis translates to x1min, x1max = %g %g\n",
            std::exp(x1min), x1min, x1max);
+  }
+
+  // Set Cv properly for radiation
+  const bool do_rad = pin->GetOrAddBoolean("physics", "rad", false);
+  if (do_rad) {
+    const std::string eos_type = pin->GetString("eos", "type");
+    if (eos_type == "IdealGas") {
+      const Real Gamma = pin->GetReal("eos", "Gamma");
+      const Real cv = (Gamma - 1.) * pc::kb / pc::mp;
+      pin->SetPrecise("eos", "Cv", cv);
+    }
   }
 }
 
