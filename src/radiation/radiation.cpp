@@ -53,6 +53,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_FAIL(msg);
   }
 
+  bool is_gray = (method == "monte_carlo" || method == "mocmc") ? true : false;
+
   // Set which neutrino species to include in simulation
   bool do_nu_electron = pin->GetOrAddBoolean("radiation", "do_nu_electron", true);
   params.Add("do_nu_electron", do_nu_electron);
@@ -79,21 +81,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("scattering_fraction", scattering_fraction);
 
   // Initialize frequency discretization
-  Real nu_min = pin->GetReal("radiation", "nu_min");
-  params.Add("nu_min", nu_min);
-  Real nu_max = pin->GetReal("radiation", "nu_max");
-  params.Add("nu_max", nu_max);
-  int nu_bins = pin->GetInteger("radiation", "nu_bins");
-  params.Add("nu_bins", nu_bins);
-  Real dlnu = (log(nu_max) - log(nu_min)) / nu_bins;
-  params.Add("dlnu", dlnu);
-  ParArray1D<Real> nusamp("Frequency grid", nu_bins + 1);
-  auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
-  for (int n = 0; n < nu_bins + 1; n++) {
-    nusamp_h(n) = exp(log(nu_min) + n * dlnu);
+  if (is_gray) {
+    Real nu_min = pin->GetReal("radiation", "nu_min");
+    params.Add("nu_min", nu_min);
+    Real nu_max = pin->GetReal("radiation", "nu_max");
+    params.Add("nu_max", nu_max);
+    int nu_bins = pin->GetInteger("radiation", "nu_bins");
+    params.Add("nu_bins", nu_bins);
+    Real dlnu = (log(nu_max) - log(nu_min)) / nu_bins;
+    params.Add("dlnu", dlnu);
+    ParArray1D<Real> nusamp("Frequency grid", nu_bins + 1);
+    auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
+    for (int n = 0; n < nu_bins + 1; n++) {
+      nusamp_h(n) = exp(log(nu_min) + n * dlnu);
+    }
+    Kokkos::deep_copy(nusamp, nusamp_h);
+    params.Add("nusamp", nusamp);
   }
-  Kokkos::deep_copy(nusamp, nusamp_h);
-  params.Add("nusamp", nusamp);
 
   int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
   params.Add("num_species", num_species);
@@ -121,7 +125,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField("dN", mspecies_scalar);
     physics->AddField("Ns", mspecies_scalar);
 
-    std::vector<int> dNdlnu_size{NumRadiationTypes, nu_bins + 1};
+    std::vector<int> dNdlnu_size{NumRadiationTypes, params.Get<int>("nu_bins") + 1};
     Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
     physics->AddField("dNdlnu", mdNdlnu);
 
