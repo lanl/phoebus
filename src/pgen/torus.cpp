@@ -275,9 +275,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
             // TODO(BRR) only first species right now
             for (int ispec = specB.s; ispec < 1; ispec++) {
-              printf("ispec: %i\n", ispec);
-              printf("iJ(ispec): %i\n", iJ(ispec));
-
               // Given total pressure, calculate temperature such that fluid and radiation
               // pressures sum to total pressure
               // TODO(BRR) Generalize to all neutrino species
