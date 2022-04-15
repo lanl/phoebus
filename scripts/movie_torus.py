@@ -1,4 +1,5 @@
-DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
+#DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
+DUMP_NAMES = '/home/jonahm/phoebus/bin/torus.out1.*.phdf'
 
 import argparse
 import numpy as np
@@ -14,9 +15,14 @@ import glob
 from parthenon_tools import phdf
 import time
 from enum import Enum
+from multiprocessing import Pool
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
 
-for n, dfnam in enumerate(dfnams):
+def worker(pair):
+  n, dfnam = pair
   print(f'n: {n} / {len(dfnams)}')
   call(['python', 'plot_torus.py', '--nfinal', str(n), '--savefig', 'True'])
+
+p = Pool()
+p.map(worker,enumerate(dfnams))
