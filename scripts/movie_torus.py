@@ -1,5 +1,4 @@
-#DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
-DUMP_NAMES = '/home/jonahm/phoebus/bin/torus.out1.*.phdf'
+DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
 
 import argparse
 import numpy as np
