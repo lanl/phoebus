@@ -34,6 +34,8 @@ typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 namespace torus {
 
+enum class InitialRadiation { none, thermal };
+
 // Prototypes
 // ----------------------------------------------------------------------
 KOKKOS_FUNCTION
@@ -57,7 +59,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PackIndexMap imap;
   auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
                               fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
-                              fluid_prim::pressure, fluid_prim::temperature},
+                              fluid_prim::pressure, fluid_prim::temperature,
+                              radmoment_prim::J},
                              imap);
 
   const int irho = imap[fluid_prim::density].first;
@@ -69,6 +72,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iye = imap[fluid_prim::ye].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
+
+  auto iJ = imap.GetFlatIdx(radmoment_prim::J);
+  const auto specB = iJ.GetBounds(1);
 
   // this only works with ideal gases
   // The Fishbone solver needs to know about Ye
@@ -86,6 +92,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
   const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
   const Real Ye = pin->GetOrAddReal("torus", "Ye", 0.5);
+
+  bool do_rad = pmb->packages.Get("radiation")->Param<bool>("active");
+  const std::string init_rad_str = pin->GetOrAddString("torus", "initial_radiation", "None");
+  InitialRadiation init_rad;
+  if (init_rad_str == "None") {
+    init_rad = InitialRadiation::none;
+  } else if (init_rad_str == "thermal") {
+    init_rad = InitialRadiation::thermal;
+  } else {
+    PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
+  }
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
@@ -198,6 +215,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i),
                                                               v(itmp, k, j, i), lambda);
 
+        // Radiation
+        if (do_rad) {
+          // TODO(BRR) only first species right now
+          for (int ispec = specB.s; ispec < 1; ispec++) {
+            v(iJ(ispec), k, j, i) = 1.;
+          }
+
+        }
+
         rng_pool.free_state(rng_gen);
       });
 
@@ -238,6 +264,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 
   fluid::PrimitiveToConserved(rc);
+  if (do_rad) {
+    radiation::MomentPrim2Con(rc);
+  }
+  PARTHENON_FAIL("isuhdf");
 }
 
 void ProblemModifier(ParameterInput *pin) {
