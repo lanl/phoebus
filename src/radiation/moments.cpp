@@ -114,8 +114,11 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           v(b, iPhi(ispec), k, j, i) = phi;
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
-        if (std::isnan(J) || std::isnan(covH(0)))
+        if (std::isnan(J) || std::isnan(covH(0))) {
+          printf("[%i %i %i] E: %e covF: %e %e %e J: %e covH: %e %e %e\n",
+            k, j, i, E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2));
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
+        }
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -804,7 +807,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
           // Add source corrections to conserved fluid variables
           if (update_fluid) {
-            v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+            if (cye > 0) {
+              v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+            }
             v(iblock, ceng, k, j, i) -= sdetgam * dE;
             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
@@ -886,7 +891,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
                                  // opacity at enu = 10 MeV
           const Real rho = v(iblock, prho, k, j, i);
           const Real Temp = v(iblock, pT, k, j, i);
-          const Real Ye = v(iblock, pYe, k, j, i);
+          const Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
           const Real T_code = v(iblock, pT, k, j, i);
 
           Real kappa =
