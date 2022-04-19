@@ -27,7 +27,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-
+from multiprocessing import Pool
 
 # Assumes phdf in global python path
 try:
@@ -123,13 +123,16 @@ if __name__ == "__main__":
                         help='Use linear, instead of log scale')
     parser.add_argument('--pdf', action='store_true',
                         help="Save as pdf instead of png")
+    parser.add_argument('--nproc', type=int, default=1,
+                        help="Number of CPUs to use")
     parser.add_argument('varname', type=str, help='Variable to plot')
     parser.add_argument('files', type=str, nargs='+',
                         help='Files to take a snapshot of')
     args = parser.parse_args()
-    for i,f in enumerate(args.files):
-        log = not args.linear
-        postfix = '.pdf' if args.pdf else '.png'
+    log = not args.linear
+    postfix = '.pdf' if args.pdf else '.png'
+    def make_frame(pair):
+        i,f = pair
         savename = args.saveprefix + str(i).rjust(5,"0") + postfix
         print(savename)
         plot_dump(f, args.varname, savename,
@@ -140,4 +143,7 @@ if __name__ == "__main__":
                   cbarbounds = args.cbarbounds,
                   colormap = args.cmap,
                   log = log)
+
+    p = Pool(processes=args.nproc)
+    p.map(make_frame,enumerate(args.files))
 
