@@ -57,24 +57,25 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
 
-  pmb->par_for("Phoebus::ProblemGenerator::radiation_equilibration", kb.s, kb.e, jb.s,
-               jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-                 const Real rho = 1.0;
-                 const Real T = 1.0;
-                 const Real P = eos.PressureFromDensityTemperature(rho, T);
-                 const Real eps = eos.InternalEnergyFromDensityTemperature(rho, T);
+  pmb->par_for(
+      "Phoebus::ProblemGenerator::radiation_equilibration", kb.s, kb.e, jb.s, jb.e, ib.s,
+      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const Real rho = 1.0;
+        const Real T = 1.0;
+        const Real P = eos.PressureFromDensityTemperature(rho, T);
+        const Real eps = eos.InternalEnergyFromDensityTemperature(rho, T);
 
-                 v(iRho, k, j, i) = rho;
-                 v(iT, k, j, i) = T;
-                 v(iP, k, j, i) = P;
-                 v(iEps, k, j, i) = eps;
-                 SPACELOOP(ii) v(idv(ii), k, j, i) = 0.0;
+        v(iRho, k, j, i) = rho;
+        v(iT, k, j, i) = T;
+        v(iP, k, j, i) = P;
+        v(iEps, k, j, i) = eps;
+        SPACELOOP(ii) v(idv(ii), k, j, i) = 0.0;
 
-                 for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
-                   SPACELOOP(ii) v(idH(ii, ispec), k, j, i) = 0.0;
-                   v(idJ(ispec), k, j, i) = J;
-                 }
-               });
+        for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
+          SPACELOOP(ii) v(idH(ii, ispec), k, j, i) = 0.0;
+          v(idJ(ispec), k, j, i) = J;
+        }
+      });
 
   radiation::MomentPrim2Con(rc.get(), IndexDomain::entire);
   fluid::PrimitiveToConserved(rc.get());

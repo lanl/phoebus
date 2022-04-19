@@ -225,18 +225,18 @@ void SetGeometryDefault(Data *rc, const System &system) {
   IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
   IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Cent",
-                     DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s,
-                     ib.e,
-                     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-                       lamb(b, k, j, i, CellLocation::Cent);
-                     });
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Corn",
-                     DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e + 1, jb.s,
-                     jb.e + 1, ib.s, ib.e + 1,
-                     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-                       lamb(b, k, j, i, CellLocation::Corn);
-                     });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Cent", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Cent);
+      });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Corn", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kb.s, kb.e + 1, jb.s, jb.e + 1, ib.s, ib.e + 1,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Corn);
+      });
 }
 } // namespace impl
 

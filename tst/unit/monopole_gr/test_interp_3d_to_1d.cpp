@@ -59,20 +59,21 @@ TEST_CASE("Coordinates in spherical geometry", "[MonopoleGR]") {
       int nwrong = 0;
       const int k = 0;
       const int j = 0;
-      parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag, "check coords values",
-                            parthenon::DevExecSpace(), 0, rs.nx1 - 1,
-                            KOKKOS_LAMBDA(const int i, int &nw) {
-                              Real r, th, ph, dr, dth, dph, dv;
-                              MonopoleGR::Interp3DTo1D::GetCoordsAndDerivsSph(
-                                  k, j, i, coords, r, th, ph, dr, dth, dph, dv);
-                              Real idr = (1. / 12.) * (dr * dr * dr) + dr * (r * r);
-                              Real dv_true = std::sin(th) * dth * dph * idr;
-                              nw += (GetDifference(dr, dr_true) > EPS);
-                              nw += (GetDifference(dth, dth_true) > EPS);
-                              nw += (GetDifference(dph, dph_true) > EPS);
-                              nw += (GetDifference(dv, dv_true) > EPS);
-                            },
-                            nwrong);
+      parthenon::par_reduce(
+          parthenon::loop_pattern_flatrange_tag, "check coords values",
+          parthenon::DevExecSpace(), 0, rs.nx1 - 1,
+          KOKKOS_LAMBDA(const int i, int &nw) {
+            Real r, th, ph, dr, dth, dph, dv;
+            MonopoleGR::Interp3DTo1D::GetCoordsAndDerivsSph(k, j, i, coords, r, th, ph,
+                                                            dr, dth, dph, dv);
+            Real idr = (1. / 12.) * (dr * dr * dr) + dr * (r * r);
+            Real dv_true = std::sin(th) * dth * dph * idr;
+            nw += (GetDifference(dr, dr_true) > EPS);
+            nw += (GetDifference(dth, dth_true) > EPS);
+            nw += (GetDifference(dph, dph_true) > EPS);
+            nw += (GetDifference(dv, dv_true) > EPS);
+          },
+          nwrong);
       THEN("The coordinate values and volumes are what we expect") {
         REQUIRE(nwrong == 0);
       }
@@ -83,13 +84,13 @@ TEST_CASE("Coordinates in spherical geometry", "[MonopoleGR]") {
 inline bool CheckInBoundsHelper(const Real a, const Real r, const Real dr,
                                 const bool inbounds) {
   int nwrong = 0;
-  parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag, "Check InBoundsHelper",
-                        parthenon::DevExecSpace(), 0, 1,
-                        KOKKOS_LAMBDA(const int i, int &nw) {
-                          nw += (MonopoleGR::Interp3DTo1D::InBoundsHelper(a, r, dr) ==
-                                 inbounds);
-                        },
-                        nwrong);
+  parthenon::par_reduce(
+      parthenon::loop_pattern_flatrange_tag, "Check InBoundsHelper",
+      parthenon::DevExecSpace(), 0, 1,
+      KOKKOS_LAMBDA(const int i, int &nw) {
+        nw += (MonopoleGR::Interp3DTo1D::InBoundsHelper(a, r, dr) == inbounds);
+      },
+      nwrong);
   return (nwrong > 0);
 }
 TEST_CASE("In Bounds", "[MonopoleGR]") {

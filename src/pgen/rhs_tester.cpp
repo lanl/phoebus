@@ -44,30 +44,31 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
   auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
-  pmb->par_for("Phoebus::ProblemGenerator::rhs_tester", kb.s, kb.e, jb.s, jb.e, ib.s,
-               ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-                 const Real x = std::abs(coords.x1v(i));
-                 const Real rho = 1;
-                 const Real P = x / 2;
-                 const Real vel = x / 2;
+  pmb->par_for(
+      "Phoebus::ProblemGenerator::rhs_tester", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const Real x = std::abs(coords.x1v(i));
+        const Real rho = 1;
+        const Real P = x / 2;
+        const Real vel = x / 2;
 
-                 Real eos_lambda[2];
-                 if (iye > 0) {
-                   v(iye, k, j, i) = 0.5;
-                   eos_lambda[0] = v(iye, k, j, i);
-                 }
+        Real eos_lambda[2];
+        if (iye > 0) {
+          v(iye, k, j, i) = 0.5;
+          eos_lambda[0] = v(iye, k, j, i);
+        }
 
-                 v(irho, k, j, i) = rho;
-                 v(iprs, k, j, i) = P;
-                 v(ieng, k, j, i) =
-                     phoebus::energy_from_rho_P(eos, rho, P, emin, emax, eos_lambda[0]);
+        v(irho, k, j, i) = rho;
+        v(iprs, k, j, i) = P;
+        v(ieng, k, j, i) =
+            phoebus::energy_from_rho_P(eos, rho, P, emin, emax, eos_lambda[0]);
 
-                 v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                     rho, v(ieng, k, j, i) / rho, eos_lambda);
-                 for (int d = 0; d < 3; ++d)
-                   v(ivlo + d, k, j, i) = 0.0;
-                 v(ivlo, k, j, i) = vel;
-               });
+        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+            rho, v(ieng, k, j, i) / rho, eos_lambda);
+        for (int d = 0; d < 3; ++d)
+          v(ivlo + d, k, j, i) = 0.0;
+        v(ivlo, k, j, i) = vel;
+      });
   fluid::PrimitiveToConserved(rc.get());
 }
 

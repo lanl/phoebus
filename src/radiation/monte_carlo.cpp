@@ -97,72 +97,74 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   // value
   Real wgtC = 1.e40; // Typical-ish value
 
-  pmb->par_for("MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-               KOKKOS_LAMBDA(const int k, const int j, const int i) {
-                 for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-                   v(mu, k, j, i) = 0.;
-                 }
-                 v(Gye, k, j, i) = 0.;
-               });
+  pmb->par_for(
+      "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
+          v(mu, k, j, i) = 0.;
+        }
+        v(Gye, k, j, i) = 0.;
+      });
 
   for (int sidx = 0; sidx < 3; sidx++) {
     if (do_species[sidx]) {
       auto s = species[sidx];
-      pmb->par_for("MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-                   KOKKOS_LAMBDA(const int k, const int j, const int i) {
-                     auto rng_gen = rng_pool.get_state();
-                     Real detG = geom.DetG(CellLocation::Cent, k, j, i);
-                     Real ye = v(iye, k, j, i);
+      pmb->par_for(
+          "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            auto rng_gen = rng_pool.get_state();
+            Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+            Real ye = v(iye, k, j, i);
 
-                     Real dN = 0.;
-                     Real dNdlnu_max = 0.;
-                     for (int n = 0; n <= nu_bins; n++) {
-                       Real nu = nusamp(n);
-                       Real ener = h_code * nu;
-                       Real wgt = GetWeight(wgtC, nu);
-                       Real Jnu = d_opacity.EmissivityPerNu(v(pdens, k, j, i),
-                                                            v(ptemp, k, j, i), ye, s, nu);
+            Real dN = 0.;
+            Real dNdlnu_max = 0.;
+            for (int n = 0; n <= nu_bins; n++) {
+              Real nu = nusamp(n);
+              Real ener = h_code * nu;
+              Real wgt = GetWeight(wgtC, nu);
+              Real Jnu = d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
+                                                   ye, s, nu);
 
-                       dN += Jnu / (ener * wgt) * (nu * dlnu);
+              dN += Jnu / (ener * wgt) * (nu * dlnu);
 
-                       // Note that factors of nu in numerator and denominator cancel
-                       Real dNdlnu = Jnu * d3x * detG / (h_code * wgt);
-                       v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) = dNdlnu;
-                       if (dNdlnu > dNdlnu_max) {
-                         dNdlnu_max = dNdlnu;
-                       }
-                     }
+              // Note that factors of nu in numerator and denominator cancel
+              Real dNdlnu = Jnu * d3x * detG / (h_code * wgt);
+              v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) = dNdlnu;
+              if (dNdlnu > dNdlnu_max) {
+                dNdlnu_max = dNdlnu;
+              }
+            }
 
-                     for (int n = 0; n <= nu_bins; n++) {
-                       v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) /= dNdlnu_max;
-                     }
+            for (int n = 0; n <= nu_bins; n++) {
+              v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) /= dNdlnu_max;
+            }
 
-                     // Trapezoidal rule
-                     Real nu0 = nusamp[0];
-                     Real nu1 = nusamp[nu_bins];
-                     dN -= 0.5 *
-                           d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
-                                                     ye, s, nu0) /
-                           (h_code * GetWeight(wgtC, nu0)) * dlnu;
-                     dN -= 0.5 *
-                           d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
-                                                     ye, s, nu1) /
-                           (h_code * GetWeight(wgtC, nu1)) * dlnu;
-                     dN *= d3x * detG * dt;
+            // Trapezoidal rule
+            Real nu0 = nusamp[0];
+            Real nu1 = nusamp[nu_bins];
+            dN -= 0.5 *
+                  d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
+                                            nu0) /
+                  (h_code * GetWeight(wgtC, nu0)) * dlnu;
+            dN -= 0.5 *
+                  d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
+                                            nu1) /
+                  (h_code * GetWeight(wgtC, nu1)) * dlnu;
+            dN *= d3x * detG * dt;
 
-                     v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
+            v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
 
-                     int Ns = static_cast<int>(dN);
-                     if (dN - Ns > rng_gen.drand()) {
-                       Ns++;
-                     }
+            int Ns = static_cast<int>(dN);
+            if (dN - Ns > rng_gen.drand()) {
+              Ns++;
+            }
 
-                     // TODO(BRR) Use a ParArrayND<int> instead of these weird
-                     // static_casts
-                     v(idN + sidx, k, j, i) = dN;
-                     v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
-                     rng_pool.free_state(rng_gen);
-                   });
+            // TODO(BRR) Use a ParArrayND<int> instead of these weird
+            // static_casts
+            v(idN + sidx, k, j, i) = dN;
+            v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
+            rng_pool.free_state(rng_gen);
+          });
     }
   }
 
@@ -185,22 +187,23 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       wgtCfac * dNtot < 1.e8,
       "tune_emission*dNtot is very large, you wouldn't want to overflow an integer");
 
-  pmb->par_for("MonteCarlodiNsEval", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-               KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
-                 if (do_species[sidx]) {
-                   auto rng_gen = rng_pool.get_state();
+  pmb->par_for(
+      "MonteCarlodiNsEval", 0, 2, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
+        if (do_species[sidx]) {
+          auto rng_gen = rng_pool.get_state();
 
-                   Real dN_upd = wgtCfac * v(idN + sidx, k, j, i);
-                   int Ns = static_cast<int>(dN_upd);
-                   if (dN_upd - Ns > rng_gen.drand()) {
-                     Ns++;
-                   }
+          Real dN_upd = wgtCfac * v(idN + sidx, k, j, i);
+          int Ns = static_cast<int>(dN_upd);
+          if (dN_upd - Ns > rng_gen.drand()) {
+            Ns++;
+          }
 
-                   // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
-                   v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
-                   rng_pool.free_state(rng_gen);
-                 }
-               });
+          // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
+          v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
+          rng_pool.free_state(rng_gen);
+        }
+      });
   int Nstot = 0;
   parthenon::par_reduce(
       parthenon::loop_pattern_mdrange_tag, "MonteCarloReduceParticleCreationNs",

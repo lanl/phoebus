@@ -68,41 +68,40 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
   auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
-  pmb->par_for("Phoebus::ProblemGenerator::sedov", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-               KOKKOS_LAMBDA(const int k, const int j, const int i) {
-                 Real r;
-                 if (spherical) {
-                   r = std::abs(coords.x1v(i));
-                 } else {
-                   Real x = coords.x1v(i);
-                   Real y = ndim > 1 ? coords.x2v(j) : 0;
-                   Real z = ndim > 2 ? coords.x3v(k) : 0;
-                   r = std::sqrt(x * x + y * y + z * z);
-                 }
-                 const Real rho = rhoa;
+  pmb->par_for(
+      "Phoebus::ProblemGenerator::sedov", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        Real r;
+        if (spherical) {
+          r = std::abs(coords.x1v(i));
+        } else {
+          Real x = coords.x1v(i);
+          Real y = ndim > 1 ? coords.x2v(j) : 0;
+          Real z = ndim > 2 ? coords.x3v(k) : 0;
+          r = std::sqrt(x * x + y * y + z * z);
+        }
+        const Real rho = rhoa;
 
-                 Real lambda[2];
-                 if (iye > 0) {
-                   v(iye, k, j, i) = 0.5;
-                   lambda[0] = v(iye, k, j, i);
-                 }
+        Real lambda[2];
+        if (iye > 0) {
+          v(iye, k, j, i) = 0.5;
+          lambda[0] = v(iye, k, j, i);
+        }
 
-                 const Real ua =
-                     phoebus::energy_from_rho_P(eos, rho, Pa, emin, emax, lambda[0]);
-                 const Real u = (r <= rinner) ? uinner : ua;
+        const Real ua = phoebus::energy_from_rho_P(eos, rho, Pa, emin, emax, lambda[0]);
+        const Real u = (r <= rinner) ? uinner : ua;
 
-                 const Real eps = u / (rho + 1e-20);
-                 const Real T =
-                     eos.TemperatureFromDensityInternalEnergy(rho, eps, lambda);
-                 const Real P = eos.PressureFromDensityInternalEnergy(rho, eps, lambda);
+        const Real eps = u / (rho + 1e-20);
+        const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, lambda);
+        const Real P = eos.PressureFromDensityInternalEnergy(rho, eps, lambda);
 
-                 v(irho, k, j, i) = rho;
-                 v(iprs, k, j, i) = P;
-                 v(ieng, k, j, i) = u;
-                 v(itmp, k, j, i) = T;
-                 for (int d = ivlo; d <= ivhi; d++)
-                   v(d, k, j, i) = 0.0;
-               });
+        v(irho, k, j, i) = rho;
+        v(iprs, k, j, i) = P;
+        v(ieng, k, j, i) = u;
+        v(itmp, k, j, i) = T;
+        for (int d = ivlo; d <= ivhi; d++)
+          v(d, k, j, i) = 0.0;
+      });
 
   fluid::PrimitiveToConserved(rc.get());
 }

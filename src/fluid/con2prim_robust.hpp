@@ -261,7 +261,7 @@ class ConToPrim {
   KOKKOS_INLINE_FUNCTION ConToPrimStatus operator()(const CoordinateSystem &geom,
                                                     const singularity::EOS &eos,
                                                     const Coordinates_t &coords,
-                                                    Args &&... args) const {
+                                                    Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
     Real x1 = coords.x1v(std::forward<Args>(args)...);

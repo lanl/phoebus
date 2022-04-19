@@ -64,33 +64,34 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
   auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
-  pmb->par_for("Phoebus::ProblemGenerator::blandford_mckee", kb.s, kb.e, jb.s, jb.e, ib.s,
-               ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-                 const Real r = coords.x1v(i);
-                 Real vel = (std::abs(r) < tshock) ? rescale * r / tshock : 0;
-                 PARTHENON_REQUIRE(vel < 1, "Velocity subluminal");
-                 Real W = 1 / std::sqrt(1 - vel * vel);
-                 Real P = rescale * rescale * P0 * std::pow(W / tshock, 4.0);
-                 Real rho = rho0 * std::pow(W / tshock, 3.0);
+  pmb->par_for(
+      "Phoebus::ProblemGenerator::blandford_mckee", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const Real r = coords.x1v(i);
+        Real vel = (std::abs(r) < tshock) ? rescale * r / tshock : 0;
+        PARTHENON_REQUIRE(vel < 1, "Velocity subluminal");
+        Real W = 1 / std::sqrt(1 - vel * vel);
+        Real P = rescale * rescale * P0 * std::pow(W / tshock, 4.0);
+        Real rho = rho0 * std::pow(W / tshock, 3.0);
 
-                 Real u = phoebus::energy_from_rho_P(eos, rho, P, emin, emax);
-                 Real eps = u / rho;
+        Real u = phoebus::energy_from_rho_P(eos, rho, P, emin, emax);
+        Real eps = u / rho;
 
-                 Real eos_lambda[2];
-                 if (iye > 0) {
-                   v(iye, k, j, i) = 0.5;
-                   eos_lambda[0] = v(iye, k, j, i);
-                 }
-                 Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, eos_lambda);
+        Real eos_lambda[2];
+        if (iye > 0) {
+          v(iye, k, j, i) = 0.5;
+          eos_lambda[0] = v(iye, k, j, i);
+        }
+        Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, eos_lambda);
 
-                 v(irho, k, j, i) = rho;
-                 v(iprs, k, j, i) = P;
-                 v(ieng, k, j, i) = u;
-                 v(itmp, k, j, i) = T;
-                 for (int d = 0; d < 3; d++)
-                   v(ivlo + d, k, j, i) = 0.0;
-                 v(ivlo, k, j, i) = W * vel;
-               });
+        v(irho, k, j, i) = rho;
+        v(iprs, k, j, i) = P;
+        v(ieng, k, j, i) = u;
+        v(itmp, k, j, i) = T;
+        for (int d = 0; d < 3; d++)
+          v(ivlo + d, k, j, i) = 0.0;
+        v(ivlo, k, j, i) = W * vel;
+      });
 
   fluid::PrimitiveToConserved(rc.get());
 }
