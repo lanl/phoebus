@@ -79,12 +79,15 @@ file0 = phdf.phdf(files[0])
 L_unit = file0.Params['eos/length_unit']
 T_unit = file0.Params['eos/time_unit']
 M_unit = file0.Params['eos/mass_unit']
+scale_free = True
+if not np.isclose(L_unit, 1.) or not np.isclose(T_unit, 1.) or not np.isclose(M_unit, 1.):
+  scale_free = False
 E_unit = M_unit*L_unit**2/T_unit**2
 UE_unit = E_unit / L_unit**3
 for param in file0.Params:
   print(param)
-sys.exit()
-#J0 *= UE_unit
+#sys.exit()
+J0 *= UE_unit
 
 # Find the minimum and maximum times of the data
 minTime = sys.float_info.max
@@ -116,7 +119,7 @@ for file in files[0::1]:
   J = dfile.Get("r.p.J", flatten=False)*UE_unit
   print(J)
   print(UE_unit)
-  x = dfile.x
+  x = dfile.x*L_unit
   t = dfile.Time
 
   if (t>maxTime): continue
@@ -130,18 +133,24 @@ for file in files[0::1]:
   xgrid = np.arange(xmin, xmax, (xmax-xmin)/1000)
   tdiff = t + t0
   if args.analytic:
-    plt_ax.plot(xgrid, BoostedDiffusion(kappa, x0p, v, t0p, J0, xgrid, t + t0p), linestyle='--', color='k')
+    print(t0p)
+    print(t)
+    plt_ax.plot(xgrid, BoostedDiffusion(kappa, x0p, v, t0p, J0, xgrid/L_unit, t + t0p), linestyle='--', color='k')
 
-xl = v # 0.3
-xh = 1.0
+xl = v*L_unit # 0.3
+xh = 1.0*L_unit
 yl = -0.1
 yh = 1.05*J0
-plt_ax.set_ylabel('J (arb. units)')
-plt_ax.set_xlabel('x (arb. units)')
+if scale_free:
+  plt_ax.set_ylabel('J (arb. units)')
+  plt_ax.set_xlabel('x (arb. units)')
+else:
+  plt_ax.set_ylabel('J (erg cm^-3)')
+  plt_ax.set_xlabel('x (cm)')
 plt_ax.set_xlim([xl, xh])
 plt_ax.set_ylim([yl, yh])
 
-plt_ax.text(0.05*(xh-xl)+xl, 0.95*(xh-xl)+xl, '$\kappa={}$'.format(kappa))
+plt_ax.text(0.05*(xh-xl)+xl, 0.95*(yh-yl)+yl, '$\kappa={}$'.format(kappa))
 
 if args.savefig:
   plt.savefig(args.out_file)

@@ -88,7 +88,8 @@ TaskListStatus PhoebusDriver::Step() {
 }
 
 void PhoebusDriver::PostInitializationCommunication() {
-  return;
+  // TODO(BRR) this is needed for periodic BCs??
+//  return;
   TaskCollection tc;
   TaskID none(0);
   BlockList_t &blocks = pmesh->block_list;
