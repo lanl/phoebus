@@ -241,38 +241,38 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // get vector potential
   ParArrayND<Real> A("vector potential", jb.e + 1, ib.e + 1);
-  pmb->par_for(
-      "Phoebus::ProblemGenerator::Torus2", jb.s + 1, jb.e, ib.s + 1, ib.e,
-      KOKKOS_LAMBDA(const int j, const int i) {
-        const Real rho_av =
-            0.25 * (v(irho, kb.s, j, i) + v(irho, kb.s, j, i - 1) +
-                    v(irho, kb.s, j - 1, i) + v(irho, kb.s, j - 1, i - 1));
-        // JMM: Classic HARM divides by rho_max here, to normalize rho_av.
-        // However, we have already normalized rho, and thus rho_av. So
-        // we should not renormalize.
-        // This will change in the case of realistic EOS, when we
-        // can't simply renormalize by density and must instead do
-        // something clever with units.
-        // const Real q = rho_av / rho_rmax - 0.2;
-        const Real q = rho_av - 0.2;
-        A(j, i) = (q > 0 ? q : 0.0);
-      });
+  pmb->par_for("Phoebus::ProblemGenerator::Torus2", jb.s + 1, jb.e, ib.s + 1, ib.e,
+               KOKKOS_LAMBDA(const int j, const int i) {
+                 const Real rho_av =
+                     0.25 * (v(irho, kb.s, j, i) + v(irho, kb.s, j, i - 1) +
+                             v(irho, kb.s, j - 1, i) + v(irho, kb.s, j - 1, i - 1));
+                 // JMM: Classic HARM divides by rho_max here, to normalize rho_av.
+                 // However, we have already normalized rho, and thus rho_av. So
+                 // we should not renormalize.
+                 // This will change in the case of realistic EOS, when we
+                 // can't simply renormalize by density and must instead do
+                 // something clever with units.
+                 // const Real q = rho_av / rho_rmax - 0.2;
+                 const Real q = rho_av - 0.2;
+                 A(j, i) = (q > 0 ? q : 0.0);
+               });
 
   // Initialize B field lines, to be normalized in PostInitializationModifier
   if (ibhi > 0) {
-    pmb->par_for(
-        "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
-        KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          // JMM: HARM/bhlight divides by gdet, not gamdet.
-          // This means the HARM primitives are smaller than the Phoebus primitives by
-          // a factor of alpha.
-          const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-          v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
-                             (2.0 * coords.Dx(X2DIR, k, j, i) * gamdet);
-          v(iblo + 1, k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
-                                 (2.0 * coords.Dx(X1DIR, k, j, i) * gamdet);
-          v(ibhi, k, j, i) = 0.0;
-        });
+    pmb->par_for("Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e - 1, ib.s,
+                 ib.e - 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                   // JMM: HARM/bhlight divides by gdet, not gamdet.
+                   // This means the HARM primitives are smaller than the Phoebus
+                   // primitives by a factor of alpha.
+                   const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+                   v(iblo, k, j, i) =
+                       -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
+                       (2.0 * coords.Dx(X2DIR, k, j, i) * gamdet);
+                   v(iblo + 1, k, j, i) =
+                       (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
+                       (2.0 * coords.Dx(X1DIR, k, j, i) * gamdet);
+                   v(ibhi, k, j, i) = 0.0;
+                 });
   }
 
   fluid::PrimitiveToConserved(rc);
@@ -375,13 +375,12 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     const int ibhi = imap[fluid_prim::bfield].second;
 
     Real beta_min_local;
-    pmb->par_for(
-        "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
-        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          for (int ib = iblo; ib < ibhi; ib++) {
-            v(ib, k, j, i) *= B_field_fac;
-          }
-        });
+    pmb->par_for("Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e,
+                 ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                   for (int ib = iblo; ib < ibhi; ib++) {
+                     v(ib, k, j, i) *= B_field_fac;
+                   }
+                 });
     fluid::PrimitiveToConserved(rc.get());
   }
 }

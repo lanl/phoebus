@@ -57,26 +57,27 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
   IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
 
-  pmb->par_for(
-      "Phoebus::ProblemGenerator::friedmann", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real eos_lambda[2];
+  pmb->par_for("Phoebus::ProblemGenerator::friedmann", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+               KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                 Real eos_lambda[2];
 
-        if (iye > 0) {
-          v(iye, k, j, i) = 0.5;
-          eos_lambda[0] = v(iye, k, j, i);
-        }
+                 if (iye > 0) {
+                   v(iye, k, j, i) = 0.5;
+                   eos_lambda[0] = v(iye, k, j, i);
+                 }
 
-        const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, eos_lambda);
-        const Real P = eos.PressureFromDensityInternalEnergy(rho, eps, eos_lambda);
+                 const Real T =
+                     eos.TemperatureFromDensityInternalEnergy(rho, eps, eos_lambda);
+                 const Real P =
+                     eos.PressureFromDensityInternalEnergy(rho, eps, eos_lambda);
 
-        v(irho, k, j, i) = rho;
-        v(iprs, k, j, i) = P;
-        v(ieng, k, j, i) = u;
-        v(itmp, k, j, i) = T;
+                 v(irho, k, j, i) = rho;
+                 v(iprs, k, j, i) = P;
+                 v(ieng, k, j, i) = u;
+                 v(itmp, k, j, i) = T;
 
-        SPACELOOP(i) { v(ivlo + i, k, j, i) = 0; }
-      });
+                 SPACELOOP(i) { v(ivlo + i, k, j, i) = 0; }
+               });
   fluid::PrimitiveToConserved(rc.get());
 }
 

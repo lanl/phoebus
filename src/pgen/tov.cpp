@@ -86,39 +86,38 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
 
-  pmb->par_for(
-      "Phoebus::ProblemGenerator::TOV", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real r;
-        if (is_monopole_sph) {
-          r = coords.x1v(k, j, i);
-        } else { // Cartesian
-          const Real x1 = coords.x1v(k, j, i);
-          const Real x2 = coords.x2v(k, j, i);
-          const Real x3 = coords.x3v(k, j, i);
-          r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
-        }
-        Real rho =
-            std::max(rhomin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::RHO0));
-        Real eps =
-            std::max(epsmin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::EPS));
-        Real P = std::max(pmin, eos.PressureFromDensityInternalEnergy(rho, eps));
+  pmb->par_for("Phoebus::ProblemGenerator::TOV", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+               KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                 Real r;
+                 if (is_monopole_sph) {
+                   r = coords.x1v(k, j, i);
+                 } else { // Cartesian
+                   const Real x1 = coords.x1v(k, j, i);
+                   const Real x2 = coords.x2v(k, j, i);
+                   const Real x3 = coords.x3v(k, j, i);
+                   r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
+                 }
+                 Real rho = std::max(
+                     rhomin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::RHO0));
+                 Real eps = std::max(
+                     epsmin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::EPS));
+                 Real P = std::max(pmin, eos.PressureFromDensityInternalEnergy(rho, eps));
 
-        // TODO(JMM): Add lambdas, Ye, etc
-        v(irho, k, j, i) = rho;
-        v(iprs, k, j, i) = P;
-        v(ieng, k, j, i) = eps * rho;
-        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps);
-        for (int d = 0; d < 3; ++d) {
-          v(ivlo + d, k, j, i) = 0.0;
-        }
-        // Perturbation in velocity for testing
-        if (vpert_a > 0) {
-          v(ivlo, k, j, i) =
-              vpert_a * r *
-              std::exp(-(r - vpert_r) * (r - vpert_r) / (4 * vpert_s * vpert_s));
-        }
-      });
+                 // TODO(JMM): Add lambdas, Ye, etc
+                 v(irho, k, j, i) = rho;
+                 v(iprs, k, j, i) = P;
+                 v(ieng, k, j, i) = eps * rho;
+                 v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps);
+                 for (int d = 0; d < 3; ++d) {
+                   v(ivlo + d, k, j, i) = 0.0;
+                 }
+                 // Perturbation in velocity for testing
+                 if (vpert_a > 0) {
+                   v(ivlo, k, j, i) =
+                       vpert_a * r *
+                       std::exp(-(r - vpert_r) * (r - vpert_r) / (4 * vpert_s * vpert_s));
+                 }
+               });
 
   fluid::PrimitiveToConserved(rc.get());
 }

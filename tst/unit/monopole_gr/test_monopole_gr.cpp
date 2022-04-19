@@ -117,26 +117,26 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
     const int iSrr = MonopoleGR::Matter::Srr;
 
     WHEN("We set the matter fields to zero") {
-      parthenon::par_for(
-          parthenon::loop_pattern_flatrange_tag, "Set matter grid to 0",
-          parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
-            matter(iRHO, i) = 0;
-            matter(iJ, i) = 0;
-            matter(iS, i) = 0;
-            matter(iSrr, i) = 0;
-          });
+      parthenon::par_for(parthenon::loop_pattern_flatrange_tag, "Set matter grid to 0",
+                         parthenon::DevExecSpace(), 0, npoints - 1,
+                         KOKKOS_LAMBDA(const int i) {
+                           matter(iRHO, i) = 0;
+                           matter(iJ, i) = 0;
+                           matter(iS, i) = 0;
+                           matter(iSrr, i) = 0;
+                         });
       THEN("We can integrate along the hypersurface, with initial guesses A=1, K=0") {
         MonopoleGR::IntegrateHypersurface(pkg.get());
         AND_THEN("The solution converges identically to a=alpha=1, everything else 0") {
           Real error = 0;
-          parthenon::par_reduce(
-              parthenon::loop_pattern_flatrange_tag, "Check solution trivial",
-              parthenon::DevExecSpace(), 0, npoints - 1,
-              KOKKOS_LAMBDA(const int i, Real &e) {
-                e += pow(hypersurface(iA, i) - 1, 2);
-                e += pow(hypersurface(iK, i), 2);
-              },
-              error);
+          parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag,
+                                "Check solution trivial", parthenon::DevExecSpace(), 0,
+                                npoints - 1,
+                                KOKKOS_LAMBDA(const int i, Real &e) {
+                                  e += pow(hypersurface(iA, i) - 1, 2);
+                                  e += pow(hypersurface(iK, i), 2);
+                                },
+                                error);
           error /= 3 * npoints;
           error = std::sqrt(error);
           REQUIRE(error <= 1e-12);
@@ -151,38 +151,38 @@ TEST_CASE("Working with monopole_gr Grids", "[MonopoleGR]") {
       Real amp = 1e-5;
       Real mu = 50;
       Real sigma = 15;
-      parthenon::par_for(
-          parthenon::loop_pattern_flatrange_tag, "Set matter grid, stationary",
-          parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
-            Real r = radius.x(i);
-            Real rho = Gaussian(r, amp, mu, sigma);
-            matter(iRHO, i) = rho;
-            matter(iJ, i) = -r * 1e-2 * rho;
-            matter(iS, i) = 3 * (Gamma_eos - 1.) * rho * eps_eos;
-            matter(iSrr, i) = (Gamma_eos - 1.) * rho * eps_eos;
-          });
+      parthenon::par_for(parthenon::loop_pattern_flatrange_tag,
+                         "Set matter grid, stationary", parthenon::DevExecSpace(), 0,
+                         npoints - 1, KOKKOS_LAMBDA(const int i) {
+                           Real r = radius.x(i);
+                           Real rho = Gaussian(r, amp, mu, sigma);
+                           matter(iRHO, i) = rho;
+                           matter(iJ, i) = -r * 1e-2 * rho;
+                           matter(iS, i) = 3 * (Gamma_eos - 1.) * rho * eps_eos;
+                           matter(iSrr, i) = (Gamma_eos - 1.) * rho * eps_eos;
+                         });
       THEN("We can retrieve this information") {
         int nwrong = 0;
-        parthenon::par_reduce(
-            parthenon::loop_pattern_flatrange_tag, "Check rho grid",
-            parthenon::DevExecSpace(), 0, npoints - 1,
-            KOKKOS_LAMBDA(const int i, int &nw) {
-              Real r = radius.x(i);
-              Real rho = Gaussian(r, amp, mu, sigma);
-              if (matter(iRHO, i) != rho) {
-                nw += 1;
-              }
-              if (matter(iJ, i) != -r * 1e-2 * rho) {
-                nw += 1;
-              }
-              if (matter(iS, i) != 3 * (Gamma_eos - 1.) * rho * eps_eos) {
-                nw += 1;
-              }
-              if (matter(iSrr, i) != (Gamma_eos - 1.) * rho * eps_eos) {
-                nw += 1;
-              }
-            },
-            nwrong);
+        parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag, "Check rho grid",
+                              parthenon::DevExecSpace(), 0, npoints - 1,
+                              KOKKOS_LAMBDA(const int i, int &nw) {
+                                Real r = radius.x(i);
+                                Real rho = Gaussian(r, amp, mu, sigma);
+                                if (matter(iRHO, i) != rho) {
+                                  nw += 1;
+                                }
+                                if (matter(iJ, i) != -r * 1e-2 * rho) {
+                                  nw += 1;
+                                }
+                                if (matter(iS, i) !=
+                                    3 * (Gamma_eos - 1.) * rho * eps_eos) {
+                                  nw += 1;
+                                }
+                                if (matter(iSrr, i) != (Gamma_eos - 1.) * rho * eps_eos) {
+                                  nw += 1;
+                                }
+                              },
+                              nwrong);
         REQUIRE(nwrong == 0);
       }
       WHEN("We integrate the hypersurface") {
@@ -265,50 +265,51 @@ TEST_CASE("The solution of MonopoleGR matches TOV", "[MonopoleGR]") {
           int nwrong = 0;
           int im = TOV::M;
           int iphi = TOV::PHI;
-          parthenon::par_reduce(
-              parthenon::loop_pattern_flatrange_tag,
-              "check TOV solution against monopole", parthenon::DevExecSpace(), 0,
-              npoints - 1,
-              KOKKOS_LAMBDA(const int i, int &nw) {
-                Real r = radius.x(i);
-                Real m = tov_state(im, i);
-                Real phi = tov_state(iphi, i);
-                Real tov_grr = 1. / (1 - 2 * (m / r));
-                Real tov_alpha = std::exp(phi);
+          parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag,
+                                "check TOV solution against monopole",
+                                parthenon::DevExecSpace(), 0, npoints - 1,
+                                KOKKOS_LAMBDA(const int i, int &nw) {
+                                  Real r = radius.x(i);
+                                  Real m = tov_state(im, i);
+                                  Real phi = tov_state(iphi, i);
+                                  Real tov_grr = 1. / (1 - 2 * (m / r));
+                                  Real tov_alpha = std::exp(phi);
 
-                Real a = hypersurface(MonopoleGR::Hypersurface::A, i);
-                Real grr = a * a;
-                Real K = hypersurface(MonopoleGR::Hypersurface::K, i);
-                Real alpha = alpha_array(i);
+                                  Real a = hypersurface(MonopoleGR::Hypersurface::A, i);
+                                  Real grr = a * a;
+                                  Real K = hypersurface(MonopoleGR::Hypersurface::K, i);
+                                  Real alpha = alpha_array(i);
 
-                Real dadt = gradients(MonopoleGR::Gradients::DADT, i);
-                Real dalphadt = gradients(MonopoleGR::Gradients::DALPHADT, i);
-                Real dKdt = gradients(MonopoleGR::Gradients::DKDT, i);
-                Real dbetadt = gradients(MonopoleGR::Gradients::DBETADT, i);
+                                  Real dadt = gradients(MonopoleGR::Gradients::DADT, i);
+                                  Real dalphadt =
+                                      gradients(MonopoleGR::Gradients::DALPHADT, i);
+                                  Real dKdt = gradients(MonopoleGR::Gradients::DKDT, i);
+                                  Real dbetadt =
+                                      gradients(MonopoleGR::Gradients::DBETADT, i);
 
-                if (FractionalError(grr, tov_grr) > EPS) {
-                  nw += 1;
-                }
-                if (FractionalError(alpha, tov_alpha) > EPS) {
-                  nw += 1;
-                }
-                if (K > EPS) {
-                  nw += 1;
-                }
-                if (dadt > EPS) {
-                  nw += 1;
-                }
-                if (dalphadt > EPS) {
-                  nw += 1;
-                }
-                if (dKdt > EPS) {
-                  nw += 1;
-                }
-                if (dbetadt > EPS) {
-                  nw += 1;
-                }
-              },
-              nwrong);
+                                  if (FractionalError(grr, tov_grr) > EPS) {
+                                    nw += 1;
+                                  }
+                                  if (FractionalError(alpha, tov_alpha) > EPS) {
+                                    nw += 1;
+                                  }
+                                  if (K > EPS) {
+                                    nw += 1;
+                                  }
+                                  if (dadt > EPS) {
+                                    nw += 1;
+                                  }
+                                  if (dalphadt > EPS) {
+                                    nw += 1;
+                                  }
+                                  if (dKdt > EPS) {
+                                    nw += 1;
+                                  }
+                                  if (dbetadt > EPS) {
+                                    nw += 1;
+                                  }
+                                },
+                                nwrong);
           REQUIRE(nwrong == 0);
         }
         AND_THEN("We can output the solver data") {

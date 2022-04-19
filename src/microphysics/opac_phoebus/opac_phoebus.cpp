@@ -71,7 +71,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     singularity::neutrinos::Opacity opacity_host =
         NonCGSUnits<Gray>(Gray(kappa), time_unit, mass_unit, length_unit, temp_unit);
-        printf("temp_unit in opac: %e\n", temp_unit);
+    printf("temp_unit in opac: %e\n", temp_unit);
     singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
     params.Add("h.opacity", opacity_host);
     params.Add("d.opacity", opacity_device);
