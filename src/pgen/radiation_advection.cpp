@@ -84,9 +84,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  Real rho0;
-  Real T0;
-  if (scale_free) {
+  Real rho0 = 1.;// * RHO;
+  Real T0 = 1.;// * TEMP;
+  /*if (scale_free) {
     rho0 = 1.;
     T0 = 1.;
     PARTHENON_REQUIRE(programming::soft_equiv(pin->GetReal("eos", "Cv"), 1.0),
@@ -98,7 +98,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         programming::soft_equiv(pin->GetReal("eos", "Cv"),
                                 (pin->GetReal("eos", "Gamma") - 1.) * pc::kb / pc::mp),
         "Specific heat is incorrect!");
-  }
+  }*/
 
   // Store runtime parameters for output
   phoebus_params.Add("radiation_advection/J0", J0);
@@ -199,7 +199,7 @@ void ProblemModifier(ParameterInput *pin) {
   const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const bool scale_free = pin->GetOrAddBoolean("units", "scale_free", true);
   printf("scale_free: %i\n", scale_free);
-  const Real rho0 = scale_free ? 1. : rho0_cgs;
+  const Real rho0 = 1. * unit_conv.GetMassDensityCodeToCGS();//scale_free ? 1. : rho0_cgs;
 
   const Real Gamma = pin->GetReal("eos", "Gamma");
   const Real cv = scale_free ? 1. : (Gamma - 1.) * pc::kb / pc::mp;
