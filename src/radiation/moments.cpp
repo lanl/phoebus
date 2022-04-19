@@ -50,7 +50,6 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -128,14 +127,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
-        printf("[%i %i %i] J = %e covH = %e %e %e\n", k, j, i, J, covH(0), covH(1),
-               covH(2));
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
-          printf("E: %e covF: %e %e %e pi: %e %e %e %e %e %e %e %e %e\n", E, covF(0),
-                 covF(1), covF(2), conTilPi(0, 0), conTilPi(0, 1), conTilPi(0, 2),
-                 conTilPi(1, 0), conTilPi(1, 1), conTilPi(1, 2), conTilPi(2, 0),
-                 conTilPi(2, 1), conTilPi(2, 2));
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
         }
 
@@ -174,7 +167,6 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -238,8 +230,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         }
 
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
-        printf("[%i %i %i] E: %e covF: %e %e %e\n", k, j, i, E, covF(0), covF(1),
-               covF(2));
 
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
@@ -326,7 +316,6 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   if (eddington_known) {
     nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
   }
-  printf("nrecon: %i\n", nrecon);
 
   const int offset = imap_ql[ir::ql].first;
 
@@ -379,15 +368,6 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // z-direction
         if (ndim > 2)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
-
-        for (int i = ib.s; i < ib.e; i++) {
-          printf("[%i %i %i][%i] vi_l = %e vi_r = %e\n", k, j, i, n, vi_l[i], vi_r[i]);
-          if (std::isnan(vi_l[i]) || std::isnan(vi_r[i])) {
-            printf("var_id: %i\n", var_id);
-            printf("%e %e %e\n", pvim1[i], pv[i], pvip1[i]);
-            exit(-1);
-          }
-        }
 
         // Calculate spatial derivatives of J at zone faces for diffusion limit
         //    x-->
@@ -461,7 +441,6 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -564,9 +543,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           Real kappaH = sqrt((v(idx_kappaH(ispec), k, j, i) *
                               v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
 
-          printf("[%i %i %i][%i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e kappaH: %e\n", k,
-                 j, i, ispec, Jl, Jr, Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2), kappaH);
-
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
 
           // Calculate the observer frame quantities on either side of the interface
@@ -627,8 +603,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
-          printf("[%i %i %i] flux(%i)(%i) = %e\n", k, j, i, idir_in, ispec,
-                 v.flux(idir_in, idx_Ef(ispec), k, j, i));
 
           SPACELOOP(ii)
           v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
@@ -810,7 +784,6 @@ template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;

@@ -138,6 +138,9 @@ TaskStatus MOCMCEddington(T *rc);
 template <class T>
 TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid);
 
+TaskStatus MOCMCUpdateParticleCount(Mesh *pmesh,
+                                              std::vector<Real> *resolution);
+
 } // namespace radiation
 
 #endif // RADIATION_HPP_

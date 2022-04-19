@@ -1,0 +1,126 @@
+# © 2021. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract 89233218CNA000001
+# for Los Alamos National Laboratory (LANL), which is operated by Triad
+# National Security, LLC for the U.S.  Department of Energy/National
+# Nuclear Security Administration. All rights in the program are
+# reserved by Triad National Security, LLC, and the U.S. Department of
+# Energy/National Nuclear Security Administration. The Government is
+# granted for itself and others acting on its behalf a nonexclusive,
+# paid-up, irrevocable worldwide license in this material to reproduce,
+# prepare derivative works, distribute copies to the public, perform
+# publicly and display publicly, and to permit others to do so.
+
+<phoebus>
+problem = radiation_advection
+#ix1_bc = outflow
+#ox1_bc = outflow
+
+<parthenon/job>
+problem_id  = rad_adv   # problem ID: basename of output filenames
+
+<parthenon/output1>
+#variables = r.c.E, &
+#            r.c.F, &
+#            r.p.J, &
+#            r.p.H
+variables = r.c.E, &
+            r.p.J
+
+file_type   = hdf5      # Tabular data dump
+dt          = 1.e-1     # time increment between outputs
+
+<parthenon/time>
+nlim        = -1      # cycle limit
+tlim        = 1.e0    # time limit
+integrator  = rk2     # time integration algorithm
+ncycle_out  = 1       # interval for stdout summary info
+dt_init_fact = 1.e-6
+
+<parthenon/mesh>
+nghost = 4
+#refinement = adaptive
+#numlevel = 3
+
+nx1         = 32      # Number of zones in X1-direction
+x1min       = 0        # minimum value of X1
+x1max       = 1        # maximum value of X1
+ix1_bc = periodic
+ox1_bc = periodic
+#ix1_bc      = user     # Inner-X1 boundary condition flag
+#ox1_bc      = user     # Outer-X1 boundary condition flag
+
+nx2         = 1         # Number of zones in X2-direction
+x2min       = -1        # minimum value of X2
+x2max       = 1         # maximum value of X2
+ix2_bc      = periodic  # Inner-X2 boundary condition flag
+ox2_bc      = periodic  # Outer-X2 boundary condition flag
+
+nx3         = 1         # Number of zones in X3-direction
+x3min       = -1        # minimum value of X3
+x3max       = 1         # maximum value of X3
+ix3_bc      = periodic  # Inner-X3 boundary condition flag
+ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
+
+num_threads = 1         # maximum number of OMP threads
+
+bc_vars = primitive
+
+<parthenon/meshblock>
+nx1 = 32
+nx2 = 1
+nx3 = 1
+
+<parthenon/refinement0>
+field = c.c.bulk.rho
+method = derivative_order_1
+max_level = 3
+
+<eos>
+type = IdealGas
+Gamma = 1.6666666666666666667
+Cv = 5.e7
+
+<physics>
+hydro = false
+he = false
+3t = false
+rad = true
+
+<fluid>
+xorder = 2
+cfl = 0.8
+riemann = hll
+recon = weno5
+c2p_max_iter = 100
+Ye = true
+
+<radiation>
+cfl = 0.5
+#method = moment_m1
+#method = moment_eddington
+method = mocmc
+nu_min = 1.e17
+nu_max = 1.e24
+nu_bins = 10
+absorption = true
+do_nu_electron = true
+do_nu_electron_anti = false
+do_nu_heavy = false
+
+scattering_fraction = 1.0
+#B_fake = 0.5
+#use_B_fake = true
+
+<opacity>
+type = gray
+gray_kappa = 1.e3
+
+<radiation_advection>
+J = 1.0
+Hx = 0.0
+Hy = 0.0
+Hz = 0.0
+vx = 0.3
+width = 0.0333
+kappas_init = 1.e3
+boost_profile = true

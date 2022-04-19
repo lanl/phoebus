@@ -185,6 +185,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(mocmc_internal::Inu1, mInu);
     physics->AddField(mocmc_internal::jinvs, mInu);
     physics->AddField(iv::Gye, mscalar);
+
+    Real num_total = 0.;
+    params.Add("num_total", num_total, true);
   }
 
   if (method == "monte_carlo") {
