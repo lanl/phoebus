@@ -84,14 +84,14 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   auto npoints = params.Get<int>("npoints");
 
   // Initialize 1D arrays to zero
-  parthenon::par_for(parthenon::loop_pattern_flatrange_tag,
-                     "monopole_gr prepare for interp", parthenon::DevExecSpace(), 0,
-                     npoints - 1, KOKKOS_LAMBDA(const int i) {
-                       for (int v = 0; v < NMAT; ++v) {
-                         matter(v, i) = 0;
-                       }
-                       vols(i) = 0;
-                     });
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "monopole_gr prepare for interp",
+      parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+        for (int v = 0; v < NMAT; ++v) {
+          matter(v, i) = 0;
+        }
+        vols(i) = 0;
+      });
 
   // Templated on container type
   auto tmunu = fluid::BuildStressEnergyTensor(rc);
@@ -111,46 +111,46 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   const int nblocks = pack.GetDim(5);
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "MonpoleGR::InterpolateMatterTo1D",
-                     DevExecSpace(), 0, nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-                     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-                       // TODO(JMM): Should some of this be precomputed? Or should it
-                       // be computed here?  With liberal use of scratch arrays this
-                       // kernel could be broken up and maybe written in a way that
-                       // vectorizes better. I don't know what the right thing is
-                       // though. Just gotta try stuff.
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MonpoleGR::InterpolateMatterTo1D", DevExecSpace(), 0,
+      nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        // TODO(JMM): Should some of this be precomputed? Or should it
+        // be computed here?  With liberal use of scratch arrays this
+        // kernel could be broken up and maybe written in a way that
+        // vectorizes better. I don't know what the right thing is
+        // though. Just gotta try stuff.
 
-                       // First compute the relevant conserved/prim vars
-                       Real matter_loc[4];
-                       GetMonopoleVarsHelper<is_monopole_cart>(
-                           tmunu, geom, pack, b, k, j, i, matter_loc[Matter::RHO],
-                           matter_loc[Matter::J_R], matter_loc[Matter::Srr],
-                           matter_loc[Matter::trcS]);
-                       // Next get coords and grid spacing
-                       Real r, th, ph, dr, dth, dph, dv;
-                       GetCoordsAndCellWidthsHelper<is_monopole_cart>(
-                           pack, b, k, j, i, r, th, ph, dr, dth, dph, dv);
+        // First compute the relevant conserved/prim vars
+        Real matter_loc[4];
+        GetMonopoleVarsHelper<is_monopole_cart>(
+            tmunu, geom, pack, b, k, j, i, matter_loc[Matter::RHO],
+            matter_loc[Matter::J_R], matter_loc[Matter::Srr], matter_loc[Matter::trcS]);
+        // Next get coords and grid spacing
+        Real r, th, ph, dr, dth, dph, dv;
+        GetCoordsAndCellWidthsHelper<is_monopole_cart>(pack, b, k, j, i, r, th, ph, dr,
+                                                       dth, dph, dv);
 
-                       // Bounds in the 1d grid We're wasteful here because I'm
-                       // paranoid. Need to make sure we don't need miss any cells in
-                       // the 1d grid.
-                       // No correctness issue from making this too big,
-                       int i1dleft = radius1d.index(r - dr) - 1;
-                       int i1dright = radius1d.index(r + dr) + 1;
+        // Bounds in the 1d grid We're wasteful here because I'm
+        // paranoid. Need to make sure we don't need miss any cells in
+        // the 1d grid.
+        // No correctness issue from making this too big,
+        int i1dleft = radius1d.index(r - dr) - 1;
+        int i1dright = radius1d.index(r + dr) + 1;
 
-                       // Loop through the 1d grid, and do the thing
-                       // TODO(JMM): Thanks I hate it.
-                       Real dr1d = radius1d.dx();
-                       for (int i1d = i1dleft; i1d <= i1dright; ++i1d) {
-                         Real r1d = radius1d.x(i1d);
-                         Real weight = GetVolIntersectHelper(r1d, dr1d, r, dr) * dv;
-                         // Yucky atomics
-                         Kokkos::atomic_add(&vols(i1d), weight);
-                         for (int v = 0; v < NMAT; ++v) {
-                           Kokkos::atomic_add(&matter(v, i1d), matter_loc[v] * weight);
-                         }
-                       }
-                     });
+        // Loop through the 1d grid, and do the thing
+        // TODO(JMM): Thanks I hate it.
+        Real dr1d = radius1d.dx();
+        for (int i1d = i1dleft; i1d <= i1dright; ++i1d) {
+          Real r1d = radius1d.x(i1d);
+          Real weight = GetVolIntersectHelper(r1d, dr1d, r, dr) * dv;
+          // Yucky atomics
+          Kokkos::atomic_add(&vols(i1d), weight);
+          for (int v = 0; v < NMAT; ++v) {
+            Kokkos::atomic_add(&matter(v, i1d), matter_loc[v] * weight);
+          }
+        }
+      });
   return TaskStatus::complete;
 }
 

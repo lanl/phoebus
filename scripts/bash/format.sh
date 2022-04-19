@@ -15,7 +15,7 @@
 #------------------------------------------------------------------------------
 
 
-: ${CFM:=clang-format}
+: ${CFM:=clang-format-12}
 : ${VERBOSE:=0}
 
 if ! command -v ${CFM} &> /dev/null; then

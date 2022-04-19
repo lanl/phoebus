@@ -568,37 +568,37 @@ void SetCachedCoordinateSystem(Data *rc) {
   IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
   int kbs = axisymmetric ? 0 : kb.s;
   int kbe = axisymmetric ? 0 : kb.e;
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Cent",
-                     DevExecSpace(), 0, pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s,
-                     ib.e,
-                     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-                       lamb(b, k, j, i, CellLocation::Cent);
-                     });
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, derivs",
-                     DevExecSpace(), 0, pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s,
-                     ib.e,
-                     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-                       lamb_derivs(b, k, j, i);
-                     });
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face1",
-                     DevExecSpace(), 0, pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s,
-                     ib.e + 1,
-                     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-                       lamb(b, k, j, i, CellLocation::Face1);
-                     });
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face2",
-                     DevExecSpace(), 0, pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e + 1,
-                     ib.s, ib.e,
-                     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-                       lamb(b, k, j, i, CellLocation::Face2);
-                     });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Cent", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Cent);
+      });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, derivs", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb_derivs(b, k, j, i);
+      });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face1", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e + 1,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Face1);
+      });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face2", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e + 1, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Face2);
+      });
   if (!axisymmetric) kbe = kb.e + 1;
-  parthenon::par_for(DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face3",
-                     DevExecSpace(), 0, pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s,
-                     ib.e,
-                     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-                       lamb(b, k, j, i, CellLocation::Face3);
-                     });
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face3", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        lamb(b, k, j, i, CellLocation::Face3);
+      });
 
   // Call SetGeometryDefault to set the coords objects.
   impl::SetGeometryDefault(rc, system);

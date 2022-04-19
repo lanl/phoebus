@@ -389,41 +389,41 @@ TaskStatus MOCMCReconstruction(T *rc) {
   auto mocmc_recon = rad->Param<MOCMCRecon>("mocmc_recon");
 
   // Hack in hohlraum boundaries here
-  pmb->par_for("Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
-               KOKKOS_LAMBDA(const int n) {
-                 if (swarm_d.IsActive(n)) {
+  pmb->par_for(
+      "Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
+      KOKKOS_LAMBDA(const int n) {
+        if (swarm_d.IsActive(n)) {
 
-                   if (x(n) < swarm_d.x_min_global_) {
-                     // Reflect particle across boundary
-                     x(n) = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x(n));
-                     ncov(1, n) = -ncov(1, n);
+          if (x(n) < swarm_d.x_min_global_) {
+            // Reflect particle across boundary
+            x(n) = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x(n));
+            ncov(1, n) = -ncov(1, n);
 
-                     // Reset intensities
-                     for (int nubin = 0; nubin < nu_bins; nubin++) {
-                       for (int s = 0; s < num_species; s++) {
-                         Inuinv(nubin, s, n) = robust::SMALL();
-                       }
-                     }
-                   }
+            // Reset intensities
+            for (int nubin = 0; nubin < nu_bins; nubin++) {
+              for (int s = 0; s < num_species; s++) {
+                Inuinv(nubin, s, n) = robust::SMALL();
+              }
+            }
+          }
 
-                   if (x(n) > swarm_d.x_max_global_) {
-                     // Reflect particle across boundary
-                     x(n) = swarm_d.x_max_global_ - (x(n) - swarm_d.x_max_global_);
-                     ncov(1, n) = -ncov(1, n);
+          if (x(n) > swarm_d.x_max_global_) {
+            // Reflect particle across boundary
+            x(n) = swarm_d.x_max_global_ - (x(n) - swarm_d.x_max_global_);
+            ncov(1, n) = -ncov(1, n);
 
-                     // Reset intensities
-                     for (int nubin = 0; nubin < nu_bins; nubin++) {
-                       for (int s = 0; s < num_species; s++) {
-                         Inuinv(nubin, s, n) = robust::SMALL();
-                       }
-                     }
-                   }
+            // Reset intensities
+            for (int nubin = 0; nubin < nu_bins; nubin++) {
+              for (int s = 0; s < num_species; s++) {
+                Inuinv(nubin, s, n) = robust::SMALL();
+              }
+            }
+          }
 
-                   bool on_current_mesh_block = true;
-                   swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n),
-                                                 on_current_mesh_block);
-                 }
-               });
+          bool on_current_mesh_block = true;
+          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+        }
+      });
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,

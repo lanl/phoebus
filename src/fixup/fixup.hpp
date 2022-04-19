@@ -115,12 +115,12 @@ class Bounds {
   explicit Bounds(const Ceilings &cl) : floors_(Floors()), ceilings_(cl) {}
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetFloors(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetFloors(Args &&...args) const {
     floors_.GetFloors(std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetCeilings(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetCeilings(Args &&...args) const {
     ceilings_.GetCeilings(std::forward<Args>(args)...);
   }
 

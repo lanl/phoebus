@@ -97,22 +97,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
   auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
-  pmb->par_for("Phoebus::ProblemGenerator::Sod", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-               KOKKOS_LAMBDA(const int k, const int j, const int i) {
-                 const Real x = coords.x1v(i);
-                 v(irho, k, j, i) = rho_of_x(x);
-                 v(ieng, k, j, i) = u_of_x(x);
-                 v(ivlo, k, j, i) = v1_of_x(x);
-                 v(ivlo + 1, k, j, i) = v2_of_x(x);
-                 v(ivlo + 2, k, j, i) = v3_of_x(x);
-                 v(ib_lo, k, j, i) = b1_of_x(x);
-                 v(ib_lo + 1, k, j, i) = b2_of_x(x);
-                 v(ib_lo + 2, k, j, i) = b3_of_x(x);
-                 v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(
-                     v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i));
-                 v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                     v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i));
-               });
+  pmb->par_for(
+      "Phoebus::ProblemGenerator::Sod", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        const Real x = coords.x1v(i);
+        v(irho, k, j, i) = rho_of_x(x);
+        v(ieng, k, j, i) = u_of_x(x);
+        v(ivlo, k, j, i) = v1_of_x(x);
+        v(ivlo + 1, k, j, i) = v2_of_x(x);
+        v(ivlo + 2, k, j, i) = v3_of_x(x);
+        v(ib_lo, k, j, i) = b1_of_x(x);
+        v(ib_lo + 1, k, j, i) = b2_of_x(x);
+        v(ib_lo + 2, k, j, i) = b3_of_x(x);
+        v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(
+            v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i));
+        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+            v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i));
+      });
 
   for (int i = 0; i < 100; i++) {
     fluid::PrimitiveToConserved(rc.get());
