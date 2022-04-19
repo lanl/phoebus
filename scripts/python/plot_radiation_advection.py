@@ -84,9 +84,9 @@ if not np.isclose(L_unit, 1.) or not np.isclose(T_unit, 1.) or not np.isclose(M_
   scale_free = False
 E_unit = M_unit*L_unit**2/T_unit**2
 UE_unit = E_unit / L_unit**3
-for param in file0.Params:
-  print(param)
-#sys.exit()
+print(f"L_unit: {L_unit}")
+print(f"T_unit: {T_unit}")
+print(f"M_unit: {M_unit}")
 J0 *= UE_unit
 
 # Find the minimum and maximum times of the data

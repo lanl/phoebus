@@ -87,9 +87,9 @@ TaskListStatus PhoebusDriver::Step() {
   return status;
 }
 
+// TODO(BRR) This is required for periodic BCs, unless the issue is radiation not being
+// included in ConvertBoundaryConditions
 void PhoebusDriver::PostInitializationCommunication() {
-  // TODO(BRR) this is needed for periodic BCs??
-//  return;
   TaskCollection tc;
   TaskID none(0);
   BlockList_t &blocks = pmesh->block_list;
@@ -278,7 +278,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                              BoundaryCommSubset::all);
       auto receive =
           tl.AddTask(send, &SwarmContainer::Receive, sd0.get(), BoundaryCommSubset::all);
-      auto sample_bounds = tl.AddTask(receive, radiation::MOCMCSampleBoundaries<MDT>, sc0.get());
+      auto sample_bounds =
+          tl.AddTask(receive, radiation::MOCMCSampleBoundaries<MDT>, sc0.get());
       auto sample_recon =
           tl.AddTask(sample_bounds, radiation::MOCMCReconstruction<MDT>, sc0.get());
       auto eddington =
@@ -316,6 +317,47 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 #endif
   }
 
+  if (rad_mocmc_active && stage == integrator->nstages) {
+    TaskRegion &tuning_region = tc.AddRegion(num_independent_task_lists);
+    {
+      particle_resolution.val.resize(1); // total
+      for (int i = 0; i < particle_resolution.val.size(); i++) {
+        particle_resolution.val[i] = 0.;
+      }
+      int reg_dep_id = 0;
+      auto &tl = tuning_region[0];
+
+      auto update_count = tl.AddTask(none, radiation::MOCMCUpdateParticleCount, pmesh,
+                                     &particle_resolution.val);
+
+      tuning_region.AddRegionalDependencies(reg_dep_id, 0, update_count);
+      reg_dep_id++;
+
+      auto start_count_reduce =
+          tl.AddTask(update_count, &AllReduce<std::vector<Real>>::StartReduce,
+                     &particle_resolution, MPI_SUM);
+
+      auto finish_count_reduce =
+          tl.AddTask(start_count_reduce, &AllReduce<std::vector<Real>>::CheckReduce,
+                     &particle_resolution);
+      tuning_region.AddRegionalDependencies(reg_dep_id, 0, finish_count_reduce);
+      reg_dep_id++;
+
+      // Report particle count
+      auto report_count =
+          (Globals::my_rank == 0 ? tl.AddTask(
+                                       finish_count_reduce,
+                                       [](std::vector<Real> *res) {
+                                         std::cout << "MOCMC total particles = "
+                                                   << static_cast<long>((*res)[0])
+                                                   << std::endl;
+                                         return TaskStatus::complete;
+                                       },
+                                       &particle_resolution.val)
+                                 : none);
+    }
+  }
+
   const int num_partitions = pmesh->DefaultNumPartitions();
   TaskRegion &sync_region = tc.AddRegion(num_partitions);
   for (int ib = 0; ib < num_partitions; ib++) {
@@ -348,6 +390,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (rad_mocmc_active) {
       auto impl_update = tl.AddTask(update, radiation::MOCMCFluidSource<MeshData<Real>>,
                                     sc1.get(), beta * dt, fluid_active);
+      auto impl_edd =
+          tl.AddTask(impl_update, radiation::MOCMCEddington<MeshData<Real>>, sc1.get());
       update = impl_update | update;
     } else if (rad_moments_active) {
       auto impl_update = tl.AddTask(update, radiation::MomentFluidSource<MeshData<Real>>,
@@ -460,7 +504,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   }
 
   return tc;
-}
+} // namespace phoebus
 
 TaskStatus DefaultTask() { return TaskStatus::complete; }
 
