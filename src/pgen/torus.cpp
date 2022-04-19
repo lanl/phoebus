@@ -11,82 +11,41 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+// C/C++ includes
+#include <cstdio>
+#include <limits>
+
+// Kokkos
 #include "Kokkos_Random.hpp"
+
+// Parthenon
+#include <globals.hpp>
+
+// Phoebus
 #include "fluid/con2prim_robust.hpp"
 #include "geometry/boyer_lindquist.hpp"
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "pgen/pgen.hpp"
 #include "phoebus_utils/reduction.hpp"
+#include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
 
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 namespace torus {
 
-Real lfish_calc(Real r, Real a) {
-  return (
-      ((std::pow(a, 2) - 2. * a * std::sqrt(r) + std::pow(r, 2)) *
-       ((-2. * a * r * (std::pow(a, 2) - 2. * a * std::sqrt(r) + std::pow(r, 2))) /
-            std::sqrt(2. * a * std::sqrt(r) + (-3. + r) * r) +
-        ((a + (-2. + r) * std::sqrt(r)) * (std::pow(r, 3) + std::pow(a, 2) * (2. + r))) /
-            std::sqrt(1 + (2. * a) / std::pow(r, 1.5) - 3. / r))) /
-      (std::pow(r, 3) * std::sqrt(2. * a * std::sqrt(r) + (-3. + r) * r) *
-       (std::pow(a, 2) + (-2. + r) * r)));
-}
-
+// Prototypes
+// ----------------------------------------------------------------------
+KOKKOS_FUNCTION
+Real lfish_calc(Real r, Real a);
 KOKKOS_FUNCTION
 Real log_enthalpy(const Real r, const Real th, const Real a, const Real rin, const Real l,
-                  Real &uphi) {
-  const Real sth = sin(th);
-  const Real cth = cos(th);
-
-  const Real DD = r * r - 2. * r + a * a;
-  const Real AA = (r * r + a * a) * (r * r + a * a) - DD * a * a * sth * sth;
-  const Real SS = r * r + a * a * cth * cth;
-
-  const Real thin = M_PI / 2.;
-  const Real sthin = sin(thin);
-  const Real cthin = cos(thin);
-
-  const Real DDin = rin * rin - 2. * rin + a * a;
-  const Real AAin =
-      (rin * rin + a * a) * (rin * rin + a * a) - DDin * a * a * sthin * sthin;
-  const Real SSin = rin * rin + a * a * cthin * cthin;
-  uphi = 0.0;
-  const Real lnh =
-      0.5 * std::log((1. + std::sqrt(1. + 4. * (l * l * SS * SS) * DD /
-                                              (AA * AA * sth * sth))) /
-                     (SS * DD / AA)) -
-      0.5 * std::sqrt(1. + 4. * (l * l * SS * SS) * DD / (AA * AA * sth * sth)) -
-      2. * a * r * l / AA -
-      (0.5 * std::log((1. + std::sqrt(1. + 4. * (l * l * SSin * SSin) * DDin /
-                                               (AAin * AAin * sthin * sthin))) /
-                      (SSin * DDin / AAin)) -
-       0.5 * std::sqrt(1. + 4. * (l * l * SSin * SSin) * DDin /
-                                (AAin * AAin * sthin * sthin)) -
-       2. * a * rin * l / AAin);
-  if (lnh > 0.0) {
-    Real expm2chi = SS * SS * DD / (AA * AA * sth * sth);
-    Real up1 = std::sqrt((-1. + std::sqrt(1. + 4. * l * l * expm2chi)) / 2.);
-    uphi = 2. * a * r * std::sqrt(1. + up1 * up1) / std::sqrt(AA * SS * DD) +
-           std::sqrt(SS / AA) * up1 / sth;
-  }
-  return lnh;
-}
-
+                  Real &uphi);
 KOKKOS_FUNCTION
-Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
-  Real AA = gcov[0][0];
-  Real BB = 2. * (gcov[0][1] * ucon[1] + gcov[0][2] * ucon[2] + gcov[0][3] * ucon[3]);
-  Real CC = 1. + gcov[1][1] * ucon[1] * ucon[1] + gcov[2][2] * ucon[2] * ucon[2] +
-            gcov[3][3] * ucon[3] * ucon[3] +
-            2. * (gcov[1][2] * ucon[1] * ucon[2] + gcov[1][3] * ucon[1] * ucon[3] +
-                  gcov[2][3] * ucon[2] * ucon[3]);
-  Real discr = BB * BB - 4. * AA * CC;
-  if (discr < 0) printf("discr = %g   %g %g %g\n", discr, AA, BB, CC);
-  PARTHENON_REQUIRE(discr >= 0, "discr < 0");
-  return (-BB - std::sqrt(discr)) / (2. * AA);
-}
+Real ucon_norm(Real ucon[4], Real gcov[4][4]);
+void ComputeBetas(Mesh *pmesh, const Real rho_min_bnorm, Real &beta_min_global,
+                  Real &beta_pmax);
+// ----------------------------------------------------------------------
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -159,6 +118,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real uphi_rmax;
   const Real hm1_rmax =
       std::exp(log_enthalpy(rmax, 0.5 * M_PI, a, rin, angular_mom, uphi_rmax)) - 1.0;
+
+  // TODO(JMM): This will need to change when we move to realistic
+  // EOS's for the torus.
   const Real rho_rmax = std::pow(hm1_rmax * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
   const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
 
@@ -286,7 +248,7 @@ void ProblemModifier(ParameterInput *pin) {
   Real a = pin->GetReal("geometry", "a");
   Real Rh = 1.0 + sqrt(1.0 - a * a);
   Real xh = log(Rh);
-  int ninside = pin->GetOrAddInteger("torus", "n_inside_horizon", 4);
+  int ninside = pin->GetOrAddInteger("torus", "n_inside_horizon", 5);
   bool cutout = pin->GetOrAddBoolean("torus", "cutout", false);
   int nx1 = pin->GetInteger("parthenon/mesh", "nx1");
   Real x1min;
@@ -295,21 +257,143 @@ void ProblemModifier(ParameterInput *pin) {
     PARTHENON_REQUIRE(nx1_target >= nx1, "nx1_target should be >= nx1");
     Real dx = (x1max - xh) / (nx1_target - ninside);
     x1min = x1max - nx1 * dx;
-    printf("Setting inner radius to %g\n", std::exp(x1min));
   } else {
     Real dx = (x1max - xh) / (nx1 - ninside);
-    x1min = xh - ninside * dx;
+    x1min = xh - (ninside + 0.5) * dx;
   }
   pin->SetReal("parthenon/mesh", "x1min", x1min);
+
+  if (parthenon::Globals::my_rank == 0) {
+    printf("Torus: Setting inner radius to %g\n"
+           "\tThis translates to x1min, x1max = %g %g\n",
+           std::exp(x1min), x1min, x1max);
+  }
 }
 
 void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
-  const Real beta_min_target = pin->GetOrAddReal("torus", "beta_min", 100.);
-  const Real rho_min_bnorm = pin->GetOrAddReal("torus", "rho_min_bnorm", 1.e-4);
   const bool magnetized = pin->GetOrAddBoolean("torus", "magnetized", true);
+  const Real beta_target = pin->GetOrAddReal("torus", "target_beta", 100.);
+  const bool harm_style_beta =
+      pin->GetOrAddBoolean("torus", "harm_beta_normalization", true);
+  const Real rho_min_bnorm = pin->GetOrAddReal("torus", "rho_min_bnorm", 1.e-4);
 
-  Real beta_min = 1.e100;
+  Real beta_min, beta_pmax;
+  ComputeBetas(pmesh, rho_min_bnorm, beta_min, beta_pmax);
+  if (parthenon::Globals::my_rank == 0) {
+    printf("Torus before normalization: beta_min, beta_pmax = %.14e %.14e\n", beta_min,
+           beta_pmax);
+  }
+  const Real beta_norm = harm_style_beta ? beta_pmax : beta_min;
+  const Real B_field_fac = magnetized ? std::sqrt(beta_norm / beta_target) : 0;
+  if (parthenon::Globals::my_rank == 0) {
+    printf("Torus normalization factor = %.14e\n", B_field_fac);
+  }
+
+  for (auto &pmb : pmesh->block_list) {
+    auto &rc = pmb->meshblock_data.Get();
+    auto geom = Geometry::GetCoordinateSystem(rc.get());
+
+    auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+    auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+    auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+    PackIndexMap imap;
+    auto v = rc->PackVariables({fluid_prim::bfield}, imap);
+    const int iblo = imap[fluid_prim::bfield].first;
+    const int ibhi = imap[fluid_prim::bfield].second;
+
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          for (int ib = iblo; ib <= ibhi; ib++) {
+            v(ib, k, j, i) *= B_field_fac;
+          }
+        });
+
+    fluid::PrimitiveToConserved(rc.get());
+  }
+
+  Real beta_min_new, beta_pmax_new;
+  ComputeBetas(pmesh, rho_min_bnorm, beta_min_new, beta_pmax_new);
+  if (parthenon::Globals::my_rank == 0) {
+    printf("Torus after normalization: beta_min, beta_pmax = %.14e %.14e\n", beta_min_new,
+           beta_pmax_new);
+  }
+}
+
+KOKKOS_FUNCTION
+Real lfish_calc(Real r, Real a) {
+  return (
+      ((std::pow(a, 2) - 2. * a * std::sqrt(r) + std::pow(r, 2)) *
+       ((-2. * a * r * (std::pow(a, 2) - 2. * a * std::sqrt(r) + std::pow(r, 2))) /
+            std::sqrt(2. * a * std::sqrt(r) + (-3. + r) * r) +
+        ((a + (-2. + r) * std::sqrt(r)) * (std::pow(r, 3) + std::pow(a, 2) * (2. + r))) /
+            std::sqrt(1 + (2. * a) / std::pow(r, 1.5) - 3. / r))) /
+      (std::pow(r, 3) * std::sqrt(2. * a * std::sqrt(r) + (-3. + r) * r) *
+       (std::pow(a, 2) + (-2. + r) * r)));
+}
+
+KOKKOS_FUNCTION
+Real log_enthalpy(const Real r, const Real th, const Real a, const Real rin, const Real l,
+                  Real &uphi) {
+  const Real sth = sin(th);
+  const Real cth = cos(th);
+
+  const Real DD = r * r - 2. * r + a * a;
+  const Real AA = (r * r + a * a) * (r * r + a * a) - DD * a * a * sth * sth;
+  const Real SS = r * r + a * a * cth * cth;
+
+  const Real thin = M_PI / 2.;
+  const Real sthin = sin(thin);
+  const Real cthin = cos(thin);
+
+  const Real DDin = rin * rin - 2. * rin + a * a;
+  const Real AAin =
+      (rin * rin + a * a) * (rin * rin + a * a) - DDin * a * a * sthin * sthin;
+  const Real SSin = rin * rin + a * a * cthin * cthin;
+  uphi = 0.0;
+  const Real lnh =
+      0.5 * std::log((1. + std::sqrt(1. + 4. * (l * l * SS * SS) * DD /
+                                              (AA * AA * sth * sth))) /
+                     (SS * DD / AA)) -
+      0.5 * std::sqrt(1. + 4. * (l * l * SS * SS) * DD / (AA * AA * sth * sth)) -
+      2. * a * r * l / AA -
+      (0.5 * std::log((1. + std::sqrt(1. + 4. * (l * l * SSin * SSin) * DDin /
+                                               (AAin * AAin * sthin * sthin))) /
+                      (SSin * DDin / AAin)) -
+       0.5 * std::sqrt(1. + 4. * (l * l * SSin * SSin) * DDin /
+                                (AAin * AAin * sthin * sthin)) -
+       2. * a * rin * l / AAin);
+  if (lnh > 0.0) {
+    Real expm2chi = SS * SS * DD / (AA * AA * sth * sth);
+    Real up1 = std::sqrt((-1. + std::sqrt(1. + 4. * l * l * expm2chi)) / 2.);
+    uphi = 2. * a * r * std::sqrt(1. + up1 * up1) / std::sqrt(AA * SS * DD) +
+           std::sqrt(SS / AA) * up1 / sth;
+  }
+  return lnh;
+}
+
+KOKKOS_FUNCTION
+Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
+  Real AA = gcov[0][0];
+  Real BB = 2. * (gcov[0][1] * ucon[1] + gcov[0][2] * ucon[2] + gcov[0][3] * ucon[3]);
+  Real CC = 1. + gcov[1][1] * ucon[1] * ucon[1] + gcov[2][2] * ucon[2] * ucon[2] +
+            gcov[3][3] * ucon[3] * ucon[3] +
+            2. * (gcov[1][2] * ucon[1] * ucon[2] + gcov[1][3] * ucon[1] * ucon[3] +
+                  gcov[2][3] * ucon[2] * ucon[3]);
+  Real discr = BB * BB - 4. * AA * CC;
+  if (discr < 0) printf("discr = %g   %g %g %g\n", discr, AA, BB, CC);
+  PARTHENON_REQUIRE(discr >= 0, "discr < 0");
+  return (-BB - std::sqrt(discr)) / (2. * AA);
+}
+
+// TODO(JMM): Should this be elsewhere in Phoebus?
+void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
+                  Real &beta_pmax) {
+  Real beta_min = std::numeric_limits<Real>::infinity();
+  Real press_max = -std::numeric_limits<Real>::infinity();
+  Real bsq_max = -std::numeric_limits<Real>::infinity();
 
   for (auto &pmb : pmesh->block_list) {
     auto &rc = pmb->meshblock_data.Get();
@@ -335,54 +419,45 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
     Real beta_min_local;
     pmb->par_reduce(
-        "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
-        ib.e,
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm::beta_min", kb.s, kb.e, jb.s, jb.e,
+        ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
-          // compute bsq for max
-          Real Bsq = 0.0;
-          Real Bdotv = 0.0;
-          Real gcov[3][3];
-          geom.Metric(CellLocation::Cent, k, j, i, gcov);
-          Real vp[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
-          const Real W = phoebus::GetLorentzFactor(vp, gcov);
-          SPACELOOP2(m, n) {
-            Bdotv += gcov[m][n] * v(ivlo + m, k, j, i) / W * v(iblo + n, k, j, i);
-            Bsq += gcov[m][n] * v(iblo + m, k, j, i) * v(iblo + n, k, j, i);
-          }
-          const Real bsq = Bsq / (W * W) + Bdotv * Bdotv;
+          const Real bsq =
+              GetMagneticFieldSquared(CellLocation::Cent, k, j, i, geom, v, ivlo, iblo);
           const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
           if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
         },
         Kokkos::Min<Real>(beta_min_local));
-
     beta_min = std::min<Real>(beta_min_local, beta_min);
+
+    Real bsq_max_local;
+    pmb->par_reduce(
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm::bsq_max", kb.s, kb.e, jb.s, jb.e,
+        ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bsq_max) {
+          const Real bsq =
+              GetMagneticFieldSquared(CellLocation::Cent, k, j, i, geom, v, ivlo, iblo);
+          bsq_max = std::max(bsq, bsq_max);
+        },
+        Kokkos::Max<Real>(bsq_max_local));
+    bsq_max = std::max<Real>(bsq_max, bsq_max_local);
+
+    Real press_max_local;
+    pmb->par_reduce(
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm::press_max", kb.s, kb.e, jb.s, jb.e,
+        ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &P_max) {
+          P_max = std::max(v(iprs, k, j, i), P_max);
+        },
+        Kokkos::Max<Real>(press_max_local));
+    press_max = std::max<Real>(press_max, press_max_local);
   }
 
-  const Real beta_min_global = reduction::Min(beta_min);
-  const Real B_field_fac = magnetized ? sqrt(beta_min_global / beta_min_target) : 0;
-
-  for (auto &pmb : pmesh->block_list) {
-    auto &rc = pmb->meshblock_data.Get();
-    auto geom = Geometry::GetCoordinateSystem(rc.get());
-
-    auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-
-    PackIndexMap imap;
-    auto v = rc->PackVariables({fluid_prim::bfield}, imap);
-    const int iblo = imap[fluid_prim::bfield].first;
-    const int ibhi = imap[fluid_prim::bfield].second;
-
-    Real beta_min_local;
-    pmb->par_for("Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e,
-                 ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-                   for (int ib = iblo; ib < ibhi; ib++) {
-                     v(ib, k, j, i) *= B_field_fac;
-                   }
-                 });
-    fluid::PrimitiveToConserved(rc.get());
-  }
+  beta_min_global = reduction::Min(beta_min);
+  const Real bsq_max_global = reduction::Max(bsq_max);
+  const Real Pmax_global = reduction::Max(press_max);
+  beta_pmax = robust::ratio(Pmax_global, 0.5 * bsq_max_global);
+  return;
 }
 
 } // namespace torus
