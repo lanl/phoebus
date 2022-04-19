@@ -345,15 +345,14 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
       // Report particle count
       auto report_count =
-          (Globals::my_rank == 0 ? tl.AddTask(
-                                       finish_count_reduce,
-                                       [](std::vector<Real> *res) {
-                                         std::cout << "MOCMC total particles = "
-                                                   << static_cast<long>((*res)[0])
-                                                   << std::endl;
-                                         return TaskStatus::complete;
-                                       },
-                                       &particle_resolution.val)
+          (Globals::my_rank == 0 ? tl.AddTask(finish_count_reduce,
+                                              [](std::vector<Real> *res) {
+                                                std::cout << "MOCMC total particles = "
+                                                          << static_cast<long>((*res)[0])
+                                                          << std::endl;
+                                                return TaskStatus::complete;
+                                              },
+                                              &particle_resolution.val)
                                  : none);
     }
   }
@@ -755,15 +754,15 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       // Report tuning
       auto report_resolution =
           (Globals::my_rank == 0 || 1
-               ? tl.AddTask(
-                     finish_resolution_reduce,
-                     [](std::vector<Real> *res) {
-                       std::cout << "particles made = " << (*res)[0]
-                                 << " abs = " << (*res)[1] << " scatt = " << (*res)[2]
-                                 << " total = " << (*res)[3] << std::endl;
-                       return TaskStatus::complete;
-                     },
-                     &particle_resolution.val)
+               ? tl.AddTask(finish_resolution_reduce,
+                            [](std::vector<Real> *res) {
+                              std::cout << "particles made = " << (*res)[0]
+                                        << " abs = " << (*res)[1]
+                                        << " scatt = " << (*res)[2]
+                                        << " total = " << (*res)[3] << std::endl;
+                              return TaskStatus::complete;
+                            },
+                            &particle_resolution.val)
                : none);
 
       auto update_tuning =

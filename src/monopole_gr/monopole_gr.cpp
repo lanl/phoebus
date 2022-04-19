@@ -122,19 +122,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Alpha_t alpha("monopole_gr lapse grid", npoints);
   Alpha_t alpha_last("monopole_gr lapse grid", npoints);
 
-  parthenon::par_for(
-      parthenon::loop_pattern_flatrange_tag, "monopole_gr initialize grids",
-      parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
-        for (int v = 0; v < NMAT; ++v) {
-          matter(v, i) = 0;
-          matter_cells(v, i) = 0;
-        }
-        hypersurface(Hypersurface::A, i) = 1;
-        hypersurface(Hypersurface::K, i) = 0;
-        integration_volumes(i) = 0;
-        alpha(i) = 1;
-        alpha_last(i) = 1;
-      });
+  parthenon::par_for(parthenon::loop_pattern_flatrange_tag,
+                     "monopole_gr initialize grids", parthenon::DevExecSpace(), 0,
+                     npoints - 1, KOKKOS_LAMBDA(const int i) {
+                       for (int v = 0; v < NMAT; ++v) {
+                         matter(v, i) = 0;
+                         matter_cells(v, i) = 0;
+                       }
+                       hypersurface(Hypersurface::A, i) = 1;
+                       hypersurface(Hypersurface::K, i) = 0;
+                       integration_volumes(i) = 0;
+                       alpha(i) = 1;
+                       alpha_last(i) = 1;
+                     });
 
   // Host mirrors
   auto matter_h = Kokkos::create_mirror_view(matter);
@@ -206,15 +206,14 @@ Real EstimateTimeStep(StateDescriptor *pkg) {
   auto gradients = params.Get<Gradients_t>("gradients");
 
   Real min_dt;
-  parthenon::par_reduce(
-      parthenon::loop_pattern_flatrange_tag, "monopole_gr time step",
-      parthenon::DevExecSpace(), 0, npoints - 1,
-      KOKKOS_LAMBDA(const int i, Real &lmin_dt) {
-        Real alpha_tscale =
-            std::abs(robust::ratio(alpha(i), gradients(Gradients::DALPHADT, i)));
-        lmin_dt = std::min(lmin_dt, alpha_tscale);
-      },
-      Kokkos::Min<Real>(min_dt));
+  parthenon::par_reduce(parthenon::loop_pattern_flatrange_tag, "monopole_gr time step",
+                        parthenon::DevExecSpace(), 0, npoints - 1,
+                        KOKKOS_LAMBDA(const int i, Real &lmin_dt) {
+                          Real alpha_tscale = std::abs(
+                              robust::ratio(alpha(i), gradients(Gradients::DALPHADT, i)));
+                          lmin_dt = std::min(lmin_dt, alpha_tscale);
+                        },
+                        Kokkos::Min<Real>(min_dt));
   return dtfac * min_dt;
 }
 

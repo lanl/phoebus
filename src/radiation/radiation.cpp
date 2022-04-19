@@ -402,15 +402,15 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
-        v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
-        v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
-        v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
-        v(cye, k, j, i) += v(Gye, k, j, i) * dt;
-      });
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(),
+                     kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+                     KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                       v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
+                       v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
+                       v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
+                       v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
+                       v(cye, k, j, i) += v(Gye, k, j, i) * dt;
+                     });
 
   return TaskStatus::complete;
 }
@@ -428,15 +428,15 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   // TODO(BRR) add a cfl-like fudge factor to radiation
   auto &pars = pmb->packages.Get("radiation")->AllParams();
   Real min_dt;
-  pmb->par_reduce(
-      "Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
-        Real csig = 1.0;
-        for (int d = 0; d < ndim; d++) {
-          lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
-        }
-      },
-      Kokkos::Min<Real>(min_dt));
+  pmb->par_reduce("Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+                  KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
+                    Real csig = 1.0;
+                    for (int d = 0; d < ndim; d++) {
+                      lmin_dt =
+                          std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
+                    }
+                  },
+                  Kokkos::Min<Real>(min_dt));
   const auto &cfl = pars.Get<Real>("cfl");
   return cfl * min_dt;
 }

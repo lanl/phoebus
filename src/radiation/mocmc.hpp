@@ -47,7 +47,8 @@ class ParticleBoundNoWork : public parthenon::ParticleBound {
                                     const SwarmDeviceContext &swarm_d) const override {}
 };
 
-inline std::unique_ptr<parthenon::ParticleBound, parthenon::DeviceDeleter<parthenon::DevMemSpace>>
+inline std::unique_ptr<parthenon::ParticleBound,
+                       parthenon::DeviceDeleter<parthenon::DevMemSpace>>
 SetSwarmNoWorkBC() {
   return parthenon::DeviceAllocate<ParticleBoundNoWork>();
 }

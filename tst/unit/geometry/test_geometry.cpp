@@ -236,35 +236,37 @@ TEST_CASE("FLRW Coordinates", "[geometry]") {
       Analytic<FLRW, IndexerMeshBlock> system(t, indexer, a0, dadt);
       THEN("The coordinate system can be called on device") {
         int n_wrong = 100;
-        Kokkos::parallel_reduce(
-            "get n wrong", NTRIALS,
-            KOKKOS_LAMBDA(const int i, int &update) {
-              // lapse
-              Real alpha = system.Lapse(t, x, y, z);
-              if (alpha != 1) update += 1;
-              // shift
-              Real beta[NDSPACE];
-              system.ContravariantShift(t, x, y, z, beta);
-              SPACELOOP(m) {
-                if (beta[m] != 0) {
-                  update += 1;
-                }
-              }
-              //  metric
-              Real gamma[NDSPACE][NDSPACE];
-              system.Metric(t, x, y, z, gamma);
-              SPACELOOP2(i, j) {
-                if ((i != j) && gamma[i][j] != 0) update += 1;
-                if ((i == j) && GetDifference(gamma[i][j], 4) > EPS) update += 1;
-              }
-              // Inverse metric
-              system.MetricInverse(t, x, y, z, gamma);
-              SPACELOOP2(i, j) {
-                if ((i != j) && gamma[i][j] != 0) update += 1;
-                if ((i == j) && GetDifference(gamma[i][j], 1. / 4.) > EPS) update += 1;
-              }
-            },
-            n_wrong);
+        Kokkos::parallel_reduce("get n wrong", NTRIALS,
+                                KOKKOS_LAMBDA(const int i, int &update) {
+                                  // lapse
+                                  Real alpha = system.Lapse(t, x, y, z);
+                                  if (alpha != 1) update += 1;
+                                  // shift
+                                  Real beta[NDSPACE];
+                                  system.ContravariantShift(t, x, y, z, beta);
+                                  SPACELOOP(m) {
+                                    if (beta[m] != 0) {
+                                      update += 1;
+                                    }
+                                  }
+                                  //  metric
+                                  Real gamma[NDSPACE][NDSPACE];
+                                  system.Metric(t, x, y, z, gamma);
+                                  SPACELOOP2(i, j) {
+                                    if ((i != j) && gamma[i][j] != 0) update += 1;
+                                    if ((i == j) && GetDifference(gamma[i][j], 4) > EPS)
+                                      update += 1;
+                                  }
+                                  // Inverse metric
+                                  system.MetricInverse(t, x, y, z, gamma);
+                                  SPACELOOP2(i, j) {
+                                    if ((i != j) && gamma[i][j] != 0) update += 1;
+                                    if ((i == j) &&
+                                        GetDifference(gamma[i][j], 1. / 4.) > EPS)
+                                      update += 1;
+                                  }
+                                },
+                                n_wrong);
         REQUIRE(n_wrong == 0);
       }
     }
@@ -554,44 +556,53 @@ TEST_CASE("McKinneyGammieRyan", "[geometry]") {
                                         mks_smooth);
       THEN("The modifier can be called on device") {
         int n_wrong = 100;
-        Kokkos::parallel_reduce(
-            "get n wrong", NTRIALS,
-            KOKKOS_LAMBDA(const int i, int &update) {
-              // locations chosen from a nubhlight sim
-              constexpr Real X[] = {0, 1.1324898310315077, 0.2638888888888889,
-                                    3.2724923474893677};
-              Real C[NDSPACE];
-              Real Jcov[NDSPACE][NDSPACE];
-              Real Jcon[NDSPACE][NDSPACE];
-              transformation(X[1], X[2], X[3], C, Jcov, Jcon);
-              // r
-              if (GetDifference(C[0], 3.1033737650977384) > EPS) update += 1;
-              // theta
-              if (GetDifference(C[1], 1.1937404314936582) > EPS) update += 1;
-              // phi
-              if (GetDifference(C[2], 3.2724923474893677) > EPS) update += 1;
-              // Jcov
-              if (std::abs(Jcov[0][1] > EPS)) update += 1;
-              if (std::abs(Jcov[0][2] > EPS)) update += 1;
-              if (std::abs(Jcov[1][2] > EPS)) update += 1;
-              if (std::abs(Jcov[2][0] > EPS)) update += 1;
-              if (std::abs(Jcov[2][1] > EPS)) update += 1;
-              if (GetDifference(Jcov[2][2], 1) > EPS) update += 1;
-              if (GetDifference(Jcov[0][0], 3.10337377) > EPS) update += 1;
-              if (GetDifference(Jcov[1][0], -0.00802045) > EPS) update += 1;
-              if (GetDifference(Jcov[1][1], 2.29713534) > EPS) update += 1;
-              // Jcon
-              if (std::abs(Jcon[0][1] > EPS)) update += 1;
-              if (std::abs(Jcon[0][2] > EPS)) update += 1;
-              if (std::abs(Jcon[1][2] > EPS)) update += 1;
-              if (std::abs(Jcon[2][0] > EPS)) update += 1;
-              if (std::abs(Jcon[2][1] > EPS)) update += 1;
-              if (GetDifference(Jcon[2][2], 1) > EPS) update += 1;
-              if (GetDifference(Jcon[0][0], 0.32222996) > EPS) update += 1;
-              if (GetDifference(Jcon[1][0], 0.00112507) > EPS) update += 1;
-              if (GetDifference(Jcon[1][1], 0.43532481) > EPS) update += 1;
-            },
-            n_wrong);
+        Kokkos::parallel_reduce("get n wrong", NTRIALS,
+                                KOKKOS_LAMBDA(const int i, int &update) {
+                                  // locations chosen from a nubhlight sim
+                                  constexpr Real X[] = {0, 1.1324898310315077,
+                                                        0.2638888888888889,
+                                                        3.2724923474893677};
+                                  Real C[NDSPACE];
+                                  Real Jcov[NDSPACE][NDSPACE];
+                                  Real Jcon[NDSPACE][NDSPACE];
+                                  transformation(X[1], X[2], X[3], C, Jcov, Jcon);
+                                  // r
+                                  if (GetDifference(C[0], 3.1033737650977384) > EPS)
+                                    update += 1;
+                                  // theta
+                                  if (GetDifference(C[1], 1.1937404314936582) > EPS)
+                                    update += 1;
+                                  // phi
+                                  if (GetDifference(C[2], 3.2724923474893677) > EPS)
+                                    update += 1;
+                                  // Jcov
+                                  if (std::abs(Jcov[0][1] > EPS)) update += 1;
+                                  if (std::abs(Jcov[0][2] > EPS)) update += 1;
+                                  if (std::abs(Jcov[1][2] > EPS)) update += 1;
+                                  if (std::abs(Jcov[2][0] > EPS)) update += 1;
+                                  if (std::abs(Jcov[2][1] > EPS)) update += 1;
+                                  if (GetDifference(Jcov[2][2], 1) > EPS) update += 1;
+                                  if (GetDifference(Jcov[0][0], 3.10337377) > EPS)
+                                    update += 1;
+                                  if (GetDifference(Jcov[1][0], -0.00802045) > EPS)
+                                    update += 1;
+                                  if (GetDifference(Jcov[1][1], 2.29713534) > EPS)
+                                    update += 1;
+                                  // Jcon
+                                  if (std::abs(Jcon[0][1] > EPS)) update += 1;
+                                  if (std::abs(Jcon[0][2] > EPS)) update += 1;
+                                  if (std::abs(Jcon[1][2] > EPS)) update += 1;
+                                  if (std::abs(Jcon[2][0] > EPS)) update += 1;
+                                  if (std::abs(Jcon[2][1] > EPS)) update += 1;
+                                  if (GetDifference(Jcon[2][2], 1) > EPS) update += 1;
+                                  if (GetDifference(Jcon[0][0], 0.32222996) > EPS)
+                                    update += 1;
+                                  if (GetDifference(Jcon[1][0], 0.00112507) > EPS)
+                                    update += 1;
+                                  if (GetDifference(Jcon[1][1], 0.43532481) > EPS)
+                                    update += 1;
+                                },
+                                n_wrong);
         REQUIRE(n_wrong == 0);
       }
     }

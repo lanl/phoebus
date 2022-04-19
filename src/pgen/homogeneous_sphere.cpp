@@ -58,35 +58,34 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  pmb->par_for(
-      "Phoebus::ProblemGenerator::homogeneous_sphere", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real r = coords.x1v(i);
+  pmb->par_for("Phoebus::ProblemGenerator::homogeneous_sphere", kb.s, kb.e, jb.s, jb.e,
+               ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                 Real r = coords.x1v(i);
 
-        if (r < sphere_rad) {
-          v(prho, k, j, i) = 1.0;
-        } else {
-          v(prho, k, j, i) = rho_min;
-        }
-        v(pT, k, j, i) = 1.0;
+                 if (r < sphere_rad) {
+                   v(prho, k, j, i) = 1.0;
+                 } else {
+                   v(prho, k, j, i) = rho_min;
+                 }
+                 v(pT, k, j, i) = 1.0;
 
-        v(idv(0), k, j, i) = vx;
-        v(idv(1), k, j, i) = 0.0;
-        v(idv(2), k, j, i) = 0.0;
+                 v(idv(0), k, j, i) = vx;
+                 v(idv(1), k, j, i) = 0.0;
+                 v(idv(2), k, j, i) = 0.0;
 
-        for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
+                 for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
 
-          v(ixi(ispec), k, j, i) = 0.0;
-          v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
+                   v(ixi(ispec), k, j, i) = 0.0;
+                   v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
 
-          v(idJ(ispec), k, j, i) = J;
-          printf("i = %i r = %e J = %e rho = %e\n", i, r, v(idJ(ispec), k, j, i),
-                 v(prho, k, j, i));
-          v(idH(0, ispec), k, j, i) = Hx;
-          v(idH(1, ispec), k, j, i) = Hy;
-          v(idH(2, ispec), k, j, i) = Hz;
-        }
-      });
+                   v(idJ(ispec), k, j, i) = J;
+                   printf("i = %i r = %e J = %e rho = %e\n", i, r, v(idJ(ispec), k, j, i),
+                          v(prho, k, j, i));
+                   v(idH(0, ispec), k, j, i) = Hx;
+                   v(idH(1, ispec), k, j, i) = Hy;
+                   v(idH(2, ispec), k, j, i) = Hz;
+                 }
+               });
 
   radiation::MomentPrim2Con(rc.get(), IndexDomain::entire);
 }

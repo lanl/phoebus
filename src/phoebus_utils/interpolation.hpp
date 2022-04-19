@@ -24,8 +24,8 @@ namespace interpolation {
 class Interpolation {
  public:
   KOKKOS_FUNCTION
-  Interpolation(const int nSupport, const Real dx, const Real shift) :
-    nSupport_(nSupport), dx_(dx), shift_(shift), ishift_(std::round(shift)) {}
+  Interpolation(const int nSupport, const Real dx, const Real shift)
+      : nSupport_(nSupport), dx_(dx), shift_(shift), ishift_(std::round(shift)) {}
 
   virtual void GetIndicesAndWeights(const int i, int *idx, Real *wgt) = 0;
   virtual int constexpr StencilSize() = 0;
@@ -58,17 +58,17 @@ class PiecewiseConstant : public Interpolation {
 };
 
 class Linear : public Interpolation {
-  public:
+ public:
   KOKKOS_FUNCTION
-  Linear(const int nSupport, const Real dx, const Real shift) : Interpolation(nSupport, dx, shift) {}
+  Linear(const int nSupport, const Real dx, const Real shift)
+      : Interpolation(nSupport, dx, shift) {}
 
   KOKKOS_INLINE_FUNCTION
   void GetIndicesAndWeights(const int i, int *idx, Real *wgt) override {
     idx[0] = std::floor(i + shift_);
     idx[1] = idx[0] + 1;
 
-    wgt[0] =
-    wgt[1] = 1. - wgt[0];
+    wgt[0] = wgt[1] = 1. - wgt[0];
 
     for (int nsup = 0; nsup < 2; nsup++) {
       if (idx[nsup] < 0 || idx[nsup] >= nSupport_) {

@@ -58,7 +58,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       pmb->packages.Get("eos")->Param<phoebus::UnitConversions>("unit_conv");
   auto &constants =
       pmb->packages.Get("eos")->Param<phoebus::CodeConstants>("code_constants");
-      const Real MASS = unit_conv.GetMassCGSToCode();
+  const Real MASS = unit_conv.GetMassCGSToCode();
   const Real LENGTH = unit_conv.GetLengthCGSToCode();
   const Real RHO = unit_conv.GetMassDensityCGSToCode();
   const Real TEMP = unit_conv.GetTemperatureCGSToCode();
@@ -118,62 +118,63 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real t0p = 1.5 * kappa * width * width;
   const Real t0 = t0p;
   const Real x0p = (0.5 - vx * t0) * W;
-  pmb->par_for(
-      "Phoebus::ProblemGenerator::radiation_advection", kb.s, kb.e, jb.s, jb.e, ib.s,
-      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real x = coords.x1v(i);
-        Real y = (ndim > 1 && shapedim > 1) ? coords.x2v(j) : 0;
-        Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
-        Real r = std::sqrt(x * x + y * y + z * z);
+  pmb->par_for("Phoebus::ProblemGenerator::radiation_advection", kb.s, kb.e, jb.s, jb.e,
+               ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                 Real x = coords.x1v(i);
+                 Real y = (ndim > 1 && shapedim > 1) ? coords.x2v(j) : 0;
+                 Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
+                 Real r = std::sqrt(x * x + y * y + z * z);
 
-        v(prho, k, j, i) = rho0;
-        v(pT, k, j, i) = T0;
-        Real lambda[2] = {0.};
-        v(peng, k, j, i) =
-            v(prho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
-                                   v(prho, k, j, i), v(pT, k, j, i), lambda);
+                 v(prho, k, j, i) = rho0;
+                 v(pT, k, j, i) = T0;
+                 Real lambda[2] = {0.};
+                 v(peng, k, j, i) =
+                     v(prho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
+                                            v(prho, k, j, i), v(pT, k, j, i), lambda);
 
-        v(idv(0), k, j, i) = vx;
-        v(idv(1), k, j, i) = 0.0;
-        v(idv(2), k, j, i) = 0.0;
+                 v(idv(0), k, j, i) = vx;
+                 v(idv(1), k, j, i) = 0.0;
+                 v(idv(2), k, j, i) = 0.0;
 
-        // Write down boosted diffusion initial condition
-        Real tp = W * (t0 - vx * x);
-        Real xp = W * (x - vx * t0);
-        for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
+                 // Write down boosted diffusion initial condition
+                 Real tp = W * (t0 - vx * x);
+                 Real xp = W * (x - vx * t0);
+                 for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
 
-          Real J;
-          if (scale_free) {
-            J = J0;
-          } else {
-            J = opac_d.EnergyDensityFromTemperature(T0, species_d[ispec]);
-          }
+                   Real J;
+                   if (scale_free) {
+                     J = J0;
+                   } else {
+                     J = opac_d.EnergyDensityFromTemperature(T0, species_d[ispec]);
+                   }
 
-          J = J0;
+                   J = J0;
 
-          v(ixi(ispec), k, j, i) = 0.0;
-          v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
+                   v(ixi(ispec), k, j, i) = 0.0;
+                   v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
 
-          if (boost) {
-            v(idJ(ispec), k, j, i) = std::max(
-                J * sqrt(t0p / tp) * exp(-3 * kappa * std::pow(xp - x0p, 2) / (4 * tp)),
-                1.e-10 * J);
-          } else {
-            v(idJ(ispec), k, j, i) =
-                std::max(J * exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10 * J);
-          }
+                   if (boost) {
+                     v(idJ(ispec), k, j, i) =
+                         std::max(J * sqrt(t0p / tp) *
+                                      exp(-3 * kappa * std::pow(xp - x0p, 2) / (4 * tp)),
+                                  1.e-10 * J);
+                   } else {
+                     v(idJ(ispec), k, j, i) = std::max(
+                         J * exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10 * J);
+                   }
 
-          PARTHENON_DEBUG_REQUIRE(std::fabs(Hx) < J && std::fabs(Hy) < J &&
-                                      std::fabs(Hz) < J,
-                                  "Fluxes are incorrectly normalized!");
+                   PARTHENON_DEBUG_REQUIRE(std::fabs(Hx) < J && std::fabs(Hy) < J &&
+                                               std::fabs(Hz) < J,
+                                           "Fluxes are incorrectly normalized!");
 
-          v(idH(0, ispec), k, j, i) = Hx;
-          v(idH(1, ispec), k, j, i) = Hy;
-          v(idH(2, ispec), k, j, i) = Hz;
-          printf("[%i %i %i] J = %e H = %e %e %e\n", k, j, i, v(idJ(ispec), k, j, i),
-            v(idH(0, ispec), k, j, i), v(idH(1, ispec), k, j, i), v(idH(2, ispec), k, j, i));
-        }
-      });
+                   v(idH(0, ispec), k, j, i) = Hx;
+                   v(idH(1, ispec), k, j, i) = Hy;
+                   v(idH(2, ispec), k, j, i) = Hz;
+                   printf("[%i %i %i] J = %e H = %e %e %e\n", k, j, i,
+                          v(idJ(ispec), k, j, i), v(idH(0, ispec), k, j, i),
+                          v(idH(1, ispec), k, j, i), v(idH(2, ispec), k, j, i));
+                 }
+               });
 
   // Initialize samples
   auto radpkg = pmb->packages.Get("radiation");

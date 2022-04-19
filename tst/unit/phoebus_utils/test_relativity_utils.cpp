@@ -55,34 +55,33 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
       const Real ucon_ref[4] = {1., 0., 0., 0.};
       THEN("The Lorentz factor and four-velocity are correctly calculated") {
         int n_wrong = 1;
-        Kokkos::parallel_reduce(
-            "get n wrong", 1,
-            KOKKOS_LAMBDA(const int i, int &update) {
-              Real Gamma = GetLorentzFactor(v, system, loc, k, j, i);
-              Real gammacov[3][3] = {0};
-              system.Metric(loc, k, j, i, gammacov);
-              Real Gamma1 = GetLorentzFactor(v, gammacov);
-              Real gcov[4][4] = {0};
-              system.SpacetimeMetric(loc, k, j, i, gcov);
-              Real Gamma2 = GetLorentzFactor(v, gcov);
-              if (!SoftEquiv(Gamma, Gamma_ref)) {
-                update += 1;
-              }
-              if (!SoftEquiv(Gamma1, Gamma_ref)) {
-                update += 1;
-              }
-              if (!SoftEquiv(Gamma2, Gamma_ref)) {
-                update += 1;
-              }
-              Real ucon[4];
-              GetFourVelocity(v, system, loc, k, j, i, ucon);
-              SPACETIMELOOP(mu) {
-                if (!SoftEquiv(ucon[mu], ucon_ref[mu])) {
-                  update += 1;
-                }
-              }
-            },
-            n_wrong);
+        Kokkos::parallel_reduce("get n wrong", 1,
+                                KOKKOS_LAMBDA(const int i, int &update) {
+                                  Real Gamma = GetLorentzFactor(v, system, loc, k, j, i);
+                                  Real gammacov[3][3] = {0};
+                                  system.Metric(loc, k, j, i, gammacov);
+                                  Real Gamma1 = GetLorentzFactor(v, gammacov);
+                                  Real gcov[4][4] = {0};
+                                  system.SpacetimeMetric(loc, k, j, i, gcov);
+                                  Real Gamma2 = GetLorentzFactor(v, gcov);
+                                  if (!SoftEquiv(Gamma, Gamma_ref)) {
+                                    update += 1;
+                                  }
+                                  if (!SoftEquiv(Gamma1, Gamma_ref)) {
+                                    update += 1;
+                                  }
+                                  if (!SoftEquiv(Gamma2, Gamma_ref)) {
+                                    update += 1;
+                                  }
+                                  Real ucon[4];
+                                  GetFourVelocity(v, system, loc, k, j, i, ucon);
+                                  SPACETIMELOOP(mu) {
+                                    if (!SoftEquiv(ucon[mu], ucon_ref[mu])) {
+                                      update += 1;
+                                    }
+                                  }
+                                },
+                                n_wrong);
         REQUIRE(n_wrong == 0);
       }
     }
@@ -96,34 +95,33 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
                                 2.948839123097942716e-01, 1.474419561548971358e-01};
       THEN("The Lorentz factor and four-velocity are correctly calculated") {
         int n_wrong = 1;
-        Kokkos::parallel_reduce(
-            "get n wrong", 1,
-            KOKKOS_LAMBDA(const int i, int &update) {
-              Real Gamma = GetLorentzFactor(v, system, loc, k, j, i);
-              Real gammacov[3][3] = {0};
-              system.Metric(loc, k, j, i, gammacov);
-              Real Gamma1 = GetLorentzFactor(v, gammacov);
-              Real gcov[4][4] = {0};
-              system.SpacetimeMetric(loc, k, j, i, gcov);
-              Real Gamma2 = GetLorentzFactor(v, gcov);
-              if (!SoftEquiv(Gamma, Gamma_ref)) {
-                update += 1;
-              }
-              if (!SoftEquiv(Gamma1, Gamma_ref)) {
-                update += 1;
-              }
-              if (!SoftEquiv(Gamma2, Gamma_ref)) {
-                update += 1;
-              }
-              Real ucon[4];
-              GetFourVelocity(v, system, loc, k, j, i, ucon);
-              SPACETIMELOOP(mu) {
-                if (!SoftEquiv(ucon[mu], ucon_ref[mu])) {
-                  update += 1;
-                }
-              }
-            },
-            n_wrong);
+        Kokkos::parallel_reduce("get n wrong", 1,
+                                KOKKOS_LAMBDA(const int i, int &update) {
+                                  Real Gamma = GetLorentzFactor(v, system, loc, k, j, i);
+                                  Real gammacov[3][3] = {0};
+                                  system.Metric(loc, k, j, i, gammacov);
+                                  Real Gamma1 = GetLorentzFactor(v, gammacov);
+                                  Real gcov[4][4] = {0};
+                                  system.SpacetimeMetric(loc, k, j, i, gcov);
+                                  Real Gamma2 = GetLorentzFactor(v, gcov);
+                                  if (!SoftEquiv(Gamma, Gamma_ref)) {
+                                    update += 1;
+                                  }
+                                  if (!SoftEquiv(Gamma1, Gamma_ref)) {
+                                    update += 1;
+                                  }
+                                  if (!SoftEquiv(Gamma2, Gamma_ref)) {
+                                    update += 1;
+                                  }
+                                  Real ucon[4];
+                                  GetFourVelocity(v, system, loc, k, j, i, ucon);
+                                  SPACETIMELOOP(mu) {
+                                    if (!SoftEquiv(ucon[mu], ucon_ref[mu])) {
+                                      update += 1;
+                                    }
+                                  }
+                                },
+                                n_wrong);
         REQUIRE(n_wrong == 0);
       }
     }

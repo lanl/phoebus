@@ -57,15 +57,15 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
                         rad->Param<bool>("do_nu_electron_anti"),
                         rad->Param<bool>("do_nu_heavy")};
 
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
-      kb.e, jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        // Initialize five-force to zero
-        for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-          v(mu, k, j, i) = 0.;
-        }
-        v(Gye, k, j, i) = 0.;
-      });
+  parthenon::par_for(DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce",
+                     DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+                     KOKKOS_LAMBDA(const int k, const int j, const int i) {
+                       // Initialize five-force to zero
+                       for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
+                         v(mu, k, j, i) = 0.;
+                       }
+                       v(Gye, k, j, i) = 0.;
+                     });
 
   for (int sidx = 0; sidx < 3; sidx++) {
     // Apply cooling for each neutrino species separately

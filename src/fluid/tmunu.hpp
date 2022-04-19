@@ -89,7 +89,7 @@ class StressEnergyTensorCon {
   }
 
   template <typename... Args>
-  KOKKOS_FORCEINLINE_FUNCTION Real b_(int l, Args &&...args) const {
+  KOKKOS_FORCEINLINE_FUNCTION Real b_(int l, Args &&... args) const {
     return (ib_ >= 0 ? GetVar_(ib_ + l - 1, std::forward<Args>(args)...) : 0.0);
   }
 
