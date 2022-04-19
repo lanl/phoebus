@@ -73,8 +73,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE(std::fabs(vx) < 1., "Subluminal velocity required!");
   const Real width = pin->GetOrAddReal("radiation_advection", "width", sqrt(2.0));
   const Real kappa = pin->GetReal("opacity", "gray_kappa") * LENGTH * LENGTH / MASS;
-  printf("kappa: %e l: %e\n", kappa, unit_conv.GetLengthCGSToCode());
-  exit(-1);
   const bool boost = pin->GetOrAddBoolean("radiation_advection", "boost_profile", false);
   const int shapedim = pin->GetOrAddInteger("radiation_advection", "shapedim", 1);
 
@@ -104,6 +102,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Store runtime parameters for output
   phoebus_params.Add("radiation_advection/J0", J0);
+  phoebus_params.Add("radiation_advection/Hx", Hx);
+  phoebus_params.Add("radiation_advection/Hy", Hy);
+  phoebus_params.Add("radiation_advection/Hz", Hz);
 
   auto rad = pmb->packages.Get("radiation").get();
   auto species = rad->Param<std::vector<singularity::RadiationType>>("species");
@@ -148,6 +149,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             J = opac_d.EnergyDensityFromTemperature(T0, species_d[ispec]);
           }
 
+          J = J0;
+
           v(ixi(ispec), k, j, i) = 0.0;
           v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
 
@@ -185,7 +188,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
 void ProblemModifier(ParameterInput *pin) {
   const std::string method = pin->GetOrAddString("radiation", "method", "None");
-  if (method == "mocmc") {
+  if (method == "monte_carlo" || method == "mocmc") {
     pin->SetBoolean("units", "scale_free", false);
     pin->SetPrecise("units", "geom_length_cm", 1.e10);
     pin->SetPrecise("units", "fluid_mass_g", 1.e40);

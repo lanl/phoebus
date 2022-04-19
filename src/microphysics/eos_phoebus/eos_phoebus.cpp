@@ -125,8 +125,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
   FillRealParams(pin, base_params, names);
 
+  // TODO(BRR) Remove this and use unit_conv and code_constants from phoebus package
   params.Add("unit_conv", phoebus::UnitConversions(pin));
   auto &unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
+  //phoebus::UnitConversions unit_conv(pin);
 
   params.Add("code_constants", phoebus::CodeConstants(unit_conv));
 
