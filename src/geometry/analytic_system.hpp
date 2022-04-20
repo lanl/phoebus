@@ -169,6 +169,10 @@ class Analytic {
     return system_.Lapse(X0, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
+  Real Lapse(int b, Real X0, Real X1, Real X2, Real X3) const {
+    return system_.Lapse(X0, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
   Real Lapse(CellLocation loc, int k, int j, int i) const {
     Real X1, X2, X3;
     indexer_.GetX(loc, k, j, i, X1, X2, X3);
@@ -183,6 +187,10 @@ class Analytic {
 
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
+    return system_.ContravariantShift(X0, X1, X2, X3, beta);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void ContravariantShift(int b, Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     return system_.ContravariantShift(X0, X1, X2, X3, beta);
   }
   KOKKOS_INLINE_FUNCTION
@@ -205,6 +213,10 @@ class Analytic {
     return system_.Metric(X0, X1, X2, X3, gamma);
   }
   KOKKOS_INLINE_FUNCTION
+  void Metric(int b, Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
+    return system_.Metric(X0, X1, X2, X3, gamma);
+  }
+  KOKKOS_INLINE_FUNCTION
   void Metric(CellLocation loc, int k, int j, int i, Real gamma[NDSPACE][NDSPACE]) const {
     Real X1, X2, X3;
     indexer_.GetX(loc, k, j, i, X1, X2, X3);
@@ -220,6 +232,11 @@ class Analytic {
 
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
+                     Real gamma[NDSPACE][NDSPACE]) const {
+    return system_.MetricInverse(X0, X1, X2, X3, gamma);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void MetricInverse(int b, Real X0, Real X1, Real X2, Real X3,
                      Real gamma[NDSPACE][NDSPACE]) const {
     return system_.MetricInverse(X0, X1, X2, X3, gamma);
   }
@@ -243,6 +260,10 @@ class Analytic {
     return system_.SpacetimeMetric(X0, X1, X2, X3, g);
   }
   KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetric(int b, Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
+    return system_.SpacetimeMetric(X0, X1, X2, X3, g);
+  }
+  KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(CellLocation loc, int k, int j, int i,
                        Real g[NDFULL][NDFULL]) const {
     Real X1, X2, X3;
@@ -259,6 +280,11 @@ class Analytic {
 
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
+                              Real g[NDFULL][NDFULL]) const {
+    return system_.SpacetimeMetricInverse(X0, X1, X2, X3, g);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetricInverse(int b, Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
     return system_.SpacetimeMetricInverse(X0, X1, X2, X3, g);
   }
@@ -282,6 +308,10 @@ class Analytic {
     return system_.DetGamma(X0, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
+  Real DetGamma(int b, Real X0, Real X1, Real X2, Real X3) const {
+    return system_.DetGamma(X0, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
   Real DetGamma(CellLocation loc, int k, int j, int i) const {
     Real X1, X2, X3;
     indexer_.GetX(loc, k, j, i, X1, X2, X3);
@@ -299,6 +329,10 @@ class Analytic {
     return system_.DetG(X0, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
+  Real DetG(int b, Real X0, Real X1, Real X2, Real X3) const {
+    return system_.DetG(X0, X1, X2, X3);
+  }
+  KOKKOS_INLINE_FUNCTION
   Real DetG(CellLocation loc, int k, int j, int i) const {
     Real X1, X2, X3;
     indexer_.GetX(loc, k, j, i, X1, X2, X3);
@@ -313,6 +347,11 @@ class Analytic {
 
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
+                             Real Gamma[NDFULL][NDFULL][NDFULL]) const {
+    return system_.ConnectionCoefficient(X0, X1, X2, X3, Gamma);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void ConnectionCoefficient(int b, Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
     return system_.ConnectionCoefficient(X0, X1, X2, X3, Gamma);
   }
@@ -336,6 +375,11 @@ class Analytic {
     return system_.MetricDerivative(X0, X1, X2, X3, dg);
   }
   KOKKOS_INLINE_FUNCTION
+  void MetricDerivative(int b, Real X0, Real X1, Real X2, Real X3,
+                        Real dg[NDFULL][NDFULL][NDFULL]) const {
+    return system_.MetricDerivative(X0, X1, X2, X3, dg);
+  }
+  KOKKOS_INLINE_FUNCTION
   void MetricDerivative(CellLocation loc, int k, int j, int i,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     Real X1, X2, X3;
@@ -355,6 +399,10 @@ class Analytic {
     return system_.GradLnAlpha(X0, X1, X2, X3, da);
   }
   KOKKOS_INLINE_FUNCTION
+  void GradLnAlpha(int b, Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
+    return system_.GradLnAlpha(X0, X1, X2, X3, da);
+  }
+  KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int k, int j, int i, Real da[NDFULL]) const {
     Real X1, X2, X3;
     indexer_.GetX(loc, k, j, i, X1, X2, X3);
@@ -369,6 +417,10 @@ class Analytic {
 
   KOKKOS_INLINE_FUNCTION
   void Coords(Real X0, Real X1, Real X2, Real X3, Real C[NDFULL]) const {
+    return system_.Coords(X0, X1, X2, X3, C);
+  }
+  KOKKOS_INLINE_FUNCTION
+  void Coords(int b, Real X0, Real X1, Real X2, Real X3, Real C[NDFULL]) const {
     return system_.Coords(X0, X1, X2, X3, C);
   }
   KOKKOS_INLINE_FUNCTION
