@@ -104,6 +104,67 @@ KOKKOS_INLINE_FUNCTION void GetFourVelocity(const Real v[3],
   }
 }
 
+/*
+ * Compute square of magnetic field from primitive velocity and magnetic field
+ *
+ * PARAM[IN] - gcov[3][3] - The spacelike metric gamma
+ * PARAM[IN] - vp[3] - The primitive velocity
+ * PARAM[IN] - Bp[3] - The primitive magnetic field
+ * PARAM[IN] - W - The Lorentz factor
+ */
+KOKKOS_INLINE_FUNCTION Real GetMagneticFieldSquared(
+    const Real gcov[Geometry::NDSPACE][Geometry::NDSPACE],
+    const Real vp[Geometry::NDSPACE], const Real Bp[Geometry::NDSPACE], const Real W) {
+  Real Bsq = 0;
+  Real Bdotv = 0;
+  SPACELOOP2(m, n) {
+    Bdotv += gcov[m][n] * robust::ratio(vp[m], W) * Bp[n];
+    Bsq += gcov[m][n] * Bp[m] * Bp[n];
+  }
+  return robust::ratio(Bsq, W * W) + Bdotv * Bdotv;
+}
+
+/*
+ * Compute square of magnetic field from primitive velocity and magnetic field
+ *
+ * PARAM[IN] - loc - Cell location to do the calculation at
+ * PARAM[IN] - b, k, j, i - The cell locations
+ * PARAM[IN] - geom - A geometry object
+ * PARAM[IN] - v - a variable pack or meshblock pack
+ * PARAM[IN] - ivlo  The index in the pack of the primitive velocicty
+ * PARAM[IN] - iblo  The index in the pack of the primitive magnetic field
+ */
+template <typename Pack, typename Geometry>
+KOKKOS_INLINE_FUNCTION Real GetMagneticFieldSquared(const CellLocation loc, const int b,
+                                                    const int k, const int j, const int i,
+                                                    Geometry &geom, Pack &v,
+                                                    const int ivlo, const int iblo) {
+  Real gcov[3][3];
+  geom.Metric(loc, b, k, j, i, gcov);
+  Real vp[] = {v(b, ivlo, k, j, i), v(b, ivlo + 1, k, j, i), v(b, ivlo + 2, k, j, i)};
+  Real Bp[] = {v(b, iblo, k, j, i), v(b, iblo + 1, k, j, i), v(b, iblo + 2, k, j, i)};
+  const Real W = GetLorentzFactor(vp, gcov);
+  return GetMagneticFieldSquared(gcov, vp, Bp, W);
+}
+
+/*
+ * Compute square of magnetic field from primitive velocity and magnetic field
+ *
+ * PARAM[IN] - loc - Cell location to do the calculation at
+ * PARAM[IN] - k, j, i - The cell locations
+ * PARAM[IN] - geom - A geometry object
+ * PARAM[IN] - v - a variable pack or meshblock pack
+ * PARAM[IN] - ivlo  The index in the pack of the primitive velocicty
+ * PARAM[IN] - iblo  The index in the pack of the primitive magnetic field
+ */
+template <typename Pack, typename Geometry>
+KOKKOS_INLINE_FUNCTION Real GetMagneticFieldSquared(const CellLocation loc, const int k,
+                                                    const int j, const int i,
+                                                    Geometry &geom, Pack &v,
+                                                    const int ivlo, const int iblo) {
+  return GetMagneticFieldSquared(loc, 0, k, j, i, geom, v, ivlo, iblo);
+}
+
 } // namespace phoebus
 
 #endif // PHOEBUS_UTILS_RELATIVITY_UTILS_HPP_
