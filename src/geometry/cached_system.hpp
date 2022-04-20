@@ -14,14 +14,17 @@
 #ifndef GEOMETRY_CACHED_SYSTEM_HPP_
 #define GEOMETRY_CACHED_SYSTEM_HPP_
 
+// C++ includes
 #include <array>
 #include <cmath>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
 // Parthenon includes
 #include <coordinates/coordinates.hpp>
+#include <globals.hpp>
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
@@ -497,6 +500,26 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
   bool do_defaults = false;
   params.Add("do_defaults", do_defaults);
 
+  // Optionally use finite differences on the grid to set the metric
+  // derivatives. If the geometry we're caching specifies one way or
+  // the other, we defer to the geometry we're caching, and
+  // warn. Otherwise, we defer to the input deck.
+  bool do_fd_on_grid;
+  bool do_fd_on_grid_pin = pin->GetOrAddBoolean("geometry", "do_fd_on_grid", false);
+  if (params.hasKey("do_fd_on_grid")) {
+    do_fd_on_grid = params.Get<bool>("do_fd_on_grid");
+    if (parthenon::Globals::my_rank == 0) {
+      std::stringstream ss;
+      ss << "do_fd_on_grid set by input deck as " << do_fd_on_grid_pin
+         << " but set by the geometry class to be " << do_fd_on_grid
+         << ". The geometry class takes priority." << std::endl;
+      PARTHENON_WARN(ss);
+    }
+  } else {
+    do_fd_on_grid = do_fd_on_grid_pin;
+    params.Add("do_fd_on_grid", do_fd_on_grid);
+  }
+
   // Request fields for cache
   Utils::MeshBlockShape dims(pin);
 
@@ -579,6 +602,7 @@ void SetCachedCoordinateSystem(Data *rc) {
   parthenon::Params &params = pkg->AllParams();
   bool axisymmetric = params.Get<bool>("axisymmetric");
   bool time_dependent = params.Get<bool>("time_dependent");
+  bool do_fd_on_grid = params.Get<bool>("do_fd_on_grid");
   const int nvar_deriv = time_dependent ? NDFULL : NDSPACE;
 
   Impl::LocArray<Impl::GeomPackIndices> idx;
@@ -658,6 +682,45 @@ void SetCachedCoordinateSystem(Data *rc) {
       }
     }
   };
+  // Compute derivatives by finite differences
+  // If time-derivatives present, use this to overwrite non time-derivative calls
+  // If time-derivatives not present, just do this.
+  // Strategy is to do second-order finite differences by diffing cell
+  // faces to compute cell centered values.
+  auto lamb_derivs_fd =
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+    const auto loc = CellLocation::Cent;
+    const auto &coords = pack.GetCoords(b);
+    const Real alpha = system.Lapse(loc, b, k, j, i);
+    Real alpha_fp, alpha_fm;
+    Real g_fp[NDFULL][NDFULL];
+    Real g_fm[NDFULL][NDFULL];
+    const CellLocation floc[] = {CellLocation::Face1, CellLocation::Face2,
+                                 CellLocation::Face3};
+    SPACELOOP(d) {
+      int idx_fp[] = {k, j, i};
+      idx_fp[NDSPACE - 1 - d] += 1;
+      alpha_fp = system.Lapse(floc[d], b, idx_fp[0], idx_fp[1], idx_fp[2]);
+      alpha_fm = system.Lapse(floc[d], b, k, j, i);
+      system.SpacetimeMetric(floc[d], b, idx_fp[0], idx_fp[1], idx_fp[2], g_fp);
+      system.SpacetimeMetric(floc[d], b, k, j, i, g_fm);
+      // Recall that we're setting GradLnAlpha, not GradAlpha;
+      const Real da = robust::ratio(alpha_fp - alpha_fm, alpha * coords.Dx(d + 1));
+      // if time_dependent, then we don't want to fill the d/dt, mu = 0 terms
+      pack(b, idx[loc].dalpha + d + time_dependent, k, j, i) = da;
+      // 2d loop for metric
+      const Real sigma = d + time_dependent;
+      for (int mu = 0; mu < NDFULL; ++mu) {
+        for (int nu = mu; nu < NDFULL; ++nu) {
+          // if time_dependent, then we don't want to fill the d/dt, sigma = 0 terms
+          const int flat =
+              idx[loc].dg + nvar_deriv * Utils::Flatten2(mu, nu, NDFULL) + sigma;
+          const Real dg = robust::ratio(g_fp[mu][nu] - g_fm[mu][nu], coords.Dx(d + 1));
+          pack(b, flat, k, j, i) = dg;
+        }
+      }
+    }
+  };
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
@@ -670,12 +733,16 @@ void SetCachedCoordinateSystem(Data *rc) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         lamb(b, k, j, i, CellLocation::Cent);
       });
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, derivs", DevExecSpace(), 0,
-      pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        lamb_derivs(b, k, j, i);
-      });
+  // Skip if do_fd_on_grid and not time_dependent, since these can be
+  // all set by FD.
+  if (time_dependent || !do_fd_on_grid) {
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, derivs", DevExecSpace(), 0,
+        pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+          lamb_derivs(b, k, j, i);
+        });
+  }
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, Face1", DevExecSpace(), 0,
       pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e + 1,
@@ -695,7 +762,15 @@ void SetCachedCoordinateSystem(Data *rc) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         lamb(b, k, j, i, CellLocation::Face3);
       });
-
+  if (do_fd_on_grid) {
+    kbe = axisymmetric ? 0 : kb.e;
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "SetGeometry::Set Cached data, derivs via FD",
+        DevExecSpace(), 0, pack.GetDim(5) - 1, kbs, kbe, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+          lamb_derivs_fd(b, k, j, i);
+        });
+  }
   // Call SetGeometryDefault to set the coords objects.
   impl::SetGeometryDefault(rc, system);
 }
