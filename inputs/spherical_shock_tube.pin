@@ -92,10 +92,10 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-<parthenon/meshblock>
-nx1 = 512
-nx2 = 1
-nx3 = 1
+# <parthenon/meshblock>
+# nx1 = 512
+# nx2 = 1
+# nx3 = 1
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -104,6 +104,7 @@ max_level = 3
 
 <geometry>
 axisymmetry = false
+do_fd_on_grid = false
 
 <eos>
 type = IdealGas
