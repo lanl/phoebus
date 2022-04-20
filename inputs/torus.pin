@@ -102,6 +102,8 @@ mhd = true
 
 <geometry>
 a = 0.9375
+axisymmetric = true
+do_fd_on_grid = false
 
 <coordinates>
 derefine_poles = false
