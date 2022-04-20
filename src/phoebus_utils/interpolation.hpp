@@ -32,7 +32,12 @@ using namespace parthenon::package::prelude;
 using parthenon::Coordinates_t;
 using Spiner::weights_t;
 
-namespace Nodes {
+// TODO(JMM): Is this Interpolation::Do syntax reasonable? An
+// alternative path would be a class called "LCInterp with all
+// static functions. Then it could have an `operator()` which would
+// be maybe nicer?
+
+namespace Cent {
 namespace Linear {
 
 /*
@@ -47,7 +52,7 @@ template <int DIR>
 KOKKOS_INLINE_FUNCTION void GetWeights(const Real x, const int nx,
                                        const Coordinates_t &coords, int &ix,
                                        weights_t &w) {
-  const Real min = Coordinates::GetXf<DIR>(0, coords);
+  const Real min = Coordinates::GetXv<DIR>(0, coords);
   const Real dx = coords.Dx(DIR);
   ix = std::min(std::max(0, static_cast<int>(robust::ratio(x - min, dx))), nx - 2);
   const Real floor = min + ix * dx;
@@ -57,13 +62,14 @@ KOKKOS_INLINE_FUNCTION void GetWeights(const Real x, const int nx,
 
 /*
  * Trilinear interpolation on a variable or meshblock pack
- * PARAM[IN] - X3, X2, X1: Coordinate locations
+ * PARAM[IN] - b - Meshblock index
+ * PARAM[IN] - X1, X2, X3 - Coordinate locations
  * PARAM[IN] - p - Variable or MeshBlockPack
- * PARAM[IN] - b, v, variable and meshblock index
+ * PARAM[IN] - v - variable index
  */
 template <typename Pack>
-KOKKOS_INLINE_FUNCTION Real Do(const Real X3, const Real X2, const Real X1, const Pack &p,
-                               int b, int v) {
+KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X3,
+                               const Pack &p, int v) {
   const auto &coords = p.GetCoords(b);
   int ix[3];
   weights_t w[3];
@@ -80,54 +86,47 @@ KOKKOS_INLINE_FUNCTION Real Do(const Real X3, const Real X2, const Real X1, cons
                                 w[0][1] * p(b, v, ix[2] + 1, ix[1] + 1, ix[0] + 1))));
 }
 
-/*
- * Trilinear interpolation on a variable pack
- * PARAM[IN] - X3, X2, X1: Coordinate locations
- * PARAM[IN] - p - pack
- * PARAM[IN] - v, variable index
- */
-KOKKOS_INLINE_FUNCTION Real Do(const Real X3, const Real X2, const Real X1,
-                               const VariablePack<Real> &p, int v) {
-  return Do(x3, x2, x1, p, 0, v);
+template <typename Pack>
+KOKKOS_INLINE_FUNCTION Real DataBox::interpToReal(int b, const Real X1, const Real X2,
+                                                  const Pack &p, int v) {
+  assert(canInterpToReal_(2));
+  int ix1, ix2;
+  weights_t w1, w2;
+  grids_[0].weights(x1, ix1, w1);
+  grids_[1].weights(x2, ix2, w2);
+  return (w2[0] * (w1[0] * dataView_(ix2, ix1) + w1[1] * dataView_(ix2, ix1 + 1)) +
+          w2[1] *
+              (w1[0] * dataView_(ix2 + 1, ix1) + w1[1] * dataView_(ix2 + 1, ix1 + 1)));
 }
 
 /*
- * Trilinear interpolation on a meshblock pack
- * PARAM[IN] - X3, X2, X1: Coordinate locations
- * PARAM[IN] - p - pack
- * PARAM[IN] - v, variable index
+ * Trilinear or bilinear interpolation on a variable or meshblock pack
+ * PARAM[IN] - axisymmetric
+ * PARAM[IN] - b - Meshblock index
+ * PARAM[IN] - X1, X2, X3 - Coordinate locations
+ * PARAM[IN] - p - Variable or MeshBlockPack
+ * PARAM[IN] - v - variable index
  */
-// WARNING: This function will be MUCH slower than the MeshBlock version,
-// since there's no ordering to meshblocks.
-KOKKOS_INLINE_FUNCTION Real Do(const Real X3, const Real X2, const Real X1,
-                               const MeshBlockPack<VariablePack<Real>> &p, int v) {
-  const int nx1 = p.GetDim(1);
-  const int nx2 = p.GetDim(2);
-  const int nx3 = p.GetDim(3);
-
-  // First we need to search for the relevant meshblock
-  int b;
-  bool found false;
-  for (b = 0; b < p.GetDim(5); b++) {
-    const auto &coords = p.GetCoords(b);
-    const Real x1min = Coordinates::GetXf<X1DIR>(0, coords);
-    const Real x1max = Coordinates::GetXf<X1DIR>(nx1, coords);
-    const Real x2min = Coordinates::GetXf<X2DIR>(0, coords);
-    const Real x2max = Coordinates::GetXf<X2DIR>(nx2, coords);
-    const Real x3min = Coordinates::GetXf<X3DIR>(0, coords);
-    const Real x3max = Coordinates::GetXf<X3DIR>(nx3, coords);
-    if ((x1min <= X1 && X1 <= x2max) && (x2min <= X2 && X2 <= x2max)
-        && (x3min <= X3 && X3 <= x3max)) {
-      found = true;
-      break;
-    }
+// JMM: I know this won't vectorize because of the switch, but it
+// probably won't anyway, since we're doing trilinear
+// interpolation, which will kill memory locality.  Doing it this
+// way means we can do trilinear vs bilinear which I think is a
+// sufficient win at minimum code bloat.
+template <typename Pack>
+KOKKOS_INLINE_FUNCTION Real Do(bool axisymmetric, int b, const Real X1, const Real X2,
+                               const Real X3, const Pack &p, int v) {
+  if (axisymmetric) {
+    return Do(b, X1, X2, X3, p, v);
+  } else {
+    return Do(b, X1, X2, p, v);
   }
-  PARTHENON_REQUIRE(found, "Interpolation in bounds");
-  return Do(X3, X2, X1, p, b, v);
 }
 
 } // namespace Linear
-} // namespace Nodes
+} // namespace Cent
 } // namespace Interpolation
+
+// Convenience Namespace Alias
+namespace LCInterp = Interpolation::Cent::Lin;
 
 #endif // PHOEBUS_UTILS_INTERPOLATION_HPP_
