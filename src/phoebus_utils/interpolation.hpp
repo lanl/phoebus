@@ -86,17 +86,23 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X
                                 w[0][1] * p(b, v, ix[2] + 1, ix[1] + 1, ix[0] + 1))));
 }
 
+/*
+ * Trilinear interpolation on a variable or meshblock pack
+ * PARAM[IN] - b - Meshblock index
+ * PARAM[IN] - X1, X2, X3 - Coordinate locations
+ * PARAM[IN] - p - Variable or MeshBlockPack
+ * PARAM[IN] - v - variable index
+ */
 template <typename Pack>
-KOKKOS_INLINE_FUNCTION Real DataBox::interpToReal(int b, const Real X1, const Real X2,
-                                                  const Pack &p, int v) {
-  assert(canInterpToReal_(2));
+KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Pack &p,
+                               int v) {
+  const auto &coords = p.GetCoords(b);
   int ix1, ix2;
   weights_t w1, w2;
-  grids_[0].weights(x1, ix1, w1);
-  grids_[1].weights(x2, ix2, w2);
-  return (w2[0] * (w1[0] * dataView_(ix2, ix1) + w1[1] * dataView_(ix2, ix1 + 1)) +
-          w2[1] *
-              (w1[0] * dataView_(ix2 + 1, ix1) + w1[1] * dataView_(ix2 + 1, ix1 + 1)));
+  GetWeights(X1, p.GetDim(1), coords, ix1, w1);
+  GetWeights(X2, p.GetDim(2), coords, ix2, w2);
+  return (w2[0] * (w1[0] * p(b, v, ix2, ix1) + w1[1] * p(b, v, ix2, ix1 + 1)) +
+          w2[1] * (w1[0] * p(b, v, ix2 + 1, ix1) + w1[1] * (b, v, ix2 + 1, ix1 + 1)));
 }
 
 /*
