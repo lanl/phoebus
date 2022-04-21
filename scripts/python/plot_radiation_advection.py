@@ -84,9 +84,6 @@ if not np.isclose(L_unit, 1.) or not np.isclose(T_unit, 1.) or not np.isclose(M_
   scale_free = False
 E_unit = M_unit*L_unit**2/T_unit**2
 UE_unit = E_unit / L_unit**3
-print(f"L_unit: {L_unit}")
-print(f"T_unit: {T_unit}")
-print(f"M_unit: {M_unit}")
 J0 *= UE_unit
 
 # Find the minimum and maximum times of the data
@@ -117,8 +114,6 @@ iy = 0
 for file in files[0::1]:
   dfile = phdf.phdf(file)
   J = dfile.Get("r.p.J", flatten=False)*UE_unit
-  print(J)
-  print(UE_unit)
   x = dfile.x*L_unit
   t = dfile.Time
 
@@ -133,8 +128,6 @@ for file in files[0::1]:
   xgrid = np.arange(xmin, xmax, (xmax-xmin)/1000)
   tdiff = t + t0
   if args.analytic:
-    print(t0p)
-    print(t)
     plt_ax.plot(xgrid, BoostedDiffusion(kappa, x0p, v, t0p, J0, xgrid/L_unit, t + t0p), linestyle='--', color='k')
 
 xl = v*L_unit # 0.3

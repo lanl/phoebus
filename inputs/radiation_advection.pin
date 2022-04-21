@@ -109,9 +109,6 @@ use_B_fake = true
 type = gray
 gray_kappa = 1.e3
 
-#<units>
-#scale_free = true
-
 <radiation_advection>
 J = 1.0
 Hx = 0.0

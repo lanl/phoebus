@@ -19,12 +19,10 @@ problem = radiation_advection
 problem_id  = rad_adv   # problem ID: basename of output filenames
 
 <parthenon/output1>
-#variables = r.c.E, &
-#            r.c.F, &
-#            r.p.J, &
-#            r.p.H
 variables = r.c.E, &
-            r.p.J
+            r.c.F, &
+            r.p.J, &
+            r.p.H
 
 file_type   = hdf5      # Tabular data dump
 dt          = 1.e-1     # time increment between outputs
@@ -96,8 +94,6 @@ Ye = true
 
 <radiation>
 cfl = 0.5
-#method = moment_m1
-#method = moment_eddington
 method = mocmc
 nu_min = 1.e17
 nu_max = 1.e24
@@ -108,8 +104,6 @@ do_nu_electron_anti = false
 do_nu_heavy = false
 
 scattering_fraction = 1.0
-#B_fake = 0.5
-#use_B_fake = true
 
 <opacity>
 type = gray

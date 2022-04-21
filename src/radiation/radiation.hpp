@@ -32,8 +32,6 @@ using namespace parthenon;
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 
-#include "radiation/mocmc.hpp"
-
 using namespace phoebus;
 
 namespace radiation {

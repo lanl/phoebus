@@ -61,7 +61,9 @@ class Linear : public Interpolation {
  public:
   KOKKOS_FUNCTION
   Linear(const int nSupport, const Real dx, const Real shift)
-      : Interpolation(nSupport, dx, shift) {}
+      : Interpolation(nSupport, dx, shift) {
+    PARTHENON_FAIL("Not written yet!");
+  }
 
   KOKKOS_INLINE_FUNCTION
   void GetIndicesAndWeights(const int i, int *idx, Real *wgt) override {
