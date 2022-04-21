@@ -18,6 +18,7 @@
 
 #include <memory>
 
+#include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
@@ -29,14 +30,25 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void ReflectInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 
+class ParticleBoundNoWork : public parthenon::ParticleBound {
+ public:
+  KOKKOS_INLINE_FUNCTION void Apply(const int n, double &x, double &y, double &z,
+                                    const parthenon::SwarmDeviceContext &swarm_d) const override {}
+};
+
 std::unique_ptr<parthenon::ParticleBound,
                 parthenon::DeviceDeleter<parthenon::DevMemSpace>>
 SetSwarmIX1Outflow();
 std::unique_ptr<parthenon::ParticleBound,
                 parthenon::DeviceDeleter<parthenon::DevMemSpace>>
 SetSwarmOX1Outflow();
+std::unique_ptr<parthenon::ParticleBound,
+                       parthenon::DeviceDeleter<parthenon::DevMemSpace>>
+SetSwarmNoWorkBC();
 
 TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc);
+
+void SetPhoebusBoundaries(parthenon::ParthenonManager &pman);
 
 } // namespace Boundaries
 

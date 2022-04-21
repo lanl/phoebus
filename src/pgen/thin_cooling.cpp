@@ -49,7 +49,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &coords = pmb->coords;
   auto eospkg = pmb->packages.Get("eos");
   auto eos = eospkg->Param<singularity::EOS>("d.EOS");
-  auto &unit_conv = eospkg.get()->Param<phoebus::UnitConversions>("unit_conv");
+  auto &unit_conv =
+      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
   const Real rho0 = 1.e6 * unit_conv.GetMassDensityCGSToCode();
   const Real u0 =

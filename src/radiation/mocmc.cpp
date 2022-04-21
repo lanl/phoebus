@@ -520,9 +520,6 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
   auto &ncov = swarm->template Get<Real>("ncov").Get();
   auto swarm_d = swarm->GetDeviceContext();
 
-  // printf("num_active: %i max_active_index: %i\n", swarm->GetNumActive(),
-  //       swarm->GetMaxActiveIndex());
-
   pmb->par_for(
       "MOCMC::Transport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
