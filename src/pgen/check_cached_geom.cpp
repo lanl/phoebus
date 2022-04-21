@@ -55,8 +55,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real max_err;
   auto loc = CellLocation::Cent;
   pmb->par_reduce(
-      "Phoebus::ProblemGenerator::CheckCachedGeometry", kb.s, kb.e, jb.s, jb.e, ib.s,
-      ib.e,
+      "Phoebus::ProblemGenerator::CheckCachedGeometry::Grads", kb.s, kb.e, jb.s, jb.e,
+      ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &le) {
         Real da_an[NDFULL];
         Real da_ca[NDFULL];
@@ -77,7 +77,28 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
       },
       Kokkos::Max<Real>(max_err));
-  printf("Maximum error = %.14e\n", max_err);
+  printf("Maximum error in gradients = %.14e\n", max_err);
+
+  auto coords = pmb->coords;
+  ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  pmb->par_reduce(
+      "Phoebus::ProblemGenerator::CheckCachedGeometry::Grads", kb.s, kb.e, jb.s, jb.e,
+      ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i, Real &le) {
+        // Try to interpolate a little offset from the cell center in
+        // each direction.
+        const Real dx1 = 0.5 * coords.Dx(X1DIR);
+        const Real dx2 = 0.5 * coords.Dx(X2DIR);
+        const Real dx3 = 0.5 * coords.Dx(X3DIR);
+        Real X1 = coords.X1v(k, j, i) + dx1;
+        Real X2 = coords.X2v(k, j, i) + dx2;
+        Real X3 = coords.X3v(k, j, i) + dx3;
+        
+      },
+      Kokkos::Max<Real>(max_err));
+
   std::exit(1);
 }
 
