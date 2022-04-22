@@ -26,28 +26,28 @@ using namespace parthenon::package::prelude;
 using parthenon::Coordinates_t;
 
 template <int dir>
-KOKKOS_FORCEINLINE_FUNCTION Real GetXf(const int i, const Coordinates_t &coord);
+KOKKOS_FORCEINLINE_FUNCTION Real GetXv(const int i, const Coordinates_t &coord);
 template <>
-KOKKOS_FORCEINLINE_FUNCTION Real GetXf<X1DIR>(const int i, const Coordinates_t &coord) {
-  return coord.x1f(i);
+KOKKOS_FORCEINLINE_FUNCTION Real GetXv<X1DIR>(const int i, const Coordinates_t &coord) {
+  return coord.x1v(i);
 }
 template <>
-KOKKOS_FORCEINLINE_FUNCTION Real GetXf<X2DIR>(const int i, const Coordinates_t &coord) {
-  return coord.x2f(i);
+KOKKOS_FORCEINLINE_FUNCTION Real GetXv<X2DIR>(const int i, const Coordinates_t &coord) {
+  return coord.x2v(i);
 }
 template <>
-KOKKOS_FORCEINLINE_FUNCTION Real GetXf<X3DIR>(const int i, const Coordinates_t &coord) {
-  return coord.x3f(i);
+KOKKOS_FORCEINLINE_FUNCTION Real GetXv<X3DIR>(const int i, const Coordinates_t &coord) {
+  return coord.x3v(i);
 }
-KOKKOS_FORCEINLINE_FUNCTION Real GetXf(const int i, const int dir,
+KOKKOS_FORCEINLINE_FUNCTION Real GetXv(const int i, const int dir,
                                        const Coordinates_t &coord) {
   switch (dir) {
   case X1DIR:
-    return GetXf<X1DIR>(i, coord);
+    return GetXv<X1DIR>(i, coord);
   case X2DIR:
-    return GetXf<X2DIR>(i, coord);
+    return GetXv<X2DIR>(i, coord);
   case X3DIR:
-    return GetXf<X3DIR>(i, coord);
+    return GetXv<X3DIR>(i, coord);
   default:
     PARTHENON_FAIL("Invalid coordinate direction");
   }

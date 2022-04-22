@@ -178,7 +178,7 @@ class Cached {
     SPACELOOP2(m, n) {
       int offst = Utils::Flatten2(m + 1, n + 1, NDFULL); // gamma_{ij} = g_{ij}
       gamma[m][n] =
-          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].gcov + Offst);
+          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].gcov + offst);
     }
   }
   KOKKOS_INLINE_FUNCTION
@@ -231,7 +231,8 @@ class Cached {
     MetricInverse(loc, b_, k, j, i, gamma);
   }
   KOKKOS_INLINE_FUNCTION
-  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
+  void SpacetimeMetric(int b, Real X0, Real X1, Real X2, Real X3,
+                       Real g[NDFULL][NDFULL]) const {
     SPACETIMELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDFULL);
       g[mu][nu] =
@@ -261,6 +262,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(int b, Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
+    using robust::ratio;
     auto &idx = idx_[cent_];
     Real alpha2 = Lapse(b, X1, X2, X3);
     alpha2 *= alpha2;
@@ -279,7 +281,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
-    return SpacetimeMetricInverse(b, X0, X1, X2, X3, g);
+    return SpacetimeMetricInverse(b_, X0, X1, X2, X3, g);
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(CellLocation loc, int b, int k, int j, int i,
@@ -363,10 +365,11 @@ class Cached {
     const int offset = !time_dependent_;
     SPACETIMELOOP2(mu, nu) {
       const int flat =
-        nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[cent_].dg - offset;
+          nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[cent_].dg - offset;
       dg[mu][nu][0] = 0.0; // gets overwritten if time-dependent metric
       for (int sigma = offset; sigma < NDFULL; sigma++) {
-        dg[mu][nu][sigma] = LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, flat + sigma);
+        dg[mu][nu][sigma] =
+            LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, flat + sigma);
       }
     }
   }
@@ -387,7 +390,7 @@ class Cached {
           nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[cent_].dg - offset;
       dg[mu][nu][0] = 0.0; // gets overwritten if time-dependent metric
       for (int sigma = offset; sigma < NDFULL; sigma++) {
-        dg[mu][nu][sigma] = pack_(axisymmetric_, b, flat + sigma, k, j, i);
+        dg[mu][nu][sigma] = pack_(b, flat + sigma, k, j, i);
       }
     }
   }
@@ -401,7 +404,8 @@ class Cached {
     const int offset = !time_dependent_;
     da[0] = 0; // gets overwritten if time-dependent metric
     for (int d = offset; d < NDFULL; ++d) {
-      da[d] = LCInterp::Do(axisymmetric_, b, X1, X2, X3, idx_[cent_] + d - offset);
+      da[d] = LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_,
+                           idx_[cent_].dalpha + d - offset);
     }
   }
   KOKKOS_INLINE_FUNCTION
@@ -426,8 +430,8 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void Coords(int b, Real X0, Real X1, Real X2, Real X3, Real C[NDFULL]) const {
     C[0] = X0_;
-    SPACELOOP(i) { // coords never axisymmetric
-      C[d + 1] = LCInterp::Do(b, X1, X2, X3, pack_, icoord + d);
+    SPACELOOP(d) { // coords never axisymmetric
+      C[d + 1] = LCInterp::Do(b, X1, X2, X3, pack_, icoord_c_ + d);
     }
   }
   KOKKOS_INLINE_FUNCTION
