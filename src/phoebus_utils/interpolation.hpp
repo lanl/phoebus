@@ -15,7 +15,7 @@
 #define PHOEBUS_UTILS_INTERPOLATION_HPP_
 
 // Spiner includes
-#include <spiner/interpoaltion.hpp>
+#include <spiner/interpolation.hpp>
 
 // Parthenon includes
 #include <coordinates/coordinates.hpp>
@@ -36,7 +36,7 @@ using Spiner::weights_t;
 // alternative path would be a class called "LCInterp with all
 // static functions. Then it could have an `operator()` which would
 // be maybe nicer?
-
+// TODO(JMM): Merge this w/ what Ben has done.
 namespace Cent {
 namespace Linear {
 
@@ -73,9 +73,9 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X
   const auto &coords = p.GetCoords(b);
   int ix[3];
   weights_t w[3];
-  GetWeights(X1, p.GetDim(1), coords, ix[0], w[0]);
-  GetWeights(X2, p.GetDim(2), coords, ix[1], w[1]);
-  GetWeights(X3, p.GetDim(3), coords, ix[2], w[2]);
+  GetWeights<X1DIR>(X1, p.GetDim(1), coords, ix[0], w[0]);
+  GetWeights<X2DIR>(X2, p.GetDim(2), coords, ix[1], w[1]);
+  GetWeights<X3DIR>(X3, p.GetDim(3), coords, ix[2], w[2]);
   return (w[2][0] * (w[1][0] * (w[0][0] * p(b, v, ix[2], ix[1], ix[0]) +
                                 w[0][1] * p(b, v, ix[2], ix[1], ix[0] + 1)) +
                      w[1][1] * (w[0][0] * p(b, v, ix[2], ix[1] + 1, ix[0]) +
@@ -99,8 +99,8 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Pack &
   const auto &coords = p.GetCoords(b);
   int ix1, ix2;
   weights_t w1, w2;
-  GetWeights(X1, p.GetDim(1), coords, ix1, w1);
-  GetWeights(X2, p.GetDim(2), coords, ix2, w2);
+  GetWeights<X1DIR>(X1, p.GetDim(1), coords, ix1, w1);
+  GetWeights<X2DIR>(X2, p.GetDim(2), coords, ix2, w2);
   return (w2[0] * (w1[0] * p(b, v, ix2, ix1) + w1[1] * p(b, v, ix2, ix1 + 1)) +
           w2[1] * (w1[0] * p(b, v, ix2 + 1, ix1) + w1[1] * (b, v, ix2 + 1, ix1 + 1)));
 }
@@ -133,6 +133,6 @@ KOKKOS_INLINE_FUNCTION Real Do(bool axisymmetric, int b, const Real X1, const Re
 } // namespace Interpolation
 
 // Convenience Namespace Alias
-namespace LCInterp = Interpolation::Cent::Lin;
+namespace LCInterp = Interpolation::Cent::Linear;
 
 #endif // PHOEBUS_UTILS_INTERPOLATION_HPP_
