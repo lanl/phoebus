@@ -44,11 +44,11 @@ using vpack_types::FlatIdx;
 constexpr int MAX_SPECIES = 3;
 
 // TODO(BRR) add options
-KOKKOS_FORCEINLINE_FUNCTION int get_nsamp_per_zone(const int &k, const int &j, const int &i,
-                                              const Geometry::CoordSysMeshBlock &geom,
-                                              const Real &rho, const Real &T,
-                                              const Real &Ye, const Real &J,
-                                              const int &nsamp_per_zone_global) {
+KOKKOS_FORCEINLINE_FUNCTION int
+get_nsamp_per_zone(const int &k, const int &j, const int &i,
+                   const Geometry::CoordSysMeshBlock &geom, const Real &rho,
+                   const Real &T, const Real &Ye, const Real &J,
+                   const int &nsamp_per_zone_global) {
 
   return nsamp_per_zone_global;
 }
@@ -140,8 +140,8 @@ void MOCMCInitSamples(T *rc) {
   starting_index.DeepCopy(starting_index_h);
 
   // TODO(BRR) Implement par_scan in parthenon then switch to this
-  //int result;
-  //Kokkos::parallel_scan("MOCMC::Starting indices", nx_k*nx_j*nx_i,
+  // int result;
+  // Kokkos::parallel_scan("MOCMC::Starting indices", nx_k*nx_j*nx_i,
   //  KOKKOS_LAMBDA(const int idx, int &partial_sum, bool is_final){
   //    const int i = idx / nx_k*nx_j;
   //    const int j = (idx - i * nx_k*nx_j) / nx_j;
