@@ -32,8 +32,9 @@ void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 
 class ParticleBoundNoWork : public parthenon::ParticleBound {
  public:
-  KOKKOS_INLINE_FUNCTION void Apply(const int n, double &x, double &y, double &z,
-                                    const parthenon::SwarmDeviceContext &swarm_d) const override {}
+  KOKKOS_INLINE_FUNCTION void
+  Apply(const int n, double &x, double &y, double &z,
+        const parthenon::SwarmDeviceContext &swarm_d) const override {}
 };
 
 inline auto SetSwarmIX1Outflow() {
