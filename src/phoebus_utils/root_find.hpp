@@ -22,6 +22,8 @@ template <typename F>
 KOKKOS_INLINE_FUNCTION void broyden2(F &func, Real v[2], const int max_iter = 50,
                                      const Real tol = 1.e-10,
                                      RootFindStatus *status = nullptr) {
+
+  PARTHENON_FAIL("Not currently implemented!");
   double resid[2];
   func(v[0], v[1], resid);
 

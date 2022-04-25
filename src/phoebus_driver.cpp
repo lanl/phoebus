@@ -33,6 +33,7 @@
 #include "monopole_gr/monopole_gr.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
+#include "phoebus_package.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
@@ -789,25 +790,6 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
   }
 
   return status;
-}
-
-std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
-  auto pkg = std::make_shared<StateDescriptor>("phoebus");
-  Params &params = pkg->AllParams();
-
-  params.Add("unit_conv", phoebus::UnitConversions(pin));
-  auto &unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
-  const Real MassCodeToCGS = unit_conv.GetMassCodeToCGS();
-  params.Add("MassCodeToCGS", MassCodeToCGS);
-  const Real LengthCodeToCGS = unit_conv.GetLengthCodeToCGS();
-  params.Add("LengthCodeToCGS", LengthCodeToCGS);
-  const Real TimeCodeToCGS = unit_conv.GetTimeCodeToCGS();
-  params.Add("TimeCodeToCGS", TimeCodeToCGS);
-
-  auto code_constants = CodeConstants(unit_conv);
-  params.Add("code_constants", phoebus::CodeConstants(unit_conv));
-
-  return pkg;
 }
 
 } // namespace phoebus

@@ -99,6 +99,8 @@ add_executable(phoebus
 
   phoebus_driver.cpp
   phoebus_driver.hpp
+  phoebus_package.cpp
+  phoebus_package.hpp
 
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp

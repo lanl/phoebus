@@ -36,15 +36,15 @@ class ParticleBoundNoWork : public parthenon::ParticleBound {
                                     const parthenon::SwarmDeviceContext &swarm_d) const override {}
 };
 
-std::unique_ptr<parthenon::ParticleBound,
-                parthenon::DeviceDeleter<parthenon::DevMemSpace>>
-SetSwarmIX1Outflow();
-std::unique_ptr<parthenon::ParticleBound,
-                parthenon::DeviceDeleter<parthenon::DevMemSpace>>
-SetSwarmOX1Outflow();
-std::unique_ptr<parthenon::ParticleBound,
-                       parthenon::DeviceDeleter<parthenon::DevMemSpace>>
-SetSwarmNoWorkBC();
+inline auto SetSwarmIX1Outflow() {
+  return parthenon::DeviceAllocate<parthenon::ParticleBoundIX1Outflow>();
+}
+inline auto SetSwarmOX1Outflow() {
+  return parthenon::DeviceAllocate<parthenon::ParticleBoundOX1Outflow>();
+}
+inline auto SetSwarmNoWorkBC() {
+  return parthenon::DeviceAllocate<ParticleBoundNoWork>();
+}
 
 TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc);
 
