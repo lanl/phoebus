@@ -75,12 +75,16 @@ class CodeConstants {
     mp_code_ = pc::mp * MASS;
   }
 
+  KOKKOS_FORCEINLINE_FUNCTION
   Real h() const { return h_code_; }
 
+  KOKKOS_FORCEINLINE_FUNCTION
   Real c() const { return c_code_; }
 
+  KOKKOS_FORCEINLINE_FUNCTION
   Real kb() const { return kb_code_; }
 
+  KOKKOS_FORCEINLINE_FUNCTION
   Real mp() const { return mp_code_; }
 
  private:

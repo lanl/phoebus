@@ -79,6 +79,7 @@ class ClosureEdd {
 
   //-------------------------------------------------------------------------------------
   /// Calculate the momentum density flux P^i_j from J, \tilde H_i, and \tilde pi^{ij}.
+  KOKKOS_FUNCTION
   ClosureStatus getConCovPFromPrim(const Real J, const Vec cov_tilH,
                                    const Tens2 con_tilPi, Tens2 *concov_P);
 

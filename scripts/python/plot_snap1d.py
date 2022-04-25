@@ -1,20 +1,20 @@
 #!/usr/bin/env python
-# =========================================================================================
-# (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
-#
-# This program was produced under U.S. Government contract 89233218CNA000001 for Los
-# Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
-# for the U.S. Department of Energy/National Nuclear Security Administration. All rights
-# in the program are reserved by Triad National Security, LLC, and the U.S. Department
-# of Energy/National Nuclear Security Administration. The Government is granted for
-# itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
-# license in this material to reproduce, prepare derivative works, distribute copies to
-# the public, perform publicly and display publicly, and to permit others to do so.
-# =========================================================================================
 
-"""This is a python script for plotting 2d simulations (but only 2d for now)
-that leverages the coords output so it always gets the geometry carrect and plots in
-x,y coordinates.
+# © 2022. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract
+# 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
+# is operated by Triad National Security, LLC for the U.S.  Department
+# of Energy/National Nuclear Security Administration. All rights in
+# the program are reserved by Triad National Security, LLC, and the
+# U.S. Department of Energy/National Nuclear Security
+# Administration. The Government is granted for itself and others
+# acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+# license in this material to reproduce, prepare derivative works,
+# distribute copies to the public, perform publicly and display
+# publicly, and to permit others to do so.
+
+"""This is a python script for plotting 1d simulations that leverages the coords output so
+it always gets the geometry carrect and plots in x coordinates.
 """
 
 from __future__ import print_function
@@ -23,11 +23,7 @@ import numpy as np
 import sys
 
 import matplotlib
-
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-
-
 
 # Assumes phdf in global python path
 try:
@@ -121,14 +117,6 @@ if __name__ == "__main__":
     parser = ArgumentParser(description="Plot a 1d simulation snapshot.")
     parser.add_argument('--xbounds', type=float, nargs=2, default=None,
                         help='min and max bounds for x')
-    parser.add_argument('--ybounds', type=float, nargs=2, default=None,
-                        help='min and max bounds for y')
-    parser.add_argument('--cbarbounds', type=float, nargs=2, default=None,
-                        help='min and max values of colorbar')
-    parser.add_argument('--cmap', type=str, default='viridis',
-                        help='colormap')
-    parser.add_argument('--cbarlabel', type=str, default=None,
-                        help='Color bar label')
     parser.add_argument('-s','--saveprefix', type=str,
                         default="", help='Prefix for file save names')
     parser.add_argument('--linear',action='store_true',

@@ -44,7 +44,7 @@ using vpack_types::FlatIdx;
 constexpr int MAX_SPECIES = 3;
 
 // TODO(BRR) add options
-KOKKOS_INLINE_FUNCTION int get_nsamp_per_zone(const int &k, const int &j, const int &i,
+KOKKOS_FORCEINLINE_FUNCTION int get_nsamp_per_zone(const int &k, const int &j, const int &i,
                                               const Geometry::CoordSysMeshBlock &geom,
                                               const Real &rho, const Real &T,
                                               const Real &Ye, const Real &J,
@@ -59,7 +59,6 @@ void MOCMCInitSamples(T *rc) {
   auto *pmb = rc->GetParentPointer().get();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
-  // auto swarm = pmb->swarm_data.Get()->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
 
@@ -139,6 +138,20 @@ void MOCMCInitSamples(T *rc) {
     }
   }
   starting_index.DeepCopy(starting_index_h);
+
+  // TODO(BRR) Implement par_scan in parthenon then switch to this
+  //int result;
+  //Kokkos::parallel_scan("MOCMC::Starting indices", nx_k*nx_j*nx_i,
+  //  KOKKOS_LAMBDA(const int idx, int &partial_sum, bool is_final){
+  //    const int i = idx / nx_k*nx_j;
+  //    const int j = (idx - i * nx_k*nx_j) / nx_j;
+  //    const int k = idx - i * nx_k*nx_j - j * nx_j;
+  //    if (is_final) {
+  //    starting_index(k, j, i) = partial_sum;
+  //    }
+  //    partial_sum += static_cast<int>(dN_h(k + kb.s, j + jb.s, i + ib.s));
+  //    },
+  //  result);
 
   const auto &x = swarm->template Get<Real>("x").Get();
   const auto &y = swarm->template Get<Real>("y").Get();

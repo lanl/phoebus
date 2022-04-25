@@ -116,5 +116,5 @@ Hy = 0.0
 Hz = 0.0
 vx = 0.3
 width = 0.0333
-kappas_init = 1.e3
+tau = 1.e3
 boost_profile = true
