@@ -179,14 +179,9 @@ void MOCMCInitSamples(T *rc) {
 
         Real cov_g[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, cov_g);
-        Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-        Real con_beta[3];
-        geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta);
+        Real ucon[4];
         const Real vpcon[] = {v(pv(0), k, j, i), v(pv(1), k, j, i), v(pv(2), k, j, i)};
-        const Real W = phoebus::GetLorentzFactor(vpcon, cov_g);
-        const Real ucon[4] = {W / alpha, vpcon[0] - con_beta[0] * W / alpha,
-                              vpcon[1] - con_beta[1] * W / alpha,
-                              vpcon[2] - con_beta[2] * W / alpha};
+        GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
         const Real trial[4] = {0., 1., 0., 0.};
         Geometry::Tetrads tetrads(ucon, trial, cov_g);
 
@@ -454,15 +449,10 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
           Real cov_g[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, cov_g);
-          Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-          Real con_beta[3];
-          geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta);
           const Real vpcon[] = {v(pv(0), k, j, i), v(pv(1), k, j, i), v(pv(2), k, j, i)};
-          const Real W = phoebus::GetLorentzFactor(vpcon, cov_g);
-          const Real ucon[4] = {W / alpha, vpcon[0] - con_beta[0] * W / alpha,
-                                vpcon[1] - con_beta[1] * W / alpha,
-                                vpcon[2] - con_beta[2] * W / alpha};
           const Real trial[4] = {0., 1., 0., 0.};
+          Real ucon[4];
+          GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
           Geometry::Tetrads tetrads(ucon, trial, cov_g);
 
           Real ncov_coord[4] = {ncov(0, nswarm), ncov(1, nswarm), ncov(2, nswarm),

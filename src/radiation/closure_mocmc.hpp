@@ -53,7 +53,7 @@ class ClosureMOCMC : public ClosureEdd<Vec, Tens2, SET> {
     PARTHENON_FAIL("MOCMC has already stored TilPi elsewhere!");
 
     // Do nothing
-    return ClosureStatus::fail;
+    return ClosureStatus::failure;
   }
 
   KOKKOS_FUNCTION
@@ -62,7 +62,7 @@ class ClosureMOCMC : public ClosureEdd<Vec, Tens2, SET> {
     PARTHENON_FAIL("MOCMC has already stored TilPi elsewhere!");
 
     // Do nothing
-    return ClosureStatus::fail;
+    return ClosureStatus::failure;
   }
 };
 } // namespace radiation
