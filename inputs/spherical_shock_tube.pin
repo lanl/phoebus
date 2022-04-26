@@ -103,7 +103,7 @@ method = derivative_order_1
 max_level = 3
 
 <geometry>
-axisymmetry = false
+axisymmetric = false
 do_fd_on_grid = false
 
 <eos>

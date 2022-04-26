@@ -52,11 +52,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  Real max_err;
+  Real max_err_grad = 0;
   auto loc = CellLocation::Cent;
   pmb->par_reduce(
-      "Phoebus::ProblemGenerator::CheckCachedGeometry", kb.s, kb.e, jb.s, jb.e, ib.s,
-      ib.e,
+      "Phoebus::ProblemGenerator::CheckCachedGeometry::Grads", kb.s, kb.e, jb.s, jb.e,
+      ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &le) {
         Real da_an[NDFULL];
         Real da_ca[NDFULL];
@@ -76,8 +76,113 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           le = std::max(le, diff);
         }
       },
-      Kokkos::Max<Real>(max_err));
-  printf("Maximum error = %.14e\n", max_err);
+      Kokkos::Max<Real>(max_err_grad));
+  printf("Maximum error in gradients = %.14e\n", max_err_grad);
+
+  Real max_err_interp = 0;
+  const int b = 0;
+  const int X0 = 0;
+  auto coords = pmb->coords;
+  ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  pmb->par_reduce(
+      "Phoebus::ProblemGenerator::CheckCachedGeometry::interps", kb.s, kb.e, jb.s, jb.e,
+      ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i, Real &le) {
+        // Try to interpolate a little offset from the cell center in
+        // each direction.
+        const Real dx1 = 0.25 * coords.Dx(X1DIR);
+        const Real dx2 = 0.25 * coords.Dx(X2DIR);
+        const Real dx3 = 0.25 * coords.Dx(X3DIR);
+        Real X1 = coords.x1v(k, j, i) + dx1;
+        Real X2 = coords.x2v(k, j, i) + dx2;
+        Real X3 = coords.x3v(k, j, i) + dx3;
+
+        Real diff;
+
+        // Lapse
+        const Real alp_an = geom_analytic.Lapse(b, X0, X1, X2, X3);
+        const Real alp_ca = geom_cached.Lapse(b, X0, X1, X2, X3);
+        diff = RelErr(alp_an, alp_ca);
+        le = std::max(le, diff);
+
+        // Shift
+        Real beta_an[NDSPACE];
+        Real beta_ca[NDSPACE];
+        geom_analytic.ContravariantShift(b, X0, X1, X2, X3, beta_an);
+        geom_cached.ContravariantShift(b, X0, X1, X2, X3, beta_ca);
+        SPACELOOP(d) {
+          diff = RelErr(beta_an[d], beta_ca[d]);
+          le = std::max(le, diff);
+        }
+
+        // spatial Metric
+        Real gam_an[NDSPACE][NDSPACE];
+        Real gam_ca[NDSPACE][NDSPACE];
+        geom_analytic.Metric(b, X0, X1, X2, X3, gam_an);
+        geom_cached.Metric(b, X0, X1, X2, X3, gam_ca);
+        SPACELOOP2(m, n) {
+          diff = RelErr(gam_an[m][n], gam_ca[m][n]);
+          le = std::max(le, diff);
+        }
+
+        // Spatial metric inverse
+        geom_analytic.MetricInverse(b, X0, X1, X2, X3, gam_an);
+        geom_cached.MetricInverse(b, X0, X1, X2, X3, gam_ca);
+        SPACELOOP2(m, n) {
+          diff = RelErr(gam_an[m][n], gam_ca[m][n]);
+          le = std::max(le, diff);
+        }
+
+        // Spacetime metric
+        Real g_an[NDFULL][NDFULL];
+        Real g_ca[NDFULL][NDFULL];
+        geom_analytic.SpacetimeMetric(b, X0, X1, X2, X3, g_an);
+        geom_cached.SpacetimeMetric(b, X0, X1, X2, X3, g_ca);
+        SPACETIMELOOP2(m, n) {
+          diff = RelErr(g_an[m][n], g_ca[m][n]);
+          le = std::max(le, diff);
+        }
+
+        // Spacetime metric inverse
+        geom_analytic.SpacetimeMetricInverse(b, X0, X1, X2, X3, g_an);
+        geom_cached.SpacetimeMetricInverse(b, X0, X1, X2, X3, g_ca);
+        SPACETIMELOOP2(m, n) {
+          diff = RelErr(g_an[m][n], g_ca[m][n]);
+          le = std::max(le, diff);
+        }
+
+        // DetGamma (DetG is for free since it uses lapse * detgamma)
+        const Real det_an = geom_analytic.DetGamma(b, X0, X1, X2, X3);
+        const Real det_ca = geom_cached.DetGamma(b, X0, X1, X2, X3);
+        diff = RelErr(det_an, det_ca);
+        le = std::max(le, diff);
+
+        // Metric derivative (Connection for free since it's computed
+        // from metric derivative)
+        Real dg_an[NDFULL][NDFULL][NDFULL];
+        Real dg_ca[NDFULL][NDFULL][NDFULL];
+        geom_analytic.MetricDerivative(b, X0, X1, X2, X3, dg_an);
+        geom_cached.MetricDerivative(b, X0, X1, X2, X3, dg_ca);
+        SPACETIMELOOP3(m, n, s) {
+          diff = RelErr(dg_an[m][n][s], dg_ca[m][n][s]);
+          le = std::max(le, diff);
+        }
+
+        // GradLnAlpha
+        Real da_an[NDFULL];
+        Real da_ca[NDFULL];
+        geom_analytic.GradLnAlpha(b, X0, X1, X2, X3, da_an);
+        geom_cached.GradLnAlpha(b, X0, X1, X2, X3, da_ca);
+        SPACETIMELOOP(d) {
+          diff = RelErr(da_an[d], da_ca[d]);
+          le = std::max(le, diff);
+        }
+      },
+      Kokkos::Max<Real>(max_err_interp));
+  printf("Maximum error in interpolation = %.14e\n", max_err_interp);
+
   std::exit(1);
 }
 
