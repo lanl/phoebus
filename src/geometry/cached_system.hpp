@@ -33,7 +33,7 @@
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
-#include "phoebus_utils/interpolation.hpp"
+#include "phoebus_utils/phoebus_interpolation.hpp"
 #include "phoebus_utils/robust.hpp"
 
 using namespace parthenon::package::prelude;
