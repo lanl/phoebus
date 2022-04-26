@@ -33,6 +33,7 @@
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/phoebus_interpolation.hpp"
 #include "phoebus_utils/robust.hpp"
 
 using namespace parthenon::package::prelude;
@@ -129,8 +130,12 @@ class Cached {
     icoord_n_ = imap["g.n.coord"].first;
   }
   KOKKOS_INLINE_FUNCTION
+  Real Lapse(int b, Real X0, Real X1, Real X2, Real X3) const {
+    return LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].alpha);
+  }
+  KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
-    return s_.Lapse(X0, X1, X2, X3);
+    return Lapse(0, X0, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
   Real Lapse(CellLocation loc, int b, int k, int j, int i) const {
@@ -144,8 +149,15 @@ class Cached {
     return Lapse(loc, b_, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
+  void ContravariantShift(int b, Real X0, Real X1, Real X2, Real X3,
+                          Real beta[NDSPACE]) const {
+    SPACELOOP(d) {
+      beta[d] = LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].bcon + d);
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
-    s_.ContravariantShift(X0, X1, X2, X3, beta);
+    return ContravariantShift(0, X0, X1, X2, X3, beta);
   }
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(CellLocation loc, int b, int k, int j, int i,
@@ -161,8 +173,17 @@ class Cached {
     ContravariantShift(loc, b_, k, j, i, beta);
   }
   KOKKOS_INLINE_FUNCTION
+  void Metric(int b, Real X0, Real X1, Real X2, Real X3,
+              Real gamma[NDSPACE][NDSPACE]) const {
+    SPACELOOP2(m, n) {
+      int offst = Utils::Flatten2(m + 1, n + 1, NDFULL); // gamma_{ij} = g_{ij}
+      gamma[m][n] =
+          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].gcov + offst);
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
-    return s_.Metric(X0, X1, X2, X3, gamma);
+    return Metric(0, X0, X1, X2, X3, gamma);
   }
   KOKKOS_INLINE_FUNCTION
   void Metric(CellLocation loc, int b, int k, int j, int i,
@@ -180,9 +201,18 @@ class Cached {
     Metric(loc, b_, k, j, i, gamma);
   }
   KOKKOS_INLINE_FUNCTION
+  void MetricInverse(int b, Real X0, Real X1, Real X2, Real X3,
+                     Real gamma[NDSPACE][NDSPACE]) const {
+    SPACELOOP2(m, n) {
+      int offst = Utils::Flatten2(m, n, NDSPACE);
+      gamma[m][n] =
+          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].gamcon + offst);
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
                      Real gamma[NDSPACE][NDSPACE]) const {
-    return s_.MetricInverse(X0, X1, X2, X3, gamma);
+    return MetricInverse(0, X0, X1, X2, X3, gamma);
   }
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(CellLocation loc, int b, int k, int j, int i,
@@ -201,8 +231,17 @@ class Cached {
     MetricInverse(loc, b_, k, j, i, gamma);
   }
   KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetric(int b, Real X0, Real X1, Real X2, Real X3,
+                       Real g[NDFULL][NDFULL]) const {
+    SPACETIMELOOP2(mu, nu) {
+      int offst = Utils::Flatten2(mu, nu, NDFULL);
+      g[mu][nu] =
+          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].gcov + offst);
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
-    return s_.SpacetimeMetric(X0, X1, X2, X3, g);
+    return SpacetimeMetric(0, X0, X1, X2, X3, g);
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(CellLocation loc, int b, int k, int j, int i,
@@ -221,9 +260,28 @@ class Cached {
     SpacetimeMetric(loc, b_, k, j, i, g);
   }
   KOKKOS_INLINE_FUNCTION
+  void SpacetimeMetricInverse(int b, Real X0, Real X1, Real X2, Real X3,
+                              Real g[NDFULL][NDFULL]) const {
+    using robust::ratio;
+    auto &idx = idx_[cent_];
+    Real alpha2 = Lapse(b, X1, X2, X3);
+    alpha2 *= alpha2;
+    g[0][0] = -robust::ratio(1, alpha2);
+    SPACELOOP(mu) {
+      Real num = LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx.bcon + mu);
+      g[mu + 1][0] = g[0][mu + 1] = ratio(num, alpha2);
+    }
+    SPACELOOP2(mu, nu) {
+      int offst = Utils::Flatten2(mu, nu, NDSPACE);
+      g[mu + 1][nu + 1] =
+          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx.gamcon + offst);
+      g[mu + 1][nu + 1] -= g[0][mu + 1] * g[0][nu + 1] * alpha2;
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
-    return s_.SpacetimeMetricInverse(X0, X1, X2, X3, g);
+    return SpacetimeMetricInverse(b_, X0, X1, X2, X3, g);
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(CellLocation loc, int b, int k, int j, int i,
@@ -251,8 +309,12 @@ class Cached {
     SpacetimeMetricInverse(loc, b_, k, j, i, g);
   }
   KOKKOS_INLINE_FUNCTION
+  Real DetGamma(int b, Real X0, Real X1, Real X2, Real X3) const {
+    return LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].detgam);
+  }
+  KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
-    return s_.DetGamma(X0, X1, X2, X3);
+    return DetGamma(0, X0, X1, X2, X3);
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(CellLocation loc, int b, int k, int j, int i) const {
@@ -270,9 +332,16 @@ class Cached {
     return Lapse(std::forward<Args>(args)...) * DetGamma(std::forward<Args>(args)...);
   }
   KOKKOS_INLINE_FUNCTION
+  void ConnectionCoefficient(int b, Real X0, Real X1, Real X2, Real X3,
+                             Real Gamma[NDFULL][NDFULL][NDFULL]) const {
+    Real dg[NDFULL][NDFULL][NDFULL];
+    MetricDerivative(b, X0, X1, X2, X3, dg);
+    Utils::SetConnectionCoeffFromMetricDerivs(dg, Gamma);
+  }
+  KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(Real X0, Real X1, Real X2, Real X3,
                              Real Gamma[NDFULL][NDFULL][NDFULL]) const {
-    return s_.ConnectionCoefficient(X0, X1, X2, X3, Gamma);
+    return ConnectionCoefficient(0, X0, X1, X2, X3, Gamma);
   }
   KOKKOS_INLINE_FUNCTION
   void ConnectionCoefficient(CellLocation loc, int k, int j, int i,
@@ -291,9 +360,23 @@ class Cached {
     Utils::SetConnectionCoeffByFD(*this, Gamma, loc, bid, k, j, i);
   }
   KOKKOS_INLINE_FUNCTION
+  void MetricDerivative(int b, Real X0, Real X1, Real X2, Real X3,
+                        Real dg[NDFULL][NDFULL][NDFULL]) const {
+    const int offset = !time_dependent_;
+    SPACETIMELOOP2(mu, nu) {
+      const int flat =
+          nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[cent_].dg - offset;
+      dg[mu][nu][0] = 0.0; // gets overwritten if time-dependent metric
+      for (int sigma = offset; sigma < NDFULL; sigma++) {
+        dg[mu][nu][sigma] =
+            LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, flat + sigma);
+      }
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
-    return s_.MetricDerivative(X0, X1, X2, X3, dg);
+    return MetricDerivative(0, X0, X1, X2, X3, dg);
   }
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(CellLocation loc, int b, int k, int j, int i,
@@ -317,8 +400,17 @@ class Cached {
     MetricDerivative(loc, b_, k, j, i, dg);
   }
   KOKKOS_INLINE_FUNCTION
+  void GradLnAlpha(int b, Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
+    const int offset = !time_dependent_;
+    da[0] = 0; // gets overwritten if time-dependent metric
+    for (int d = offset; d < NDFULL; ++d) {
+      da[d] = LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_,
+                           idx_[cent_].dalpha + d - offset);
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
-    return s_.GradLnAlpha(X0, X1, X2, X3, da);
+    return GradLnAlpha(0, X0, X1, X2, X3, da);
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(CellLocation loc, int b, int k, int j, int i, Real da[NDFULL]) const {
@@ -336,8 +428,15 @@ class Cached {
     return GradLnAlpha(loc, b_, k, j, i, da);
   }
   KOKKOS_INLINE_FUNCTION
+  void Coords(int b, Real X0, Real X1, Real X2, Real X3, Real C[NDFULL]) const {
+    C[0] = X0_;
+    SPACELOOP(d) { // coords never axisymmetric
+      C[d + 1] = LCInterp::Do(b, X1, X2, X3, pack_, icoord_c_ + d);
+    }
+  }
+  KOKKOS_INLINE_FUNCTION
   void Coords(Real X0, Real X1, Real X2, Real X3, Real C[NDFULL]) const {
-    return s_.Coords(X0, X1, X2, X3, C);
+    return Coords(0, X0, X1, X2, X3, C);
   }
   KOKKOS_INLINE_FUNCTION
   void Coords(CellLocation loc, int b, int k, int j, int i, Real C[NDFULL]) const {
@@ -371,6 +470,7 @@ class Cached {
   Impl::LocArray<Impl::GeomPackIndices> idx_;
   static constexpr Real X0_ = 0;
   static constexpr int b_ = 0;
+  static constexpr CellLocation cent_ = CellLocation::Cent;
 };
 
 template <typename System>

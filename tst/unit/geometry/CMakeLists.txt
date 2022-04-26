@@ -35,14 +35,17 @@ add_library(geometry_unit_tests OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_kerr_schild.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_minkowski.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_minkowski.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/phoebus_utils/phoebus_interpolation.hpp
 
 )
 
 target_link_libraries(geometry_unit_tests
   PRIVATE
-    parthenon
-    Catch2::Catch2
-    Kokkos::kokkos)
+  parthenon
+  singularity-eos::flags
+  singularity-eos
+  Catch2::Catch2
+  Kokkos::kokkos)
 
 target_include_directories(geometry_unit_tests PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"

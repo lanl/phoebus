@@ -105,6 +105,7 @@ add_executable(phoebus
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
   phoebus_utils/linear_algebra.hpp
+  phoebus_utils/phoebus_interpolation.hpp
   phoebus_utils/reduction.hpp
   phoebus_utils/relativity_utils.hpp
   phoebus_utils/robust.hpp
