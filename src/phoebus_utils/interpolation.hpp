@@ -101,8 +101,13 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Pack &
   weights_t w1, w2;
   GetWeights<X1DIR>(X1, p.GetDim(1), coords, ix1, w1);
   GetWeights<X2DIR>(X2, p.GetDim(2), coords, ix2, w2);
-  return (w2[0] * (w1[0] * p(b, v, ix2, ix1) + w1[1] * p(b, v, ix2, ix1 + 1)) +
-          w2[1] * (w1[0] * p(b, v, ix2 + 1, ix1) + w1[1] * (b, v, ix2 + 1, ix1 + 1)));
+  // printf("\tInterp2D: %d %d %.14e %.14e %.14e %.14e\n",
+  //        ix1, ix2,
+  //        p(b, v, 0, ix2, ix1), p(b, v, 0, ix2, ix1 + 1),
+  //        p(b, v, 0, ix2 + 1, ix1), p(b, v, 0, ix2 + 1, ix1 + 1));
+  return (w2[0] * (w1[0] * p(b, v, 0, ix2, ix1) + w1[1] * p(b, v, 0, ix2, ix1 + 1)) +
+          w2[1] *
+              (w1[0] * p(b, v, 0, ix2 + 1, ix1) + w1[1] * p(b, v, 0, ix2 + 1, ix1 + 1)));
 }
 
 /*
