@@ -92,12 +92,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &le) {
         // Try to interpolate a little offset from the cell center in
         // each direction.
-        const Real dx1 = 0.5 * coords.Dx(X1DIR);
-        const Real dx2 = 0.5 * coords.Dx(X2DIR);
-        const Real dx3 = 0.5 * coords.Dx(X3DIR);
+        const Real dx1 = 0.25 * coords.Dx(X1DIR);
+        const Real dx2 = 0.25 * coords.Dx(X2DIR);
+        const Real dx3 = 0.25 * coords.Dx(X3DIR);
         Real X1 = coords.x1v(k, j, i) + dx1;
         Real X2 = coords.x2v(k, j, i) + dx2;
-        Real X3 = coords.x3v(k, j, i);// + dx3;
+        Real X3 = coords.x3v(k, j, i) + dx3;
 
         Real diff;
 
