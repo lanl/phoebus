@@ -158,7 +158,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real det_ca = geom_cached.DetGamma(b, X0, X1, X2, X3);
         diff = RelErr(det_an, det_ca);
         le = std::max(le, diff);
-        
+
         // Metric derivative (Connection for free since it's computed
         // from metric derivative)
         Real dg_an[NDFULL][NDFULL][NDFULL];

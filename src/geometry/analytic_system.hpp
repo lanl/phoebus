@@ -190,7 +190,8 @@ class Analytic {
     return system_.ContravariantShift(X0, X1, X2, X3, beta);
   }
   KOKKOS_INLINE_FUNCTION
-  void ContravariantShift(int b, Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
+  void ContravariantShift(int b, Real X0, Real X1, Real X2, Real X3,
+                          Real beta[NDSPACE]) const {
     return system_.ContravariantShift(X0, X1, X2, X3, beta);
   }
   KOKKOS_INLINE_FUNCTION
@@ -213,7 +214,8 @@ class Analytic {
     return system_.Metric(X0, X1, X2, X3, gamma);
   }
   KOKKOS_INLINE_FUNCTION
-  void Metric(int b, Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
+  void Metric(int b, Real X0, Real X1, Real X2, Real X3,
+              Real gamma[NDSPACE][NDSPACE]) const {
     return system_.Metric(X0, X1, X2, X3, gamma);
   }
   KOKKOS_INLINE_FUNCTION
@@ -260,7 +262,8 @@ class Analytic {
     return system_.SpacetimeMetric(X0, X1, X2, X3, g);
   }
   KOKKOS_INLINE_FUNCTION
-  void SpacetimeMetric(int b, Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
+  void SpacetimeMetric(int b, Real X0, Real X1, Real X2, Real X3,
+                       Real g[NDFULL][NDFULL]) const {
     return system_.SpacetimeMetric(X0, X1, X2, X3, g);
   }
   KOKKOS_INLINE_FUNCTION
