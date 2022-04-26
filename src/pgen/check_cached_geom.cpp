@@ -87,7 +87,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
   pmb->par_reduce(
-      "Phoebus::ProblemGenerator::CheckCachedGeometry::Grads", kb.s, kb.e, jb.s, jb.e,
+      "Phoebus::ProblemGenerator::CheckCachedGeometry::interps", kb.s, kb.e, jb.s, jb.e,
       ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &le) {
         // Try to interpolate a little offset from the cell center in
