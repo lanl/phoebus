@@ -11,8 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef PHOEBUS_UTILS_INTERPOLATION_HPP_
-#define PHOEBUS_UTILS_INTERPOLATION_HPP_
+#ifndef PHOEBUS_UTILS_PHOEBUS_INTERPOLATION_HPP_
+#define PHOEBUS_UTILS_PHOEBUS_INTERPOLATION_HPP_
 
 // Spiner includes
 #include <spiner/interpolation.hpp>
@@ -140,4 +140,4 @@ KOKKOS_INLINE_FUNCTION Real Do(bool axisymmetric, int b, const Real X1, const Re
 // Convenience Namespace Alias
 namespace LCInterp = Interpolation::Cent::Linear;
 
-#endif // PHOEBUS_UTILS_INTERPOLATION_HPP_
+#endif // PHOEBUS_UTILS_PHOEBUS_INTERPOLATION_HPP_
