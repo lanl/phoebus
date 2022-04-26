@@ -387,7 +387,7 @@ class Cached {
     const int offset = !time_dependent_;
     SPACETIMELOOP2(mu, nu) {
       const int flat =
-          nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[cent_].dg - offset;
+          nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[loc].dg - offset;
       dg[mu][nu][0] = 0.0; // gets overwritten if time-dependent metric
       for (int sigma = offset; sigma < NDFULL; sigma++) {
         dg[mu][nu][sigma] = pack_(b, flat + sigma, k, j, i);
