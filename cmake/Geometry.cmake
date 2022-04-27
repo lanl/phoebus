@@ -16,6 +16,7 @@ option(PHOEBUS_CACHE_GEOMETRY "Cache geometry. Only available for some geometrie
 # Default
 set(PHOEBUS_GEOMETRY "Minkowski" CACHE STRING "The metric used by Phoebus")
 
+# List analytic geometries here.
 set(PHOEBUS_ANALYTIC_GEOMETRIES
     "Minkowski"
     "BoostedMinkowski"
@@ -29,19 +30,28 @@ set(PHOEBUS_ANALYTIC_GEOMETRIES
     "MonopoleSph"
     "MonopoleCart"
     )
+
+# List geometries that should not be cached here
 set(PHOEBUS_GEOMETRY_NO_CACHE
-    "MonopoleSph"
-    "MonopoleCart"
+
     )
+
+# List geometries that MUST be cached here
+set(PHOEBUS_GEOMETRY_MUST_CACHE
+  "MonopoleCart"
+  )
 
 if(PHOEBUS_ANALYTIC_GEOMETRY)
   if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_ANALYTIC_GEOMETRIES)
     set(GEOMETRY_MESH "Analytic<${PHOEBUS_GEOMETRY}, IndexerMesh>")
     set(GEOMETRY_MESH_BLOCK "Analytic<${PHOEBUS_GEOMETRY}, IndexerMeshBlock>")
+    if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_GEOMETRY_MUST_CACHE)
+      message(WARNING "The selected geometry must be cached. Enabling cache.")
+      set(PHOEBUS_CACHE_GEOMETRY ON CACHE BOOL "Force geometry to be cached" FORCE)
+    endif()
     if (PHOEBUS_CACHE_GEOMETRY)
       if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_GEOMETRY_NO_CACHE)
-	message(WARNING "The selected geometry does not support caching. "
-	  "You may experience unexpected behaviour.")
+	message(FATAL_ERROR "The selected geometry does not support caching.")
       endif()
       set(GEOMETRY_MESH "CachedOverMesh<${GEOMETRY_MESH}>")
       set(GEOMETRY_MESH_BLOCK "CachedOverMeshBlock<${GEOMETRY_MESH_BLOCK}>")
