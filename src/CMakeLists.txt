@@ -43,6 +43,8 @@ add_executable(phoebus
   geometry/geometry.hpp
   geometry/geometry_defaults.hpp
   geometry/geometry_utils.hpp
+  geometry/sph2cart.cpp
+  geometry/sph2cart.hpp
   geometry/tetrads.hpp
 
   geometry/inchworm.hpp

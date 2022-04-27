@@ -35,18 +35,22 @@ namespace Geometry {
 template <>
 void Initialize<MplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Params &params = geometry->AllParams();
-  bool time_dependent = true;
+  const bool time_dependent = true;
   params.Add("time_dependent", time_dependent);
   return;
 }
 template <>
 void Initialize<MplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Params &params = geometry->AllParams();
-  bool time_dependent = true;
+  const bool time_dependent = true;
+  const bool do_fd_on_grid = true;
   params.Add("time_dependent", time_dependent);
+  params.Add("do_fd_on_grid", do_fd_on_grid);
   return;
 }
-// TODO(JMM): Might need to figure this out more carefully
+
+// The geometry on a block is set by the monopole solver or by the
+// Cached machinery
 template <>
 void SetGeometry<MplSphMeshBlock>(MeshBlockData<Real> *rc) {}
 template <>
@@ -100,7 +104,9 @@ MplCartMeshBlock GetCoordinateSystem<MplCartMeshBlock>(MeshBlockData<Real> *rc) 
   auto gradients = params.Get<MonopoleGR::Gradients_t>("gradients");
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
-  return MplCartMeshBlock(indexer, hypersurface, alpha, beta, gradients, rgrid);
+  auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
+
+  return MplCartMeshBlock(indexer, transformation, hypersurface, alpha, beta, gradients, rgrid);
 }
 template <>
 MplCartMesh GetCoordinateSystem<MplCartMesh>(MeshData<Real> *rc) {
@@ -115,10 +121,10 @@ MplCartMesh GetCoordinateSystem<MplCartMesh>(MeshData<Real> *rc) {
   auto gradients = params.Get<MonopoleGR::Gradients_t>("gradients");
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
-  return MplCartMesh(indexer, hypersurface, alpha, beta, gradients, rgrid);
-}
+  auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
 
-// TODO(JMM): These cached coordinate system calls may need to be revisited.
+  return MplCartMesh(indexer, transformation, hypersurface, alpha, beta, gradients, rgrid);
+}
 
 template <>
 void Initialize<CMplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {

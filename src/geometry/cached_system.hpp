@@ -493,15 +493,15 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
   // in their params during initialization.
   // If it's available it will be read out and returned here.
   // Otherwise it is set to false.
-  bool time_dependent = params.Get("time_dependent", false);
+  const bool time_dependent = params.Get("time_dependent", false);
   const int nvar_deriv = time_dependent ? NDFULL : NDSPACE;
 
-  bool axisymmetric = pin->GetOrAddBoolean("geometry", "axisymmetric", false);
+  const bool axisymmetric = pin->GetOrAddBoolean("geometry", "axisymmetric", false);
   params.Add("axisymmetric", axisymmetric);
 
   // This tells the goemetry infrastructure not to call
   // SetGeometryDefault, because the cached geometry will handle it.
-  bool do_defaults = false;
+  const bool do_defaults = false;
   params.Add("do_defaults", do_defaults);
 
   // Optionally use finite differences on the grid to set the metric
