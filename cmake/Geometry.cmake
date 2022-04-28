@@ -33,12 +33,12 @@ set(PHOEBUS_ANALYTIC_GEOMETRIES
 
 # List geometries that should not be cached here
 set(PHOEBUS_GEOMETRY_NO_CACHE
-
-    )
+  # "MonopoleSph"
+  )
 
 # List geometries that MUST be cached here
 set(PHOEBUS_GEOMETRY_MUST_CACHE
-  "MonopoleCart"
+  # "MonopoleCart"
   )
 
 if(PHOEBUS_ANALYTIC_GEOMETRY)
