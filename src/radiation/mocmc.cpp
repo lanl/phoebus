@@ -23,7 +23,7 @@
 #include "closure_mocmc.hpp"
 #include "geodesics.hpp"
 #include "kd_grid.hpp"
-#include "phoebus_utils/interpolation.hpp"
+#include "phoebus_utils/phoebus_interpolation.hpp"
 #include "phoebus_utils/root_find.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
