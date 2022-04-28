@@ -179,7 +179,7 @@ class Modified {
     Real C[NDSPACE];
     Real Jcov[NDSPACE][NDSPACE];
     Real Jcon[NDSPACE][NDSPACE];
-    GetTransformation_(X1, X2, XI can 3, C, Jcov, Jcon);
+    GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     Real detJ = LinearAlgebra::Determinant(Jcov);
     return s_.DetG(X0, C[0], C[1], C[2]) * std::abs(detJ);
   }
@@ -245,8 +245,8 @@ class Modified {
       return A[mu - 1][nu - 1];
     }
   }
-  Real dx_ = 1e-10; // finite differences dx
-  System s_; // underlying coordinate system
+  Real dx_ = 1e-10;                  // finite differences dx
+  System s_;                         // underlying coordinate system
   Transformation GetTransformation_; // transformation operator
 
   // This doesn't mean the transformation is time-dependent. It means
