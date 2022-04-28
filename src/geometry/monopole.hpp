@@ -44,7 +44,6 @@ namespace Geometry {
  */
 class MonopoleSph {
  public:
-
   MonopoleSph() = default;
   KOKKOS_INLINE_FUNCTION
   MonopoleSph(const MonopoleGR::Hypersurface_t &hypersurface,
@@ -245,7 +244,7 @@ void Initialize<CMplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry
 
 // --------------------------------------------------------------------------------
 
-/* 
+/*
  * Cartesian Monopole class.
  * Built explicitly on modifiers and the cached coordinate system.  We
  * define the types for non-cached MonopoleCart, to make all the other
