@@ -46,6 +46,11 @@ void Initialize<MplCartMeshBlock>(ParameterInput *pin, StateDescriptor *geometry
   const bool do_fd_on_grid = true;
   params.Add("time_dependent", time_dependent);
   params.Add("do_fd_on_grid", do_fd_on_grid);
+  Real dxfd_geom = pin->GetOrAddReal("geometry", "finite_differences_dx", 1e-8);
+  Real dxfd = pin->GetOrAddReal("coordinates", "finite_differences_dx", dxfd_geom);
+  if (!params.hasKey("dxfd")) {
+    params.Add("dxfd", dxfd);
+  }
   return;
 }
 
@@ -104,9 +109,13 @@ MplCartMeshBlock GetCoordinateSystem<MplCartMeshBlock>(MeshBlockData<Real> *rc) 
   auto gradients = params.Get<MonopoleGR::Gradients_t>("gradients");
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
+
+  bool time_dependent = true;
+  Real dxfd = pkg->Param<Real>("dxfd");
   auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
 
-  return MplCartMeshBlock(indexer, transformation, hypersurface, alpha, beta, gradients, rgrid);
+  return MplCartMeshBlock(indexer, time_dependent, dxfd, transformation, hypersurface,
+                          alpha, beta, gradients, rgrid);
 }
 template <>
 MplCartMesh GetCoordinateSystem<MplCartMesh>(MeshData<Real> *rc) {
@@ -121,9 +130,13 @@ MplCartMesh GetCoordinateSystem<MplCartMesh>(MeshData<Real> *rc) {
   auto gradients = params.Get<MonopoleGR::Gradients_t>("gradients");
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
+
+  bool time_dependent = true;
+  Real dxfd = pkg->Param<Real>("dxfd");
   auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
 
-  return MplCartMesh(indexer, transformation, hypersurface, alpha, beta, gradients, rgrid);
+  return MplCartMesh(indexer, time_dependent, dxfd, transformation, hypersurface, alpha,
+                     beta, gradients, rgrid);
 }
 
 template <>
