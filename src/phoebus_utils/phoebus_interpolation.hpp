@@ -186,7 +186,7 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Pack &p, int v) {
   const auto &coords = p.GetCoords(b);
   int ix;
   weights_t w;
-  GetWeights<X1DIR>(X1, p.GetDim(1), coords, ix1, w1);
+  GetWeights<X1DIR>(X1, p.GetDim(1), coords, ix, w);
   return w[0] * p(b, v, 0, 0, ix) + w[1] * p(b, v, 0, 0, ix + 1);
 }
 
@@ -203,7 +203,7 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Pack &p, int v) {
 // interpolation, which will kill memory locality.  Doing it this
 // way means we can do trilinear vs bilinear which I think is a
 // sufficient win at minimum code bloat.
-template <typename Pack>
+/*template <typename Pack>
 KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X3,
                                const Pack &p, int v) {
   if (p.GetDim(3) > 0) {
@@ -213,7 +213,7 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X
   } else { // 1D
     return Do(b, X1, p, v);
   }
-}
+}*/
 
 } // namespace Linear
 } // namespace Cent
