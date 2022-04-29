@@ -131,7 +131,7 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   Real Lapse(int b, Real X0, Real X1, Real X2, Real X3) const {
-    return LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].alpha);
+    return LCInterp::Do(b, X1, X2, X3, pack_, idx_[cent_].alpha);
   }
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
@@ -151,9 +151,7 @@ class Cached {
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(int b, Real X0, Real X1, Real X2, Real X3,
                           Real beta[NDSPACE]) const {
-    SPACELOOP(d) {
-      beta[d] = LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].bcon + d);
-    }
+    SPACELOOP(d) { beta[d] = LCInterp::Do(b, X1, X2, X3, pack_, idx_[cent_].bcon + d); }
   }
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
@@ -177,8 +175,7 @@ class Cached {
               Real gamma[NDSPACE][NDSPACE]) const {
     SPACELOOP2(m, n) {
       int offst = Utils::Flatten2(m + 1, n + 1, NDFULL); // gamma_{ij} = g_{ij}
-      gamma[m][n] =
-          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].gcov + offst);
+      gamma[m][n] = LCInterp::Do(b, X1, X2, X3, pack_, idx_[cent_].gcov + offst);
     }
   }
   KOKKOS_INLINE_FUNCTION
@@ -205,8 +202,7 @@ class Cached {
                      Real gamma[NDSPACE][NDSPACE]) const {
     SPACELOOP2(m, n) {
       int offst = Utils::Flatten2(m, n, NDSPACE);
-      gamma[m][n] =
-          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].gamcon + offst);
+      gamma[m][n] = LCInterp::Do(b, X1, X2, X3, pack_, idx_[cent_].gamcon + offst);
     }
   }
   KOKKOS_INLINE_FUNCTION
@@ -235,8 +231,7 @@ class Cached {
                        Real g[NDFULL][NDFULL]) const {
     SPACETIMELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDFULL);
-      g[mu][nu] =
-          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].gcov + offst);
+      g[mu][nu] = LCInterp::Do(b, X1, X2, X3, pack_, idx_[cent_].gcov + offst);
     }
   }
   KOKKOS_INLINE_FUNCTION
@@ -268,13 +263,12 @@ class Cached {
     alpha2 *= alpha2;
     g[0][0] = -robust::ratio(1, alpha2);
     SPACELOOP(mu) {
-      Real num = LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx.bcon + mu);
+      Real num = LCInterp::Do(b, X1, X2, X3, pack_, idx.bcon + mu);
       g[mu + 1][0] = g[0][mu + 1] = ratio(num, alpha2);
     }
     SPACELOOP2(mu, nu) {
       int offst = Utils::Flatten2(mu, nu, NDSPACE);
-      g[mu + 1][nu + 1] =
-          LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx.gamcon + offst);
+      g[mu + 1][nu + 1] = LCInterp::Do(b, X1, X2, X3, pack_, idx.gamcon + offst);
       g[mu + 1][nu + 1] -= g[0][mu + 1] * g[0][nu + 1] * alpha2;
     }
   }
@@ -310,7 +304,7 @@ class Cached {
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(int b, Real X0, Real X1, Real X2, Real X3) const {
-    return LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, idx_[cent_].detgam);
+    return LCInterp::Do(b, X1, X2, X3, pack_, idx_[cent_].detgam);
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
@@ -368,8 +362,7 @@ class Cached {
           nvar_deriv_ * Utils::Flatten2(mu, nu, NDFULL) + idx_[cent_].dg - offset;
       dg[mu][nu][0] = 0.0; // gets overwritten if time-dependent metric
       for (int sigma = offset; sigma < NDFULL; sigma++) {
-        dg[mu][nu][sigma] =
-            LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_, flat + sigma);
+        dg[mu][nu][sigma] = LCInterp::Do(b, X1, X2, X3, pack_, flat + sigma);
       }
     }
   }
@@ -404,8 +397,7 @@ class Cached {
     const int offset = !time_dependent_;
     da[0] = 0; // gets overwritten if time-dependent metric
     for (int d = offset; d < NDFULL; ++d) {
-      da[d] = LCInterp::Do(axisymmetric_, b, X1, X2, X3, pack_,
-                           idx_[cent_].dalpha + d - offset);
+      da[d] = LCInterp::Do(b, X1, X2, X3, pack_, idx_[cent_].dalpha + d - offset);
     }
   }
   KOKKOS_INLINE_FUNCTION
