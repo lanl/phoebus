@@ -222,8 +222,8 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom,
 
     parthenon::Coordinates_t coords = p.GetCoords(b);
     const Real X1 = coords.x1v(i);
-    const Real X2 = coords.x1v(j);
-    const Real X3 = coords.x1v(k);
+    const Real X2 = coords.x2v(j);
+    const Real X3 = coords.x3v(k);
     transform(X1, X2, X3, C, c2s, s2c);
     const Real r = C[0];
     const Real th = C[1];
