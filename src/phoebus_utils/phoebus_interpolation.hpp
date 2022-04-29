@@ -68,8 +68,8 @@ KOKKOS_INLINE_FUNCTION void GetWeights(const Real x, const int nx,
  * PARAM[IN] - v - variable index
  */
 template <typename Pack>
-KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X3,
-                               const Pack &p, int v) {
+KOKKOS_INLINE_FUNCTION Real Do3D(int b, const Real X1, const Real X2, const Real X3,
+                                 const Pack &p, int v) {
   const auto &coords = p.GetCoords(b);
   int ix[3];
   weights_t w[3];
@@ -94,8 +94,8 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X
  * PARAM[IN] - v - variable index
  */
 template <typename Pack>
-KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Pack &p,
-                               int v) {
+KOKKOS_INLINE_FUNCTION Real Do2D(int b, const Real X1, const Real X2, const Pack &p,
+                                 int v) {
   const auto &coords = p.GetCoords(b);
   int ix1, ix2;
   weights_t w1, w2;
@@ -104,6 +104,22 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Pack &
   return (w2[0] * (w1[0] * p(b, v, 0, ix2, ix1) + w1[1] * p(b, v, 0, ix2, ix1 + 1)) +
           w2[1] *
               (w1[0] * p(b, v, 0, ix2 + 1, ix1) + w1[1] * p(b, v, 0, ix2 + 1, ix1 + 1)));
+}
+
+/*
+ * Linear interpolation on a variable or meshblock pack
+ * PARAM[IN] - b - Meshblock index
+ * PARAM[IN] - X1 - Coordinate location
+ * PARAM[IN] - p - Variable or MeshBlockPack
+ * PARAM[IN] - v - variable index
+ */
+template <typename Pack>
+KOKKOS_INLINE_FUNCTION Real Do1D(int b, const Real X1, const Pack &p, int v) {
+  const auto &coords = p.GetCoords(b);
+  int ix;
+  weights_t w;
+  GetWeights<X1DIR>(X1, p.GetDim(1), coords, ix, w);
+  return w[0] * p(b, v, 0, 0, ix) + w[1] * p(b, v, 0, 0, ix + 1);
 }
 
 /*
@@ -120,12 +136,14 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Pack &
 // way means we can do trilinear vs bilinear which I think is a
 // sufficient win at minimum code bloat.
 template <typename Pack>
-KOKKOS_INLINE_FUNCTION Real Do(bool axisymmetric, int b, const Real X1, const Real X2,
-                               const Real X3, const Pack &p, int v) {
-  if (axisymmetric) {
-    return Do(b, X1, X2, X3, p, v);
-  } else {
-    return Do(b, X1, X2, p, v);
+KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X3,
+                               const Pack &p, int v) {
+  if (p.GetDim(3) > 1) {
+    return Do3D(b, X1, X2, X3, p, v);
+  } else if (p.GetDim(2) > 1) {
+    return Do2D(b, X1, X2, p, v);
+  } else { // 1D
+    return Do1D(b, X1, p, v);
   }
 }
 
