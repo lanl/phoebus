@@ -137,7 +137,7 @@ KOKKOS_INLINE_FUNCTION void GetWeights(const Real x, const int nx,
  */
 template <typename Pack>
 KOKKOS_INLINE_FUNCTION Real Do3D(int b, const Real X1, const Real X2, const Real X3,
-                               const Pack &p, int v) {
+                                 const Pack &p, int v) {
   const auto &coords = p.GetCoords(b);
   int ix[3];
   weights_t w[3];
@@ -163,7 +163,7 @@ KOKKOS_INLINE_FUNCTION Real Do3D(int b, const Real X1, const Real X2, const Real
  */
 template <typename Pack>
 KOKKOS_INLINE_FUNCTION Real Do2D(int b, const Real X1, const Real X2, const Pack &p,
-                               int v) {
+                                 int v) {
   const auto &coords = p.GetCoords(b);
   int ix1, ix2;
   weights_t w1, w2;
@@ -206,9 +206,9 @@ KOKKOS_INLINE_FUNCTION Real Do1D(int b, const Real X1, const Pack &p, int v) {
 /*template <typename Pack>
 KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X3,
                                const Pack &p, int v) {
-  if (p.GetDim(3) > 0) {
+  if (p.GetDim(3) > 1) {
     return Do3D(b, X1, X2, X3, p, v);
-  } else if (p.GetDim(2) > 0) {
+  } else if (p.GetDim(2) > 1) {
     return Do2D(b, X1, X2, p, v);
   } else { // 1D
     return Do1D(b, X1, p, v);
