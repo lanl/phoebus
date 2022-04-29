@@ -19,9 +19,11 @@ bc_ox1 = outflow
 problem_id  = rad_eql   # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = r.c.E, &
+variables = r.p.J, &
+            r.p.H, &
+            r.c.E, &
             r.c.F, &
-            c.energy 
+            c.energy
 
 file_type   = hdf5      # Tabular data dump
 dt          = 1.e-1     # time increment between outputs
@@ -38,7 +40,7 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 32      # Number of zones in X1-direction
+nx1         = 4      # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1        # maximum value of X1
 ix1_bc      = periodic     # Inner-X1 boundary condition flag
@@ -58,10 +60,10 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-bc_vars = primitive 
+bc_vars = primitive
 
 <parthenon/meshblock>
-nx1 = 32
+nx1 = 4
 nx2 = 1
 nx3 = 1
 
@@ -73,7 +75,7 @@ max_level = 3
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
-Cv = 1.0 
+Cv = 1.0
 
 <physics>
 hydro = true
@@ -90,7 +92,7 @@ c2p_max_iter = 100
 Ye = true
 
 <radiation>
-cfl = 0.8 
+cfl = 0.8
 method = moment_eddington
 nu_min = 1.e15
 nu_max = 1.e22
@@ -100,12 +102,12 @@ do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
 
-scattering_fraction = 0.0 
+scattering_fraction = 0.0
 B_fake = 0.5
 use_B_fake = false
 
-<opacity> 
-type = gray 
+<opacity>
+type = gray
 gray_kappa = 1.0
 
 <radiation_equilibration>

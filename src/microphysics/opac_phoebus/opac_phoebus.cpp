@@ -56,10 +56,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_FAIL(msg);
   }
 
+  params.Add("type", opacity_type);
+
   if (opacity_type == "tophat") {
     const Real C = pin->GetReal("opacity", "tophat_C");
     const Real numin = pin->GetReal("opacity", "tophat_numin");
     const Real numax = pin->GetReal("opacity", "tophat_numax");
+    params.Add("C", C);
+    params.Add("numin", numin);
+    params.Add("numax", numax);
 
     singularity::neutrinos::Opacity opacity_host = NonCGSUnits<Tophat>(
         Tophat(C, numin, numax), time_unit, mass_unit, length_unit, temp_unit);
@@ -68,6 +73,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("d.opacity", opacity_device);
   } else if (opacity_type == "gray") {
     const Real kappa = pin->GetReal("opacity", "gray_kappa");
+    params.Add("gray_kappa", kappa);
 
     singularity::neutrinos::Opacity opacity_host =
         NonCGSUnits<Gray>(Gray(kappa), time_unit, mass_unit, length_unit, temp_unit);
@@ -77,6 +83,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   } else if (opacity_type == "tabular") {
 #ifdef SPINER_USE_HDF
     const std::string filename = pin->GetString("opacity", "filename");
+    params.Add("filename", filename);
 
     singularity::neutrinos::Opacity opacity_host = NonCGSUnits<SpinerOpac>(
         SpinerOpac(filename), time_unit, mass_unit, length_unit, temp_unit);
