@@ -13,6 +13,7 @@ import time
 from enum import Enum
 from phoebus_constants import cgs
 import phoebus_utils
+from phoedf import phoedf
 
 parser = argparse.ArgumentParser(description='Plot neutrino thermalization')
 parser.add_argument('-f', '--files', dest='files', nargs='*', default=['rad_eql*.phdf'], help='List of input Parthenon hdf files to plot')
@@ -63,6 +64,11 @@ M_unit = params['phoebus/MassCodeToCGS']
 for param in params:
   print(param)
 opacity_model = params['opacity/type'].decode('ascii')
+
+dfile = phoedf(files[0])
+print(dfile.Params)
+print(dfile.opacity.alphanu(1., 1., 1., 1.))
+sys.exit()
 
 t = np.zeros(nfiles)
 J = np.zeros(nfiles)
