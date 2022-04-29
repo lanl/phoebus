@@ -118,7 +118,7 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Pack &p, int v) {
   const auto &coords = p.GetCoords(b);
   int ix;
   weights_t w;
-  GetWeights<X1DIR>(X1, p.GetDim(1), coords, ix1, w1);
+  GetWeights<X1DIR>(X1, p.GetDim(1), coords, ix, w);
   return w[0] * p(b, v, 0, 0, ix) + w[1] * p(b, v, 0, 0, ix + 1);
 }
 
