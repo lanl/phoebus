@@ -112,3 +112,5 @@ gray_kappa = 1.0
 
 <radiation_equilibration>
 J = 0.2
+ncool = 1
+nstep = 100
