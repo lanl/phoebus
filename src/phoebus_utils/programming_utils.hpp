@@ -30,14 +30,6 @@ bool soft_equiv(const T x, const T y, const T tolerance = static_cast<T>(1.e-10f
   return (2. * fabs(y - x) < tolerance * (std::fabs(x) + std::fabs(y)));
 }
 
-template <typename T>
-bool ContainedInVector(T &item, std::vector<T> &container) {
-  if (std::find(container.begin(), container.end(), item) == container.end()) {
-    return false;
-  }
-  return true;
-}
-
 } // namespace programming
 
 #endif // PHOEBUS_UTILS_PROGRAMMING_UTILS_HPP_

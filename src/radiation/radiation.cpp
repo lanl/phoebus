@@ -47,9 +47,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
-  std::vector<std::string> known_methods = {"cooling_function", "moment_m1",
-                                            "moment_eddington", "monte_carlo", "mocmc"};
-  if (!programming::ContainedInVector(method, known_methods)) {
+  std::set<std::string> known_methods = {"cooling_function", "moment_m1",
+                                         "moment_eddington", "monte_carlo", "mocmc"};
+  if (!known_methods.count(method)) {
     std::stringstream msg;
     msg << "Radiation method \"" << method << "\" not recognized!";
     PARTHENON_FAIL(msg);
