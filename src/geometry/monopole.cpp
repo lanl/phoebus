@@ -110,11 +110,10 @@ MplCartMeshBlock GetCoordinateSystem<MplCartMeshBlock>(MeshBlockData<Real> *rc) 
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
 
-  bool time_dependent = true;
   Real dxfd = pkg->Param<Real>("dxfd");
   auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
 
-  return MplCartMeshBlock(indexer, time_dependent, dxfd, transformation, hypersurface,
+  return MplCartMeshBlock(indexer, dxfd, transformation, hypersurface,
                           alpha, beta, gradients, rgrid);
 }
 template <>
@@ -131,11 +130,10 @@ MplCartMesh GetCoordinateSystem<MplCartMesh>(MeshData<Real> *rc) {
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
 
-  bool time_dependent = true;
   Real dxfd = pkg->Param<Real>("dxfd");
   auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
 
-  return MplCartMesh(indexer, time_dependent, dxfd, transformation, hypersurface, alpha,
+  return MplCartMesh(indexer, dxfd, transformation, hypersurface, alpha,
                      beta, gradients, rgrid);
 }
 

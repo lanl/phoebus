@@ -246,11 +246,9 @@ void Initialize<CMplSphMeshBlock>(ParameterInput *pin, StateDescriptor *geometry
 
 /*
  * Cartesian Monopole class.
- * Built explicitly on modifiers and the cached coordinate system.  We
- * define the types for non-cached MonopoleCart, to make all the other
- * machinery work, but we forbid this in the cmake.
+ * Built explicitly on modifiers.
  */
-using MonopoleCart = Modified<MonopoleSph, SphericalToCartesian>;
+using MonopoleCart = Modified<MonopoleSph, SphericalToCartesian, true>;
 
 using MplCartMeshBlock = Analytic<MonopoleCart, IndexerMeshBlock>;
 using CMplCartMeshBlock = CachedOverMeshBlock<Analytic<MonopoleCart, IndexerMeshBlock>>;

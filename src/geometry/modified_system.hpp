@@ -44,24 +44,21 @@ namespace Geometry {
 //                 Real Jcov[NDSPACE][NDSPACE],
 //                 Real Jcon[NDSPACE][NDSPACE]) const;
 //
+// The TIME_DEPENDENT template parameter DOES NOT mean the
+// transformation is time-dependent. It means the metric is.
 // TODO(JMM): A time-dependent version of this may be worth pursuing
 // eventually.
-template <typename System, typename Transformation>
+template <typename System, typename Transformation, bool TIME_DEPENDENT=false>
 class Modified {
  public:
   Modified() = default;
   template <typename... Args>
   Modified(const Transformation &GetTransformation, Args... args)
-      : time_dependent_(false), dx_(1e-10), GetTransformation_(GetTransformation),
+      : dx_(1e-10), GetTransformation_(GetTransformation),
         s_(std::forward<Args>(args)...) {}
   template <typename... Args>
   Modified(const Real dx, const Transformation &GetTransformation, Args... args)
-      : time_dependent_(false), dx_(dx), GetTransformation_(GetTransformation),
-        s_(std::forward<Args>(args)...) {}
-  template <typename... Args>
-  Modified(const bool time_dependent, const Real dx,
-           const Transformation &GetTransformation, Args... args)
-      : time_dependent_(time_dependent), dx_(dx), GetTransformation_(GetTransformation),
+      : dx_(dx), GetTransformation_(GetTransformation),
         s_(std::forward<Args>(args)...) {}
 
   KOKKOS_INLINE_FUNCTION
@@ -196,7 +193,7 @@ class Modified {
     // If time-dependent, assume coordinate transformation is time
     // indepedent, pull dg_{mu nu}/dt from underlying system, and
     // transform mu and nu
-    if (time_dependent_) {
+    if (TIME_DEPENDENT) {
       Real dg0[NDFULL][NDFULL][NDFULL];
       Real C[NDSPACE];
       Real Jcon[NDSPACE][NDSPACE];
@@ -216,7 +213,7 @@ class Modified {
     Utils::SetGradLnAlphaByFD(*this, dx_, X0, X1, X2, X3, da);
     // If time-dependent, assume coordinate transformation is time
     // indepedent, pull dalpha/dt from underlying system
-    if (time_dependent_) {
+    if (TIME_DEPENDENT) {
       Real da0[NDFULL];
       Real C[NDSPACE];
       Real Jcon[NDSPACE][NDSPACE];
@@ -248,10 +245,6 @@ class Modified {
   Real dx_ = 1e-10;                  // finite differences dx
   System s_;                         // underlying coordinate system
   Transformation GetTransformation_; // transformation operator
-
-  // This doesn't mean the transformation is time-dependent. It means
-  // the metric is.
-  bool time_dependent_ = false;
 };
 
 } // namespace Geometry
