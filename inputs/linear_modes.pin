@@ -63,10 +63,10 @@ num_threads = 1         # maximum number of OMP threads
 <phoebus/mesh>
 #bc_vars = primitive
 
-<parthenon/meshblock>
-nx1 = 128
-nx2 = 128
-nx3 = 1
+# <parthenon/meshblock>
+# nx1 = 128
+# nx2 = 128
+# nx3 = 1
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -91,6 +91,7 @@ vy = 0. # 0.524631
 # vy = 0.81     # shift. Default is 0.
 # vy = 0.617213 # shift. Default is 0.
 # vy = 0      # shift. Default is 0.
+do_fd_on_grid = false
 
 <eos>
 type = IdealGas
