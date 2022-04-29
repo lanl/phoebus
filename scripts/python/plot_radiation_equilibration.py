@@ -15,6 +15,7 @@ from phoebus_constants import cgs
 import phoebus_utils
 
 parser = argparse.ArgumentParser(description='Plot neutrino thermalization')
+parser.add_argument('-f', '--files', dest='files', nargs='*', default=['rad_eql*.phdf'], help='List of input Parthenon hdf files to plot')
 parser.add_argument('--savefig', type=bool, default=False, help='Whether to save figure')
 parser.add_argument('--Tg0', type=float, default=1., help='Initial gas temperature (MeV)')
 parser.add_argument('--Tr0', type=float, default=0., help='Initial neutrino temperature (MeV)')
@@ -41,6 +42,53 @@ dlnu = (lnumax - lnumin)/(nnu - 1)
 nus = np.zeros(nnu)
 for n in range(nnu):
   nus[n] = 10**(lnumin + n*dlnu)
+
+# Read in the files
+files = []
+print(args.files)
+for file in args.files:
+  print(f"globbing {file}")
+  files += glob.glob(file)
+files = sorted(files)
+nfiles = len(files)
+print(files)
+
+# Set up unit conversions
+params = phdf.phdf(files[0]).Params
+L_unit = params['phoebus/LengthCodeToCGS']
+T_unit = params['phoebus/TimeCodeToCGS']
+M_unit = params['phoebus/MassCodeToCGS']
+
+# Get simulation setup
+for param in params:
+  print(param)
+opacity_model = params['opacity/type'].decode('ascii')
+
+t = np.zeros(nfiles)
+J = np.zeros(nfiles)
+Jstd = np.zeros(nfiles)
+for n, filename in enumerate(files[0::1]):
+  dfile = phdf.phdf(filename)
+  t[n] = dfile.Time
+  Jfile = dfile.Get("r.p.J", flatten=False)
+  J[n] = np.mean(Jfile)
+  Jstd[n] = np.std(Jfile)
+
+from phoebus_opacities import *
+print(opacity_model)
+opac = opacity_type_dict[opacity_model](params)
+print(opac.alphanu(1., 1., 1., 1.))
+
+# Set up the axes
+fig, ax = plt.subplots(figsize=[12,8])
+ax.plot(t, J, color='r')
+ax.set_xlim([0, None])
+ax.set_ylim([0, None])
+ax.set_xlabel('t')
+ax.set_ylabel('J')
+plt.show()
+
+sys.exit()
 
 
 # Burrows-Reddy-Thompson opacity
