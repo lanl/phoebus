@@ -107,6 +107,22 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Pack &
 }
 
 /*
+ * Linear interpolation on a variable or meshblock pack
+ * PARAM[IN] - b - Meshblock index
+ * PARAM[IN] - X1 - Coordinate location
+ * PARAM[IN] - p - Variable or MeshBlockPack
+ * PARAM[IN] - v - variable index
+ */
+template <typename Pack>
+KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Pack &p, int v) {
+  const auto &coords = p.GetCoords(b);
+  int ix;
+  weights_t w;
+  GetWeights<X1DIR>(X1, p.GetDim(1), coords, ix1, w1);
+  return w[0] * p(b, v, 0, 0, ix) + w[1] * p(b, v, 0, 0, ix + 1);
+}
+
+/*
  * Trilinear or bilinear interpolation on a variable or meshblock pack
  * PARAM[IN] - axisymmetric
  * PARAM[IN] - b - Meshblock index
@@ -120,12 +136,14 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Pack &
 // way means we can do trilinear vs bilinear which I think is a
 // sufficient win at minimum code bloat.
 template <typename Pack>
-KOKKOS_INLINE_FUNCTION Real Do(bool axisymmetric, int b, const Real X1, const Real X2,
-                               const Real X3, const Pack &p, int v) {
-  if (axisymmetric) {
+KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X3,
+                               const Pack &p, int v) {
+  if (p.GetDim(3) > 0) {
     return Do(b, X1, X2, X3, p, v);
-  } else {
+  } else if (p.GetDim(2) > 0) {
     return Do(b, X1, X2, p, v);
+  } else { // 1D
+    return Do(b, X1, p, v);
   }
 }
 
