@@ -48,7 +48,7 @@ namespace Geometry {
 // transformation is time-dependent. It means the metric is.
 // TODO(JMM): A time-dependent version of this may be worth pursuing
 // eventually.
-template <typename System, typename Transformation, bool TIME_DEPENDENT=false>
+template <typename System, typename Transformation, bool TIME_DEPENDENT = false>
 class Modified {
  public:
   Modified() = default;
@@ -58,8 +58,7 @@ class Modified {
         s_(std::forward<Args>(args)...) {}
   template <typename... Args>
   Modified(const Real dx, const Transformation &GetTransformation, Args... args)
-      : dx_(dx), GetTransformation_(GetTransformation),
-        s_(std::forward<Args>(args)...) {}
+      : dx_(dx), GetTransformation_(GetTransformation), s_(std::forward<Args>(args)...) {}
 
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
