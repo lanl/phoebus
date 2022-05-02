@@ -19,7 +19,8 @@ bc_ox1 = outflow
 problem_id  = rad_eql   # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = r.p.J, &
+variables = p.density, &
+            r.p.J, &
             r.p.H, &
             r.c.E, &
             r.c.F, &

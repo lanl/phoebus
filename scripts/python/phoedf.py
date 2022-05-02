@@ -14,6 +14,7 @@
 from parthenon_tools import phdf
 
 from phoebus_constants import *
+from phoebus_eos import *
 from phoebus_opacities import *
 
 # ---------------------------------------------------------------------------- #
@@ -23,6 +24,23 @@ class phoedf(phdf.phdf):
   def __init__(self, filename):
     super().__init__(filename)
 
+    print(self.Params['eos/type'])
+    self.eos_type = self.Params['eos/type'].decode('ascii')
+
     if 'opacity/type' in self.Params:
       self.opacity_model = self.Params['opacity/type'].decode('ascii')
-      self.opacity = opacity_type_dict[self.opacity_model](self.Params)
+
+    self.LengthCodeToCGS = self.Params['phoebus/LengthCodeToCGS']
+    self.TimeCodeToCGS = self.Params['phoebus/TimeCodeToCGS']
+    self.MassCodeToCGS = self.Params['phoebus/MassCodeToCGS']
+    self.TemperatureCodeToCGS = self.Params['phoebus/TemperatureCodeToCGS']
+    self.EnergyCodeToCGS = self.MassCodeToCGS * cgs['CL']**2
+    self.NumberDensityCodeToCGS = self.LengthCodeToCGS**(-3)
+    self.EnergyDensityCodeToCGS = self.EnergyCodeToCGS * self.NumberDensityCodeToCGS
+    self.MassDensityCodeToCGS = self.MassCodeToCGS * self.NumberDensityCodeToCGS
+
+  def GetEOS(self):
+    return eos_type_dict[self.eos_type](self.Params)
+
+  def GetOpacity(self):
+    return opacity_type_dict[self.opacity_model](self.Params)

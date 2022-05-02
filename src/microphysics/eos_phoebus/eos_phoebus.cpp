@@ -65,6 +65,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 #endif
   };
   std::string eos_type = pin->GetString(block_name, std::string("type"));
+  params.Add("type", eos_type);
   if (eos_type.compare(IdealGas::EosType()) == 0) {
     type = EOSBuilder::EOSType::IdealGas;
     names = {"Cv"};

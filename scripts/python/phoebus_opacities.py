@@ -24,31 +24,32 @@ class ThermalDistribution:
     self.c = self.constants['CL']
     self.nspecies = nspecies
 
-  def Bnu(T, nu):
+  def Bnu(self, T, nu):
     x = self.h*nu/(self.kb*T)
-    return self.nspeces * (2. * self.h * nu**3)/self.c**2/(np.exp(x) + 1.)
+    return self.nspecies * (2. * self.h * nu**3)/self.c**2/(np.exp(x) + 1.)
 
-  def T_from_J(J):
+  def T_from_J(self, J):
     return pow(15.*self.c**3*self.h**3*E/(7.*self.kb**4*np.pi**5*self.nspecies),1./4.)
 
-  def J_from_T(T):
-    return 7.*self.kb**4*np.pi**5*nspecies*T**4/(15.*self.c**3*self.h**3)
+  def J_from_T(self, T):
+    return 7.*self.kb**4*np.pi**5*self.nspecies*T**4/(15.*self.c**3*self.h**3)
 
 # ---------------------------------------------------------------------------- #
 # -- Base class containing required data and functions
 class BaseOpacity:
   def __init__(self):
     self.model = None
-    self.dist = ThermalDistribution
+    self.dist = ThermalDistribution()
 
-  def jnu(rho, T, Ye, nu):
+  def jnu(self, rho, T, Ye, nu):
     raise NotImplementedError()
-  def alphanu(rho, T, Ye, nu):
+  def alphanu(self, rho, T, Ye, nu):
     raise NotImplementedError()
 
 # -- Gray opacity
 class GrayOpacity(BaseOpacity):
   def __init__(self, params):
+    super().__init__()
     self.model = "gray"
     self.kappa = params['opacity/gray_kappa']
 
@@ -59,6 +60,6 @@ class GrayOpacity(BaseOpacity):
     return self.alphanu(rho, T, Ye, nu) * self.dist.Bnu(T, nu)
 
 
-
-
+# ---------------------------------------------------------------------------- #
+# -- Dictionary of opacity types
 opacity_type_dict = {'gray' : GrayOpacity}
