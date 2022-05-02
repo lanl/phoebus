@@ -91,11 +91,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("tov_intrinsic_h", tov_intrinsic_h);
 
   // Redutions for history file
-  using HstMax = parthenon::UserHistoryOperation::max;
+  auto HstMax = parthenon::UserHistoryOperation::max;
   auto ReducePress = [](MeshData<Real> *md) {
-    return ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::pressure, 0);
-  } parthenon::HstVar_list hst_vars = {};
-  hst_vars.emplace_back(parthenon::HistoryOutputVar(HstMax, ReducePress));
+    return History::ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::pressure, 0);
+  };
+  parthenon::HstVar_list hst_vars = {};
+  hst_vars.emplace_back(parthenon::HistoryOutputVar(HstMax, ReducePress, "max pressure"));
   params.Add(parthenon::hist_param_key, hst_vars);
 
   return tov;

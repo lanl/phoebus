@@ -46,20 +46,20 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
   PackIndexMap imap;
   std::vector<std::string> vars = {varname};
   const auto pack = md->PackVariables(vars, imap);
-  int ivar = imap[vars];
+  const auto ivar = imap[varname];
   PARTHENON_REQUIRE(ivar.first >= 0, "Var must exist");
   PARTHENON_REQUIRE(ivar.second >= ivar.first + idx, "Var must exist");
 
   Real result = 0.0;
   Reducer_t reducer(result);
   parthenon::par_reduce(
-      DEFAULT_LOOP_PATTERN, "Phoebus History for " + varname, 0, pack.GetDim(5) - 1, kb.s,
-      kb.e, jb.s, jb.e, ib.s, ib.e,
+      parthenon::LoopPatternMDRange(), "Phoebus History for " + varname, DevExecSpace(),
+      0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         // join is a Kokkos construct
         // that automatically does the
         // reduction operation locally
-        reducer.join(lresult, pack(b, idx, k, j, i));
+        reducer.join(lresult, pack(b, ivar.first + idx, k, j, i));
       },
       reducer);
   return result;
