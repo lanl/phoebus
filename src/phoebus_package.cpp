@@ -37,6 +37,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("LengthCodeToCGS", LengthCodeToCGS);
   const Real TimeCodeToCGS = unit_conv.GetTimeCodeToCGS();
   params.Add("TimeCodeToCGS", TimeCodeToCGS);
+  const Real TemperatureCodeToCGS = unit_conv.GetTemperatureCodeToCGS();
+  //params.Add("TemperatureCodeToCGS", TemperatureCodeToCGS);
+  params.Add("TemperatureCodeToCGS", unit_conv.GetTemperatureCodeToCGS());
 
   auto code_constants = CodeConstants(unit_conv);
   params.Add("code_constants", phoebus::CodeConstants(unit_conv));

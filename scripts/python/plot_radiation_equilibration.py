@@ -55,35 +55,80 @@ nfiles = len(files)
 print(files)
 
 # Set up unit conversions
-params = phdf.phdf(files[0]).Params
-L_unit = params['phoebus/LengthCodeToCGS']
-T_unit = params['phoebus/TimeCodeToCGS']
-M_unit = params['phoebus/MassCodeToCGS']
+dfile0 = phoedf(files[0])
+params = dfile0.Params
+#L_unit = params['phoebus/LengthCodeToCGS']
+#T_unit = params['phoebus/TimeCodeToCGS']
+#M_unit = params['phoebus/MassCodeToCGS']
+eos = dfile0.GetEOS()
+opac = dfile0.GetOpacity()
 
 # Get simulation setup
-for param in params:
-  print(param)
-opacity_model = params['opacity/type'].decode('ascii')
+#for param in params:
+#  print(param)
+#opacity_model = params['opacity/type'].decode('ascii')
 
-dfile = phoedf(files[0])
-print(dfile.Params)
-print(dfile.opacity.alphanu(1., 1., 1., 1.))
-sys.exit()
+#dfile = phoedf(files[0])
+#print(dfile.Params)
+#print(opac.alphanu(1., 1., 1., 1.))
 
 t = np.zeros(nfiles)
 J = np.zeros(nfiles)
 Jstd = np.zeros(nfiles)
 for n, filename in enumerate(files[0::1]):
-  dfile = phdf.phdf(filename)
+  dfile = phoedf(filename)
   t[n] = dfile.Time
   Jfile = dfile.Get("r.p.J", flatten=False)
   J[n] = np.mean(Jfile)
   Jstd[n] = np.std(Jfile)
 
-from phoebus_opacities import *
-print(opacity_model)
-opac = opacity_type_dict[opacity_model](params)
 print(opac.alphanu(1., 1., 1., 1.))
+
+# Calculate analytic solution
+def f(t, y, args):
+  nubins = args[0]
+  nus = args[1]
+  eos = args[2]
+  opac = args[3]
+  rho0 = args[4]
+  Ye0 = args[5]
+  ug = y[0]
+  ur = y[1]
+  Tg = eos.T_from_rho_u_Ye(rho0, ug, Ye0)
+  Inu = y[2:nubins+2]
+  print(t)
+  print(y)
+
+  dydt = np.zeros(len(y))
+  dydt[0] = 0.
+  dydt[1] = 0.
+
+
+  #rho =
+  Ye = 0.5
+  for n in range(nubins):
+    nu = nus[n]
+    #jnu =
+    #alphanu =
+
+    dydt[2+n] = cgs['CL']*(opac.jnu(rho0, Tg, Ye0, nu))
+
+    #dInu[n] = cgs['CL']*dt*(jnu(T, nu) - alphanu(T, nu)*Inu[n])
+    #dInu[n] = (Inu[n] + cgs['CL']*dt*jnu(T, nu))/(1. + cgs['CL']*dt*alphanu(T, nu)) - Inu[n]
+    #Inu[n] += dInu[n]
+    #Inu[n] = max(Inu[n], 1.e-100)
+
+  return dydt
+
+from scipy.integrate import ode
+r = ode(f).set_integrator('vode', method='bdf')
+rho0 = dfile0.Get('p.density', flatten=False)
+r.set_initial_value([1., 0., 1., 1.], 0.).set_f_params((2, [1,2], eos, opac, rho0.mean(), 0.5))
+print(r.integrate(r.t + 0.1))
+
+import sys
+sys.exit()
+
 
 # Set up the axes
 fig, ax = plt.subplots(figsize=[12,8])
