@@ -35,7 +35,7 @@ namespace check_cached_geom {
 
 KOKKOS_FORCEINLINE_FUNCTION
 Real RelErr(const Real a, const Real b) {
-  return 2 * robust::ratio(std::abs(a - b), a + b);
+  return std::min(2 * robust::ratio(std::abs(a - b), a + b), std::abs(a - b));
 }
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
