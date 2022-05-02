@@ -19,7 +19,7 @@
 
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
-#include <parthenon_utils/error_checking.hpp>
+#include <utils/error_checking.hpp>
 
 using namespace parthenon::package::prelude;
 
