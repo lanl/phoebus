@@ -33,6 +33,7 @@
 #include "monopole_gr/monopole_gr.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
+#include "phoebus_package.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
@@ -431,6 +432,7 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   parthenon::Packages_t packages;
 
+  packages.Add(phoebus::Initialize(pin.get()));
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
   packages.Add(Microphysics::Opacity::Initialize(pin.get()));
   packages.Add(Geometry::Initialize(pin.get()));
