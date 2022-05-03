@@ -29,6 +29,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto pkg = std::make_shared<StateDescriptor>("phoebus");
   Params &params = pkg->AllParams();
 
+  // Add some parthenon parameters for output
+  params.Add("tlim", pin->GetReal("parthenon/time", "tlim"));
+  params.Add("nlim", pin->GetReal("parthenon/time", "nlim"));
+  params.Add("integrator", pin->GetString("parthenon/time", "integrator"));
+
+  // Store unit conversions
   params.Add("unit_conv", phoebus::UnitConversions(pin));
   auto &unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
   const Real MassCodeToCGS = unit_conv.GetMassCodeToCGS();

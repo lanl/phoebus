@@ -82,6 +82,68 @@ for n, filename in enumerate(files[0::1]):
   J[n] = np.mean(Jfile)
   Jstd[n] = np.std(Jfile)
 
+# ---------------------------------------------------------------------------- #
+# -- Calculate analytic solution
+# Ensure tmax is divisible by dt for best accuracy!
+tmax = 1.e-1*tc
+print("Final time: %e s" % tmax)
+dt = min(1.e-2*tc, 1.e-2*tmax)
+print("dt: %e s" % dt)
+t = 0
+cycle = 0
+
+ncycle = int(tmax/dt)
+
+t = np.zeros(ncycle+1)
+u = np.zeros(ncycle+1)
+E = np.zeros(ncycle+1)
+Tg = np.zeros(ncycle+1)
+Tr = np.zeros(ncycle+1)
+
+t[0] = 0
+Tg[0] = Tg0
+Tr[0] = Tr0
+u[0] = gas_T_to_u(Tg[0])
+E[0] = rad_T_to_E(Tr[0])
+
+# Initialize neutrino spectrum
+Inu = np.zeros(nnu)
+for n in range(nnu):
+  Inu[n] = max(1.e-100, Bnu(Tr[0], nus[n]))
+
+for cycle in range(ncycle):
+  phoebus_utils.progress_bar((cycle+1)/ncycle)
+  import time
+  #print(f"cycle = {cycle} t = {t[cycle]}")
+  #T = u[cycle]*mu*(gamma - 1.)/(rho0*cgs['KBOL'])
+  T = Tg[cycle]
+  dE = 0
+  dInu = np.zeros(nnu)
+  for n in range(nnu):
+    nu = nus[n]
+
+    #dInu[n] = cgs['CL']*dt*(jnu(T, nu) - alphanu(T, nu)*Inu[n])
+    dInu[n] = (Inu[n] + cgs['CL']*dt*jnu(T, nu))/(1. + cgs['CL']*dt*alphanu(T, nu)) - Inu[n]
+    Inu[n] += dInu[n]
+    Inu[n] = max(Inu[n], 1.e-100)
+
+  for n in range(nnu - 1):
+    dE += 4.*np.pi/cgs['CL']*(dInu[n+1] + dInu[n])/2*(nus[n+1]-nus[n])
+
+  E[cycle+1] = E[cycle] + dE
+  u[cycle+1] = u[cycle] - dE
+  Tr[cycle+1] = pow(15.*cgs['CL']**3*cgs['HPL']**3*E[cycle+1]/(7.*cgs['KBOL']**4*np.pi**5*NSPECIES),1./4.)
+  Tg[cycle+1] = u[cycle+1]*mu*(gamma - 1.)/(rho0*cgs['KBOL'])
+
+
+  t[cycle+1] = t[cycle] + dt
+
+
+
+
+
+
+
 print(opac.alphanu(1., 1., 1., 1.))
 
 # Calculate analytic solution

@@ -15,8 +15,12 @@
 #include <string>
 
 #include "pgen/pgen.hpp"
+#include "radiation/radiation.hpp"
 
 namespace radiation_equilibration {
+
+using singularity::RadiationType;
+using radiation::species;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -56,24 +60,43 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  const auto opac_d =
+      pmb->packages.Get("opacity")->template Param<singularity::neutrinos::Opacity>(
+          "d.opacity");
+
+  const Real rho0 = pin->GetOrAddReal("radiation_equilibration", "rho0", 1.);
+  const Real Tg0 = pin->GetOrAddReal("radiation_equilibration", "Tg0", 1.);
+  const Real Tr0 = pin->GetOrAddReal("radiation_equilibration", "Tr0", 0.);
+  const Real Ye0 = pin->GetOrAddReal("radiation_equilibration", "Ye0", 0.5);
+
+  // Store runtime parameters for output
+  Params &phoebus_params = pmb->packages.Get("phoebus")->AllParams();
+  phoebus_params.Add("radiation_equilibration/rho0", rho0);
+  phoebus_params.Add("radiation_equilibration/Tg0", Tg0);
+  phoebus_params.Add("radiation_equilibration/Tr0", Tr0);
+  phoebus_params.Add("radiation_equilibration/Ye0", Ye0);
+
+  /// TODO: (BRR) Fix this junk
+  RadiationType dev_species[3] = {species[0], species[1], species[2]};
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::radiation_equilibration", kb.s, kb.e, jb.s, jb.e, ib.s,
       ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real rho = 1.0;
-        const Real T = 1.0;
-        const Real P = eos.PressureFromDensityTemperature(rho, T);
-        const Real eps = eos.InternalEnergyFromDensityTemperature(rho, T);
+        //const Real rho = 1.0;
+        //const Real T = 1.0;
+        const Real P = eos.PressureFromDensityTemperature(rho0, Tg0);
+        const Real eps = eos.InternalEnergyFromDensityTemperature(rho0, Tg0);
 
-        v(iRho, k, j, i) = rho;
-        v(iT, k, j, i) = T;
+        v(iRho, k, j, i) = rho0;
+        v(iT, k, j, i) = Tg0;
         v(iP, k, j, i) = P;
         v(iEps, k, j, i) = eps;
         SPACELOOP(ii) v(idv(ii), k, j, i) = 0.0;
 
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
           SPACELOOP(ii) v(idH(ii, ispec), k, j, i) = 0.0;
-          v(idJ(ispec), k, j, i) = J;
+          v(idJ(ispec), k, j, i) = opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
+          printf("J: %e\n", v(idJ(ispec), k, j, i));
         }
       });
 
