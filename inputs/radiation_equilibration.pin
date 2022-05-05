@@ -103,15 +103,13 @@ do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
 
-scattering_fraction = 0.0
-B_fake = 0.5
-use_B_fake = false
+#scattering_fraction = 0.0
+#B_fake = 0.5
+#use_B_fake = false
 
 <opacity>
-type = gray
+type = scalefree
 gray_kappa = 1.0
 
 <radiation_equilibration>
 J = 0.2
-ncool = 1
-nstep = 100

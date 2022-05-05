@@ -27,6 +27,8 @@ class UnitConversions {
  public:
   UnitConversions(ParameterInput *pin);
 
+  bool IsScaleFree() const { return scale_free_; }
+
   Real GetMassCodeToCGS() const { return mass_; }
   Real GetMassCGSToCode() const { return 1. / mass_; }
 
@@ -49,6 +51,7 @@ class UnitConversions {
   Real GetTemperatureCGSToCode() const { return 1. / temperature_; }
 
  private:
+  bool scale_free_;
   Real mass_;
   Real length_;
   Real time_;
