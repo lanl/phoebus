@@ -34,7 +34,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto v = rc->PackVariables(
       {radmoment_prim::J, radmoment_prim::H, radmoment_internal::xi,
        radmoment_internal::phi, fluid_prim::density, fluid_prim::temperature,
-       fluid_prim::pressure, fluid_prim::energy, fluid_prim::velocity},
+       fluid_prim::pressure, fluid_prim::energy, fluid_prim::ye, fluid_prim::velocity},
       imap);
 
   auto idJ = imap.GetFlatIdx(radmoment_prim::J);
@@ -45,7 +45,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iRho = imap[fluid_prim::density].first;
   const int iT = imap[fluid_prim::temperature].first;
   const int iP = imap[fluid_prim::pressure].first;
-  const int iEps = imap[fluid_prim::energy].first;
+  const int ieng = imap[fluid_prim::energy].first;
+  const int pye = imap[fluid_prim::ye].first;
   auto idv = imap.GetFlatIdx(fluid_prim::velocity);
 
   const auto specB = idJ.GetBounds(1);
@@ -66,8 +67,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const Real rho0 = pin->GetOrAddReal("radiation_equilibration", "rho0", 1.);
   const Real Tg0 = pin->GetOrAddReal("radiation_equilibration", "Tg0", 1.);
-  const Real Tr0 = pin->GetOrAddReal("radiation_equilibration", "Tr0", 0.);
-  const Real Ye0 = pin->GetOrAddReal("radiation_equilibration", "Ye0", 0.5);
+  const Real Tr0 = pin->GetOrAddReal("radiation_equilibration", "Tr0", 1.e-2);
+  const Real Ye0 = pin->GetOrAddReal("radiation_equilibration", "Ye0", 0.4);
 
   // Store runtime parameters for output
   Params &phoebus_params = pmb->packages.Get("phoebus")->AllParams();
@@ -82,21 +83,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::radiation_equilibration", kb.s, kb.e, jb.s, jb.e, ib.s,
       ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        //const Real rho = 1.0;
-        //const Real T = 1.0;
         const Real P = eos.PressureFromDensityTemperature(rho0, Tg0);
         const Real eps = eos.InternalEnergyFromDensityTemperature(rho0, Tg0);
 
         v(iRho, k, j, i) = rho0;
         v(iT, k, j, i) = Tg0;
         v(iP, k, j, i) = P;
-        v(iEps, k, j, i) = eps;
+        v(ieng, k, j, i) = v(iRho, k, j, i)*eps;
+        v(pye, k, j, i) = Ye0;
         SPACELOOP(ii) v(idv(ii), k, j, i) = 0.0;
 
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
           SPACELOOP(ii) v(idH(ii, ispec), k, j, i) = 0.0;
-          v(idJ(ispec), k, j, i) = opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
-          printf("J: %e\n", v(idJ(ispec), k, j, i));
+          v(idJ(ispec), k, j, i) = 0.2;//opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
         }
       });
 
