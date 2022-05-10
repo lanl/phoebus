@@ -19,8 +19,8 @@
 
 namespace radiation_equilibration {
 
-using singularity::RadiationType;
 using radiation::species;
+using singularity::RadiationType;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -89,13 +89,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(iRho, k, j, i) = rho0;
         v(iT, k, j, i) = Tg0;
         v(iP, k, j, i) = P;
-        v(ieng, k, j, i) = v(iRho, k, j, i)*eps;
+        v(ieng, k, j, i) = v(iRho, k, j, i) * eps;
         v(pye, k, j, i) = Ye0;
         SPACELOOP(ii) v(idv(ii), k, j, i) = 0.0;
 
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
           SPACELOOP(ii) v(idH(ii, ispec), k, j, i) = 0.0;
-          v(idJ(ispec), k, j, i) = 0.2;//opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
+          v(idJ(ispec), k, j, i) =
+              0.2; // opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
         }
       });
 
