@@ -69,7 +69,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("type", opacity_type);
 
+  bool scale_free = false;
   if (opacity_type == "scalefree") {
+    scale_free = true;
+
     const Real kappa = pin->GetReal("opacity", "gray_kappa");
     params.Add("gray_kappa", kappa);
 
@@ -77,6 +80,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     auto opacity_device = opacity_host.GetOnDevice();
     params.Add("h.opacity", opacity_host);
     params.Add("d.opacity", opacity_device);
+
   } else if (opacity_type == "tophat") {
     const Real C = pin->GetReal("opacity", "tophat_C");
     const Real numin = pin->GetReal("opacity", "tophat_numin");
@@ -116,25 +120,35 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   if (do_mean_opacity) {
     auto opacity_host = params.Get<singularity::neutrinos::Opacity>("h.opacity");
-    const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(0.1));
-    const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(10.));
-    const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
-    const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(0.1));
-    const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(10.));
-    const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
-    const Real YeMin = pin->GetOrAddReal("mean_opacity", "lyemin", 0.1);
-    const Real YeMax = pin->GetOrAddReal("mean_opacity", "lyemax", 0.5);
+    const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
+    const Real YeMax = pin->GetOrAddReal("mean_opacity", "yemax", 0.5);
     const int NYe = pin->GetOrAddInteger("mean_opacity", "nye", 10);
-    // TODO(BRR) Need to support either unity or CGS physical constants!
-    /*VMeanOpacity*/ MeanScaleFree vmean_opac_host(opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin, YeMax, NYe);
-    auto vmean_opac = vmean_opac_host.GetOnDevice();
-    MeanOpacity<singularity::PhysicalConstantsUnity> mean_opac_host(
-        opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin, YeMax, NYe);
-    auto mean_opac = mean_opac_host.GetOnDevice();
-    params.Add("h.mean_opacity", mean_opac_host);
-    params.Add("d.mean_opacity", mean_opac);
-
-    params.Add("h.vm", vmean_opac_host);
+    if (scale_free) {
+      const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(0.1));
+      const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(10.));
+      const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
+      const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(0.1));
+      const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(10.));
+      const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
+      MeanOpacity mean_opac_host = MeanOpacityScaleFree(
+          opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin, YeMax, NYe);
+      auto mean_opac_device = mean_opac_host.GetOnDevice();
+      params.Add("h.mean_opacity", mean_opac_host);
+      params.Add("d.mean_opacity", mean_opac_device);
+    } else {
+      const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(1.e5));
+      const Real lRhoMax =
+          pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(1.e14));
+      const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
+      const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(1.e5));
+      const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(1.e12));
+      const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
+      MeanOpacity mean_opac_host = MeanOpacityCGS(opacity_host, lRhoMin, lRhoMax, NRho,
+                                                  lTMin, lTMax, NT, YeMin, YeMax, NYe);
+      auto mean_opac_device = mean_opac_host.GetOnDevice();
+      params.Add("h.mean_opacity", mean_opac_host);
+      params.Add("d.mean_opacity", mean_opac_device);
+    }
   }
 
   return pkg;
