@@ -126,10 +126,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
             v(b, iPhi(ispec), k, j, i) = phi;
           }
         }
-        printf("E: %e covf; %e %e %e\n",
-        E, covF(0), covF(1), covF(2));
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
-        printf("J: %e covH: %e %e %e\n", J, covH(0), covH(1), covH(2));
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
@@ -233,8 +230,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         }
 
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
-        printf("J: %e covH: %e %e %e -> E: %e covF: %e %e %e\n",
-          J, covH(0), covH(1), covH(2), E, covF(0), covF(1), covF(2));
 
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
@@ -950,8 +945,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   // Get the device opacity object
   using namespace singularity::neutrinos;
   const auto &d_opacity = opac->Param<Opacity>("d.opacity");
-  const auto &d_mean_opacity = opac->Param<MeanOpacity<singularity::PhysicalConstantsUnity>>("d.mean_opacity");
-  const auto &vmo = opac->Param<VMeanOpacity>("h.vm");
+  const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
 
   // Get the background geometry
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -975,21 +969,19 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           ///             create a task to fill the opacity based on MoCMC or some other
           ///             rule.
           /// TOMAYBENOTDO: (BRR) Can't we just use kappaH and kappaJ?
-          //const Real enu = 10.0; // Assume we are gray for now or can take the peak
+          // const Real enu = 10.0; // Assume we are gray for now or can take the peak
           //                       // opacity at enu = 10 MeV
           const Real rho = v(iblock, prho, k, j, i);
           const Real Temp = v(iblock, pT, k, j, i);
           const Real Ye = v(iblock, pYe, k, j, i);
 
-          printf("rho: %e T: %e Ye: %e\n", rho, Temp, Ye);
-          Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Temp, Ye, dev_species[ispec]);
+          Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+              rho, Temp, Ye, dev_species[ispec]);
           Real JBB = d_opacity.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
 
           v(iblock, idx_JBB(ispec), k, j, i) = JBB;
           v(iblock, idx_kappaJ(ispec), k, j, i) = kappa * (1.0 - scattering_fraction);
           v(iblock, idx_kappaH(ispec), k, j, i) = kappa;
-          printf("JBB: %e kappaJ: %e kappaH: %e\n", JBB, v(iblock, idx_kappaJ(ispec), k, j, i),
-            v(iblock, idx_kappaH(ispec), k, j, i));
         }
       });
 
