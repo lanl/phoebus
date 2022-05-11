@@ -14,11 +14,12 @@
 #ifndef FIXUP_FIXUP_HPP_
 #define FIXUP_FIXUP_HPP_
 
+#include <cmath>
+#include <limits>
+
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
-
-#include <limits>
 
 namespace fixup {
 
@@ -35,6 +36,12 @@ static struct ExpX1RhoSieFloor {
 } exp_x1_rho_sie_floor_tag;
 static struct ExpX1RhoUFloor {
 } exp_x1_rho_u_floor_tag;
+static struct X1RhoSieFloor {
+} x1_rho_sie_floor_tag;
+static struct RRhoSieFloor {
+} r_rho_sie_floor_tag;
+
+enum class FloorFlag { ConstantRhoSie, ExpX1RhoSie, ExpX1RhoU, X1RhoSie, RRhoSie };
 
 class Floors {
  public:
@@ -42,32 +49,45 @@ class Floors {
       : Floors(constant_rho_sie_floor_tag, -std::numeric_limits<Real>::max(),
                -std::numeric_limits<Real>::max()) {}
   Floors(ConstantRhoSieFloor, const Real rho0, const Real sie0)
-      : r0_(rho0), s0_(sie0), floor_flag_(1) {}
+      : r0_(rho0), s0_(sie0), floor_flag_(FloorFlag::ConstantRhoSie) {}
   Floors(ExpX1RhoSieFloor, const Real rho0, const Real sie0, const Real rp, const Real sp)
-      : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(2) {}
+      : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp),
+        floor_flag_(FloorFlag::ExpX1RhoSie) {}
   Floors(ExpX1RhoUFloor, const Real rho0, const Real sie0, const Real rp, const Real sp)
-      : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(3) {
-    std::cout << "Initializing floor object!!!" << std::endl;
+      : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp),
+        floor_flag_(FloorFlag::ExpX1RhoU) {}
+  Floors(X1RhoSieFloor, const Real rho0, const Real sie0, const Real rp, const Real sp)
+      : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(FloorFlag::X1RhoSie) {
   }
+  Floors(RRhoSieFloor, const Real rho0, const Real sie0, const Real rp, const Real sp)
+      : r0_(rho0), s0_(sie0), ralpha_(rp), salpha_(sp), floor_flag_(FloorFlag::RRhoSie) {}
 
   KOKKOS_INLINE_FUNCTION
   void GetFloors(const Real x1, const Real x2, const Real x3, Real &rflr,
                  Real &sflr) const {
-    Real scratch;
     switch (floor_flag_) {
-    case 1:
+    case FloorFlag::ConstantRhoSie:
       rflr = r0_;
       sflr = s0_;
       break;
-    case 2:
-      rflr = r0_ * exp(ralpha_ * x1);
-      sflr = s0_ * exp(salpha_ * x1);
+    case FloorFlag::ExpX1RhoSie:
+      rflr = r0_ * std::exp(ralpha_ * x1);
+      sflr = s0_ * std::exp(salpha_ * x1);
       break;
-    case 3:
-      scratch = r0_ * exp(ralpha_ * x1);
-      sflr = s0_ * exp(salpha_ * x1) / std::max(rflr, scratch);
+    case FloorFlag::ExpX1RhoU: {
+      Real scratch = r0_ * std::exp(ralpha_ * x1);
+      sflr = s0_ * std::exp(salpha_ * x1) / std::max(rflr, scratch);
       rflr = scratch;
+    } break;
+    case FloorFlag::X1RhoSie:
+      rflr = r0_ * std::pow(x1, ralpha_);
+      sflr = s0_ * std::pow(x1, salpha_);
       break;
+    case FloorFlag::RRhoSie: {
+      Real r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
+      rflr = r0_ * std::pow(r, ralpha_);
+      sflr = s0_ * std::pow(r, salpha_);
+    } break;
     default:
       PARTHENON_FAIL("No valid floor set.");
     }
@@ -75,7 +95,7 @@ class Floors {
 
  private:
   Real r0_, s0_, ralpha_, salpha_;
-  const int floor_flag_;
+  const FloorFlag floor_flag_;
 };
 
 static struct ConstantGamSieCeiling {
