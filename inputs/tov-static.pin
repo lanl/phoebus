@@ -1,4 +1,4 @@
-# © 2021. Triad National Security, LLC. All rights reserved.  This
+# © 2021-2022. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
 # National Security, LLC for the U.S.  Department of Energy/National
@@ -11,11 +11,13 @@
 # publicly and display publicly, and to permit others to do so.
 
 # Tohlmann-Oppenheimer-Volkov star in hydrostatic equilibrium
+# This version uses a very compact star in the unstable branch
+# of the TOV solution. If the metric is allowed to evolve, a horizon
+# will form and the simulation will crash. Run this one
+# with a static metric, e.g., in the Cowling approximation.
 
 <phoebus>
 problem = tov
-#ix1_bc = outflow
-#ox1_bc = reflect
 ix1_bc = reflect
 ox1_bc = outflow
 
@@ -106,18 +108,14 @@ recon = weno5
 c2p_max_iter = 1000
 Ye = false
 
-# Fixups aren't necessary for this problem,
-# especially with the Cowling approximation
-# and reflecting outer boundary.
-# But they also don't do any harm.
 <fixup>
 enable_floors = true
 enable_ceilings = true
-enable_flux_fixup = false
+enable_flux_fixup = true
 enable_c2p_fixup = true
-floor_type = ConstantRhoSie
-rho0_floor = 1.0e-12
-sie0_floor = 1.0e-12
+floor_type = X1RhoSie
+rho0_floor = 1.0e-8
+sie0_floor = 1.0e-3
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
@@ -136,13 +134,13 @@ run_n_times = -1
 
 <tov>
 enabled = true
-Pc = 1e-6
+Pc = 1e-2
 entropy = 8
 # pressure below which we terminate the TOV solver and transition to atmosphere
-Pmin = 1e-10
+Pmin = 1e-9
 # The atmosphere values in the problem generator for density and energy
-rhomin = 1e-12
-epsmin = 1e-12
+rhomin = 1e-10
+epsmin = 1e-10
 # Velocity perturbation
 vpert_amp = 0
 vpert_radius = 5
