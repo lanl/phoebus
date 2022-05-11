@@ -1,4 +1,4 @@
-# © 2021. Triad National Security, LLC. All rights reserved.  This
+# © 2021-2022. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
 # National Security, LLC for the U.S.  Department of Energy/National
@@ -14,9 +14,8 @@
 
 <phoebus>
 problem = tov
-bc_ix1 = reflect
-bc_ox1 = reflect  # reflecting outer boundary a bit better behaved
-#bc_ox1 = outflow # but outflow and reflecting both work fine
+ix1_bc = reflect
+ox1_bc = outflow
 
 <parthenon/job>
 problem_id  = tov # problem ID: basename of output filenames
@@ -42,11 +41,11 @@ variables = p.density,  &
 	    src_terms
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1         # time increment between outputs
+dt          = 5         # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 1000      # time limit
+tlim        = 5000      # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -56,7 +55,7 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 512         # Number of zones in X1-direction
+nx1         = 1024        # Number of zones in X1-direction
 x1min       = 0           # minimum value of X1
 x1max       = 250         # maximum value of X1
 ix1_bc      = user        # Inner-X1 boundary condition flag
@@ -77,7 +76,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 512
+nx1 = 1024
 nx2 = 1
 nx3 = 1
 
@@ -105,18 +104,14 @@ recon = weno5
 c2p_max_iter = 1000
 Ye = false
 
-# Fixups aren't necessary for this problem,
-# especially with the Cowling approximation
-# and reflecting outer boundary.
-# But they also don't do any harm.
 <fixup>
 enable_floors = true
 enable_ceilings = true
-enable_flux_fixup = false
+enable_flux_fixup = true
 enable_c2p_fixup = true
-floor_type = ConstantRhoSie
-rho0_floor = 1.0e-9
-sie0_floor = 1.0e-9
+floor_type = X1RhoSie
+rho0_floor = 1.0e-8
+sie0_floor = 1.0e-3
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
@@ -125,7 +120,7 @@ gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
-npoints = 4096
+npoints = 2048
 rout = 250
 # Disables time derivatives. Runs only at initialization
 force_static = false
@@ -146,7 +141,7 @@ enabled = true
 Pc = 1e-6
 entropy = 8
 # pressure below which we terminate the TOV solver and transition to atmosphere
-Pmin = 1e-12 
+Pmin = 1e-10
 # The atmosphere values in the problem generator for density and energy
 rhomin = 1e-12
 epsmin = 1e-12
