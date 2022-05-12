@@ -222,6 +222,7 @@ void MOCMCInitSamples(T *rc) {
               Inuinv(nubin, s, n) = std::max<Real>(
                   robust::SMALL(),
                   d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3));
+              printf("Inuinv(%i, %i, %i) = %e\n", nubin, s, n, Inuinv(nubin, s, n));
             }
           }
         }

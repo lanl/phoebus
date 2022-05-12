@@ -76,9 +76,9 @@ files = sorted(files)
 
 # Set up unit conversions
 file0 = phdf.phdf(files[0])
-L_unit = file0.Params['eos/length_unit']
-T_unit = file0.Params['eos/time_unit']
-M_unit = file0.Params['eos/mass_unit']
+L_unit = file0.Params['phoebus/LengthCodeToCGS']
+T_unit = file0.Params['phoebus/TimeCodeToCGS']
+M_unit = file0.Params['phoebus/MassCodeToCGS']
 scale_free = True
 if not np.isclose(L_unit, 1.) or not np.isclose(T_unit, 1.) or not np.isclose(M_unit, 1.):
   scale_free = False
