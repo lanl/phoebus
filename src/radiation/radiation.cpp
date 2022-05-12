@@ -55,6 +55,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_FAIL(msg);
   }
 
+  bool is_frequency_dependent = (method == "monte_carlo" || method == "mocmc");
+
   // Set which neutrino species to include in simulation
   bool do_nu_electron = pin->GetOrAddBoolean("radiation", "do_nu_electron", true);
   params.Add("do_nu_electron", do_nu_electron);
@@ -73,22 +75,28 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("cfl", cfl);
 
   // Get fake value for integrated BB for testing
-  Real B_fake = pin->GetOrAddReal("radiation", "B_fake", 1.0);
-  params.Add("B_fake", B_fake);
-  bool use_B_fake = pin->GetOrAddBoolean("radiation", "use_B_fake", false);
-  params.Add("use_B_fake", use_B_fake);
+  //Real B_fake = pin->GetOrAddReal("radiation", "B_fake", 1.0);
+  //params.Add("B_fake", B_fake);
+  //bool use_B_fake = pin->GetOrAddBoolean("radiation", "use_B_fake", false);
+  //params.Add("use_B_fake", use_B_fake);
   Real scattering_fraction = pin->GetOrAddReal("radiation", "scattering_fraction", 0.0);
   params.Add("scattering_fraction", scattering_fraction);
 
   // Initialize frequency discretization
-  Real nu_min = pin->GetReal("radiation", "nu_min");
-  params.Add("nu_min", nu_min);
-  Real nu_max = pin->GetReal("radiation", "nu_max");
-  params.Add("nu_max", nu_max);
-  int nu_bins = pin->GetInteger("radiation", "nu_bins");
-  params.Add("nu_bins", nu_bins);
-  Real dlnu = (log(nu_max) - log(nu_min)) / nu_bins;
-  params.Add("dlnu", dlnu);
+  Real nu_min;
+  Real nu_max;
+  int nu_bins;
+  Real dlnu;
+  if (is_frequency_dependent) {
+    nu_min = pin->GetReal("radiation", "nu_min");
+    params.Add("nu_min", nu_min);
+    nu_max = pin->GetReal("radiation", "nu_max");
+    params.Add("nu_max", nu_max);
+    nu_bins = pin->GetInteger("radiation", "nu_bins");
+    params.Add("nu_bins", nu_bins);
+    dlnu = (log(nu_max) - log(nu_min)) / nu_bins;
+    params.Add("dlnu", dlnu);
+  }
 
   int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
   params.Add("num_species", num_species);

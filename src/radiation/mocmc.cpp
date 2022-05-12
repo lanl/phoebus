@@ -222,7 +222,7 @@ void MOCMCInitSamples(T *rc) {
               Inuinv(nubin, s, n) = std::max<Real>(
                   robust::SMALL(),
                   d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3));
-              printf("Inuinv(%i, %i, %i) = %e\n", nubin, s, n, Inuinv(nubin, s, n));
+              Inuinv(nubin, s, n) = 1.;
             }
           }
         }
@@ -736,11 +736,11 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
             // Add source corrections to conserved fluid variables
             if (update_fluid) {
-              v(iblock, cye, k, j, i) -= sdetgam * 0.0;
-              v(iblock, ceng, k, j, i) -= sdetgam * dE;
-              v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
-              v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
-              v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
+              //v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+              //v(iblock, ceng, k, j, i) -= sdetgam * dE;
+              //v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
+              //v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
+              //v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
             }
 
             // Update sample intensities

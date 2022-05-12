@@ -112,7 +112,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
                      v(b, cF(ispec, 2), k, j, i) * isdetgam}};
 
         if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
+          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = 0.;}//v(b, iTilPi(ispec, ii, jj), k, j, i); }
         } else {
           Real xi = 0.0;
           Real phi = pi;
@@ -224,7 +224,7 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
                      v(b, pH(ispec, 2), k, j, i) * J}};
 
         if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
+          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = 0.;}//v(b, iTilPi(ispec, ii, jj), k, j, i); }
         } else {
           c.GetCovTilPiFromPrim(J, covH, &conTilPi);
         }
@@ -294,7 +294,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
       rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
   std::vector<std::string> variables = {pr::J, pr::H};
   if (eddington_known) {
-    variables.push_back(ir::tilPi);
+  //  variables.push_back(ir::tilPi);
   }
   variables.push_back(ir::dJ);
   VariablePack<Real> v = rc->PackVariables(variables, imap);
@@ -302,7 +302,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   auto idx_dJ = imap.GetFlatIdx(ir::dJ);
   vpack_types::FlatIdx iTilPi({-1}, -1);
   if (eddington_known) {
-    iTilPi = imap.GetFlatIdx(ir::tilPi);
+    //iTilPi = imap.GetFlatIdx(ir::tilPi);
   }
 
   ParArrayND<Real> ql_v = rc->Get(ir::ql_v).data;
@@ -314,7 +314,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   const int nspec = qIdx.DimSize(1);
   int nrecon = 4 * nspec;
   if (eddington_known) {
-    nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
+    //nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
   }
 
   const int offset = imap_ql[ir::ql].first;
@@ -562,8 +562,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
             // Use reconstructed values of tilPi
             SPACELOOP2(ii, jj) {
-              con_tilPil(ii, jj) = v(idx_ql(ispec, 4 + ii + 3 * jj, idir), k, j, i);
-              con_tilPir(ii, jj) = v(idx_qr(ispec, 4 + ii + 3 * jj, idir), k, j, i);
+              con_tilPil(ii, jj) = 0.;//v(idx_ql(ispec, 4 + ii + 3 * jj, idir), k, j, i);
+              con_tilPir(ii, jj) = 0.;//v(idx_qr(ispec, 4 + ii + 3 * jj, idir), k, j, i);
             }
           } else {
             cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
@@ -735,7 +735,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
           if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
             SPACELOOP2(ii, jj) {
-              con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+              con_tilPi(ii, jj) = 0.;//v(iblock, iTilPi(ispec, ii, jj), k, j, i);
             }
           } else {
             c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
@@ -869,7 +869,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           }};
           Tens2 con_tilPi;
 
-          // TODO(BRR) Use stored value if Eddington is known
           c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
 
           Real B = v(iblock, idx_JBB(ispec), k, j, i);
