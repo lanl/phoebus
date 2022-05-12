@@ -29,7 +29,7 @@ dt          = 1.e-1     # time increment between outputs
 
 <parthenon/time>
 nlim        = -1      # cycle limit
-tlim        = 1.e0    # time limit
+tlim        = 0.14 # 1.e0    # time limit
 integrator  = rk2     # time integration algorithm
 ncycle_out  = 1       # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -39,7 +39,7 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 512      # Number of zones in X1-direction
+nx1         = 32      # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1        # maximum value of X1
 ix1_bc      = user     # Inner-X1 boundary condition flag
@@ -62,7 +62,7 @@ num_threads = 1         # maximum number of OMP threads
 bc_vars = primitive
 
 <parthenon/meshblock>
-nx1 = 512
+nx1 = 32
 nx2 = 1
 nx3 = 1
 
@@ -92,21 +92,20 @@ Ye = true
 
 <radiation>
 cfl = 0.5
-method = moment_m1
-nu_min = 1.e15
-nu_max = 1.e22
-nu_bins = 200
+#method = moment_m1
+method = mocmc
+nu_min = 1.e-2
+nu_max = 1.e2
+nu_bins = 10
 absorption = true
 do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
 
 scattering_fraction = 1.0
-B_fake = 0.5
-use_B_fake = true
 
 <opacity>
-type = scalefree
+type = gray
 gray_kappa = 1.e3
 
 <radiation_advection>

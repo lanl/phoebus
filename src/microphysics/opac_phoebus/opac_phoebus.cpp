@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -40,6 +40,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return pkg;
   }
 
+  const bool scale_free = pin->GetOrAddBoolean("units", "scale_free", true);
+
   const std::string radiation_method = pin->GetString("radiation", "method");
   std::set<std::string> gray_methods = {"moment_eddington", "moment_m1"};
   bool do_mean_opacity = false;
@@ -56,7 +58,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   double temp_unit = unit_conv.GetTemperatureCodeToCGS();
 
   std::string opacity_type = pin->GetString(block_name, "type");
-  std::set<std::string> known_opacity_types = {"scalefree", "tophat", "gray", "tabular"};
+  std::set<std::string> known_opacity_types = {"tophat", "gray", "tabular"};
   if (!known_opacity_types.count(opacity_type)) {
     std::stringstream msg;
     msg << "Opacity model \"" << opacity_type << "\" not recognized!";
@@ -69,25 +71,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("type", opacity_type);
 
-  bool scale_free = false;
-  if (opacity_type == "scalefree") {
-    scale_free = true;
-
-    const Real kappa = pin->GetReal("opacity", "gray_kappa");
-    params.Add("gray_kappa", kappa);
-
-    singularity::neutrinos::Opacity opacity_host = ScaleFree(kappa);
-    auto opacity_device = opacity_host.GetOnDevice();
-    params.Add("h.opacity", opacity_host);
-    params.Add("d.opacity", opacity_device);
-
-  } else if (opacity_type == "tophat") {
+  if (opacity_type == "tophat") {
     const Real C = pin->GetReal("opacity", "tophat_C");
     const Real numin = pin->GetReal("opacity", "tophat_numin");
     const Real numax = pin->GetReal("opacity", "tophat_numax");
     params.Add("C", C);
     params.Add("numin", numin);
     params.Add("numax", numax);
+
+    PARTHENON_REQUIRE(!scale_free, "Must have CGS scaling for tophat opacities!");
 
     singularity::neutrinos::Opacity opacity_host = NonCGSUnits<Tophat>(
         Tophat(C, numin, numax), time_unit, mass_unit, length_unit, temp_unit);
@@ -98,15 +90,24 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     const Real kappa = pin->GetReal("opacity", "gray_kappa");
     params.Add("gray_kappa", kappa);
 
-    singularity::neutrinos::Opacity opacity_host =
-        NonCGSUnits<Gray>(Gray(kappa), time_unit, mass_unit, length_unit, temp_unit);
-    auto opacity_device = opacity_host.GetOnDevice();
-    params.Add("h.opacity", opacity_host);
-    params.Add("d.opacity", opacity_device);
+    if (scale_free) {
+      singularity::neutrinos::Opacity opacity_host = ScaleFree(kappa);
+      auto opacity_device = opacity_host.GetOnDevice();
+      params.Add("h.opacity", opacity_host);
+      params.Add("d.opacity", opacity_device);
+    } else {
+      singularity::neutrinos::Opacity opacity_host =
+          NonCGSUnits<Gray>(Gray(kappa), time_unit, mass_unit, length_unit, temp_unit);
+      auto opacity_device = opacity_host.GetOnDevice();
+      params.Add("h.opacity", opacity_host);
+      params.Add("d.opacity", opacity_device);
+    }
   } else if (opacity_type == "tabular") {
 #ifdef SPINER_USE_HDF
     const std::string filename = pin->GetString("opacity", "filename");
     params.Add("filename", filename);
+
+    PARTHENON_REQUIRE(!scale_free, "Must have CGS scaling for tabular opacities!");
 
     singularity::neutrinos::Opacity opacity_host = NonCGSUnits<SpinerOpac>(
         SpinerOpac(filename), time_unit, mass_unit, length_unit, temp_unit);

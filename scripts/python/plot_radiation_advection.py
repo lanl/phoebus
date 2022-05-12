@@ -143,6 +143,9 @@ else:
 plt_ax.set_xlim([xl, xh])
 plt_ax.set_ylim([yl, yh])
 
+etot = sum(J[0, iz, iy, :, ispec])
+print("etot: ", etot)
+
 plt_ax.text(0.05*(xh-xl)+xl, 0.95*(yh-yl)+yl, '$\kappa={}$'.format(kappa))
 
 if args.savefig:
