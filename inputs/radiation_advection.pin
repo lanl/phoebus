@@ -106,7 +106,7 @@ B_fake = 0.5
 use_B_fake = true
 
 <opacity>
-type = gray
+type = scalefree
 gray_kappa = 1.e3
 
 <radiation_advection>

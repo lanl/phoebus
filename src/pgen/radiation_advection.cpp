@@ -158,25 +158,25 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 }
 
 void ProblemModifier(ParameterInput *pin) {
-  const std::string method = pin->GetOrAddString("radiation", "method", "None");
-  if (method == "monte_carlo" || method == "mocmc") {
-    pin->SetBoolean("units", "scale_free", false);
-    pin->SetPrecise("units", "geom_length_cm", 1.e10);
-    pin->SetPrecise("units", "fluid_mass_g", 1.e40);
-  }
+  //const std::string method = pin->GetOrAddString("radiation", "method", "None");
+  //if (method == "monte_carlo" || method == "mocmc") {
+  //  pin->SetBoolean("units", "scale_free", false);
+  //  pin->SetPrecise("units", "geom_length_cm", 1.e10);
+  //  pin->SetPrecise("units", "fluid_mass_g", 1.e40);
+  //}
 
   auto unit_conv = phoebus::UnitConversions(pin);
-  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
-  const bool scale_free = pin->GetOrAddBoolean("units", "scale_free", true);
+  //const Real LENGTH = unit_conv.GetLengthCodeToCGS();
+  //const bool scale_free = pin->GetOrAddBoolean("units", "scale_free", true);
   const Real rho0 = 1. * unit_conv.GetMassDensityCodeToCGS();
 
-  const Real Gamma = pin->GetReal("eos", "Gamma");
-  const Real cv = scale_free ? 1. : (Gamma - 1.) * pc::kb / pc::mp;
-  pin->SetPrecise("eos", "Cv", cv);
+  //const Real Gamma = pin->GetReal("eos", "Gamma");
+  //const Real cv = scale_free ? 1. : (Gamma - 1.) * pc::kb / pc::mp;
+  //pin->SetPrecise("eos", "Cv", cv);
 
   const Real dx1 = (pin->GetReal("parthenon/mesh", "x1max") -
                     pin->GetReal("parthenon/mesh", "x1min")) *
-                   LENGTH;
+                   unit_conv.GetLengthCodeToCGS();
 
   // Optical depth over the entire X1 simulation region
   const Real tau = pin->GetOrAddReal("radiation_advection", "tau", 1.e3);
