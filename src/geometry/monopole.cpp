@@ -110,7 +110,8 @@ MplCartMeshBlock GetCoordinateSystem<MplCartMeshBlock>(MeshBlockData<Real> *rc) 
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
 
-  Real dxfd = pkg->Param<Real>("dxfd");
+  auto &geom_pkg = rc->GetParentPointer()->packages.Get("geometry");
+  Real dxfd = geom_pkg->Param<Real>("dxfd");
   auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
 
   return MplCartMeshBlock(indexer, dxfd, transformation, hypersurface, alpha, beta,
@@ -130,7 +131,8 @@ MplCartMesh GetCoordinateSystem<MplCartMesh>(MeshData<Real> *rc) {
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
 
-  Real dxfd = pkg->Param<Real>("dxfd");
+  auto &geom_pkg = rc->GetParentPointer()->packages.Get("geometry");
+  Real dxfd = geom_pkg->Param<Real>("dxfd");
   auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
 
   return MplCartMesh(indexer, dxfd, transformation, hypersurface, alpha, beta, gradients,
