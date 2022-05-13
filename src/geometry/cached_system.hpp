@@ -504,7 +504,7 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
   bool do_fd_on_grid_pin = pin->GetOrAddBoolean("geometry", "do_fd_on_grid", false);
   if (params.hasKey("do_fd_on_grid")) {
     do_fd_on_grid = params.Get<bool>("do_fd_on_grid");
-    if (parthenon::Globals::my_rank == 0) {
+    if ((do_fd_on_grid != do_fd_on_grid_pin) && parthenon::Globals::my_rank == 0) {
       std::stringstream ss;
       ss << "do_fd_on_grid set by input deck as " << do_fd_on_grid_pin
          << " but set by the geometry class to be " << do_fd_on_grid
