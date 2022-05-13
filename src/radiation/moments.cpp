@@ -37,6 +37,11 @@ class ReconstructionIndexer {
   Real &operator()(const int idir, const int ivar, const int k, const int j,
                    const int i) const {
     const int idx = idir * chunk_size_ + ivar + offset_;
+    if (idir == 0 && ivar == 0) {
+      printf("idir: %i ivar: %i k: %i j: %i i: %i\n", idir, ivar, k, j, i);
+      printf("chunk_size_: %i offset_: %i\n", chunk_size_, offset_);
+      printf("block_: %i idx: %i\n", block_, idx);
+    }
     return v_(block_, idx, k, j, i);
   }
 
@@ -231,6 +236,11 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
 
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
+        if (i == 18) {
+          printf("J: %e covH: %e %e %e\n", J, covH(0), covH(1), covH(2));
+          printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
+        }
+
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
@@ -369,6 +379,21 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         if (ndim > 2)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
 
+          if (n == 0)
+          {
+          for (int i = 16; i < 21; i++) {
+            printf("pv: %e %e %e\n", pvim1[i], pv[i], pvip1[i]);
+          printf("[%i:%i][%i] vi_l: %e vi_r: %e\n", i,
+            n, var_id, vi_l[i], vi_r[i]);
+          printf("[%i:%i][%i] ql_v: %e qr_v: %e\n", i,
+            0, 0, ql(0, 0, k, j, 1  + i), qr(0, 0, k, j, i));
+
+          if (vi_r[i] > 4.e-2 && vi_r[i] < 5.e-2) {
+            printf("!!!!!!!!!!!!!\n\n\n");
+          }
+          }
+        }
+
         // Calculate spatial derivatives of J at zone faces for diffusion limit
         //    x-->
         //    +---+---+
@@ -403,6 +428,9 @@ TaskStatus ReconstructEdgeStates(T *rc) {
           parthenon::par_for_inner(
               DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ib.e + 1, [&](const int i) {
                 dJdx[i] = (J[i] - J[i - 1]) * idx;
+                if (i == 18) {
+                  printf("J = %e Jm1 = %e dJdx = %e\n", J[i], J[i-1], dJdx[i]);
+                }
                 dJdy[i] = (Jjp1[i] + Jjp1[i - 1] - Jjm1[i] - Jjm1[i - 1]) * idy4;
                 dJdz[i] = (Jkp1[i] + Jkp1[i - 1] - Jkm1[i] - Jkm1[i - 1]) * idz4;
               });
@@ -603,6 +631,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
+
+              if (i == 18) {
+                printf("Jl: %e Jr: %e\n", Jl, Hr);
+                printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2));
+                printf("flux(%i, E(%i), k, j, i) = %e\n", idir_in, ispec, v.flux(idir_in, idx_Ef(ispec), k, j, i));
+              }
 
           SPACELOOP(ii)
           v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
@@ -881,6 +915,16 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
           for (int idir = 0; idir < 3; ++idir) {
             v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
+          }
+
+          if (i == 18) {
+            printf("Estar: %e Fstar: %e %e %e B: %e\n", Estar, cov_Fstar(0),
+              cov_Fstar(1), cov_Fstar(2), B);
+            printf("dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
+            printf("E: %e + %e = %e\n",
+              v(iblock, idx_E(ispec), k, j, i), sdetgam * dE,
+              v(iblock, idx_E(ispec), k, j, i) + sdetgam * dE);
+            exit(-1);
           }
 
           // Add source corrections to conserved fluid variables
