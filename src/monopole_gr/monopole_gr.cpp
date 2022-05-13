@@ -167,9 +167,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("integration_volumes_h", integration_vols_h);
   params.Add("hypersurface", hypersurface);
   params.Add("hypersurface_h", hypersurface_h);
-  params.Add("lapse", alpha);
   params.Add("lapse_h", alpha_h);
-  params.Add("lapse_last", alpha_last);
+  // Lapse is mutable because we swap between alpha and alpha_last
+  params.Add("lapse", alpha, true);
+  params.Add("lapse_last", alpha_last, true);
   // mutable because the reducer is stateful
   params.Add("matter_reducer", matter_reducer, true);
   params.Add("volumes_reducer", volumes_reducer, true);
@@ -416,10 +417,13 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   Kokkos::deep_copy(hypersurface, hypersurface_h);
 
   auto alpha = params.Get<Alpha_t>("lapse");
-
-  // Copy old data from alpha into alpha_last
   auto alpha_last = params.Get<Alpha_t>("lapse_last");
+
+  // Swap alpha and alpha last
+  // Params must be updated with new references.
   std::swap(alpha, alpha_last);
+  params.Update("lapse", alpha);
+  params.Update("lapse_last", alpha_last);
 
   auto alpha_h = params.Get<Alpha_host_t>("lapse_h");
   Kokkos::deep_copy(alpha, alpha_h);
