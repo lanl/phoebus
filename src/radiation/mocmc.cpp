@@ -663,7 +663,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                           v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
             Tens2 con_tilPi;
             SPACELOOP2(ii, jj) {
-              con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+              con_tilPi(ii, jj) = 0.;//v(iblock, iTilPi(ispec, ii, jj), k, j, i);
             }
             Real JBB = opac_d.EnergyDensityFromTemperature(v(iblock, pT, k, j, i),
                                                            dev_species[ispec]);
@@ -732,6 +732,23 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
             for (int idir = 0; idir < 3; ++idir) {
               v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
+            }
+            if (i == 18) {
+              SPACELOOP(ii) {
+                SPACELOOP(jj) {
+                  printf("%e ", con_tilPi(ii, jj));
+                }
+                printf("\n");
+              }
+              printf("\n");
+            printf("Estar: %e Fstar: %e %e %e B: %e\n", Estar, cov_Fstar(0),
+              cov_Fstar(1), cov_Fstar(2), JBB);
+            printf("dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
+              printf("tauJ: %e tauH: %e dE: %e\n", tauJ, tauH, dE);
+              printf("E: %e + %e = %e\n",
+              v(iblock, idx_E(ispec), k, j, i), sdetgam * dE, v(iblock, idx_E(ispec), k, j, i) + sdetgam * dE);
+              if (dE > 0.)
+              exit(-1);
             }
 
             // Add source corrections to conserved fluid variables

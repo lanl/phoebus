@@ -343,7 +343,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     /// of more dependency
     int nrecon = 4;
     if (method == "mocmc") {
-      nrecon += 9; // Reconstruct conTilPi // TODO(BRR) Use 6 elements by symmetry
+      //nrecon += 9; // Reconstruct conTilPi // TODO(BRR) Use 6 elements by symmetry
     }
     Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                std::vector<int>{NumRadiationTypes, nrecon, ndim});
