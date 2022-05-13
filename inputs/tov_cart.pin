@@ -14,6 +14,8 @@
 
 <phoebus>
 problem = tov
+ix1_bc = outflow
+ox1_bc = outflow
 
 <parthenon/job>
 problem_id  = tov # problem ID: basename of output filenames
@@ -39,11 +41,15 @@ variables = p.density,  &
 	    src_terms
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1         # time increment between outputs
+dt          = 100       # time increment between outputs
+
+<parthenon/output2>
+file_type = hst
+dt = 10
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 1000      # time limit
+tlim        = 2000      # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -53,19 +59,19 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 250         # Number of zones in X1-direction
+nx1         = 200         # Number of zones in X1-direction
 x1min       = -100        # minimum value of X1
 x1max       = 100         # maximum value of X1
 ix1_bc      = periodic    # Inner-X1 boundary condition flag
 ox1_bc      = periodic    # Outer-X1 boundary condition flag
 
-nx2         = 250           # Number of zones in X2-direction
+nx2         = 200           # Number of zones in X2-direction
 x2min       = -100          # minimum value of X2
 x2max       = 100           # maximum value of X2. Pi
 ix2_bc      = periodic      # Inner-X2 boundary condition flag
 ox2_bc      = periodic      # Outer-X2 boundary condition flag
 
-nx3         = 250           # Number of zones in X3-direction
+nx3         = 200           # Number of zones in X3-direction
 x3min       = -100          # minimum value of X3
 x3max       = 100           # maximum value of X3. 2*pi
 ix3_bc      = periodic      # Inner-X3 boundary condition flag
@@ -74,9 +80,9 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 64
-nx2 = 64
-nx3 = 64
+nx1 = 200
+nx2 = 200
+nx3 = 200
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -102,28 +108,28 @@ recon = weno5
 c2p_max_iter = 1000
 Ye = false
 
-# Fixups aren't necessary for this problem,
-# especially with the Cowling approximation
-# and reflecting outer boundary.
-# But they also don't do any harm.
 <fixup>
 enable_floors = true
 enable_ceilings = true
-enable_flux_fixup = false
+enable_flux_fixup = true
 enable_c2p_fixup = true
-floor_type = ConstantRhoSie
-rho0_floor = 1.0e-9
-sie0_floor = 1.0e-9
+floor_type = X1RhoSie
+rho0_floor = 1.0e-8
+sie0_floor = 1.0e-3
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
 sie0_ceiling = 10.0;
 gam0_ceiling = 10.0;
 
+<geometry>
+do_fd_on_grid = true
+finite_differences_dx = 1e-8
+
 <monopole_gr>
 enabled = true
-npoints = 1024
-rout = 100
+npoints = 2048
+rout = 250
 # Disables time derivatives. Runs only at initialization
 force_static = true
 # Runs the first n subcycles. Then freezes. Source terms are not disabled.

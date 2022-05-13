@@ -43,6 +43,10 @@ variables = p.density,  &
 file_type   = hdf5      # Tabular data dump
 dt          = 5         # time increment between outputs
 
+<parthenon/output2>
+file_type = hst
+dt = 1
+
 <parthenon/time>
 nlim        = -1        # cycle limit
 tlim        = 5000      # time limit
