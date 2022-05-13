@@ -95,8 +95,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto ReducePress = [](MeshData<Real> *md) {
     return History::ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::pressure, 0);
   };
+  auto ReduceDens = [](MeshData<Real> *md) {
+    return History::ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::density, 0);
+  };
   parthenon::HstVar_list hst_vars = {};
   hst_vars.emplace_back(parthenon::HistoryOutputVar(HstMax, ReducePress, "max pressure"));
+  hst_vars.emplace_back(parthenon::HistoryOutputVar(HstMax, ReduceDens, "max Density"));
   params.Add(parthenon::hist_param_key, hst_vars);
 
   return tov;

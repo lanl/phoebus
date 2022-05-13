@@ -18,6 +18,7 @@
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
+#include "phoebus_utils/history.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
@@ -260,6 +261,33 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, c2p_scratch_size);
   physics->AddField(impl::c2p_scratch, c2p_meta);
 
+  // Reductions
+  // By default compute integrated value of scalar conserved vars
+  auto HstSum = parthenon::UserHistoryOperation::sum;
+  using History::ReduceOneVar;
+  using parthenon::HistoryOutputVar;
+  parthenon::HstVar_list hst_vars = {};
+
+  auto ReduceMass = [](MeshData<Real> *md) {
+    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::density, 0);
+  };
+  auto ReduceEn = [](MeshData<Real> *md) {
+    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::energy, 0);
+  };
+  hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceMass, "total baryon number"));
+  hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceEn, "total conserved energy tau"));
+
+  for (int d = 0; d < 3; ++d) {
+    auto ReduceMom = [d](MeshData<Real> *md) {
+      return History::ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::momentum, d);
+    };
+    hst_vars.emplace_back(HistoryOutputVar(
+        HstSum, ReduceMom, "total X" + std::to_string(d + 1) + " momentum"));
+  }
+
+  params.Add(parthenon::hist_param_key, hst_vars);
+
+  // Fill Derived and Estimate Timestep
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
