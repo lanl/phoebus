@@ -28,7 +28,7 @@ file_type   = hdf5      # Tabular data dump
 dt          = 1.e-1     # time increment between outputs
 
 <parthenon/time>
-nlim        = 1      # cycle limit
+nlim        = -1      # cycle limit
 tlim        = 0.14 # 1.e0    # time limit
 integrator  = rk2     # time integration algorithm
 ncycle_out  = 1       # interval for stdout summary info
@@ -92,6 +92,7 @@ Ye = true
 
 <radiation>
 cfl = 0.5
+#method = moment_eddington
 #method = moment_m1
 method = mocmc
 nu_min = 1.e-2
