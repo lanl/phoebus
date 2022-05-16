@@ -43,8 +43,12 @@ class Interpolation {
   Interpolation(const int nSupport, const Real dx, const Real shift)
       : nSupport_(nSupport), dx_(dx), shift_(shift), ishift_(std::round(shift)) {}
 
-  virtual void GetIndicesAndWeights(const int i, int *idx, Real *wgt) = 0;
-  virtual int constexpr StencilSize() = 0;
+  KOKKOS_INLINE_FUNCTION
+  virtual void GetIndicesAndWeights(const int i, int *idx, Real *wgt) const {}
+  KOKKOS_INLINE_FUNCTION
+  virtual int StencilSize() const { return 0; }
+
+  static constexpr int maxStencilSize = 2;
 
  protected:
   const int nSupport_;
@@ -60,7 +64,7 @@ class PiecewiseConstant : public Interpolation {
       : Interpolation(nSupport, dx, shift) {}
 
   KOKKOS_INLINE_FUNCTION
-  void GetIndicesAndWeights(const int i, int *idx, Real *wgt) override {
+  void GetIndicesAndWeights(const int i, int *idx, Real *wgt) const override {
     idx[0] = i + ishift_;
     wgt[0] = 1.;
     if (idx[0] < 0 || idx[0] >= nSupport_) {
@@ -70,7 +74,7 @@ class PiecewiseConstant : public Interpolation {
   }
 
   KOKKOS_INLINE_FUNCTION
-  int constexpr StencilSize() override { return 1; }
+  int StencilSize() const override { return 1; }
 };
 
 class Linear : public Interpolation {
@@ -82,7 +86,7 @@ class Linear : public Interpolation {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void GetIndicesAndWeights(const int i, int *idx, Real *wgt) override {
+  void GetIndicesAndWeights(const int i, int *idx, Real *wgt) const override {
     idx[0] = std::floor(i + shift_);
     idx[1] = idx[0] + 1;
 
@@ -97,7 +101,7 @@ class Linear : public Interpolation {
   }
 
   KOKKOS_INLINE_FUNCTION
-  int constexpr StencilSize() override { return 2; }
+  int StencilSize() const override { return 2; }
 };
 
 // TODO(JMM): Is this interpolation::Do syntax reasonable? An
