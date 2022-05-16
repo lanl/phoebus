@@ -20,6 +20,7 @@
 #include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
 #include "tov/tov.hpp"
+#include "phoebus_utils/initial_model_reader.hpp"
 
 // Tohlmann-Oppenheimer-Volkov star in hydrostatic equilibrium
 
@@ -30,6 +31,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
   const bool is_monopole_sph =
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
+
+  const auto model_filename = pin->GetOrAddString("tov", "model_filename", "file.txt");
 
   // Velocity perturbation
   // of form v = a*r*exp(-(r-mu)^2/(2 sigma)^2)

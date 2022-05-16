@@ -154,3 +154,4 @@ epsmin = 1e-12
 vpert_amp = 0
 vpert_radius = 5
 vpert_sigma = 1
+model_filename = "test.txt"
