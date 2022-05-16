@@ -753,8 +753,8 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
               const Real shift = (log(nusamp(0)) - log(nu_lab0)) / dlnu;
               interpolation::PiecewiseConstant interp(nu_bins, dlnu, -shift);
-              int nubin_shift[interp.StencilSize()];
-              Real nubin_wgt[interp.StencilSize()];
+              int nubin_shift[interp.maxStencilSize];
+              Real nubin_wgt[interp.maxStencilSize];
 
               // Calculate effective scattering emissivity from angle-averaged intensity
               // TODO(BRR) include dI/ds in this calculation for inelastic scattering
@@ -934,8 +934,8 @@ TaskStatus MOCMCEddington(T *rc) {
 
           const Real shift = (log(nusamp(0)) - log(nu_lab0)) / dlnu;
           interpolation::PiecewiseConstant interp(nu_bins, dlnu, shift);
-          int nubin_shift[interp.StencilSize()];
-          Real nubin_wgt[interp.StencilSize()];
+          int nubin_shift[interp.maxStencilSize];
+          Real nubin_wgt[interp.maxStencilSize];
 
           // get the energy integrated intensity
           Real I[MAX_SPECIES] = {0.0};
