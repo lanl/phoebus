@@ -663,7 +663,8 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                           v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
             Tens2 con_tilPi;
             SPACELOOP2(ii, jj) {
-              con_tilPi(ii, jj) = 0.;//v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+              // TODO(BRR) this is the nonconservation!!
+              con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
             }
             Real JBB = opac_d.EnergyDensityFromTemperature(v(iblock, pT, k, j, i),
                                                            dev_species[ispec]);
@@ -747,8 +748,6 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
               printf("tauJ: %e tauH: %e dE: %e\n", tauJ, tauH, dE);
               printf("E: %e + %e = %e\n",
               v(iblock, idx_E(ispec), k, j, i), sdetgam * dE, v(iblock, idx_E(ispec), k, j, i) + sdetgam * dE);
-              if (dE > 0.)
-              exit(-1);
             }
 
             // Add source corrections to conserved fluid variables
