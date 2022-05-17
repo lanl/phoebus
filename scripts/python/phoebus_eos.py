@@ -31,8 +31,6 @@ class IdealEOS(BaseEOS):
   def __init__(self, params):
     super().__init__()
     self.type = 'IdealGas'
-    for param in params:
-      print(f"{param}: {params[param]}")
     self.Cv = params['eos/Cv']
     self.gm1 = params['eos/gm1']
 

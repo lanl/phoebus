@@ -24,7 +24,6 @@ class phoedf(phdf.phdf):
   def __init__(self, filename):
     super().__init__(filename)
 
-    print(self.Params['eos/type'])
     self.eos_type = self.Params['eos/type'].decode('ascii')
 
     if 'opacity/type' in self.Params:
@@ -42,5 +41,5 @@ class phoedf(phdf.phdf):
   def GetEOS(self):
     return eos_type_dict[self.eos_type](self.Params)
 
-  def GetOpacity(self):
-    return opacity_type_dict[self.opacity_model](self.Params)
+  def GetOpacity(self, constants='cgs'):
+    return opacity_type_dict[self.opacity_model](self.Params, constants)

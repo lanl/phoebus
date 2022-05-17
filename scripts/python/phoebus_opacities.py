@@ -12,7 +12,7 @@
 # publicly, and to permit others to do so.
 
 import numpy as np
-from phoebus_constants import cgs
+from phoebus_constants import cgs, scalefree
 
 # ---------------------------------------------------------------------------- #
 # -- Thermal distribution function for neutrinos
@@ -29,7 +29,7 @@ class ThermalDistribution:
     return self.nspecies * (2. * self.h * nu**3)/self.c**2/(np.exp(x) + 1.)
 
   def T_from_J(self, J):
-    return pow(15.*self.c**3*self.h**3*E/(7.*self.kb**4*np.pi**5*self.nspecies),1./4.)
+    return pow(15.*self.c**3*self.h**3*J/(7.*self.kb**4*np.pi**5*self.nspecies),1./4.)
 
   def J_from_T(self, T):
     return 7.*self.kb**4*np.pi**5*self.nspecies*T**4/(15.*self.c**3*self.h**3)
@@ -37,9 +37,10 @@ class ThermalDistribution:
 # ---------------------------------------------------------------------------- #
 # -- Base class containing required data and functions
 class BaseOpacity:
-  def __init__(self):
+  def __init__(self, constants='cgs'):
     self.model = None
-    self.dist = ThermalDistribution()
+    constants_dict = {'cgs' : cgs, 'scalefree' : scalefree}
+    self.dist = ThermalDistribution(constants_dict[constants])
 
   def jnu(self, rho, T, Ye, nu):
     raise NotImplementedError()
@@ -48,8 +49,8 @@ class BaseOpacity:
 
 # -- Gray opacity
 class GrayOpacity(BaseOpacity):
-  def __init__(self, params):
-    super().__init__()
+  def __init__(self, params, constants='cgs'):
+    super().__init__(constants)
     self.model = "gray"
     self.kappa = params['opacity/gray_kappa']
 

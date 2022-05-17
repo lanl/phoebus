@@ -96,7 +96,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
           SPACELOOP(ii) v(idH(ii, ispec), k, j, i) = 0.0;
           v(idJ(ispec), k, j, i) =
-              0.2; // opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
+              opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
         }
       });
 

@@ -44,3 +44,36 @@ cgs['alphafs'] = 1./137.
 cgs['NUSIGMA0'] = (4.0*(cgs['GFERM']**2)
                    *((cgs['ME']*cgs['CL']**2)**2)
                    /(pi*(cgs['HBAR']*cgs['CL'])**4))
+
+scalefree = {}
+scalefree['KM']      = 1.
+scalefree['CL']      = 1.
+scalefree['QE']      = 1.
+scalefree['ME']      = 1.
+scalefree['MP']      = 1.
+scalefree['MN']      = 1.
+scalefree['HPL']     = 1.
+scalefree['HBAR']    = scalefree['HPL']/(2.*pi)
+scalefree['KBOL']    = 1.
+scalefree['GNEWT']   = 1.
+scalefree['SIG']     = 1.
+scalefree['AR']      = 1.
+scalefree['THOMSON'] = 1.
+scalefree['JY']      = 1.
+scalefree['PC']      = 1.
+scalefree['AU']      = 1.
+scalefree['MSOLAR']  = 1.
+scalefree['RSOLAR']  = 1.
+scalefree['LSOLAR']  = 1.
+scalefree['EV']      = 1.
+scalefree['MEV']     = 1.0e6*scalefree['EV']
+scalefree['GEV']     = 1.0e9*scalefree['EV']
+scalefree['K']       = 1.
+scalefree['GK']      = 1.0e9*scalefree['K']
+scalefree['GFERM']   = 1.
+scalefree['GA']      = -1.
+scalefree['S2THW']   = 1.
+scalefree['alphafs'] = 1./137.
+scalefree['NUSIGMA0'] = (4.0*(scalefree['GFERM']**2)
+                   *((scalefree['ME']*scalefree['CL']**2)**2)
+                   /(pi*(scalefree['HBAR']*scalefree['CL'])**4))

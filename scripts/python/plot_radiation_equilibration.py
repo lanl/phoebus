@@ -61,7 +61,7 @@ params = dfile0.Params
 #T_unit = params['phoebus/TimeCodeToCGS']
 #M_unit = params['phoebus/MassCodeToCGS']
 eos = dfile0.GetEOS()
-opac = dfile0.GetOpacity()
+opac = dfile0.GetOpacity('scalefree')
 
 # Get simulation setup
 #for param in params:
@@ -75,12 +75,31 @@ opac = dfile0.GetOpacity()
 t = np.zeros(nfiles)
 J = np.zeros(nfiles)
 Jstd = np.zeros(nfiles)
+ug = np.zeros(nfiles)
+Tr = np.zeros(nfiles)
+Tg = np.zeros(nfiles)
 for n, filename in enumerate(files[0::1]):
   dfile = phoedf(filename)
   t[n] = dfile.Time
   Jfile = dfile.Get("r.p.J", flatten=False)
   J[n] = np.mean(Jfile)
   Jstd[n] = np.std(Jfile)
+  ugfile = dfile.Get("p.energy", flatten=False)
+  ug[n] = np.mean(ugfile)
+  Tr[n] = opac.dist.T_from_J(J[n])
+  Tg[n] = eos.T_from_rho_u_Ye(1., ug[n], 0.5)
+
+print(Tr[-1])
+print(Tg[-1])
+
+fig, ax = plt.subplots(1,2,figsize=(12,5))
+ax[0].plot(t, J)
+ax[0].plot(t, ug)
+ax[1].plot(t, Tr)
+ax[1].plot(t, Tg)
+plt.show()
+
+sys.exit()
 
 # ---------------------------------------------------------------------------- #
 # -- Calculate analytic solution

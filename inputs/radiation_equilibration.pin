@@ -24,6 +24,7 @@ variables = p.density, &
             r.p.H, &
             r.c.E, &
             r.c.F, &
+            p.energy, &
             c.energy
 
 file_type   = hdf5      # Tabular data dump
@@ -31,7 +32,7 @@ dt          = 1.e-1     # time increment between outputs
 
 <parthenon/time>
 nlim        = -1      # cycle limit
-tlim        = 1.e0    # time limit
+tlim        = 2.    # time limit
 integrator  = rk2     # time integration algorithm
 ncycle_out  = 1       # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -95,9 +96,9 @@ Ye = true
 <radiation>
 cfl = 0.8
 method = moment_eddington
-nu_min = 1.e15
-nu_max = 1.e22
-nu_bins = 200
+nu_min = 1.e-2
+nu_max = 1.e2
+nu_bins = 10
 absorption = true
 do_nu_electron = true
 do_nu_electron_anti = false
@@ -108,8 +109,8 @@ do_nu_heavy = false
 #use_B_fake = false
 
 <opacity>
-type = scalefree
-gray_kappa = 1.0
+type = gray
+gray_kappa = 0.1
 
 <radiation_equilibration>
 J = 0.2
