@@ -25,6 +25,7 @@
 #include "kd_grid.hpp"
 #include "phoebus_utils/phoebus_interpolation.hpp"
 #include "phoebus_utils/root_find.hpp"
+#include "phoebus_utils/programming_utils.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
@@ -398,7 +399,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
   auto mocmc_recon = rad->Param<MOCMCRecon>("mocmc_recon");
 
   // Hack in hohlraum boundaries here
-  pmb->par_for(
+  /*pmb->par_for(
       "Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
       KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
@@ -432,7 +433,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
         }
-      });
+      });*/
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
@@ -446,6 +447,16 @@ TaskStatus MOCMCReconstruction(T *rc) {
             phi_lo(nswarm) = 0.0;
             phi_hi(nswarm) = 2.0 * M_PI;
             continue;
+          }
+
+          Real dOmega = 0.;
+          for (int m = 0; m < n; m++) {
+            const int mswarm = swarm_d.GetFullIndex(k, j, i, m);
+            dOmega += (mu_hi(mswarm) - mu_lo(mswarm))*(phi_hi(mswarm) - phi_lo(mswarm));
+          }
+          if (!programming::soft_equiv(dOmega, 4.*M_PI)) {
+            printf("BAD! n: %i dOmega/4pi = %e\n", n, dOmega/(4.*M_PI));
+            exit(-1);
           }
 
           Real cov_g[4][4];
@@ -462,12 +473,14 @@ TaskStatus MOCMCReconstruction(T *rc) {
           tetrads.CoordToTetradCov(ncov_coord, ncov_tetrad);
 
           const Real mu = 1.0 - ncov_tetrad[1];
-          const Real phi = atan2(ncov_tetrad[3], ncov_tetrad[2]);
+          const Real phi = atan2(ncov_tetrad[3], ncov_tetrad[2]) + M_PI;
 
           for (int m = 0; m < n; m++) {
             const int mswarm = swarm_d.GetFullIndex(k, j, i, m);
+            PARTHENON_DEBUG_REQUIRE(mswarm != nswarm, "Comparing the same particle!");
             if (mu > mu_lo(mswarm) && mu < mu_hi(mswarm) && phi > phi_lo(mswarm) &&
                 phi < phi_hi(mswarm)) {
+              Real dOmega_before = (mu_hi(mswarm) - mu_lo(mswarm))*(phi_hi(mswarm) - phi_lo(mswarm));
               Real mcov_tetrad[4] = {-1., ncov(1, mswarm), ncov(2, mswarm),
                                      ncov(3, mswarm)};
               Real mu0 = mu_hi(mswarm) - mu_lo(mswarm);
@@ -501,10 +514,52 @@ TaskStatus MOCMCReconstruction(T *rc) {
                 mu_lo(nswarm) = mu_lo(mswarm);
                 mu_hi(nswarm) = mu_hi(mswarm);
               }
+              Real dOmega1 = (mu_hi(mswarm) - mu_lo(mswarm))*(phi_hi(mswarm) - phi_lo(mswarm));
+              Real dOmega2 = (mu_hi(nswarm) - mu_lo(nswarm))*(phi_hi(nswarm) - phi_lo(nswarm));
+              if (!programming::soft_equiv(dOmega_before, dOmega1 + dOmega2)) {
+                printf("Bad decomp! %e -> %e %e\n", dOmega_before, dOmega1, dOmega2);
+                exit(-1);
+              }
+              //printf("NEW: mu: %e phi: %e\n", mu, phi);
+              //printf("mu: %e %e phi: %e %e\n", mu_hi(nswarm), mu_lo(nswarm),
+              //  phi_hi(nswarm), phi_lo(nswarm));
               break;
             } // if inside
           }   // m = 0..n
+
+          {Real dOmega = 0.;
+          for (int m = 0; m <= n; m++) {
+            const int mswarm = swarm_d.GetFullIndex(k, j, i, m);
+            dOmega += (mu_hi(mswarm) - mu_lo(mswarm))*(phi_hi(mswarm) - phi_lo(mswarm));
+          }
+          if (!programming::soft_equiv(dOmega, 4.*M_PI)) {
+          for (int m = 0; m <= n; m++) {
+            const int mswarm = swarm_d.GetFullIndex(k, j, i, m);
+            printf("mswarm: %i\n", mswarm);
+            printf("dOmega/4pi: %e\n", (mu_hi(mswarm) - mu_lo(mswarm))*(phi_hi(mswarm) - phi_lo(mswarm)));
+            printf("mu: %e %e phi: %e %e\n", mu_lo(mswarm), mu_hi(mswarm), phi_lo(mswarm), phi_hi(mswarm));
+          Real ncov_coord[4] = {ncov(0, mswarm), ncov(1, mswarm), ncov(2, mswarm),
+                                ncov(3, mswarm)};
+
+          const Real mu = 1.0 - ncov_coord[1];
+          const Real phi = atan2(ncov_coord[3], ncov_coord[2]) + M_PI;
+          printf("mu: %e phi: %e\n", mu, phi);
+          }
+            printf("BAD2! nsamp: %i n: %i dOmega/4pi = %e\n", nsamp, n, dOmega/(4.*M_PI));
+            exit(-1);
+          }}
         }     // n = 0..nsamp
+
+        // TODO(BRR) test for dOmega = 4pi
+        Real dOmega = 0.;
+        for (int n = 0; n < nsamp; n++) {
+          const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
+          dOmega += (mu_hi(nswarm) - mu_lo(nswarm))*(phi_hi(nswarm) - phi_lo(nswarm));
+        }
+        if (!programming::soft_equiv(dOmega, 4.*M_PI)) {
+          printf("bad 4pi! %e\n", dOmega/(4.*M_PI));
+          exit(-1);
+        }
       });
 
   return TaskStatus::complete;
@@ -552,6 +607,7 @@ TaskStatus MOCMCFluidSource(MeshData<Real> *rc, const Real dt, const bool update
 template <class T>
 TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   // Assume particles are already sorted from MOCMCReconstruction call!
+  printf("\n\nMOCMCFluidSource\n");
 
   auto *pmb = rc->GetParentPointer().get();
   auto &sc = pmb->swarm_data.Get();
@@ -734,29 +790,31 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             for (int idir = 0; idir < 3; ++idir) {
               v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
             }
-            if (i == 18) {
+            if (i == 18 && ispec == 0) {
               SPACELOOP(ii) {
                 SPACELOOP(jj) {
                   printf("%e ", con_tilPi(ii, jj));
                 }
                 printf("\n");
               }
-              printf("\n");
             printf("Estar: %e Fstar: %e %e %e B: %e\n", Estar, cov_Fstar(0),
               cov_Fstar(1), cov_Fstar(2), JBB);
             printf("dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
               printf("tauJ: %e tauH: %e dE: %e\n", tauJ, tauH, dE);
               printf("E: %e + %e = %e\n",
               v(iblock, idx_E(ispec), k, j, i), sdetgam * dE, v(iblock, idx_E(ispec), k, j, i) + sdetgam * dE);
+
+              //if (dt > 0.)
+              //exit(-1);
             }
 
             // Add source corrections to conserved fluid variables
             if (update_fluid) {
-              //v(iblock, cye, k, j, i) -= sdetgam * 0.0;
-              //v(iblock, ceng, k, j, i) -= sdetgam * dE;
-              //v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
-              //v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
-              //v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
+              v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+              v(iblock, ceng, k, j, i) -= sdetgam * dE;
+              v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
+              v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
+              v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
             }
 
             // Update sample intensities
@@ -941,6 +999,7 @@ TaskStatus MOCMCEddington(T *rc) {
                               vpcon[1] - con_beta[1] * W / alpha,
                               vpcon[2] - con_beta[2] * W / alpha};
 
+        Real dOmega = 0.; // TODO(BRR) temp
         for (int n = 0; n < nsamp; n++) {
           const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
 
@@ -970,6 +1029,7 @@ TaskStatus MOCMCEddington(T *rc) {
           Real wgts[6];
           kdgrid::integrate_ninj_domega_quad(mu_lo(nswarm), mu_hi(nswarm), phi_lo(nswarm),
                                              phi_hi(nswarm), wgts);
+          dOmega += (mu_hi(nswarm) - mu_lo(nswarm))*(phi_hi(nswarm) - phi_lo(nswarm));
           for (int ii = 0; ii < 3; ii++) {
             for (int jj = ii; jj < 3; jj++) {
               const int ind = Geometry::Utils::Flatten2(ii, jj, 3);
@@ -1000,6 +1060,22 @@ TaskStatus MOCMCEddington(T *rc) {
           v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
           v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
         }
+
+        // TODO(BRR) enforce Eddington
+        //if (!programming::soft_equiv(dOmega, 4.*M_PI)) {
+        //printf("Warning! dOmega/4pi = %e\n",
+        //  dOmega/(4.*M_PI));
+        for (int s = 0; s < num_species; s++) {
+          SPACELOOP2(ii, jj) {
+            /*if (std::fabs(v(iTilPi(s, ii, jj), k, j, i) > 1.e-14)) {
+              printf("LARGE TILPI! %i %i %i %i %i %i = %e\n", s, ii, jj, k, j, i,
+                v(iTilPi(s, ii, jj), k, j, i));
+              exit(-1);
+            }*/
+            v(iTilPi(s, ii, jj), k, j, i) = 0.;
+          }
+        }
+        //}
       });
 
   return TaskStatus::complete;

@@ -37,11 +37,6 @@ class ReconstructionIndexer {
   Real &operator()(const int idir, const int ivar, const int k, const int j,
                    const int i) const {
     const int idx = idir * chunk_size_ + ivar + offset_;
-    if (idir == 0 && ivar == 0) {
-      printf("idir: %i ivar: %i k: %i j: %i i: %i\n", idir, ivar, k, j, i);
-      printf("chunk_size_: %i offset_: %i\n", chunk_size_, offset_);
-      printf("block_: %i idx: %i\n", block_, idx);
-    }
     return v_(block_, idx, k, j, i);
   }
 
@@ -379,21 +374,6 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         if (ndim > 2)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
 
-          if (n == 0)
-          {
-          for (int i = 16; i < 21; i++) {
-            printf("pv: %e %e %e\n", pvim1[i], pv[i], pvip1[i]);
-          printf("[%i:%i][%i] vi_l: %e vi_r: %e\n", i,
-            n, var_id, vi_l[i], vi_r[i]);
-          printf("[%i:%i][%i] ql_v: %e qr_v: %e\n", i,
-            0, 0, ql(0, 0, k, j, 1  + i), qr(0, 0, k, j, i));
-
-          if (vi_r[i] > 4.e-2 && vi_r[i] < 5.e-2) {
-            printf("!!!!!!!!!!!!!\n\n\n");
-          }
-          }
-        }
-
         // Calculate spatial derivatives of J at zone faces for diffusion limit
         //    x-->
         //    +---+---+
@@ -466,6 +446,7 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
+  printf("\n\nCalculateFluxesImpl\n");
   auto *pmb = rc->GetParentPointer().get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -596,7 +577,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           }
           cl.getFluxesFromPrim(Jl, HasymL, con_tilPil, &conFl_asym, &Pl_asym);
           cr.getFluxesFromPrim(Jr, HasymR, con_tilPir, &conFr_asym, &Pr_asym);
-          if (i == 18) {
+          if (i == 18 && ispec == 0) {
             printf("Jl: %e Hasyml: %e %e %e\n", Jl, HasymL(0), HasymL(1), HasymL(2));
             printf("Jr: %e Hasymr: %e %e %e\n", Jr, HasymR(0), HasymR(1), HasymR(2));
             printf("conFl_asym: %e %e %e conFr_asym: %e %e %e\n",
@@ -612,7 +593,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           }
           cl.getFluxesFromPrim(Jl, Hl, con_tilPil, &conFl, &Pl);
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
-          if (i == 18) {
+          if (i == 18 && ispec == 0) {
             printf("Jl: %e Hl: %e %e %e\n", Jl, Hl(0), Hl(1), Hl(2));
             printf("Jr: %e Hr: %e %e %e\n", Jr, Hr(0), Hr(1), Hr(2));
             printf("con_tilPil:\n");
@@ -655,7 +636,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
 
-              if (i == 18) {
+              if (i == 18 && ispec == 0) {
                 printf("a: %e\n", a);
                 printf("con_beta(%i) = %e\n", con_beta(idir));
                 printf("conFl_asym: %e %e %e conFr_asym: %e %e %e\n", conFl_asym(0), conFl_asym(1), conFl_asym(2), conFr_asym(0), conFr_asym(1), conFr_asym(2));
@@ -671,7 +652,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
               0.5 * sdetgam *
               (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
-              if (i == 18) {
+              if (i == 18 && ispec == 0) {
                 printf("flux(%i, F(%i, %i)) = %e\n", idir_in, ispec, ii, v.flux(idir_in, idx_Ff(ispec, ii), k, j, i));
               }
           }
@@ -823,12 +804,12 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           }
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
           SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
-          if (i == 18) {
+          /*if (i == 18) {
             printf("SRC: %e %e %e %e\n", v_src(iblock, idx_E_src(ispec), k, j, i),
               v_src(iblock, idx_F_src(ispec, 0), k, j, i),
               v_src(iblock, idx_F_src(ispec, 1), k, j, i),
               v_src(iblock, idx_F_src(ispec, 2), k, j, i));
-          }
+          }*/
         }
       });
   return TaskStatus::complete;
@@ -857,6 +838,7 @@ template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
+  printf("\n\nMomentFluidSource\n");
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -964,6 +946,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             printf("E: %e + %e = %e\n",
               v(iblock, idx_E(ispec), k, j, i), sdetgam * dE,
               v(iblock, idx_E(ispec), k, j, i) + sdetgam * dE);
+//            exit(-1);
           }
 
           // Add source corrections to conserved fluid variables
