@@ -44,7 +44,6 @@ def plot_dump(filename, varname,
     data = phdf(filename)
     if overlay_initial:
       data0 = phdf(filename0)
-    print(data)
 
     if savename is not None:
       matplotlib.use('Agg')

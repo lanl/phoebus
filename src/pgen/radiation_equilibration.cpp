@@ -1,4 +1,4 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
+// © 2021-2022. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -83,8 +83,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   phoebus_params.Add("radiation_equilibration/Tr0", Tr0);
   phoebus_params.Add("radiation_equilibration/Ye0", Ye0);
 
-  //Tg0 = 0.2107033;
-
   /// TODO: (BRR) Fix this junk
   RadiationType dev_species[3] = {species[0], species[1], species[2]};
 
@@ -105,15 +103,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           SPACELOOP(ii) v(idH(ii, ispec), k, j, i) = 0.0;
           v(idJ(ispec), k, j, i) =
               opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
-              //opac_d.EnergyDensityFromTemperature(Tg0, dev_species[ispec]);
         }
-
-        //Real utot = v(ieng, k, j, i) + v(idJ(0), k, j, i);
-        //printf("utot: %e\n", utot);
-        //printf("resid: %e\n", resid(0.16, opac_d, eos, utot));
-        //printf("resid: %e\n", resid(0.21, opac_d, eos, utot));
-        //exit(-1);
-
       });
 
   // Initialize samples

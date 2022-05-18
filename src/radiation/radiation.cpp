@@ -74,11 +74,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.8);
   params.Add("cfl", cfl);
 
-  // Get fake value for integrated BB for testing
-  //Real B_fake = pin->GetOrAddReal("radiation", "B_fake", 1.0);
-  //params.Add("B_fake", B_fake);
-  //bool use_B_fake = pin->GetOrAddBoolean("radiation", "use_B_fake", false);
-  //params.Add("use_B_fake", use_B_fake);
+  // Get fake scattering value for testing in anticipation of scattering in singularity-opac
   Real scattering_fraction = pin->GetOrAddReal("radiation", "scattering_fraction", 0.0);
   params.Add("scattering_fraction", scattering_fraction);
 
