@@ -18,26 +18,19 @@ import os
 import sys
 import regression_test as rt
 
-parser = argparse.ArgumentParser(description='Run a finite velocity radiation diffusion test')
+parser = argparse.ArgumentParser(description='Run a uniform radiation equilibration test')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
 parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
-parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../inputs/radiation_advection.pin'))
+parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../inputs/radiation_equilibration.pin'))
 parser.add_argument('--executable', type=str, default=None)
 parser.add_argument('--build_type', type=str, default='Release', choices=['Debug, Release'])
 args = parser.parse_args()
 
 modified_inputs = {}
-modified_inputs['radiation/scattering_fraction'] = 1.0
-modified_inputs['radiation/B_fake'] = 0.5
-modified_inputs['radiation/method'] = 'moment_m1'
-modified_inputs['opacity/gray_kappa'] = 1.e3
-modified_inputs['radiation_advection/J'] = 1.0
-modified_inputs['radiation_advection/Hx'] = 0.0
-modified_inputs['radiation_advection/Hy'] = 0.0
-modified_inputs['radiation_advection/Hz'] = 0.0
-modified_inputs['radiation_advection/vx'] = 0.3
-modified_inputs['radiation_advection/width'] = 0.0333
-modified_inputs['radiation_advection/kappas_init'] = 1.e3
+modified_inputs['radiation/method'] = 'moment_eddington'
+modified_inputs['radiation/scattering_fraction'] = 0.0
+modified_inputs['opacity/gray_kappa'] = 0.1
+modified_inputs['radiation_equilibration/J'] = 0.2
 
 code = rt.gold_comparison(variables=['r.p.J', 'r.p.H'],
                           input_file=args.input,
@@ -47,6 +40,6 @@ code = rt.gold_comparison(variables=['r.p.J', 'r.p.H'],
                           use_gpu=args.use_gpu,
                           build_type=args.build_type,
                           upgold=args.upgold,
-                          compression_factor=10)
+                          compression_factor=1)
 
 sys.exit(code)

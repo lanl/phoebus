@@ -665,7 +665,6 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                           v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
             Tens2 con_tilPi;
             SPACELOOP2(ii, jj) {
-              // TODO(BRR) this is the nonconservation!!
               con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
             }
             Real JBB = opac_d.EnergyDensityFromTemperature(v(iblock, pT, k, j, i),

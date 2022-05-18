@@ -94,9 +94,7 @@ Ye = true
 
 <radiation>
 cfl = 0.5
-#method = moment_eddington
-#method = moment_m1
-method = mocmc
+method = moment_m1
 nu_min = 1.e-2
 nu_max = 1.e2
 nu_bins = 10

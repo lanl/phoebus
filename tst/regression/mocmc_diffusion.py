@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# © 2021. Triad National Security, LLC. All rights reserved.  This
+# © 2022. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract
 # 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 # is operated by Triad National Security, LLC for the U.S.  Department
@@ -28,8 +28,6 @@ args = parser.parse_args()
 
 modified_inputs = {}
 modified_inputs['radiation/scattering_fraction'] = 1.0
-modified_inputs['radiation/B_fake'] = 0.5
-modified_inputs['radiation/method'] = 'moment_m1'
 modified_inputs['opacity/gray_kappa'] = 1.e3
 modified_inputs['radiation_advection/J'] = 1.0
 modified_inputs['radiation_advection/Hx'] = 0.0
@@ -38,6 +36,13 @@ modified_inputs['radiation_advection/Hz'] = 0.0
 modified_inputs['radiation_advection/vx'] = 0.3
 modified_inputs['radiation_advection/width'] = 0.0333
 modified_inputs['radiation_advection/kappas_init'] = 1.e3
+modified_inputs['radiation/method'] = 'mocmc'
+modified_inputs['radiation/nu_min'] = 1.e-2
+modified_inputs['radiation/nu_max'] = 1.e2
+modified_inputs['radiation/nu_bins'] = 10
+modified_inputs['radiation/mocmc/nsamp_per_zone'] = 32
+modified_inputs['parthenon/mesh/nx1'] = 64
+modified_inputs['parthenon/meshblock/nx1'] = 64
 
 code = rt.gold_comparison(variables=['r.p.J', 'r.p.H'],
                           input_file=args.input,
