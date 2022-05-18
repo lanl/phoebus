@@ -12,8 +12,8 @@
 
 <phoebus>
 problem = radiation_advection
-ix1_bc = outflow
-ox1_bc = outflow
+#ix1_bc = outflow
+#ox1_bc = outflow
 
 <parthenon/job>
 problem_id  = rad_adv   # problem ID: basename of output filenames
@@ -32,20 +32,23 @@ nlim        = -1      # cycle limit
 tlim        = 1.e0    # time limit
 integrator  = rk2     # time integration algorithm
 ncycle_out  = 1       # interval for stdout summary info
-dt_init_fact = 1.e0
+dt_init_fact = 1.e-6
 
 <parthenon/mesh>
 nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 64      # Number of zones in X1-direction
+nx1         = 512      # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1        # maximum value of X1
-ix1_bc      = user     # Inner-X1 boundary condition flag
-ox1_bc      = user     # Outer-X1 boundary condition flag
-#ix1_bc      = periodic     # Inner-X1 boundary condition flag
-#ox1_bc      = periodic     # Outer-X1 boundary condition flag
+#ix1_bc      = user     # Inner-X1 boundary condition flag
+#ox1_bc      = user     # Outer-X1 boundary condition flag
+# TODO(BRR) Currently an issue with asymptotic preserving transport in samples
+# in pure scattering problems that makes this problem misbehave with outflow
+# boundaries
+ix1_bc = periodic
+ox1_bc = periodic
 
 nx2         = 1         # Number of zones in X2-direction
 x2min       = -1        # minimum value of X2
@@ -64,7 +67,7 @@ num_threads = 1         # maximum number of OMP threads
 bc_vars = primitive
 
 <parthenon/meshblock>
-nx1 = 64
+nx1 = 512
 nx2 = 1
 nx3 = 1
 
@@ -107,7 +110,6 @@ scattering_fraction = 1.0
 
 <radiation/mocmc>
 nsamp_per_zone = 32
-
 
 <opacity>
 type = gray

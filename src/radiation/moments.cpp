@@ -112,7 +112,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
                      v(b, cF(ispec, 2), k, j, i) * isdetgam}};
 
         if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = 0.;}//v(b, iTilPi(ispec, ii, jj), k, j, i); }
+          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
         } else {
           Real xi = 0.0;
           Real phi = pi;
@@ -224,7 +224,7 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
                      v(b, pH(ispec, 2), k, j, i) * J}};
 
         if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = 0.;}//v(b, iTilPi(ispec, ii, jj), k, j, i); }
+          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
         } else {
           c.GetCovTilPiFromPrim(J, covH, &conTilPi);
         }
@@ -442,6 +442,7 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
   auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const int di = (pmb->pmy_mesh->ndim > 0 ? 1 : 0);
@@ -472,7 +473,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   auto idx_Ff = imap.GetFlatIdx(cr::F);
   auto idx_Ef = imap.GetFlatIdx(cr::E);
 
-  const int nspec = idx_ql.DimSize(1);
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
 
   // const int nblock = 1; //v.GetDim(5);
 
@@ -518,7 +524,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
         const Real dx = coords.Dx(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
 
-        for (int ispec = 0; ispec < nspec; ++ispec) {
+        for (int ispec = 0; ispec < num_species; ++ispec) {
 
           const Real &Jl = v(idx_ql(ispec, 0, idir), k, j, i);
           const Real &Jr = v(idx_qr(ispec, 0, idir), k, j, i);

@@ -18,46 +18,6 @@ namespace root_find {
 
 enum class RootFindStatus { success, failure };
 
-template <typename F>
-KOKKOS_INLINE_FUNCTION void broyden2(F &func, Real v[2], const int max_iter = 50,
-                                     const Real tol = 1.e-10,
-                                     RootFindStatus *status = nullptr) {
-
-  PARTHENON_FAIL("Not currently implemented!");
-  double resid[2];
-  func(v[0], v[1], resid);
-
-  // Calculate initial Jacobian
-  Real J[2][2] = {0.};
-
-  int niter = 0;
-  while (sqrt(pow(fabs(resid[0]), 2) + pow(fabs(resid[1]), 2)) > tol) {
-    Real s[2] = {0.};
-    // Solve J.s = -f
-
-    v[0] = v[0] + s[0];
-    v[1] = v[1] + s[1];
-    Real newresid[2] = {0.};
-    func(v[0], v[1], newresid);
-    Real z[2] = {newresid[0] - resid[0], newresid[1] - resid[1]};
-
-    // J = J + (outer((z - J.s),s)) / ( s.s )
-    for (int ii = 0; ii < 2; ii++) {
-      resid[ii] = newresid[ii];
-    }
-
-    niter++;
-    if (niter == max_iter) {
-      *status = RootFindStatus::failure;
-      return;
-    }
-  }
-
-  if (status != nullptr) {
-    *status = RootFindStatus::success;
-  }
-}
-
 struct RootFind {
   KOKKOS_INLINE_FUNCTION
   RootFind(int max_iterations = std::numeric_limits<int>::max())

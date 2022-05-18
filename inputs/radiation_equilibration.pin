@@ -32,7 +32,7 @@ dt          = 1.e-1     # time increment between outputs
 
 <parthenon/time>
 nlim        = -1      # cycle limit
-tlim        = 2.    # time limit
+tlim        = 1.e0    # time limit
 integrator  = rk2     # time integration algorithm
 ncycle_out  = 1       # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -42,11 +42,11 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 4      # Number of zones in X1-direction
+nx1         = 4        # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1        # maximum value of X1
-ix1_bc      = periodic     # Inner-X1 boundary condition flag
-ox1_bc      = periodic     # Outer-X1 boundary condition flag
+ix1_bc      = periodic # Inner-X1 boundary condition flag
+ox1_bc      = periodic # Outer-X1 boundary condition flag
 
 nx2         = 1         # Number of zones in X2-direction
 x2min       = -1        # minimum value of X2
@@ -104,13 +104,9 @@ do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
 
-#scattering_fraction = 0.0
-#B_fake = 0.5
-#use_B_fake = false
-
 <opacity>
 type = gray
-gray_kappa = 0.1
+gray_kappa = 0.2
 
 <radiation_equilibration>
 J = 0.2
