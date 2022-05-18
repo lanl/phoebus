@@ -53,6 +53,9 @@ jobs:
             # TODO(BRR) add --use_gpu flag here if running on GPU
             # Release suite
             ./radiation_diffusion.py --executable build_minkowski_release/src/phoebus
+            ./mocmc_diffusion.py --executable build_minkowski_release/src/phoebus
+            ./radiation_equilibration.py --executable build_minkowski_release/src/phoebus
+            ./mocmc_equilibration.py --executable build_minkowski_release/src/phoebus
             ./bondi.py --executable build_fmks_release/src/phoebus
             ./linear_modes.py --executable build_minkowski_release/src/phoebus
             ./thincooling.py --executable build_minkowski_release/src/phoebus
