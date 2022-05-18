@@ -18,9 +18,7 @@ from phoedf import phoedf
 parser = argparse.ArgumentParser(description='Plot neutrino thermalization')
 parser.add_argument('-f', '--files', dest='files', nargs='*', default=['rad_eql*.phdf'], help='List of input Parthenon hdf files to plot')
 parser.add_argument('--savefig', type=bool, default=False, help='Whether to save figure')
-parser.add_argument('--Tg0', type=float, default=1., help='Initial gas temperature (MeV)')
-parser.add_argument('--Tr0', type=float, default=0., help='Initial neutrino temperature (MeV)')
-parser.add_argument('--numin', type=float, default=1.e-2, help='Minimum frequency (Hz)')
+parser.add_argument('--numin', type=float, default=1.e-4, help='Minimum frequency (Hz)')
 parser.add_argument('--numax', type=float, default=1.e2, help='Maximum frequency (Hz)')
 parser.add_argument('--nnu', type=int, default=100, help='Number of frequency support points')
 args = parser.parse_args()
@@ -100,21 +98,22 @@ for n in range(nnu):
 
 for cycle in range(n_soln):
   phoebus_utils.progress_bar((cycle+1)/n_soln)
-  import time
-  T = Tg_soln[cycle]
   dJ = 0
   dInu = np.zeros(nnu)
   for n in range(nnu):
     nu = nus[n]
-    jnu = opac.jnu(rho0, T, Ye0, nu)
-    alphanu = opac.alphanu(rho0, T, Ye0, nu)
+    jnu = opac.jnu(rho0, Tg_soln[cycle], Ye0, nu)
+    alphanu = opac.alphanu(rho0, Tg_soln[cycle], Ye0, nu)
 
     dInu[n] = (Inu[n] + const['CL']*dt_soln*jnu)/(1. + const['CL']*dt_soln*alphanu) - Inu[n]
+    #dInu[n] = opac.dist.Bnu(.16, nu) - Inu[n]
     Inu[n] += dInu[n]
     Inu[n] = max(Inu[n], 1.e-100)
 
   for n in range(nnu - 1):
     dJ += 4.*np.pi/const['CL']*(dInu[n+1] + dInu[n])/2*(nus[n+1]-nus[n])
+  dJ -= 0.5 * 4.*np.pi/const['CL']*(dInu[0] + dInu[1])/2*(nus[1] - nus[0])
+  dJ -= 0.5 * 4.*np.pi/const['CL']*(dInu[-2] + dInu[-1])/2*(nus[-1] - nus[-2])
 
   J_soln[cycle+1] = J_soln[cycle] + dJ
   ug_soln[cycle+1] = ug_soln[cycle] - dJ
@@ -123,15 +122,28 @@ for cycle in range(n_soln):
 
   t_soln[cycle+1] = t_soln[cycle] + dt_soln
 
+print("utot: ", (ug[0] + J[0]))
+utot = ug[0] + J[0]
+def resid(T):
+  return utot - eos.u_from_rho_T_Ye(rho0, T, Ye0) - opac.dist.J_from_T(T)
+print(resid(.16))
+print(resid(.21))
+
 # ---------------------------------------------------------------------------- #
 # -- Plot solution
 fig, ax = plt.subplots(1,2,figsize=(12,5))
 ax[0].plot(t, J)
 ax[0].plot(t, ug)
+ax[0].plot(t_soln, J_soln, color='k', linestyle='--')
+ax[0].plot(t_soln, ug_soln, color='k', linestyle='--')
+ax[0].set_xlim([0, None])
+ax[0].set_ylim([0, None])
 ax[1].plot(t, Tr)
 ax[1].plot(t, Tg)
 ax[1].plot(t_soln, Tr_soln, color='k', linestyle='--')
 ax[1].plot(t_soln, Tg_soln, color='k', linestyle='--')
+ax[1].set_xlim([0, None])
+ax[1].set_ylim([0, None])
 plt.show()
 
 sys.exit()

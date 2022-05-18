@@ -33,6 +33,8 @@ class IdealEOS(BaseEOS):
     self.type = 'IdealGas'
     self.Cv = params['eos/Cv']
     self.gm1 = params['eos/gm1']
+    print(self.Cv)
+    print(self.gm1)
 
   def T_from_rho_u_Ye(self, rho, u, Ye):
     return u / (rho * self.Cv)
