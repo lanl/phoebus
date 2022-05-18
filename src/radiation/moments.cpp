@@ -783,8 +783,19 @@ TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
 template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<Real> *,
                                                                   MeshBlockData<Real> *);
 
+// TODO(BRR) Unsure how else to get radiation parameters from MeshData
+template <>
+TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
+  for (int n = 0; n < rc->NumBlocks(); n++) {
+    MomentFluidSource(rc->GetBlockData(n).get(), dt, update_fluid);
+  }
+  return TaskStatus::complete;
+}
+
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
+  auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -830,7 +841,16 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   int nblock = v.GetDim(5);
-  int nspec = idx_E.DimSize(1);
+  // TODO(BRR) This updates all neutrino species (including contributions to fluid)
+  // regardless of whether they are active
+  //int nspec = idx_E.DimSize(1);
+
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -839,7 +859,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
       jb.s, jb.e, // y-loop
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
-        for (int ispec = 0; ispec < nspec; ++ispec) {
+        for (int ispec = 0; ispec < num_species; ++ispec) {
 
           // Set up the background state
           Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
@@ -897,7 +917,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
   return TaskStatus::complete;
 }
-template TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *, Real, bool);
+//template TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *, Real, bool);
 template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real,
                                                            bool);
 
