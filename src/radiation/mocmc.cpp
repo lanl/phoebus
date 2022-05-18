@@ -24,8 +24,8 @@
 #include "geodesics.hpp"
 #include "kd_grid.hpp"
 #include "phoebus_utils/phoebus_interpolation.hpp"
-#include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/programming_utils.hpp"
+#include "phoebus_utils/root_find.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 

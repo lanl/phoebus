@@ -611,9 +611,9 @@ TaskStatus CalculateFluxesImpl(T *rc) {
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
 
           SPACELOOP(ii) {
-          v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
-              0.5 * sdetgam *
-              (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
+            v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
+                0.5 * sdetgam *
+                (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
           }
           if (sdetgam < std::numeric_limits<Real>::min() * 10) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
@@ -849,7 +849,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   int nblock = v.GetDim(5);
   // TODO(BRR) This updates all neutrino species (including contributions to fluid)
   // regardless of whether they are active
-  //int nspec = idx_E.DimSize(1);
+  // int nspec = idx_E.DimSize(1);
 
   auto species = rad->Param<std::vector<RadiationType>>("species");
   auto num_species = rad->Param<int>("num_species");
@@ -923,7 +923,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
   return TaskStatus::complete;
 }
-//template TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *, Real, bool);
+// template TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *, Real, bool);
 template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real,
                                                            bool);
 
