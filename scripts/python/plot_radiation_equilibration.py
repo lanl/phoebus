@@ -11,7 +11,7 @@ import glob
 from parthenon_tools import phdf
 import time
 from enum import Enum
-from phoebus_constants import cgs
+from phoebus_constants import cgs, scalefree
 import phoebus_utils
 from phoedf import phoedf
 
@@ -20,8 +20,8 @@ parser.add_argument('-f', '--files', dest='files', nargs='*', default=['rad_eql*
 parser.add_argument('--savefig', type=bool, default=False, help='Whether to save figure')
 parser.add_argument('--Tg0', type=float, default=1., help='Initial gas temperature (MeV)')
 parser.add_argument('--Tr0', type=float, default=0., help='Initial neutrino temperature (MeV)')
-parser.add_argument('--numin', type=float, default=1.e14, help='Minimum frequency (Hz)')
-parser.add_argument('--numax', type=float, default=1.e22, help='Maximum frequency (Hz)')
+parser.add_argument('--numin', type=float, default=1.e-2, help='Minimum frequency (Hz)')
+parser.add_argument('--numax', type=float, default=1.e2, help='Maximum frequency (Hz)')
 parser.add_argument('--nnu', type=int, default=100, help='Number of frequency support points')
 args = parser.parse_args()
 
@@ -29,9 +29,8 @@ if args.savefig:
   matplotlib.use('Agg')
 
 # Initial state
-rho0 = 1.e10 # g cm^-3
-Tg0 = args.Tg0*cgs['MEV']/cgs['KBOL'] # K
-Tr0 = args.Tr0*cgs['MEV']/cgs['KBOL'] # K
+rho0 = 1.
+Ye0 = 0.5
 # TODO(BRR) Add velocity?
 gamma = 5./3. # Ideal gas EOS
 NSPECIES=3
@@ -46,31 +45,17 @@ for n in range(nnu):
 
 # Read in the files
 files = []
-print(args.files)
 for file in args.files:
-  print(f"globbing {file}")
   files += glob.glob(file)
 files = sorted(files)
 nfiles = len(files)
-print(files)
 
 # Set up unit conversions
 dfile0 = phoedf(files[0])
 params = dfile0.Params
-#L_unit = params['phoebus/LengthCodeToCGS']
-#T_unit = params['phoebus/TimeCodeToCGS']
-#M_unit = params['phoebus/MassCodeToCGS']
 eos = dfile0.GetEOS()
 opac = dfile0.GetOpacity('scalefree')
-
-# Get simulation setup
-#for param in params:
-#  print(param)
-#opacity_model = params['opacity/type'].decode('ascii')
-
-#dfile = phoedf(files[0])
-#print(dfile.Params)
-#print(opac.alphanu(1., 1., 1., 1.))
+const = scalefree
 
 t = np.zeros(nfiles)
 J = np.zeros(nfiles)
@@ -87,16 +72,66 @@ for n, filename in enumerate(files[0::1]):
   ugfile = dfile.Get("p.energy", flatten=False)
   ug[n] = np.mean(ugfile)
   Tr[n] = opac.dist.T_from_J(J[n])
-  Tg[n] = eos.T_from_rho_u_Ye(1., ug[n], 0.5)
+  Tg[n] = eos.T_from_rho_u_Ye(1., ug[n], Ye0)
 
-print(Tr[-1])
-print(Tg[-1])
+# ---------------------------------------------------------------------------- #
+# -- Calculate analytic solution
 
+tmax = t[-1]
+n_soln = 1000
+dt_soln = tmax/n_soln
+
+t_soln = np.zeros(n_soln+1)
+ug_soln = np.zeros(n_soln+1)
+J_soln = np.zeros(n_soln+1)
+Tg_soln = np.zeros(n_soln+1)
+Tr_soln = np.zeros(n_soln+1)
+
+t_soln[0] = 0.
+Tg_soln[0] = Tg[0]
+Tr_soln[0] = Tr[0]
+ug_soln[0] = eos.u_from_rho_T_Ye(rho0, Tg[0], Ye0)
+J_soln[0] = opac.dist.J_from_T(Tr[0])
+
+# Initialize neutrino spectrum
+Inu = np.zeros(nnu)
+for n in range(nnu):
+  Inu[n] = max(1.e-100, opac.dist.Bnu(Tr[0], nus[n]))
+
+for cycle in range(n_soln):
+  phoebus_utils.progress_bar((cycle+1)/n_soln)
+  import time
+  T = Tg_soln[cycle]
+  dJ = 0
+  dInu = np.zeros(nnu)
+  for n in range(nnu):
+    nu = nus[n]
+    jnu = opac.jnu(rho0, T, Ye0, nu)
+    alphanu = opac.alphanu(rho0, T, Ye0, nu)
+
+    dInu[n] = (Inu[n] + const['CL']*dt_soln*jnu)/(1. + const['CL']*dt_soln*alphanu) - Inu[n]
+    Inu[n] += dInu[n]
+    Inu[n] = max(Inu[n], 1.e-100)
+
+  for n in range(nnu - 1):
+    dJ += 4.*np.pi/const['CL']*(dInu[n+1] + dInu[n])/2*(nus[n+1]-nus[n])
+
+  J_soln[cycle+1] = J_soln[cycle] + dJ
+  ug_soln[cycle+1] = ug_soln[cycle] - dJ
+  Tr_soln[cycle+1] = opac.dist.T_from_J(J_soln[cycle+1])
+  Tg_soln[cycle+1] = eos.T_from_rho_u_Ye(rho0, ug_soln[cycle+1], Ye0)
+
+  t_soln[cycle+1] = t_soln[cycle] + dt_soln
+
+# ---------------------------------------------------------------------------- #
+# -- Plot solution
 fig, ax = plt.subplots(1,2,figsize=(12,5))
 ax[0].plot(t, J)
 ax[0].plot(t, ug)
 ax[1].plot(t, Tr)
 ax[1].plot(t, Tg)
+ax[1].plot(t_soln, Tr_soln, color='k', linestyle='--')
+ax[1].plot(t_soln, Tg_soln, color='k', linestyle='--')
 plt.show()
 
 sys.exit()
