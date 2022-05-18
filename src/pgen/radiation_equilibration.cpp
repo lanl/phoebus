@@ -22,6 +22,12 @@ namespace radiation_equilibration {
 using radiation::species;
 using singularity::RadiationType;
 
+Real resid(Real T, const singularity::neutrinos::Opacity &opac, const singularity::EOS &eos, Real utot) {
+  Real rho0 = 1.;
+  Real ug = rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T);
+  return utot - opac.EnergyDensityFromTemperature(T, species[0]) - ug;
+}
+
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PARTHENON_REQUIRE(
@@ -98,6 +104,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(idJ(ispec), k, j, i) =
               opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
         }
+
+        Real utot = v(ieng, k, j, i) + v(idJ(0), k, j, i);
+        printf("utot: %e\n", utot);
+        printf("resid: %e\n", resid(0.16, opac_d, eos, utot));
+        printf("resid: %e\n", resid(0.21, opac_d, eos, utot));
+        exit(-1);
+
       });
 
   radiation::MomentPrim2Con(rc.get(), IndexDomain::entire);

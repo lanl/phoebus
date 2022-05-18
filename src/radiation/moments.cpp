@@ -978,6 +978,8 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
               rho, Temp, Ye, dev_species[ispec]);
           Real JBB = d_opacity.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
+          if (i == 4)
+          printf("T: %e JBB: %e\n", Temp, JBB);
 
           v(iblock, idx_JBB(ispec), k, j, i) = JBB;
           v(iblock, idx_kappaJ(ispec), k, j, i) = kappa * (1.0 - scattering_fraction);
