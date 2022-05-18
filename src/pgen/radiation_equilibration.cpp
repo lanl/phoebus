@@ -22,7 +22,8 @@ namespace radiation_equilibration {
 using radiation::species;
 using singularity::RadiationType;
 
-Real resid(Real T, const singularity::neutrinos::Opacity &opac, const singularity::EOS &eos, Real utot) {
+Real resid(Real T, const singularity::neutrinos::Opacity &opac,
+           const singularity::EOS &eos, Real utot) {
   Real rho0 = 1.;
   Real ug = rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T);
   return utot - opac.EnergyDensityFromTemperature(T, species[0]) - ug;

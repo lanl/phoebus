@@ -264,7 +264,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto moment_flux =
           tl.AddTask(get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());
       auto moment_geom_src = tl.AddTask(none, radiation::CalculateGeometricSource<MDT>,
-                                      sc0.get(), gsrc.get());
+                                        sc0.get(), gsrc.get());
       geom_src = geom_src | moment_geom_src;
       sndrcv_flux_depend = sndrcv_flux_depend | moment_flux;
     }
