@@ -63,6 +63,9 @@ jobs:
 
             # Debug suite
             ./radiation_diffusion.py --executable build_minkowski_debug/src/phoebus
+            ./mocmc_diffusion.py --executable build_minkowski_debug/src/phoebus
+            ./radiation_equilibration.py --executable build_minkowski_debug/src/phoebus
+            ./mocmc_equilibration.py --executable build_minkowski_debug/src/phoebus
             ./bondi.py --executable build_fmks_debug/src/phoebus
             ./linear_modes.py --executable build_minkowski_debug/src/phoebus
             ./thincooling.py --executable build_minkowski_debug/src/phoebus
