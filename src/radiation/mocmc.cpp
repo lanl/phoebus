@@ -647,7 +647,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                                 vpcon[1] - con_beta[1] * W / alpha,
                                 vpcon[2] - con_beta[2] * W / alpha};
 
-          for (int ispec = 0; ispec < nspec; ++ispec) {
+          for (int ispec = 0; ispec < num_species; ++ispec) {
             const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
             const Real dtau = dt; // TODO(BRR): dtau = dt / u^0
 

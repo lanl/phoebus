@@ -64,7 +64,7 @@ Tg = np.zeros(nfiles)
 for n, filename in enumerate(files[0::1]):
   dfile = phoedf(filename)
   t[n] = dfile.Time
-  Jfile = dfile.Get("r.p.J", flatten=False)
+  Jfile = dfile.Get("r.p.J", flatten=False)[:,:,:,:,0]
   J[n] = np.mean(Jfile)
   Jstd[n] = np.std(Jfile)
   ugfile = dfile.Get("p.energy", flatten=False)
@@ -128,6 +128,7 @@ def resid(T):
   return utot - eos.u_from_rho_T_Ye(rho0, T, Ye0) - opac.dist.J_from_T(T)
 print(resid(.16))
 print(resid(.21))
+print(Tg_soln)
 
 # ---------------------------------------------------------------------------- #
 # -- Plot solution
