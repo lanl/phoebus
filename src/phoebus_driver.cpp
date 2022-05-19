@@ -99,10 +99,14 @@ void PhoebusDriver::PostInitializationCommunication() {
 
   auto rad = pmesh->packages.Get("radiation");
   auto fluid = pmesh->packages.Get("fluid");
-  const auto rad_active = rad->Param<bool>("active");
-  const auto rad_moments_active = rad->Param<bool>("moments_active");
-  const auto fluid_active = fluid->Param<bool>("active");
-  const bool rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
+  const bool rad_active = rad->Param<bool>("active");
+  const bool fluid_active = fluid->Param<bool>("active");
+  bool rad_moments_active = false;
+  bool rad_mocmc_active = false;
+  if (rad_active) {
+    rad_moments_active = rad->Param<bool>("moments_active");
+    rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
+  }
 
   TaskRegion &async_region = tc.AddRegion(blocks.size());
   for (int ib = 0; ib < blocks.size(); ib++) {
@@ -156,7 +160,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const auto rad_active = rad->Param<bool>("active");
   const auto rad_moments_active = rad->Param<bool>("moments_active");
   const auto fluid_active = fluid->Param<bool>("active");
-  const bool rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
+  bool rad_mocmc_active = false;
+  if (rad_active) {
+    rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
+  }
   const auto monopole_enabled = monopole->Param<bool>("enable_monopole_gr");
   // Force static here means monopole only called at initialization.
   // and source terms are disabled
