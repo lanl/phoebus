@@ -50,6 +50,12 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
   PARTHENON_REQUIRE(ivar.first >= 0, "Var must exist");
   PARTHENON_REQUIRE(ivar.second >= ivar.first + idx, "Var must exist");
 
+  // We choose to apply volume weighting when using the sum reduction.
+  // This assumes that for "Sum" variables, the variable is densitized, meaning
+  // it already contains a factor of the measure: sqrt(det(gamma))
+  const bool volume_weighting =
+      std::is_same<Reducer_t, Kokkos::Sum<Real, HostExecSpace>>::value;
+
   Real result = 0.0;
   Reducer_t reducer(result);
   parthenon::par_reduce(
@@ -59,7 +65,9 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
         // join is a Kokkos construct
         // that automatically does the
         // reduction operation locally
-        reducer.join(lresult, pack(b, ivar.first + idx, k, j, i));
+        const auto &coords = pack.GetCoords(b);
+        const Real vol = volume_weighting ? coords.Volume(k, j, i) : 1.0;
+        reducer.join(lresult, pack(b, ivar.first + idx, k, j, i) * vol);
       },
       reducer);
   return result;
