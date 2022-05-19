@@ -14,7 +14,7 @@
 # publicly, and to permit others to do so.
 
 """This is a python script for plotting 1d simulations that leverages the coords output so
-it always gets the geometry carrect and plots in x coordinates.
+it always gets the geometry correct and plots in x coordinates.
 """
 
 from __future__ import print_function
