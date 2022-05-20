@@ -35,8 +35,8 @@ h = 6.62606957e-27
 
 T_unit = dfile0.TimeCodeToCGS
 U_unit = dfile0.EnergyDensityCodeToCGS
-numin = dfile0.Params['radiation/nu_min']
-numax = dfile0.Params['radiation/nu_max']
+numin = dfile0.Params['opacity/numin']
+numax = dfile0.Params['opacity/numax']
 do_nu_electron = dfile0.Params['radiation/do_nu_electron']
 do_nu_electron_anti = dfile0.Params['radiation/do_nu_electron_anti']
 do_nu_heavy = dfile0.Params['radiation/do_nu_heavy']

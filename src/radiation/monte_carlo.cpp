@@ -75,6 +75,14 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
+  printf("%e %e\n", h_code, mp_code);
+
+    const Real MASS = unit_conv.GetMassCodeToCGS();
+  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
+  const Real TIME = unit_conv.GetTimeCodeToCGS();
+  const Real h_code_old = pc::h * TIME / (MASS * LENGTH * LENGTH);
+  const Real mp_code_old = pc::mp / MASS;
+  printf("%e %e old\n", h_code_old, mp_code_old);
 
   std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
                                  "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
@@ -100,6 +108,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   pmb->par_for(
       "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        printf("rho: %e T: %e ye: %e\n",
+          v(pdens,k,j,i), v(ptemp,k,j,i), v(iye,k,j,i));
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
           v(mu, k, j, i) = 0.;
         }
@@ -121,7 +131,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             for (int n = 0; n <= nu_bins; n++) {
               Real nu = nusamp(n);
               Real ener = h_code * nu;
-              printf("h_code: %e\n", h_code);
               Real wgt = GetWeight(wgtC, nu);
               Real Jnu = d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
                                                    ye, s, nu);
@@ -321,9 +330,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               }
               // TODO(BRR) lepton sign
               v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
-              printf("G: %e %e %e %e | %e\n", v(Gcov_lo,k,j,i),
-                v(Gcov_lo+1,k,j,i), v(Gcov_lo+2,k,j,i), v(Gcov_lo+3,k,j,i),
-                v(Gye,k,j,i));
 
               rng_pool.free_state(rng_gen);
             }
