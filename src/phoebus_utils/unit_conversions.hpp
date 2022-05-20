@@ -66,35 +66,31 @@ class CodeConstants {
   using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
  public:
-  CodeConstants(UnitConversions unit_conv) {
+  CodeConstants(UnitConversions unit_conv)
+      : CodeConstants(MakeCodeConstants(unit_conv)) {}
+
+  CodeConstants(CodeConstants &&mE) = default;
+
+  CodeConstants(CodeConstants &mE) = default;
+
+  const Real h;
+  const Real c;
+  const Real kb;
+  const Real mp;
+
+ private:
+  CodeConstants(const Real h_, const Real c_, const Real kb_, const Real mp_)
+      : h(h_), c(c_), kb(kb_), mp(mp_) {}
+
+  static CodeConstants MakeCodeConstants(UnitConversions unit_conv) {
     const Real TIME = unit_conv.GetTimeCGSToCode();
     const Real MASS = unit_conv.GetMassCGSToCode();
     const Real LENGTH = unit_conv.GetLengthCGSToCode();
     const Real ENERGY = MASS * LENGTH * LENGTH / (TIME * TIME);
     const Real TEMPERATURE = unit_conv.GetTemperatureCGSToCode();
-    h_code_ = pc::h * MASS * LENGTH * LENGTH / TIME;
-    c_code_ = pc::c * LENGTH / TIME;
-    kb_code_ = pc::kb * ENERGY / TEMPERATURE;
-    mp_code_ = pc::mp * MASS;
+    return CodeConstants(pc::h * MASS * LENGTH * LENGTH / TIME, pc::c * LENGTH / TIME,
+                         pc::kb * ENERGY / TEMPERATURE, pc::mp * MASS);
   }
-
-  KOKKOS_FORCEINLINE_FUNCTION
-  Real h() const { return h_code_; }
-
-  KOKKOS_FORCEINLINE_FUNCTION
-  Real c() const { return c_code_; }
-
-  KOKKOS_FORCEINLINE_FUNCTION
-  Real kb() const { return kb_code_; }
-
-  KOKKOS_FORCEINLINE_FUNCTION
-  Real mp() const { return mp_code_; }
-
- private:
-  Real h_code_;
-  Real c_code_;
-  Real kb_code_;
-  Real mp_code_;
 };
 
 constexpr Real solar_mass = 1.989e33; // g

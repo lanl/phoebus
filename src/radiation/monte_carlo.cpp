@@ -73,8 +73,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   const Real d3x = dx_i * dx_j * dx_k;
 
-  const Real h_code = code_constants.h();
-  const Real mp_code = code_constants.mp();
+  const Real h_code = code_constants.h;
+  const Real mp_code = code_constants.mp;
 
   std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
                                  "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
@@ -387,8 +387,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto &unit_conv = phoebus_pkg->Param<phoebus::UnitConversions>("unit_conv");
   auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
 
-  const Real h_code = code_constants.h();
-  const Real mp_code = code_constants.mp();
+  const Real h_code = code_constants.h;
+  const Real mp_code = code_constants.mp;
 
   std::vector<std::string> vars(
       {p::density, p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});

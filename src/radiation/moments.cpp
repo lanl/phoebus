@@ -990,13 +990,6 @@ TaskStatus MomentCalculateOpacities(T *rc) {
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
         for (int ispec = 0; ispec < nspec; ++ispec) {
-          /// TODO: (LFR) Need to make a grid variable holding the energy integrated
-          /// opacity so that we can
-          ///             create a task to fill the opacity based on MoCMC or some other
-          ///             rule.
-          /// TOMAYBENOTDO: (BRR) Can't we just use kappaH and kappaJ?
-          // const Real enu = 10.0; // Assume we are gray for now or can take the peak
-          //                       // opacity at enu = 10 MeV
           const Real rho = v(iblock, prho, k, j, i);
           const Real Temp = v(iblock, pT, k, j, i);
           const Real Ye = v(iblock, pYe, k, j, i);
