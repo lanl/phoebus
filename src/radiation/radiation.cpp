@@ -281,7 +281,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     ParArray1D<Real> nusamp("Frequency grid", nu_bins + 1);
     auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
     for (int n = 0; n < nu_bins + 1; n++) {
-      nusamp_h(n) = exp(log(nu_min) + n * dlnu);
+      nusamp_h(n) = exp(log(nu_min) + n * dlnu) / unit_conv.GetTimeCGSToCode();
     }
     Kokkos::deep_copy(nusamp, nusamp_h);
     params.Add("nusamp", nusamp);
@@ -415,6 +415,9 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
         v(cye, k, j, i) += v(Gye, k, j, i) * dt;
+        printf("cons: %e %e %e %e | %e\n", v(ceng,k,j,i),
+          v(cmom_lo,k,j,i), v(cmom_lo+1,k,j,i), v(cmom_lo+2,k,j,i),
+          v(cye,k,j,i));
       });
 
   return TaskStatus::complete;

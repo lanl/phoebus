@@ -61,7 +61,7 @@ constexpr char kappaH_mean[] = "r.i.kappaH_mean";
 namespace mocmc_internal {
 constexpr char dnsamp[] = "mocmc.i.dnsamp";
 constexpr char Inu0[] = "mocmc.i.inu0";
-constexpr char Inu1[] = "mocmc.i.inu0";
+constexpr char Inu1[] = "mocmc.i.inu1";
 constexpr char jinvs[] = "mocmc.i.jinvs";
 } // namespace mocmc_internal
 

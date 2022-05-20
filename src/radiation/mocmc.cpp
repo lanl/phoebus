@@ -680,6 +680,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                      v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1));
             kappaJ = robust::ratio(kappaJ, Itot);
             kappaH = kappaJ;
+            // TODO(BRR) Replace scattering_fraction with physical scattering opacity
             kappaJ *= (1. - scattering_fraction);
 
             Real tauJ = alpha * dt * kappaJ;
