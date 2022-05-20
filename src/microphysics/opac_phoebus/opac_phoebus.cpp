@@ -78,6 +78,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("C", C);
     params.Add("numin", numin);
     params.Add("numax", numax);
+    printf("C: %e numin: %e numax: %e\n", C, numin, numax);
 
     PARTHENON_REQUIRE(!scale_free, "Must have CGS scaling for tophat opacities!");
 
