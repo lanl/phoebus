@@ -169,7 +169,7 @@ class Modified {
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     Real detJ = LinearAlgebra::Determinant(Jcov);
-    return std::abs(s_.DetGamma(X0, C[0], C[1], C[2])*detJ);
+    return std::abs(s_.DetGamma(X0, C[0], C[1], C[2]) * detJ);
   }
   KOKKOS_INLINE_FUNCTION
   Real DetG(Real X0, Real X1, Real X2, Real X3) const {

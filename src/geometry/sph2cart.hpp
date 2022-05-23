@@ -83,13 +83,13 @@ class SphericalToCartesian {
     // better-behaved because these quantities cancel out with the
     // quantities in the metric.
     Jcov[0][0] = sth * cph;
-    Jcov[0][1] = sth *sph;
+    Jcov[0][1] = sth * sph;
     Jcov[0][2] = cth;
     Jcov[1][0] = ratio(cth * cph, r);
     Jcov[1][1] = ratio(cth * sph, r);
     Jcov[1][2] = -ratio(sth, r);
-    Jcov[2][0] = -ratio(sph, r*sth);
-    Jcov[2][1] = ratio(cph, r*sth);
+    Jcov[2][0] = -ratio(sph, r * sth);
+    Jcov[2][1] = ratio(cph, r * sth);
     Jcov[2][2] = 0;
 
     // Jcon
