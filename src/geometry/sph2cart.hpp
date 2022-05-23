@@ -68,6 +68,7 @@ class SphericalToCartesian {
     // Jcov has x^{mu'} = {r,th,ph}
 
     // Jcov
+    /*
     Jcov[0][0] = ratio(x, r);             // dr/dx
     Jcov[0][1] = ratio(y, r);             // dr/dy
     Jcov[0][2] = ratio(z, r);             // dr/dz
@@ -77,6 +78,19 @@ class SphericalToCartesian {
     Jcov[2][0] = -ratio(y, rho2);         // dph/dx
     Jcov[2][1] = ratio(x, rho2);          // dph/dy
     Jcov[2][2] = 0;                       // dph/dz
+    */
+    // JMM: The version with all spherical quantities is substantially
+    // better-behaved because these quantities cancel out with the
+    // quantities in the metric.
+    Jcov[0][0] = sth * cph;
+    Jcov[0][1] = sth *sph;
+    Jcov[0][2] = cth;
+    Jcov[1][0] = ratio(cth * cph, r);
+    Jcov[1][1] = ratio(cth * sph, r);
+    Jcov[1][2] = -ratio(sth, r);
+    Jcov[2][0] = -ratio(sph, r*sth);
+    Jcov[2][1] = ratio(cph, r*sth);
+    Jcov[2][2] = 0;
 
     // Jcon
     Jcon[0][0] = sth * cph;      // dx/dr
@@ -95,9 +109,9 @@ class SphericalToCartesian {
                                    Real &th, Real &ph, Real &r2, Real &sth, Real &cth,
                                    Real &sph, Real &cph) const {
     using robust::ratio;
-    r2 = x * x + y * y + z * z;
+    r2 = robust::make_positive(x * x + y * y + z * z);
     r = std::sqrt(r2);
-    th = std::acos(ratio(z, r));
+    th = robust::make_positive(std::acos(ratio(z, r)));
     ph = std::atan2(y, x);
     sth = std::sin(th);
     cth = std::cos(th);
