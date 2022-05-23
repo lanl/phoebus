@@ -14,10 +14,17 @@
 
 <phoebus>
 problem = tov
+
+# To use Octant symmetry
+# change inner BCs to reflect
+# and change domain to [0,xmax]
+
 ix1_bc = outflow
 ox1_bc = outflow
+
 ix2_bc = outflow
 ox2_bc = outflow
+
 ix3_bc = outflow
 ox3_bc = outflow
 
@@ -40,13 +47,15 @@ variables = p.density,  &
 	    g.c.alpha, &
 	    g.c.detgam, &
 	    g.c.gcov, &
+            g.c.gamcon, &
+            g.c.bcon, &
 	    g.c.dg, &
 	    g.c.dalpha, &
 	    flux_divergence, &
 	    src_terms
 
 file_type   = hdf5      # Tabular data dump
-dt          = 100       # time increment between outputs
+dt          = 200       # time increment between outputs
 
 <parthenon/output2>
 file_type = hst
@@ -84,10 +93,10 @@ ox3_bc      = user          # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-<parthenon/meshblock>
-nx1 = 200
-nx2 = 200
-nx3 = 200
+# <parthenon/meshblock>
+# nx1 = 200
+# nx2 = 200
+# nx3 = 200
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -109,7 +118,7 @@ rad = false
 xorder = 2
 cfl = 0.25
 riemann = llf
-recon = weno5
+recon = linear
 c2p_max_iter = 1000
 Ye = false
 
@@ -119,7 +128,7 @@ enable_ceilings = true
 enable_flux_fixup = true
 enable_c2p_fixup = true
 floor_type = RRhoSie
-rho0_floor = 1.0e-8
+rho0_floor = 1.0e-6
 sie0_floor = 1.0e-3
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
@@ -136,7 +145,7 @@ enabled = true
 npoints = 2048
 rout = 250
 # Disables time derivatives. Runs only at initialization
-force_static = true
+force_static = false
 # Runs the first n subcycles. Then freezes. Source terms are not disabled.
 # -1 means it's always run.
 run_n_times = -1
@@ -154,7 +163,7 @@ enabled = true
 Pc = 1e-6
 entropy = 8
 # pressure below which we terminate the TOV solver and transition to atmosphere
-Pmin = 1e-12 
+Pmin = 1e-8
 # The atmosphere values in the problem generator for density and energy
 rhomin = 1e-12
 epsmin = 1e-12
