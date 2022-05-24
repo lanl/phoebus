@@ -18,8 +18,8 @@
 
 #include <memory>
 
-#include <parthenon_manager.hpp>
 #include <parthenon/package.hpp>
+#include <parthenon_manager.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
