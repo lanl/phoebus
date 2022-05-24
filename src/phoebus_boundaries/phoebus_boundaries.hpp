@@ -18,11 +18,14 @@
 
 #include <memory>
 
+#include <parthenon_manager.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
 namespace Boundaries {
+
+void ProcessBoundaryConditions(parthenon::ParthenonManager &pman);
 
 void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
