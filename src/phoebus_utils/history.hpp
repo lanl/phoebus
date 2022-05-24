@@ -29,10 +29,8 @@ using namespace parthenon::package::prelude;
  * from first element. You should capture this object in a lambda to
  * pass it to the Parthenon history machinery.
  *
- * TODO(JMM): This one is very simple. No volume weighting, no metric
- * information. So it only works for min and max basically.  This can
- * be made more sophisticated if needed, but I think this is fine for
- * now.
+ * Works on max/min and on sums over densitized variables, which
+ * include the determinant of the metric.
  */
 
 namespace History {
