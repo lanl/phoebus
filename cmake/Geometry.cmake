@@ -1,4 +1,4 @@
-# © 2021. Triad National Security, LLC. All rights reserved.  This
+# © 2021-2022. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
 # National Security, LLC for the U.S.  Department of Energy/National
@@ -16,6 +16,7 @@ option(PHOEBUS_CACHE_GEOMETRY "Cache geometry. Only available for some geometrie
 # Default
 set(PHOEBUS_GEOMETRY "Minkowski" CACHE STRING "The metric used by Phoebus")
 
+# List analytic geometries here.
 set(PHOEBUS_ANALYTIC_GEOMETRIES
     "Minkowski"
     "BoostedMinkowski"
@@ -29,20 +30,12 @@ set(PHOEBUS_ANALYTIC_GEOMETRIES
     "MonopoleSph"
     "MonopoleCart"
     )
-set(PHOEBUS_GEOMETRY_NO_CACHE
-    "MonopoleSph"
-    "MonopoleCart"
-    )
 
 if(PHOEBUS_ANALYTIC_GEOMETRY)
   if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_ANALYTIC_GEOMETRIES)
     set(GEOMETRY_MESH "Analytic<${PHOEBUS_GEOMETRY}, IndexerMesh>")
     set(GEOMETRY_MESH_BLOCK "Analytic<${PHOEBUS_GEOMETRY}, IndexerMeshBlock>")
     if (PHOEBUS_CACHE_GEOMETRY)
-      if (PHOEBUS_GEOMETRY IN_LIST PHOEBUS_GEOMETRY_NO_CACHE)
-	message(WARNING "The selected geometry does not support caching. "
-	  "You may experience unexpected behaviour.")
-      endif()
       set(GEOMETRY_MESH "CachedOverMesh<${GEOMETRY_MESH}>")
       set(GEOMETRY_MESH_BLOCK "CachedOverMeshBlock<${GEOMETRY_MESH_BLOCK}>")
     endif()

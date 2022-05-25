@@ -22,6 +22,8 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
+using namespace parthenon::package::prelude;
+
 // Singularity
 #include <singularity-eos/eos/eos.hpp>
 
@@ -31,6 +33,8 @@
 #include "monopole_gr/monopole_gr_base.hpp"
 #include "monopole_gr/monopole_gr_interface.hpp"
 #include "monopole_gr/monopole_gr_utils.hpp"
+#include "phoebus_utils/history.hpp"
+#include "phoebus_utils/variables.hpp"
 
 #include "tov.hpp"
 
@@ -85,6 +89,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("tov_state_h", tov_state_h);
   params.Add("tov_intrinsic", tov_intrinsic);
   params.Add("tov_intrinsic_h", tov_intrinsic_h);
+
+  // Redutions for history file
+  auto HstMax = parthenon::UserHistoryOperation::max;
+  auto ReducePress = [](MeshData<Real> *md) {
+    return History::ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::pressure, 0);
+  };
+  auto ReduceDens = [](MeshData<Real> *md) {
+    return History::ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::density, 0);
+  };
+  parthenon::HstVar_list hst_vars = {};
+  hst_vars.emplace_back(parthenon::HistoryOutputVar(HstMax, ReducePress, "max pressure"));
+  hst_vars.emplace_back(parthenon::HistoryOutputVar(HstMax, ReduceDens, "max Density"));
+  params.Add(parthenon::hist_param_key, hst_vars);
 
   return tov;
 }

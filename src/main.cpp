@@ -13,8 +13,13 @@
 // so.
 //========================================================================================
 
+#include <string>
+#include <vector>
+
 #include <defs.hpp>
 #include <globals.hpp>
+#include <parthenon/driver.hpp>
+#include <parthenon/package.hpp>
 #include <parthenon_manager.hpp>
 
 #include "fluid/con2prim_statistics.hpp"
@@ -46,34 +51,9 @@ int main(int argc, char *argv[]) {
   // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
 
-  // TODO(JMM): Move this into another function somewhere?
-  // Ensure only allowed parthenon boundary conditions are used
-  const std::string parth_ix1_bc = pman.pinput->GetString("parthenon/mesh", "ix1_bc");
-  PARTHENON_REQUIRE(parth_ix1_bc == "user" || parth_ix1_bc == "periodic",
-                    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ix1_bc");
-  const std::string parth_ox1_bc = pman.pinput->GetString("parthenon/mesh", "ox1_bc");
-  PARTHENON_REQUIRE(parth_ox1_bc == "user" || parth_ox1_bc == "periodic",
-                    "Only \"user\" and \"periodic\" allowed for parthenon/mesh/ox1_bc");
-
-  const std::string ix1_bc = pman.pinput->GetOrAddString("phoebus", "ix1_bc", "outflow");
-  const std::string ox1_bc = pman.pinput->GetOrAddString("phoebus", "ox1_bc", "outflow");
-
-  if (ix1_bc == "reflect") {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
-        Boundaries::ReflectInnerX1;
-  } else if (ix1_bc == "outflow") {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
-        Boundaries::OutflowInnerX1;
-  } // else, parthenon periodic boundaries
-  if (ox1_bc == "reflect") {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-        Boundaries::ReflectOuterX1;
-  } else if (ox1_bc == "outflow") {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-        Boundaries::OutflowOuterX1;
-  } // else, parthenon periodic boundaries
-
   phoebus::ProblemModifier(pman.pinput.get());
+
+  Boundaries::ProcessBoundaryConditions(pman);
 
   // call ParthenonInit to set up the mesh
   pman.ParthenonInitPackagesAndMesh();
