@@ -62,7 +62,7 @@ parser.add_argument('-s','--savename', type=str,
                     help='Name to save movie as')
 parser.add_argument('-l','--linear',action='store_true',
                     help='Use linear, instead of log scale')
-parser.add_arrgument('--noclean',action='store_true',
+parser.add_argument('--noclean',action='store_true',
                      help="Don't clean up the temporary directory when done")
 parser.add_argument('varname', type=str, help='Variable to plot')
 parser.add_argument('files', type=str, nargs='+',

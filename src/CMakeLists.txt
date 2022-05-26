@@ -43,6 +43,8 @@ add_executable(phoebus
   geometry/geometry.hpp
   geometry/geometry_defaults.hpp
   geometry/geometry_utils.hpp
+  geometry/sph2cart.cpp
+  geometry/sph2cart.hpp
   geometry/tetrads.hpp
 
   geometry/inchworm.hpp
@@ -106,6 +108,7 @@ add_executable(phoebus
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
+  phoebus_utils/history.hpp
   phoebus_utils/linear_algebra.hpp
   phoebus_utils/phoebus_interpolation.hpp
   phoebus_utils/reduction.hpp

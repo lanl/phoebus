@@ -26,6 +26,7 @@ using namespace parthenon::package::prelude;
 // phoebus includes
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace Geometry {
 
@@ -43,7 +44,12 @@ namespace Geometry {
 //                 Real C[NDSPACE],
 //                 Real Jcov[NDSPACE][NDSPACE],
 //                 Real Jcon[NDSPACE][NDSPACE]) const;
-template <typename System, typename Transformation>
+//
+// The TIME_DEPENDENT template parameter DOES NOT mean the
+// transformation is time-dependent. It means the metric is.
+// TODO(JMM): A time-dependent version of this may be worth pursuing
+// eventually.
+template <typename System, typename Transformation, bool TIME_DEPENDENT = false>
 class Modified {
  public:
   Modified() = default;
@@ -52,7 +58,7 @@ class Modified {
       : dx_(1e-10), GetTransformation_(GetTransformation),
         s_(std::forward<Args>(args)...) {}
   template <typename... Args>
-  Modified(Real dx, const Transformation &GetTransformation, Args... args)
+  Modified(const Real dx, const Transformation &GetTransformation, Args... args)
       : dx_(dx), GetTransformation_(GetTransformation), s_(std::forward<Args>(args)...) {}
 
   KOKKOS_INLINE_FUNCTION
@@ -163,7 +169,7 @@ class Modified {
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     Real detJ = LinearAlgebra::Determinant(Jcov);
-    return s_.DetGamma(X0, C[0], C[1], C[2]) * std::abs(detJ);
+    return std::abs(s_.DetGamma(X0, C[0], C[1], C[2]) * detJ);
   }
   KOKKOS_INLINE_FUNCTION
   Real DetG(Real X0, Real X1, Real X2, Real X3) const {
@@ -172,7 +178,7 @@ class Modified {
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
     Real detJ = LinearAlgebra::Determinant(Jcov);
-    return s_.DetG(X0, C[0], C[1], C[2]) * std::abs(detJ);
+    return std::abs(s_.DetG(X0, C[0], C[1], C[2]) * detJ);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -184,10 +190,38 @@ class Modified {
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     Utils::SetMetricGradientByFD(*this, dx_, X0, X1, X2, X3, dg);
+    // If time-dependent, assume coordinate transformation is time
+    // indepedent, pull dg_{mu nu}/dt from underlying system, and
+    // transform mu and nu
+    if (TIME_DEPENDENT) {
+      Real dg0[NDFULL][NDFULL][NDFULL];
+      Real C[NDSPACE];
+      Real Jcon[NDSPACE][NDSPACE];
+      Real Jcov[NDSPACE][NDSPACE];
+      GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
+      s_.MetricDerivative(X0, X1, X2, X3, dg0);
+      SPACETIMELOOP2(mu, nu) {
+        dg[mu][nu][0] = 0;
+        SPACETIMELOOP2(lam, kap) {
+          dg[mu][nu][0] += dg0[lam][kap][0] * S2ST_(Jcon, mu, lam) * S2ST_(Jcon, nu, kap);
+        }
+      }
+    }
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
     Utils::SetGradLnAlphaByFD(*this, dx_, X0, X1, X2, X3, da);
+    // If time-dependent, assume coordinate transformation is time
+    // indepedent, pull dalpha/dt from underlying system
+    if (TIME_DEPENDENT) {
+      Real da0[NDFULL];
+      Real C[NDSPACE];
+      Real Jcon[NDSPACE][NDSPACE];
+      Real Jcov[NDSPACE][NDSPACE];
+      GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
+      s_.GradLnAlpha(X0, X1, X2, X3, da0);
+      da[0] = da0[0];
+    }
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -208,9 +242,9 @@ class Modified {
       return A[mu - 1][nu - 1];
     }
   }
-  Real dx_ = 1e-10;
-  System s_;
-  Transformation GetTransformation_;
+  Real dx_ = 1e-10;                  // finite differences dx
+  System s_;                         // underlying coordinate system
+  Transformation GetTransformation_; // transformation operator
 };
 
 } // namespace Geometry
