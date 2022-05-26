@@ -16,7 +16,7 @@ file_type   = hdf5      # Tabular data dump
 dt          = 1.e-3     # time increment between outputs
 
 <parthenon/time>
-nlim        = 1       # cycle limit
+nlim        = -1       # cycle limit
 tlim        = 1.e-1           # time limit
 integrator  = rk2      # time integration algorithm
 ncycle_out  = 1        # interval for stdout summary info
@@ -76,13 +76,13 @@ c2p_max_iter = 100
 Ye = true
 
 <radiation>
-#method = cooling_function
-method = monte_carlo
+method = cooling_function
+#method = monte_carlo
 nu_min = 1.e15
 nu_max = 0.9999e17
 nu_bins = 100
-#tune_emission = 1.e-41
-tune_emission = 1.e-34
+tune_emission = 1.e-41
+#tune_emission = 1.e-34
 num_particles = 16
 opacity_model = tophat
 absorption = false

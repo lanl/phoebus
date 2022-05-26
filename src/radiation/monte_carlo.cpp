@@ -67,22 +67,15 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real &minx_k = pmb->coords.x3f(kb.s);
   auto geom = Geometry::GetCoordinateSystem(rc);
 
+  const Real d3x = dx_i * dx_j * dx_k;
+
   auto &phoebus_pkg = pmb->packages.Get("phoebus");
   auto &unit_conv = phoebus_pkg->Param<phoebus::UnitConversions>("unit_conv");
   auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
 
-  const Real d3x = dx_i * dx_j * dx_k;
-
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
-  printf("%e %e\n", h_code, mp_code);
-
-    const Real MASS = unit_conv.GetMassCodeToCGS();
-  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
   const Real TIME = unit_conv.GetTimeCodeToCGS();
-  const Real h_code_old = pc::h * TIME / (MASS * LENGTH * LENGTH);
-  const Real mp_code_old = pc::mp / MASS;
-  printf("%e %e old\n", h_code_old, mp_code_old);
 
   std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
                                  "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
@@ -128,12 +121,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             const Real &dens = v(pdens, k, j, i);
             const Real &temp = v(ptemp, k, j, i);
             const Real &ye = v(pye, k, j, i);
-            printf("Emissivity: %e dU = %e\n", d_opacity.Emissivity(dens,temp,ye,s),
-              d_opacity.Emissivity(dens,temp,ye,s)*dt);
-            printf("YeEmissivity: %e dYe = %e\n", mp_code*d_opacity.NumberEmissivity(dens,temp,ye,s),
-              mp_code*d_opacity.NumberEmissivity(dens,temp,ye,s)*dt);
-            Real intEmiss = 0.;
-            Real intYeEmiss = 0.;
 
             Real dN = 0.;
             Real dNdlnu_max = 0.;
@@ -155,16 +142,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 dNdlnu_max = dNdlnu;
               }
             }
-            intEmiss -= 0.5*d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
-              ye, s, nusamp(0));
-            intEmiss -= 0.5*d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
-              ye, s, nusamp(nu_bins));
-            intYeEmiss -= 0.5*d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
-              ye, s, nusamp(0))*mp_code/(h_code*nusamp(0));
-            intYeEmiss -= 0.5*d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
-              ye, s, nusamp(nu_bins))*mp_code/(h_code*nusamp(nu_bins));
-              printf("intEmiss: %e\n", intEmiss);
-              printf("intYeEmiss: %e\n", intYeEmiss);
 
             for (int n = 0; n <= nu_bins; n++) {
               v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) /= dNdlnu_max;
@@ -174,11 +151,11 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real nu0 = nusamp[0];
             Real nu1 = nusamp[nu_bins];
             dN -= 0.5 *
-                  d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
+                  d_opacity.EmissivityPerNu(dens, temp, ye, s,
                                             nu0) /
                   (h_code * GetWeight(wgtC, nu0)) * dlnu;
             dN -= 0.5 *
-                  d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
+                  d_opacity.EmissivityPerNu(dens, temp, ye, s,
                                             nu1) /
                   (h_code * GetWeight(wgtC, nu1)) * dlnu;
             dN *= d3x * detG * dt;
@@ -190,8 +167,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Ns++;
             }
 
-            // TODO(BRR) Use a ParArrayND<int> instead of these weird
-            // static_casts
+            // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
             v(idN + sidx, k, j, i) = dN;
             v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
             rng_pool.free_state(rng_gen);
