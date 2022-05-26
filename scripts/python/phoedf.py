@@ -24,10 +24,10 @@ class phoedf(phdf.phdf):
   def __init__(self, filename):
     super().__init__(filename)
 
-    self.eos_type = self.Params['eos/type'].decode('ascii')
+    self.eos_type = self.Params['eos/type']
 
     if 'opacity/type' in self.Params:
-      self.opacity_model = self.Params['opacity/type'].decode('ascii')
+      self.opacity_model = self.Params['opacity/type']
 
     self.LengthCodeToCGS = self.Params['phoebus/LengthCodeToCGS']
     self.TimeCodeToCGS = self.Params['phoebus/TimeCodeToCGS']
