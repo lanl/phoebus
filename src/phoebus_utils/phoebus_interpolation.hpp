@@ -11,8 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef PHOEBUS_UTILS_PHOEBUS_INTERPOLATION_
-#define PHOEBUS_UTILS_PHOEBUS_INTERPOLATION_
+#ifndef PHOEBUS_UTILS_PHOEBUS_INTERPOLATION_HPP_
+#define PHOEBUS_UTILS_PHOEBUS_INTERPOLATION_HPP_
 
 // Spiner includes
 #include <spiner/interpolation.hpp>
