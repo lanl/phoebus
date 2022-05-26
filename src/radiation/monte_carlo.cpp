@@ -315,7 +315,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 v(mu, k, j, i) -= 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
               }
               // TODO(BRR) lepton sign
-              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code; /// 3333.
+              v(Gye, k, j, i) -=
+                  1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code; /// 3333.
 
               rng_pool.free_state(rng_gen);
             } // for n

@@ -85,9 +85,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   int nu_bins;
   Real dlnu;
   if (is_frequency_dependent) {
-    nu_min = pin->GetReal("radiation", "nu_min") / unit_conv.GetTimeCGSToCode();;
+    nu_min = pin->GetReal("radiation", "nu_min") / unit_conv.GetTimeCGSToCode();
+    ;
     params.Add("nu_min", nu_min);
-    nu_max = pin->GetReal("radiation", "nu_max") / unit_conv.GetTimeCGSToCode();;
+    nu_max = pin->GetReal("radiation", "nu_max") / unit_conv.GetTimeCGSToCode();
+    ;
     params.Add("nu_max", nu_max);
     nu_bins = pin->GetInteger("radiation", "nu_bins");
     params.Add("nu_bins", nu_bins);
