@@ -85,9 +85,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   int nu_bins;
   Real dlnu;
   if (is_frequency_dependent) {
-    nu_min = pin->GetReal("radiation", "nu_min");
+    nu_min = pin->GetReal("radiation", "nu_min") / unit_conv.GetTimeCGSToCode();;
     params.Add("nu_min", nu_min);
-    nu_max = pin->GetReal("radiation", "nu_max");
+    nu_max = pin->GetReal("radiation", "nu_max") / unit_conv.GetTimeCGSToCode();;
     params.Add("nu_max", nu_max);
     nu_bins = pin->GetInteger("radiation", "nu_bins");
     params.Add("nu_bins", nu_bins);
@@ -167,7 +167,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     ParArray1D<Real> nusamp("Frequency grid", nu_bins);
     auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
     for (int n = 0; n < nu_bins; n++) {
-      nusamp_h(n) = exp(log(nu_min) + (n + 0.5) * dlnu) / unit_conv.GetTimeCGSToCode();
+      nusamp_h(n) = exp(log(nu_min) + (n + 0.5) * dlnu);
     }
     Kokkos::deep_copy(nusamp, nusamp_h);
     params.Add("nusamp", nusamp);
@@ -281,7 +281,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     ParArray1D<Real> nusamp("Frequency grid", nu_bins + 1);
     auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
     for (int n = 0; n < nu_bins + 1; n++) {
-      nusamp_h(n) = exp(log(nu_min) + n * dlnu) / unit_conv.GetTimeCGSToCode();
+      nusamp_h(n) = exp(log(nu_min) + n * dlnu);
     }
     Kokkos::deep_copy(nusamp, nusamp_h);
     params.Add("nusamp", nusamp);

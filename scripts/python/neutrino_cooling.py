@@ -87,10 +87,6 @@ for n, dfnam in enumerate(dfnams):
   Ye_code[n] = dfile.Get("p.ye").mean()
   u_code[n] = dfile.Get("p.energy").mean()*U_unit
 
-print(t_code)
-print(Ye_code)
-print(u_code)
-
 fig, axes = plt.subplots(2, 1, figsize=(8,6))
 ax = axes[0]
 ax.set_yscale('log')
