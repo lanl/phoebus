@@ -13,8 +13,13 @@
 // so.
 //========================================================================================
 
+#include <string>
+#include <vector>
+
 #include <defs.hpp>
 #include <globals.hpp>
+#include <parthenon/driver.hpp>
+#include <parthenon/package.hpp>
 #include <parthenon_manager.hpp>
 
 #include "fluid/con2prim_statistics.hpp"
@@ -47,9 +52,9 @@ int main(int argc, char *argv[]) {
   // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
 
-  Boundaries::SetPhoebusBoundaries(pman);
-
   phoebus::ProblemModifier(pman.pinput.get());
+
+  Boundaries::ProcessBoundaryConditions(pman);
 
   // call ParthenonInit to set up the mesh
   pman.ParthenonInitPackagesAndMesh();

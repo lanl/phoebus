@@ -3,6 +3,8 @@
 problem = torus
 ix1_bc = outflow
 ox1_bc = outflow
+ix2_bc = reflect
+ox2_bc = reflect
 
 <phoebus/mesh>
 bc_vars = primitive
@@ -56,8 +58,8 @@ ox1_bc      = user          # Outer-X1 boundary condition flag
 nx2         = 256           # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
 x2max       = 1             # maximum value of X2. X2 = 1 -> theta = pi
-ix2_bc      = reflecting    # Inner-X2 boundary condition flag
-ox2_bc      = reflecting    # Outer-X2 boundary condition flag
+ix2_bc      = user          # Inner-X2 boundary condition flag
+ox2_bc      = user          # Outer-X2 boundary condition flag
 
 nx3         = 1             # Number of zones in X3-direction
 x3min       = 0             # minimum value of X3

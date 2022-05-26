@@ -80,13 +80,13 @@ class Floors {
       rflr = scratch;
     } break;
     case FloorFlag::X1RhoSie:
-      rflr = r0_ * std::pow(x1, ralpha_);
-      sflr = s0_ * std::pow(x1, salpha_);
+      rflr = r0_ * std::min(1.0, std::pow(x1, ralpha_));
+      sflr = s0_ * std::min(1.0, std::pow(x1, salpha_));
       break;
     case FloorFlag::RRhoSie: {
       Real r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
-      rflr = r0_ * std::pow(r, ralpha_);
-      sflr = s0_ * std::pow(r, salpha_);
+      rflr = r0_ * std::min(1.0, std::pow(r, ralpha_));
+      sflr = s0_ * std::min(1.0, std::pow(r, salpha_));
     } break;
     default:
       PARTHENON_FAIL("No valid floor set.");
