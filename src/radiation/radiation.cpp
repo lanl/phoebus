@@ -378,9 +378,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("moments_active", moments_active);
 
-  if (method != "cooling_function") {
-    physics->EstimateTimestepBlock = EstimateTimestepBlock;
-  }
+  physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   printf("Done initializing\n");
 
@@ -430,6 +428,8 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
 }
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+  // Note that this is still used for the cooling function even though that option
+  // contains no transport. This is useful for consistency between methods.
   auto pmb = rc->GetBlockPointer();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);

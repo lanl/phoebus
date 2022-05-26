@@ -89,6 +89,7 @@ for n, dfnam in enumerate(dfnams):
 
 print(t_code)
 print(Ye_code)
+print(u_code)
 
 fig, axes = plt.subplots(2, 1, figsize=(8,6))
 ax = axes[0]

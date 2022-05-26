@@ -88,7 +88,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                  "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int iye = imap[p::ye].first;
+  const int pye = imap[p::ye].first;
   const int pdens = imap[p::density].first;
   const int ptemp = imap[p::temperature].first;
   const int pvlo = imap[p::velocity].first;
@@ -109,7 +109,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         printf("rho: %e T: %e ye: %e\n",
-          v(pdens,k,j,i), v(ptemp,k,j,i), v(iye,k,j,i));
+          v(pdens,k,j,i), v(ptemp,k,j,i), v(pye,k,j,i));
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
           v(mu, k, j, i) = 0.;
         }
@@ -122,9 +122,18 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       pmb->par_for(
           "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
           KOKKOS_LAMBDA(const int k, const int j, const int i) {
+
             auto rng_gen = rng_pool.get_state();
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
-            Real ye = v(iye, k, j, i);
+            const Real &dens = v(pdens, k, j, i);
+            const Real &temp = v(ptemp, k, j, i);
+            const Real &ye = v(pye, k, j, i);
+            printf("Emissivity: %e dU = %e\n", d_opacity.Emissivity(dens,temp,ye,s),
+              d_opacity.Emissivity(dens,temp,ye,s)*dt);
+            printf("YeEmissivity: %e dYe = %e\n", mp_code*d_opacity.NumberEmissivity(dens,temp,ye,s),
+              mp_code*d_opacity.NumberEmissivity(dens,temp,ye,s)*dt);
+            Real intEmiss = 0.;
+            Real intYeEmiss = 0.;
 
             Real dN = 0.;
             Real dNdlnu_max = 0.;
@@ -132,8 +141,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Real nu = nusamp(n);
               Real ener = h_code * nu;
               Real wgt = GetWeight(wgtC, nu);
-              Real Jnu = d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
+              Real Jnu = d_opacity.EmissivityPerNu(dens,temp,
                                                    ye, s, nu);
+              intEmiss += Jnu*nu*dlnu;
+              intYeEmiss += Jnu*nu*dlnu*mp_code/ener;
 
               dN += Jnu / (ener * wgt) * (nu * dlnu);
 
@@ -144,6 +155,16 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 dNdlnu_max = dNdlnu;
               }
             }
+            intEmiss -= 0.5*d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
+              ye, s, nusamp(0));
+            intEmiss -= 0.5*d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
+              ye, s, nusamp(nu_bins));
+            intYeEmiss -= 0.5*d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
+              ye, s, nusamp(0))*mp_code/(h_code*nusamp(0));
+            intYeEmiss -= 0.5*d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
+              ye, s, nusamp(nu_bins))*mp_code/(h_code*nusamp(nu_bins));
+              printf("intEmiss: %e\n", intEmiss);
+              printf("intYeEmiss: %e\n", intYeEmiss);
 
             for (int n = 0; n <= nu_bins; n++) {
               v(idNdlnu + sidx + n * NumRadiationTypes, k, j, i) /= dNdlnu_max;
@@ -305,8 +326,11 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               do {
                 nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
                 counter++;
+                PARTHENON_REQUIRE(counter < 100000, "Inefficient or impossible frequency sampling!");
               } while (rng_gen.drand() >
                        LogLinearInterp(nu, sidx, k, j, i, dNdlnu, lnu_min, dlnu));
+              // TODO(BRR) convert cgs lnu_min etc. into code nu
+              nu *= TIME;
 
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
@@ -326,16 +350,16 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
               for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
                 // detG is in both numerator and denominator
-                v(mu, k, j, i) += 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
+                v(mu, k, j, i) -= 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
               }
               // TODO(BRR) lepton sign
-              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
+              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;///3333.
 
               rng_pool.free_state(rng_gen);
-            }
+            } // for n
           });
-    }
-  }
+    } // if do_species[sidx]
+  } // for sidx
 
   if (remove_emitted_particles) {
     pmb->par_for(

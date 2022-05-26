@@ -86,6 +86,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             const Real Ye = v(pye, k, j, i);
 
             double J = d_opacity.Emissivity(v(prho, k, j, i), v(ptemp, k, j, i), Ye, s);
+            // TODO(BRR) mp_code
             double Jye = pc::mp * d_opacity.NumberEmissivity(v(prho, k, j, i),
                                                              v(ptemp, k, j, i), Ye, s);
 
@@ -93,9 +94,10 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             Real Gcov_coord[4];
             Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+            printf("[%i][%i %i %i] J = %e dU = %e\n", sidx, k, j, i, J, J*dt);
 
             for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-              Kokkos::atomic_add(&(v(mu, k, j, i)), detG * Gcov_coord[mu - Gcov_lo]);
+              Kokkos::atomic_add(&(v(mu, k, j, i)), -detG * Gcov_coord[mu - Gcov_lo]);
             }
             Kokkos::atomic_add(&(v(Gye, k, j, i)), -detG * Jye);
           });
