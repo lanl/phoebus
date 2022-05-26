@@ -49,6 +49,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   auto rad = pmb->packages.Get("radiation").get();
   auto opac = pmb->packages.Get("opacity").get();
 
+  auto &phoebus_pkg = pmb->packages.Get("phoebus");
   auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
   const Real mp_code = code_constants.mp;
 

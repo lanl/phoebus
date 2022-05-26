@@ -70,12 +70,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real d3x = dx_i * dx_j * dx_k;
 
   auto &phoebus_pkg = pmb->packages.Get("phoebus");
-  auto &unit_conv = phoebus_pkg->Param<phoebus::UnitConversions>("unit_conv");
   auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
 
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
-  const Real TIME = unit_conv.GetTimeCodeToCGS();
 
   std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
                                  "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
@@ -94,15 +92,12 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
 
-  // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting
-  // value
+  // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
   Real wgtC = 1.e40; // Typical-ish value
 
   pmb->par_for(
       "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        printf("rho: %e T: %e ye: %e\n",
-          v(pdens,k,j,i), v(ptemp,k,j,i), v(pye,k,j,i));
         for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
           v(mu, k, j, i) = 0.;
         }
@@ -115,7 +110,6 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       pmb->par_for(
           "MonteCarlodNdlnu", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
           KOKKOS_LAMBDA(const int k, const int j, const int i) {
-
             auto rng_gen = rng_pool.get_state();
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
             const Real &dens = v(pdens, k, j, i);
@@ -128,10 +122,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Real nu = nusamp(n);
               Real ener = h_code * nu;
               Real wgt = GetWeight(wgtC, nu);
-              Real Jnu = d_opacity.EmissivityPerNu(dens,temp,
-                                                   ye, s, nu);
-              intEmiss += Jnu*nu*dlnu;
-              intYeEmiss += Jnu*nu*dlnu*mp_code/ener;
+              Real Jnu = d_opacity.EmissivityPerNu(dens, temp, ye, s, nu);
 
               dN += Jnu / (ener * wgt) * (nu * dlnu);
 
@@ -150,13 +141,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             // Trapezoidal rule
             Real nu0 = nusamp[0];
             Real nu1 = nusamp[nu_bins];
-            dN -= 0.5 *
-                  d_opacity.EmissivityPerNu(dens, temp, ye, s,
-                                            nu0) /
+            dN -= 0.5 * d_opacity.EmissivityPerNu(dens, temp, ye, s, nu0) /
                   (h_code * GetWeight(wgtC, nu0)) * dlnu;
-            dN -= 0.5 *
-                  d_opacity.EmissivityPerNu(dens, temp, ye, s,
-                                            nu1) /
+            dN -= 0.5 * d_opacity.EmissivityPerNu(dens, temp, ye, s, nu1) /
                   (h_code * GetWeight(wgtC, nu1)) * dlnu;
             dN *= d3x * detG * dt;
 
@@ -302,11 +289,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               do {
                 nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
                 counter++;
-                PARTHENON_REQUIRE(counter < 100000, "Inefficient or impossible frequency sampling!");
+                PARTHENON_REQUIRE(counter < 100000,
+                                  "Inefficient or impossible frequency sampling!");
               } while (rng_gen.drand() >
                        LogLinearInterp(nu, sidx, k, j, i, dNdlnu, lnu_min, dlnu));
-              // TODO(BRR) convert cgs lnu_min etc. into code nu
-              nu *= TIME;
 
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
@@ -329,13 +315,13 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 v(mu, k, j, i) -= 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
               }
               // TODO(BRR) lepton sign
-              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;///3333.
+              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code; /// 3333.
 
               rng_pool.free_state(rng_gen);
             } // for n
           });
     } // if do_species[sidx]
-  } // for sidx
+  }   // for sidx
 
   if (remove_emitted_particles) {
     pmb->par_for(
