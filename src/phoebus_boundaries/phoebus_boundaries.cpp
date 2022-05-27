@@ -356,7 +356,6 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
         }
       } // periodic boundaries, which are handled by parthenon, so no need to set anything
     }
->>>>>>> origin/main
   }
 }
 
