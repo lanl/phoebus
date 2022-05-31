@@ -99,7 +99,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
 
             for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-              Kokkos::atomic_add(&(v(mu, k, j, i)), -detG * Gcov_coord[mu - Gcov_lo]);
+              Kokkos::atomic_add(&(v(mu, k, j, i)), detG * Gcov_coord[mu - Gcov_lo]);
             }
             Kokkos::atomic_add(&(v(Gye, k, j, i)), -detG * Jye);
           });
