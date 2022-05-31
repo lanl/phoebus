@@ -266,7 +266,8 @@ def gold_comparison(variables, input_file, modified_inputs={},
       print("TEST FAILED")
       mean_error = np.mean(variables_data - gold_variables)
       max_error = np.max(np.fabs(variables_data - gold_variables))
-      max_frac_error = np.max(np.fabs(variables_data - gold_variables)/gold_variables)
+      max_frac_error = np.max(np.fabs(variables_data - gold_variables)/
+                              np.clip(np.fabs(gold_variables), 1.e-100, None))
 
       print(f"Mean error:           {mean_error}")
       print(f"Max error:            {max_error}")
