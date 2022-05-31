@@ -170,7 +170,7 @@ void ProblemModifier(ParameterInput *pin) {
 
   const Real kappa = tau / (rho0 * dx1);
 
-  pin->SetPrecise("opacity", "gray_kappa", kappa);
+  pin->SetReal("opacity", "gray_kappa", kappa);
 }
 
 } // namespace radiation_advection
