@@ -47,7 +47,22 @@ using singularity::RadiationType;
 
 constexpr RadiationType species[3] = {
     RadiationType::NU_ELECTRON, RadiationType::NU_ELECTRON_ANTI, RadiationType::NU_HEAVY};
-constexpr int NumRadiationTypes = 3;
+constexpr int NumRadiationTypes = 1;
+
+class RadiationInfo {
+  static constexpr int max_radiation_types = 3;
+
+  RadiationInfo(const int num_radiation_types_,
+                const RadiationType radiation_types_[max_radiation_types])
+      : num_radiation_types(num_radiation_types_) {
+    for (int i = 0; i < num_radiation_types; i++) {
+      radiation_types[i] = radiation_types_[i];
+    }
+  }
+
+  const int num_radiation_types;
+  RadiationType radiation_types[max_radiation_types];
+};
 
 KOKKOS_INLINE_FUNCTION
 Real LogLinearInterp(Real x, int sidx, int k, int j, int i, ParArrayND<Real> table,
