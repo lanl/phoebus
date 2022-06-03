@@ -126,8 +126,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("mu_hi", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("phi_lo", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("phi_hi", swarm_name, real_swarmvalue_metadata);
-    Metadata fourv_swarmvalue_metadata({Metadata::Real},
-                                       std::vector<int>{4});
+    Metadata fourv_swarmvalue_metadata({Metadata::Real}, std::vector<int>{4});
     physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
     Metadata Inu_swarmvalue_metadata({Metadata::Real},
                                      std::vector<int>{NumRadiationTypes, nu_bins});
