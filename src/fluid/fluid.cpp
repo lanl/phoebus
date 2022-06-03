@@ -492,6 +492,8 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
 #if SET_FLUX_SRC_DIAGS
 TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
   auto *pmb = rc->GetParentPointer().get();
+  auto &fluid = pmb->packages.Get("fluid");
+  if (!fluid->Param<bool>("active")) return TaskStatus::complete;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
