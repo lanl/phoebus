@@ -120,16 +120,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     std::string swarm_name = "mocmc";
     Metadata swarm_metadata({Metadata::Provides});
     physics->AddSwarm(swarm_name, swarm_metadata);
-    Metadata real_swarmvalue_metadata({Metadata::Real, Metadata::Particle});
+    Metadata real_swarmvalue_metadata({Metadata::Real});
     physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("mu_lo", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("mu_hi", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("phi_lo", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("phi_hi", swarm_name, real_swarmvalue_metadata);
-    Metadata fourv_swarmvalue_metadata({Metadata::Real, Metadata::Particle},
+    Metadata fourv_swarmvalue_metadata({Metadata::Real},
                                        std::vector<int>{4});
     physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
-    Metadata Inu_swarmvalue_metadata({Metadata::Real, Metadata::Particle},
+    Metadata Inu_swarmvalue_metadata({Metadata::Real},
                                      std::vector<int>{NumRadiationTypes, nu_bins});
     physics->AddSwarmValue("Inuinv", swarm_name, Inu_swarmvalue_metadata);
 
@@ -201,7 +201,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     std::string swarm_name = "monte_carlo";
     Metadata swarm_metadata({Metadata::Provides});
     physics->AddSwarm(swarm_name, swarm_metadata);
-    Metadata real_swarmvalue_metadata({Metadata::Real, Metadata::Particle});
+    Metadata real_swarmvalue_metadata({Metadata::Real});
     physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("k0", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("k1", swarm_name, real_swarmvalue_metadata);
