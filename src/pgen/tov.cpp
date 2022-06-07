@@ -32,7 +32,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool is_monopole_sph =
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
 
-  const auto model_filename = pin->GetOrAddString("tov", "model_filename", "file.txt");
+  const std::string model_filename = pin->GetOrAddString("tov", "model_filename", "file.txt");
 
   // Velocity perturbation
   // of form v = a*r*exp(-(r-mu)^2/(2 sigma)^2)
@@ -93,7 +93,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "Phoebus::ProblemGenerator::TOV", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real r;
-        if (is_monopole_sph) {
+        // Real model_1d = phoebus::Get1DProfile(model_filename);
+	if (is_monopole_sph) {
           r = coords.x1v(k, j, i);
         } else { // Cartesian
           const Real x1 = coords.x1v(k, j, i);
