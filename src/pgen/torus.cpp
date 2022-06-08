@@ -302,6 +302,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               v(iH(1, ispec), k, j, i) = 0.0;
               v(iH(2, ispec), k, j, i) = 0.0;
             }
+          } else {
+            for (int ispec = specB.s; ispec < 1; ispec++) {
+              // Small radiation energy density
+              v(iJ(ispec), k, j, i) = 1.e-5*v(ieng, k, j, i);
+
+              // Zero comoving frame fluxes
+              v(iH(0, ispec), k, j, i) = 0.0;
+              v(iH(1, ispec), k, j, i) = 0.0;
+              v(iH(2, ispec), k, j, i) = 0.0;
+            }
           }
         }
 
