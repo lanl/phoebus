@@ -24,11 +24,10 @@ using namespace singularity::neutrinos;
 using singularity::RadiationType;
 
 KOKKOS_INLINE_FUNCTION
-Real GetWeight(const double wgtC, const double nu) { return wgtC / nu; }
+Real GetWeight(const Real wgtC, const Real nu) { return wgtC / nu; }
 
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
-                                     SwarmContainer *sc, const double t0,
-                                     const double dt) {
+                                     SwarmContainer *sc, const Real t0, const Real dt) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -68,21 +67,19 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real &minx_k = pmb->coords.x3f(kb.s);
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  StateDescriptor *eos = pmb->packages.Get("eos").get();
-  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  const Real MASS = unit_conv.GetMassCodeToCGS();
-  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
-  const Real TIME = unit_conv.GetTimeCodeToCGS();
-
   const Real d3x = dx_i * dx_j * dx_k;
 
-  const Real h_code = pc::h * TIME / (MASS * LENGTH * LENGTH);
+  auto &phoebus_pkg = pmb->packages.Get("phoebus");
+  auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
+
+  const Real h_code = code_constants.h;
+  const Real mp_code = code_constants.mp;
 
   std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
                                  "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int iye = imap[p::ye].first;
+  const int pye = imap[p::ye].first;
   const int pdens = imap[p::density].first;
   const int ptemp = imap[p::temperature].first;
   const int pvlo = imap[p::velocity].first;
@@ -95,8 +92,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
 
-  // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting
-  // value
+  // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
   Real wgtC = 1.e40; // Typical-ish value
 
   pmb->par_for(
@@ -116,18 +112,19 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           KOKKOS_LAMBDA(const int k, const int j, const int i) {
             auto rng_gen = rng_pool.get_state();
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
-            Real ye = v(iye, k, j, i);
+            const Real &dens = v(pdens, k, j, i);
+            const Real &temp = v(ptemp, k, j, i);
+            const Real &ye = v(pye, k, j, i);
 
             Real dN = 0.;
             Real dNdlnu_max = 0.;
             for (int n = 0; n <= nu_bins; n++) {
               Real nu = nusamp(n);
-              Real ener = h_code * nu * TIME;
+              Real ener = h_code * nu;
               Real wgt = GetWeight(wgtC, nu);
-              Real Jnu = d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i),
-                                                   ye, s, nu * TIME);
+              Real Jnu = d_opacity.EmissivityPerNu(dens, temp, ye, s, nu);
 
-              dN += Jnu / (ener * wgt) * (nu * dlnu * TIME);
+              dN += Jnu / (ener * wgt) * (nu * dlnu);
 
               // Note that factors of nu in numerator and denominator cancel
               Real dNdlnu = Jnu * d3x * detG / (h_code * wgt);
@@ -144,13 +141,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             // Trapezoidal rule
             Real nu0 = nusamp[0];
             Real nu1 = nusamp[nu_bins];
-            dN -= 0.5 *
-                  d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
-                                            nu0 * TIME) /
+            dN -= 0.5 * d_opacity.EmissivityPerNu(dens, temp, ye, s, nu0) /
                   (h_code * GetWeight(wgtC, nu0)) * dlnu;
-            dN -= 0.5 *
-                  d_opacity.EmissivityPerNu(v(pdens, k, j, i), v(ptemp, k, j, i), ye, s,
-                                            nu1 * TIME) /
+            dN -= 0.5 * d_opacity.EmissivityPerNu(dens, temp, ye, s, nu1) /
                   (h_code * GetWeight(wgtC, nu1)) * dlnu;
             dN *= d3x * detG * dt;
 
@@ -296,13 +289,15 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               do {
                 nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
                 counter++;
+                PARTHENON_REQUIRE(counter < 100000,
+                                  "Inefficient or impossible frequency sampling!");
               } while (rng_gen.drand() >
                        LogLinearInterp(nu, sidx, k, j, i, dNdlnu, lnu_min, dlnu));
 
               weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
               // Encode frequency and randomly sample direction
-              Real E = nu * TIME * h_code;
+              Real E = nu * h_code;
               Real theta = acos(2. * rng_gen.drand() - 1.);
               Real phi = 2. * M_PI * rng_gen.drand();
               Real K_tetrad[4] = {-E, E * cos(theta), E * cos(phi) * sin(theta),
@@ -320,13 +315,13 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 v(mu, k, j, i) += 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
               }
               // TODO(BRR) lepton sign
-              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * pc::mp / MASS;
+              v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
 
               rng_pool.free_state(rng_gen);
-            }
+            } // for n
           });
-    }
-  }
+    } // if do_species[sidx]
+  }   // for sidx
 
   if (remove_emitted_particles) {
     pmb->par_for(
@@ -349,7 +344,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 }
 
 TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
-                               SwarmContainer *sc, const double t0, const double dt) {
+                               SwarmContainer *sc, const Real dt) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
@@ -384,13 +379,12 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto &swarm_species = swarm->Get<int>("species").Get();
   auto swarm_d = swarm->GetDeviceContext();
 
-  StateDescriptor *eos = pmb->packages.Get("eos").get();
-  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
-  const Real MASS = unit_conv.GetMassCodeToCGS();
-  const Real LENGTH = unit_conv.GetLengthCodeToCGS();
-  const Real TIME = unit_conv.GetTimeCodeToCGS();
+  auto phoebus_pkg = pmb->packages.Get("phoebus");
+  auto &unit_conv = phoebus_pkg->Param<phoebus::UnitConversions>("unit_conv");
+  auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
 
-  const Real h_code = pc::h * TIME / (MASS * LENGTH * LENGTH);
+  const Real h_code = code_constants.h;
+  const Real mp_code = code_constants.mp;
 
   std::vector<std::string> vars(
       {p::density, p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});
@@ -446,8 +440,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
                                  -1. / d4x * weight(n) * k3(n));
               // TODO(BRR) Add Ucon[0] in the below
-              Kokkos::atomic_add(&(v(iGye, k, j, i)),
-                                 1. / d4x * weight(n) * pc::mp / MASS);
+              Kokkos::atomic_add(&(v(iGye, k, j, i)), 1. / d4x * weight(n) * mp_code);
 
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]), 1.);
@@ -504,7 +497,7 @@ TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh,
 // Update particle resolution tuning parameters and reset counters if it is time for an
 // update.
 TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
-                                  const double t0, const double dt) {
+                                  const Real t0, const Real dt) {
   auto rad = pmesh->packages.Get("radiation");
   const auto tuning = rad->Param<std::string>("tuning");
   const auto t_tune_emission = rad->Param<Real>("t_tune_emission");

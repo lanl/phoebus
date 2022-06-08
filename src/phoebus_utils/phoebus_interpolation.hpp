@@ -26,13 +26,85 @@
 #include "phoebus_utils/grid_utils.hpp"
 #include "phoebus_utils/robust.hpp"
 
-namespace Interpolation {
+namespace interpolation {
 
 using namespace parthenon::package::prelude;
 using parthenon::Coordinates_t;
 using Spiner::weights_t;
 
-// TODO(JMM): Is this Interpolation::Do syntax reasonable? An
+/// Base class for providing interpolation methods on uniformly spaced data.
+/// Constructor is provided with spacing, number of support points, and desired
+/// shift. GetIndicesAndWeights then updates arrays of indices and weights for
+/// calculating the interpolated data. These arrays are of size StencilSize().
+/// Data is forced to zero outside the boundaries.
+class Interpolation {
+ public:
+  KOKKOS_FUNCTION
+  Interpolation(const int nSupport, const Real dx, const Real shift)
+      : nSupport_(nSupport), dx_(dx), shift_(shift), ishift_(std::round(shift)) {}
+
+  KOKKOS_INLINE_FUNCTION
+  virtual void GetIndicesAndWeights(const int i, int *idx, Real *wgt) const {}
+  KOKKOS_INLINE_FUNCTION
+  virtual int StencilSize() const { return 0; }
+
+  static constexpr int maxStencilSize = 2;
+
+ protected:
+  const int nSupport_;
+  const Real dx_;
+  Real shift_;
+  int ishift_;
+};
+
+class PiecewiseConstant : public Interpolation {
+ public:
+  KOKKOS_FUNCTION
+  PiecewiseConstant(const int nSupport, const Real dx, const Real shift)
+      : Interpolation(nSupport, dx, shift) {}
+
+  KOKKOS_INLINE_FUNCTION
+  void GetIndicesAndWeights(const int i, int *idx, Real *wgt) const override {
+    idx[0] = i + ishift_;
+    wgt[0] = 1.;
+    if (idx[0] < 0 || idx[0] >= nSupport_) {
+      idx[0] = 0;
+      wgt[0] = 0.;
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  int StencilSize() const override { return 1; }
+};
+
+class Linear : public Interpolation {
+ public:
+  KOKKOS_FUNCTION
+  Linear(const int nSupport, const Real dx, const Real shift)
+      : Interpolation(nSupport, dx, shift) {
+    PARTHENON_FAIL("Not written yet!");
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void GetIndicesAndWeights(const int i, int *idx, Real *wgt) const override {
+    idx[0] = std::floor(i + shift_);
+    idx[1] = idx[0] + 1;
+
+    wgt[0] = wgt[1] = 1. - wgt[0];
+
+    for (int nsup = 0; nsup < 2; nsup++) {
+      if (idx[nsup] < 0 || idx[nsup] >= nSupport_) {
+        idx[nsup] = 0;
+        wgt[nsup] = 0.;
+      }
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  int StencilSize() const override { return 2; }
+};
+
+// TODO(JMM): Is this interpolation::Do syntax reasonable? An
 // alternative path would be a class called "LCInterp with all
 // static functions. Then it could have an `operator()` which would
 // be maybe nicer?
@@ -149,9 +221,9 @@ KOKKOS_INLINE_FUNCTION Real Do(int b, const Real X1, const Real X2, const Real X
 
 } // namespace Linear
 } // namespace Cent
-} // namespace Interpolation
+} // namespace interpolation
 
 // Convenience Namespace Alias
-namespace LCInterp = Interpolation::Cent::Linear;
+namespace LCInterp = interpolation::Cent::Linear;
 
 #endif // PHOEBUS_UTILS_PHOEBUS_INTERPOLATION_HPP_

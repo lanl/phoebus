@@ -226,8 +226,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
           // JMM: HARM/bhlight divides by gdet, not gamdet.
-          // This means the HARM primitives are smaller than the Phoebus primitives by
-          // a factor of alpha.
+          // This means the HARM primitives are smaller than the Phoebus
+          // primitives by a factor of alpha.
           const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
           v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
                              (2.0 * coords.Dx(X2DIR, k, j, i) * gamdet);

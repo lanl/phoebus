@@ -26,8 +26,12 @@ parser.add_argument('--executable', type=str, default=None)
 parser.add_argument('--build_type', type=str, default='Release', choices=['Debug', 'Release'])
 args = parser.parse_args()
 
+modified_inputs = {}
+modified_inputs['radiation/method'] = 'monte_carlo'
+
 code = rt.gold_comparison(variables=['p.density', 'p.energy'],
                           input_file=args.input,
+                          modified_inputs=modified_inputs,
                           executable=args.executable,
                           geometry='Minkowski',
                           use_gpu=args.use_gpu,

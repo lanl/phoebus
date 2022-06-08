@@ -12,8 +12,8 @@
 
 <phoebus>
 problem = radiation_advection
-ix1_bc = outflow
-ox1_bc = outflow
+#ix1_bc = outflow
+#ox1_bc = outflow
 
 <parthenon/job>
 problem_id  = rad_adv   # problem ID: basename of output filenames
@@ -22,7 +22,7 @@ problem_id  = rad_adv   # problem ID: basename of output filenames
 variables = r.c.E, &
             r.c.F, &
             r.p.J, &
-            r.p.H 
+            r.p.H
 
 file_type   = hdf5      # Tabular data dump
 dt          = 1.e-1     # time increment between outputs
@@ -42,8 +42,13 @@ nghost = 4
 nx1         = 512      # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1        # maximum value of X1
-ix1_bc      = user     # Inner-X1 boundary condition flag
-ox1_bc      = user     # Outer-X1 boundary condition flag
+#ix1_bc      = user     # Inner-X1 boundary condition flag
+#ox1_bc      = user     # Outer-X1 boundary condition flag
+# TODO(BRR) Currently an issue with asymptotic preserving transport in samples
+# in pure scattering problems that makes this problem misbehave with outflow
+# boundaries
+ix1_bc = periodic
+ox1_bc = periodic
 
 nx2         = 1         # Number of zones in X2-direction
 x2min       = -1        # minimum value of X2
@@ -59,7 +64,7 @@ ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
-bc_vars = primitive 
+bc_vars = primitive
 
 <parthenon/meshblock>
 nx1 = 512
@@ -74,7 +79,7 @@ max_level = 3
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
-Cv = 1.0 
+Cv = 1.0
 
 <physics>
 hydro = false
@@ -91,23 +96,24 @@ c2p_max_iter = 100
 Ye = true
 
 <radiation>
-cfl = 0.5 
+cfl = 0.5
 method = moment_m1
-nu_min = 1.e15
-nu_max = 1.e22
-nu_bins = 200
+nu_min = 1.e-2
+nu_max = 1.e2
+nu_bins = 10
 absorption = true
 do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
 
-scattering_fraction = 1.0 
-B_fake = 0.5
-use_B_fake = true
+scattering_fraction = 1.0
 
-<opacity> 
-type = gray 
-gray_kappa = 1.e3 
+<radiation/mocmc>
+nsamp_per_zone = 32
+
+<opacity>
+type = gray
+gray_kappa = 1.e3
 
 <radiation_advection>
 J = 1.0
@@ -116,5 +122,5 @@ Hy = 0.0
 Hz = 0.0
 vx = 0.3
 width = 0.0333
-kappas_init = 1.e3
+tau = 1.e3
 boost_profile = true
