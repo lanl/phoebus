@@ -86,7 +86,8 @@ def plot_dump(filename, varname,
     fig = plt.figure()
     p = fig.add_subplot(111, aspect=1)
     for i in range(NB):
-        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:], shading='gouraud',
+        #mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:], shading='gouraud',
+        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:,0], shading='gouraud',
                             vmin=qmin, vmax=qmax, cmap=colormap)
 
     plt.xlim(x1bounds[0], x1bounds[1])

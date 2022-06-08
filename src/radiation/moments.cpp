@@ -334,34 +334,6 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   const int nblock = ql_base.GetDim(5);
   const int ndim = pmb->pmy_mesh->ndim;
   auto &coords = pmb->coords;
-    {
-      printf("Testing E, J, F, H %s:%i\n", __FILE__, __LINE__);
-      PackIndexMap mymap;
-      auto v = rc->PackVariables({radmoment_prim::J, radmoment_prim::H,
-        radmoment_cons::E, radmoment_cons::F}, mymap);
-      const
-      vpack_types::FlatIdx iJ = mymap.GetFlatIdx(radmoment_prim::J);
-      vpack_types::FlatIdx iH = mymap.GetFlatIdx(radmoment_prim::H);
-      vpack_types::FlatIdx iE = mymap.GetFlatIdx(radmoment_cons::E);
-      vpack_types::FlatIdx iF = mymap.GetFlatIdx(radmoment_cons::F);
-      pmb->par_for("test", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k,
-        const int j, const int i) {
-        for (int ispec = 0; ispec < nspec; ++ispec) {
-          if (std::isnan(v(iJ(ispec), k, j, i)) ||
-              std::isnan(v(iH(ispec, 0), k, j, i)) ||
-              std::isnan(v(iH(ispec, 1), k, j, i)) ||
-              std::isnan(v(iH(ispec, 2), k, j, i)) ||
-              std::isnan(v(iE(ispec), k, j, i)) ||
-              std::isnan(v(iF(ispec, 0), k, j, i)) ||
-              std::isnan(v(iF(ispec, 1), k, j, i)) ||
-              std::isnan(v(iF(ispec, 2), k, j, i))) {
-            printf("%i %i %i\n", k, j, i);
-            PARTHENON_FAIL("Bad radiation values!");
-          }
-        }
-      });
-      printf("done testing!\n");
-    }
 
   // TODO(JCD): par_for_outer doesn't have a 4d loop pattern which is needed for blocks
   parthenon::par_for_outer(
