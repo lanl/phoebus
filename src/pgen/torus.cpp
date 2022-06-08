@@ -41,10 +41,10 @@ using namespace radiation;
 using namespace singularity;
 using namespace singularity::neutrinos;
 
-class Residual {
+class GasRadTemperatureResidual {
  public:
   KOKKOS_FUNCTION
-  Residual(const Real Ptot, const Real rho, const Opacity &opac, const EOS &eos,
+  GasRadTemperatureResidual(const Real Ptot, const Real rho, const Opacity &opac, const EOS &eos,
            RadiationType type, const Real Ye)
       : Ptot_(Ptot), rho_(rho), opac_(opac), eos_(eos), type_(type), Ye_(Ye) {}
 
@@ -283,7 +283,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               const Real Ye = iye > 0 ? v(iye, k, j, i) : 0.5;
 
               root_find::RootFind root_find;
-              Residual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity, eos,
+              GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity, eos,
                            d_species[ispec], Ye);
               v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-8, 0.5 * T);
 
