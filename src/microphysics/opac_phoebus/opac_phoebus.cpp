@@ -36,12 +36,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   bool do_rad = pin->GetBoolean("physics", "rad");
   if (!do_rad) {
-    // TODO(BRR) Allow for copy constructor in opacity variant so we don't need to always provide
-    // a default opacity
-    singularity::neutrinos::Opacity opacity_host = Gray(1.0);
-    singularity::neutrinos::Opacity opacity_device = opacity_host.GetOnDevice();
-    params.Add("h.opacity", opacity_host);
-    params.Add("d.opacity", opacity_device);
     return pkg;
   }
 
