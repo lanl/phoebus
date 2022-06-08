@@ -360,10 +360,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
             }
 
             c.Prim2Con(J, covH, conTilPi, &E, &covF);
-            printf("[%i %i %i][%i] J = %e covH = %e %e %e -> E = %e covF = %e %e %e\n",
-              k,j,i,ispec, J, covH(0), covH(1), covH(2), E,
-              covF(0), covF(1), covF(2));
-            exit(-1);
 
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * covF(ii); }
