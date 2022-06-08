@@ -28,6 +28,7 @@
 #include "pgen/pgen.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
+#include "radiation/radiation.hpp"
 
 int main(int argc, char *argv[]) {
   parthenon::ParthenonManager pman;
@@ -64,6 +65,9 @@ int main(int argc, char *argv[]) {
   // Initialize the driver
   phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(),
                                 pman.pmesh.get());
+
+  // Communicate ghost buffers before executing
+  driver.PostInitializationCommunication();
 
   // This line actually runs the simulation
   auto driver_status = driver.Execute();

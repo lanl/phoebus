@@ -20,9 +20,9 @@ parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 // Construct unit conversion factors based on a mass/length scale for the
 // geometry and a mass scale for the fluid. Assume kb = 1 in code units.
 UnitConversions::UnitConversions(ParameterInput *pin) {
-  bool scale_free = pin->GetOrAddBoolean("units", "scale_free", true);
+  scale_free_ = pin->GetOrAddBoolean("units", "scale_free", true);
 
-  if (scale_free) {
+  if (scale_free_) {
     mass_ = 1.;
     length_ = 1.;
     time_ = 1.;

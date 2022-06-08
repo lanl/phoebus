@@ -44,10 +44,14 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  StateDescriptor *eos = pmb->packages.Get("eos").get();
-  auto &unit_conv = eos->Param<phoebus::UnitConversions>("unit_conv");
+  auto &unit_conv =
+      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   auto rad = pmb->packages.Get("radiation").get();
   auto opac = pmb->packages.Get("opacity").get();
+
+  auto &phoebus_pkg = pmb->packages.Get("phoebus");
+  auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
+  const Real mp_code = code_constants.mp;
 
   const auto d_opacity = opac->Param<Opacity>("d.opacity");
 
@@ -86,8 +90,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             const Real Ye = v(pye, k, j, i);
 
             double J = d_opacity.Emissivity(v(prho, k, j, i), v(ptemp, k, j, i), Ye, s);
-            double Jye = pc::mp * d_opacity.NumberEmissivity(v(prho, k, j, i),
-                                                             v(ptemp, k, j, i), Ye, s);
+            double Jye = mp_code * d_opacity.NumberEmissivity(v(prho, k, j, i),
+                                                              v(ptemp, k, j, i), Ye, s);
 
             Real Gcov_tetrad[4] = {-J, 0., 0., 0.};
             Real Gcov_coord[4];

@@ -20,25 +20,23 @@ import shutil
 import os
 from subprocess import call, DEVNULL
 import glob
-from parthenon_tools import phdf
 import time
 from enum import Enum
+from phoedf import phoedf
 
 NeutrinoSpecies = Enum('NeutrinoSpecies', 'electron electronanti')
 
 dfnams = np.sort(glob.glob(DUMP_NAMES))
-dfile0 = phdf.phdf(dfnams[0])
+dfile0 = phoedf(dfnams[0])
 
 cl = 2.99792458e10
 mp = 1.672621777e-24
 h = 6.62606957e-27
 
-T_unit = dfile0.Params['eos/time_unit']
-L_unit = dfile0.Params['eos/length_unit']
-M_unit = dfile0.Params['eos/mass_unit']
-U_unit = M_unit / L_unit**3 * cl**2
-numin = dfile0.Params['radiation/nu_min']
-numax = dfile0.Params['radiation/nu_max']
+T_unit = dfile0.TimeCodeToCGS
+U_unit = dfile0.EnergyDensityCodeToCGS
+numin = dfile0.Params['opacity/numin']
+numax = dfile0.Params['opacity/numax']
 do_nu_electron = dfile0.Params['radiation/do_nu_electron']
 do_nu_electron_anti = dfile0.Params['radiation/do_nu_electron_anti']
 do_nu_heavy = dfile0.Params['radiation/do_nu_heavy']
@@ -84,7 +82,7 @@ t_code = np.zeros(dfnams.size)
 Ye_code = np.zeros(dfnams.size)
 u_code = np.zeros(dfnams.size)
 for n, dfnam in enumerate(dfnams):
-  dfile = phdf.phdf(dfnam)
+  dfile = phoedf(dfnam)
   t_code[n] = dfile.Time*T_unit
   Ye_code[n] = dfile.Get("p.ye").mean()
   u_code[n] = dfile.Get("p.energy").mean()*U_unit

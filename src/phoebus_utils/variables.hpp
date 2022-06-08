@@ -54,7 +54,16 @@ constexpr char dJ[] = "r.i.dJ";
 constexpr char kappaJ[] = "r.i.kappaJ";
 constexpr char kappaH[] = "r.i.kappaH";
 constexpr char JBB[] = "r.i.JBB";
+constexpr char tilPi[] = "r.i.tilPi";
+constexpr char kappaH_mean[] = "r.i.kappaH_mean";
 } // namespace radmoment_internal
+
+namespace mocmc_internal {
+constexpr char dnsamp[] = "mocmc.i.dnsamp";
+constexpr char Inu0[] = "mocmc.i.inu0";
+constexpr char Inu1[] = "mocmc.i.inu1";
+constexpr char jinvs[] = "mocmc.i.jinvs";
+} // namespace mocmc_internal
 
 namespace internal_variables {
 constexpr char face_signal_speed[] = "face_signal_speed";

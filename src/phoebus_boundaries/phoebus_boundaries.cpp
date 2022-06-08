@@ -313,6 +313,9 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
       {Boundaries::ReflectInnerX2, Boundaries::ReflectOuterX2},
       {Boundaries::ReflectInnerX3, Boundaries::ReflectOuterX3}};
 
+  const std::string rad_method =
+      pman.pinput->GetOrAddString("radiation", "method", "None");
+
   for (int d = 1; d <= 3; ++d) {
     // outer = 0 for inner face, outer = 1 for outer face
     for (int outer = 0; outer <= 1; ++outer) {
@@ -328,6 +331,29 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
         pman.app_input->boundary_conditions[loc[d - 1][outer]] = reflect[d - 1][outer];
       } else if (bc == "outflow") {
         pman.app_input->boundary_conditions[loc[d - 1][outer]] = outflow[d - 1][outer];
+        if (d == 1) {
+          if (outer == 0) {
+            if (rad_method == "mocmc") {
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x1] =
+                  Boundaries::SetSwarmNoWorkBC;
+            } else {
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x1] =
+                  Boundaries::SetSwarmIX1Outflow;
+            }
+          } else if (outer == 1) {
+            if (rad_method == "mocmc") {
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x1] =
+                  Boundaries::SetSwarmNoWorkBC;
+            } else {
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x1] =
+                  Boundaries::SetSwarmOX1Outflow;
+            }
+          }
+        }
       } // periodic boundaries, which are handled by parthenon, so no need to set anything
     }
   }
