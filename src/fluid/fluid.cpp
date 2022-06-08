@@ -597,10 +597,10 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           }
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
 #else
-          SPACETIMELOOP2(mu, nu) {
-            TGam += Tmunu[mu][nu] * gam[nu][0][mu];
-          }
-          src(ceng,k,j,i) = gdet * TGam;
+                         SPACETIMELOOP2(mu, nu) {
+                           TGam += Tmunu[mu][nu] * gam[nu][0][mu];
+                         }
+                         src(ceng, k, j, i) = gdet * TGam;
 #endif // USE_VALENCIA
         }
 

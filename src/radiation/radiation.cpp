@@ -13,6 +13,7 @@
 
 #include "radiation.hpp"
 #include "geometry/geometry.hpp"
+#include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
@@ -34,6 +35,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return physics;
   }
 
+  auto unit_conv = phoebus::UnitConversions(pin);
+
   std::vector<int> four_vec(1, 4);
   Metadata mfourforce = Metadata({Metadata::Cell, Metadata::OneCopy}, four_vec);
   physics->AddField(iv::Gcov, mfourforce);
@@ -44,14 +47,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
-  std::vector<std::string> known_methods = {"cooling_function", "moment_m1",
-                                            "moment_eddington", "monte_carlo", "mocmc"};
-  if (std::find(known_methods.begin(), known_methods.end(), method) ==
-      known_methods.end()) {
+  std::set<std::string> known_methods = {"cooling_function", "moment_m1",
+                                         "moment_eddington", "monte_carlo", "mocmc"};
+  if (!known_methods.count(method)) {
     std::stringstream msg;
     msg << "Radiation method \"" << method << "\" not recognized!";
     PARTHENON_FAIL(msg);
   }
+
+  bool is_frequency_dependent = (method == "monte_carlo" || method == "mocmc");
 
   // Set which neutrino species to include in simulation
   bool do_nu_electron = pin->GetOrAddBoolean("radiation", "do_nu_electron", true);
@@ -70,36 +74,127 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.8);
   params.Add("cfl", cfl);
 
-  // Get fake value for integrated BB for testing
-  Real B_fake = pin->GetOrAddReal("radiation", "B_fake", 1.0);
-  params.Add("B_fake", B_fake);
-  bool use_B_fake = pin->GetOrAddBoolean("radiation", "use_B_fake", false);
-  params.Add("use_B_fake", use_B_fake);
+  // Get fake scattering value for testing in anticipation of scattering in
+  // singularity-opac
   Real scattering_fraction = pin->GetOrAddReal("radiation", "scattering_fraction", 0.0);
   params.Add("scattering_fraction", scattering_fraction);
 
   // Initialize frequency discretization
-  Real nu_min = pin->GetReal("radiation", "nu_min");
-  params.Add("nu_min", nu_min);
-  Real nu_max = pin->GetReal("radiation", "nu_max");
-  params.Add("nu_max", nu_max);
-  int nu_bins = pin->GetInteger("radiation", "nu_bins");
-  params.Add("nu_bins", nu_bins);
-  Real dlnu = (log(nu_max) - log(nu_min)) / nu_bins;
-  params.Add("dlnu", dlnu);
-  ParArray1D<Real> nusamp("Frequency grid", nu_bins + 1);
-  auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
-  for (int n = 0; n < nu_bins + 1; n++) {
-    nusamp_h(n) = exp(log(nu_min) + n * dlnu);
+  Real nu_min;
+  Real nu_max;
+  int nu_bins;
+  Real dlnu;
+  if (is_frequency_dependent) {
+    nu_min = pin->GetReal("radiation", "nu_min") / unit_conv.GetTimeCGSToCode();
+    ;
+    params.Add("nu_min", nu_min);
+    nu_max = pin->GetReal("radiation", "nu_max") / unit_conv.GetTimeCGSToCode();
+    ;
+    params.Add("nu_max", nu_max);
+    nu_bins = pin->GetInteger("radiation", "nu_bins");
+    params.Add("nu_bins", nu_bins);
+    dlnu = (log(nu_max) - log(nu_min)) / nu_bins;
+    params.Add("dlnu", dlnu);
   }
-  Kokkos::deep_copy(nusamp, nusamp_h);
-  params.Add("nusamp", nusamp);
 
   int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
   params.Add("num_species", num_species);
+  std::vector<RadiationType> species;
+  if (do_nu_electron) {
+    species.push_back(RadiationType::NU_ELECTRON);
+  }
+  if (do_nu_electron_anti) {
+    species.push_back(RadiationType::NU_ELECTRON_ANTI);
+  }
+  if (do_nu_heavy) {
+    species.push_back(RadiationType::NU_HEAVY);
+  }
+  params.Add("species", species);
+  PARTHENON_REQUIRE(num_species == species.size(),
+                    "Number of species does not match requested species!");
 
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
+
+  if (method == "mocmc") {
+    std::string swarm_name = "mocmc";
+    Metadata swarm_metadata({Metadata::Provides});
+    physics->AddSwarm(swarm_name, swarm_metadata);
+    Metadata real_swarmvalue_metadata({Metadata::Real});
+    physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("mu_lo", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("mu_hi", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("phi_lo", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue("phi_hi", swarm_name, real_swarmvalue_metadata);
+    Metadata fourv_swarmvalue_metadata({Metadata::Real}, std::vector<int>{4});
+    physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
+    Metadata Inu_swarmvalue_metadata({Metadata::Real},
+                                     std::vector<int>{NumRadiationTypes, nu_bins});
+    physics->AddSwarmValue("Inuinv", swarm_name, Inu_swarmvalue_metadata);
+
+    // Boundary temperatures for outflow sample boundary conditions
+    const std::string ix1_bc = pin->GetOrAddString("phoebus", "ix1_bc", "None");
+    if (ix1_bc == "outflow") {
+      params.Add("ix1_bc", MOCMCBoundaries::outflow);
+    } else if (ix1_bc == "fixed_temp") {
+      params.Add("ix1_bc", MOCMCBoundaries::fixed_temp);
+    } else {
+      params.Add("ix1_bc", MOCMCBoundaries::periodic);
+    }
+    if (ix1_bc == "fixed_temp") {
+      const Real ix1_temp = pin->GetOrAddReal("phoebus", "ix1_temp", 0.) *
+                            unit_conv.GetTemperatureCGSToCode();
+      params.Add("ix1_temp", ix1_temp);
+    }
+
+    const std::string ox1_bc = pin->GetOrAddString("phoebus", "ox1_bc", "None");
+    if (ox1_bc == "outflow") {
+      params.Add("ox1_bc", MOCMCBoundaries::outflow);
+    } else if (ox1_bc == "fixed_temp") {
+      params.Add("ox1_bc", MOCMCBoundaries::fixed_temp);
+    } else {
+      params.Add("ox1_bc", MOCMCBoundaries::periodic);
+    }
+    if (ox1_bc == "fixed_temp") {
+      const Real ox1_temp = pin->GetOrAddReal("phoebus", "ox1_temp", 0.) *
+                            unit_conv.GetTemperatureCGSToCode();
+      params.Add("ox1_temp", ox1_temp);
+    }
+
+    const int nsamp_per_zone =
+        pin->GetOrAddInteger("radiation/mocmc", "nsamp_per_zone", 32);
+    params.Add("nsamp_per_zone", nsamp_per_zone);
+
+    ParArray1D<Real> nusamp("Frequency grid", nu_bins);
+    auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
+    for (int n = 0; n < nu_bins; n++) {
+      nusamp_h(n) = exp(log(nu_min) + (n + 0.5) * dlnu);
+    }
+    Kokkos::deep_copy(nusamp, nusamp_h);
+    params.Add("nusamp", nusamp);
+
+    std::string mocmc_recon_str =
+        pin->GetOrAddString("radiation/mocmc", "recon", "kdgrid");
+    MOCMCRecon mocmc_recon;
+    if (mocmc_recon_str == "kdgrid") {
+      mocmc_recon = MOCMCRecon::kdgrid;
+    } else {
+      std::stringstream msg;
+      msg << "MOCMC reconstruction method \"" << mocmc_recon_str << "\" not recognized!";
+      PARTHENON_FAIL(msg);
+    }
+    params.Add("mocmc_recon", mocmc_recon);
+
+    std::vector<int> Inu_size{NumRadiationTypes, nu_bins};
+    Metadata mInu = Metadata({Metadata::Cell, Metadata::OneCopy}, Inu_size);
+    physics->AddField(mocmc_internal::Inu0, mInu);
+    physics->AddField(mocmc_internal::Inu1, mInu);
+    physics->AddField(mocmc_internal::jinvs, mInu);
+    physics->AddField(iv::Gye, mscalar);
+
+    Real num_total = 0.;
+    params.Add("num_total", num_total, true);
+  }
 
   if (method == "monte_carlo") {
     std::string swarm_name = "monte_carlo";
@@ -183,6 +278,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     bool remove_emitted_particles =
         pin->GetOrAddBoolean("monte_carlo", "remove_emitted_particles", false);
     params.Add("remove_emitted_particles", remove_emitted_particles);
+
+    ParArray1D<Real> nusamp("Frequency grid", nu_bins + 1);
+    auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
+    for (int n = 0; n < nu_bins + 1; n++) {
+      nusamp_h(n) = exp(log(nu_min) + n * dlnu);
+    }
+    Kokkos::deep_copy(nusamp, nusamp_h);
+    params.Add("nusamp", nusamp);
   }
 
   if (method == "monte_carlo" || method == "mocmc") {
@@ -192,12 +295,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     RNGPool rng_pool(rng_seed);
     physics->AddParam<>("rng_pool", rng_pool);
   }
-
-  //  physics->AddField(c::E, mspecies_scalar_cons);
-  //  physics->AddField(c::F, mspecies_three_vector_cons);
-
-  //  physics->AddField(p::J, mspecies_scalar);
-  //  physics->AddField(p::H, mspecies_three_vector);
 
   bool moments_active = false;
   if ((method == "mocmc") || (method == "moment_m1") || (method == "moment_eddington")) {
@@ -242,8 +339,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Fields for cell edge reconstruction
     /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense
     /// of more dependency
+    int nrecon = 4;
+    if (method == "mocmc") {
+      nrecon += 9; // Reconstruct conTilPi // TODO(BRR) Use 6 elements by symmetry
+    }
     Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-                               std::vector<int>{NumRadiationTypes, 4, ndim});
+                               std::vector<int>{NumRadiationTypes, nrecon, ndim});
     Metadata mrecon_v = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                  std::vector<int>{3, ndim});
     physics->AddField(i::ql, mrecon);
@@ -263,14 +364,24 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(i::kappaH, mSourceVar);
     physics->AddField(i::JBB, mSourceVar);
 
+    // Make Eddington tensor an independent quantity for MOCMC to supply
+    if (method == "mocmc") {
+      Metadata mspecies_three_tensor = Metadata(
+          {Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
+          std::vector<int>{NumRadiationTypes, 3, 3});
+
+      physics->AddField(i::tilPi, mspecies_three_tensor);
+      physics->AddField(mocmc_internal::dnsamp, mscalar);
+    }
+
     physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }
 
   params.Add("moments_active", moments_active);
 
-  if (method != "cooling_function") {
-    physics->EstimateTimestepBlock = EstimateTimestepBlock;
-  }
+  physics->EstimateTimestepBlock = EstimateTimestepBlock;
+
+  printf("Done initializing\n");
 
   return physics;
 }
@@ -309,6 +420,8 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
 }
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+  // Note that this is still used for the cooling function even though that option
+  // contains no transport. This is useful for consistency between methods.
   auto pmb = rc->GetBlockPointer();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);

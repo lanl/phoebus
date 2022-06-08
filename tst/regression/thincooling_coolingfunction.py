@@ -28,7 +28,6 @@ args = parser.parse_args()
 
 modified_inputs = {}
 modified_inputs['radiation/method'] = 'cooling_function'
-modified_inputs['parthenon/mesh/x1max'] = 1.e-7
 
 code = rt.gold_comparison(variables=['p.density', 'p.energy'],
                           input_file=args.input,

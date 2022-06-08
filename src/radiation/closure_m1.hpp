@@ -368,4 +368,4 @@ KOKKOS_FUNCTION ClosureStatus ClosureM1<Vec, Tens2, SET>::GetBasisVectors(const 
 }
 } // namespace radiation
 
-#endif // CLOSURE_HPP_
+#endif // CLOSURE_M1_HPP_

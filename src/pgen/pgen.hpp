@@ -54,7 +54,8 @@ using namespace parthenon::package::prelude;
 // if you need problem-specific modifications to inputs, add the name here
 #define FOREACH_MODIFIER                                                                 \
   MODIFIER(phoebus)                                                                      \
-  MODIFIER(torus)
+  MODIFIER(torus)                                                                        \
+  MODIFIER(radiation_advection)
 
 // if you need problem-specific post-initialization modifiers to initial conditions, add
 // the name here
