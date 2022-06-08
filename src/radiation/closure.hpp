@@ -282,11 +282,21 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Con2Prim(
   Real vvTilPi;
   Vec cov_vTilPi;
   GetTilPiContractions(con_tilPi, &cov_vTilPi, &vvTilPi);
+  /*printf("E: %e F: %e %e %e\n", E, cov_F(0), cov_F(1), cov_F(2));
+  printf("con_tilPi:\n");
+  SPACELOOP(ii) {
+    SPACELOOP(jj) {
+      printf("%e ", con_tilPi(ii, jj));
+    }
+    printf("\n");
+  }*/
 
   double vF = 0.0;
   SPACELOOP(i) vF += con_v(i) * cov_F(i);
 
   if (SET::eqn_type == ClosureEquation::number_conserve) E = E / W + vF;
+  //printf("vF: %e\n", vF);
+  //printf("E: %e\n", E);
 
   // lam is proportional to the determinant of the 2x2 linear system relating
   // E and v_i F^i to J and v_i H^i for fixed tilde pi^ij

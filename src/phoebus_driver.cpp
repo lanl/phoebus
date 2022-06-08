@@ -91,6 +91,7 @@ TaskListStatus PhoebusDriver::Step() {
 // TODO(BRR) This is required for periodic BCs, unless the issue is radiation not being
 // included in ConvertBoundaryConditions
 void PhoebusDriver::PostInitializationCommunication() {
+  return;
   TaskCollection tc;
   TaskID none(0);
   BlockList_t &blocks = pmesh->block_list;
@@ -118,8 +119,10 @@ void PhoebusDriver::PostInitializationCommunication() {
 
     auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
                                  BoundaryCommSubset::all);
+    auto apply_floors2 = tl.AddTask(start_recv, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
     auto send =
-        tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
+        //tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
+        tl.AddTask(apply_floors2, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
     auto recv =
         tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
     auto fill_from_bufs =
@@ -130,7 +133,9 @@ void PhoebusDriver::PostInitializationCommunication() {
 
     auto prolongBound = tl.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
 
-    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+    auto apply_floors = tl.AddTask(prolongBound, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
+
+    auto set_bc = tl.AddTask(apply_floors, parthenon::ApplyBoundaryConditions, sc);
 
     auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
 
@@ -140,7 +145,9 @@ void PhoebusDriver::PostInitializationCommunication() {
     // IndexDomain::entire);
   }
 
+  printf("%s:%i\n", __FILE__, __LINE__);
   tc.Execute();
+  printf("%s:%i\n", __FILE__, __LINE__);
 }
 
 TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {

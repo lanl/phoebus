@@ -115,8 +115,9 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   const int pv_lo = imap[fluid_prim::velocity].first;
 
-  auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
-  std::string bc_vars = pkg->Param<std::string>("bc_vars");
+  auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
+  auto &rad = rc->GetParentPointer()->packages.Get("radiation");
+  std::string bc_vars = fluid->Param<std::string>("bc_vars");
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
@@ -128,6 +129,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           q(l, k, j, i) = gratio * q(l, k, j, ref);
         });
   } else if (bc_vars == "primitive") {
+    PARTHENON_REQUIRE(!rad->Param<bool>("active"), "Primitive BC vars not supported for radiation!");
     pmb->par_for_bndry(
         "OutflowInnerX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
@@ -172,8 +174,9 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   const int pv_lo = imap[fluid_prim::velocity].first;
 
-  auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
-  std::string bc_vars = pkg->Param<std::string>("bc_vars");
+  auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
+  auto &rad = rc->GetParentPointer()->packages.Get("radiation");
+  std::string bc_vars = fluid->Param<std::string>("bc_vars");
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
@@ -185,6 +188,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           q(l, k, j, i) = gratio * q(l, k, j, ref);
         });
   } else if (bc_vars == "primitive") {
+    PARTHENON_REQUIRE(!rad->Param<bool>("active"), "Primitive BC vars not supported for radiation!");
     pmb->par_for_bndry(
         "OutflowOuterX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
@@ -256,6 +260,7 @@ void ReflectOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
+  printf("%s:%i ConvertBoundaryConditions\n", __FILE__, __LINE__);
 
   auto pmb = rc->GetBlockPointer();
   const int ndim = pmb->pmy_mesh->ndim;
@@ -293,6 +298,8 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
       }
     }
   }
+
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   return TaskStatus::complete;
 }
