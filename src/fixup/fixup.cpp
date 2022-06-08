@@ -22,11 +22,21 @@
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
+#include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
+#include "radiation/closure.hpp"
+#include "radiation/closure_m1.hpp"
+#include "radiation/closure_mocmc.hpp"
+#include "radiation/radiation.hpp"
 
 using robust::ratio;
+using radiation::Vec;
+using radiation::Tens2;
+using radiation::ClosureSettings;
+using radiation::ClosureEquation;
+using radiation::ClosureVerbosity;
 
 #define FIXUP_PRINT_TOTAL_NFAIL 0
 
@@ -49,6 +59,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("report_c2p_fails", report_c2p_fails);
   bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
   params.Add("enable_mhd_floors", enable_mhd_floors);
+  bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", false);
+  params.Add("enable_rad_floors", enable_rad_floors);
+
+  if (!pin->GetOrAddBoolean("fluid", "mhd", false)) {
+    PARTHENON_REQUIRE(enable_mhd_floors == false,
+                      "MHD floors enabled but MHD is disabled!");
+  }
+  if (!pin->GetOrAddBoolean("physics", "rad", false)) {
+    PARTHENON_REQUIRE(enable_rad_floors == false,
+                      "Radiation floors enabled but radiation is disabled!");
+  }
 
   if (enable_c2p_fixup && !enable_floors) {
     enable_floors = true;
@@ -59,6 +80,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     enable_floors = true;
     PARTHENON_WARN(
         "WARNING Forcing enable_floors to \"true\" because enable_mhd_floors = true");
+  }
+  if (enable_rad_floors && !enable_floors) {
+    enable_floors = true;
+    PARTHENON_WARN(
+        "WARNING Forcing enable_floors to \"true\" because enable_rad_floors = true");
   }
   params.Add("enable_floors", enable_floors);
 
@@ -128,23 +154,27 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return fix;
 }
 
-template <typename T>
-TaskStatus ApplyFloors(T *rc) {
+template <typename T, class CLOSURE>
+TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
+  printf("%s:%i ApplyFloors\n", __FILE__, __LINE__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
+  namespace pr = radmoment_prim;
+  namespace cr = radmoment_cons;
+  namespace ir = radmoment_internal;
   namespace impl = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
 
-  const std::vector<std::string> vars({p::density, c::density, p::velocity, c::momentum,
-                                       p::energy, c::energy, p::bfield, p::ye, c::ye,
-                                       p::pressure, p::temperature, p::gamma1,
-                                       impl::cell_signal_speed, impl::fail});
+  const std::vector<std::string> vars(
+      {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
+       p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
+       impl::cell_signal_speed, impl::fail});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -166,10 +196,20 @@ TaskStatus ApplyFloors(T *rc) {
   const int pb_hi = imap[p::bfield].second;
   int pye = imap[p::ye].second; // negative if not present
   int cye = imap[c::ye].second;
+  auto idx_J = imap.GetFlatIdx(pr::J);
+  auto idx_H = imap.GetFlatIdx(pr::H);
+  auto idx_E = imap.GetFlatIdx(cr::E);
+  auto idx_F = imap.GetFlatIdx(cr::F);
+  vpack_types::FlatIdx iTilPi({-1}, -1);
+  if (programming::is_specialization_of<CLOSURE, radiation::ClosureMOCMC>::value) {
+    iTilPi = imap.GetFlatIdx(ir::tilPi);
+  }
+  const int nspec = idx_J.DimSize(1);
 
   bool enable_floors = fix_pkg->Param<bool>("enable_floors");
   if (!enable_floors) return TaskStatus::complete;
   bool enable_mhd_floors = fix_pkg->Param<bool>("enable_mhd_floors");
+  bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
 
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -240,6 +280,15 @@ TaskStatus ApplyFloors(T *rc) {
           }
         }
 
+        if (enable_rad_floors) {
+          for (int ispec = 0; ispec < nspec; ++ispec) {
+            if (v(b, idx_J(ispec), k, j, i) < 1.e-5 * v(b, peng, k, j, i)) {
+              floor_applied = true;
+              v(b, idx_J(ispec), k, j, i) = 1.e-5 * v(b, peng, k, j, i);
+            }
+          }
+        }
+
         if (floor_applied) {
           // Update dependent primitives
           if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
@@ -251,7 +300,7 @@ TaskStatus ApplyFloors(T *rc) {
                                    v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda) /
                                v(b, prs, k, j, i);
 
-          // Update conserved variables
+          // Update fluid conserved variables
           const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
           Real gcon[3][3];
           geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
@@ -284,10 +333,68 @@ TaskStatus ApplyFloors(T *rc) {
           for (int m = slo; m <= shi; m++) {
             v(b, m, k, j, i) = sig[m - slo];
           }
+
+          // Update radiation conserved variables
+          for (int ispec = 0; ispec < nspec; ++ispec) {
+            Vec con_v{{v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
+                       v(b, pvel_lo + 2, k, j, i)}};
+            const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+
+            typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, 0, b, j, i);
+            CLOSURE c(con_v, &g);
+
+            Real E;
+            Vec covF;
+            Tens2 conTilPi;
+            Real J = v(b, idx_J(ispec), k, j, i);
+            Vec covH = {{v(b, idx_H(ispec, 0), k, j, i),
+              v(b, idx_H(ispec, 1), k, j, i),
+              v(b, idx_H(ispec, 2), k, j, i)}};
+
+            if (programming::is_specialization_of<CLOSURE, radiation::ClosureMOCMC>::value) {
+              SPACELOOP2(ii, jj) {
+                conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+              }
+            } else {
+              c.GetCovTilPiFromPrim(J, covH, &conTilPi);
+            }
+
+            c.Prim2Con(J, covH, conTilPi, &E, &covF);
+            printf("[%i %i %i][%i] J = %e covH = %e %e %e -> E = %e covF = %e %e %e\n",
+              k,j,i,ispec, J, covH(0), covH(1), covH(2), E,
+              covF(0), covF(1), covF(2));
+            exit(-1);
+
+            v(b, idx_E(ispec), k, j, i) = sdetgam * E;
+            SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * covF(ii); }
+          }
         }
       });
 
   return TaskStatus::complete;
+}
+
+template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+
+template <typename T>
+TaskStatus ApplyFloors(T *rc) {
+  auto *pm = rc->GetParentPointer().get();
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
+  auto method = rad->Param<std::string>("method");
+
+  // TODO(BRR) share these settings somewhere else. Set at configure time?
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  if (method == "moment_m1") {
+    return ApplyFloorsImpl<T, radiation::ClosureM1<Vec, Tens2, settings>>(rc);
+  } else if (method == "moment_eddington") {
+    return ApplyFloorsImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+  } else if (method == "mocmc") {
+    return ApplyFloorsImpl<T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
+  } else {
+    PARTHENON_FAIL("Radiation method unknown");
+  }
+  return TaskStatus::fail;
 }
 
 template <typename T>
@@ -637,8 +744,6 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 
   return TaskStatus::complete;
 }
-
-template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 template TaskStatus
 ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);

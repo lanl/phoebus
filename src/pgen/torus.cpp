@@ -164,7 +164,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   /// TODO: (LFR) Fix this junk
   RadiationType d_species[3] = {species[0], species[1], species[2]};
   auto &unit_conv =
-      pmb->packages.Get("eos")->Param<phoebus::UnitConversions>("unit_conv");
+      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
   // set up transformation stuff
   auto gpkg = pmb->packages.Get("geometry");
@@ -348,6 +348,32 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   if (do_rad) {
     radiation::MomentPrim2Con(rc);
   }
+  printf("%s:%i\n", __FILE__, __LINE__);
+
+
+  PackIndexMap imap_c;
+  auto v_c =
+      rc->PackVariables({fluid_cons::energy, fluid_cons::momentum, radmoment_cons::E, radmoment_cons::F}, imap);
+  const int cener = imap[fluid_cons::energy].first;
+  const int cmom = imap[fluid_cons::momentum].first;
+  vpack_types::FlatIdx iE = imap.GetFlatIdx(radmoment_cons::E);
+  vpack_types::FlatIdx iF = imap.GetFlatIdx(radmoment_cons::F);
+
+  pmb->par_for(
+      "Phoebus::ProblemGenerator::TorusCheck", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        if (j == 32) {
+            for (int ispec = specB.s; ispec < 1; ispec++) {
+        printf("[%i %i %i][%i] T00 = %e T0i = %e %e %e E = %e F = %e %e %e\n", k,j,i,ispec, v_c(cener, k, j, i),
+          v_c(cmom, k, j, i), v_c(cmom+1,k,j,i), v_c(cmom+2,k,j,i),
+          v_c(iE(ispec), k, j, i),
+          v_c(iF(ispec, 0), k, j, i),
+          v_c(iF(ispec, 1), k, j, i),
+          v_c(iF(ispec, 2), k, j, i));
+            }
+        }
+      });
+  printf("%s:%i\n", __FILE__, __LINE__);
 }
 
 void ProblemModifier(ParameterInput *pin) {
@@ -386,12 +412,13 @@ void ProblemModifier(ParameterInput *pin) {
     if (eos_type == "IdealGas") {
       const Real Gamma = pin->GetReal("eos", "Gamma");
       const Real cv = (Gamma - 1.) * pc::kb / pc::mp;
-      pin->SetPrecise("eos", "Cv", cv);
+      pin->SetReal("eos", "Cv", cv);
     }
   }
 }
 
 void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   const bool magnetized = pin->GetOrAddBoolean("torus", "magnetized", true);
   const Real beta_target = pin->GetOrAddReal("torus", "target_beta", 100.);
@@ -423,6 +450,38 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     auto v = rc->PackVariables({fluid_prim::bfield}, imap);
     const int iblo = imap[fluid_prim::bfield].first;
     const int ibhi = imap[fluid_prim::bfield].second;
+
+
+
+    {
+      printf("Testing E, J, F, H %s:%i\n", __FILE__, __LINE__);
+      const int nspec = 3;
+      PackIndexMap mymap;
+      auto v = rc->PackVariables({radmoment_prim::J, radmoment_prim::H,
+        radmoment_cons::E, radmoment_cons::F}, mymap);
+      const
+      vpack_types::FlatIdx iJ = mymap.GetFlatIdx(radmoment_prim::J);
+      vpack_types::FlatIdx iH = mymap.GetFlatIdx(radmoment_prim::H);
+      vpack_types::FlatIdx iE = mymap.GetFlatIdx(radmoment_cons::E);
+      vpack_types::FlatIdx iF = mymap.GetFlatIdx(radmoment_cons::F);
+      pmb->par_for("test", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k,
+        const int j, const int i) {
+        for (int ispec = 0; ispec < nspec; ++ispec) {
+          if (std::isnan(v(iJ(ispec), k, j, i)) ||
+              std::isnan(v(iH(ispec, 0), k, j, i)) ||
+              std::isnan(v(iH(ispec, 1), k, j, i)) ||
+              std::isnan(v(iH(ispec, 2), k, j, i)) ||
+              std::isnan(v(iE(ispec), k, j, i)) ||
+              std::isnan(v(iF(ispec, 0), k, j, i)) ||
+              std::isnan(v(iF(ispec, 1), k, j, i)) ||
+              std::isnan(v(iF(ispec, 2), k, j, i))) {
+            printf("%i %i %i\n", k, j, i);
+            PARTHENON_FAIL("Bad radiation values!");
+          }
+        }
+      });
+      printf("done testing!\n");
+    }
 
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
@@ -536,6 +595,36 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
     const int ibhi = imap[fluid_prim::bfield].second;
     const int iprs = imap[fluid_prim::pressure].first;
 
+    {
+      printf("Testing E, J, F, H %s:%i\n", __FILE__, __LINE__);
+      const int nspec = 3;
+      PackIndexMap mymap;
+      auto v = rc->PackVariables({radmoment_prim::J, radmoment_prim::H,
+        radmoment_cons::E, radmoment_cons::F}, mymap);
+      const
+      vpack_types::FlatIdx iJ = mymap.GetFlatIdx(radmoment_prim::J);
+      vpack_types::FlatIdx iH = mymap.GetFlatIdx(radmoment_prim::H);
+      vpack_types::FlatIdx iE = mymap.GetFlatIdx(radmoment_cons::E);
+      vpack_types::FlatIdx iF = mymap.GetFlatIdx(radmoment_cons::F);
+      pmb->par_for("test", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k,
+        const int j, const int i) {
+        for (int ispec = 0; ispec < nspec; ++ispec) {
+          if (std::isnan(v(iJ(ispec), k, j, i)) ||
+              std::isnan(v(iH(ispec, 0), k, j, i)) ||
+              std::isnan(v(iH(ispec, 1), k, j, i)) ||
+              std::isnan(v(iH(ispec, 2), k, j, i)) ||
+              std::isnan(v(iE(ispec), k, j, i)) ||
+              std::isnan(v(iF(ispec, 0), k, j, i)) ||
+              std::isnan(v(iF(ispec, 1), k, j, i)) ||
+              std::isnan(v(iF(ispec, 2), k, j, i))) {
+            printf("%i %i %i\n", k, j, i);
+            PARTHENON_FAIL("Bad radiation values!");
+          }
+        }
+      });
+      printf("done testing!\n");
+    }
+
     if (ibhi < 0) return;
 
     Real beta_min_local;
@@ -578,6 +667,43 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
   const Real bsq_max_global = reduction::Max(bsq_max);
   const Real Pmax_global = reduction::Max(press_max);
   beta_pmax = robust::ratio(Pmax_global, 0.5 * bsq_max_global);
+  for (auto &pmb : pmesh->block_list) {
+    auto &rc = pmb->meshblock_data.Get();
+    auto geom = Geometry::GetCoordinateSystem(rc.get());
+
+    auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+    auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+    auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+    {
+      printf("Testing E, J, F, H %s:%i\n", __FILE__, __LINE__);
+      const int nspec = 3;
+      PackIndexMap mymap;
+      auto v = rc->PackVariables({radmoment_prim::J, radmoment_prim::H,
+        radmoment_cons::E, radmoment_cons::F}, mymap);
+      const
+      vpack_types::FlatIdx iJ = mymap.GetFlatIdx(radmoment_prim::J);
+      vpack_types::FlatIdx iH = mymap.GetFlatIdx(radmoment_prim::H);
+      vpack_types::FlatIdx iE = mymap.GetFlatIdx(radmoment_cons::E);
+      vpack_types::FlatIdx iF = mymap.GetFlatIdx(radmoment_cons::F);
+      pmb->par_for("test", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k,
+        const int j, const int i) {
+        for (int ispec = 0; ispec < nspec; ++ispec) {
+          if (std::isnan(v(iJ(ispec), k, j, i)) ||
+              std::isnan(v(iH(ispec, 0), k, j, i)) ||
+              std::isnan(v(iH(ispec, 1), k, j, i)) ||
+              std::isnan(v(iH(ispec, 2), k, j, i)) ||
+              std::isnan(v(iE(ispec), k, j, i)) ||
+              std::isnan(v(iF(ispec, 0), k, j, i)) ||
+              std::isnan(v(iF(ispec, 1), k, j, i)) ||
+              std::isnan(v(iF(ispec, 2), k, j, i))) {
+            printf("%i %i %i\n", k, j, i);
+            PARTHENON_FAIL("Bad radiation values!");
+          }
+        }
+      });
+      printf("done testing!\n");
+    }
+    }
   return;
 }
 
