@@ -27,6 +27,8 @@ class PhoebusDriver : public EvolutionDriver {
  public:
   PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm);
 
+  void PostInitializationCommunication();
+
   TaskCollection RungeKuttaStage(const int stage);
   TaskListStatus RadiationPreStep();
   TaskListStatus RadiationPostStep();

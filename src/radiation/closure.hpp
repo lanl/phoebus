@@ -137,8 +137,6 @@ class ClosureEdd {
     }
     gamma->lower3Vector(con_vTilPi, cov_vTilPi);
   }
-
- private:
 };
 
 template <class Vec, class Tens2, class SET>

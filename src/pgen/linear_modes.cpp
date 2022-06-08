@@ -218,8 +218,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           eos_lambda[0] = v(iye, k, j, i);
         }
         // This line causes NaNs and I don't know why
-        // v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho, v(ieng, k, j,
-        // i)/rho);
+        // v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho, v(ieng,
+        // k, j, i)/rho);
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
             rho, v(ieng, k, j, i) / rho, eos_lambda);
         if (ivhi > 0) {
