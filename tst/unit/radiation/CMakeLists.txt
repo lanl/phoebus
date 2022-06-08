@@ -19,9 +19,11 @@ add_library(radiation_unit_tests OBJECT
 
 target_link_libraries(radiation_unit_tests
   PRIVATE
-    parthenon
-    Catch2::Catch2
-    Kokkos::kokkos)
+  parthenon
+  singularity-eos::flags
+  singularity-eos
+  Catch2::Catch2
+  Kokkos::kokkos)
 
 target_include_directories(radiation_unit_tests PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"

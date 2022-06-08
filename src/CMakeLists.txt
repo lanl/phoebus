@@ -43,6 +43,8 @@ add_executable(phoebus
   geometry/geometry.hpp
   geometry/geometry_defaults.hpp
   geometry/geometry_utils.hpp
+  geometry/sph2cart.cpp
+  geometry/sph2cart.hpp
   geometry/tetrads.hpp
 
   geometry/inchworm.hpp
@@ -78,6 +80,7 @@ add_executable(phoebus
   pgen/advection.cpp
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
+  pgen/check_cached_geom.cpp
   pgen/friedmann.cpp
   pgen/homogeneous_sphere.cpp
   pgen/kh.cpp
@@ -99,11 +102,15 @@ add_executable(phoebus
 
   phoebus_driver.cpp
   phoebus_driver.hpp
+  phoebus_package.cpp
+  phoebus_package.hpp
 
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
+  phoebus_utils/history.hpp
   phoebus_utils/linear_algebra.hpp
+  phoebus_utils/phoebus_interpolation.hpp
   phoebus_utils/reduction.hpp
   phoebus_utils/relativity_utils.hpp
   phoebus_utils/robust.hpp

@@ -27,6 +27,7 @@
 #include "fluid/tmunu.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
+#include "geometry/sph2cart.hpp"
 #include "monopole_gr/monopole_gr_base.hpp"
 #include "monopole_gr/monopole_gr_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
@@ -39,19 +40,21 @@ namespace MonopoleGR {
 namespace impl {
 // Gets ADM mass rho0, adm momentum in r, jr, the rr component of S^i_j, and the trace
 // of the spatial stress tensor. Applies coordinate transforms if necessary.
-template <bool IS_CART, typename EnergyMomentum, typename Geometry, typename Pack>
+template <bool IS_CART, typename EnergyMomentum, typename Geometry, typename Transform,
+          typename Pack>
 KOKKOS_INLINE_FUNCTION void
-GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom, const Pack &p,
-                      const int b, const int k, const int j, const int i, Real &rho0,
-                      Real &jr, Real &srr, Real &trcs);
+GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry &geom,
+                      const Transform &transform, const Pack &p, const int b, const int k,
+                      const int j, const int i, Real &rho0, Real &jr, Real &srr,
+                      Real &trcs);
 // Gets the radius r of a cell, as well as its width in radius dr, and
 // its volume element dv. Computes this for both Cartesian and
 // spherical coords.
-template <bool IS_CART, typename Pack>
+template <bool IS_CART, typename Transform, typename Pack>
 PORTABLE_INLINE_FUNCTION void
-GetCoordsAndCellWidthsHelper(const Pack &p, const int b, const int k, const int j,
-                             const int i, Real &r, Real &th, Real &ph, Real &dr,
-                             Real &dth, Real &dph, Real &dv);
+GetCoordsAndCellWidthsHelper(const Transform &transform, const Pack &p, const int b,
+                             const int k, const int j, const int i, Real &r, Real &th,
+                             Real &ph, Real &dr, Real &dth, Real &dph, Real &dv);
 
 } // namespace impl
 
@@ -64,8 +67,8 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   using namespace impl;
 
   // Available in both mesh and meshblock
-  std::shared_ptr<StateDescriptor> const &pkg =
-      rc->GetParentPointer()->packages.Get("monopole_gr");
+  auto pparent = rc->GetParentPointer();
+  std::shared_ptr<StateDescriptor> const &pkg = pparent->packages.Get("monopole_gr");
   auto &params = pkg->AllParams();
 
   auto enabled = params.Get<bool>("enable_monopole_gr");
@@ -105,6 +108,15 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   // PackIndexMap imap;
   auto pack = rc->PackVariables(vars);
 
+  // Always generate the transformation operator even if we don't need
+  // it.
+  // TODO(JMM): Long term we might want some logic to select the
+  // transformation actually in use... e.g., if we're doing something
+  // like a Sinh grid.
+  using Transformation_t = Geometry::SphericalToCartesian;
+  std::shared_ptr<StateDescriptor> const &geom_pkg = pparent->packages.Get("geometry");
+  auto transform = Geometry::GetTransformation<Transformation_t>(geom_pkg.get());
+
   // Available in all Container types
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
@@ -124,12 +136,12 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
         // First compute the relevant conserved/prim vars
         Real matter_loc[4];
         GetMonopoleVarsHelper<is_monopole_cart>(
-            tmunu, geom, pack, b, k, j, i, matter_loc[Matter::RHO],
+            tmunu, geom, transform, pack, b, k, j, i, matter_loc[Matter::RHO],
             matter_loc[Matter::J_R], matter_loc[Matter::Srr], matter_loc[Matter::trcS]);
         // Next get coords and grid spacing
         Real r, th, ph, dr, dth, dph, dv;
-        GetCoordsAndCellWidthsHelper<is_monopole_cart>(pack, b, k, j, i, r, th, ph, dr,
-                                                       dth, dph, dv);
+        GetCoordsAndCellWidthsHelper<is_monopole_cart>(transform, pack, b, k, j, i, r, th,
+                                                       ph, dr, dth, dph, dv);
 
         // Bounds in the 1d grid We're wasteful here because I'm
         // paranoid. Need to make sure we don't need miss any cells in
@@ -161,11 +173,13 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
 // with type resolution and a constexpr if based on other templated types
 // Geometry_t is the geometry class in this case. Geometry is a namespace.
 namespace impl {
-template <bool IS_CART, typename EnergyMomentum, typename Geometry_t, typename Pack>
+template <bool IS_CART, typename EnergyMomentum, typename Geometry_t, typename Transform,
+          typename Pack>
 KOKKOS_INLINE_FUNCTION void
-GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom, const Pack &p,
-                      const int b, const int k, const int j, const int i, Real &rho0,
-                      Real &jr, Real &srr, Real &trcs) {
+GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom,
+                      const Transform &transform, const Pack &p, const int b, const int k,
+                      const int j, const int i, Real &rho0, Real &jr, Real &srr,
+                      Real &trcs) {
   // Tmunu and gcov
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
@@ -198,29 +212,30 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom, const
   // Only one branch is resolved at compile time
   // Thanks to the magic of templates and C++11.
   // constexpr if would be better though
+  // TODO(JMM): Should we remove branching and always apply something
+  // like an "identity" transform? That might be worth trying when we
+  // move to more exotic grids, like sinh.
   if (IS_CART) {
+    Real C[NS];
     Real ssph[NS][NS] = {0};
-    Real s2c[ND][ND], c2s[ND][ND];
-    Real r, th, ph;
+    Real s2c[NS][NS], c2s[NS][NS];
 
     parthenon::Coordinates_t coords = p.GetCoords(b);
-    Real X1 = coords.x1v(i);
-    Real X2 = coords.x1v(j);
-    Real X3 = coords.x1v(k);
-    // TODO(JMM): I kinda don't like this design. Should I redesign
-    // the coordinate transforms in the monopole class to be
-    // self-contained?
-    Geometry::MonopoleCoordTransforms::Cart2Sph(X1, X2, X3, r, th, ph);
-    Geometry::MonopoleCoordTransforms::S2C(r, th, ph, s2c);
-    Geometry::MonopoleCoordTransforms::C2S(X1, X2, X3, r, c2s);
+    const Real X1 = coords.x1v(i);
+    const Real X2 = coords.x2v(j);
+    const Real X3 = coords.x3v(k);
+    transform(X1, X2, X3, C, c2s, s2c);
+    const Real r = C[0];
+    const Real th = C[1];
+    const Real ph = C[2];
 
     // J
     jr = 0;
-    SPACELOOP(d) { jr += c2s[1][d + 1] * Scon[d]; }
+    SPACELOOP(d) { jr += c2s[0][d] * Scon[d]; }
     // S
     SPACELOOP2(l, ip) {
       SPACELOOP2(m, jp) {
-        ssph[ip][jp] += c2s[l + 1][ip + 1] * s2c[m + 1][jp + 1] *
+        ssph[ip][jp] += c2s[l][ip] * s2c[m][jp] *
                         (TConCov[ip + 1][jp + 1] + beta[ip] * TConCov[0][jp + 1]);
       }
     }
@@ -234,17 +249,17 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom, const
   }
 }
 
-template <bool IS_CART, typename Pack>
+template <bool IS_CART, typename Transform, typename Pack>
 PORTABLE_INLINE_FUNCTION void
-GetCoordsAndCellWidthsHelper(const Pack &p, const int b, const int k, const int j,
-                             const int i, Real &r, Real &th, Real &ph, Real &dr,
-                             Real &dth, Real &dph, Real &dv) {
+GetCoordsAndCellWidthsHelper(const Transform &transform, const Pack &p, const int b,
+                             const int k, const int j, const int i, Real &r, Real &th,
+                             Real &ph, Real &dr, Real &dth, Real &dph, Real &dv) {
   const parthenon::Coordinates_t &coords = p.GetCoords(b);
   if (IS_CART) {
-    Geometry::MonopoleCoordTransforms::Cart2Sph(
-        coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
-        coords.Dx(1, k, j, i), coords.Dx(2, k, j, i), coords.Dx(3, k, j, i), r, th, ph,
-        dr, dth, dph);
+    transform.GetCoordsAndDerivatives(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                                      coords.x3v(k, j, i), coords.Dx(1, k, j, i),
+                                      coords.Dx(2, k, j, i), coords.Dx(3, k, j, i), r, th,
+                                      ph, dr, dth, dph);
     dv = coords.Volume(k, j, i);
   } else {
     Interp3DTo1D::GetCoordsAndDerivsSph(k, j, i, coords, r, th, ph, dr, dth, dph, dv);
