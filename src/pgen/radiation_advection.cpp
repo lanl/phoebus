@@ -123,10 +123,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real tp = W * (t0 - vx * x);
         Real xp = W * (x - vx * t0);
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
-          printf("ispec: %i ixi: %i iphi: %i\n", ispec, ixi(ispec), iphi(ispec));
           v(ixi(ispec), k, j, i) = 0.0;
           v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
-          printf("%s:%i\n", __FILE__, __LINE__);
 
           if (boost) {
             v(idJ(ispec), k, j, i) =
@@ -137,12 +135,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(idJ(ispec), k, j, i) =
                 J0 * std::max(exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10);
           }
-          printf("%s:%i\n", __FILE__, __LINE__);
 
           v(idH(0, ispec), k, j, i) = Hx;
           v(idH(1, ispec), k, j, i) = Hy;
           v(idH(2, ispec), k, j, i) = Hz;
-          printf("%s:%i\n", __FILE__, __LINE__);
         }
       });
 
