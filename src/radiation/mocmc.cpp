@@ -132,7 +132,7 @@ void MOCMCInitSamples(T *rc) {
   for (int k = 0; k < nx_k; k++) {
     for (int j = 0; j < nx_j; j++) {
       for (int i = 0; i < nx_i; i++) {
-        starting_index(k, j, i) = index;
+        starting_index_h(k, j, i) = index;
         index += static_cast<int>(dN_h(k + kb.s, j + jb.s, i + ib.s));
       }
     }
