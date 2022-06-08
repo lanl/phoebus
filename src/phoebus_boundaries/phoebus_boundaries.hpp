@@ -19,15 +19,31 @@
 #include <memory>
 
 #include <parthenon/package.hpp>
+#include <parthenon_manager.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
 namespace Boundaries {
 
+void ProcessBoundaryConditions(parthenon::ParthenonManager &pman);
+
 void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
 void ReflectInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
+void OutflowInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+void OutflowOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
+void ReflectInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+void ReflectOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
+void OutflowInnerX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+void OutflowOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
+void ReflectInnerX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+void ReflectOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 
 TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc);
 
