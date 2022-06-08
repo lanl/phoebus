@@ -91,7 +91,6 @@ TaskListStatus PhoebusDriver::Step() {
 // TODO(BRR) This is required for periodic BCs, unless the issue is radiation not being
 // included in ConvertBoundaryConditions
 void PhoebusDriver::PostInitializationCommunication() {
-  return;
   TaskCollection tc;
   TaskID none(0);
   BlockList_t &blocks = pmesh->block_list;
