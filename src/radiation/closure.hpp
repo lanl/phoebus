@@ -184,8 +184,6 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::LinearSourceUpdate(
     b[0] = Estar + tauJ * JBB;
   }
   b[1] = vFstar + (W2 - 1) / W * tauJ * JBB;
-  printf("A: %e %e %e %e\n", A[0][0], A[0][1], A[1][0], A[1][1]);
-  printf("b: %e %e\n", b[0], b[1]);
 
   SolveAxb2x2(A, b, x);
   // if (std::isnan(b[0])) throw 1;
