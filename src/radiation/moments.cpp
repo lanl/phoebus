@@ -132,7 +132,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
-         if (i == 4 && j == 4) {
+         if (i == 4) {
          printf("[%i %i %i][%i] J: %e covH: %e %e %e\n", k, j, i, ispec,
            J, covH(0), covH(1), covH(2));
          }
@@ -246,6 +246,13 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
         }
+         if (i == 4) {
+         printf("[%i %i %i][%i] E: %e covF: %e %e %e\n", k, j, i, ispec,
+           v(b, cE(ispec), k, j, i), 
+           v(b, cF(ispec, 0), k, j, i),
+           v(b, cF(ispec, 1), k, j, i),
+           v(b, cF(ispec, 2), k, j, i));
+         }
       });
 
   return TaskStatus::complete;
@@ -556,7 +563,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_qlv(2, idir), k, j, i)}};
           Vec con_vr{{v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
                       v(idx_qrv(2, idir), k, j, i)}};
-          if (i == 4 && j == 4) {
+          if (i == 4) {
             printf("Jl: %e Jr: %e\n", Jl, Jr);
             printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2),
               Hr(0), Hr(1), Hr(2));
@@ -637,7 +644,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
           }
-          if (i == 4 && j == 4) {
+          if (i == 4) {
             printf("[%i %i %i][%i][dir: %i] F = %e %e %e %e\n",
             k,j,i,ispec,idir_in,v.flux(idir_in, idx_Ef(ispec), k, j, i),
             v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
