@@ -131,10 +131,6 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
-         if (i == 4) {
-         printf("[%i %i %i][%i] J: %e covH: %e %e %e\n", k, j, i, ispec,
-           J, covH(0), covH(1), covH(2));
-         }
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
           printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
@@ -244,13 +240,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
         }
-         if (i == 4) {
-         printf("[%i %i %i][%i] E: %e covF: %e %e %e\n", k, j, i, ispec,
-           v(b, cE(ispec), k, j, i), 
-           v(b, cF(ispec, 0), k, j, i),
-           v(b, cF(ispec, 1), k, j, i),
-           v(b, cF(ispec, 2), k, j, i));
-         }
       });
 
   return TaskStatus::complete;
@@ -561,11 +550,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_qlv(2, idir), k, j, i)}};
           Vec con_vr{{v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
                       v(idx_qrv(2, idir), k, j, i)}};
-          if (i == 4) {
-            printf("Jl: %e Jr: %e\n", Jl, Jr);
-            printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2),
-              Hr(0), Hr(1), Hr(2));
-            }
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
@@ -641,13 +625,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
-          }
-          if (i == 4) {
-            printf("[%i %i %i][%i][dir: %i] F = %e %e %e %e\n",
-            k,j,i,ispec,idir_in,v.flux(idir_in, idx_Ef(ispec), k, j, i),
-            v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
-            v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
-            v.flux(idir_in, idx_Ff(ispec, 2), k, j, i));
           }
           if (sdetgam < std::numeric_limits<Real>::min() * 10) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
@@ -945,35 +922,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           for (int idir = 0; idir < 3; ++idir) {
             v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
           }
-          if (i == 4) {
-            printf("conv: %e %e %e\n", con_v(0), con_v(1), con_v(2));
-                       printf("Estar: %e Fstar: %e %e %e\n", Estar, cov_Fstar(0), cov_Fstar(1), cov_Fstar(2));
-             printf("B: %e tau: %e %e\n", B, tauJ, tauH);
-             SPACELOOP(ii) {
-               SPACELOOP(jj) {
-                 printf("%e ", con_tilPi(ii,jj));
-               }
-               printf("\n");
-             }
-            
-            printf("updated E: %e F: %e %e %e\n",
-              v(iblock, idx_E(ispec), k, j, i),
-              v(iblock, idx_F(ispec, 0), k, j, i),
-              v(iblock, idx_F(ispec, 1), k, j, i),
-              v(iblock, idx_F(ispec, 2), k, j, i));
-            printf("dE: %e dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
-          }
 
           // Add source corrections to conserved fluid variables
           if (update_fluid) {
             if (cye > 0) {
               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
             }
-            printf("orig eng: %e mom: %e %e %e\n", v(iblock, ceng, k, j, i),
-              v(iblock, cmom_lo + 0, k, j, i),
-              v(iblock, cmom_lo + 1, k, j, i),
-              v(iblock, cmom_lo + 2, k, j, i));
-            printf("sdetgam: %e dE: %e cov_dF: %e %e %e\n", sdetgam, dE, cov_dF(0), cov_dF(1), cov_dF(2));
             #if USE_VALENCIA
             v(iblock, ceng, k, j, i) -= sdetgam * dE;
             #else
@@ -982,10 +936,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
             v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
-            printf("updated eng: %e mom: %e %e %e\n", v(iblock, ceng, k, j, i),
-              v(iblock, cmom_lo + 0, k, j, i),
-              v(iblock, cmom_lo + 1, k, j, i),
-              v(iblock, cmom_lo + 2, k, j, i));
           }
         }
       });
@@ -1066,9 +1016,6 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
               rho, Temp, Ye, dev_species[ispec]);
           Real JBB = d_opacity.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
-           if (i == 4) {                                                                              
-             printf("kappa: %e JBB: %e Temp: %e spec(%i): %i\n", kappa, JBB, Temp, ispec, static_cast<int>     (dev_species[ispec]));
-           } 
 
           v(iblock, idx_JBB(ispec), k, j, i) = JBB;
           v(iblock, idx_kappaJ(ispec), k, j, i) = kappa * (1.0 - scattering_fraction);
