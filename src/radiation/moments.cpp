@@ -23,6 +23,9 @@
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
+#define DOTASKREPORTING 1
+#define REPORTTASK {if (DOTASKREPORTING) {printf("\n%s:%i:%s\n", __FILE__, __LINE__, __func__);}}
+
 namespace radiation {
 
 template <class T>
@@ -50,7 +53,7 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
-  printf("%s:%i MomentCon2PrimImpl\n", __FILE__, __LINE__);
+  REPORTTASK
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -111,10 +114,6 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         Vec covF = {{v(b, cF(ispec, 0), k, j, i) * isdetgam,
                      v(b, cF(ispec, 1), k, j, i) * isdetgam,
                      v(b, cF(ispec, 2), k, j, i) * isdetgam}};
-         if (i == 16 && j == 16) {
-         printf("[%i %i %i][%i] E: %e covF: %e %e %e\n", k, j, i, ispec,
-           E, covF(0), covF(1), covF(2));
-         }
 
         if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
@@ -132,12 +131,10 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
-         if (i == 16 && j == 16) {
-         printf("[%i %i %i][%i] J: %e covH: %e %e %e\n", k, j, i, ispec,
-           J, covH(0), covH(1), covH(2));
-         }
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
+          printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
+          printf("J: %e covH: %e %e %e\n", J, covH(0), covH(1), covH(2));
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
         }
 
@@ -176,7 +173,7 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
-  printf("%s:%i MomentPrim2ConImpl\n", __FILE__, __LINE__);
+  REPORTTASK
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -219,9 +216,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
         // Set up the background
         Vec con_v{{v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)}};
-        // TODO(BRR) Remove?
-        //Tens2 cov_gamma;
-        //geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, 0, b, j, i);
@@ -245,12 +239,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
-        }
-        if (i == 16 && j == 16) {
-          printf("E: %e F: %e %e %e\n", v(b, cE(ispec), k, j, i),
-            v(b, cF(ispec, 0), k, j, i),
-            v(b, cF(ispec, 1), k, j, i),
-            v(b, cF(ispec, 2), k, j, i));
         }
       });
 
@@ -281,7 +269,7 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
-  printf("%s:%i ReconstructEdgeStates\n", __FILE__, __LINE__);
+  REPORTTASK
   using namespace PhoebusReconstruction;
 
   auto *pmb = rc->GetParentPointer().get();
@@ -463,7 +451,7 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  printf("\n%s:%i CalculateFluxesImpl\n", __FILE__, __LINE__);
+  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -562,11 +550,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_qlv(2, idir), k, j, i)}};
           Vec con_vr{{v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
                       v(idx_qrv(2, idir), k, j, i)}};
-          if (i == 16 && j == 16) {
-            printf("Jl: %e Jr: %e\n", Jl, Jr);
-            printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2),
-              Hr(0), Hr(1), Hr(2));
-            }
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
@@ -616,10 +599,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
           cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
-          if (i == 16 && j == 16) {
-            printf("El: %e Fl: %e %e %e\n", El, covFl(0), covFl(1), covFl(2));
-            printf("Er: %e Fr: %e %e %e\n", Er, covFr(0), covFr(1), covFr(2));
-          }
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
@@ -646,16 +625,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
-          }
-          if (i == 16 && j == 16) {
-            printf("[%i %i %i][%i][dir: %i] F = %e %e %e %e\n",
-            k,j,i,ispec,idir_in,v.flux(idir_in, idx_Ef(ispec), k, j, i),
-            v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
-            v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
-            v.flux(idir_in, idx_Ff(ispec, 2), k, j, i));
-            printf("E:\n");
-            printf("  conFl: %e conFr: %e speed: %e El: %e Er: %e\n",
-              conFl(idir), conFr(idir), speed, El, Er);
           }
           if (sdetgam < std::numeric_limits<Real>::min() * 10) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
@@ -689,7 +658,7 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
-  printf("\n%s:%i CalculateGeometricSourceImpl\n", __FILE__, __LINE__);
+  REPORTTASK
   constexpr int ND = Geometry::NDFULL;
   // constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -779,10 +748,6 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Vec covH{{J * v(iblock, idx_H(ispec, 0), k, j, i),
                     J * v(iblock, idx_H(ispec, 1), k, j, i),
                     J * v(iblock, idx_H(ispec, 2), k, j, i)}};
-                    if (i == 16 && j == 16) {
-                      printf("  E: %e F: %e %e %e\n", E, covF(0), covF(1), covF(2));
-                      printf("  J: %e H: %e %e %e\n", J, covH(0), covH(1), covH(2));
-                    }
           Vec conF;
           g.raise3Vector(covF, &conF);
           Tens2 conP, con_tilPi;
@@ -810,12 +775,6 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           }
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
           SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
-          if (i == 16 && j == 16) {
-            printf("src: %e %e %e %e\n", v_src(iblock, idx_E_src(ispec), k, j, i),
-              v_src(iblock, idx_F_src(ispec, 0), k, j, i),
-              v_src(iblock, idx_F_src(ispec, 1), k, j, i),
-              v_src(iblock, idx_F_src(ispec, 2), k, j, i));
-          }
         }
       });
   return TaskStatus::complete;
@@ -853,7 +812,7 @@ TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
-  printf("\n%s:%i MomentFluidSource\n", __FILE__, __LINE__);
+  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   namespace cr = radmoment_cons;
@@ -957,23 +916,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
           Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
-          if (i == 16 && j == 16) {
-            printf("Estar: %e covFstar: %e %e %e\n", Estar, cov_Fstar(0), cov_Fstar(1), cov_Fstar(2));
-            printf("dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
-          }
 
           // Add source corrections to conserved iration variables
           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
           for (int idir = 0; idir < 3; ++idir) {
             v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
-          }
-
-          if (i == 16 && j == 16) {
-            printf("Updated E = %e F = %e %e %e\n",
-              v(iblock, idx_E(ispec), k, j, i),
-              v(iblock, idx_F(ispec, 0), k, j, i),
-              v(iblock, idx_F(ispec, 1), k, j, i),
-              v(iblock, idx_F(ispec, 2), k, j, i));
           }
 
           // Add source corrections to conserved fluid variables

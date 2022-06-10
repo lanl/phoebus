@@ -156,7 +156,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <typename T, class CLOSURE>
 TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
-  printf("\n%s:%i ApplyFloors\n", __FILE__, __LINE__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace pr = radmoment_prim;
@@ -363,12 +362,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
 
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * covF(ii); }
-            if (i == 16 && j == 16) {
-              printf("updated E = %e F = %e %e %e\n", v(b, idx_E(ispec), k, j, i),
-                v(b, idx_F(ispec, 0), k, j, i),
-                v(b, idx_F(ispec, 1), k, j, i),
-                v(b, idx_F(ispec, 2), k, j, i));
-            }
           }
         }
       });
