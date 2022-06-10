@@ -945,16 +945,47 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           for (int idir = 0; idir < 3; ++idir) {
             v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
           }
+          if (i == 4) {
+            printf("conv: %e %e %e\n", con_v(0), con_v(1), con_v(2));
+                       printf("Estar: %e Fstar: %e %e %e\n", Estar, cov_Fstar(0), cov_Fstar(1), cov_Fstar(2));
+             printf("B: %e tau: %e %e\n", B, tauJ, tauH);
+             SPACELOOP(ii) {
+               SPACELOOP(jj) {
+                 printf("%e ", con_tilPi(ii,jj));
+               }
+               printf("\n");
+             }
+            
+            printf("updated E: %e F: %e %e %e\n",
+              v(iblock, idx_E(ispec), k, j, i),
+              v(iblock, idx_F(ispec, 0), k, j, i),
+              v(iblock, idx_F(ispec, 1), k, j, i),
+              v(iblock, idx_F(ispec, 2), k, j, i));
+            printf("dE: %e dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
+          }
 
           // Add source corrections to conserved fluid variables
           if (update_fluid) {
             if (cye > 0) {
               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
             }
+            printf("orig eng: %e mom: %e %e %e\n", v(iblock, ceng, k, j, i),
+              v(iblock, cmom_lo + 0, k, j, i),
+              v(iblock, cmom_lo + 1, k, j, i),
+              v(iblock, cmom_lo + 2, k, j, i));
+            printf("sdetgam: %e dE: %e cov_dF: %e %e %e\n", sdetgam, dE, cov_dF(0), cov_dF(1), cov_dF(2));
+            #if USE_VALENCIA
             v(iblock, ceng, k, j, i) -= sdetgam * dE;
+            #else
+            v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
+            #endif
             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
             v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
+            printf("updated eng: %e mom: %e %e %e\n", v(iblock, ceng, k, j, i),
+              v(iblock, cmom_lo + 0, k, j, i),
+              v(iblock, cmom_lo + 1, k, j, i),
+              v(iblock, cmom_lo + 2, k, j, i));
           }
         }
       });
@@ -1035,6 +1066,9 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
               rho, Temp, Ye, dev_species[ispec]);
           Real JBB = d_opacity.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
+           if (i == 4) {                                                                              
+             printf("kappa: %e JBB: %e Temp: %e spec(%i): %i\n", kappa, JBB, Temp, ispec, static_cast<int>     (dev_species[ispec]));
+           } 
 
           v(iblock, idx_JBB(ispec), k, j, i) = JBB;
           v(iblock, idx_kappaJ(ispec), k, j, i) = kappa * (1.0 - scattering_fraction);

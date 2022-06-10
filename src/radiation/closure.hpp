@@ -160,6 +160,7 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::LinearSourceUpdate(
   Real vvTilPi;
   Vec cov_vTilPi;
   GetTilPiContractions(con_tilPi, &cov_vTilPi, &vvTilPi);
+  printf("vvTilPi: %e W: %e W2: %e\n", vvTilPi, W, W2);
 
   Real A[2][2], x[2], b[2];
   A[0][0] = (4 * W2 - 1) / 3 + W2 * vvTilPi + W * tauJ;
@@ -173,19 +174,25 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::LinearSourceUpdate(
   }
 
   Real vFstar = gamma->contractConCov3Vectors(con_v, cov_Fstar);
+  printf("vFstar: %e\n", vFstar);
 
   if (SET::eqn_type == ClosureEquation::energy_conserve) {
+    printf("EC Estar: %e W: %e tauJ: %e JBB: %e\n", Estar, W, tauJ, JBB);
     b[0] = Estar + W * tauJ * JBB;
   } else if (SET::eqn_type == ClosureEquation::number_conserve) {
+    printf("NC Estar: %e tauJ: %e JBB: %e\n", Estar, tauJ, JBB);
     b[0] = Estar + tauJ * JBB;
   }
   b[1] = vFstar + (W2 - 1) / W * tauJ * JBB;
+    printf("A: %e %e %e %e\n", A[0][0], A[0][1], A[1][0], A[1][1]);
+  printf("b: %e %e\n", b[0], b[1]);
 
   SolveAxb2x2(A, b, x);
   // if (std::isnan(b[0])) throw 1;
 
   Real &J = x[0];
   Real &zeta = x[1]; // v^i \tilde H_i
+  printf("J: %e zeta: %e\n", J, zeta);
 
   if (SET::eqn_type == ClosureEquation::energy_conserve) {
     *dE = (4 * W2 - 1 + 3 * W2 * vvTilPi) / 3 * J + 2 * W * zeta - Estar;
