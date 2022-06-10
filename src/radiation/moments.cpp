@@ -23,6 +23,9 @@
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
+#define DOTASKREPORTING 1
+#define REPORTTASK {if (DOTASKREPORTING) {printf("\n%s:%i:%s\n", __FILE__, __LINE__, __func__);}}
+
 namespace radiation {
 
 template <class T>
@@ -50,7 +53,7 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
-  printf("%s:%i MomentCon2PrimImpl\n", __FILE__, __LINE__);
+  REPORTTASK
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -111,10 +114,6 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         Vec covF = {{v(b, cF(ispec, 0), k, j, i) * isdetgam,
                      v(b, cF(ispec, 1), k, j, i) * isdetgam,
                      v(b, cF(ispec, 2), k, j, i) * isdetgam}};
-         if (i == 4 && j == 4) {
-         printf("[%i %i %i][%i] E: %e covF: %e %e %e\n", k, j, i, ispec,
-           E, covF(0), covF(1), covF(2));
-         }
 
         if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
@@ -138,6 +137,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
          }
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
+          printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
+          printf("J: %e covH: %e %e %e\n", J, covH(0), covH(1), covH(2));
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
         }
 
@@ -176,7 +177,7 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
-  printf("%s:%i MomentPrim2ConImpl\n", __FILE__, __LINE__);
+  REPORTTASK
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -219,9 +220,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
         // Set up the background
         Vec con_v{{v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)}};
-        // TODO(BRR) Remove?
-        //Tens2 cov_gamma;
-        //geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, 0, b, j, i);
@@ -282,7 +280,7 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
-  printf("%s:%i ReconstructEdgeStates\n", __FILE__, __LINE__);
+  REPORTTASK
   using namespace PhoebusReconstruction;
 
   auto *pmb = rc->GetParentPointer().get();
@@ -464,7 +462,7 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  printf("%s:%i CalculateFluxesImpl\n", __FILE__, __LINE__);
+  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -683,6 +681,7 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
+  REPORTTASK
   constexpr int ND = Geometry::NDFULL;
   // constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -836,6 +835,7 @@ TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
+  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   namespace cr = radmoment_cons;

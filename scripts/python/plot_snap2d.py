@@ -86,8 +86,13 @@ def plot_dump(filename, varname,
     fig = plt.figure()
     p = fig.add_subplot(111, aspect=1)
     for i in range(NB):
+        val = q[i,0,:,:]
+        if len(val.shape) > 2:
+          print("WARNING plotting the 0th index of multidimensional variable!")
+          val = val[:,:,0]
+        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:], shading='gouraud',
         #mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:], shading='gouraud',
-        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:,0], shading='gouraud',
+        #mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:,0], shading='gouraud',
                             vmin=qmin, vmax=qmax, cmap=colormap)
 
     plt.xlim(x1bounds[0], x1bounds[1])
