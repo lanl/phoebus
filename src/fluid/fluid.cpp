@@ -296,7 +296,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 // template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
-  printf("%s:%i PrimitiveToConserved\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -374,9 +373,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
                       v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov4, gcon, shift, lapse,
                       gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,
                       sig);
-        printf("rho: %e v: %e %e %e eng: %e ceng: %e\n",
-           v(b, prho, k, j, i), vel[0], vel[1], vel[2], v(b, peng, k, j, i),
-           v(b, ceng, k, j, i));
 
         v(b, cmom_lo, k, j, i) = S[0];
         v(b, cmom_lo + 1, k, j, i) = S[1];
@@ -402,7 +398,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
-  printf("%s:%i ConservedToPrimitive\n", __FILE__, __LINE__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
