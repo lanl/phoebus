@@ -34,26 +34,27 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto ccsn_pkg = pmb->packages.Get("ccsn");
   auto monopole_pkg = pmb->packages.Get("monopole_gr");
   auto eos_pkg = pmb->packages.Get("eos");
-  const auto enable_tov = tov_pkg->Param<bool>("enabled");
+  const auto enable_ccsn = ccsn_pkg->Param<bool>("enabled");
   const auto enable_monopole = monopole_pkg->Param<bool>("enable_monopole_gr");
-  if (!(enable_tov && enable_monopole)) {
-    PARTHENON_THROW("TOV problem generator requires tov and monopole GR packages");
+  if (!(enable_ccsn && enable_monopole)) {
+    PARTHENON_THROW("CCSN problem generator requires ccsn and monopole GR packages");
   }
   if (!(is_monopole_cart || is_monopole_sph)) {
-    PARTHENON_THROW("TOV problem generator requires a MonopoleGR metric.");
+    PARTHENON_THROW("CCSN problem generator requires a MonopoleGR metric.");
   }
 
   auto &rc = pmb->meshblock_data.Get();
 
   auto rgrid = monopole_pkg->Param<MonopoleGR::Radius>("radius");
-  auto intrinsic = tov_pkg->Param<TOV::State_t>("tov_intrinsic");
+  auto intrinsic = ccsn_pkg->Param<CCSN::State_t>("ccsn_intrinsic");
 
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
 
-  const auto pmin = tov_pkg->Param<Real>("pmin");
-  const Real rhomin = pin->GetOrAddReal("tov", "rhomin", 1e-12);
-  const Real epsmin = pin->GetOrAddReal("tov", "rhomin", 1e-12);
+  // reenable to set floors for CCSN problem
+  // const auto pmin = ccsn_pkg->Param<Real>("pmin");
+  // const Real rhomin = pin->GetOrAddReal("ccsn", "rhomin", 1e-12);
+  // const Real epsmin = pin->GetOrAddReal("ccsn", "epsmin", 1e-12);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -78,7 +79,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int itmp = imap[fluid_prim::temperature].first;
 
   pmb->par_for(
-      "Phoebus::ProblemGenerator::TOV", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      "Phoebus::ProblemGenerator::CCSN", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real r;
 	if (is_monopole_sph) {
@@ -89,10 +90,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           const Real x3 = coords.x3v(k, j, i);
           r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
         }
+	// interp per mesh block here? or pull data from model_1d
         Real rho =
-            std::max(rhomin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::RHO0));
+            std::max(rhomin, MonopoleGR::Interpolate(r, intrinsic, rgrid, CCSN::RHO0));
         Real eps =
-            std::max(epsmin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::EPS));
+            std::max(epsmin, MonopoleGR::Interpolate(r, intrinsic, rgrid, CCSN::EPS));
         Real P = std::max(pmin, eos.PressureFromDensityInternalEnergy(rho, eps));
 
         // TODO(JMM): Add lambdas, Ye, etc
