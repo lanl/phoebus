@@ -38,6 +38,7 @@ code = rt.gold_comparison(variables=['p.density', 'p.energy'],
                           use_gpu=args.use_gpu,
                           use_mpiexec=args.use_mpiexec,
                           build_type=args.build_type,
-                          upgold=args.upgold)
+                          upgold=args.upgold,
+                          tolerance=1.e-2)
 
 sys.exit(code)
