@@ -23,9 +23,6 @@
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
-#define DOTASKREPORTING 1
-#define REPORTTASK {if (DOTASKREPORTING) {printf("\n%s:%i:%s\n", __FILE__, __LINE__, __func__);}}
-
 namespace radiation {
 
 template <class T>
@@ -53,7 +50,6 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
-  REPORTTASK
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -173,7 +169,6 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
-  REPORTTASK
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -269,7 +264,6 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
-  REPORTTASK
   using namespace PhoebusReconstruction;
 
   auto *pmb = rc->GetParentPointer().get();
@@ -451,7 +445,6 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -658,7 +651,6 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
-  REPORTTASK
   constexpr int ND = Geometry::NDFULL;
   // constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -812,7 +804,6 @@ TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
-  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   namespace cr = radmoment_cons;
