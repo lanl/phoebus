@@ -83,7 +83,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 }
 
 // this task will change to something that generates the ccsn initial problem
-TaskStatus IntegrateTov(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg,
+TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg,
                         StateDescriptor *eospkg) {
   PARTHENON_REQUIRE_THROWS(ccsnpkg->label() == "ccsn", "Requires the ccsn package");
   PARTHENON_REQUIRE_THROWS(monopolepkg->label() == "monopole_gr",

@@ -93,7 +93,7 @@ void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, const R
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 //this task will change to something that inits the CCSN problem
-TaskStatus IntegrateTov(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg,
+TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg,
                         StateDescriptor *eospkg);
 
 } // namespace CCSN
