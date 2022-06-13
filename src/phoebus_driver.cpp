@@ -36,6 +36,7 @@
 #include "phoebus_utils/robust.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
+#include "ccsn/ccsn.hpp"
 
 using namespace parthenon::driver::prelude;
 using parthenon::AllReduce;
