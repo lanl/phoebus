@@ -73,11 +73,11 @@ Real GetPRHS(const Real r, const Real rho_adm, const Real m, const Real P,
 }
 
 KOKKOS_INLINE_FUNCTION
-void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, const Real Pmin,
-            Real out[NTOV]) {
-  Real m = in[TOV::M];
-  Real P = in[TOV::P];
-  // Real phi = in[TOV::PHI];
+void TovRHS(Real r, const Real in[NCCSN], const Real K, const Real Gamma, const Real Pmin,
+            Real out[NCCSN]) {
+  Real m = in[CCSN::M];
+  Real P = in[CCSN::P];
+  // Real phi = in[CCSN::PHI];
   if (P < Pmin) P = 0;
 
   Real rho, eps;
@@ -85,9 +85,9 @@ void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, const R
   // More generality requires exposing entropy in singularity-eos
   PolytropeThermoFromP(P, K, Gamma, rho, eps);
   Real rho_adm = rho * (1 + eps);
-  out[TOV::M] = GetMRHS(r, rho_adm);
-  out[TOV::P] = GetPRHS(r, rho_adm, m, P, Pmin);
-  out[TOV::PHI] = GetPhiRHS(r, rho_adm, m, P);
+  out[CCSN::M] = GetMRHS(r, rho_adm);
+  out[CCSN::P] = GetPRHS(r, rho_adm, m, P, Pmin);
+  out[CCSN::PHI] = GetPhiRHS(r, rho_adm, m, P);
 }
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);

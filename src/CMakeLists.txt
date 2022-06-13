@@ -15,6 +15,9 @@ add_executable(phoebus
   main.cpp # first
 
   # alphabetical
+  ccsn/ccsn.hpp
+  ccsn/ccsn.cpp
+
   fixup/fixup.cpp
   fixup/fixup.hpp
 
@@ -94,6 +97,7 @@ add_executable(phoebus
   pgen/sedov.cpp
   pgen/torus.cpp
   pgen/tov.cpp
+  pgen/ccsn.cpp
 
   phoebus_boundaries/phoebus_boundaries.hpp
   phoebus_boundaries/phoebus_boundaries.cpp
@@ -110,6 +114,7 @@ add_executable(phoebus
   phoebus_utils/robust.hpp
   phoebus_utils/root_find.hpp
   phoebus_utils/variables.hpp
+  phoebus_utils/initial_model_reader.hpp
 
   radiation/radiation.hpp
   radiation/radiation.cpp
