@@ -58,8 +58,8 @@ class GasRadTemperatureResidual {
  private:
   const Real Ptot_;
   const Real rho_;
-  const Opacity opac_;
-  const EOS eos_;
+  const Opacity &opac_;
+  const EOS &eos_;
   const RadiationType type_;
   const Real Ye_;
 };
@@ -149,8 +149,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Initialize radiation, if active
   InitialRadiation init_rad;
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
-  const auto d_opacity = opac->Param<Opacity>("d.opacity");
+  Opacity d_opacity;
   if (do_rad) {
+    d_opacity = opac->Param<Opacity>("d.opacity");
     const std::string init_rad_str =
         pin->GetOrAddString("torus", "initial_radiation", "None");
     if (init_rad_str == "None") {
@@ -285,7 +286,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               root_find::RootFind root_find;
               GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity,
                                             eos, d_species[ispec], Ye);
-              v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-8, 0.5 * T);
+              v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6*T, T);
 
               // Set fluid u/P/T and radiation J using equilibrium temperature
               v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(

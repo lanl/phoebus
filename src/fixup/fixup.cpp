@@ -383,7 +383,11 @@ TaskStatus ApplyFloors(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
-  auto method = rad->Param<std::string>("method");
+  const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
+  std::string method;
+  if (enable_rad_floors) {
+    method = rad->Param<std::string>("method");
+  }
 
   // TODO(BRR) share these settings somewhere else. Set at configure time?
   using settings =
@@ -397,7 +401,6 @@ TaskStatus ApplyFloors(T *rc) {
   } else {
     // TODO(BRR) default to Eddington closure, check that rad floors are unused for
     // Monte Carlo/cooling function
-    bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
     PARTHENON_REQUIRE(!enable_rad_floors,
                       "Rad floors not supported with cooling function/Monte Carlo!");
     return ApplyFloorsImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
