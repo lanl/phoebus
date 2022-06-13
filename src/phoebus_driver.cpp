@@ -118,10 +118,13 @@ void PhoebusDriver::PostInitializationCommunication() {
 
     auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
                                  BoundaryCommSubset::all);
-    auto apply_floors2 = tl.AddTask(start_recv, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
+    auto apply_floors2 =
+        tl.AddTask(start_recv, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
     auto send =
-        //tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
-        tl.AddTask(apply_floors2, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
+        // tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers,
+        // md);
+        tl.AddTask(apply_floors2, parthenon::cell_centered_bvars::SendBoundaryBuffers,
+                   md);
     auto recv =
         tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
     auto fill_from_bufs =
@@ -132,7 +135,8 @@ void PhoebusDriver::PostInitializationCommunication() {
 
     auto prolongBound = tl.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
 
-    auto apply_floors = tl.AddTask(prolongBound, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
+    auto apply_floors =
+        tl.AddTask(prolongBound, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
 
     auto set_bc = tl.AddTask(apply_floors, parthenon::ApplyBoundaryConditions, sc);
 

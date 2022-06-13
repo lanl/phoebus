@@ -44,8 +44,8 @@ using namespace singularity::neutrinos;
 class GasRadTemperatureResidual {
  public:
   KOKKOS_FUNCTION
-  GasRadTemperatureResidual(const Real Ptot, const Real rho, const Opacity &opac, const EOS &eos,
-           RadiationType type, const Real Ye)
+  GasRadTemperatureResidual(const Real Ptot, const Real rho, const Opacity &opac,
+                            const EOS &eos, RadiationType type, const Real Ye)
       : Ptot_(Ptot), rho_(rho), opac_(opac), eos_(eos), type_(type), Ye_(Ye) {}
 
   KOKKOS_INLINE_FUNCTION
@@ -283,8 +283,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               const Real Ye = iye > 0 ? v(iye, k, j, i) : 0.5;
 
               root_find::RootFind root_find;
-              GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity, eos,
-                           d_species[ispec], Ye);
+              GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity,
+                                            eos, d_species[ispec], Ye);
               v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-8, 0.5 * T);
 
               // Set fluid u/P/T and radiation J using equilibrium temperature
@@ -305,7 +305,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           } else {
             // In the atmosphere set some small radiation energy
             for (int ispec = specB.s; ispec < 1; ispec++) {
-              v(iJ(ispec), k, j, i) = 1.e-5*v(ieng, k, j, i);
+              v(iJ(ispec), k, j, i) = 1.e-5 * v(ieng, k, j, i);
 
               // Zero comoving frame fluxes
               v(iH(0, ispec), k, j, i) = 0.0;

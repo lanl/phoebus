@@ -31,12 +31,12 @@
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/radiation.hpp"
 
-using robust::ratio;
-using radiation::Vec;
-using radiation::Tens2;
-using radiation::ClosureSettings;
 using radiation::ClosureEquation;
+using radiation::ClosureSettings;
 using radiation::ClosureVerbosity;
+using radiation::Tens2;
+using radiation::Vec;
+using robust::ratio;
 
 #define FIXUP_PRINT_TOTAL_NFAIL 0
 
@@ -353,10 +353,11 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
             Tens2 conTilPi;
             Real J = v(b, idx_J(ispec), k, j, i);
             Vec covH = {{v(b, idx_H(ispec, 0), k, j, i) * J,
-              v(b, idx_H(ispec, 1), k, j, i) * J,
-              v(b, idx_H(ispec, 2), k, j, i) * J}};
+                         v(b, idx_H(ispec, 1), k, j, i) * J,
+                         v(b, idx_H(ispec, 2), k, j, i) * J}};
 
-            if (programming::is_specialization_of<CLOSURE, radiation::ClosureMOCMC>::value) {
+            if (programming::is_specialization_of<CLOSURE,
+                                                  radiation::ClosureMOCMC>::value) {
               SPACELOOP2(ii, jj) {
                 conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
               }
@@ -397,7 +398,8 @@ TaskStatus ApplyFloors(T *rc) {
     // TODO(BRR) default to Eddington closure, check that rad floors are unused for
     // Monte Carlo/cooling function
     bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
-    PARTHENON_REQUIRE(!enable_rad_floors, "Rad floors not supported with cooling function/Monte Carlo!");
+    PARTHENON_REQUIRE(!enable_rad_floors,
+                      "Rad floors not supported with cooling function/Monte Carlo!");
     return ApplyFloorsImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
   }
   return TaskStatus::fail;

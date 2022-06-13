@@ -137,8 +137,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
           v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
-            //  covH(idir) /
-            //  J; // Used the scaled value of the rest frame flux for reconstruction
+          //  covH(idir) /
+          //  J; // Used the scaled value of the rest frame flux for reconstruction
         }
       });
 
@@ -919,11 +919,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             if (cye > 0) {
               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
             }
-            #if USE_VALENCIA
+#if USE_VALENCIA
             v(iblock, ceng, k, j, i) -= sdetgam * dE;
-            #else
+#else
             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
-            #endif
+#endif
             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
             v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
