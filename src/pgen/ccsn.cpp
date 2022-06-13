@@ -46,15 +46,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   auto rgrid = monopole_pkg->Param<MonopoleGR::Radius>("radius");
-  auto intrinsic = ccsn_pkg->Param<CCSN::State_t>("ccsn_intrinsic");
-
+  auto base = ccsn_pkg->Param<CCSN::State_t>("ccsn_state");
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
 
-  // reenable to set floors for CCSN problem
-  // const auto pmin = ccsn_pkg->Param<Real>("pmin");
-  // const Real rhomin = pin->GetOrAddReal("ccsn", "rhomin", 1e-12);
-  // const Real epsmin = pin->GetOrAddReal("ccsn", "epsmin", 1e-12);
+  // floors from pin
+  const auto pmin = ccsn_pkg->Param<Real>("pmin");
+  const auto rhomin = ccsn_pkg->Param<Real>("rhomin");
+  const auto epsmin = ccsn_pkg->Param<Real>("epsmin");
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -63,6 +62,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   PackIndexMap imap;
+
   auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
                               fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
                               fluid_prim::pressure, fluid_prim::temperature},
@@ -92,9 +92,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 	// interp per mesh block here? or pull data from model_1d
         Real rho =
-            std::max(rhomin, MonopoleGR::Interpolate(r, intrinsic, rgrid, CCSN::RHO0));
+            std::max(rhomin, MonopoleGR::Interpolate(r, base, rgrid, CCSN::RHO));
         Real eps =
-            std::max(epsmin, MonopoleGR::Interpolate(r, intrinsic, rgrid, CCSN::EPS));
+            std::max(epsmin, MonopoleGR::Interpolate(r, base, rgrid, CCSN::EPS));
         Real P = std::max(pmin, eos.PressureFromDensityInternalEnergy(rho, eps));
 
         // TODO(JMM): Add lambdas, Ye, etc
@@ -104,12 +104,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps);
         for (int d = 0; d < 3; ++d) {
           v(ivlo + d, k, j, i) = 0.0;
-        }
-        // Perturbation in velocity for testing
-        if (vpert_a > 0) {
-          v(ivlo, k, j, i) =
-              vpert_a * r *
-              std::exp(-(r - vpert_r) * (r - vpert_r) / (4 * vpert_s * vpert_s));
         }
       });
 
