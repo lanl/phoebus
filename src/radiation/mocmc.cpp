@@ -701,7 +701,11 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             // Add source corrections to conserved fluid variables
             if (update_fluid) {
               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+              #if USE_VALENCIA
               v(iblock, ceng, k, j, i) -= sdetgam * dE;
+              #else
+              v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
+              #endif
               v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
               v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
               v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);

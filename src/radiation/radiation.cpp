@@ -411,7 +411,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         // TODO(BRR) check this
         #if USE_VALENCIA
-        v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
+        v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
         #else 
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         #endif

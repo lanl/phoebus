@@ -253,7 +253,7 @@ def gold_comparison(variables, input_file, modified_inputs={},
       success = False
     else:
       for n in range(len(gold_variables)):
-        if not soft_equiv(variables_data[n], gold_variables[n]):
+        if not soft_equiv(variables_data[n], gold_variables[n], tol=tolerance):
           success = False
 
   cleanup()
