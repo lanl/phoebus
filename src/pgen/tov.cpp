@@ -62,7 +62,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const auto pmin = tov_pkg->Param<Real>("pmin");
   const Real rhomin = pin->GetOrAddReal("tov", "rhomin", 1e-12);
-  const Real epsmin = pin->GetOrAddReal("tov", "rhomin", 1e-12);
+  const Real epsmin = pin->GetOrAddReal("tov", "epsmin", 1e-12);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
