@@ -189,8 +189,8 @@ def cleanup():
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
 def gold_comparison(variables, input_file, modified_inputs={},
-                    executable=None, geometry='Minkowski', use_gpu=False, build_type='Release',
-                    upgold=False, compression_factor=1, tolerance=1.e-5):
+                    executable=None, geometry='Minkowski', use_gpu=False, use_mpiexec=False,
+                    build_type='Release', upgold=False, compression_factor=1, tolerance=1.e-5):
 
   if executable is None:
     executable = os.path.join(BUILD_DIR, 'src', 'phoebus')
@@ -208,10 +208,13 @@ def gold_comparison(variables, input_file, modified_inputs={},
     modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
   # Run test problem
+  preamble = []
+  if use_mpiexec:
+      preamble = preamble + ['mpiexec', '-n', '1']
   if os.path.isabs(executable):
-    call([executable, '-i', TEMPORARY_INPUT_FILE])
+    call(preamble + [executable, '-i', TEMPORARY_INPUT_FILE])
   else:
-    call([os.path.join('..', executable), '-i', TEMPORARY_INPUT_FILE])
+    call(preamble + [os.path.join('..', executable), '-i', TEMPORARY_INPUT_FILE])
 
   # Get last dump file
   dumpfiles = np.sort(glob.glob('*.phdf'))

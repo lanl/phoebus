@@ -260,8 +260,6 @@ void ReflectOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
-  printf("%s:%i ConvertBoundaryConditions\n", __FILE__, __LINE__);
-
   auto pmb = rc->GetBlockPointer();
   const int ndim = pmb->pmy_mesh->ndim;
 
@@ -298,8 +296,6 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
       }
     }
   }
-
-  printf("%s:%i\n", __FILE__, __LINE__);
 
   return TaskStatus::complete;
 }

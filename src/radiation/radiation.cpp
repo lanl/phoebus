@@ -413,7 +413,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
         #if USE_VALENCIA
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         #else 
-        v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
+        v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
         #endif
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;

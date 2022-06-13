@@ -170,6 +170,11 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
 
+  bool enable_floors = fix_pkg->Param<bool>("enable_floors");
+  if (!enable_floors) return TaskStatus::complete;
+  bool enable_mhd_floors = fix_pkg->Param<bool>("enable_mhd_floors");
+  bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
+
   const std::vector<std::string> vars(
       {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
        p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
@@ -195,20 +200,21 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
   const int pb_hi = imap[p::bfield].second;
   int pye = imap[p::ye].second; // negative if not present
   int cye = imap[c::ye].second;
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_H = imap.GetFlatIdx(pr::H);
-  auto idx_E = imap.GetFlatIdx(cr::E);
-  auto idx_F = imap.GetFlatIdx(cr::F);
+  vpack_types::FlatIdx idx_J({-1}, -1);
+  vpack_types::FlatIdx idx_H({-1}, -1);
+  vpack_types::FlatIdx idx_E({-1}, -1);
+  vpack_types::FlatIdx idx_F({-1}, -1);
   vpack_types::FlatIdx iTilPi({-1}, -1);
-  if (programming::is_specialization_of<CLOSURE, radiation::ClosureMOCMC>::value) {
-    iTilPi = imap.GetFlatIdx(ir::tilPi);
+  if (enable_rad_floors) {
+    auto idx_J = imap.GetFlatIdx(pr::J);
+    auto idx_H = imap.GetFlatIdx(pr::H);
+    auto idx_E = imap.GetFlatIdx(cr::E);
+    auto idx_F = imap.GetFlatIdx(cr::F);
+    if (programming::is_specialization_of<CLOSURE, radiation::ClosureMOCMC>::value) {
+      iTilPi = imap.GetFlatIdx(ir::tilPi);
+    }
   }
   const int nspec = idx_J.DimSize(1);
-
-  bool enable_floors = fix_pkg->Param<bool>("enable_floors");
-  if (!enable_floors) return TaskStatus::complete;
-  bool enable_mhd_floors = fix_pkg->Param<bool>("enable_mhd_floors");
-  bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
 
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -375,6 +381,7 @@ template <typename T>
 TaskStatus ApplyFloors(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
   auto method = rad->Param<std::string>("method");
 
   // TODO(BRR) share these settings somewhere else. Set at configure time?
@@ -387,7 +394,11 @@ TaskStatus ApplyFloors(T *rc) {
   } else if (method == "mocmc") {
     return ApplyFloorsImpl<T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
   } else {
-    PARTHENON_FAIL("Radiation method unknown");
+    // TODO(BRR) default to Eddington closure, check that rad floors are unused for
+    // Monte Carlo/cooling function
+    bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
+    PARTHENON_REQUIRE(!enable_rad_floors, "Rad floors not supported with cooling function/Monte Carlo!");
+    return ApplyFloorsImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
   }
   return TaskStatus::fail;
 }
