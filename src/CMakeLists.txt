@@ -114,7 +114,6 @@ add_executable(phoebus
   phoebus_utils/robust.hpp
   phoebus_utils/root_find.hpp
   phoebus_utils/variables.hpp
-  phoebus_utils/initial_model_reader.hpp
 
   radiation/radiation.hpp
   radiation/radiation.cpp
