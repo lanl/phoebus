@@ -117,21 +117,20 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto &sc = pmb->meshblock_data.Get();
 
     auto start_recv = tl0.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
-                                 BoundaryCommSubset::all);
+                                  BoundaryCommSubset::all);
   }
 
   // tasks that span <md>
   auto &tl1 = async_region[1];
   auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], 0);
 
-  auto send =
-     tl1.AddTask(none, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
+  auto send = tl1.AddTask(none, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
 
   auto recv =
-     tl1.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
+      tl1.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
 
   auto fill_from_bufs =
-     tl1.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
+      tl1.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
 
   // tailing per-block-tasks
   auto &tl2 = async_region[2];
@@ -139,19 +138,15 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto pmb = blocks[ib].get();
     auto &sc = pmb->meshblock_data.Get();
 
-    auto clear_comm_flags =
-       tl2.AddTask(none, &MeshBlockData<Real>::ClearBoundary,
-                  sc.get(),
-                  BoundaryCommSubset::all);
+    auto clear_comm_flags = tl2.AddTask(none, &MeshBlockData<Real>::ClearBoundary,
+                                        sc.get(), BoundaryCommSubset::all);
 
     auto prolongBound =
-       tl2.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
+        tl2.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
 
-    auto set_bc =
-       tl2.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+    auto set_bc = tl2.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
 
-    auto convert_bc =
-       tl2.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
+    auto convert_bc = tl2.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
 
     // Radiation should actually be included in ConvertBoundaryConditions
     // using MDT = std::remove_pointer<decltype(sc.get())>::type;
