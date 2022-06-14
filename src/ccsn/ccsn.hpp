@@ -71,6 +71,20 @@ Real Get1DProfile(std::string model_filename){
     return model_1d[num_vars][num_zones];
 }
 
+KOKKOS_INLINE_FUNCTION
+Real Interp1DProfile(const Real model_1d[NCCSN][npoints], const int npoints, const Real r, const Real dr){
+
+    for (int k = 0, k < num_vars; k++)
+    {
+	for (int j = 1, j < npoints; j++)  //call interp on a point by point basis here
+	{
+	    call blah
+}
+
+
+
+
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 //this task will change to something that inits the CCSN problem

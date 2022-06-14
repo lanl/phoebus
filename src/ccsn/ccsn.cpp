@@ -132,12 +132,12 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
      Real temp = model_1d_interp(CCSN::TEMP, i);     
 
      // set host state vector to interpolated values
-     state_h(CCSN::RHO, i) = rho
-     state_h(CCSN::V, i) = radvel
-     state_h(CCSN::EPS, i) = eps
-     state_h(CCSN::YE, i) = ye
-     state_h(CCSN::P, i) = pres
-     state_h(CCSN::TEMP, i) = temp
+     state_h(CCSN::RHO, i) = rho;
+     state_h(CCSN::V, i) = radvel;
+     state_h(CCSN::EPS, i) = eps;
+     state_h(CCSN::YE, i) = ye;
+     state_h(CCSN::P, i) = pres;
+     state_h(CCSN::TEMP, i) = temp;
 
      // change to non-static values
      matter_h(MonopoleGR::Matter::RHO, i) = rho * (1 + eps); // ADM mass
