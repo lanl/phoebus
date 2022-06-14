@@ -34,22 +34,41 @@ constexpr int YE = 4;
 constexpr int P = 5;
 constexpr int TEMP = 6;
 
+KOKKOS_INLINE_FUNCTION 
+Real Get1DProfile(std::string model_filename){
 
-KOKKOS_INLINE_FUNCTION
-Real GetMRHS(const Real r, const Real rho_adm) { return 4 * M_PI * r * r * rho_adm; }
+    // open file					    
+    std::ifstream inputfile(model_filename);
 
-KOKKOS_INLINE_FUNCTION
-Real GetPhiRHS(const Real r, const Real rho_adm, const Real m, const Real P) {
-  if (r == 0) return 0;
-  return (m + 4 * M_PI * r * r * r * P) / (r * (r - 2 * m));
-}
+    // error check    
+    if (!inputfile.is_open()) 
+        std::cout<<"Error opening file",model_filename;
 
-KOKKOS_INLINE_FUNCTION
-Real GetPRHS(const Real r, const Real rho_adm, const Real m, const Real P,
-             const Real Pmin) {
-  if (P < Pmin) return 0;
-  Real phirhs = GetPhiRHS(r, rho_adm, m, P);
-  return -(rho_adm + P) * phirhs;
+    const int num_vars = 7; // 6 + radius
+    int num_zones = 0;
+    std::string line;
+
+    // get number of zones from 1d file
+    while(!inputfile.eof()) {
+            getline(inputfile, line);
+            num_zones ++;
+    }
+
+    Real model_1d[num_vars][num_zones];
+
+    // read file into model_1d     
+    for (int k = 0; k < num_vars; k++) // number of vars
+    {
+        for (int j = 0; j < num_zones; j++) //  number of zones
+        {
+          inputfile >> model_1d[k][j];
+        }
+    }					  
+
+    std::cout << "Read in file " << model_filename << " 6 variables and " << num_zones << " number of zones.";
+
+    inputfile.close();
+    return model_1d[num_vars][num_zones];
 }
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
