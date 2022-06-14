@@ -62,6 +62,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
   params.Add("npoints", npoints);
 
+  const std::string model_filename = pin->GetOrAddString("ccsn", "model_filename", "file.txt");
+
   // Pressure floor
   Real pmin = pin->GetOrAddReal("ccsn", "Pmin", 1e-9);
   params.Add("pmin", pmin);
@@ -102,35 +104,47 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   auto npoints = params.Get<int>("npoints");
   auto radius = monopolepkg->Param<MonopoleGR::Radius>("radius");
 
-  auto alpha = monopolepkg->Param<MonopoleGR::Alpha_t>("lapse");
-  auto alpha_h = monopolepkg->Param<MonopoleGR::Alpha_host_t>("lapse_h");
-  Kokkos::deep_copy(alpha_h, alpha);
-
   auto matter_h = monopolepkg->Param<MonopoleGR::Matter_host_t>("matter_h");
   auto state_h = params.Get<CCSN::State_host_t>("ccsn_state_h");
 
-  // assumed model_1d loaded in hpp?
   const Real dr = radius.dx();
 
-  // set center value to BC if necessary
-  // state_h(CCSN::M, 0) = 0;
-  // state_h(CCSN::P, 0) = 1;
-  // state_h(CCSN::PHI, 0) = std::log(alpha_h(0));
+  // read 1d model
+  Real model_1d = CCSN::Get1DProfile(model_filename);
 
   // allocate state size of NCCSN which should equal num vars for CCSN ?
   Real state[NCCSN];
 
-  // cef: remove pressure loop because given in model_1d? or would this be new pressure after some solve?
+  // interpolate to determine 1d model on monopole GR radial grid
+  Real model_1d_interp = CCSN::Interp1DProfile(model_1d,npoints,radius,dr);
 
   // second loop, to set density, specific energy, and matter state
-  // for (int i = 0; i < npoints; ++i) {
-  //   Real mass = state_h(CCSN::M, i);
-  //   Real press = state_h(CCSN::P, i);
-  //   matter_h(MonopoleGR::Matter::RHO, i) = rho * (1 + eps); // ADM mass
-  //   matter_h(MonopoleGR::Matter::J_R, i) = 0;               // momentum
-  //   matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
-  //   matter_h(MonopoleGR::Matter::Srr, i) = press;
-  // }
+  for (int i = 0; i < npoints; ++i) {
+
+     // some of the vars below will be changed to EOS calls
+
+     // set i'th interpolated values from 1D model	  
+     Real rho = model_1d_interp(CCSN::RHO, i);
+     Real radvel = model_1d_interp(CCSN::V, i);
+     Real eps = model_1d_interp(CCSN::EPS, i);
+     Real ye = model_1d_interp(CCSN::YE, i);
+     Real pres = model_1d_interp(CCSN::P, i);
+     Real temp = model_1d_interp(CCSN::TEMP, i);     
+
+     // set host state vector to interpolated values
+     state_h(CCSN::RHO, i) = rho
+     state_h(CCSN::V, i) = radvel
+     state_h(CCSN::EPS, i) = eps
+     state_h(CCSN::YE, i) = ye
+     state_h(CCSN::P, i) = pres
+     state_h(CCSN::TEMP, i) = temp
+
+     // change to non-static values
+     matter_h(MonopoleGR::Matter::RHO, i) = rho * (1 + eps); // ADM mass
+     matter_h(MonopoleGR::Matter::J_R, i) = 0;               // momentum
+     matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
+     matter_h(MonopoleGR::Matter::Srr, i) = press;
+   }
 
   // add appropraite print here for CCSN initialization
   // printf("TOV star constructed. Total mass = %.14e\n", state_h(TOV::M, npoints - 1));
