@@ -660,7 +660,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
 /*          if (j == 64 && i < 10) {
-            printf("[%i %i %i][%i] F = %e %e %e %e\n", 
+            printf("[%i %i %i][%i] F = %e %e %e %e\n",
               k, j, i, ispec, v.flux(idir_in, idx_Ef(ispec), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
@@ -695,7 +695,7 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   constexpr int ND = Geometry::NDFULL;
-  // constexpr int NS = Geometry::NDSPACE;
+  constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
   namespace cr = radmoment_cons;
@@ -763,6 +763,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Real Gamma[ND][ND][ND];
         geom.GradLnAlpha(CellLocation::Cent, iblock, k, j, i, dlnalp);
         geom.ConnectionCoefficient(CellLocation::Cent, iblock, k, j, i, Gamma);
+        Real dg[ND][ND][ND];
+        geom.MetricDerivative(CellLocation::Cent, iblock, k, j, i, dg);
 
         // Get the gradient of the shift from the Christoffel symbols of the first kind
         // Get the extrinsic curvature from the Christoffel symbols of the first kind
@@ -805,13 +807,20 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
           Vec srcF{0, 0, 0};
           SPACELOOP(ii) {
-            SPACELOOP(jj) srcF(ii) += covF(jj) * dbeta(ii, jj);
+            SPACELOOP(jj) {
+              srcF(ii) += covF(jj) * dbeta(ii, jj);
+            }
             srcF(ii) -= alp * E * dlnalp[ii + 1];
-            SPACELOOP2(jj, kk)
-            srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
+            SPACELOOP2(jj, kk) {
+            // TODO(BRR) dg[j]+1j[kk+1][ii+1]/2 instead of Gamma[jj+1][kk+1][ii+1]?
+            //srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
+            srcF(ii) += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
+            }
           }
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
-          SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
+          SPACELOOP(ii) {
+            v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
+          }
         }
       });
   return TaskStatus::complete;
