@@ -108,10 +108,9 @@ void PhoebusDriver::PostInitializationCommunication() {
     rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
   }
 
-  TaskRegion &async_region = tc.AddRegion(3);
-
   // leading per-block tasks
-  auto &tl0 = async_region[0];
+  TaskRegion &async_region0 = tc.AddRegion(1);
+  auto &tl0 = async_region0[0];
   for (int ib = 0; ib < blocks.size(); ib++) {
     auto pmb = blocks[ib].get();
     auto &sc = pmb->meshblock_data.Get();
@@ -121,7 +120,8 @@ void PhoebusDriver::PostInitializationCommunication() {
   }
 
   // tasks that span <md>
-  auto &tl1 = async_region[1];
+  TaskRegion &async_region1 = tc.AddRegion(1);
+  auto &tl1 = async_region1[0];
   auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], 0);
 
   auto send = tl1.AddTask(none, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
@@ -133,7 +133,8 @@ void PhoebusDriver::PostInitializationCommunication() {
       tl1.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
 
   // tailing per-block-tasks
-  auto &tl2 = async_region[2];
+  TaskRegion &async_region2 = tc.AddRegion(1);
+  auto &tl2 = async_region2[0];
   for (int ib = 0; ib < blocks.size(); ib++) {
     auto pmb = blocks[ib].get();
     auto &sc = pmb->meshblock_data.Get();
