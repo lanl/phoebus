@@ -20,19 +20,18 @@
 #include <utils/error_checking.hpp>
 
 namespace CCSN {
-constexpr int NCCSN = 7;
+constexpr int NCCSN = 6;
 
 using State_t = parthenon::ParArray2D<Real>;
 using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
 // cef: additional vars for ccsn problems?
-constexpr int R = 0;
-constexpr int RHO = 1;
-constexpr int V = 2;
-constexpr int EPS = 3;
-constexpr int YE = 4;
-constexpr int P = 5;
-constexpr int TEMP = 6;
+constexpr int RHO = 0;
+constexpr int V = 1;
+constexpr int EPS = 2;
+constexpr int YE = 3;
+constexpr int P = 4;
+constexpr int TEMP = 5;
 
 KOKKOS_INLINE_FUNCTION 
 Real Get1DProfile(std::string model_filename){
@@ -72,15 +71,36 @@ Real Get1DProfile(std::string model_filename){
 }
 
 KOKKOS_INLINE_FUNCTION
-Real Interp1DProfile(const Real model_1d[NCCSN][npoints], const int npoints, const Real r, const Real dr){
+Real Interp1DProfile(const Real model_1d[NCCSN][num_zones], const int npoints, const Real r, const Real dr){
+
+    Real model_1d_interp[NCCSN][npoints];
 
     for (int k = 0, k < num_vars; k++)
     {
 	for (int j = 1, j < npoints; j++)  //call interp on a point by point basis here
 	{
-	    call blah
+	    call quadraticInterp(model_1d[0][:],r(j),model_1d[k+1][:],)
+	}
+     }
+
+    return model_1d_interp;
 }
 
+KOKKOS_INLINE_FUNCTION
+Real quadraticInterp(const Real input_radius, const Real radius_want, const Real var){ 
+        Real var_l;
+	Real var_c;
+	Real var_r;
+
+	return 
+}
+
+KOKKOS_INLINE_FUNCTION
+int huntInterp(const Real input_radius, const Real radius_want){
+	int j_want;
+	
+	return
+}
 
 
 
