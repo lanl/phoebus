@@ -95,10 +95,13 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
       jb.s, jb.e,       // y-loop
       ib.s, ib.e,       // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
-        Vec con_v{{v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)}};
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real isdetgam = 1.0 / geom.DetGamma(CellLocation::Cent, b, k, j, i);
+
+        const Real vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)};
+        const Real W = phoebus::GetLorentzFactor(vp, cov_gamma.data);
+        Vec con_v{{v(b, pv(0), k, j, i)/W, v(b, pv(1), k, j, i)/W, v(b, pv(2), k, j, i)/W}};
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
         CLOSURE c(con_v, &g);
@@ -210,10 +213,15 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
       ib.s, ib.e,       // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
         // Set up the background
-        Vec con_v{{v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)}};
         const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
-
+        Tens2 cov_gamma;
+        geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, 0, b, j, i);
+
+        const Real con_vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)};
+        const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+        Vec con_v{{con_vp[0]/W, con_vp[1]/W, con_vp[2]/W}};
+
         CLOSURE c(con_v, &g);
 
         Real E;
@@ -323,6 +331,10 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   const int ndim = pmb->pmy_mesh->ndim;
   auto &coords = pmb->coords;
 
+  // TODO temp
+  auto idx_ql = imap_ql.GetFlatIdx(ir::ql);
+  auto idx_qr = imap_qr.GetFlatIdx(ir::qr);
+
   // TODO(JCD): par_for_outer doesn't have a 4d loop pattern which is needed for blocks
   parthenon::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "RadMoments::Reconstruct", DevExecSpace(), 0, 0, 0,
@@ -365,6 +377,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // TODO(JCD): do we want to enable other recon methods like weno5?
         // x-direction
         // TODO(BRR) ib.s - 1 means Jl = 0 in first active zone
+        //ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
         ReconLoop<PiecewiseLinear>(member, ib.s - 2, ib.e + 1, pvim1, pv, pvip1, vi_l,
                                    vi_r);
         // y-direction
@@ -373,6 +386,21 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // z-direction
         if (ndim > 2)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
+
+        /*if (j == 64)
+        {
+//           ql_base(idx_ql(ispec, 0, idir), k, j, i);
+int ispec = 0;
+int idir = 0;
+printf("ib.s - 1: %i\n", ib.s - 1);
+           printf("ql(J): %e %e %e %e | %e %e\n",
+             ql_base(idx_ql(ispec, 0, idir), k, j, 0),
+             ql_base(idx_ql(ispec, 0, idir), k, j, 1),
+             ql_base(idx_ql(ispec, 0, idir), k, j, 2),
+             ql_base(idx_ql(ispec, 0, idir), k, j, 3),
+             ql_base(idx_ql(ispec, 0, idir), k, j, 4),
+             ql_base(idx_ql(ispec, 0, idir), k, j, 5));
+        }*/
 
         // Calculate spatial derivatives of J at zone faces for diffusion limit
         //    x-->
@@ -394,6 +422,9 @@ TaskStatus ReconstructEdgeStates(T *rc) {
           const Real idz = 1.0 / coords.Dx(X3DIR, k, j, 0);
           const Real idz4 = 0.25 * idz;
           Real *J = &v(b, idx_J(n), k, j, 0);
+          //if (j == 64) {
+          //  printf("J: %e %e %e %e | %e\n", J[0], J[1], J[2], J[3], J[4]);
+          //}
           Real *Jjm1 = &v(b, idx_J(n), k, j - dj, 0);
           Real *Jjp1 = &v(b, idx_J(n), k, j + dj, 0);
           Real *Jkm1 = &v(b, idx_J(n), k - dk, j, 0);
@@ -540,10 +571,14 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                           Jr * v(idx_qr(ispec, 2, idir), k, j, i),
                           Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
 
-          Vec con_vl{{v(idx_qlv(0, idir), k, j, i), v(idx_qlv(1, idir), k, j, i),
-                      v(idx_qlv(2, idir), k, j, i)}};
-          Vec con_vr{{v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
-                      v(idx_qrv(2, idir), k, j, i)}};
+          const Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i), v(idx_qlv(1, idir), k, j, i),
+                      v(idx_qlv(2, idir), k, j, i)};
+          const Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
+                      v(idx_qrv(2, idir), k, j, i)};
+          const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
+          const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
+          Vec con_vl{{con_vpl[0]/Wl, con_vpl[1]/Wl, con_vpl[2]/Wl}};
+          Vec con_vr{{con_vpr[0]/Wr, con_vpr[1]/Wr, con_vpr[2]/Wr}};
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
@@ -624,13 +659,13 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
-          if (j == 64 && i < 10) {
+/*          if (j == 64 && i < 10) {
             printf("[%i %i %i][%i] F = %e %e %e %e\n", 
               k, j, i, ispec, v.flux(idir_in, idx_Ef(ispec), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 2), k, j, i));
-          }
+          }*/
         }
       });
 
@@ -707,10 +742,12 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
         // Set up the background state
-        Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                   v(iblock, pv(2), k, j, i)}};
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+        const Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                   v(iblock, pv(2), k, j, i)};
+        const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+        Vec con_v{{con_vp[0]/W, con_vp[1]/W, con_vp[2]/W}};
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
         CLOSURE c(con_v, &g);
@@ -880,13 +917,15 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         for (int ispec = 0; ispec < num_species; ++ispec) {
 
           // Set up the background state
-          Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                     v(iblock, pv(2), k, j, i)}};
           Tens2 cov_gamma;
           geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
           Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
           Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
           LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
+          const Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                     v(iblock, pv(2), k, j, i)};
+          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+          Vec con_v{{con_vp[0]/W, con_vp[1]/W, con_vp[2]/W}};
 
           /// TODO: (LFR) Move beyond Eddington for this update
           ClosureEdd<Vec, Tens2> c(con_v, &g);
@@ -913,7 +952,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Real B = v(iblock, idx_JBB(ispec), k, j, i);
           Real tauJ = alpha * dt * v(iblock, idx_kappaJ(ispec), k, j, i);
           Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
-          if (i == 64 && j == 64) printf("dtaus: %e %e (%e)\n", tauJ, tauH, v(iblock, idx_kappaH(ispec), k, j, i));
           Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
 
