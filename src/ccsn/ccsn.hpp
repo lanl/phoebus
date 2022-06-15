@@ -79,15 +79,19 @@ Real Interp1DProfile(const Real model_1d[NCCSN][num_zones], const int npoints, c
     {
 	for (int j = 1, j < npoints; j++)  //call interp on a point by point basis here
 	{
-	    call quadraticInterp(model_1d[0][:],r(j),model_1d[k+1][:],)
+	    call quadraticInterp(model_1d[0][:],       // radius from 1D model
+			    model_1d[k+1][:],          // k-th variable from 1D model
+			    num_zones,                 // total number of zones for 1D model
+			    r[j]-dr,r[j],r[j]+dr,      // (left/center/right) r[j] of phoebus grid want var value at 
+			    model_1d_interp[k+1][j]);  // resulting zone averaged var interp value at r[j] 
 	}
      }
 
-    return model_1d_interp;
+    return model_1d_interp[NCCSN][npoints];
 }
 
 KOKKOS_INLINE_FUNCTION
-Real quadraticInterp(const Real input_radius, const Real radius_want, const Real var){ 
+Real quadraticInterp(const Real input_radius[num_zones], const Real model_1d[num_zones], const int num_zones, const Real r_l, const Real r_c, const Real r_r, const Real var_interp){ 
         Real var_l;
 	Real var_c;
 	Real var_r;
@@ -96,7 +100,7 @@ Real quadraticInterp(const Real input_radius, const Real radius_want, const Real
 }
 
 KOKKOS_INLINE_FUNCTION
-int huntInterp(const Real input_radius, const Real radius_want){
+int huntInterp(const Real input_radius[num_zones], const Real radius_want){
 	int j_want;
 	
 	return
