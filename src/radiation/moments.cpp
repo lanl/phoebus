@@ -364,7 +364,8 @@ TaskStatus ReconstructEdgeStates(T *rc) {
 
         // TODO(JCD): do we want to enable other recon methods like weno5?
         // x-direction
-        ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
+        // TODO(BRR) ib.s - 1 means Jl = 0 in first active zone
+        ReconLoop<PiecewiseLinear>(member, ib.s - 2, ib.e + 1, pvim1, pv, pvip1, vi_l,
                                    vi_r);
         // y-direction
         if (ndim > 1)
@@ -622,6 +623,13 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           if (sdetgam < std::numeric_limits<Real>::min() * 10) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
+          }
+          if (j == 64 && i < 10) {
+            printf("[%i %i %i][%i] F = %e %e %e %e\n", 
+              k, j, i, ispec, v.flux(idir_in, idx_Ef(ispec), k, j, i),
+                v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
+                v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
+                v.flux(idir_in, idx_Ff(ispec, 2), k, j, i));
           }
         }
       });
@@ -905,6 +913,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Real B = v(iblock, idx_JBB(ispec), k, j, i);
           Real tauJ = alpha * dt * v(iblock, idx_kappaJ(ispec), k, j, i);
           Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
+          if (i == 64 && j == 64) printf("dtaus: %e %e (%e)\n", tauJ, tauH, v(iblock, idx_kappaH(ispec), k, j, i));
           Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
 
