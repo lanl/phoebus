@@ -20,18 +20,19 @@
 #include <utils/error_checking.hpp>
 
 namespace CCSN {
-constexpr int NCCSN = 6;
+constexpr int NCCSN = 8;
 
 using State_t = parthenon::ParArray2D<Real>;
 using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
-// cef: additional vars for ccsn problems?
 constexpr int RHO = 0;
 constexpr int V = 1;
 constexpr int EPS = 2;
 constexpr int YE = 3;
 constexpr int P = 4;
 constexpr int TEMP = 5;
+constexpr int grav = 6;
+constexpr int entr = 7;
 
 KOKKOS_INLINE_FUNCTION 
 Real Get1DProfile(std::string model_filename){
@@ -43,7 +44,7 @@ Real Get1DProfile(std::string model_filename){
     if (!inputfile.is_open()) 
         std::cout<<"Error opening file",model_filename;
 
-    const int num_vars = 7; // 6 + radius
+    const int num_vars = 9; // 8 + radius
     int num_zones = 0;
     std::string line;
 
@@ -64,7 +65,7 @@ Real Get1DProfile(std::string model_filename){
         }
     }					  
 
-    std::cout << "Read in file " << model_filename << " 6 variables and " << num_zones << " number of zones.";
+    std::cout << "Read in file " << model_filename << " 8 variables and " << num_zones << " number of zones.";
 
     inputfile.close();
     return model_1d[num_vars][num_zones];
