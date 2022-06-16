@@ -629,7 +629,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
           cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
-          if (Jl > 1. || Jr > 1.) {
+          if (Jl > 1. || Jr > 1. || Jl < 0. || Jr < 0.) {
             printf("Jl = %e Jr = %e! [%i %i %i][%i][dir: %i]\n",
               Jl, Jr, k, j, i, ispec, idir);
             PARTHENON_FAIL("Bad J!");
