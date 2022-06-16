@@ -811,10 +811,21 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
               srcF(ii) += covF(jj) * dbeta(ii, jj);
             }
             srcF(ii) -= alp * E * dlnalp[ii + 1];
+            Real tmp1 = 0.;
+            Real tmp2 = 0.;
             SPACELOOP2(jj, kk) {
             // TODO(BRR) dg[j]+1j[kk+1][ii+1]/2 instead of Gamma[jj+1][kk+1][ii+1]?
             //srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
             srcF(ii) += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
+            if (i == 64 && j == 64 && std::fabs(alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1]) > 1.e-20) {
+            printf("[%i %i %i] old: %e new: %e\n", jj,kk,ii,alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1],
+              alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1]);
+            }
+            tmp1 += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
+            tmp2 += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
+            }
+            if (i == 64 && j == 64) {
+              printf("old sum: %e new sum: %e\n", tmp1, tmp2);
             }
           }
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
