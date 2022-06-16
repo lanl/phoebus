@@ -290,6 +290,11 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
             if (v(b, idx_J(ispec), k, j, i) < 1.e-5 * v(b, peng, k, j, i)) {
               floor_applied = true;
               v(b, idx_J(ispec), k, j, i) = 1.e-5 * v(b, peng, k, j, i);
+              if (v(b, idx_J(ispec), k, j, i) < 0.) {
+                printf("Bad fixed up J! J = %e [%i %i %i]\n", v(b, idx_J(ispec), k, j, i),
+                  k, j, i);
+                PARTHENON_FAIL("bad!");
+              }
             }
           }
         }
