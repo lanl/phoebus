@@ -51,23 +51,30 @@ int main(int argc, char *argv[]) {
   pman.app_input->InitMeshBlockUserData = Geometry::SetGeometryBlock;
   // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   phoebus::ProblemModifier(pman.pinput.get());
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   Boundaries::ProcessBoundaryConditions(pman);
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   // call ParthenonInit to set up the mesh
   pman.ParthenonInitPackagesAndMesh();
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   // call post-initialization
   phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get());
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   // Initialize the driver
   phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(),
                                 pman.pmesh.get());
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   // Communicate ghost buffers before executing
   driver.PostInitializationCommunication();
+  printf("%s:%i\n", __FILE__, __LINE__);
 
   // This line actually runs the simulation
   auto driver_status = driver.Execute();

@@ -255,7 +255,9 @@ void ReflectOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   GenericBC<X3DIR, BCSide::Outer, BCType::Reflect>(rc, coarse);
 }
 
+#define REPORTTASK {printf("[%i] %s:%i:%s\n", parthenon::Globals::my_rank, __FILE__, __LINE__, __func__);}
 TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
+  REPORTTASK
 
   auto pmb = rc->GetBlockPointer();
   const int ndim = pmb->pmy_mesh->ndim;

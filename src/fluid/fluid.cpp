@@ -32,12 +32,15 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
+#define REPORTTASK {printf("[%i] %s:%i:%s\n", parthenon::Globals::my_rank, __FILE__, __LINE__, __func__);}
+
 // statically defined vars from riemann.hpp
 std::vector<std::string> riemann::FluxState::recon_vars, riemann::FluxState::flux_vars;
 
 namespace fluid {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
+  REPORTTASK
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -296,6 +299,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 // template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
+  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -306,6 +310,7 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
 // template <typename T>
 TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange &ib,
                                       const IndexRange &jb, const IndexRange &kb) {
+  REPORTTASK
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -398,6 +403,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
+  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -410,6 +416,7 @@ TaskStatus ConservedToPrimitive(T *rc) {
 template <typename T>
 TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRange &jb,
                                       const IndexRange &kb) {
+  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
@@ -444,6 +451,7 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
 template <typename T>
 TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexRange &jb,
                                        const IndexRange &kb) {
+  REPORTTASK
   using namespace con2prim;
   auto *pmb = rc->GetParentPointer().get();
 
@@ -491,6 +499,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
 
 #if SET_FLUX_SRC_DIAGS
 TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
+  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   auto &fluid = pmb->packages.Get("fluid");
   if (!fluid->Param<bool>("active")) return TaskStatus::complete;
@@ -525,6 +534,7 @@ TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
 
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src) {
+  REPORTTASK
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -617,6 +627,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 }
 
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
+  REPORTTASK
   using namespace PhoebusReconstruction;
   auto *pmb = rc->GetParentPointer().get();
   auto &fluid = pmb->packages.Get("fluid");
@@ -732,6 +743,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 }
 
 TaskStatus FluxCT(MeshBlockData<Real> *rc) {
+  REPORTTASK
   auto *pmb = rc->GetParentPointer().get();
   auto &fluid = pmb->packages.Get("fluid");
   if (!fluid->Param<bool>("mhd") || !fluid->Param<bool>("active") ||
@@ -794,6 +806,7 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
 }
 
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
+  REPORTTASK
   auto pmb = rc->GetBlockPointer();
   if (!pmb->packages.Get("fluid")->Param<bool>("active")) return TaskStatus::complete;
   if (!pmb->packages.Get("fluid")->Param<bool>("mhd")) return TaskStatus::complete;
@@ -849,6 +862,7 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
 }
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+  REPORTTASK
   auto pmb = rc->GetBlockPointer();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);

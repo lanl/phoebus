@@ -91,11 +91,73 @@ TaskListStatus PhoebusDriver::Step() {
 // TODO(BRR) This is required for periodic BCs, unless the issue is radiation not being
 // included in ConvertBoundaryConditions
 void PhoebusDriver::PostInitializationCommunication() {
+
+  // Try a non-tasklist approach
+//  for (auto &pmb : pmesh->block_list) {
+//    auto &rc = pmb->meshblock_data.Get();
+//    rc->ClearBoundary(BoundaryCommSubset::all);
+//    rc->StartReceiving(BoundaryCommSubset::all);
+//  }
+//
+//  parthenon::cell_centered_bvars::SendBoundaryBuffers(pmesh->mesh_data.Get());
+//
+//  for (auto &pmb : pmesh->block_list) {
+//    auto &rc = pmb->meshblock_data.Get();
+//    // TODO(BRR) ReceiveAndSetBoundariesWithWait no longer available
+//    rc->ReceiveAndSetBoundariesWithWait();
+//    rc->ClearBoundary(BoundaryCommSubset::all);
+//    parthenon::ProlongateBoundaries(rc);
+//    parthenon::ApplyBoundaryConditions(rc);
+//    Boundaries::ConvertBoundaryConditions(rc);
+//  }
+//  return;
+  
   TaskCollection tc;
   TaskID none(0);
   BlockList_t &blocks = pmesh->block_list;
 
   const auto &stage_name = integrator->stage_name;
+  printf("nstages: %i\n", stage_name.size());
+  printf("stage names: %s %s %s\n",
+    stage_name[0].c_str(),
+    stage_name[1].c_str(),
+    stage_name[2].c_str());
+  
+ /* {
+    TaskRegion &async_region0 = tc.AddRegion(blocks.size());
+    for (int ib = 0; ib < blocks.size(); ib++) {
+      auto &tl0 = async_region0[ib];
+      auto pmb = blocks[ib].get();
+      auto &sc = pmb->meshblock_data.Get(stage_name[0]);
+
+      auto start_recv = tl0.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
+                                    BoundaryCommSubset::all);
+    }
+    
+    TaskRegion &async_region2 = tc.AddRegion(blocks.size());
+    for (int ib = 0; ib < blocks.size(); ib++) {
+      auto &tl2 = async_region2[ib];
+      auto pmb = blocks[ib].get();
+      auto &sc = pmb->meshblock_data.Get(stage_name[0]);
+
+      auto clear_comm_flags = tl2.AddTask(none, &MeshBlockData<Real>::ClearBoundary,
+                                          sc.get(), BoundaryCommSubset::all);
+    }
+  
+    const int num_partitions = pmesh->DefaultNumPartitions();
+    //TaskRegion &async_region1 = tc.AddRegion(1);
+    TaskRegion &async_region1 = tc.AddRegion(num_partitions);
+    for (int ib = 0; ib < num_partitions; ib++) {
+      auto &tl1 = async_region1[ib];
+      auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], ib);
+      auto alloc_status = parthenon::cell_centered_bvars::ResetSendBuffers(md.get());
+      //parthenon::cell_centered_bvars::ResetSendBoundaryBufferInfo(md.get(), alloc_state);
+    }
+  }
+  printf("%s:%i\n", __FILE__, __LINE__);
+  tc.Execute();
+  printf("%s:%i\n", __FILE__, __LINE__);
+  return;*/
 
   auto rad = pmesh->packages.Get("radiation");
   auto fluid = pmesh->packages.Get("fluid");
@@ -109,41 +171,52 @@ void PhoebusDriver::PostInitializationCommunication() {
   }
 
   // leading per-block tasks
-  TaskRegion &async_region0 = tc.AddRegion(1);
-  auto &tl0 = async_region0[0];
-  for (int ib = 0; ib < blocks.size(); ib++) {
-    auto pmb = blocks[ib].get();
-    auto &sc = pmb->meshblock_data.Get();
-
-    auto start_recv = tl0.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
-                                  BoundaryCommSubset::all);
-  }
+//  TaskRegion &async_region0 = tc.AddRegion(blocks.size());
+//  for (int ib = 0; ib < blocks.size(); ib++) {
+//    auto &tl0 = async_region0[ib];
+//    auto pmb = blocks[ib].get();
+//    auto &sc = pmb->meshblock_data.Get(stage_name[0]);
+//
+//    auto start_recv = tl0.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
+//                                  BoundaryCommSubset::all);
+//  }
 
   // tasks that span <md>
-  TaskRegion &async_region1 = tc.AddRegion(1);
-  auto &tl1 = async_region1[0];
-  auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], 0);
+  const int num_partitions = pmesh->DefaultNumPartitions();
+  //TaskRegion &async_region1 = tc.AddRegion(1);
+  TaskRegion &async_region1 = tc.AddRegion(num_partitions);
+  for (int ib = 0; ib < num_partitions; ib++) {
+    auto &tl1 = async_region1[ib];
+    auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], ib);
 
-  auto send = tl1.AddTask(none, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
+    auto start_recv = tl1.AddTask(none, &MeshData<Real>::StartReceiving, md.get(), BoundaryCommSubset::all);
 
-  auto recv =
-      tl1.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
+    auto send = tl1.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
 
-  auto fill_from_bufs =
-      tl1.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
+    auto recv =
+        tl1.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
+
+    auto fill_from_bufs =
+        tl1.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
+
+    auto clear_boundary = tl1.AddTask(fill_from_bufs, &MeshData<Real>::ClearBoundary,
+      md.get(), BoundaryCommSubset::all);
+  }
 
   // tailing per-block-tasks
-  TaskRegion &async_region2 = tc.AddRegion(1);
-  auto &tl2 = async_region2[0];
+  TaskCollection tc2;
+  //TaskRegion &async_region2 = tc.AddRegion(blocks.size());
+  TaskRegion &async_region2 = tc2.AddRegion(blocks.size());
   for (int ib = 0; ib < blocks.size(); ib++) {
+    auto &tl2 = async_region2[ib];
     auto pmb = blocks[ib].get();
-    auto &sc = pmb->meshblock_data.Get();
+    auto &sc = pmb->meshblock_data.Get(stage_name[0]);
 
-    auto clear_comm_flags = tl2.AddTask(none, &MeshBlockData<Real>::ClearBoundary,
-                                        sc.get(), BoundaryCommSubset::all);
+    //auto clear_comm_flags = tl2.AddTask(none, &MeshBlockData<Real>::ClearBoundary,
+    //                                    sc.get(), BoundaryCommSubset::all);
 
     auto prolongBound =
-        tl2.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
+        tl2.AddTask(none, parthenon::ProlongateBoundaries, sc);
 
     auto set_bc = tl2.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
 
@@ -156,6 +229,7 @@ void PhoebusDriver::PostInitializationCommunication() {
   }
 
   tc.Execute();
+  tc2.Execute();
 }
 
 TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
