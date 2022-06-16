@@ -39,7 +39,7 @@ variables = p.density,       &
 
 file_type   = hdf5      # Tabular data dump
 #dt          = 5.0       # time increment between outputs
-dt          = 1.
+dt          = 0.1
 
 <parthenon/time>
 nlim        = -1        # cycle limit
@@ -107,7 +107,8 @@ Ye = false
 mhd = true
 
 <geometry>
-a = 0.9375
+#a = 0.9375
+a = 0
 
 <coordinates>
 derefine_poles = false

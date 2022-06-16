@@ -133,6 +133,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
           printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
+          printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
           printf("J: %e covH: %e %e %e\n", J, covH(0), covH(1), covH(2));
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
         }
@@ -628,6 +629,11 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
           cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
+          if (Jl > 1. || Jr > 1.) {
+            printf("Jl = %e Jr = %e! [%i %i %i][%i][dir: %i]\n",
+              Jl, Jr, k, j, i, ispec, idir);
+            PARTHENON_FAIL("Bad J!");
+          }
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
@@ -659,13 +665,13 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
-/*          if (j == 64 && i < 10) {
+          if (j == 64 && i < 10) {
             printf("[%i %i %i][%i] F = %e %e %e %e\n",
               k, j, i, ispec, v.flux(idir_in, idx_Ef(ispec), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 2), k, j, i));
-          }*/
+          }
         }
       });
 
