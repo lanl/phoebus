@@ -312,7 +312,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
           Real S[3];
-          const Real vel[] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
+          const Real con_vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
                               v(b, pvel_hi, k, j, i)};
           Real bcons[3];
           Real bp[3] = {0.0, 0.0, 0.0};
@@ -327,7 +327,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
             ye_prim = v(b, pye, k, j, i);
           }
           Real sig[3];
-          prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
+          prim2con::p2c(v(b, prho, k, j, i), con_vp, bp, v(b, peng, k, j, i), ye_prim,
                         v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gcon, beta, alpha,
                         gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,
                         sig);
@@ -340,9 +340,11 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
           }
 
           // Update radiation conserved variables
+          Real cov_gamma[3][3];
+          geom.Metric(CellLocation::Cent, k, j, i, cov_gamma);
+          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma);
+          Vec con_v{{con_vp[0]/W, con_vp[1]/W, con_vp[2]/W}};
           for (int ispec = 0; ispec < nspec; ++ispec) {
-            Vec con_v{{v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                       v(b, pvel_lo + 2, k, j, i)}};
             const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
 
             typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, 0, b, j, i);
@@ -608,12 +610,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
     if (ix1_bc == "outflow") {
       auto flux =
-          rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density}),
-                                     std::vector<std::string>({fluid_cons::density}));
+          rc->PackVariablesAndFluxes(std::vector<std::string>({fluid_cons::density, radmoment_cons::E}),
+                                     std::vector<std::string>({fluid_cons::density, radmoment_cons::E}));
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             flux.flux(X1DIR, 0, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
+            // TODO(BRR) fix flux for radiation energy?
+            //flux.flux(X1DIR, 1, k, j, i) = std::max(flux.flux(X1DIR, 0, k, j, i), 0.0);
           });
     } else if (ix1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(
