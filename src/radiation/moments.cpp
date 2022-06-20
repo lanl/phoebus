@@ -903,6 +903,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   std::vector<std::string> vars{cr::E,      cr::F,       p::density, p::temperature,
                                 p::ye,      p::velocity, pr::J,      pr::H,
                                 ir::kappaJ, ir::kappaH,  ir::JBB};
+  printf("skipping fluid update\n"); update_fluid = false;
   if (update_fluid) {
     vars.push_back(c::energy);
     vars.push_back(c::momentum);
@@ -1000,7 +1001,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
 
           // Add source corrections to conserved iration variables
-          v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
+          /*v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
           for (int idir = 0; idir < 3; ++idir) {
             v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
           }
@@ -1018,7 +1019,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
             v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
-          }
+          }*/
         }
       });
 

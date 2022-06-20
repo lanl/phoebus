@@ -293,16 +293,15 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
         }
 
         if (enable_rad_floors) {
+          const double r = std::exp(coords.x1v(k, j, i));
+          const double Jmin = 1.e-4 * std::pow(r, -4);
           for (int ispec = 0; ispec < nspec; ++ispec) {
-            if (v(b, idx_J(ispec), k, j, i) < 1.e-5 * v(b, peng, k, j, i)) {
+            //if (v(b, idx_J(ispec), k, j, i) < 1.e-5 * v(b, peng, k, j, i)) {
+            if (v(b, idx_J(ispec), k, j, i) < Jmin) {
               floor_applied = true;
               //printf("Applying rad floor to [%i %i %i]\n", k, j, i);
-              v(b, idx_J(ispec), k, j, i) = 1.e-5 * v(b, peng, k, j, i);
-              if (v(b, idx_J(ispec), k, j, i) < 0.) {
-                printf("Bad fixed up J! J = %e [%i %i %i]\n", v(b, idx_J(ispec), k, j, i),
-                  k, j, i);
-                PARTHENON_FAIL("bad!");
-              }
+              //v(b, idx_J(ispec), k, j, i) = 1.e-5 * v(b, peng, k, j, i);
+              v(b, idx_J(ispec), k, j, i) = Jmin;
             }
           }
         }

@@ -39,7 +39,7 @@ variables = p.density,       &
 
 file_type   = hdf5      # Tabular data dump
 #dt          = 5.0       # time increment between outputs
-dt          = 0.1
+dt          = 1.0
 
 <parthenon/time>
 nlim        = -1        # cycle limit
@@ -152,7 +152,7 @@ gam0_ceiling = 10.0
 <torus>
 target_beta = 100.
 harm_beta_normalization = true
-u_jitter = 0.05
+u_jitter = 0 # 0.05
 kappa = 0.01
 rin = 6.0
 rmax = 12.0
