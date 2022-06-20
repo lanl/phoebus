@@ -138,6 +138,21 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
         }
 
+        /*if (J < 0. && j == 67 && i == 75) {
+          printf("[%i %i %i][%i]\n", k, j, i, ispec);
+          printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
+          printf("J: %e covH: %e %e %e\n", J, covH(0), covH(1), covH(2));
+          printf("con_v: %e %e %e\n", con_v(0), con_v(1), con_v(2));
+          SPACELOOP(ii) {
+            SPACELOOP(jj) {
+              printf("%e ", conTilPi(ii,jj));
+            }
+            printf("\n");
+          }
+        }
+
+        PARTHENON_DEBUG_REQUIRE(J >= 0., "Negative radiation energy density!");*/
+
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
           v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
@@ -665,13 +680,13 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
-          if (j == 64 && i < 10) {
+          /*if (j == 64 && i < 10) {
             printf("[%i %i %i][%i] F = %e %e %e %e\n",
               k, j, i, ispec, v.flux(idir_in, idx_Ef(ispec), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
                 v.flux(idir_in, idx_Ff(ispec, 2), k, j, i));
-          }
+          }*/
         }
       });
 
@@ -822,9 +837,11 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             SPACELOOP2(jj, kk) {
             // TODO(BRR) dg[j]+1j[kk+1][ii+1]/2 instead of Gamma[jj+1][kk+1][ii+1]?
             //srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
-            srcF(ii) += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
+              srcF(ii) += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
+            }
+            /*
             if (i == 64 && j == 64 && std::fabs(alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1]) > 1.e-20) {
-            printf("[%i %i %i] old: %e new: %e\n", jj,kk,ii,alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1],
+              printf("[%i %i %i] old: %e new: %e\n", jj,kk,ii,alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1],
               alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1]);
             }
             tmp1 += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
@@ -833,6 +850,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             if (i == 64 && j == 64) {
               printf("old sum: %e new sum: %e\n", tmp1, tmp2);
             }
+            */
           }
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
           SPACELOOP(ii) {
