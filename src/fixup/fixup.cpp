@@ -156,6 +156,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <typename T, class CLOSURE>
 TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
+  printf("\nApplyFloorsImpl\n");
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace pr = radmoment_prim;
@@ -166,14 +167,20 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
   IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
+  printf("ib: %i %i jb: %i %i kb: %i %i\n", ib.s,ib.e,jb.s,jb.e,kb.s,kb.e);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
 
   bool enable_floors = fix_pkg->Param<bool>("enable_floors");
-  if (!enable_floors) return TaskStatus::complete;
   bool enable_mhd_floors = fix_pkg->Param<bool>("enable_mhd_floors");
   bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
+  printf("floors: %i %i %i\n",
+    static_cast<int>(enable_floors),
+    static_cast<int>(enable_mhd_floors),
+    static_cast<int>(enable_rad_floors));
+  
+  if (!enable_floors) return TaskStatus::complete;
 
   const std::vector<std::string> vars(
       {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
@@ -206,10 +213,10 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
   vpack_types::FlatIdx idx_F({-1}, -1);
   vpack_types::FlatIdx iTilPi({-1}, -1);
   if (enable_rad_floors) {
-    auto idx_J = imap.GetFlatIdx(pr::J);
-    auto idx_H = imap.GetFlatIdx(pr::H);
-    auto idx_E = imap.GetFlatIdx(cr::E);
-    auto idx_F = imap.GetFlatIdx(cr::F);
+    idx_J = imap.GetFlatIdx(pr::J);
+    idx_H = imap.GetFlatIdx(pr::H);
+    idx_E = imap.GetFlatIdx(cr::E);
+    idx_F = imap.GetFlatIdx(cr::F);
     if (programming::is_specialization_of<CLOSURE, radiation::ClosureMOCMC>::value) {
       iTilPi = imap.GetFlatIdx(ir::tilPi);
     }
@@ -289,6 +296,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
           for (int ispec = 0; ispec < nspec; ++ispec) {
             if (v(b, idx_J(ispec), k, j, i) < 1.e-5 * v(b, peng, k, j, i)) {
               floor_applied = true;
+              //printf("Applying rad floor to [%i %i %i]\n", k, j, i);
               v(b, idx_J(ispec), k, j, i) = 1.e-5 * v(b, peng, k, j, i);
               if (v(b, idx_J(ispec), k, j, i) < 0.) {
                 printf("Bad fixed up J! J = %e [%i %i %i]\n", v(b, idx_J(ispec), k, j, i),
@@ -298,6 +306,20 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
             }
           }
         }
+        if (j == 67 && i == 75) {
+          printf("fl? %i\n", static_cast<int>(floor_applied));
+          printf("nspec: %i\n", nspec);
+          for (int ispec = 0; ispec < nspec; ++ispec) {
+          printf("[%i %i %i] floor applied: %i J: %e E: %e\n", k,j,i,static_cast<int>(floor_applied),
+            v(b, idx_J(ispec), k, j, i), v(b, idx_E(ispec), k, j, i));
+          }
+        }
+        /*if ((i == 67 || i == 68) && (j == 76 || j == 77)) {
+          for (int ispec = 0; ispec < nspec; ++ispec) {
+          printf("[%i %i %i] floor applied: %i J: %e E: %e\n", static_cast<int>(floor_applied),
+            v(b, idx_J(ispec), k, j, i), v(b, idx_E(ispec), k, j, i));
+          }
+        }*/
 
         if (floor_applied) {
           // Update dependent primitives
@@ -349,6 +371,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
           geom.Metric(CellLocation::Cent, k, j, i, cov_gamma);
           const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma);
           Vec con_v{{con_vp[0]/W, con_vp[1]/W, con_vp[2]/W}};
+        if (j == 67 && i == 75) {
+         printf("con v: %e %e %e\n", con_v(0), con_v(1), con_v(2));
+        }
           for (int ispec = 0; ispec < nspec; ++ispec) {
             const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
 
