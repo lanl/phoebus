@@ -130,6 +130,9 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
+        if (i == 75 && j > 60 && j < 70) {
+          printf("J[%i %i %i]: %e\n", k,j,i,J);
+        }
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
           printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
@@ -599,6 +602,13 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
+
+          if (idir == 1 && i == 75 && j > 60 && j < 70) {
+            printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
+            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
+              con_vl(0), con_vl(1), con_vl(2),
+              con_vr(0), con_vr(1), con_vr(2));
+          }
 
           // Calculate the geometric mean of the opacity on either side of the interface,
           // this is necessary for handling the asymptotic limit near sharp surfaces
