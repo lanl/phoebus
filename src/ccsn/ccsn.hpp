@@ -80,12 +80,12 @@ Real Interp1DProfile(const Real model_1d[NCCSN][num_zones], const int npoints, c
     {
 	for (int j = 1, j < npoints; j++)  //call interp on a point by point basis here
 	{
-		// move hunt call here??
-	    call quadraticInterp(model_1d[0][:],       // radius from 1D model
-			    model_1d[k+1][:],          // k-th variable from 1D model
-			    num_zones,                 // total number of zones for 1D model
-			    r[j],      // (center) r[j] of phoebus grid want var value at 
-			    model_1d_interp[k+1][j]);  // resulting zone averaged var interp value at r[j] 
+	    call hunt(input_radius,num_zones,r_c,jlo);
+	    //call quadraticInterp(model_1d[0][:],       // radius from 1D model
+	    //		    model_1d[k+1][:],          // k-th variable from 1D model
+	    //		    num_zones,                 // total number of zones for 1D model
+	    //		    r[j],      // (center) r[j] of phoebus grid want var value at 
+	    //		    model_1d_interp[k+1][j]);  // resulting zone averaged var interp value at r[j] 
 	}
      }
 
@@ -97,23 +97,66 @@ Real quadraticInterp(const Real input_radius[num_zones], const Real model_1d[num
         Real var_l;
 	Real var_c;
 	Real var_r;
-
-
-        call huntInterp(input_radius,num_zones,r_c,low);
-       
         
 
 	return 
 }
 
+// hunt routine - Numerical Recipes in C 2nd Ed
+// --------------------------------------------
+// Given an array xx[1..n], and given a value x, returns a value jlo such that x is between
+// xx[jlo] and xx[jlo+1]. xx[1..n] must be monotonic, either increasing or decreasing.
+// jlo=0 or jlo=n is returned to indicate that x is out of range. jlo on input is taken as the
+// initial guess for jlo on output. 
 KOKKOS_INLINE_FUNCTION
-int huntInterp(const Real input_radius[num_zones], const int num_zones, const Real radius_want, int low){
-	step = 1;
-
-	
-	return
+int hunt(const Real xx[num_zones], const int n, const Real x, unsigned long *jlo){
+	unsigned long jm,jhi,inc;
+	int ascnd;
+	ascnd=(xx[n] >= xx[1]);
+	if (*jlo <= 0 || *jlo > n) {
+	    *jlo=0;
+	    jhi=n+1;
+	} else {
+	    inc=1;
+	    if (x >= xx[*jlo] == ascnd) {
+		if (*jlo == n) return;
+		jhi=(*jlo)+1;
+		while (x >= xx[jhi] == ascnd) {
+		    *jlo=jhi;
+		    inc += inc;
+		    jhi=(*jlo)+inc;
+		    if (jhi > n) {
+			jhi=n+1;
+			break;
+		    }
+		}
+	    } else {
+		if (*jlo == 1) {
+		    *jlo=0;
+		    return;
+		}
+		jhi=(*jlo)--;
+		while (x < xx[*jlo] == ascnd) {
+		    jhi=(*jlo);
+		    inc <<= 1;
+		    if (inc >= jhi) {
+			*jlo=0;
+			break;
+		    }
+		    else *jlo=jhi-inc;
+		}
+	    }
+        }
+	while (jhi-(*jlo) != 1) {
+	    jm=(jhi+(*jlo)) >> 1;
+	    if (x >= xx[jm] == ascnd)
+		*jlo=jm;
+	    else
+		jhi=jm;
+	}
+	if (x == xx[n]) *jlo=n-1;
+	if (x == xx[1]) *jlo=1;
 }
-
 
 
 
