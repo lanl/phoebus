@@ -289,6 +289,10 @@ TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
 template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
                                                         IndexDomain);
 
+//template <class T>
+//TaskStatus ReconstructEdgeStates(T *rc) {
+//}
+
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
   using namespace PhoebusReconstruction;
