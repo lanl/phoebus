@@ -62,7 +62,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
   params.Add("npoints", npoints);
 
-  const std::string model_filename = pin->GetOrAddString("ccsn", "model_filename", "file.txt");
+  std::string model_filename = pin->GetOrAddString("ccsn", "model_filename", "file.txt");
+  params.Add("model_filename", model_filename);
 
   // Pressure floor
   Real pmin = pin->GetOrAddReal("ccsn", "Pmin", 1e-9);
@@ -101,6 +102,10 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   auto monopole_enabled = monopolepkg->Param<bool>("enable_monopole_gr");
   if (!monopole_enabled) return TaskStatus::complete;
 
+  auto model_filename = params.Get<std::string>("model_filename");
+
+  printf("Filename",model_filename);
+
   auto npoints = params.Get<int>("npoints");
   auto radius = monopolepkg->Param<MonopoleGR::Radius>("radius");
 
@@ -110,13 +115,19 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   const Real dr = radius.dx();
 
   // read 1d model
-  Real model_1d = CCSN::Get1DProfile(model_filename);
+  const int num_zones = CCSN::Get1DProfileNumZones(model_filename);
+
+  printf("1D model read in",num_zones,"number of zones.");    
+
+  // const Real model_1d[9][num_zones] = {{CCSN::Get1DProfileData("model_filename",num_zones)}};
+
+  // printf("1D model read in. Max radius is  = %.14e\n", model_1d[0][num_zones],"with ",0,"number of zones.");
 
   // allocate state size of NCCSN which should equal num vars for CCSN ?
   Real state[NCCSN];
 
   // interpolate to determine 1d model on monopole GR radial grid
-  Real model_1d_interp = CCSN::Interp1DProfile(model_1d,npoints,radius,dr);
+  //Real model_1d_interp = CCSN::Interp1DProfile(model_1d,npoints,radius,dr);
 
   // second loop, to set density, specific energy, and matter state
   for (int i = 0; i < npoints; ++i) {
@@ -124,26 +135,26 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
      // some of the vars below will be changed to EOS calls
 
      // set i'th interpolated values from 1D model	  
-     Real rho = model_1d_interp(CCSN::RHO, i);
-     Real radvel = model_1d_interp(CCSN::V, i);
-     Real eps = model_1d_interp(CCSN::EPS, i);
-     Real ye = model_1d_interp(CCSN::YE, i);
-     Real pres = model_1d_interp(CCSN::P, i);
-     Real temp = model_1d_interp(CCSN::TEMP, i);     
+     //Real rho = model_1d_interp(CCSN::RHO, i);
+     //Real radvel = model_1d_interp(CCSN::V, i);
+     //Real eps = model_1d_interp(CCSN::EPS, i);
+     //Real ye = model_1d_interp(CCSN::YE, i);
+     //Real pres = model_1d_interp(CCSN::P, i);
+     //Real temp = model_1d_interp(CCSN::TEMP, i);     
 
      // set host state vector to interpolated values
-     state_h(CCSN::RHO, i) = rho;
-     state_h(CCSN::V, i) = radvel;
-     state_h(CCSN::EPS, i) = eps;
-     state_h(CCSN::YE, i) = ye;
-     state_h(CCSN::P, i) = pres;
-     state_h(CCSN::TEMP, i) = temp;
+     //state_h(CCSN::RHO, i) = rho;
+     //state_h(CCSN::V, i) = radvel;
+     //state_h(CCSN::EPS, i) = eps;
+     //state_h(CCSN::YE, i) = ye;
+     //state_h(CCSN::P, i) = pres;
+     //state_h(CCSN::TEMP, i) = temp;
 
      // change to non-static values
-     matter_h(MonopoleGR::Matter::RHO, i) = rho * (1 + eps); // ADM mass
-     matter_h(MonopoleGR::Matter::J_R, i) = 0;               // momentum
-     matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
-     matter_h(MonopoleGR::Matter::Srr, i) = press;
+     //matter_h(MonopoleGR::Matter::RHO, i) = rho * (1 + eps); // ADM mass
+     //matter_h(MonopoleGR::Matter::J_R, i) = 0;               // momentum
+     //matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
+     //matter_h(MonopoleGR::Matter::Srr, i) = press;
    }
 
   // add appropraite print here for CCSN initialization

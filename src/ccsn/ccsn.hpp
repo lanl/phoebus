@@ -35,7 +35,7 @@ constexpr int grav = 6;
 constexpr int entr = 7;
 
 KOKKOS_INLINE_FUNCTION 
-Real Get1DProfile(std::string model_filename){
+int Get1DProfileNumZones(const std::string model_filename){
 
     // open file					    
     std::ifstream inputfile(model_filename);
@@ -43,6 +43,7 @@ Real Get1DProfile(std::string model_filename){
     // error check    
     if (!inputfile.is_open()) 
         std::cout<<"Error opening file",model_filename;
+    	return 0;
 
     const int num_vars = 9; // 8 + radius
     int num_zones = 0;
@@ -54,23 +55,43 @@ Real Get1DProfile(std::string model_filename){
             num_zones ++;
     }
 
+    std::cout << "Read in file" << model_filename << "  with  " << num_zones << " number of zones.";
+
+    inputfile.close();
+
+    return num_zones;
+}
+
+KOKKOS_INLINE_FUNCTION
+Real Get1DProfileData(const std::string model_filename, const int num_zones){
+
+    // open file
+    std::ifstream inputfile(model_filename);
+
+    // error check
+    if (!inputfile.is_open())
+        std::cout<<"Error opening file",model_filename;
+
+    const int num_vars = 9; // 8 + radius
     Real model_1d[num_vars][num_zones];
 
-    // read file into model_1d     
+    // read file into model_1d
     for (int k = 0; k < num_vars; k++) // number of vars
     {
         for (int j = 0; j < num_zones; j++) //  number of zones
         {
           inputfile >> model_1d[k][j];
         }
-    }					  
+    }
 
-    std::cout << "Read in file " << model_filename << " 8 variables and " << num_zones << " number of zones.";
+    std::cout << "Read 1D profile into.";
 
     inputfile.close();
+
     return model_1d[num_vars][num_zones];
 }
 
+/*
 KOKKOS_INLINE_FUNCTION
 Real Interp1DProfile(const Real model_1d[NCCSN][num_zones], const int npoints, const Real r, const Real dr){
 
@@ -158,7 +179,7 @@ int hunt(const Real xx[num_zones], const int n, const Real x, unsigned long *jlo
 	if (x == xx[1]) *jlo=1;
 }
 
-
+*/
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
