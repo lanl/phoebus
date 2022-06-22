@@ -156,7 +156,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <typename T, class CLOSURE>
 TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
-  printf("\nApplyFloorsImpl\n");
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace pr = radmoment_prim;
@@ -167,7 +166,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
   IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
-  printf("ib: %i %i jb: %i %i kb: %i %i\n", ib.s,ib.e,jb.s,jb.e,kb.s,kb.e);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
@@ -305,20 +303,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
             }
           }
         }
-        if (j == 67 && i == 75) {
-          printf("fl? %i\n", static_cast<int>(floor_applied));
-          printf("nspec: %i\n", nspec);
-          for (int ispec = 0; ispec < nspec; ++ispec) {
-          printf("[%i %i %i] floor applied: %i J: %e E: %e\n", k,j,i,static_cast<int>(floor_applied),
-            v(b, idx_J(ispec), k, j, i), v(b, idx_E(ispec), k, j, i));
-          }
-        }
-        /*if ((i == 67 || i == 68) && (j == 76 || j == 77)) {
-          for (int ispec = 0; ispec < nspec; ++ispec) {
-          printf("[%i %i %i] floor applied: %i J: %e E: %e\n", static_cast<int>(floor_applied),
-            v(b, idx_J(ispec), k, j, i), v(b, idx_E(ispec), k, j, i));
-          }
-        }*/
 
         if (floor_applied) {
           // Update dependent primitives
@@ -370,9 +354,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
           geom.Metric(CellLocation::Cent, k, j, i, cov_gamma);
           const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma);
           Vec con_v{{con_vp[0]/W, con_vp[1]/W, con_vp[2]/W}};
-        if (j == 67 && i == 75) {
-         printf("con v: %e %e %e\n", con_v(0), con_v(1), con_v(2));
-        }
           for (int ispec = 0; ispec < nspec; ++ispec) {
             const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
 

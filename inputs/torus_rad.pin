@@ -39,7 +39,7 @@ variables = p.density,       &
 
 file_type   = hdf5      # Tabular data dump
 #dt          = 5.0       # time increment between outputs
-dt          = 0.1
+dt          = 1.0
 
 <parthenon/time>
 nlim        = -1        # cycle limit
@@ -107,8 +107,8 @@ Ye = false
 mhd = true
 
 <geometry>
-#a = 0.9375
-a = 0
+a = 0.9375
+#a = 0
 
 <coordinates>
 derefine_poles = false
@@ -126,7 +126,9 @@ scattering_fraction = 1.0
 
 <opacity>
 type = gray
-gray_kappa = 1.e-20
+gray_kappa = 1.e-60
+#gray_kappa = 1.e-10
+#gray_kappa = 1.e-5
 
 <units>
 scale_free = false

@@ -118,8 +118,8 @@ KOKKOS_INLINE_FUNCTION
 void PiecewiseLinear(const Real qm, const Real q0, const Real qp, Real &ql, Real &qr) {
   Real dq = qp - q0;
   dq = mc(q0 - qm, dq, 1.5);
-  ql = q0 - 0.5 * dq;
-  qr = q0 + 0.5 * dq;
+  ql = q0 + 0.5 * dq;
+  qr = q0 - 0.5 * dq;
 }
 
 #pragma omp declare simd

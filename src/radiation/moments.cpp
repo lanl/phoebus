@@ -130,9 +130,6 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         c.Con2Prim(E, covF, conTilPi, &J, &covH);
-        if (i == 75 && j > 60 && j < 70) {
-          printf("J[%i %i %i]: %e\n", k,j,i,J);
-        }
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
           printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
@@ -140,21 +137,6 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           printf("J: %e covH: %e %e %e\n", J, covH(0), covH(1), covH(2));
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
         }
-
-        /*if (J < 0. && j == 67 && i == 75) {
-          printf("[%i %i %i][%i]\n", k, j, i, ispec);
-          printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
-          printf("J: %e covH: %e %e %e\n", J, covH(0), covH(1), covH(2));
-          printf("con_v: %e %e %e\n", con_v(0), con_v(1), con_v(2));
-          SPACELOOP(ii) {
-            SPACELOOP(jj) {
-              printf("%e ", conTilPi(ii,jj));
-            }
-            printf("\n");
-          }
-        }
-
-        PARTHENON_DEBUG_REQUIRE(J >= 0., "Negative radiation energy density!");*/
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -400,9 +382,10 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // TODO(JCD): do we want to enable other recon methods like weno5?
         // x-direction
         // TODO(BRR) ib.s - 1 means Jl = 0 in first active zone
-        //ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
-        ReconLoop<PiecewiseLinear>(member, ib.s - 2, ib.e + 1, pvim1, pv, pvip1, vi_l,
+        ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
                                    vi_r);
+        //ReconLoop<PiecewiseLinear>(member, ib.s - 2, ib.e + 1, pvim1, pv, pvip1, vi_l,
+         //                          vi_r);
         // y-direction
         if (ndim > 1)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
@@ -410,20 +393,15 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         if (ndim > 2)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
 
-        /*if (j == 64)
-        {
-//           ql_base(idx_ql(ispec, 0, idir), k, j, i);
-int ispec = 0;
-int idir = 0;
-printf("ib.s - 1: %i\n", ib.s - 1);
-           printf("ql(J): %e %e %e %e | %e %e\n",
-             ql_base(idx_ql(ispec, 0, idir), k, j, 0),
-             ql_base(idx_ql(ispec, 0, idir), k, j, 1),
-             ql_base(idx_ql(ispec, 0, idir), k, j, 2),
-             ql_base(idx_ql(ispec, 0, idir), k, j, 3),
-             ql_base(idx_ql(ispec, 0, idir), k, j, 4),
-             ql_base(idx_ql(ispec, 0, idir), k, j, 5));
-        }*/
+        /*ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vi_l,
+                                   vi_r);
+        // y-direction
+        if (ndim > 1)
+          ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vj_l, vj_r);
+        // z-direction
+        if (ndim > 2)
+          ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vk_l, vk_r);
+          */
 
         // Calculate spatial derivatives of J at zone faces for diffusion limit
         //    x-->
@@ -445,9 +423,6 @@ printf("ib.s - 1: %i\n", ib.s - 1);
           const Real idz = 1.0 / coords.Dx(X3DIR, k, j, 0);
           const Real idz4 = 0.25 * idz;
           Real *J = &v(b, idx_J(n), k, j, 0);
-          //if (j == 64) {
-          //  printf("J: %e %e %e %e | %e\n", J[0], J[1], J[2], J[3], J[4]);
-          //}
           Real *Jjm1 = &v(b, idx_J(n), k, j - dj, 0);
           Real *Jjp1 = &v(b, idx_J(n), k, j + dj, 0);
           Real *Jkm1 = &v(b, idx_J(n), k - dk, j, 0);
@@ -607,19 +582,13 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
-          if (idir == 1 && i == 75 && j > 60 && j < 70) {
-            printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
-            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
-              con_vl(0), con_vl(1), con_vl(2),
-              con_vr(0), con_vr(1), con_vr(2));
-          }
-
           // Calculate the geometric mean of the opacity on either side of the interface,
           // this is necessary for handling the asymptotic limit near sharp surfaces
           Real kappaH = sqrt((v(idx_kappaH(ispec), k, j, i) *
                               v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
 
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
+          //const Real a = 1.;
 
           // Calculate the observer frame quantities on either side of the interface
           /// TODO: (LFR) Add other contributions to the asymptotic flux
@@ -658,11 +627,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
           cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
-          if (Jl > 1. || Jr > 1. || Jl < 0. || Jr < 0.) {
-            printf("Jl = %e Jr = %e! [%i %i %i][%i][dir: %i]\n",
-              Jl, Jr, k, j, i, ispec, idir);
-            PARTHENON_FAIL("Bad J!");
-          }
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
@@ -694,13 +658,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
-          /*if (j == 64 && i < 10) {
-            printf("[%i %i %i][%i] F = %e %e %e %e\n",
-              k, j, i, ispec, v.flux(idir_in, idx_Ef(ispec), k, j, i),
-                v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
-                v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
-                v.flux(idir_in, idx_Ff(ispec, 2), k, j, i));
-          }*/
         }
       });
 
@@ -1015,7 +972,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
 
           // Add source corrections to conserved iration variables
-          /*v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
+          v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
           for (int idir = 0; idir < 3; ++idir) {
             v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
           }
@@ -1033,7 +990,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
             v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
-          }*/
+          }
         }
       });
 
