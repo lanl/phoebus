@@ -456,11 +456,11 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
   const bool is_monopole_sph =
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
-  if (enable_tov && !enable_monopole) {
-    PARTHENON_THROW("MonopoleGR required for TOV initialization");
+  if ((enable_tov || enable_ccsn) && !enable_monopole) {
+    PARTHENON_THROW("MonopoleGR required for TOV/CCSN initialization");
   }
-  if (enable_monopole && !enable_tov) {
-    PARTHENON_THROW("Currently monopole GR only enabled with TOV");
+  if (enable_monopole && !(enable_tov || enable_ccsn)) {
+    PARTHENON_THROW("Currently monopole GR only enabled with TOV/CCSN");
   }
   if ((enable_monopole && !(is_monopole_cart || is_monopole_sph)) ||
       (is_monopole_cart || is_monopole_sph) && !enable_monopole) {
