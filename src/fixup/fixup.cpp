@@ -155,7 +155,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 }
 
 template <typename T, class CLOSURE>
-TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
+TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace pr = radmoment_prim;
@@ -291,8 +291,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
         }
 
         if (enable_rad_floors) {
-          const double r = std::exp(coords.x1v(k, j, i));
-          const double Jmin = 1.e-4 * std::pow(r, -4);
+          const Real r = std::exp(coords.x1v(k, j, i));
+          const Real Jmin = 1.e-4 * std::pow(r, -4);
           for (int ispec = 0; ispec < nspec; ++ispec) {
             //if (v(b, idx_J(ispec), k, j, i) < 1.e-5 * v(b, peng, k, j, i)) {
             if (v(b, idx_J(ispec), k, j, i) < Jmin) {
@@ -300,6 +300,21 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::interior) {
               //printf("Applying rad floor to [%i %i %i]\n", k, j, i);
               //v(b, idx_J(ispec), k, j, i) = 1.e-5 * v(b, peng, k, j, i);
               v(b, idx_J(ispec), k, j, i) = Jmin;
+            }
+
+            // Limit magnitude of flux
+            const Real Hmag = std::sqrt(std::pow(v(b,idx_H(0,ispec),k,j,i),2) + 
+              std::pow(v(b,idx_H(1,ispec),k,j,i),2) + 
+              std::pow(v(b,idx_H(2,ispec),k,j,i),2));
+            if (Hmag > 1.) {
+//              printf("Hmag = %e! [%i %i %i]\n", Hmag, k,j,i);
+//              PARTHENON_FAIL("Hmag");
+              floor_applied = true;
+
+              const Real rescale = 0.99/Hmag;
+              SPACELOOP(ii) {
+                v(b,idx_H(ii,ispec),k,j,i) *= rescale;
+              }
             }
           }
         }

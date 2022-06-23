@@ -573,6 +573,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_qlv(2, idir), k, j, i)};
           const Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
                       v(idx_qrv(2, idir), k, j, i)};
+                      /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
+                        printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e\n",
+                        k,j,i,Jl,Jr,Hl(0),Hl(1),Hl(2),Hr(0),Hr(1),Hr(2));
+                      }*/
           const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
           const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
           Vec con_vl{{con_vpl[0]/Wl, con_vpl[1]/Wl, con_vpl[2]/Wl}};
@@ -648,6 +652,39 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
+              if (std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i))) {
+                printf("NAN flux! %i %i %i F: %e Fl Fr: %e %e speed: %e El Er: %e %e\n",
+                  k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i),
+                  conFl(idir), conFr(idir),speed, El,Er);
+                printf("Jl: %e Jr: %e\n", Jl, Jr);
+                printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2));
+                printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
+                PARTHENON_FAIL("nan flux");
+              }
+                      
+                      /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
+                        printf("[%i %i %i] flux[0]: %e\n",
+                          k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
+                      }
+                      if ((j == 97 || j == 98) && i == 4 && idir == 1) {
+                        printf("[%i %i %i] flux[1]: %e\n",
+                          k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
+                      }*/
+
+                      if (j == 97 && i < 6 && ispec == 0 && idir == 0) {
+                        printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e flux: %e\n",
+                          k,j,i,Jl,Jr,Hl(0),Hl(1),Hl(2),Hr(0),Hr(1),Hr(2),
+                          v.flux(idir_in, idx_Ef(ispec), k, j, i));
+                      }
+
+                      //Fix flux experiment
+                      if (i <= 4) {
+                        if (v.flux(idir_in, idx_Ef(ispec), k, j, i) > 0.) {
+                          
+                          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.;
+                        }
+                      }
+                
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
@@ -807,8 +844,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             Real tmp2 = 0.;
             SPACELOOP2(jj, kk) {
             // TODO(BRR) dg[j]+1j[kk+1][ii+1]/2 instead of Gamma[jj+1][kk+1][ii+1]?
-            //srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
-              srcF(ii) += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
+            srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
+            //  srcF(ii) += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
             }
             /*
             if (i == 64 && j == 64 && std::fabs(alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1]) > 1.e-20) {
@@ -826,6 +863,12 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
           SPACELOOP(ii) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
+          }
+          if (j == 97 && i == 4) {
+            printf("sources[%i]: %e %e %e %e\n", ispec,v_src(iblock, idx_E_src(ispec), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 0), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 1), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 2), k, j, i));
           }
         }
       });
@@ -874,7 +917,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   std::vector<std::string> vars{cr::E,      cr::F,       p::density, p::temperature,
                                 p::ye,      p::velocity, pr::J,      pr::H,
                                 ir::kappaJ, ir::kappaH,  ir::JBB};
-  printf("skipping fluid update\n"); update_fluid = false;
+  //printf("skipping fluid update\n"); update_fluid = false;
   if (update_fluid) {
     vars.push_back(c::energy);
     vars.push_back(c::momentum);
@@ -970,6 +1013,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
           Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
+          if (i == 64 && j == 64) printf("[%i %i] tauJ = %e tauH = %e\n", i, j, tauH, tauH);
 
           // Add source corrections to conserved iration variables
           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
