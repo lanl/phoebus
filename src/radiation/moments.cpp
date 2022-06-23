@@ -562,6 +562,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           const Real &Jl = v(idx_ql(ispec, 0, idir), k, j, i);
           const Real &Jr = v(idx_qr(ispec, 0, idir), k, j, i);
+          if (i < 15) {
+            if (Jl > 1. || Jr > 1.) {
+              printf("[%i %i %i]\n", k, j, i);
+              PARTHENON_FAIL("Jl/r bad!");
+            }
+          }
           const Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
                           Jl * v(idx_ql(ispec, 2, idir), k, j, i),
                           Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
@@ -675,14 +681,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                         printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e flux: %e\n",
                           k,j,i,Jl,Jr,Hl(0),Hl(1),Hl(2),Hr(0),Hr(1),Hr(2),
                           v.flux(idir_in, idx_Ef(ispec), k, j, i));
-                      }
-
-                      //Fix flux experiment
-                      if (i <= 4) {
-                        if (v.flux(idir_in, idx_Ef(ispec), k, j, i) > 0.) {
-                          
-                          v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.;
-                        }
                       }
                 
 
