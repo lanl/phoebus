@@ -1,8 +1,10 @@
 
 <phoebus>
 problem = torus
-ix1_bc = outflow
-ox1_bc = outflow
+#ix1_bc = outflow
+#ox1_bc = outflow
+ix1_bc = reflect 
+ox1_bc = reflect
 ix2_bc = reflect
 ox2_bc = reflect
 
@@ -42,7 +44,7 @@ file_type   = hdf5      # Tabular data dump
 dt          = 0.1
 
 <parthenon/time>
-nlim        = 250        # cycle limit
+nlim        = -1        # cycle limit
 tlim        = 5.0    # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
@@ -99,7 +101,7 @@ rad = true
 xorder = 2
 cfl = 0.8
 riemann = llf
-recon = weno5
+recon = linear # weno5
 c2p_max_iter = 100
 c2p_tol = 1.e-8
 c2p_method = robust
@@ -140,7 +142,7 @@ enable_floors = true
 enable_mhd_floors = true
 enable_rad_floors = true
 enable_ceilings = true
-enable_flux_fixup = false # true
+enable_flux_fixup = true
 enable_c2p_fixup = true
 floor_type = ExpX1RhoSie
 rho0_floor = 1.0e-8
