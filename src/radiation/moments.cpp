@@ -627,12 +627,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           const Real &Jl = v(idx_ql(ispec, 0, idir), k, j, i);
           const Real &Jr = v(idx_qr(ispec, 0, idir), k, j, i);
-          if (i < 15) {
-            if (Jl > 1. || Jr > 1.) {
-              printf("[%i %i %i]\n", k, j, i);
-              PARTHENON_FAIL("Jl/r bad!");
-            }
-          }
           const Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
                           Jl * v(idx_ql(ispec, 2, idir), k, j, i),
                           Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
@@ -860,8 +854,6 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Real Gamma[ND][ND][ND];
         geom.GradLnAlpha(CellLocation::Cent, iblock, k, j, i, dlnalp);
         geom.ConnectionCoefficient(CellLocation::Cent, iblock, k, j, i, Gamma);
-        Real dg[ND][ND][ND];
-        geom.MetricDerivative(CellLocation::Cent, iblock, k, j, i, dg);
 
         // Get the gradient of the shift from the Christoffel symbols of the first kind
         // Get the extrinsic curvature from the Christoffel symbols of the first kind
@@ -906,26 +898,9 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           SPACELOOP(ii) {
             SPACELOOP(jj) { srcF(ii) += covF(jj) * dbeta(ii, jj); }
             srcF(ii) -= alp * E * dlnalp[ii + 1];
-            Real tmp1 = 0.;
-            Real tmp2 = 0.;
             SPACELOOP2(jj, kk) {
-              // TODO(BRR) dg[j]+1j[kk+1][ii+1]/2 instead of Gamma[jj+1][kk+1][ii+1]?
               srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
-              //  srcF(ii) += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
             }
-            /*
-            if (i == 64 && j == 64 && std::fabs(alp * conP(jj, kk) * Gamma[jj + 1][kk +
-            1][ii + 1]) > 1.e-20) { printf("[%i %i %i] old: %e new: %e\n", jj,kk,ii,alp *
-            conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1], alp / 2. * conP(jj, kk) *
-            dg[jj+1][kk+1][ii+1]);
-            }
-            tmp1 += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
-            tmp2 += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
-            }
-            if (i == 64 && j == 64) {
-              printf("old sum: %e new sum: %e\n", tmp1, tmp2);
-            }
-            */
           }
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
           SPACELOOP(ii) {
@@ -1070,11 +1045,15 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         }
 
         const Real dtau = alpha * dt / W;
+          
+        const Real rho = v(iblock, prho, k, j, i);
+        const Real ug = v(iblock, peng, k, j, i);
+        const Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
 
         // Rootfind over fluid temperature in fluid rest frame
         root_find::RootFind root_find;
-        InteractionTResidual res(eos, d_opacity, d_mean_opacity, v(iblock, prho, k, j, i),
-                                 v(iblock, peng, k, j, i), v(iblock, pYe, k, j, i), J0,
+        InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho,
+                                 ug, Ye, J0,
                                  num_species, species_d, scattering_fraction, dtau);
         const Real T1 =
             root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
@@ -1109,12 +1088,17 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
           Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
           Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-              v(iblock, prho, k, j, i), T1, v(iblock, pYe, k, j, i), species_d[ispec]);
+              rho, T1, Ye, species_d[ispec]);
           Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
           Real tauH = alpha * dt * kappa;
 
           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
                                &cov_dF);
+
+          /*Real rescale = 1.;
+          if (v(iblock, ceng, k, j, i) < sdetgam * dE) {
+            rescale = 0.95 * v(iblock, ceng, k, j, i) / (sdetgam * dE);
+          }*/
 
           // Add source corrections to conserved iration variables
           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
@@ -1128,14 +1112,24 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
             }
 #if USE_VALENCIA
-            v(iblock, ceng, k, j, i) -= sdetgam * dE;
+//            if (v(iblock, ceng, k, j, i) < sdetgam * dE) {
+//    printf("too large source! [%i %i %i] ceng = %e sdg*dE = %e alpha = %e\n", k, j, i, v(iblock, ceng, k, j, i), sdetgam*dE, alpha);
+//              printf("ispec: %i\n", ispec);
+//    printf("rho: %e T: %e peng: %e Ye: %e\n", rho, v(iblock, pT, k, j, i), ug, Ye);
+//    printf("J0: %e tauJ: %e tauH: %e\n", J0, tauJ, tauH);
+//    printf("T1: %e JBB: %e\n", T1, JBB);
+//    PARTHENON_FAIL("negative ceng");
+//  }
+            //v(iblock, ceng, k, j, i) -= sdetgam * dE;
+            v(iblock, ceng, k, j, i) -= dE;
 #else
             // TODO(BRR) This is not correct
             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
 #endif
-            v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
-            v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
-            v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
+            SPACELOOP(ii) {
+              //v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii);
+              v(iblock, cmom_lo + ii, k, j, i) -= cov_dF(ii);
+            }
           }
         } // for ispec
 
