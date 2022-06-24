@@ -24,6 +24,61 @@
 #include "reconstruction.hpp"
 
 namespace radiation {
+          
+<template typename CLOSURE>
+class InteractionResidual {
+  public:
+  KOKKOS_FUNCTION
+  InteractionTResidual(const CLOSURE &c, const EOS &eos, const Opacity &opacity, const MeanOpacity &mean_opacity,
+  const Real &ug0, const Real ur0[3], const Real &rho, 
+  const Real &Ye, const int &nspec, 
+  const RadiationType species[3], const Real &scattering_fraction, const Real &dtau) :
+    c_(c), eos_(eos), opacity_(opacity), mean_opacity_(mean_opacity),
+    ug0_(ug0), ur0_(ur0) rho_(rho), Ye_(Ye), nspec_(nspec), 
+    scattering_fraction_(scattering_fraction), alpha_(alpha), dt_(dt),
+    {
+      for (int ispec = 0; ispec < nspec; ++ispec) {
+        ur0_[ispec] = ur0[ispec];
+        species_[ispec] = species[ispec];
+      }
+    }
+
+  KOKKOS_INLINE_FUNCTION
+  Real operator()(const Real T) {
+    Real lambda[2] = {Ye_, 0.0};
+
+    Real ur0_tot = 0.;
+    Real dur_tot = 0.;
+    
+    for (int ispec = 0; ispec < nspec; ++ispec) {
+      ur0_tot += ur0_[ispec];
+      const Real kappa = (1. - scattering_fraction) * mean_opacity_.RosselandMeanAbsorptionCoefficient(
+              rho_, T, Ye_, species_[ispec]);
+
+      const Real JBB = opacity_.EnergyDensityFromTemperature(T, species_[ispec]);
+      
+      dur_tot += (ur0[ispec] + dtau * kappa * JBB)/(1. + dtau * kappa) - ur0[ispec];
+    }
+
+    const Real ug1 = rho_*eos.InternalEnergyFromDensityTemperature(rho_, T_, lambda);
+
+    return ((ug1 - ug0) + (dur_tot)) / (ug0 + ur0_tot);
+  }
+
+  private:
+  const CLOSURE &c_;
+  const EOS &eos_;
+  const Opacity &opacity_;
+  const MeanOpacity &mean_opacity_;
+  const Real &ug0_;
+  const Real &ur0_[3];
+  const Real &rho_;
+  const Real &Ye_;
+  const int &nspec_;
+  const Real &scattering_fraction_;
+  const Real &dtau_;
+  RadiationType species_[3];
+};
 
 template <class T>
 class ReconstructionIndexer {
@@ -475,6 +530,9 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
+
+  //printf("skipping radiation fluxes\n");
+  //return TaskStatus::complete;
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -725,6 +783,9 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
+  //printf("skipping radiation geometric sources\n");
+  //return TaskStatus::complete;
+
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -964,6 +1025,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
     species_d[s] = species[s];
   }
 
+//  InteractionUpdateType interaction_update = InteractionUpdateType::explicit;
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
@@ -1006,6 +1069,15 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
           c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
 
+          // Rootfind over fluid temperature
+          Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+              rho, Temp, Ye, dev_species[ispec]);
+          Real JBB = d_opacity.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
+          InteractionResidual res(c, d_opacity, d_mean_opacity, Estar, cov_Fstar, con_tilPi, dE, cov_dF);
+          const Real temp = root_find.secant(res, 0, T, 1.e-4*T, 1.e4*T);
+
+          // If rootfind fails assume thermal equilibrium?
+
           Real B = v(iblock, idx_JBB(ispec), k, j, i);
           Real tauJ = alpha * dt * v(iblock, idx_kappaJ(ispec), k, j, i);
           Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
@@ -1026,6 +1098,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             }
 #if USE_VALENCIA
             v(iblock, ceng, k, j, i) -= sdetgam * dE;
+            if (v(iblock, ceng, k, j, i) < sdetgam * dE) {
+              printf("WARNING dE > tau! [%i %i %i] ceng: %e sdg*dE: %e\n",
+                k, j, i, v(iblock, ceng, k, j, i), sdetgam*dE);
+            }
 #else
             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
 #endif
@@ -1035,6 +1111,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           }
         }
       });
+  }
 
   return TaskStatus::complete;
 }
