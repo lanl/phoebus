@@ -15,7 +15,10 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
+#include <singularity-eos/eos/eos.hpp>
+
 #include "phoebus_utils/programming_utils.hpp"
+#include "phoebus_utils/root_find.hpp"
 #include "radiation/closure.hpp"
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
@@ -24,59 +27,60 @@
 #include "reconstruction.hpp"
 
 namespace radiation {
-          
-<template typename CLOSURE>
-class InteractionResidual {
-  public:
+
+using namespace singularity::neutrinos;
+using singularity::EOS;
+
+class InteractionTResidual {
+ public:
   KOKKOS_FUNCTION
-  InteractionTResidual(const CLOSURE &c, const EOS &eos, const Opacity &opacity, const MeanOpacity &mean_opacity,
-  const Real &ug0, const Real ur0[3], const Real &rho, 
-  const Real &Ye, const int &nspec, 
-  const RadiationType species[3], const Real &scattering_fraction, const Real &dtau) :
-    c_(c), eos_(eos), opacity_(opacity), mean_opacity_(mean_opacity),
-    ug0_(ug0), ur0_(ur0) rho_(rho), Ye_(Ye), nspec_(nspec), 
-    scattering_fraction_(scattering_fraction), alpha_(alpha), dt_(dt),
-    {
-      for (int ispec = 0; ispec < nspec; ++ispec) {
-        ur0_[ispec] = ur0[ispec];
-        species_[ispec] = species[ispec];
-      }
+  InteractionTResidual(const EOS &eos, const Opacity &opacity,
+                       const MeanOpacity &mean_opacity, const Real &rho, const Real &ug0,
+                       const Real &Ye, const Real J0[3], const int &nspec,
+                       const RadiationType species[3], const Real &scattering_fraction,
+                       const Real &dtau)
+      : eos_(eos), opacity_(opacity), mean_opacity_(mean_opacity), rho_(rho), ug0_(ug0),
+        Ye_(Ye), nspec_(nspec), scattering_fraction_(scattering_fraction), dtau_(dtau) {
+    for (int ispec = 0; ispec < nspec; ++ispec) {
+      J0_[ispec] = J0[ispec];
+      species_[ispec] = species[ispec];
     }
+  }
 
   KOKKOS_INLINE_FUNCTION
   Real operator()(const Real T) {
     Real lambda[2] = {Ye_, 0.0};
 
-    Real ur0_tot = 0.;
-    Real dur_tot = 0.;
-    
-    for (int ispec = 0; ispec < nspec; ++ispec) {
-      ur0_tot += ur0_[ispec];
-      const Real kappa = (1. - scattering_fraction) * mean_opacity_.RosselandMeanAbsorptionCoefficient(
-              rho_, T, Ye_, species_[ispec]);
+    Real J0_tot = 0.;
+    Real dJ_tot = 0.;
+
+    for (int ispec = 0; ispec < nspec_; ++ispec) {
+      J0_tot += J0_[ispec];
+      const Real kappa =
+          (1. - scattering_fraction_) *
+          mean_opacity_.RosselandMeanAbsorptionCoefficient(rho_, T, Ye_, species_[ispec]);
 
       const Real JBB = opacity_.EnergyDensityFromTemperature(T, species_[ispec]);
-      
-      dur_tot += (ur0[ispec] + dtau * kappa * JBB)/(1. + dtau * kappa) - ur0[ispec];
+
+      dJ_tot += (J0_[ispec] + dtau_ * kappa * JBB) / (1. + dtau_ * kappa) - J0_[ispec];
     }
 
-    const Real ug1 = rho_*eos.InternalEnergyFromDensityTemperature(rho_, T_, lambda);
+    const Real ug1 = rho_ * eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda);
 
-    return ((ug1 - ug0) + (dur_tot)) / (ug0 + ur0_tot);
+    return ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot);
   }
 
-  private:
-  const CLOSURE &c_;
+ private:
   const EOS &eos_;
   const Opacity &opacity_;
   const MeanOpacity &mean_opacity_;
-  const Real &ug0_;
-  const Real &ur0_[3];
   const Real &rho_;
+  const Real &ug0_;
   const Real &Ye_;
+  Real J0_[3];
   const int &nspec_;
   const Real &scattering_fraction_;
-  const Real &dtau_;
+  const Real &dtau_; // Proper time
   RadiationType species_[3];
 };
 
@@ -154,9 +158,11 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real isdetgam = 1.0 / geom.DetGamma(CellLocation::Cent, b, k, j, i);
 
-        const Real vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)};
+        const Real vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i),
+                            v(b, pv(2), k, j, i)};
         const Real W = phoebus::GetLorentzFactor(vp, cov_gamma.data);
-        Vec con_v{{v(b, pv(0), k, j, i)/W, v(b, pv(1), k, j, i)/W, v(b, pv(2), k, j, i)/W}};
+        Vec con_v{{v(b, pv(0), k, j, i) / W, v(b, pv(1), k, j, i) / W,
+                   v(b, pv(2), k, j, i) / W}};
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
         CLOSURE c(con_v, &g);
@@ -274,9 +280,10 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, 0, b, j, i);
 
-        const Real con_vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)};
+        const Real con_vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i),
+                                v(b, pv(2), k, j, i)};
         const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-        Vec con_v{{con_vp[0]/W, con_vp[1]/W, con_vp[2]/W}};
+        Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
 
         CLOSURE c(con_v, &g);
 
@@ -326,8 +333,8 @@ TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
 template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
                                                         IndexDomain);
 
-//template <class T>
-//TaskStatus ReconstructEdgeStates(T *rc) {
+// template <class T>
+// TaskStatus ReconstructEdgeStates(T *rc) {
 //}
 
 template <class T>
@@ -439,8 +446,8 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // TODO(BRR) ib.s - 1 means Jl = 0 in first active zone
         ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
                                    vi_r);
-        //ReconLoop<PiecewiseLinear>(member, ib.s - 2, ib.e + 1, pvim1, pv, pvip1, vi_l,
-         //                          vi_r);
+        // ReconLoop<PiecewiseLinear>(member, ib.s - 2, ib.e + 1, pvim1, pv, pvip1, vi_l,
+        //                          vi_r);
         // y-direction
         if (ndim > 1)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
@@ -531,8 +538,8 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
 
-  //printf("skipping radiation fluxes\n");
-  //return TaskStatus::complete;
+  // printf("skipping radiation fluxes\n");
+  // return TaskStatus::complete;
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -633,18 +640,20 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                           Jr * v(idx_qr(ispec, 2, idir), k, j, i),
                           Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
 
-          const Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i), v(idx_qlv(1, idir), k, j, i),
-                      v(idx_qlv(2, idir), k, j, i)};
-          const Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
-                      v(idx_qrv(2, idir), k, j, i)};
-                      /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
-                        printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e\n",
-                        k,j,i,Jl,Jr,Hl(0),Hl(1),Hl(2),Hr(0),Hr(1),Hr(2));
-                      }*/
+          const Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i),
+                                   v(idx_qlv(1, idir), k, j, i),
+                                   v(idx_qlv(2, idir), k, j, i)};
+          const Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i),
+                                   v(idx_qrv(1, idir), k, j, i),
+                                   v(idx_qrv(2, idir), k, j, i)};
+          /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
+            printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e\n",
+            k,j,i,Jl,Jr,Hl(0),Hl(1),Hl(2),Hr(0),Hr(1),Hr(2));
+          }*/
           const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
           const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
-          Vec con_vl{{con_vpl[0]/Wl, con_vpl[1]/Wl, con_vpl[2]/Wl}};
-          Vec con_vr{{con_vpr[0]/Wr, con_vpr[1]/Wr, con_vpr[2]/Wr}};
+          Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
+          Vec con_vr{{con_vpr[0] / Wr, con_vpr[1] / Wr, con_vpr[2] / Wr}};
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
@@ -656,7 +665,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                               v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
 
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
-          //const Real a = 1.;
+          // const Real a = 1.;
 
           // Calculate the observer frame quantities on either side of the interface
           /// TODO: (LFR) Add other contributions to the asymptotic flux
@@ -716,31 +725,31 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
-              if (std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i))) {
-                printf("NAN flux! %i %i %i F: %e Fl Fr: %e %e speed: %e El Er: %e %e\n",
-                  k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i),
-                  conFl(idir), conFr(idir),speed, El,Er);
-                printf("Jl: %e Jr: %e\n", Jl, Jr);
-                printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2));
-                printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
-                PARTHENON_FAIL("nan flux");
-              }
-                      
-                      /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
-                        printf("[%i %i %i] flux[0]: %e\n",
-                          k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
-                      }
-                      if ((j == 97 || j == 98) && i == 4 && idir == 1) {
-                        printf("[%i %i %i] flux[1]: %e\n",
-                          k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
-                      }*/
+          if (std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i))) {
+            printf("NAN flux! %i %i %i F: %e Fl Fr: %e %e speed: %e El Er: %e %e\n", k, j,
+                   i, v.flux(idir_in, idx_Ef(ispec), k, j, i), conFl(idir), conFr(idir),
+                   speed, El, Er);
+            printf("Jl: %e Jr: %e\n", Jl, Jr);
+            printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0), Hr(1),
+                   Hr(2));
+            printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
+            PARTHENON_FAIL("nan flux");
+          }
 
-                      if (j == 97 && i < 6 && ispec == 0 && idir == 0) {
-                        printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e flux: %e\n",
-                          k,j,i,Jl,Jr,Hl(0),Hl(1),Hl(2),Hr(0),Hr(1),Hr(2),
-                          v.flux(idir_in, idx_Ef(ispec), k, j, i));
-                      }
-                
+          /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
+            printf("[%i %i %i] flux[0]: %e\n",
+              k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
+          }
+          if ((j == 97 || j == 98) && i == 4 && idir == 1) {
+            printf("[%i %i %i] flux[1]: %e\n",
+              k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
+          }*/
+
+          if (j == 97 && i < 6 && ispec == 0 && idir == 0) {
+            printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e flux: %e\n", k, j,
+                   i, Jl, Jr, Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2),
+                   v.flux(idir_in, idx_Ef(ispec), k, j, i));
+          }
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
@@ -783,8 +792,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
-  //printf("skipping radiation geometric sources\n");
-  //return TaskStatus::complete;
+  // printf("skipping radiation geometric sources\n");
+  // return TaskStatus::complete;
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
@@ -833,9 +842,9 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
         const Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                   v(iblock, pv(2), k, j, i)};
+                                v(iblock, pv(2), k, j, i)};
         const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-        Vec con_v{{con_vp[0]/W, con_vp[1]/W, con_vp[2]/W}};
+        Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
         CLOSURE c(con_v, &g);
@@ -895,21 +904,20 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
           Vec srcF{0, 0, 0};
           SPACELOOP(ii) {
-            SPACELOOP(jj) {
-              srcF(ii) += covF(jj) * dbeta(ii, jj);
-            }
+            SPACELOOP(jj) { srcF(ii) += covF(jj) * dbeta(ii, jj); }
             srcF(ii) -= alp * E * dlnalp[ii + 1];
             Real tmp1 = 0.;
             Real tmp2 = 0.;
             SPACELOOP2(jj, kk) {
-            // TODO(BRR) dg[j]+1j[kk+1][ii+1]/2 instead of Gamma[jj+1][kk+1][ii+1]?
-            srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
-            //  srcF(ii) += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
+              // TODO(BRR) dg[j]+1j[kk+1][ii+1]/2 instead of Gamma[jj+1][kk+1][ii+1]?
+              srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
+              //  srcF(ii) += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
             }
             /*
-            if (i == 64 && j == 64 && std::fabs(alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1]) > 1.e-20) {
-              printf("[%i %i %i] old: %e new: %e\n", jj,kk,ii,alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1],
-              alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1]);
+            if (i == 64 && j == 64 && std::fabs(alp * conP(jj, kk) * Gamma[jj + 1][kk +
+            1][ii + 1]) > 1.e-20) { printf("[%i %i %i] old: %e new: %e\n", jj,kk,ii,alp *
+            conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1], alp / 2. * conP(jj, kk) *
+            dg[jj+1][kk+1][ii+1]);
             }
             tmp1 += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
             tmp2 += alp / 2. * conP(jj, kk) * dg[jj+1][kk+1][ii+1];
@@ -924,10 +932,11 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
           }
           if (j == 97 && i == 4) {
-            printf("sources[%i]: %e %e %e %e\n", ispec,v_src(iblock, idx_E_src(ispec), k, j, i),
-              v_src(iblock, idx_F_src(ispec, 0), k, j, i),
-              v_src(iblock, idx_F_src(ispec, 1), k, j, i),
-              v_src(iblock, idx_F_src(ispec, 2), k, j, i));
+            printf("sources[%i]: %e %e %e %e\n", ispec,
+                   v_src(iblock, idx_E_src(ispec), k, j, i),
+                   v_src(iblock, idx_F_src(ispec, 0), k, j, i),
+                   v_src(iblock, idx_F_src(ispec, 1), k, j, i),
+                   v_src(iblock, idx_F_src(ispec, 2), k, j, i));
           }
         }
       });
@@ -968,15 +977,18 @@ template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  StateDescriptor *opac = pmb->packages.Get("opacity").get();
+  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E,      cr::F,       p::density, p::temperature,
-                                p::ye,      p::velocity, pr::J,      pr::H,
-                                ir::kappaJ, ir::kappaH,  ir::JBB};
-  //printf("skipping fluid update\n"); update_fluid = false;
+  std::vector<std::string> vars{cr::E,     cr::F,      p::density,  p::temperature,
+                                p::energy, p::ye,      p::velocity, pr::J,
+                                pr::H,     ir::kappaJ, ir::kappaH,  ir::JBB};
+  // printf("skipping fluid update\n"); update_fluid = false;
   if (update_fluid) {
     vars.push_back(c::energy);
     vars.push_back(c::momentum);
@@ -996,6 +1008,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto pv = imap.GetFlatIdx(p::velocity);
 
   int prho = imap[p::density].first;
+  int peng = imap[p::energy].first;
   int pT = imap[p::temperature].first;
   int pYe = imap[p::ye].first;
 
@@ -1025,7 +1038,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
     species_d[s] = species[s];
   }
 
-//  InteractionUpdateType interaction_update = InteractionUpdateType::explicit;
+  const auto &d_opacity = opac->Param<Opacity>("d.opacity");
+  const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
+  // Mainly for testing purposes, probably should be able to do this with the opacity code
+  // itself
+  const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
+
+  //  InteractionUpdateType interaction_update = InteractionUpdateType::explicit;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1034,21 +1053,40 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
       jb.s, jb.e, // y-loop
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
+        // Set up the background state
+        Tens2 cov_gamma;
+        geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+        Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
+        Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
+        LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
+        const Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                                v(iblock, pv(2), k, j, i)};
+        const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+        Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+
+        Real J0[3] = {0.};
         for (int ispec = 0; ispec < num_species; ++ispec) {
+          J0[ispec] = v(iblock, idx_J(ispec), k, j, i);
+        }
 
-          // Set up the background state
-          Tens2 cov_gamma;
-          geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
-          Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
-          Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-          LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
-          const Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                     v(iblock, pv(2), k, j, i)};
-          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-          Vec con_v{{con_vp[0]/W, con_vp[1]/W, con_vp[2]/W}};
+        const Real dtau = alpha * dt / W;
 
-          /// TODO: (LFR) Move beyond Eddington for this update
-          ClosureEdd<Vec, Tens2> c(con_v, &g);
+        // Rootfind over fluid temperature in fluid rest frame
+        root_find::RootFind root_find;
+        InteractionTResidual res(eos, d_opacity, d_mean_opacity, v(iblock, prho, k, j, i),
+                                 v(iblock, peng, k, j, i), v(iblock, pYe, k, j, i), J0,
+                                 num_species, species_d, scattering_fraction, dtau);
+        const Real T1 =
+            root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
+                             1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
+
+        // If rootfind fails assume thermal equilibrium?
+
+        // Calculate energy/momentum exchange with updated fluid temperature
+
+        /// TODO: (LFR) Move beyond Eddington for this update
+        ClosureEdd<Vec, Tens2> c(con_v, &g);
+        for (int ispec = 0; ispec < num_species; ++ispec) {
 
           Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
           Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
@@ -1069,21 +1107,14 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
           c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
 
-          // Rootfind over fluid temperature
+          Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
           Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-              rho, Temp, Ye, dev_species[ispec]);
-          Real JBB = d_opacity.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
-          InteractionResidual res(c, d_opacity, d_mean_opacity, Estar, cov_Fstar, con_tilPi, dE, cov_dF);
-          const Real temp = root_find.secant(res, 0, T, 1.e-4*T, 1.e4*T);
+              v(iblock, prho, k, j, i), T1, v(iblock, pYe, k, j, i), species_d[ispec]);
+          Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
+          Real tauH = alpha * dt * kappa;
 
-          // If rootfind fails assume thermal equilibrium?
-
-          Real B = v(iblock, idx_JBB(ispec), k, j, i);
-          Real tauJ = alpha * dt * v(iblock, idx_kappaJ(ispec), k, j, i);
-          Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
-          Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
-          c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
-          if (i == 64 && j == 64) printf("[%i %i] tauJ = %e tauH = %e\n", i, j, tauH, tauH);
+          c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
+                               &cov_dF);
 
           // Add source corrections to conserved iration variables
           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
@@ -1098,23 +1129,72 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             }
 #if USE_VALENCIA
             v(iblock, ceng, k, j, i) -= sdetgam * dE;
-            if (v(iblock, ceng, k, j, i) < sdetgam * dE) {
-              printf("WARNING dE > tau! [%i %i %i] ceng: %e sdg*dE: %e\n",
-                k, j, i, v(iblock, ceng, k, j, i), sdetgam*dE);
-            }
 #else
+            // TODO(BRR) This is not correct
             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
 #endif
             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
             v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
           }
-        }
-      });
-  }
+        } // for ispec
 
+        /* for (int ispec = 0; ispec < num_species; ++ispec) {
+
+           /// TODO: (LFR) Move beyond Eddington for this update
+           ClosureEdd<Vec, Tens2> c(con_v, &g);
+
+           Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+           Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
+                         v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
+                         v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
+
+           Real dE;
+           Vec cov_dF;
+
+           // Treat the Eddington tensor explicitly for now
+           Real &J = v(iblock, idx_J(ispec), k, j, i);
+           Vec cov_H{{
+               J * v(iblock, idx_H(ispec, 0), k, j, i),
+               J * v(iblock, idx_H(ispec, 1), k, j, i),
+               J * v(iblock, idx_H(ispec, 2), k, j, i),
+           }};
+           Tens2 con_tilPi;
+
+           c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+
+           Real B = v(iblock, idx_JBB(ispec), k, j, i);
+           Real tauJ = alpha * dt * v(iblock, idx_kappaJ(ispec), k, j, i);
+           Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
+           Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
+           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
+
+           // Add source corrections to conserved iration variables
+           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
+           for (int idir = 0; idir < 3; ++idir) {
+             v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
+           }
+
+           // Add source corrections to conserved fluid variables
+           if (update_fluid) {
+             if (cye > 0) {
+               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+             }
+ #if USE_VALENCIA
+             v(iblock, ceng, k, j, i) -= sdetgam * dE;
+ #else
+             // TODO(BRR) This is not correct
+             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
+ #endif
+             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
+             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
+             v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
+           }
+         }*/
+      });
   return TaskStatus::complete;
 }
+
 // template TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *, Real, bool);
 template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real,
                                                            bool);
@@ -1161,7 +1241,6 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
   // Get the device opacity object
-  using namespace singularity::neutrinos;
   const auto &d_opacity = opac->Param<Opacity>("d.opacity");
   const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
 
@@ -1175,7 +1254,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   RadiationType dev_species[3] = {species[0], species[1], species[2]};
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
+      DEFAULT_LOOP_PATTERN, "RadMoments::CalculateOpacities", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
       kb.s, kb.e, // z-loop
       jb.s, jb.e, // y-loop

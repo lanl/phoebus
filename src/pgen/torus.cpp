@@ -29,6 +29,7 @@
 #include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
+#include "phoebus_utils/root_find.hpp"
 #include "radiation/radiation.hpp"
 
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
