@@ -646,10 +646,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           const Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i),
                                    v(idx_qrv(1, idir), k, j, i),
                                    v(idx_qrv(2, idir), k, j, i)};
-          /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
-            printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e\n",
-            k,j,i,Jl,Jr,Hl(0),Hl(1),Hl(2),Hr(0),Hr(1),Hr(2));
-          }*/
           const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
           const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
           Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
@@ -665,7 +661,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                               v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
 
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
-          // const Real a = 1.;
 
           // Calculate the observer frame quantities on either side of the interface
           /// TODO: (LFR) Add other contributions to the asymptotic flux
