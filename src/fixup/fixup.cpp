@@ -640,12 +640,6 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   namespace cr = radmoment_cons;
 
   // x1-direction
-  printf("bflags: %i %i %i %i\n",
-         static_cast<int>(pmb->boundary_flag[BoundaryFace::inner_x1]),
-         static_cast<int>(pmb->boundary_flag[BoundaryFace::outer_x1]),
-         static_cast<int>(pmb->boundary_flag[BoundaryFace::inner_x2]),
-         static_cast<int>(pmb->boundary_flag[BoundaryFace::outer_x2]));
-  printf("ix1_bc: %s ox1_bc: %s\n", ix1_bc.c_str(), ox1_bc.c_str());
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
     if (ix1_bc == "outflow") {
       auto flux = rc->PackVariablesAndFluxes(

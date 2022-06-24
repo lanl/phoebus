@@ -719,16 +719,16 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
-          if (std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i))) {
-            printf("NAN flux! %i %i %i F: %e Fl Fr: %e %e speed: %e El Er: %e %e\n", k, j,
-                   i, v.flux(idir_in, idx_Ef(ispec), k, j, i), conFl(idir), conFr(idir),
-                   speed, El, Er);
-            printf("Jl: %e Jr: %e\n", Jl, Jr);
-            printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0), Hr(1),
-                   Hr(2));
-            printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
-            PARTHENON_FAIL("nan flux");
-          }
+//          if (std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i))) {
+//            printf("NAN flux! %i %i %i F: %e Fl Fr: %e %e speed: %e El Er: %e %e\n", k, j,
+//                   i, v.flux(idir_in, idx_Ef(ispec), k, j, i), conFl(idir), conFr(idir),
+//                   speed, El, Er);
+//            printf("Jl: %e Jr: %e\n", Jl, Jr);
+//            printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0), Hr(1),
+//                   Hr(2));
+//            printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
+//            PARTHENON_FAIL("nan flux");
+//          }
 
           /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
             printf("[%i %i %i] flux[0]: %e\n",
@@ -739,11 +739,11 @@ TaskStatus CalculateFluxesImpl(T *rc) {
               k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
           }*/
 
-          if (j == 97 && i < 6 && ispec == 0 && idir == 0) {
-            printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e flux: %e\n", k, j,
-                   i, Jl, Jr, Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2),
-                   v.flux(idir_in, idx_Ef(ispec), k, j, i));
-          }
+//          if (j == 97 && i < 6 && ispec == 0 && idir == 0) {
+//            printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e flux: %e\n", k, j,
+//                   i, Jl, Jr, Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2),
+//                   v.flux(idir_in, idx_Ef(ispec), k, j, i));
+//          }
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
@@ -906,13 +906,13 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           SPACELOOP(ii) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
           }
-          if (j == 97 && i == 4) {
-            printf("sources[%i]: %e %e %e %e\n", ispec,
-                   v_src(iblock, idx_E_src(ispec), k, j, i),
-                   v_src(iblock, idx_F_src(ispec, 0), k, j, i),
-                   v_src(iblock, idx_F_src(ispec, 1), k, j, i),
-                   v_src(iblock, idx_F_src(ispec, 2), k, j, i));
-          }
+//          if (j == 97 && i == 4) {
+//            printf("sources[%i]: %e %e %e %e\n", ispec,
+//                   v_src(iblock, idx_E_src(ispec), k, j, i),
+//                   v_src(iblock, idx_F_src(ispec, 0), k, j, i),
+//                   v_src(iblock, idx_F_src(ispec, 1), k, j, i),
+//                   v_src(iblock, idx_F_src(ispec, 2), k, j, i));
+//          }
         }
       });
   return TaskStatus::complete;
