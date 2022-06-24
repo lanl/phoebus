@@ -3,7 +3,7 @@
 problem = torus
 #ix1_bc = outflow
 #ox1_bc = outflow
-ix1_bc = reflect 
+ix1_bc = reflect
 ox1_bc = reflect
 ix2_bc = reflect
 ox2_bc = reflect
