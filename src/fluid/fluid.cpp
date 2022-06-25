@@ -154,6 +154,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("ix1_bc", ix1_bc);
   const std::string ox1_bc = pin->GetString("phoebus", "ox1_bc");
   params.Add("ox1_bc", ox1_bc);
+  const std::string ix2_bc = pin->GetString("phoebus", "ix2_bc");
+  params.Add("ix2_bc", ix2_bc);
+  const std::string ox2_bc = pin->GetString("phoebus", "ox2_bc");
+  params.Add("ox2_bc", ox2_bc);
 
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
@@ -532,8 +536,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_sources"))
     return TaskStatus::complete;
 
-  printf("skipping fluid sources\n");
-  return TaskStatus::complete;
+  //printf("skipping fluid sources\n");
+  //return TaskStatus::complete;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -626,8 +630,8 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
 
-  printf("Skipping fluid fluxes\n");
-  return TaskStatus::complete;
+  //printf("skipping fluid fluxes\n");
+  //return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
   auto sig = rc->Get(internal_variables::face_signal_speed).data;
