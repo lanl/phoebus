@@ -31,6 +31,28 @@ namespace radiation {
 using namespace singularity::neutrinos;
 using singularity::EOS;
 
+class InteractionFourMomResidual {
+  public:
+  KOKKOS_FUNCTION
+  InteractionFourMomResidual() {}
+
+  KOKKOS_INLINE_FUNCTION
+  void Residual(Real x[4], Real resid[4]) {
+    for (int i = 0; i < 4; i++) {
+      resid[i] = 0.;
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void Jacobian(Real x[4], Real jac[4][4]) {
+    for (int i = 0; i < 4; i++) {
+      for (int j = 0; j < 4; j++) {
+        jac[i][j] = 0.;
+      }
+    }
+  }
+};
+
 class InteractionTResidual {
  public:
   KOKKOS_FUNCTION
@@ -653,7 +675,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
-<<<<<<< HEAD
           if (idir == 1 && i == 75 && j > 50 && j < 70 && ispec == 0) {
             printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
             printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
@@ -661,8 +682,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
               con_vr(0), con_vr(1), con_vr(2));
           }
 
-=======
->>>>>>> b2189b06d5e543b21902b34dfa71a63d78698cb4
           // Calculate the geometric mean of the opacity on either side of the interface,
           // this is necessary for handling the asymptotic limit near sharp surfaces
           Real kappaH = sqrt((v(idx_kappaH(ispec), k, j, i) *
@@ -1067,6 +1086,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         const Real T1 =
             root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
                              1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
+
+        // Practice multiD rootfind
+        root_find::MultiDRootFind<4> md_root_find;
+        InteractionFourMomResidual resid;
+        Real guess[4] = {0};
+        Real ans[4] = {0};
+        md_root_find.newton(resid, 1.e-8, guess, ans);
 
         // If rootfind fails assume thermal equilibrium?
 
