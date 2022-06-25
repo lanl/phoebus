@@ -18,6 +18,19 @@ namespace root_find {
 
 enum class RootFindStatus { success, failure };
 
+template <unsigned int N>
+struct MultiDRootFind {
+  KOKKOS_INLINE_FUNCTION
+  MultiDRootFind(int max_iterations = std::numeric_limits<int>::max()) : iteration_count(0), max_iter(max_iterations) {}
+
+  template <typename F, typename J>
+  KOKKOS_INLINE_FUNCTION void newton(F &func, J &jac, const Real tol, const Real guess[N], Real ans[N]) {
+    for (int n = 0; n < N; n++) {
+      ans[n] = guess[n];
+    }
+  }
+};
+
 struct RootFind {
   KOKKOS_INLINE_FUNCTION
   RootFind(int max_iterations = std::numeric_limits<int>::max())
