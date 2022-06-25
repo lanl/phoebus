@@ -263,7 +263,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (fluid_active) {
       auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
-      auto fix_flux = tl.AddTask(hydro_flux, fixup::FixFluxes, sc0.get());
+     // auto fix_flux = tl.AddTask(hydro_flux, fixup::FixFluxes, sc0.get());
       auto hydro_flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
       auto hydro_geom_src =
           tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
@@ -284,6 +284,11 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                         sc0.get(), gsrc.get());
       sndrcv_flux_depend = sndrcv_flux_depend | moment_flux;
       geom_src = geom_src | moment_geom_src;
+    }
+
+    if (rad_moments_active || fluid_active) {
+      auto fix_flux = tl.AddTask(sndrcv_flux_depend, fixup::FixFluxes, sc0.get());
+      sndrcv_flux_depend = sndrcv_flux_depend | fix_flux;
     }
 
     if (rad_mocmc_active) {
