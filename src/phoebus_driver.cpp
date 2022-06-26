@@ -432,10 +432,23 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                     sc1.get(), beta * dt, fluid_active);
       auto impl_edd =
           tl.AddTask(impl_update, radiation::MOCMCEddington<MeshBlockData<Real>>, sc1.get());
+
+      fixup = fixup | impl_update;
     } else if (rad_moments_active) {
       auto impl_update = tl.AddTask(fixup, radiation::MomentFluidSource<MeshBlockData<Real>>,
                                     sc1.get(), beta * dt, fluid_active);
+
+      fixup = fixup | impl_update;
     }
+
+    // fill in derived fields after source update
+    auto fill_derived_2 = tl.AddTask(
+        fixup, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+
+    auto fixup_2 = tl.AddTask(
+        fill_derived_2, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+
+    auto floors_2 = tl.AddTask(fixup_2, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
   }
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
 
