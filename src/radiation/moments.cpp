@@ -1120,15 +1120,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 //    printf("T1: %e JBB: %e\n", T1, JBB);
 //    PARTHENON_FAIL("negative ceng");
 //  }
-            //v(iblock, ceng, k, j, i) -= sdetgam * dE;
-            v(iblock, ceng, k, j, i) -= dE;
+            v(iblock, ceng, k, j, i) -= sdetgam * dE;
 #else
             // TODO(BRR) This is not correct
             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
 #endif
             SPACELOOP(ii) {
-              //v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii);
-              v(iblock, cmom_lo + ii, k, j, i) -= cov_dF(ii);
+              v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii);
             }
           }
         } // for ispec
