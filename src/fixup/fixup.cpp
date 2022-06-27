@@ -656,7 +656,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             flux.flux(X1DIR, 0, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
             // TODO(BRR) fix flux for radiation energy?
-            flux.flux(X1DIR, 1, k, j, i) = std::max(flux.flux(X1DIR, 0, k, j, i), 0.0);
+            //flux.flux(X1DIR, 1, k, j, i) = std::max(flux.flux(X1DIR, 0, k, j, i), 0.0);
           });
     } else if (ix1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(
