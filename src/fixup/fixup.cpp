@@ -844,9 +844,6 @@ TaskStatus SourceFixup(T *rc) {
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
-  //StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  printf("rad: %i enabel src fixup: %i\n", rad_pkg->Param<bool>("active"),
-    fix_pkg->Param<bool>("enable_source_fixup"));
   if (!rad_pkg->Param<bool>("active")) {
     return TaskStatus::complete;
   }
@@ -863,9 +860,9 @@ TaskStatus SourceFixup(T *rc) {
   const int cmom_lo = imap[c::momentum].first;
   const int cmom_hi = imap[c::momentum].second;
   const int ceng = imap[c::energy].first;
-  auto idx_F = imap.GetFlatIdx(r::F);
   auto idx_E = imap.GetFlatIdx(r::E);
-  int ifail = imap[impl::fail].first;
+  auto idx_F = imap.GetFlatIdx(r::F);
+  int ifail = imap[ri::fail].first;
 
   bool report_source_fails = fix_pkg->Param<bool>("report_source_fails");
   printf("report src fails? %i\n", report_source_fails);
@@ -907,7 +904,7 @@ TaskStatus SourceFixup(T *rc) {
             const Real gdetjm1 = geom.DetG(CellLocation::Cent, k, j - 1, i);
             const Real gdetjp1 = geom.DetG(CellLocation::Cent, k, j + 1, i);
             v(b, iv, k, j, i) += gdet * (v(b, ifail, k, j - 1, i) * v(b, iv, k, j - 1, i) / gdetjm1 +
-                                 v(b, ifail, k, j + 1, i) * v(b, iv, k, j + 1, i) / gdetip1 );
+                                 v(b, ifail, k, j + 1, i) * v(b, iv, k, j + 1, i) / gdetjp1 );
             if (ndim == 3) {
               const Real gdetkm1 = geom.DetG(CellLocation::Cent, k - 1, j, i);
               const Real gdetkp1 = geom.DetG(CellLocation::Cent, k + 1, j, i);
