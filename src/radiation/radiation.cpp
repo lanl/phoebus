@@ -216,7 +216,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField("dN", mspecies_scalar);
     physics->AddField("Ns", mspecies_scalar);
 
-    std::vector<int> dNdlnu_size{NumRadiationTypes, nu_bins + 1};
+    std::vector<int> dNdlnu_size{NumRadiationTypes, params.Get<int>("nu_bins") + 1};
     Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
     physics->AddField("dNdlnu", mdNdlnu);
 
@@ -364,6 +364,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(i::kappaH, mSourceVar);
     physics->AddField(i::JBB, mSourceVar);
 
+    // this fail flag should really be an enum or something
+    // but parthenon doesn't yet support that kind of thing
+    Metadata m_scalar =
+        Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
+                  Metadata::Intensive, Metadata::FillGhost});
+    physics->AddField(i::fail, m_scalar);
+
     // Make Eddington tensor an independent quantity for MOCMC to supply
     if (method == "mocmc") {
       Metadata mspecies_three_tensor = Metadata(
@@ -409,7 +416,12 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+// TODO(BRR) check this
+#if USE_VALENCIA
+        v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
+#else
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
+#endif
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;

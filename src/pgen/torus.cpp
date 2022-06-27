@@ -29,10 +29,43 @@
 #include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
+#include "phoebus_utils/root_find.hpp"
+#include "radiation/radiation.hpp"
 
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 namespace torus {
+
+using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
+
+using namespace radiation;
+using namespace singularity;
+using namespace singularity::neutrinos;
+
+class GasRadTemperatureResidual {
+ public:
+  KOKKOS_FUNCTION
+  GasRadTemperatureResidual(const Real Ptot, const Real rho, const Opacity &opac,
+                            const EOS &eos, RadiationType type, const Real Ye)
+      : Ptot_(Ptot), rho_(rho), opac_(opac), eos_(eos), type_(type), Ye_(Ye) {}
+
+  KOKKOS_INLINE_FUNCTION
+  Real operator()(const Real T) {
+    Real lambda[2] = {Ye_, 0.0};
+    return Ptot_ - (4. / 3. - 1.) * opac_.EnergyDensityFromTemperature(T, type_) -
+           eos_.PressureFromDensityTemperature(rho_, T, lambda);
+  }
+
+ private:
+  const Real Ptot_;
+  const Real rho_;
+  const Opacity &opac_;
+  const EOS &eos_;
+  const RadiationType type_;
+  const Real Ye_;
+};
+
+enum class InitialRadiation { none, thermal };
 
 // Prototypes
 // ----------------------------------------------------------------------
@@ -54,11 +87,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto rc = pmb->meshblock_data.Get().get();
 
+  bool do_rad = pmb->packages.Get("radiation")->Param<bool>("active");
+
   PackIndexMap imap;
-  auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
-                              fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
-                              fluid_prim::pressure, fluid_prim::temperature},
-                             imap);
+  auto v =
+      rc->PackVariables({fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
+                         fluid_prim::bfield, fluid_prim::ye, fluid_prim::pressure,
+                         fluid_prim::temperature, radmoment_prim::J, radmoment_prim::H},
+                        imap);
 
   const int irho = imap[fluid_prim::density].first;
   const int ivlo = imap[fluid_prim::velocity].first;
@@ -69,6 +105,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iye = imap[fluid_prim::ye].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
+
+  vpack_types::FlatIdx iJ({-1}, -1);
+  vpack_types::FlatIdx iH({-1}, -1);
+  if (do_rad) {
+    iJ = imap.GetFlatIdx(radmoment_prim::J);
+    iH = imap.GetFlatIdx(radmoment_prim::H);
+  }
+  const auto specB = iJ.GetBounds(1);
 
   // this only works with ideal gases
   // The Fishbone solver needs to know about Ye
@@ -102,6 +146,27 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
 
   auto geom = Geometry::GetCoordinateSystem(rc);
+
+  // Initialize radiation, if active
+  InitialRadiation init_rad;
+  StateDescriptor *opac = pmb->packages.Get("opacity").get();
+  Opacity d_opacity;
+  if (do_rad) {
+    d_opacity = opac->Param<Opacity>("d.opacity");
+    const std::string init_rad_str =
+        pin->GetOrAddString("torus", "initial_radiation", "None");
+    if (init_rad_str == "None") {
+      init_rad = InitialRadiation::none;
+    } else if (init_rad_str == "thermal") {
+      init_rad = InitialRadiation::thermal;
+    } else {
+      PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
+    }
+  }
+  /// TODO: (LFR) Fix this junk
+  RadiationType d_species[3] = {species[0], species[1], species[2]};
+  auto &unit_conv =
+      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
   // set up transformation stuff
   auto gpkg = pmb->packages.Get("geometry");
@@ -198,6 +263,60 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i),
                                                               v(itmp, k, j, i), lambda);
 
+        // Radiation
+        if (do_rad) {
+
+          Real r = tr.bl_radius(x1v);
+          Real th = tr.bl_theta(x1v, x2v);
+          Real lnh = -1.0;
+          Real uphi;
+          if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
+
+          // Set radiation inside the disk according to the Fishbone gas solution
+          if (lnh > 0.0) {
+
+            // TODO(BRR) only first species right now
+            for (int ispec = specB.s; ispec < 1; ispec++) {
+              // Given total pressure, calculate temperature such that fluid and radiation
+              // pressures sum to total pressure
+              // TODO(BRR) Generalize to all neutrino species
+              const Real Ptot = v(iprs, k, j, i);
+              const Real T = v(itmp, k, j, i);
+              const Real Ye = iye > 0 ? v(iye, k, j, i) : 0.5;
+
+              root_find::RootFind root_find;
+              GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity,
+                                            eos, d_species[ispec], Ye);
+              v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
+
+              // Set fluid u/P/T and radiation J using equilibrium temperature
+              v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
+                  v(itmp, k, j, i), d_species[ispec]);
+              Real lambda[2] = {Ye, 0.0};
+              v(ieng, k, j, i) =
+                  v(irho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
+                                         v(irho, k, j, i), v(itmp, k, j, i), lambda);
+              v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
+                  v(irho, k, j, i), v(itmp, k, j, i), lambda);
+
+              // Zero comoving frame fluxes
+              v(iH(0, ispec), k, j, i) = 0.0;
+              v(iH(1, ispec), k, j, i) = 0.0;
+              v(iH(2, ispec), k, j, i) = 0.0;
+            }
+          } else {
+            // In the atmosphere set some small radiation energy
+            for (int ispec = specB.s; ispec < 1; ispec++) {
+              v(iJ(ispec), k, j, i) = 1.e-5 * v(ieng, k, j, i);
+
+              // Zero comoving frame fluxes
+              v(iH(0, ispec), k, j, i) = 0.0;
+              v(iH(1, ispec), k, j, i) = 0.0;
+              v(iH(2, ispec), k, j, i) = 0.0;
+            }
+          }
+        }
+
         rng_pool.free_state(rng_gen);
       });
 
@@ -238,6 +357,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
 
   fluid::PrimitiveToConserved(rc);
+  if (do_rad) {
+    radiation::MomentPrim2Con(rc);
+  }
 }
 
 void ProblemModifier(ParameterInput *pin) {
@@ -268,10 +390,20 @@ void ProblemModifier(ParameterInput *pin) {
            "\tThis translates to x1min, x1max = %g %g\n",
            std::exp(x1min), x1min, x1max);
   }
+
+  // Set Cv properly for radiation
+  const bool do_rad = pin->GetOrAddBoolean("physics", "rad", false);
+  if (do_rad) {
+    const std::string eos_type = pin->GetString("eos", "type");
+    if (eos_type == "IdealGas") {
+      const Real Gamma = pin->GetReal("eos", "Gamma");
+      const Real cv = (Gamma - 1.) * pc::kb / pc::mp;
+      pin->SetReal("eos", "Cv", cv);
+    }
+  }
 }
 
 void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
-
   const bool magnetized = pin->GetOrAddBoolean("torus", "magnetized", true);
   const Real beta_target = pin->GetOrAddReal("torus", "target_beta", 100.);
   const bool harm_style_beta =

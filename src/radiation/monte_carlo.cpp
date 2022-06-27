@@ -312,7 +312,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
               for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
                 // detG is in both numerator and denominator
-                v(mu, k, j, i) += 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
+                v(mu, k, j, i) -= 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
               }
               // TODO(BRR) lepton sign
               v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
@@ -432,13 +432,13 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real xabs = -log(rng_gen.drand());
             if (xabs <= dtau_abs) {
               // Deposit energy-momentum and lepton number in fluid
-              Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)), -1. / d4x * weight(n) * k0(n));
+              Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)), 1. / d4x * weight(n) * k0(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 1, k, j, i)),
-                                 -1. / d4x * weight(n) * k1(n));
+                                 1. / d4x * weight(n) * k1(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 2, k, j, i)),
-                                 -1. / d4x * weight(n) * k2(n));
+                                 1. / d4x * weight(n) * k2(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
-                                 -1. / d4x * weight(n) * k3(n));
+                                 1. / d4x * weight(n) * k3(n));
               // TODO(BRR) Add Ucon[0] in the below
               Kokkos::atomic_add(&(v(iGye, k, j, i)), 1. / d4x * weight(n) * mp_code);
 

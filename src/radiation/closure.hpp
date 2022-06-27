@@ -150,6 +150,9 @@ KOKKOS_FUNCTION ClosureEdd<Vec, Tens2, SET>::ClosureEdd(const Vec con_v_in,
   SPACELOOP(i) v2 += con_v(i) * cov_v(i);
   W = 1 / std::sqrt(1 - v2);
   W2 = W * W;
+  if (std::isinf(W)) {
+    printf("conv: %e %e %e covv: %e %e %e, v2 = %e\n", con_v(0), con_v(1), con_v(2), cov_v(0), cov_v(1), cov_v(2), v2);
+  }
 }
 
 template <class Vec, class Tens2, class SET>
@@ -269,6 +272,11 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Prim2Con(const Real J
     *E = (4 * W2 - 1 + 3 * W2 * vvPi) / 3 * J + 2 * W * vH;
   } else if (SET::eqn_type == ClosureEquation::number_conserve) {
     *E = W * J + vH;
+  }
+  if (std::isnan(*E)) {
+    printf("E: %e J: %e covH: %e %e %e W2: %e vvPi: %e W: %e vH: %e\n",
+      *E, J, cov_H(0), cov_H(1), cov_H(2), W2, vvPi, W, vH);
+    PARTHENON_FAIL("nan in p2c");
   }
   SPACELOOP(i)
   (*cov_F)(i) =

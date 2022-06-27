@@ -21,6 +21,7 @@ import regression_test as rt
 parser = argparse.ArgumentParser(description='Run a homogeneous sphere')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
 parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
+parser.add_argument('--use_mpiexec', dest='use_mpiexec', action='store_true')
 parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../inputs/homogeneous_sphere.pin'))
 parser.add_argument('--executable', type=str, default=None)
 parser.add_argument('--build_type', type=str, default='Release', choices=['Debug, Release'])
@@ -44,6 +45,7 @@ code = rt.gold_comparison(variables=['r.p.J', 'r.p.H'],
                           executable=args.executable,
                           geometry='SphericalMinkowski',
                           use_gpu=args.use_gpu,
+                          use_mpiexec=args.use_mpiexec,
                           build_type=args.build_type, 
                           upgold=args.upgold,
                           compression_factor=10)
