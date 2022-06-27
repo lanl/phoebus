@@ -845,7 +845,9 @@ TaskStatus SourceFixup(T *rc) {
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
   //StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  if (rad_pkg->Param<bool>("active")) {
+  printf("rad: %i enabel src fixup: %i\n", rad_pkg->Param<bool>("active"),
+    fix_pkg->Param<bool>("enable_source_fixup"));
+  if (!rad_pkg->Param<bool>("active")) {
     return TaskStatus::complete;
   }
   bool enable_source_fixup = fix_pkg->Param<bool>("enable_source_fixup");
@@ -866,6 +868,7 @@ TaskStatus SourceFixup(T *rc) {
   int ifail = imap[impl::fail].first;
 
   bool report_source_fails = fix_pkg->Param<bool>("report_source_fails");
+  printf("report src fails? %i\n", report_source_fails);
   if (report_source_fails) {
     int nfail_total;
     parthenon::par_reduce(
