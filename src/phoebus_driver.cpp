@@ -418,6 +418,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
     using MDT = std::remove_pointer<decltype(sc0.get())>::type;
 
+    // Need send/recv here?
+
     // fill in derived fields
     auto fill_derived = tl.AddTask(
         none, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
@@ -441,9 +443,16 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       fixup = fixup | impl_update;
     }
 
+    // Need send/recv here?
+
+    // Fixup for interaction failures
+    auto src_fixup = tl.AddTask(fixup, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get());
+
+    // Need send/recv here?
+
     // fill in derived fields after source update
     auto fill_derived_2 = tl.AddTask(
-        fixup, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+        src_fixup, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
 
     auto fixup_2 = tl.AddTask(
         fill_derived_2, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());

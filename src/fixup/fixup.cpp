@@ -53,10 +53,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool enable_floors = pin->GetOrAddBoolean("fixup", "enable_floors", false);
   bool enable_c2p_fixup = pin->GetOrAddBoolean("fixup", "enable_c2p_fixup", false);
   params.Add("enable_c2p_fixup", enable_c2p_fixup);
+  bool enable_source_fixup = pin->GetOrAddBoolean("fixup", "enable_source_fixup", false);
+  params.Add("enable_source_fixup", enable_source_fixup);
   bool enable_ceilings = pin->GetOrAddBoolean("fixup", "enable_ceilings", false);
   params.Add("enable_ceilings", enable_ceilings);
   bool report_c2p_fails = pin->GetOrAddBoolean("fixup", "report_c2p_fails", false);
   params.Add("report_c2p_fails", report_c2p_fails);
+  bool report_source_fails = pin->GetOrAddBoolean("fixup", "report_source_fails", false);
+  params.Add("report_source_fails", report_source_fails);
   bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
   params.Add("enable_mhd_floors", enable_mhd_floors);
   bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", false);
@@ -822,5 +826,121 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 
 template TaskStatus
 ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+
+// If radiation source terms fail (probably due to a rootfind failing to converge) average
+// the de-densitized conserved variables over good neighbors
+template <typename T>
+TaskStatus SourceFixup(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
+  namespace impl = internal_variables;
+  namespace r = radmoment_cons;
+  namespace ri = radmoment_internal;
+  auto *pmb = rc->GetParentPointer().get();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
+  //StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  if (rad_pkg->Param<bool>("active")) {
+    return TaskStatus::complete;
+  }
+  bool enable_source_fixup = fix_pkg->Param<bool>("enable_source_fixup");
+  if (!enable_source_fixup) {
+    return TaskStatus::complete;
+  }
+
+  const std::vector<std::string> vars({c::momentum, c::energy, r::F, r::E, ri::fail});
+
+  PackIndexMap imap;
+  auto v = rc->PackVariables(vars, imap);
+
+  const int cmom_lo = imap[c::momentum].first;
+  const int cmom_hi = imap[c::momentum].second;
+  const int ceng = imap[c::energy].first;
+  auto idx_F = imap.GetFlatIdx(r::F);
+  auto idx_E = imap.GetFlatIdx(r::E);
+  int ifail = imap[impl::fail].first;
+
+  bool report_source_fails = fix_pkg->Param<bool>("report_source_fails");
+  if (report_source_fails) {
+    int nfail_total;
+    parthenon::par_reduce(
+        parthenon::loop_pattern_mdrange_tag, "Source fixup failures",
+        DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+          if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
+            nf++;
+          }
+        },
+        Kokkos::Sum<int>(nfail_total));
+    printf("total source nfail: %i\n", nfail_total);
+  }
+
+  const int ndim = pmb->pmy_mesh->ndim;
+  const int nspec = idx_E.DimSize(1);
+
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  Coordinates_t coords = rc->GetParentPointer().get()->coords;
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "Source fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+//        Real eos_lambda[2]; // use last temp as initial guess
+//        eos_lambda[0] = 0.5;
+//        eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
+
+        auto fixup = [&](const int iv, const Real inv_mask_sum) {
+          const Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
+          const Real gdetim1 = geom.DetG(CellLocation::Cent, k, j, i - 1);
+          const Real gdetip1 = geom.DetG(CellLocation::Cent, k, j, i + 1);
+          v(b, iv, k, j, i) = gdet * (v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) / gdetim1 +
+                              v(b, ifail, k, j, i + 1) * v(b, iv, k, j, i + 1) / gdetip1 );
+          if (ndim > 1) {
+            const Real gdetjm1 = geom.DetG(CellLocation::Cent, k, j - 1, i);
+            const Real gdetjp1 = geom.DetG(CellLocation::Cent, k, j + 1, i);
+            v(b, iv, k, j, i) += gdet * (v(b, ifail, k, j - 1, i) * v(b, iv, k, j - 1, i) / gdetjm1 +
+                                 v(b, ifail, k, j + 1, i) * v(b, iv, k, j + 1, i) / gdetip1 );
+            if (ndim == 3) {
+              const Real gdetkm1 = geom.DetG(CellLocation::Cent, k - 1, j, i);
+              const Real gdetkp1 = geom.DetG(CellLocation::Cent, k + 1, j, i);
+              v(b, iv, k, j, i) += gdet * (v(b, ifail, k - 1, j, i) * v(b, iv, k - 1, j, i) / gdetkm1 +
+                                   v(b, ifail, k + 1, j, i) * v(b, iv, k + 1, j, i) / gdetkp1);
+            }
+          }
+          return inv_mask_sum * v(b, iv, k, j, i);
+        };
+        if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
+          Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
+          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
+          if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+          if (num_valid > 0.5) {
+            const Real norm = 1.0 / num_valid;
+
+            v(b, ceng, k, j, i) = fixup(ceng, norm);
+            for (int cv = cmom_lo; cv <= cmom_hi; cv++) {
+              v(b, cv, k, j, i) = fixup(cv, norm);
+            }
+            for (int ispec = 0; ispec < nspec; ispec++) {
+              v(b, idx_E(ispec), k, j, i) = fixup(idx_E(ispec), norm);
+              SPACELOOP(ii) {
+                v(b, idx_F(ispec, ii), k, j, i) = fixup(idx_F(ispec, ii), norm);
+              }
+            }
+          } else {
+            // No valid neighbors; not sure what to do here
+          }
+        }
+      });
+
+  return TaskStatus::complete;
+}
+
+template TaskStatus
+SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 } // namespace fixup

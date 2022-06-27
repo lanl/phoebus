@@ -364,6 +364,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(i::kappaH, mSourceVar);
     physics->AddField(i::JBB, mSourceVar);
 
+    // this fail flag should really be an enum or something
+    // but parthenon doesn't yet support that kind of thing
+    Metadata m_scalar =
+        Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
+                  Metadata::Intensive, Metadata::FillGhost});
+    physics->AddField(i::fail, m_scalar);
+
     // Make Eddington tensor an independent quantity for MOCMC to supply
     if (method == "mocmc") {
       Metadata mspecies_three_tensor = Metadata(
@@ -412,7 +419,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
 // TODO(BRR) check this
 #if USE_VALENCIA
         v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
-#else 
+#else
         v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
 #endif
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;

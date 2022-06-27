@@ -29,6 +29,8 @@ template <typename T>
 TaskStatus ApplyFloors(T *rc);
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc);
+template <typename T>
+TaskStatus SourceFixup(T *rc);
 
 static struct ConstantRhoSieFloor {
 } constant_rho_sie_floor_tag;
