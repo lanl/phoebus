@@ -14,10 +14,17 @@
 // stdlib
 #include <cmath>
 #include <cstdio>
+#include <iostream>
+#include <limits>
 #include <memory>
 #include <sstream>
+#include <string>
+#include <utility>
+#include <iostream>
+#include <fstream>
 
 // Parthenon
+#include <globals.hpp>
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
@@ -103,9 +110,6 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   if (!monopole_enabled) return TaskStatus::complete;
 
   auto model_filename = params.Get<std::string>("model_filename");
-
-  printf("Filename",model_filename);
-
   auto npoints = params.Get<int>("npoints");
   auto radius = monopolepkg->Param<MonopoleGR::Radius>("radius");
 
@@ -115,9 +119,9 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   const Real dr = radius.dx();
 
   // read 1d model
-  const int num_zones = CCSN::Get1DProfileNumZones(model_filename);
+  const int num_zones = CCSN::Get1DProfileNumZones(model_filename.c_str());
 
-  printf("1D model read in",num_zones,"number of zones.");    
+  //printf("%s:%i model_filename = %s\n", __FILE__, __LINE__, model_filename.c_str());
 
   // const Real model_1d[9][num_zones] = {{CCSN::Get1DProfileData("model_filename",num_zones)}};
 

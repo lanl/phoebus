@@ -35,14 +35,14 @@ constexpr int grav = 6;
 constexpr int entr = 7;
 
 KOKKOS_INLINE_FUNCTION 
-int Get1DProfileNumZones(const std::string model_filename){
+int Get1DProfileNumZones(const std::string &model_filename){
 
-    // open file					    
-    std::ifstream inputfile(model_filename);
+    // open file
+    std::ifstream inputfile( model_filename.c_str() );
 
     // error check    
     if (!inputfile.is_open()) 
-        std::cout<<"Error opening file",model_filename;
+        printf("%s:%i model_filename not found = %s\n", __FILE__, __LINE__, model_filename.c_str());
     	return 0;
 
     const int num_vars = 9; // 8 + radius
