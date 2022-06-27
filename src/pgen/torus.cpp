@@ -210,7 +210,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             Real lnh = -1.0;
             Real uphi;
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
-            uphi = 0.0;
 
             if (lnh > 0.0) {
               Real hm1 = std::exp(lnh) - 1.;
