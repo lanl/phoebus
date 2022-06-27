@@ -31,10 +31,15 @@ namespace radiation {
 using namespace singularity::neutrinos;
 using singularity::EOS;
 
-class InteractionFourMomResidual {
+/*class InteractionFourMomResidual {
   public:
   KOKKOS_FUNCTION
   InteractionFourMomResidual() {}
+
+//void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
+//         const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
+//         const Real gcon[3][3], const Real beta[], const Real &alpha, const Real &gdet,
+//         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig = nullptr) {
 
   KOKKOS_INLINE_FUNCTION
   void Residual(Real x[4], Real resid[4]) {
@@ -51,7 +56,10 @@ class InteractionFourMomResidual {
       }
     }
   }
-};
+
+  private:
+  const Real &rho_;
+};*/
 
 class InteractionTResidual {
  public:
@@ -1053,6 +1061,182 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
   //  InteractionUpdateType interaction_update = InteractionUpdateType::explicit;
 
+//void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
+//         const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
+//         const Real gcon[3][3], const Real beta[], const Real &alpha, const Real &gdet,
+//         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig = nullptr) {
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
+      nblock - 1, // Loop over blocks
+      kb.s, kb.e, // z-loop
+      jb.s, jb.e, // y-loop
+      ib.s, ib.e, // x-loop
+      KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
+
+        // TODO(BRR) turn this into a loop
+        const int ispec = 0;
+
+        // Geometry
+        Tens2 cov_gamma;
+        geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+        Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
+        Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
+
+        // Write out rootfind explicitly to include fixups
+
+        Real rho = v(iblock, prho, k, j, i);
+        Real ug = v(iblock, peng, k, j, i);
+        Real Tg = v(iblock, pT, k, j, i);
+        Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
+        Real lambda[2] = {Ye, 0.};
+        Real J = v(iblock, idx_J(ispec), k, j, i);
+        Real cov_H[3] = {v(iblock, idx_H(0, ispec), k, j, i),
+                     v(iblock, idx_H(1, ispec), k, j, i),
+                     v(iblock, idx_H(2, ispec), k, j, i)};
+        Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                                v(iblock, pv(2), k, j, i)};
+        Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+        Real con_v[3] = {con_vp[0] / W, con_vp[1] / W, con_vp[2] / W};
+        Real cov_v[3] = {0};
+        SPACELOOP2(ii, jj) {
+          cov_v[ii] += cov_gamma(ii,jj)*con_v[jj];
+        }
+        //Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+        //Vec cov_v
+        Real vdH = 0.;
+        SPACELOOP(ii) {
+          vdH += con_v[ii]*cov_H[ii];
+        }
+
+        // Radiation source terms; initially set from current radiation primitives
+        Real dS[4];
+        Real kappaH =
+          d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, Ye, species_d[ispec]);
+        Real kappaJ = (1. - scattering_fraction)*kappaH;
+        Real JBB = d_opacity.EnergyDensityFromTemperature(Tg, species_d[ispec]);
+
+        dS[0] = alpha * sdetgam * (kappaJ*W*(JBB - J) - kappaH*vdH);
+        SPACELOOP(ii) {
+          dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH*cov_H[ii]);
+        }
+
+        Real Ug0[4] = {v(iblock, ceng, k, j, i), v(iblock, cmom_lo, k, j, i),
+                       v(iblock, cmom_lo + 1, k, j, i), v(iblock, cmom_lo + 2, k, j, i)};
+        Real Ug1[4];
+        Real resid[4];
+        for (int n = 0; n < 4; n++) {
+          Ug1[n] = Ug0[n];
+          resid[n] = Ug1[n] - Ug0[n] - dt * dS[n];
+        }
+
+        Real err = robust::SMALL();
+        for (int n = 0; n < 4; n++) {
+          printf("resid: %e denom: %e\n", resid[n], std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
+          Real suberr = std::fabs(resid[n]) / (std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
+          if (suberr > err) {
+            err = suberr;
+          }
+        }
+class SourceResidual4 {
+
+  KOKKOS_FUNCTION
+  SourceResidual4(EOS &eos, Opacity &opac, MeanOpacity &mopac, const Real rho, const Real Ye,
+  const RadiationType species) :
+  eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), species_(species) {
+    lambda_[0] = Ye;
+    lambda_[1] = 0.;
+    }
+
+  KOKKOS_INLINE_FUNCTION
+  void CalculateFluidConserved(Real P[4], Real U[4]) {
+    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, P[0]/rho_, lambda_);
+    Real gam1 = eos.BulkModulusFromDensityInternalEnergy(rho_, P[0]/rho_, lambda_) / Pg;
+    Real D;
+    Real bcons[3];
+    fluid::p2c(rho_, &(P[1]), b_, P[0], lambda_[0], Pg, gam1, gcov_, gammacon_, betacon_, alpha_,
+      gammadet_, D, &(U[1]), bcons, U[0], ye_cons);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void CalculateSource(Real Pg[4], Real Pr[4], Real S[4]) {
+    Real Tg = eos.TemperatureFromDensityInternalEnergy(rho_, P[0]/rho_, lambda_);
+    Real JBB = opac.EnergyDensityFromTemperature(Tg, species_);
+    Real kappaH =
+      mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
+    Real kappaJ = (1. - scattering_fraction_)*kappaH;
+
+    // TODO(BRR) need J1 not J0!
+    dS[0] = alpha_ * sdetgam_ * (kappaJ*W*(JBB - J) - kappaH*vdH);
+    SPACELOOP(ii) {
+      dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH*cov_H[ii]);
+    }
+  }
+
+
+  private:
+  const EOS &eos_;
+  const Opacity &opac_;
+  const MeanOpacity &mopac_;
+  const Real rho_;
+  Real b_[3];
+  const RadiationType species_;
+  const Real scattering_fraction_;
+  Real lambda_[2];
+
+// TODO(BRR) do this without copying memory?
+  Real gcov_[4][4];
+  Real gammacon_[3][3];
+  const Real alpha_;
+  Real beta_[3];
+  const Real sdetgam_;
+
+};
+
+        // Numerically calculate Jacobian
+        Real jac[4][4] = {0};
+        constexpr Real EPS = 1.e-8;
+        pm[4] = {(1. - EPS)*ug, (1. - EPS) * con_vp[0], (1. - EPS) * con_vp[1], (1. - EPS) * con_vp[2]};
+        pp[4] = {(1. + EPS)*ug, (1. + EPS) * con_vp[0], (1. + EPS) * con_vp[1], (1. + EPS) * con_vp[2]};
+        for (int m = 0; m < 4; m++) {
+          calc_mhd_cons(pm, Ug1m);
+          calc_mhd_cons(pp, Ug1p);
+          // From MHD cons, get rad cons, from rad cons get rad prim
+          calc_src(pm, dSm);
+          calc_src(pp, dSp);
+
+          Real Ug1p[4];
+          Real Ug1m[4];
+//void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
+//         const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
+//         const Real gcon[3][3], const Real beta[], const Real &alpha, const Real &gdet,
+//         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig = nullptr) {
+          Real dSp[4];
+          Real dSm[4];
+          Real Tgp = eos.TemperatureFromDensityInternalEnergy(rho, pp[0]/rho, lambda);
+          Real JBBp = d_opacity.EnergyDensityFromTemperature(Tgp, species_d[ispec]);
+          // TODO(BRR) update kappa with updated T
+          dS[0] = alpha * sdetgam * (kappaJ*Wp*(JBBp - J) - kappaH*vdHp);
+          SPACELOOP(ii) {
+            dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH*cov_H[ii]);
+          }
+
+          Real fp = Ug1p[n] - Ug0[n] - dSp[n];
+          Real fm = Ug1m[n] - Ug0[n] - dSm[n];
+          for (int n = 0; n < 4; n++) {
+            jac[m][n] = fp - fm / (pp[n] - pm[n]);
+          }
+        }
+
+        printf("J: %e JBB: %e\n", J, JBB);
+        printf("kappaJ: %e kappaH: %e\n", kappaJ, kappaH);
+        printf("ds: %e %e %e %e dt: %e\n", dS[0], dS[1], dS[2], dS[3], dt);
+        printf("err: %e\n", err);
+        exit(-1);
+
+
+      });
+  return TaskStatus::complete;
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
@@ -1092,11 +1276,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                              1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
 
         // Practice multiD rootfind
-        root_find::MultiDRootFind<4> md_root_find;
-        InteractionFourMomResidual resid;
-        Real guess[4] = {0};
-        Real ans[4] = {0};
-        md_root_find.newton(resid, 1.e-8, guess, ans);
+//        root_find::MultiDRootFind<4> md_root_find;
+//        InteractionFourMomResidual resid;
+//        Real guess[4] = {0};
+//        Real ans[4] = {0};
+//        md_root_find.newton(resid, 1.e-8, guess, ans);
 
         // If rootfind fails assume thermal equilibrium?
 
