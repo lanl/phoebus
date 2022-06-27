@@ -474,9 +474,9 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         if (ndim > 1)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
 
-        if (j > 50 && j < 70 && n >= nrecon) {
-          printf("[%i] pv: %e %e %e vl: %e vr: %e\n", n, pvjm1[75], pv[75], pvjp1[75], vj_l[75], vj_r[75]);
-        }
+        //if (j > 50 && j < 70 && n >= nrecon) {
+        //  printf("[%i] pv: %e %e %e vl: %e vr: %e\n", n, pvjm1[75], pv[75], pvjp1[75], vj_l[75], vj_r[75]);
+        //}
         // z-direction
         if (ndim > 2)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
@@ -676,12 +676,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
-          if (idir == 1 && i == 75 && j > 50 && j < 70 && ispec == 0) {
-            printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
-            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
-              con_vl(0), con_vl(1), con_vl(2),
-              con_vr(0), con_vr(1), con_vr(2));
-          }
+//          if (idir == 1 && i == 75 && j > 50 && j < 70 && ispec == 0) {
+//            printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
+//            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
+//              con_vl(0), con_vl(1), con_vl(2),
+//              con_vr(0), con_vr(1), con_vr(2));
+//          }
 
           // Calculate the geometric mean of the opacity on either side of the interface,
           // this is necessary for handling the asymptotic limit near sharp surfaces
