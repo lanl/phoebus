@@ -31,6 +31,28 @@ namespace radiation {
 using namespace singularity::neutrinos;
 using singularity::EOS;
 
+class InteractionFourMomResidual {
+  public:
+  KOKKOS_FUNCTION
+  InteractionFourMomResidual() {}
+
+  KOKKOS_INLINE_FUNCTION
+  void Residual(Real x[4], Real resid[4]) {
+    for (int i = 0; i < 4; i++) {
+      resid[i] = 0.;
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void Jacobian(Real x[4], Real jac[4][4]) {
+    for (int i = 0; i < 4; i++) {
+      for (int j = 0; j < 4; j++) {
+        jac[i][j] = 0.;
+      }
+    }
+  }
+};
+
 class InteractionTResidual {
  public:
   KOKKOS_FUNCTION
@@ -451,6 +473,10 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // y-direction
         if (ndim > 1)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
+
+        if (j > 50 && j < 70 && n >= nrecon) {
+          printf("[%i] pv: %e %e %e vl: %e vr: %e\n", n, pvjm1[75], pv[75], pvjp1[75], vj_l[75], vj_r[75]);
+        }
         // z-direction
         if (ndim > 2)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
@@ -537,6 +563,7 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
 
   // printf("skipping radiation fluxes\n");
   // return TaskStatus::complete;
@@ -640,10 +667,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           const Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i),
                                    v(idx_qrv(1, idir), k, j, i),
                                    v(idx_qrv(2, idir), k, j, i)};
-          /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
-            printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e\n",
-            k,j,i,Jl,Jr,Hl(0),Hl(1),Hl(2),Hr(0),Hr(1),Hr(2));
-          }*/
           const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
           const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
           Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
@@ -653,13 +676,19 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
+          if (idir == 1 && i == 75 && j > 50 && j < 70 && ispec == 0) {
+            printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
+            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
+              con_vl(0), con_vl(1), con_vl(2),
+              con_vr(0), con_vr(1), con_vr(2));
+          }
+
           // Calculate the geometric mean of the opacity on either side of the interface,
           // this is necessary for handling the asymptotic limit near sharp surfaces
           Real kappaH = sqrt((v(idx_kappaH(ispec), k, j, i) *
                               v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
 
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
-          // const Real a = 1.;
 
           // Calculate the observer frame quantities on either side of the interface
           /// TODO: (LFR) Add other contributions to the asymptotic flux
@@ -782,6 +811,7 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -950,6 +980,7 @@ TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
@@ -1045,7 +1076,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         }
 
         const Real dtau = alpha * dt / W;
-          
+
         const Real rho = v(iblock, prho, k, j, i);
         const Real ug = v(iblock, peng, k, j, i);
         const Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
@@ -1058,6 +1089,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         const Real T1 =
             root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
                              1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
+
+        // Practice multiD rootfind
+        root_find::MultiDRootFind<4> md_root_find;
+        InteractionFourMomResidual resid;
+        Real guess[4] = {0};
+        Real ans[4] = {0};
+        md_root_find.newton(resid, 1.e-8, guess, ans);
 
         // If rootfind fails assume thermal equilibrium?
 

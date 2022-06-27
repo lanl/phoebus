@@ -18,6 +18,102 @@ namespace root_find {
 
 enum class RootFindStatus { success, failure };
 
+KOKKOS_INLINE_FUNCTION
+Real MINOR(Real m[16], int r0, int r1, int r2, int c0, int c1, int c2) {
+return m[4*r0+c0]*(m[4*r1+c1]*m[4*r2+c2] - m[4*r2+c1]*m[4*r1+c2]) -
+         m[4*r0+c1]*(m[4*r1+c0]*m[4*r2+c2] - m[4*r2+c0]*m[4*r1+c2]) +
+         m[4*r0+c2]*(m[4*r1+c0]*m[4*r2+c1] - m[4*r2+c0]*m[4*r1+c1]);
+}
+
+KOKKOS_INLINE_FUNCTION
+void adjoint(Real m[16], Real adjOut[16]) {
+  adjOut[ 0] =  MINOR(m,1,2,3,1,2,3);
+  adjOut[ 1] = -MINOR(m,0,2,3,1,2,3);
+  adjOut[ 2] =  MINOR(m,0,1,3,1,2,3);
+  adjOut[ 3] = -MINOR(m,0,1,2,1,2,3);
+
+  adjOut[ 4] = -MINOR(m,1,2,3,0,2,3);
+  adjOut[ 5] =  MINOR(m,0,2,3,0,2,3);
+  adjOut[ 6] = -MINOR(m,0,1,3,0,2,3);
+  adjOut[ 7] =  MINOR(m,0,1,2,0,2,3);
+
+  adjOut[ 8] =  MINOR(m,1,2,3,0,1,3);
+  adjOut[ 9] = -MINOR(m,0,2,3,0,1,3);
+  adjOut[10] =  MINOR(m,0,1,3,0,1,3);
+  adjOut[11] = -MINOR(m,0,1,2,0,1,3);
+
+  adjOut[12] = -MINOR(m,1,2,3,0,1,2);
+  adjOut[13] =  MINOR(m,0,2,3,0,1,2);
+  adjOut[14] = -MINOR(m,0,1,3,0,1,2);
+  adjOut[15] =  MINOR(m,0,1,2,0,1,2);
+}
+
+KOKKOS_INLINE_FUNCTION
+Real determinant(Real m[16])
+{
+  return m[0]*MINOR(m,1,2,3,1,2,3) -
+         m[1]*MINOR(m,1,2,3,0,2,3) +
+         m[2]*MINOR(m,1,2,3,0,1,3) -
+         m[3]*MINOR(m,1,2,3,0,1,2);
+}
+
+KOKKOS_INLINE_FUNCTION
+void InvertMatrix(Real mat[4][4], Real matinv[4][4]) {
+  adjoint(&(mat[0][0]), &(matinv[0][0]));
+
+  Real det = determinant(&(mat[0][0]));
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 4; j++) {
+      matinv[i][j] /= det;
+    }
+  }
+}
+
+template <unsigned int N>
+struct MultiDRootFind {
+  KOKKOS_INLINE_FUNCTION
+  MultiDRootFind(int max_iterations = std::numeric_limits<int>::max()) : iteration_count(0), max_iter(max_iterations) {}
+
+  template <typename F>
+  KOKKOS_INLINE_FUNCTION void newton(F &func, const Real tol, const Real guess[N], Real ans[N]) {
+    for (int n = 0; n < N; n++) {
+      ans[n] = guess[n];
+    }
+
+    Real x[N];
+    for (int i = 0; i < N; i++) {
+      x[i] = guess[i];
+    }
+
+    Real resid[N];
+    Real jac[N][N];
+    Real jacinv[4][4];
+    Real norm;
+
+    do {
+      func.Residual(x, resid);
+      func.Jacobian(x, jac);
+
+      InvertMatrix(jac, jacinv);
+
+      for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+          x[i] -= jacinv[i][j]*resid[j];
+        }
+      }
+
+      norm = 0.;
+      for (int i = 0; i < N; i++) {
+        norm += resid[i]*resid[i];
+      }
+      norm = std::sqrt(norm);
+
+    } while (norm > tol);
+  }
+
+  int iteration_count, max_iter;
+};
+
 struct RootFind {
   KOKKOS_INLINE_FUNCTION
   RootFind(int max_iterations = std::numeric_limits<int>::max())
