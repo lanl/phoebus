@@ -60,6 +60,12 @@ Real LogLinearInterp(Real x, int sidx, int k, int j, int i, ParArrayND<Real> tab
   return (1. - dn) * table(n, sidx, k, j, i) + dn * table(n + 1, sidx, k, j, i);
 }
 
+enum class SourceStatus { success, failure };
+struct FailFlags {
+  static constexpr Real success = 1.0;
+  static constexpr Real fail = 0.0;
+};
+
 // Choice of RNG
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 

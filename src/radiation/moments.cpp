@@ -993,7 +993,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   namespace p = fluid_prim;
   std::vector<std::string> vars{cr::E,     cr::F,      p::density,  p::temperature,
                                 p::energy, p::ye,      p::velocity, pr::J,
-                                pr::H,     ir::kappaJ, ir::kappaH,  ir::JBB};
+                                pr::H,     ir::kappaJ, ir::kappaH,  ir::JBB, ir::fail};
   // printf("skipping fluid update\n"); update_fluid = false;
   if (update_fluid) {
     vars.push_back(c::energy);
@@ -1011,6 +1011,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
+  auto ifail = imap[ir::fail].first;
   auto pv = imap.GetFlatIdx(p::velocity);
 
   int prho = imap[p::density].first;
@@ -1137,8 +1138,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           if (v(iblock, ceng, k, j, i) < sdetgam * dE) {
             rescale = 0.95 * v(iblock, ceng, k, j, i) / (sdetgam * dE);
           }*/
+          // Success unless subsequent failure
+          v(iblock, ifail, k, j, i) = FailFlags::success;
 
           // Add source corrections to conserved iration variables
+          if (-sdetgam * dE > v(iblock, idx_E(ispec), k, j, i)) {
+            v(iblock, ifail, k, j, i) = FailFlags::fail;
+          }
           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
           for (int idir = 0; idir < 3; ++idir) {
             v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
@@ -1158,17 +1164,19 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 //    printf("T1: %e JBB: %e\n", T1, JBB);
 //    PARTHENON_FAIL("negative ceng");
 //  }
-            //v(iblock, ceng, k, j, i) -= sdetgam * dE;
-            v(iblock, ceng, k, j, i) -= dE;
+            if (sdetgam * dE > v(iblock, ceng, k, j, i)) {
+              v(iblock, ifail, k, j, i) = FailFlags::fail;
+            }
+            v(iblock, ceng, k, j, i) -= sdetgam * dE;
 #else
             // TODO(BRR) This is not correct
             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
 #endif
             SPACELOOP(ii) {
-              //v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii);
-              v(iblock, cmom_lo + ii, k, j, i) -= cov_dF(ii);
+              v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii);
             }
           }
+
         } // for ispec
 
         /* for (int ispec = 0; ispec < num_species; ++ispec) {
