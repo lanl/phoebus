@@ -33,7 +33,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("tlim", pin->GetReal("parthenon/time", "tlim"));
   params.Add("nlim", pin->GetReal("parthenon/time", "nlim"));
   params.Add("integrator", pin->GetString("parthenon/time", "integrator"));
-  params.Add("do_post_init_comms", pin->GetOrAddBoolean("phoebus","do_post_init_comms",false));
+  params.Add("do_post_init_comms",
+             pin->GetOrAddBoolean("phoebus", "do_post_init_comms", false));
 
   // Store unit conversions
   params.Add("unit_conv", phoebus::UnitConversions(pin));
