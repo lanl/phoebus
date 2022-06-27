@@ -154,6 +154,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("ix1_bc", ix1_bc);
   const std::string ox1_bc = pin->GetString("phoebus", "ox1_bc");
   params.Add("ox1_bc", ox1_bc);
+  const std::string ix2_bc = pin->GetString("phoebus", "ix2_bc");
+  params.Add("ix2_bc", ix2_bc);
+  const std::string ox2_bc = pin->GetString("phoebus", "ox2_bc");
+  params.Add("ox2_bc", ox2_bc);
 
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
