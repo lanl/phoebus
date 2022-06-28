@@ -17,6 +17,7 @@
 
 #include <singularity-eos/eos/eos.hpp>
 
+#include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/root_find.hpp"
 #include "radiation/closure.hpp"
@@ -25,6 +26,8 @@
 #include "radiation/local_three_geometry.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
+
+#include "fluid/prim2con.hpp"
 
 namespace radiation {
 
@@ -39,7 +42,8 @@ using singularity::EOS;
 //void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
 //         const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
 //         const Real gcon[3][3], const Real beta[], const Real &alpha, const Real &gdet,
-//         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig = nullptr) {
+//         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig = nullptr)
+{
 
   KOKKOS_INLINE_FUNCTION
   void Residual(Real x[4], Real resid[4]) {
@@ -60,6 +64,116 @@ using singularity::EOS;
   private:
   const Real &rho_;
 };*/
+
+template <typename CLOSURE>
+class SourceResidual4 {
+ public:
+  KOKKOS_FUNCTION
+  SourceResidual4(const EOS &eos, const Opacity &opac, const MeanOpacity &mopac,
+                  const Real rho, const Real Ye, const Real bprim[3],
+                  const RadiationType species, const Tens2 conTilPi,
+                  const Real gcov[4][4], const Real gammacon[3][3], const Real alpha,
+                  const Real beta[3], const Real sdetgam, const Real scattering_fraction,
+                  typename CLOSURE::LocalGeometryType &g, Real U_mhd_0[4], Real U_rad_0[4])
+      : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), species_(species),
+        conTilPi_(conTilPi), alpha_(alpha), sdetgam_(sdetgam),
+        scattering_fraction_(scattering_fraction), g_(g) {//, c_(con_v, g_) {
+    lambda_[0] = Ye;
+    lambda_[1] = 0.;
+    SPACELOOP(ii) {
+      bprim_[ii] = bprim[ii];
+      beta_[ii] = beta[ii];
+      SPACELOOP(jj) { gammacon_[ii][jj] = gammacon[ii][jj]; }
+    }
+    SPACETIMELOOP2(mu, nu) { gcov_[mu][nu] = gcov[mu][nu]; }
+    // TODO(BRR) A Vec-like object would be handy here for passing a reference
+    for (int n = 0; n < 4; n++) {
+      U_mhd_0_[n] = U_mhd_0[n];
+      U_rad_0_[n] = U_rad_0[n];
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void CalculateMHDConserved(Real P_mhd[4], Real U_mhd[4]) {
+    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, P_mhd[0] / rho_, lambda_);
+    Real gam1 =
+        eos_.BulkModulusFromDensityInternalEnergy(rho_, P_mhd[0] / rho_, lambda_) / Pg;
+    Real D;
+    Real bcons[3];
+    Real ye_cons;
+    prim2con::p2c(rho_, &(P_mhd[1]), bprim_, P_mhd[0], lambda_[0], Pg, gam1, gcov_,
+                  gammacon_, beta_, alpha_, sdetgam_, D, &(U_mhd[1]), bcons, U_mhd[0],
+                  ye_cons);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void CalculateRadConserved(Real U_mhd[4], Real U_rad[4]) {
+    for (int n = 0; n < 4; n++) {
+      U_rad[n] = U_rad_0_[n] - (U_mhd[n] - U_mhd_0_[n]);
+    }
+
+    SPACELOOP(ii) {
+    }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void CalculateRadPrimitive(Real P_mhd[4], Real U_rad[4], Real P_rad[4]) {
+    Vec cov_F{U_rad[1], U_rad[2], U_rad[3]};
+    Vec cov_H;
+    Vec con_v{P_mhd[1], P_mhd[2], P_mhd[3]};
+    CLOSURE c(con_v, &g_);
+    c.Con2Prim(U_rad[0], cov_F, conTilPi_, &(P_rad[0]), &cov_H);
+    SPACELOOP(ii) { P_rad[ii + 1] = cov_H(ii); }
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void CalculateSource(Real P_mhd[4], Real P_rad[4], Real S[4]) {
+    Real Tg = eos_.TemperatureFromDensityInternalEnergy(rho_, P_mhd[0] / rho_, lambda_);
+    Real JBB = opac_.EnergyDensityFromTemperature(Tg, species_);
+    Real kappaH =
+        mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
+    Real kappaJ = (1. - scattering_fraction_) * kappaH;
+    Real W = 0.;
+    SPACELOOP2(ii, jj) { W += gcov_[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
+    W = std::sqrt(1. + W);
+    Real cov_v[3] = {0};
+    SPACELOOP2(ii, jj) {
+      cov_v[ii] += gcov_[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1] / (W * W);
+    }
+    Real vdH = 0.;
+    SPACELOOP(ii) { vdH += P_mhd[ii + 1] * P_rad[ii + 1]; }
+
+    S[0] = alpha_ * sdetgam_ * (kappaJ * W * (JBB - P_rad[0]) - kappaH * vdH);
+    SPACELOOP(ii) {
+      S[ii + 1] = alpha_ * sdetgam_ *
+                  (kappaJ * W * cov_v[ii] * (JBB - P_rad[0]) - kappaH * P_rad[1 + ii]);
+    }
+  }
+
+ private:
+  const EOS &eos_;
+  const Opacity &opac_;
+  const MeanOpacity &mopac_;
+  const Real rho_;
+  Real bprim_[3];
+  const RadiationType species_;
+  const Real scattering_fraction_;
+  Real lambda_[2];
+
+  // TODO(BRR) do this without copying memory?
+  Real gcov_[4][4];
+  Real gammacon_[3][3];
+  const Real alpha_;
+  Real beta_[3];
+  const Real sdetgam_;
+
+  const Tens2 &conTilPi_;
+  typename CLOSURE::LocalGeometryType &g_; //(geom, CellLocation::Cent, 0, b, j, i);
+  //CLOSURE c_;
+
+  Real U_mhd_0_[4];
+  Real U_rad_0_[4];
+};
 
 class InteractionTResidual {
  public:
@@ -482,8 +596,9 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         if (ndim > 1)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
 
-        //if (j > 50 && j < 70 && n >= nrecon) {
-        //  printf("[%i] pv: %e %e %e vl: %e vr: %e\n", n, pvjm1[75], pv[75], pvjp1[75], vj_l[75], vj_r[75]);
+        // if (j > 50 && j < 70 && n >= nrecon) {
+        //  printf("[%i] pv: %e %e %e vl: %e vr: %e\n", n, pvjm1[75], pv[75], pvjp1[75],
+        //  vj_l[75], vj_r[75]);
         //}
         // z-direction
         if (ndim > 2)
@@ -684,12 +799,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
-//          if (idir == 1 && i == 75 && j > 50 && j < 70 && ispec == 0) {
-//            printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
-//            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
-//              con_vl(0), con_vl(1), con_vl(2),
-//              con_vr(0), con_vr(1), con_vr(2));
-//          }
+          //          if (idir == 1 && i == 75 && j > 50 && j < 70 && ispec == 0) {
+          //            printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
+          //            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
+          //              con_vl(0), con_vl(1), con_vl(2),
+          //              con_vr(0), con_vr(1), con_vr(2));
+          //          }
 
           // Calculate the geometric mean of the opacity on either side of the interface,
           // this is necessary for handling the asymptotic limit near sharp surfaces
@@ -756,16 +871,18 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
-//          if (std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i))) {
-//            printf("NAN flux! %i %i %i F: %e Fl Fr: %e %e speed: %e El Er: %e %e\n", k, j,
-//                   i, v.flux(idir_in, idx_Ef(ispec), k, j, i), conFl(idir), conFr(idir),
-//                   speed, El, Er);
-//            printf("Jl: %e Jr: %e\n", Jl, Jr);
-//            printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0), Hr(1),
-//                   Hr(2));
-//            printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
-//            PARTHENON_FAIL("nan flux");
-//          }
+          //          if (std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i))) {
+          //            printf("NAN flux! %i %i %i F: %e Fl Fr: %e %e speed: %e El Er: %e
+          //            %e\n", k, j,
+          //                   i, v.flux(idir_in, idx_Ef(ispec), k, j, i), conFl(idir),
+          //                   conFr(idir), speed, El, Er);
+          //            printf("Jl: %e Jr: %e\n", Jl, Jr);
+          //            printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0),
+          //            Hr(1),
+          //                   Hr(2));
+          //            printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
+          //            PARTHENON_FAIL("nan flux");
+          //          }
 
           /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
             printf("[%i %i %i] flux[0]: %e\n",
@@ -776,11 +893,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
               k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
           }*/
 
-//          if (j == 97 && i < 6 && ispec == 0 && idir == 0) {
-//            printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e flux: %e\n", k, j,
-//                   i, Jl, Jr, Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2),
-//                   v.flux(idir_in, idx_Ef(ispec), k, j, i));
-//          }
+          //          if (j == 97 && i < 6 && ispec == 0 && idir == 0) {
+          //            printf("[%i %i %i] Jl: %e Jr: %e Hl: %e %e %e Hr: %e %e %e flux:
+          //            %e\n", k, j,
+          //                   i, Jl, Jr, Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2),
+          //                   v.flux(idir_in, idx_Ef(ispec), k, j, i));
+          //          }
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
@@ -944,13 +1062,13 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           SPACELOOP(ii) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
           }
-//          if (j == 97 && i == 4) {
-//            printf("sources[%i]: %e %e %e %e\n", ispec,
-//                   v_src(iblock, idx_E_src(ispec), k, j, i),
-//                   v_src(iblock, idx_F_src(ispec, 0), k, j, i),
-//                   v_src(iblock, idx_F_src(ispec, 1), k, j, i),
-//                   v_src(iblock, idx_F_src(ispec, 2), k, j, i));
-//          }
+          //          if (j == 97 && i == 4) {
+          //            printf("sources[%i]: %e %e %e %e\n", ispec,
+          //                   v_src(iblock, idx_E_src(ispec), k, j, i),
+          //                   v_src(iblock, idx_F_src(ispec, 0), k, j, i),
+          //                   v_src(iblock, idx_F_src(ispec, 1), k, j, i),
+          //                   v_src(iblock, idx_F_src(ispec, 2), k, j, i));
+          //          }
         }
       });
   return TaskStatus::complete;
@@ -999,9 +1117,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E,     cr::F,      p::density,  p::temperature,
-                                p::energy, p::ye,      p::velocity, pr::J,
-                                pr::H,     ir::kappaJ, ir::kappaH,  ir::JBB, ir::fail};
+  std::vector<std::string> vars{cr::E,          cr::F,     c::bfield, p::density,
+                                p::temperature, p::energy, p::ye,     p::velocity,
+                                p::bfield,      pr::J,     pr::H,     ir::kappaJ,
+                                ir::kappaH,     ir::JBB,   ir::fail};
   // printf("skipping fluid update\n"); update_fluid = false;
   if (update_fluid) {
     vars.push_back(c::energy);
@@ -1026,6 +1145,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   int peng = imap[p::energy].first;
   int pT = imap[p::temperature].first;
   int pYe = imap[p::ye].first;
+  int pb_lo = imap[p::bfield].first;
+  int cb_lo = imap[c::bfield].first;
 
   int ceng(-1), cmom_lo(-1), cye(-1);
   if (update_fluid) {
@@ -1061,10 +1182,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
   //  InteractionUpdateType interaction_update = InteractionUpdateType::explicit;
 
-//void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
-//         const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
-//         const Real gcon[3][3], const Real beta[], const Real &alpha, const Real &gdet,
-//         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig = nullptr) {
+  // void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
+  //         const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
+  //         const Real gcon[3][3], const Real beta[], const Real &alpha, const Real
+  //         &gdet, Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig =
+  //         nullptr) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
@@ -1072,15 +1194,22 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
       jb.s, jb.e, // y-loop
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
-
         // TODO(BRR) turn this into a loop
         const int ispec = 0;
 
         // Geometry
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+        Tens2 con_gamma;
+        geom.MetricInverse(CellLocation::Cent, iblock, k, j, i, con_gamma.data);
+        Real cov_g[4][4];
+        geom.SpacetimeMetric(CellLocation::Cent, iblock, k, j, i, cov_g);
+        Real beta[3];
+        geom.ContravariantShift(CellLocation::Cent, iblock, k, j, i, beta);
         Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
         Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
+        // TODO(BRR) go beyond Eddington
+        typename ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
 
         // Write out rootfind explicitly to include fixups
 
@@ -1088,40 +1217,43 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real ug = v(iblock, peng, k, j, i);
         Real Tg = v(iblock, pT, k, j, i);
         Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
+        Real bprim[3] = {0};
+        if (pb_lo > -1) {
+          Real bprim[3] = {v(iblock, pb_lo, k, j, i), v(iblock, pb_lo + 1, k, j, i),
+                           v(iblock, pb_lo + 2, k, j, i)};
+        }
         Real lambda[2] = {Ye, 0.};
         Real J = v(iblock, idx_J(ispec), k, j, i);
         Real cov_H[3] = {v(iblock, idx_H(0, ispec), k, j, i),
-                     v(iblock, idx_H(1, ispec), k, j, i),
-                     v(iblock, idx_H(2, ispec), k, j, i)};
+                         v(iblock, idx_H(1, ispec), k, j, i),
+                         v(iblock, idx_H(2, ispec), k, j, i)};
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                                v(iblock, pv(2), k, j, i)};
+                          v(iblock, pv(2), k, j, i)};
         Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
         Real con_v[3] = {con_vp[0] / W, con_vp[1] / W, con_vp[2] / W};
         Real cov_v[3] = {0};
-        SPACELOOP2(ii, jj) {
-          cov_v[ii] += cov_gamma(ii,jj)*con_v[jj];
-        }
-        //Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
-        //Vec cov_v
+        SPACELOOP2(ii, jj) { cov_v[ii] += cov_gamma(ii, jj) * con_v[jj]; }
+        // Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+        // Vec cov_v
         Real vdH = 0.;
-        SPACELOOP(ii) {
-          vdH += con_v[ii]*cov_H[ii];
-        }
+        SPACELOOP(ii) { vdH += con_v[ii] * cov_H[ii]; }
 
         // Radiation source terms; initially set from current radiation primitives
         Real dS[4];
-        Real kappaH =
-          d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, Ye, species_d[ispec]);
-        Real kappaJ = (1. - scattering_fraction)*kappaH;
+        Real kappaH = d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, Ye,
+                                                                        species_d[ispec]);
+        Real kappaJ = (1. - scattering_fraction) * kappaH;
         Real JBB = d_opacity.EnergyDensityFromTemperature(Tg, species_d[ispec]);
 
-        dS[0] = alpha * sdetgam * (kappaJ*W*(JBB - J) - kappaH*vdH);
+        dS[0] = alpha * sdetgam * (kappaJ * W * (JBB - J) - kappaH * vdH);
         SPACELOOP(ii) {
-          dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH*cov_H[ii]);
+          dS[ii + 1] =
+              alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH * cov_H[ii]);
         }
 
         Real Ug0[4] = {v(iblock, ceng, k, j, i), v(iblock, cmom_lo, k, j, i),
                        v(iblock, cmom_lo + 1, k, j, i), v(iblock, cmom_lo + 2, k, j, i)};
+        Real Pguess[4] = {ug, con_vp[0], con_vp[1], con_vp[2]};
         Real Ug1[4];
         Real resid[4];
         for (int n = 0; n < 4; n++) {
@@ -1131,119 +1263,118 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         Real err = robust::SMALL();
         for (int n = 0; n < 4; n++) {
-          printf("resid: %e denom: %e\n", resid[n], std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
-          Real suberr = std::fabs(resid[n]) / (std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
+          printf("resid: %e denom: %e\n", resid[n],
+                 std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
+          Real suberr = std::fabs(resid[n]) /
+                        (std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
           if (suberr > err) {
             err = suberr;
           }
         }
 
-template <typename CLOSURE>
-class SourceResidual4 {
-
-  KOKKOS_FUNCTION
-  SourceResidual4(EOS &eos, Opacity &opac, MeanOpacity &mopac, const Real rho, const Real Ye, const Real bprim[3],
-  const RadiationType species,
-  const Tens2 conTilPi, const Real gcov[4][4], const Real gammacon[3][3], const Real beta[3], const Real sdetgam) :
-  eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), species_(species), conTilPi_(conTilPi) {
-    lambda_[0] = Ye;
-    lambda_[1] = 0.;
-    SPACELOOP(ii) {
-      bprim_[ii] = bprim[ii];
-      beta_[ii] = beta[ii];
-      SPACELOOP(jj) {
-        gammacon_[ii][jj] = gammacon[ii][jj];
-      }
-    }
-    SPACETIMELOOP2(mu, nu) {
-      gcov_[mu][nu] = gcov[mu][nu];
-    }
-    }
-
-  KOKKOS_INLINE_FUNCTION
-  void CalculateMHDConserved(Real P_mhd[4], Real U_mhd[4]) {
-    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, P_mhd[0]/rho_, lambda_);
-    Real gam1 = eos.BulkModulusFromDensityInternalEnergy(rho_, P_mhd[0]/rho_, lambda_) / Pg;
-    Real D;
-    Real bcons[3];
-    fluid::p2c(rho_, &(P_mhd[1]), bprim_, P_mhd[0], lambda_[0], Pg, gam1, gcov_, gammacon_, betacon_, alpha_,
-      gammadet_, D, &(U_mhd[1]), bcons, U_mhd[0], ye_cons);
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void CalculateRadPrimitive(Real U_rad[4], Real P_rad[4]) {
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void CalculateSource(Real P_mhd[4], Real P_rad[4], Real S[4]) {
-    Real Tg = eos.TemperatureFromDensityInternalEnergy(rho_, P[0]/rho_, lambda_);
-    Real JBB = opac.EnergyDensityFromTemperature(Tg, species_);
-    Real kappaH =
-      mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
-    Real kappaJ = (1. - scattering_fraction_)*kappaH;
-
-    dS[0] = alpha_ * sdetgam_ * (kappaJ*W*(JBB - P_rad[0]) - kappaH*vdH);
-    SPACELOOP(ii) {
-      dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - P_rad[0]) - kappaH*P_rad[1+ii]);
-    }
-  }
-
-
-  private:
-  const EOS &eos_;
-  const Opacity &opac_;
-  const MeanOpacity &mopac_;
-  const Real rho_;
-  Real bprim_[3];
-  const RadiationType species_;
-  const Real scattering_fraction_;
-  Real lambda_[2];
-
-// TODO(BRR) do this without copying memory?
-  Real gcov_[4][4];
-  Real gammacon_[3][3];
-  const Real alpha_;
-  Real beta_[3];
-  const Real sdetgam_;
-
-  const Tens2 &conTilPi_;
-  CLOSURE c_;
-
-};
-
         // Numerically calculate Jacobian
         Real jac[4][4] = {0};
         constexpr Real EPS = 1.e-8;
-        pm[4] = {(1. - EPS)*ug, (1. - EPS) * con_vp[0], (1. - EPS) * con_vp[1], (1. - EPS) * con_vp[2]};
-        pp[4] = {(1. + EPS)*ug, (1. + EPS) * con_vp[0], (1. + EPS) * con_vp[1], (1. + EPS) * con_vp[2]};
+        //Real pm[4] = {(1. - EPS) * ug, (1. - EPS) * con_vp[0], (1. - EPS) * con_vp[1],
+        //              (1. - EPS) * con_vp[2]};
+        //Real pp[4] = {(1. + EPS) * ug, (1. + EPS) * con_vp[0], (1. + EPS) * con_vp[1],
+        //              (1. + EPS) * con_vp[2]};
+
+        Real U_mhd_0[4] = {v(iblock, ceng, k, j, i),
+          v(iblock, cmom_lo, k, j, i), v(iblock, cmom_lo+1, k, j, i), v(iblock, cmom_lo+2, k, j, i)};
+        Real U_rad_0[4] = {v(iblock, idx_E(ispec), k, j, i),
+          v(iblock, idx_F(0, ispec), k, j, i), v(iblock, idx_F(1, ispec), k, j, i),
+          v(iblock, idx_F(2, ispec), k, j, i)};
+
+        // TODO(BRR) go beyond Eddington
+        Tens2 conTilPi = {0};
+        SourceResidual4<ClosureEdd<Vec, Tens2>> srm(
+            eos, d_opacity, d_mean_opacity, rho, Ye, bprim, species_d[ispec], conTilPi,
+            cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g, U_mhd_0, U_rad_0);
+
         for (int m = 0; m < 4; m++) {
-          calc_mhd_cons(pm, Ug1m);
-          calc_mhd_cons(pp, Ug1p);
+          Real P_mhd_m[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
+          Real P_mhd_p[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
+          P_mhd_m[m] -= std::max(robust::SMALL(), EPS*std::fabs(P_mhd_m[m]));
+          P_mhd_p[m] += std::max(robust::SMALL(), EPS*std::fabs(P_mhd_p[m]));
+
+          Real P_rad_m[4];
+          Real P_rad_p[4];
+
+          Real U_mhd_m[4];
+          Real U_mhd_p[4];
+
+          Real U_rad_m[4];
+          Real U_rad_p[4];
+
+          Real dS_m[4];
+          Real dS_p[4];
+
+          srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
+          srm.CalculateRadConserved(U_mhd_m, U_rad_m);
+          srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
+          srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
+
+          srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
+          srm.CalculateRadConserved(U_mhd_p, U_rad_p);
+          srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
+          srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
+
+          printf("P_mhd_0: %e %e %e %e\n", ug, con_vp[0], con_vp[1], con_vp[2]);
+          printf("P_mhd_m: %e %e %e %e\n", P_mhd_m[0], P_mhd_m[1], P_mhd_m[2], P_mhd_m[3]);
+          printf("U_mhd_m: %e %e %e %e\n", U_mhd_m[0], U_mhd_m[1], U_mhd_m[2], U_mhd_m[3]);
+          printf("P_rad_m: %e %e %e %e\n", P_rad_m[0], P_rad_m[1], P_rad_m[2], P_rad_m[3]);
+          printf("U_rad_m: %e %e %e %e\n", U_rad_m[0], U_rad_m[1], U_rad_m[2], U_rad_m[3]);
+          printf("dS_m:    %e %e %e %e\n", dS_m[0], dS_m[1], dS_m[2], dS_m[3]);
+          // calc_mhd_cons(pm, Ug1m);
+          // calc_mhd_cons(pp, Ug1p);
           // From MHD cons, get rad cons, from rad cons get rad prim
-          calc_src(pm, dSm);
-          calc_src(pp, dSp);
+          // calc_src(pm, dSm);
+          // calc_src(pp, dSp);
 
-          Real Ug1p[4];
-          Real Ug1m[4];
-//void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
-//         const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
-//         const Real gcon[3][3], const Real beta[], const Real &alpha, const Real &gdet,
-//         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig = nullptr) {
-          Real dSp[4];
-          Real dSm[4];
-          Real Tgp = eos.TemperatureFromDensityInternalEnergy(rho, pp[0]/rho, lambda);
-          Real JBBp = d_opacity.EnergyDensityFromTemperature(Tgp, species_d[ispec]);
+          //Real Tgp = eos.TemperatureFromDensityInternalEnergy(rho, pp[0] / rho, lambda);
+          //Real JBBp = d_opacity.EnergyDensityFromTemperature(Tgp, species_d[ispec]);
           // TODO(BRR) update kappa with updated T
-          dS[0] = alpha * sdetgam * (kappaJ*Wp*(JBBp - J) - kappaH*vdHp);
-          SPACELOOP(ii) {
-            dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH*cov_H[ii]);
-          }
+          // dS[0] = alpha * sdetgam * (kappaJ*Wp*(JBBp - J) - kappaH*vdHp);
+          // SPACELOOP(ii) {
+          //  dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) -
+          //  kappaH*cov_H[ii]);
+          // }
 
-          Real fp = Ug1p[n] - Ug0[n] - dSp[n];
-          Real fm = Ug1m[n] - Ug0[n] - dSm[n];
           for (int n = 0; n < 4; n++) {
-            jac[m][n] = fp - fm / (pp[n] - pm[n]);
+            Real fp = U_mhd_p[n] - U_mhd_0[n] - dt * dS_p[n];
+            Real fm = U_mhd_m[n] - U_mhd_0[n] - dt * dS_m[n];
+            jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
+            printf("[%i][%i] fp: %e fm: %e Pp: %e Pm: %e\n",
+              n, m, fp, fm, P_mhd_p[m], P_mhd_m[m]);
           }
+        }
+
+        printf("jacobian:\n");
+        for (int m = 0; m < 4; m++) {
+          for (int n = 0; n < 4; n++) {
+            printf("%e ", jac[m][n]);
+          }
+          printf("\n");
+        }
+
+        Real jacinv[4][4];
+        LinearAlgebra::Invert4x4Matrix(jac, jacinv);
+
+        printf("jacobian inverse:\n");
+        for (int m = 0; m < 4; m++) {
+          for (int n = 0; n < 4; n++) {
+            printf("%e ", jacinv[m][n]);
+          }
+          printf("\n");
+        }
+
+        for (int m = 0; m < 4; m++) {
+          for (int n = 0; n < 4; n++) {
+            Pguess[m] -= jacinv[m][n]*resid[n];
+            printf("dP[%i][%i] = %e\n", m, n, jacinv[m][n]*resid[n]);
+          }
+          printf("Pguess[%i] = %28.18e\n", m, Pguess[m]);
         }
 
         printf("J: %e JBB: %e\n", J, JBB);
@@ -1251,8 +1382,6 @@ class SourceResidual4 {
         printf("ds: %e %e %e %e dt: %e\n", dS[0], dS[1], dS[2], dS[3], dt);
         printf("err: %e\n", err);
         exit(-1);
-
-
       });
   return TaskStatus::complete;
 
@@ -1287,19 +1416,18 @@ class SourceResidual4 {
 
         // Rootfind over fluid temperature in fluid rest frame
         root_find::RootFind root_find;
-        InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho,
-                                 ug, Ye, J0,
+        InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
                                  num_species, species_d, scattering_fraction, dtau);
         const Real T1 =
             root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
                              1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
 
         // Practice multiD rootfind
-//        root_find::MultiDRootFind<4> md_root_find;
-//        InteractionFourMomResidual resid;
-//        Real guess[4] = {0};
-//        Real ans[4] = {0};
-//        md_root_find.newton(resid, 1.e-8, guess, ans);
+        //        root_find::MultiDRootFind<4> md_root_find;
+        //        InteractionFourMomResidual resid;
+        //        Real guess[4] = {0};
+        //        Real ans[4] = {0};
+        //        md_root_find.newton(resid, 1.e-8, guess, ans);
 
         // If rootfind fails assume thermal equilibrium?
 
@@ -1359,14 +1487,15 @@ class SourceResidual4 {
               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
             }
 #if USE_VALENCIA
-//            if (v(iblock, ceng, k, j, i) < sdetgam * dE) {
-//    printf("too large source! [%i %i %i] ceng = %e sdg*dE = %e alpha = %e\n", k, j, i, v(iblock, ceng, k, j, i), sdetgam*dE, alpha);
-//              printf("ispec: %i\n", ispec);
-//    printf("rho: %e T: %e peng: %e Ye: %e\n", rho, v(iblock, pT, k, j, i), ug, Ye);
-//    printf("J0: %e tauJ: %e tauH: %e\n", J0, tauJ, tauH);
-//    printf("T1: %e JBB: %e\n", T1, JBB);
-//    PARTHENON_FAIL("negative ceng");
-//  }
+            //            if (v(iblock, ceng, k, j, i) < sdetgam * dE) {
+            //    printf("too large source! [%i %i %i] ceng = %e sdg*dE = %e alpha =
+            //    %e\n", k, j, i, v(iblock, ceng, k, j, i), sdetgam*dE, alpha);
+            //              printf("ispec: %i\n", ispec);
+            //    printf("rho: %e T: %e peng: %e Ye: %e\n", rho, v(iblock, pT, k, j, i),
+            //    ug, Ye); printf("J0: %e tauJ: %e tauH: %e\n", J0, tauJ, tauH);
+            //    printf("T1: %e JBB: %e\n", T1, JBB);
+            //    PARTHENON_FAIL("negative ceng");
+            //  }
             if (sdetgam * dE > v(iblock, ceng, k, j, i)) {
               v(iblock, ifail, k, j, i) = FailFlags::fail;
             }
@@ -1375,9 +1504,7 @@ class SourceResidual4 {
             // TODO(BRR) This is not correct
             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
 #endif
-            SPACELOOP(ii) {
-              v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii);
-            }
+            SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
           }
 
         } // for ispec
