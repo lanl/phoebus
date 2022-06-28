@@ -119,7 +119,7 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   const Real dr = radius.dx();
 
   // read 1d model
-  const int num_zones = CCSN::Get1DProfileNumZones(model_filename.c_str());
+  int num_zones = CCSN::Get1DProfileNumZones(model_filename);
   printf("1D model read in with ",num_zones,"number of zones.");
 
   //printf("%s:%i model_filename = %s\n", __FILE__, __LINE__, model_filename.c_str());

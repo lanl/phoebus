@@ -34,14 +34,13 @@ constexpr int TEMP = 5;
 constexpr int grav = 6;
 constexpr int entr = 7;
 
-KOKKOS_INLINE_FUNCTION 
-int Get1DProfileNumZones(std::string model_filename){
+inline int Get1DProfileNumZones(const std::string &model_filename){
 
     // open file
-    std::ifstream inputfile( model_filename.c_str() );
+    std::ifstream inputfile( model_filename.c_str(),std::ifstream::in);
 
     // error check    
-    if (!inputfile.is_open()) 
+    if (!inputfile.good()) 
         printf("%s:%i model_filename not found = %s\n", __FILE__, __LINE__, model_filename.c_str());
     	return 0;
 
@@ -55,7 +54,7 @@ int Get1DProfileNumZones(std::string model_filename){
             num_zones ++;
     }
 
-    std::cout << "Read in file" << model_filename << "  with  " << num_zones << " number of zones.";
+    //std::cout << "Read in file" << model_filename << "  with  " << num_zones << " number of zones.";
 
     inputfile.close();
 
