@@ -1160,7 +1160,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
         // TODO(BRR) turn this into a loop
         const int ispec = 0;
-        printf("%s:%i\n", __FILE__, __LINE__);
 
         // Geometry
         Tens2 cov_gamma;
@@ -1252,12 +1251,14 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // TODO(BRR) different for valencia
           resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
         }
-//        printf("[%i %i %i]\n", k, j, i);
-//        printf("Ug0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2],
-//               U_mhd_guess[3]);
-//        printf("Ur0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
-//               U_rad_guess[3]);
-//        printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2], resid[3]);
+        //        printf("[%i %i %i]\n", k, j, i);
+        //        printf("Ug0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1],
+        //        U_mhd_guess[2],
+        //               U_mhd_guess[3]);
+        //        printf("Ur0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
+        //        U_rad_guess[2],
+        //               U_rad_guess[3]);
+        //        printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2], resid[3]);
 
         Real err = 1.e100;
         constexpr Real TOL = 1.e-8;
@@ -1271,7 +1272,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           for (int m = 0; m < 4; m++) {
             Real P_mhd_m[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
             Real P_mhd_p[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
-            Real P_mhd_mag_min = std::min<Real>(std::min<Real>(std::min<Real>(std::fabs(Pguess[0]), std::fabs(Pguess[1])), std::fabs(Pguess[2])), std::fabs(Pguess[3]));
+            Real P_mhd_mag_min = std::max<Real>(
+                std::max<Real>(std::max<Real>(std::fabs(Pguess[0]), std::fabs(Pguess[1])),
+                               std::fabs(Pguess[2])),
+                std::fabs(Pguess[3]));
             // TODO(BRR) SMALL() doesn't work when dS is 0
             P_mhd_m[m] -= std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
             P_mhd_p[m] += std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
@@ -1291,30 +1295,32 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
               Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
               jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
-//              printf("[%i][%i] Umhdp: %28.18e Umhdm = %28.18e Umhd0 = %28.18e dS: %28.18e %28.18e\n",
-//                     n,m,U_mhd_p[n],U_mhd_m[n], U_mhd_0[n], dS_p[n], dS_m[n]);
-//              printf("fp: %28.18e fm: %28.18e\n", fp, fm);
+              //              printf("[%i][%i] Umhdp: %28.18e Umhdm = %28.18e Umhd0 =
+              //              %28.18e dS: %28.18e %28.18e\n",
+              //                     n,m,U_mhd_p[n],U_mhd_m[n], U_mhd_0[n], dS_p[n],
+              //                     dS_m[n]);
+              //              printf("fp: %28.18e fm: %28.18e\n", fp, fm);
             }
           }
 
-//                    printf("jacobian:\n");
-//                    for (int m = 0; m < 4; m++) {
-//                      for (int n = 0; n < 4; n++) {
-//                        printf("%e ", jac[m][n]);
-//                      }
-//                      printf("\n");
-//                    }
+          //                    printf("jacobian:\n");
+          //                    for (int m = 0; m < 4; m++) {
+          //                      for (int n = 0; n < 4; n++) {
+          //                        printf("%e ", jac[m][n]);
+          //                      }
+          //                      printf("\n");
+          //                    }
 
           Real jacinv[4][4];
           LinearAlgebra::Invert4x4Matrix(jac, jacinv);
 
-//                    printf("jacobian inverse:\n");
-//                    for (int m = 0; m < 4; m++) {
-//                      for (int n = 0; n < 4; n++) {
-//                        printf("%e ", jacinv[m][n]);
-//                      }
-//                      printf("\n");
-//                    }
+          //                    printf("jacobian inverse:\n");
+          //                    for (int m = 0; m < 4; m++) {
+          //                      for (int n = 0; n < 4; n++) {
+          //                        printf("%e ", jacinv[m][n]);
+          //                      }
+          //                      printf("\n");
+          //                    }
 
           // Calculate residual (unneeded, use value from end of last step?)
           srm.CalculateMHDConserved(Pguess, U_mhd_guess);
@@ -1348,8 +1354,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               err = suberr;
             }
           }
-//          printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2], resid[3]);
-//          printf("niter: %i err: %e\n", niter, err);
+          //          printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2],
+          //          resid[3]); printf("niter: %i err: %e\n", niter, err);
 
           niter++;
           if (niter == max_iter) {
