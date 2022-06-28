@@ -190,7 +190,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Just want constant primitive fields around to serve as
   // background if we are not evolving the fluid, don't need
   // to do the rest.
-  if (!active) return physics;
+  // TODO(BRR) logic gets very complicated accounting for this in situations where
+  // radiation is active but fluid isn't -- for example we want fluid prims from c2p to
+  // calculate opacities.
+  //if (!active) return physics;
 
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
@@ -206,6 +209,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) {
     physics->AddField(c::ye, mcons_scalar);
   }
+
+  // If fluid is not active, still don't add reconstruction variables
+  if (!active) return physics;
 
 #if SET_FLUX_SRC_DIAGS
   // DIAGNOSTIC STUFF FOR DEBUGGING
