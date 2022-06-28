@@ -110,19 +110,18 @@ class SourceResidual4 {
   KOKKOS_INLINE_FUNCTION
   void CalculateRadConserved(Real U_mhd[4], Real U_rad[4]) {
     for (int n = 0; n < 4; n++) {
-      U_rad[n] = U_rad_0_[n] - (U_mhd[n] - U_mhd_0_[n]);
+      U_rad[n] = U_rad_0_[n] + (U_mhd[n] - U_mhd_0_[n]);
+      // TODO(BRR) different for non-valencia
     }
-
-    SPACELOOP(ii) {}
   }
 
   KOKKOS_INLINE_FUNCTION
   void CalculateRadPrimitive(Real P_mhd[4], Real U_rad[4], Real P_rad[4]) {
-    Vec cov_F{U_rad[1], U_rad[2], U_rad[3]};
+    Vec cov_F{U_rad[1] / sdetgam_, U_rad[2] / sdetgam_, U_rad[3] / sdetgam_};
     Vec cov_H;
     Vec con_v{P_mhd[1], P_mhd[2], P_mhd[3]};
     CLOSURE c(con_v, &g_);
-    c.Con2Prim(U_rad[0], cov_F, conTilPi_, &(P_rad[0]), &cov_H);
+    c.Con2Prim(U_rad[0] / sdetgam_, cov_F, conTilPi_, &(P_rad[0]), &cov_H);
     SPACELOOP(ii) { P_rad[ii + 1] = cov_H(ii); }
   }
 
@@ -1182,11 +1181,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
   //  InteractionUpdateType interaction_update = InteractionUpdateType::explicit;
 
-  // void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
-  //         const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
-  //         const Real gcon[3][3], const Real beta[], const Real &alpha, const Real
-  //         &gdet, Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig =
-  //         nullptr) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
@@ -1244,6 +1238,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real U_rad_0[4] = {
             v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(0, ispec), k, j, i),
             v(iblock, idx_F(1, ispec), k, j, i), v(iblock, idx_F(2, ispec), k, j, i)};
+            printf("U_rad_0: %e %e %e %e\n", U_rad_0[0], U_rad_0[1], U_rad_0[2], U_rad_0[3]);
+            printf("U_prim_0: %e %e %e %e\n", J, cov_H[0], cov_H[1], cov_H[2]);
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
@@ -1310,24 +1306,24 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             }
           }
 
-//          printf("jacobian:\n");
-//          for (int m = 0; m < 4; m++) {
-//            for (int n = 0; n < 4; n++) {
-//              printf("%e ", jac[m][n]);
-//            }
-//            printf("\n");
-//          }
+          //          printf("jacobian:\n");
+          //          for (int m = 0; m < 4; m++) {
+          //            for (int n = 0; n < 4; n++) {
+          //              printf("%e ", jac[m][n]);
+          //            }
+          //            printf("\n");
+          //          }
 
           Real jacinv[4][4];
           LinearAlgebra::Invert4x4Matrix(jac, jacinv);
 
-//          printf("jacobian inverse:\n");
-//          for (int m = 0; m < 4; m++) {
-//            for (int n = 0; n < 4; n++) {
-//              printf("%e ", jacinv[m][n]);
-//            }
-//            printf("\n");
-//          }
+          //          printf("jacobian inverse:\n");
+          //          for (int m = 0; m < 4; m++) {
+          //            for (int n = 0; n < 4; n++) {
+          //              printf("%e ", jacinv[m][n]);
+          //            }
+          //            printf("\n");
+          //          }
 
           // Calculate residual (unneeded, use value from end of last step?)
           srm.CalculateMHDConserved(Pguess, U_mhd_guess);
@@ -1361,7 +1357,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               err = suberr;
             }
           }
-          printf("niter: %i err: %e (TOL = %e)\n", niter, err, TOL);
 
           niter++;
           if (niter == max_iter) {
@@ -1373,46 +1368,18 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           v(iblock, ifail, k, j, i) = FailFlags::fail;
         } else {
           v(iblock, ifail, k, j, i) = FailFlags::success;
+
+          // Update conserved variables
+          printf("U_mhd0: %e U_rad0: %e\n", U_mhd_guess[0], U_rad_guess[0]);
+          v(iblock, idx_E(ispec), k, j, i) = U_rad_guess[0];
+          SPACELOOP(ii) { v(iblock, idx_F(ii, ispec), k, j, i) = U_rad_guess[ii + 1]; }
+
+          if (update_fluid) {
+            // TODO(BRR) Update Ye somehow
+            v(iblock, ceng, k, j, i) = U_mhd_guess[0];
+            SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) = U_mhd_guess[ii + 1]; }
+          }
         }
-
-        exit(-1);
-
-        //        // Radiation source terms; initially set from current radiation
-        //        primitives Real dS[4]; Real kappaH =
-        //        d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, Ye,
-        //                                                                        species_d[ispec]);
-        //        Real kappaJ = (1. - scattering_fraction) * kappaH;
-        //        Real JBB = d_opacity.EnergyDensityFromTemperature(Tg, species_d[ispec]);
-        //
-        //        dS[0] = alpha * sdetgam * (kappaJ * W * (JBB - J) - kappaH * vdH);
-        //        SPACELOOP(ii) {
-        //          dS[ii + 1] =
-        //              alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH *
-        //              cov_H[ii]);
-        //        }
-        //
-        //        Real Ug0[4] = {v(iblock, ceng, k, j, i), v(iblock, cmom_lo, k, j, i),
-        //                       v(iblock, cmom_lo + 1, k, j, i), v(iblock, cmom_lo + 2,
-        //                       k, j, i)};
-        //        Real Pguess[4] = {ug, con_vp[0], con_vp[1], con_vp[2]};
-        //        Real Ug1[4];
-        //        Real resid[4];
-        //        for (int n = 0; n < 4; n++) {
-        //          Ug1[n] = Ug0[n];
-        //          resid[n] = Ug1[n] - Ug0[n] - dt * dS[n];
-        //        }
-        //
-        //        Real err = robust::SMALL();
-        //        for (int n = 0; n < 4; n++) {
-        //          printf("resid: %e denom: %e\n", resid[n],
-        //                 std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
-        //          Real suberr = std::fabs(resid[n]) /
-        //                        (std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt *
-        //                        dS[n]));
-        //          if (suberr > err) {
-        //            err = suberr;
-        //          }
-        //        }
       });
   return TaskStatus::complete;
 
@@ -1568,7 +1535,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
            Real tauJ = alpha * dt * v(iblock, idx_kappaJ(ispec), k, j, i);
            Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
            Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
-           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
+           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE,
+ &cov_dF);
 
            // Add source corrections to conserved iration variables
            v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
@@ -1637,8 +1605,8 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  // Mainly for testing purposes, probably should be able to do this with the opacity code
-  // itself
+  // Mainly for testing purposes, probably should be able to do this with the opacity
+  // code itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
   // Get the device opacity object
