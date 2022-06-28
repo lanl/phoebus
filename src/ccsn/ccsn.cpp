@@ -17,11 +17,10 @@
 #include <iostream>
 #include <limits>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <utility>
-#include <iostream>
 #include <fstream>
+#include <typeinfo>
 
 // Parthenon
 #include <globals.hpp>
@@ -119,8 +118,8 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   const Real dr = radius.dx();
 
   // read 1d model
-  int num_zones = CCSN::Get1DProfileNumZones(model_filename);
-  printf("1D model read in with ",num_zones,"number of zones.");
+  const int num_zones = Get1DProfileNumZones(model_filename);
+  //printf("1D model read in with ",num_zones,"number of zones.");
 
   //printf("%s:%i model_filename = %s\n", __FILE__, __LINE__, model_filename.c_str());
 
