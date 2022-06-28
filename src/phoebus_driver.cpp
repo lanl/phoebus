@@ -112,36 +112,51 @@ void PhoebusDriver::PostInitializationCommunication() {
     rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
   }
 
-  TaskRegion &async_region = tc.AddRegion(blocks.size());
+  // leading per-block tasks
+  TaskRegion &async_region0 = tc.AddRegion(1);
+  auto &tl0 = async_region0[0];
   for (int ib = 0; ib < blocks.size(); ib++) {
     auto pmb = blocks[ib].get();
-    auto &tl = async_region[ib];
     auto &sc = pmb->meshblock_data.Get();
-    auto &md =
-        pmesh->mesh_data.GetOrAdd(stage_name[0], ib); // TODO(BRR) This gives an empty md
 
-    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
-                                 BoundaryCommSubset::all);
-    auto send =
-        tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
-    auto recv =
-        tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
-    auto fill_from_bufs =
-        tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
-    auto clear_comm_flags =
-        tl.AddTask(fill_from_bufs, &MeshBlockData<Real>::ClearBoundary, sc.get(),
-                   BoundaryCommSubset::all);
+    auto start_recv = tl0.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
+                                  BoundaryCommSubset::all);
+  }
 
-    auto prolongBound = tl.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
+  // tasks that span <md>
+  TaskRegion &async_region1 = tc.AddRegion(1);
+  auto &tl1 = async_region1[0];
+  auto &md = pmesh->mesh_data.GetOrAdd(stage_name[0], 0);
 
-    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+  auto send = tl1.AddTask(none, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
 
-    auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
+  auto recv =
+      tl1.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
+
+  auto fill_from_bufs =
+      tl1.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
+
+  // tailing per-block-tasks
+  TaskRegion &async_region2 = tc.AddRegion(1);
+  auto &tl2 = async_region2[0];
+  for (int ib = 0; ib < blocks.size(); ib++) {
+    auto pmb = blocks[ib].get();
+    auto &sc = pmb->meshblock_data.Get();
+
+    auto clear_comm_flags = tl2.AddTask(none, &MeshBlockData<Real>::ClearBoundary,
+                                        sc.get(), BoundaryCommSubset::all);
+
+    auto prolongBound =
+        tl2.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
+
+    auto set_bc = tl2.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+
+    auto convert_bc = tl2.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
 
     // Radiation should actually be included in ConvertBoundaryConditions
     // using MDT = std::remove_pointer<decltype(sc.get())>::type;
-    // auto momentp2c = tl.AddTask(convert_bc, radiation::MomentPrim2Con<MDT>, sc.get(),
-    // IndexDomain::entire);
+    // auto momentp2c = tl2.AddTask(convert_bc, radiation::MomentPrim2Con<MDT>, sc.get(),
+    //                              IndexDomain::entire);
   }
 
   tc.Execute();
