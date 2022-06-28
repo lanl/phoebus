@@ -1137,38 +1137,54 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             err = suberr;
           }
         }
+
+template <typename CLOSURE>
 class SourceResidual4 {
 
   KOKKOS_FUNCTION
-  SourceResidual4(EOS &eos, Opacity &opac, MeanOpacity &mopac, const Real rho, const Real Ye,
-  const RadiationType species) :
-  eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), species_(species) {
+  SourceResidual4(EOS &eos, Opacity &opac, MeanOpacity &mopac, const Real rho, const Real Ye, const Real bprim[3],
+  const RadiationType species,
+  const Tens2 conTilPi, const Real gcov[4][4], const Real gammacon[3][3], const Real beta[3], const Real sdetgam) :
+  eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), species_(species), conTilPi_(conTilPi) {
     lambda_[0] = Ye;
     lambda_[1] = 0.;
+    SPACELOOP(ii) {
+      bprim_[ii] = bprim[ii];
+      beta_[ii] = beta[ii];
+      SPACELOOP(jj) {
+        gammacon_[ii][jj] = gammacon[ii][jj];
+      }
+    }
+    SPACETIMELOOP2(mu, nu) {
+      gcov_[mu][nu] = gcov[mu][nu];
+    }
     }
 
   KOKKOS_INLINE_FUNCTION
-  void CalculateFluidConserved(Real P[4], Real U[4]) {
-    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, P[0]/rho_, lambda_);
-    Real gam1 = eos.BulkModulusFromDensityInternalEnergy(rho_, P[0]/rho_, lambda_) / Pg;
+  void CalculateMHDConserved(Real P_mhd[4], Real U_mhd[4]) {
+    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, P_mhd[0]/rho_, lambda_);
+    Real gam1 = eos.BulkModulusFromDensityInternalEnergy(rho_, P_mhd[0]/rho_, lambda_) / Pg;
     Real D;
     Real bcons[3];
-    fluid::p2c(rho_, &(P[1]), b_, P[0], lambda_[0], Pg, gam1, gcov_, gammacon_, betacon_, alpha_,
-      gammadet_, D, &(U[1]), bcons, U[0], ye_cons);
+    fluid::p2c(rho_, &(P_mhd[1]), bprim_, P_mhd[0], lambda_[0], Pg, gam1, gcov_, gammacon_, betacon_, alpha_,
+      gammadet_, D, &(U_mhd[1]), bcons, U_mhd[0], ye_cons);
   }
 
   KOKKOS_INLINE_FUNCTION
-  void CalculateSource(Real Pg[4], Real Pr[4], Real S[4]) {
+  void CalculateRadPrimitive(Real U_rad[4], Real P_rad[4]) {
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  void CalculateSource(Real P_mhd[4], Real P_rad[4], Real S[4]) {
     Real Tg = eos.TemperatureFromDensityInternalEnergy(rho_, P[0]/rho_, lambda_);
     Real JBB = opac.EnergyDensityFromTemperature(Tg, species_);
     Real kappaH =
       mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
     Real kappaJ = (1. - scattering_fraction_)*kappaH;
 
-    // TODO(BRR) need J1 not J0!
-    dS[0] = alpha_ * sdetgam_ * (kappaJ*W*(JBB - J) - kappaH*vdH);
+    dS[0] = alpha_ * sdetgam_ * (kappaJ*W*(JBB - P_rad[0]) - kappaH*vdH);
     SPACELOOP(ii) {
-      dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH*cov_H[ii]);
+      dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - P_rad[0]) - kappaH*P_rad[1+ii]);
     }
   }
 
@@ -1178,7 +1194,7 @@ class SourceResidual4 {
   const Opacity &opac_;
   const MeanOpacity &mopac_;
   const Real rho_;
-  Real b_[3];
+  Real bprim_[3];
   const RadiationType species_;
   const Real scattering_fraction_;
   Real lambda_[2];
@@ -1189,6 +1205,9 @@ class SourceResidual4 {
   const Real alpha_;
   Real beta_[3];
   const Real sdetgam_;
+
+  const Tens2 &conTilPi_;
+  CLOSURE c_;
 
 };
 
