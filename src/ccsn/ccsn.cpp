@@ -120,6 +120,7 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
 
   // read 1d model
   const int num_zones = CCSN::Get1DProfileNumZones(model_filename.c_str());
+  printf("1D model read in with ",num_zones,"number of zones.");
 
   //printf("%s:%i model_filename = %s\n", __FILE__, __LINE__, model_filename.c_str());
 
@@ -128,13 +129,13 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   // printf("1D model read in. Max radius is  = %.14e\n", model_1d[0][num_zones],"with ",0,"number of zones.");
 
   // allocate state size of NCCSN which should equal num vars for CCSN ?
-  Real state[NCCSN];
+  //  Real state[NCCSN];
 
   // interpolate to determine 1d model on monopole GR radial grid
   //Real model_1d_interp = CCSN::Interp1DProfile(model_1d,npoints,radius,dr);
 
   // second loop, to set density, specific energy, and matter state
-  for (int i = 0; i < npoints; ++i) {
+  //for (int i = 0; i < npoints; ++i) {
 
      // some of the vars below will be changed to EOS calls
 
@@ -159,16 +160,16 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
      //matter_h(MonopoleGR::Matter::J_R, i) = 0;               // momentum
      //matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
      //matter_h(MonopoleGR::Matter::Srr, i) = press;
-   }
+  // }
 
   // add appropraite print here for CCSN initialization
   // printf("TOV star constructed. Total mass = %.14e\n", state_h(TOV::M, npoints - 1));
 
   // Copy to device
-  auto matter_d = monopolepkg->Param<MonopoleGR::Matter_t>("matter");
-  auto state_d = params.Get<CCSN::State_t>("ccsn_state");
-  Kokkos::deep_copy(matter_d, matter_h);
-  Kokkos::deep_copy(state_d, state_h);
+  // auto matter_d = monopolepkg->Param<MonopoleGR::Matter_t>("matter");
+  // auto state_d = params.Get<CCSN::State_t>("ccsn_state");
+  // Kokkos::deep_copy(matter_d, matter_h);
+  //  Kokkos::deep_copy(state_d, state_h);
 
   return TaskStatus::complete;
 }

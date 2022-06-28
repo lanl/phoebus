@@ -35,7 +35,7 @@ constexpr int grav = 6;
 constexpr int entr = 7;
 
 KOKKOS_INLINE_FUNCTION 
-int Get1DProfileNumZones(const std::string &model_filename){
+int Get1DProfileNumZones(std::string model_filename){
 
     // open file
     std::ifstream inputfile( model_filename.c_str() );
