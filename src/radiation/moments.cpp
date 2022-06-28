@@ -74,10 +74,11 @@ class SourceResidual4 {
                   const RadiationType species, const Tens2 conTilPi,
                   const Real gcov[4][4], const Real gammacon[3][3], const Real alpha,
                   const Real beta[3], const Real sdetgam, const Real scattering_fraction,
-                  typename CLOSURE::LocalGeometryType &g, Real U_mhd_0[4], Real U_rad_0[4])
+                  typename CLOSURE::LocalGeometryType &g, Real U_mhd_0[4],
+                  Real U_rad_0[4])
       : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), species_(species),
         conTilPi_(conTilPi), alpha_(alpha), sdetgam_(sdetgam),
-        scattering_fraction_(scattering_fraction), g_(g) {//, c_(con_v, g_) {
+        scattering_fraction_(scattering_fraction), g_(g) { //, c_(con_v, g_) {
     lambda_[0] = Ye;
     lambda_[1] = 0.;
     SPACELOOP(ii) {
@@ -112,8 +113,7 @@ class SourceResidual4 {
       U_rad[n] = U_rad_0_[n] - (U_mhd[n] - U_mhd_0_[n]);
     }
 
-    SPACELOOP(ii) {
-    }
+    SPACELOOP(ii) {}
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -169,7 +169,7 @@ class SourceResidual4 {
 
   const Tens2 &conTilPi_;
   typename CLOSURE::LocalGeometryType &g_; //(geom, CellLocation::Cent, 0, b, j, i);
-  //CLOSURE c_;
+  // CLOSURE c_;
 
   Real U_mhd_0_[4];
   Real U_rad_0_[4];
@@ -1209,7 +1209,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
         Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
         // TODO(BRR) go beyond Eddington
-        typename ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
+        typename ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent,
+                                                             iblock, k, j, i);
 
         // Write out rootfind explicitly to include fixups
 
@@ -1233,70 +1234,41 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real con_v[3] = {con_vp[0] / W, con_vp[1] / W, con_vp[2] / W};
         Real cov_v[3] = {0};
         SPACELOOP2(ii, jj) { cov_v[ii] += cov_gamma(ii, jj) * con_v[jj]; }
-        // Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
-        // Vec cov_v
         Real vdH = 0.;
         SPACELOOP(ii) { vdH += con_v[ii] * cov_H[ii]; }
 
-        // Radiation source terms; initially set from current radiation primitives
-        Real dS[4];
-        Real kappaH = d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, Ye,
-                                                                        species_d[ispec]);
-        Real kappaJ = (1. - scattering_fraction) * kappaH;
-        Real JBB = d_opacity.EnergyDensityFromTemperature(Tg, species_d[ispec]);
-
-        dS[0] = alpha * sdetgam * (kappaJ * W * (JBB - J) - kappaH * vdH);
-        SPACELOOP(ii) {
-          dS[ii + 1] =
-              alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH * cov_H[ii]);
-        }
-
-        Real Ug0[4] = {v(iblock, ceng, k, j, i), v(iblock, cmom_lo, k, j, i),
-                       v(iblock, cmom_lo + 1, k, j, i), v(iblock, cmom_lo + 2, k, j, i)};
         Real Pguess[4] = {ug, con_vp[0], con_vp[1], con_vp[2]};
-        Real Ug1[4];
-        Real resid[4];
-        for (int n = 0; n < 4; n++) {
-          Ug1[n] = Ug0[n];
-          resid[n] = Ug1[n] - Ug0[n] - dt * dS[n];
-        }
-
-        Real err = robust::SMALL();
-        for (int n = 0; n < 4; n++) {
-          printf("resid: %e denom: %e\n", resid[n],
-                 std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
-          Real suberr = std::fabs(resid[n]) /
-                        (std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
-          if (suberr > err) {
-            err = suberr;
-          }
-        }
-
-        // Numerically calculate Jacobian
-        Real jac[4][4] = {0};
-        constexpr Real EPS = 1.e-8;
-        //Real pm[4] = {(1. - EPS) * ug, (1. - EPS) * con_vp[0], (1. - EPS) * con_vp[1],
-        //              (1. - EPS) * con_vp[2]};
-        //Real pp[4] = {(1. + EPS) * ug, (1. + EPS) * con_vp[0], (1. + EPS) * con_vp[1],
-        //              (1. + EPS) * con_vp[2]};
-
-        Real U_mhd_0[4] = {v(iblock, ceng, k, j, i),
-          v(iblock, cmom_lo, k, j, i), v(iblock, cmom_lo+1, k, j, i), v(iblock, cmom_lo+2, k, j, i)};
-        Real U_rad_0[4] = {v(iblock, idx_E(ispec), k, j, i),
-          v(iblock, idx_F(0, ispec), k, j, i), v(iblock, idx_F(1, ispec), k, j, i),
-          v(iblock, idx_F(2, ispec), k, j, i)};
+        Real U_mhd_0[4] = {v(iblock, ceng, k, j, i), v(iblock, cmom_lo, k, j, i),
+                           v(iblock, cmom_lo + 1, k, j, i),
+                           v(iblock, cmom_lo + 2, k, j, i)};
+        Real U_rad_0[4] = {
+            v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(0, ispec), k, j, i),
+            v(iblock, idx_F(1, ispec), k, j, i), v(iblock, idx_F(2, ispec), k, j, i)};
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
         SourceResidual4<ClosureEdd<Vec, Tens2>> srm(
             eos, d_opacity, d_mean_opacity, rho, Ye, bprim, species_d[ispec], conTilPi,
-            cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g, U_mhd_0, U_rad_0);
+            cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g, U_mhd_0,
+            U_rad_0);
 
-        for (int m = 0; m < 4; m++) {
-          Real P_mhd_m[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
-          Real P_mhd_p[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
-          P_mhd_m[m] -= std::max(robust::SMALL(), EPS*std::fabs(P_mhd_m[m]));
-          P_mhd_p[m] += std::max(robust::SMALL(), EPS*std::fabs(P_mhd_p[m]));
+        /*Real err = robust::SMALL();
+        for (int n = 0; n < 4; n++) {
+          Real suberr = std::fabs(resid[n]) /
+                        (std::fabs(U_mhd_0[n]) + std::fabs(U_mhd_0[n]) + std::fabs(dt *
+        dS[n])); if (suberr > err) { err = suberr;
+          }
+        }*/
+
+        Real err = 1.e100;
+        constexpr Real TOL = 1.e-8;
+        constexpr int max_iter = 10;
+        int niter = 0;
+        Real resid[4];
+        do {
+          // Numerically calculate Jacobian
+          Real jac[4][4] = {0};
+          constexpr Real EPS = 1.e-8;
 
           Real P_rad_m[4];
           Real P_rad_p[4];
@@ -1310,78 +1282,155 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Real dS_m[4];
           Real dS_p[4];
 
-          srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
-          srm.CalculateRadConserved(U_mhd_m, U_rad_m);
-          srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
-          srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
+          for (int m = 0; m < 4; m++) {
+            Real P_mhd_m[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
+            Real P_mhd_p[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
+            P_mhd_m[m] -= std::max(robust::SMALL(), EPS * std::fabs(P_mhd_m[m]));
+            P_mhd_p[m] += std::max(robust::SMALL(), EPS * std::fabs(P_mhd_p[m]));
 
-          srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
-          srm.CalculateRadConserved(U_mhd_p, U_rad_p);
-          srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
-          srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
+            srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
+            srm.CalculateRadConserved(U_mhd_m, U_rad_m);
+            srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
+            srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
 
-          printf("P_mhd_0: %e %e %e %e\n", ug, con_vp[0], con_vp[1], con_vp[2]);
-          printf("P_mhd_m: %e %e %e %e\n", P_mhd_m[0], P_mhd_m[1], P_mhd_m[2], P_mhd_m[3]);
-          printf("U_mhd_m: %e %e %e %e\n", U_mhd_m[0], U_mhd_m[1], U_mhd_m[2], U_mhd_m[3]);
-          printf("P_rad_m: %e %e %e %e\n", P_rad_m[0], P_rad_m[1], P_rad_m[2], P_rad_m[3]);
-          printf("U_rad_m: %e %e %e %e\n", U_rad_m[0], U_rad_m[1], U_rad_m[2], U_rad_m[3]);
-          printf("dS_m:    %e %e %e %e\n", dS_m[0], dS_m[1], dS_m[2], dS_m[3]);
-          // calc_mhd_cons(pm, Ug1m);
-          // calc_mhd_cons(pp, Ug1p);
-          // From MHD cons, get rad cons, from rad cons get rad prim
-          // calc_src(pm, dSm);
-          // calc_src(pp, dSp);
+            srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
+            srm.CalculateRadConserved(U_mhd_p, U_rad_p);
+            srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
+            srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
 
-          //Real Tgp = eos.TemperatureFromDensityInternalEnergy(rho, pp[0] / rho, lambda);
-          //Real JBBp = d_opacity.EnergyDensityFromTemperature(Tgp, species_d[ispec]);
-          // TODO(BRR) update kappa with updated T
-          // dS[0] = alpha * sdetgam * (kappaJ*Wp*(JBBp - J) - kappaH*vdHp);
-          // SPACELOOP(ii) {
-          //  dS[ii+1] = alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) -
-          //  kappaH*cov_H[ii]);
-          // }
+            //          printf("P_mhd_0: %e %e %e %e\n", ug, con_vp[0], con_vp[1],
+            //          con_vp[2]); printf("P_mhd_m: %e %e %e %e\n", P_mhd_m[0],
+            //          P_mhd_m[1], P_mhd_m[2], P_mhd_m[3]); printf("U_mhd_m: %e %e %e
+            //          %e\n", U_mhd_m[0], U_mhd_m[1], U_mhd_m[2], U_mhd_m[3]);
+            //          printf("P_rad_m: %e %e %e %e\n", P_rad_m[0], P_rad_m[1],
+            //          P_rad_m[2], P_rad_m[3]); printf("U_rad_m: %e %e %e %e\n",
+            //          U_rad_m[0], U_rad_m[1], U_rad_m[2], U_rad_m[3]); printf("dS_m: %e
+            //          %e %e %e\n", dS_m[0], dS_m[1], dS_m[2], dS_m[3]);
+
+            for (int n = 0; n < 4; n++) {
+              Real fp = U_mhd_p[n] - U_mhd_0[n] - dt * dS_p[n];
+              Real fm = U_mhd_m[n] - U_mhd_0[n] - dt * dS_m[n];
+              jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
+              //            printf("[%i][%i] fp: %e fm: %e Pp: %e Pm: %e\n",
+              //              n, m, fp, fm, P_mhd_p[m], P_mhd_m[m]);
+            }
+          }
+
+          printf("jacobian:\n");
+          for (int m = 0; m < 4; m++) {
+            for (int n = 0; n < 4; n++) {
+              printf("%e ", jac[m][n]);
+            }
+            printf("\n");
+          }
+
+          Real jacinv[4][4];
+          LinearAlgebra::Invert4x4Matrix(jac, jacinv);
+
+          printf("jacobian inverse:\n");
+          for (int m = 0; m < 4; m++) {
+            for (int n = 0; n < 4; n++) {
+              printf("%e ", jacinv[m][n]);
+            }
+            printf("\n");
+          }
+
+          //printf("J: %e JBB: %e\n", J, JBB);
+          //printf("kappaJ: %e kappaH: %e\n", kappaJ, kappaH);
+          //printf("ds: %e %e %e %e dt: %e\n", dS[0], dS[1], dS[2], dS[3], dt);
+          //printf("err: %e\n", err);
+
+          // Alias existing allocated memory to save space
+          Real *U_mhd_guess = &(U_mhd_p[0]);
+          Real *U_rad_guess = &(U_rad_p[0]);
+          Real *P_rad_guess = &(P_rad_p[0]);
+          Real *dS_guess = &(dS_p[0]);
+
+          // Calculate residual (unneeded, use value from end of last step?)
+          srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+          srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+          srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
+          srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
 
           for (int n = 0; n < 4; n++) {
-            Real fp = U_mhd_p[n] - U_mhd_0[n] - dt * dS_p[n];
-            Real fm = U_mhd_m[n] - U_mhd_0[n] - dt * dS_m[n];
-            jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
-            printf("[%i][%i] fp: %e fm: %e Pp: %e Pm: %e\n",
-              n, m, fp, fm, P_mhd_p[m], P_mhd_m[m]);
+            resid[n] = U_mhd_guess[n] - U_mhd_0[n] - dt * dS_guess[n];
           }
-        }
 
-        printf("jacobian:\n");
-        for (int m = 0; m < 4; m++) {
+          // Update guess
+          for (int m = 0; m < 4; m++) {
+            for (int n = 0; n < 4; n++) {
+              Pguess[m] -= jacinv[m][n] * resid[n];
+              printf("dP[%i][%i] = %e\n", m, n, jacinv[m][n] * resid[n]);
+            }
+            printf("Pguess[%i] = %28.18e\n", m, Pguess[m]);
+          }
+          srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+          srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+          srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
+          srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+
+          // Calculate error
+          err = robust::SMALL();
           for (int n = 0; n < 4; n++) {
-            printf("%e ", jac[m][n]);
+            Real suberr =
+                std::fabs(resid[n]) / (std::fabs(U_mhd_guess[n]) + std::fabs(U_mhd_0[n]) +
+                                       std::fabs(dt * dS_guess[n]));
+            if (suberr > err) {
+              err = suberr;
+            }
           }
-          printf("\n");
+          printf("niter: %i err: %e (TOL = %e)\n", niter, err, TOL);
+
+          niter++;
+          if (niter == max_iter) {
+            break;
+          }
+        } while (err > TOL);
+
+        if (niter == max_iter && err > TOL) {
+          v(iblock, ifail, k, j, i) = FailFlags::fail;
+        } else {
+          v(iblock, ifail, k, j, i) = FailFlags::success;
         }
 
-        Real jacinv[4][4];
-        LinearAlgebra::Invert4x4Matrix(jac, jacinv);
-
-        printf("jacobian inverse:\n");
-        for (int m = 0; m < 4; m++) {
-          for (int n = 0; n < 4; n++) {
-            printf("%e ", jacinv[m][n]);
-          }
-          printf("\n");
-        }
-
-        for (int m = 0; m < 4; m++) {
-          for (int n = 0; n < 4; n++) {
-            Pguess[m] -= jacinv[m][n]*resid[n];
-            printf("dP[%i][%i] = %e\n", m, n, jacinv[m][n]*resid[n]);
-          }
-          printf("Pguess[%i] = %28.18e\n", m, Pguess[m]);
-        }
-
-        printf("J: %e JBB: %e\n", J, JBB);
-        printf("kappaJ: %e kappaH: %e\n", kappaJ, kappaH);
-        printf("ds: %e %e %e %e dt: %e\n", dS[0], dS[1], dS[2], dS[3], dt);
-        printf("err: %e\n", err);
         exit(-1);
+
+        //        // Radiation source terms; initially set from current radiation
+        //        primitives Real dS[4]; Real kappaH =
+        //        d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, Ye,
+        //                                                                        species_d[ispec]);
+        //        Real kappaJ = (1. - scattering_fraction) * kappaH;
+        //        Real JBB = d_opacity.EnergyDensityFromTemperature(Tg, species_d[ispec]);
+        //
+        //        dS[0] = alpha * sdetgam * (kappaJ * W * (JBB - J) - kappaH * vdH);
+        //        SPACELOOP(ii) {
+        //          dS[ii + 1] =
+        //              alpha * sdetgam * (kappaJ * W * cov_v[ii] * (JBB - J) - kappaH *
+        //              cov_H[ii]);
+        //        }
+        //
+        //        Real Ug0[4] = {v(iblock, ceng, k, j, i), v(iblock, cmom_lo, k, j, i),
+        //                       v(iblock, cmom_lo + 1, k, j, i), v(iblock, cmom_lo + 2,
+        //                       k, j, i)};
+        //        Real Pguess[4] = {ug, con_vp[0], con_vp[1], con_vp[2]};
+        //        Real Ug1[4];
+        //        Real resid[4];
+        //        for (int n = 0; n < 4; n++) {
+        //          Ug1[n] = Ug0[n];
+        //          resid[n] = Ug1[n] - Ug0[n] - dt * dS[n];
+        //        }
+        //
+        //        Real err = robust::SMALL();
+        //        for (int n = 0; n < 4; n++) {
+        //          printf("resid: %e denom: %e\n", resid[n],
+        //                 std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt * dS[n]));
+        //          Real suberr = std::fabs(resid[n]) /
+        //                        (std::fabs(Ug1[n]) + std::fabs(Ug0[n]) + std::fabs(dt *
+        //                        dS[n]));
+        //          if (suberr > err) {
+        //            err = suberr;
+        //          }
+        //        }
       });
   return TaskStatus::complete;
 
