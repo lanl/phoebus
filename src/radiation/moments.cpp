@@ -1252,35 +1252,40 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g, U_mhd_0,
             U_rad_0);
 
-        /*Real err = robust::SMALL();
+        // Memory for evaluating Jacobian via finite differences
+        Real P_rad_m[4];
+        Real P_rad_p[4];
+        Real U_mhd_m[4];
+        Real U_mhd_p[4];
+        Real U_rad_m[4];
+        Real U_rad_p[4];
+        Real dS_m[4];
+        Real dS_p[4];
+
+        // Alias existing allocated memory to save space
+        Real *U_mhd_guess = &(U_mhd_p[0]);
+        Real *U_rad_guess = &(U_rad_p[0]);
+        Real *P_rad_guess = &(P_rad_p[0]);
+        Real *dS_guess = &(dS_p[0]);
+
+        // Initialize residuals
+        Real resid[4];
+        srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+        srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+        srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
+        srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
         for (int n = 0; n < 4; n++) {
-          Real suberr = std::fabs(resid[n]) /
-                        (std::fabs(U_mhd_0[n]) + std::fabs(U_mhd_0[n]) + std::fabs(dt *
-        dS[n])); if (suberr > err) { err = suberr;
-          }
-        }*/
+          resid[n] = U_mhd_guess[n] - U_mhd_0[n] - dt * dS_guess[n];
+        }
 
         Real err = 1.e100;
         constexpr Real TOL = 1.e-8;
         constexpr int max_iter = 10;
         int niter = 0;
-        Real resid[4];
         do {
           // Numerically calculate Jacobian
           Real jac[4][4] = {0};
           constexpr Real EPS = 1.e-8;
-
-          Real P_rad_m[4];
-          Real P_rad_p[4];
-
-          Real U_mhd_m[4];
-          Real U_mhd_p[4];
-
-          Real U_rad_m[4];
-          Real U_rad_p[4];
-
-          Real dS_m[4];
-          Real dS_p[4];
 
           for (int m = 0; m < 4; m++) {
             Real P_mhd_m[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
@@ -1298,53 +1303,31 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
             srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
 
-            //          printf("P_mhd_0: %e %e %e %e\n", ug, con_vp[0], con_vp[1],
-            //          con_vp[2]); printf("P_mhd_m: %e %e %e %e\n", P_mhd_m[0],
-            //          P_mhd_m[1], P_mhd_m[2], P_mhd_m[3]); printf("U_mhd_m: %e %e %e
-            //          %e\n", U_mhd_m[0], U_mhd_m[1], U_mhd_m[2], U_mhd_m[3]);
-            //          printf("P_rad_m: %e %e %e %e\n", P_rad_m[0], P_rad_m[1],
-            //          P_rad_m[2], P_rad_m[3]); printf("U_rad_m: %e %e %e %e\n",
-            //          U_rad_m[0], U_rad_m[1], U_rad_m[2], U_rad_m[3]); printf("dS_m: %e
-            //          %e %e %e\n", dS_m[0], dS_m[1], dS_m[2], dS_m[3]);
-
             for (int n = 0; n < 4; n++) {
               Real fp = U_mhd_p[n] - U_mhd_0[n] - dt * dS_p[n];
               Real fm = U_mhd_m[n] - U_mhd_0[n] - dt * dS_m[n];
               jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
-              //            printf("[%i][%i] fp: %e fm: %e Pp: %e Pm: %e\n",
-              //              n, m, fp, fm, P_mhd_p[m], P_mhd_m[m]);
             }
           }
 
-          printf("jacobian:\n");
-          for (int m = 0; m < 4; m++) {
-            for (int n = 0; n < 4; n++) {
-              printf("%e ", jac[m][n]);
-            }
-            printf("\n");
-          }
+//          printf("jacobian:\n");
+//          for (int m = 0; m < 4; m++) {
+//            for (int n = 0; n < 4; n++) {
+//              printf("%e ", jac[m][n]);
+//            }
+//            printf("\n");
+//          }
 
           Real jacinv[4][4];
           LinearAlgebra::Invert4x4Matrix(jac, jacinv);
 
-          printf("jacobian inverse:\n");
-          for (int m = 0; m < 4; m++) {
-            for (int n = 0; n < 4; n++) {
-              printf("%e ", jacinv[m][n]);
-            }
-            printf("\n");
-          }
-
-          //printf("J: %e JBB: %e\n", J, JBB);
-          //printf("kappaJ: %e kappaH: %e\n", kappaJ, kappaH);
-          //printf("ds: %e %e %e %e dt: %e\n", dS[0], dS[1], dS[2], dS[3], dt);
-          //printf("err: %e\n", err);
-
-          // Alias existing allocated memory to save space
-          Real *U_mhd_guess = &(U_mhd_p[0]);
-          Real *U_rad_guess = &(U_rad_p[0]);
-          Real *P_rad_guess = &(P_rad_p[0]);
-          Real *dS_guess = &(dS_p[0]);
+//          printf("jacobian inverse:\n");
+//          for (int m = 0; m < 4; m++) {
+//            for (int n = 0; n < 4; n++) {
+//              printf("%e ", jacinv[m][n]);
+//            }
+//            printf("\n");
+//          }
 
           // Calculate residual (unneeded, use value from end of last step?)
           srm.CalculateMHDConserved(Pguess, U_mhd_guess);
@@ -1352,22 +1335,21 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
           srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
 
-          for (int n = 0; n < 4; n++) {
-            resid[n] = U_mhd_guess[n] - U_mhd_0[n] - dt * dS_guess[n];
-          }
-
           // Update guess
           for (int m = 0; m < 4; m++) {
             for (int n = 0; n < 4; n++) {
               Pguess[m] -= jacinv[m][n] * resid[n];
-              printf("dP[%i][%i] = %e\n", m, n, jacinv[m][n] * resid[n]);
             }
-            printf("Pguess[%i] = %28.18e\n", m, Pguess[m]);
           }
           srm.CalculateMHDConserved(Pguess, U_mhd_guess);
           srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
           srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
           srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+
+          // Update residuals
+          for (int n = 0; n < 4; n++) {
+            resid[n] = U_mhd_guess[n] - U_mhd_0[n] - dt * dS_guess[n];
+          }
 
           // Calculate error
           err = robust::SMALL();
