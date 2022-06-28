@@ -34,37 +34,6 @@ namespace radiation {
 using namespace singularity::neutrinos;
 using singularity::EOS;
 
-/*class InteractionFourMomResidual {
-  public:
-  KOKKOS_FUNCTION
-  InteractionFourMomResidual() {}
-
-//void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
-//         const Real &ye_prim, const Real &p, const Real gam1, const Real gcov[4][4],
-//         const Real gcon[3][3], const Real beta[], const Real &alpha, const Real &gdet,
-//         Real &D, Real S[], Real bcons[], Real &tau, Real &ye_cons, Real *sig = nullptr)
-{
-
-  KOKKOS_INLINE_FUNCTION
-  void Residual(Real x[4], Real resid[4]) {
-    for (int i = 0; i < 4; i++) {
-      resid[i] = 0.;
-    }
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void Jacobian(Real x[4], Real jac[4][4]) {
-    for (int i = 0; i < 4; i++) {
-      for (int j = 0; j < 4; j++) {
-        jac[i][j] = 0.;
-      }
-    }
-  }
-
-  private:
-  const Real &rho_;
-};*/
-
 template <typename CLOSURE>
 class SourceResidual4 {
  public:
@@ -78,7 +47,7 @@ class SourceResidual4 {
                   Real U_rad_0[4])
       : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), species_(species),
         conTilPi_(conTilPi), alpha_(alpha), sdetgam_(sdetgam),
-        scattering_fraction_(scattering_fraction), g_(g) { //, c_(con_v, g_) {
+        scattering_fraction_(scattering_fraction), g_(g) {
     lambda_[0] = Ye;
     lambda_[1] = 0.;
     SPACELOOP(ii) {
@@ -110,7 +79,7 @@ class SourceResidual4 {
   KOKKOS_INLINE_FUNCTION
   void CalculateRadConserved(Real U_mhd[4], Real U_rad[4]) {
     for (int n = 0; n < 4; n++) {
-      U_rad[n] = U_rad_0_[n] + (U_mhd[n] - U_mhd_0_[n]);
+      U_rad[n] = U_rad_0_[n] - (U_mhd[n] - U_mhd_0_[n]);
       // TODO(BRR) different for non-valencia
     }
   }
@@ -1238,8 +1207,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real U_rad_0[4] = {
             v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(0, ispec), k, j, i),
             v(iblock, idx_F(1, ispec), k, j, i), v(iblock, idx_F(2, ispec), k, j, i)};
-            printf("U_rad_0: %e %e %e %e\n", U_rad_0[0], U_rad_0[1], U_rad_0[2], U_rad_0[3]);
-            printf("U_prim_0: %e %e %e %e\n", J, cov_H[0], cov_H[1], cov_H[2]);
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
@@ -1271,7 +1238,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
         srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
         for (int n = 0; n < 4; n++) {
-          resid[n] = U_mhd_guess[n] - U_mhd_0[n] - dt * dS_guess[n];
+          // TODO(BRR) different for valencia
+          resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
         }
 
         Real err = 1.e100;
@@ -1300,8 +1268,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
 
             for (int n = 0; n < 4; n++) {
-              Real fp = U_mhd_p[n] - U_mhd_0[n] - dt * dS_p[n];
-              Real fm = U_mhd_m[n] - U_mhd_0[n] - dt * dS_m[n];
+              // TODO(BRR) -dt*dS for valencia
+              Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
+              Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
               jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
             }
           }
@@ -1344,7 +1313,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
           // Update residuals
           for (int n = 0; n < 4; n++) {
-            resid[n] = U_mhd_guess[n] - U_mhd_0[n] - dt * dS_guess[n];
+            resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
           }
 
           // Calculate error
