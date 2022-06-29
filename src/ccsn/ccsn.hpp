@@ -22,8 +22,13 @@
 namespace CCSN {
 constexpr int NCCSN = 8;
 
+// NVAR::NPOINTS
 using State_t = parthenon::ParArray2D<Real>;
 using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
+
+// NVAR:NUMZONES
+using State_t_raw = parthenon::ParArray2D<Real>;
+using State_host_t_raw = typename parthenon::ParArray2D<Real>::HostMirror;
 
 constexpr int RHO = 0;
 constexpr int V = 1;
@@ -34,11 +39,11 @@ constexpr int TEMP = 5;
 constexpr int grav = 6;
 constexpr int entr = 7;
 
-int inline Get1DProfileNumZones(const std::string &model_filename){
+int inline Get1DProfileNumZones(const std::string& model_filename){
 
     // open file
-    std::ifstream inputfile(model_filename);
-    //std::string test = "2dinput.txt";
+    std::ifstream inputfile;
+    inputfile.open("1d_model.txt"); //model_filename
 
     // error check    
     if (!inputfile.is_open()){ 
@@ -53,7 +58,7 @@ int inline Get1DProfileNumZones(const std::string &model_filename){
     std::string line;
 
     // get number of zones from 1d file
-    while(!inputfile.eof()) {
+    while(!inputfile.eof()){ 
             getline(inputfile, line);
             num_zones ++;
     }
@@ -64,15 +69,17 @@ int inline Get1DProfileNumZones(const std::string &model_filename){
     return num_zones-1;
 }
 
-KOKKOS_INLINE_FUNCTION
-Real Get1DProfileData(const std::string model_filename, const int num_zones){
+Real inline Get1DProfileData(const std::string model_filename, const int num_zones){
 
     // open file
-    std::ifstream inputfile(model_filename);
+    std::ifstream inputfile;
+    inputfile.open("1d_model.txt"); //model_filename
 
     // error check
-    if (!inputfile.is_open())
+    if (!inputfile.is_open()){
         std::cout<<"Error opening file",model_filename;
+	return 0;
+    }
 
     const int num_vars = 9; // 8 + radius
     Real model_1d[num_vars][num_zones];
@@ -82,15 +89,16 @@ Real Get1DProfileData(const std::string model_filename, const int num_zones){
     {
         for (int j = 0; j < num_zones; j++) //  number of zones
         {
-          inputfile >> model_1d[k][j];
+          inputfile >> model_1d(k,j);
         }
     }
 
-    std::cout << "Read 1D profile into.";
+    std::cout << "Read 1D profile into state array.";
 
     inputfile.close();
 
-    return model_1d[num_vars][num_zones];
+    return model_1d;
+
 }
 
 /*

@@ -21,6 +21,7 @@
 #include <utility>
 #include <fstream>
 #include <typeinfo>
+#include <unistd.h>
 
 // Parthenon
 #include <globals.hpp>
@@ -84,11 +85,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("epsmin", epsmin);
 
   // Arrays for CCSN stuff
-  CCSN::State_t ccsn_state("CCSN state", CCSN::NCCSN, npoints);
-  auto ccsn_state_h = Kokkos::create_mirror_view(ccsn_state);
+  //  CCSN::State_t ccsn_state("CCSN state", CCSN::NCCSN, npoints);
+  //  auto ccsn_state_h = Kokkos::create_mirror_view(ccsn_state);
 
-  params.Add("ccsn_state", ccsn_state);
-  params.Add("ccsn_state_h", ccsn_state_h);
+  //  params.Add("ccsn_state", ccsn_state);
+  //  params.Add("ccsn_state_h", ccsn_state_h);
 
   return ccsn;
 }
@@ -112,14 +113,20 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   auto npoints = params.Get<int>("npoints");
   auto radius = monopolepkg->Param<MonopoleGR::Radius>("radius");
 
-  auto matter_h = monopolepkg->Param<MonopoleGR::Matter_host_t>("matter_h");
-  auto state_h = params.Get<CCSN::State_host_t>("ccsn_state_h");
+  // auto matter_h = monopolepkg->Param<MonopoleGR::Matter_host_t>("matter_h");
+  // auto state_h = params.Get<CCSN::State_host_t>("ccsn_state_h");
 
   const Real dr = radius.dx();
 
+  //printf("Current working dir: %s\n", get_current_dir_name());
+
   // read 1d model
   const int num_zones = Get1DProfileNumZones(model_filename);
-  //printf("1D model read in with ",num_zones,"number of zones.");
+
+  // CCSN::State_t_raw ccsn_state_raw("CCSN state raw", CCSN::NCCSN, num_zones);
+  // auto ccsn_state_raw_h = Kokkos::create_mirror_view(ccsn_state_raw);
+
+  const Real 1d_model = Get1DProfileData(model_filename,num_zones);
 
   //printf("%s:%i model_filename = %s\n", __FILE__, __LINE__, model_filename.c_str());
 
