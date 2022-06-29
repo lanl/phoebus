@@ -40,7 +40,7 @@ class SourceResidual4 {
   KOKKOS_FUNCTION
   SourceResidual4(const EOS &eos, const Opacity &opac, const MeanOpacity &mopac,
                   const Real rho, const Real Ye, const Real bprim[3],
-                  const RadiationType species, const Tens2 conTilPi,
+                  const RadiationType species, const Tens2 &conTilPi,
                   const Real gcov[4][4], const Real gammacon[3][3], const Real alpha,
                   const Real beta[3], const Real sdetgam, const Real scattering_fraction,
                   typename CLOSURE::LocalGeometryType &g, Real U_mhd_0[4],
@@ -97,15 +97,13 @@ class SourceResidual4 {
     Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
     CLOSURE c(con_v, &g_);
     c.Con2Prim(U_rad[0] / sdetgam_, cov_F, conTilPi_, &(P_rad[0]), &cov_H);
-    //    SPACELOOP2(ii, jj) {
-    //      printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi_(ii,jj));
-    //    }
-    //    SPACELOOP(ii) {
-    //      printf("con_v: %e %e %e\n", con_v(0), con_v(1), con_v(2));
-    //    }
-    //    printf("E: %e cov_F: %e %e %e J: %e cov_H: %e %e %e\n", U_rad[0], cov_F(0),
-    //    cov_F(1), cov_F(2),
-    //      P_rad[0], cov_H(0), cov_H(1), cov_H(2));
+        SPACELOOP2(ii, jj) {
+          printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi_(ii,jj));
+        }
+        printf("con_v: %e %e %e\n", con_v(0), con_v(1), con_v(2));
+        printf("E: %e cov_F: %e %e %e J: %e cov_H: %e %e %e\n", U_rad[0], cov_F(0),
+        cov_F(1), cov_F(2),
+          P_rad[0], cov_H(0), cov_H(1), cov_H(2));
     SPACELOOP(ii) { P_rad[ii + 1] = cov_H(ii); }
   }
 
@@ -1237,6 +1235,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
+        SPACELOOP2(ii, jj) {
+          conTilPi(ii, jj) = 0.;
+        }
         SourceResidual4<ClosureEdd<Vec, Tens2>> srm(
             eos, d_opacity, d_mean_opacity, rho, Ye, bprim, species_d[ispec], conTilPi,
             cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g, U_mhd_0,
@@ -1265,26 +1266,15 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
         srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
         for (int n = 0; n < 4; n++) {
-          // TODO(BRR) different for valencia
+          // TODO(BRR) different for non-valencia
           resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
         }
-        if (i == 64) {
-          printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2],
-                 U_mhd_guess[3]);
-          printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
-                 U_rad_guess[3]);
-          printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
-          printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
-                 P_rad_guess[3]);
-        }
-        //        printf("[%i %i %i]\n", k, j, i);
-        //        printf("Ug0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1],
-        //        U_mhd_guess[2],
-        //               U_mhd_guess[3]);
-        //        printf("Ur0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
-        //        U_rad_guess[2],
-        //               U_rad_guess[3]);
-        //        printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2], resid[3]);
+
+if (i == 64) {
+        printf("Pmhd Prad Umhd Urad\n");
+        for (int n = 0; n < 4; n++) {
+          printf("%e %e %e %e\n", Pguess[n], P_rad_guess[n], U_mhd_guess[n], U_rad_guess[n]);
+        }}
 
         bool success = false;
         // TODO(BRR) These will need to be per-species later
@@ -1303,11 +1293,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           for (int m = 0; m < 4; m++) {
             Real P_mhd_m[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
             Real P_mhd_p[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
+            // TODO(BRR) Use minimum non-zero magnitude from Pguess[]
             Real P_mhd_mag_min = std::max<Real>(
                 std::max<Real>(std::max<Real>(std::fabs(Pguess[0]), std::fabs(Pguess[1])),
                                std::fabs(Pguess[2])),
                 std::fabs(Pguess[3]));
-            // TODO(BRR) SMALL() doesn't work when dS is 0
             P_mhd_m[m] -= std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
             P_mhd_p[m] += std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
 
@@ -1322,36 +1312,15 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
 
             for (int n = 0; n < 4; n++) {
-              // TODO(BRR) -dt*dS for valencia
+              // TODO(BRR) -dt*dS for non-valencia
               Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
               Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
               jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
-              //              printf("[%i][%i] Umhdp: %28.18e Umhdm = %28.18e Umhd0 =
-              //              %28.18e dS: %28.18e %28.18e\n",
-              //                     n,m,U_mhd_p[n],U_mhd_m[n], U_mhd_0[n], dS_p[n],
-              //                     dS_m[n]);
-              //              printf("fp: %28.18e fm: %28.18e\n", fp, fm);
             }
           }
 
-          //                    printf("jacobian:\n");
-          //                    for (int m = 0; m < 4; m++) {
-          //                      for (int n = 0; n < 4; n++) {
-          //                        printf("%e ", jac[m][n]);
-          //                      }
-          //                      printf("\n");
-          //                    }
-
           Real jacinv[4][4];
           LinearAlgebra::Invert4x4Matrix(jac, jacinv);
-
-          //                    printf("jacobian inverse:\n");
-          //                    for (int m = 0; m < 4; m++) {
-          //                      for (int n = 0; n < 4; n++) {
-          //                        printf("%e ", jacinv[m][n]);
-          //                      }
-          //                      printf("\n");
-          //                    }
 
           // Calculate residual (unneeded, use value from end of last step?)
           srm.CalculateMHDConserved(Pguess, U_mhd_guess);
@@ -1385,12 +1354,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               err = suberr;
             }
           }
-          //          printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2],
-          //          resid[3]); printf("niter: %i err: %e\n", niter, err);
-          if (i == 64) {
-            printf("[%i] err: %e Pguess: %e %e %e %e\n", niter, err, Pguess[0], Pguess[1],
-                   Pguess[2], Pguess[3]);
-          }
 
           niter++;
           if (niter == max_iter) {
@@ -1406,6 +1369,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           SPACELOOP(ii) {
             cov_dF(ii) = U_rad_guess[ii + 1] - v(iblock, idx_F(ispec, ii), k, j, i);
           }
+            if (i == 64) {
+              printf("4D dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
+              exit(-1);
+            }
         }
 
         // FORCING USE OF 1D ROOTFIND!
@@ -1458,6 +1425,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
             c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
                                  &cov_dF);
+            if (i == 64) {
+              printf("1D dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
+            }
           }
 
           if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0.) {
@@ -1466,7 +1436,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           } else {
             success = false;
           }
-          // exit(-1);
         }
 
         // If sequence of source update methods was successful, apply update to conserved
@@ -1493,251 +1462,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           exit(-1);
           v(iblock, ifail, k, j, i) = FailFlags::fail;
         }
-      });
-  return TaskStatus::complete;
-
-//        if (niter == max_iter && err > TOL) {
-//          printf("FAIL niter = %i err = %e (%e)\n", niter, err, TOL);
-//          exit(-1);
-//
-//          // Operator split the energy and momentum exchanges
-//
-//        } else {
-//          v(iblock, ifail, k, j, i) = FailFlags::success;
-//
-//          if (std::isnan(U_rad_guess[0]) || std::isnan(U_rad_guess[1]) ||
-//              std::isnan(U_rad_guess[2]) || std::isnan(U_rad_guess[3])) {
-//            printf("bad! %i %i %i\n", k, j, i);
-//            printf("%e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
-//                   U_rad_guess[3]);
-//            exit(-1);
-//          }
-//
-//          // Update conserved variables
-//          v(iblock, idx_E(ispec), k, j, i) = U_rad_guess[0];
-//          SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) = U_rad_guess[ii + 1]; }
-//
-//          if (update_fluid) {
-//            // TODO(BRR) Update Ye somehow
-//            v(iblock, ceng, k, j, i) = U_mhd_guess[0];
-//            SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) = U_mhd_guess[ii + 1]; }
-//          }
-//          if (i == 64) {
-//            printf("Urad: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
-//                   U_rad_guess[3]);
-//          }
-//        }
-//      });
-  return TaskStatus::complete;
-
-  //      if (niter == max_iter && err > TOL) {
-  //        v(iblock, ifail, k, j, i) = FailFlags::fail;
-  //      } else {
-  //        v(iblock, ifail, k, j, i) = FailFlags::success;
-  //
-  //        if (std::isnan(U_rad_guess[0]) || std::isnan(U_rad_guess[1]) ||
-  //            std::isnan(U_rad_guess[2]) || std::isnan(U_rad_guess[3])) {
-  //          printf("bad! %i %i %i\n", k, j, i);
-  //          printf("%e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
-  //                 U_rad_guess[3]);
-  //          exit(-1);
-  //        }
-  //
-  //        // Update conserved variables
-  //        v(iblock, idx_E(ispec), k, j, i) = U_rad_guess[0];
-  //        SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) = U_rad_guess[ii + 1]; }
-  //
-  //        if (update_fluid) {
-  //          // TODO(BRR) Update Ye somehow
-  //          v(iblock, ceng, k, j, i) = U_mhd_guess[0];
-  //          SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) = U_mhd_guess[ii + 1]; }
-  //        }
-  //        if (i == 64) {
-  //          printf("Urad: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
-  //          U_rad_guess[2],
-  //                 U_rad_guess[3]);
-  //        }
-  //      }
-  //    });
-  //    return TaskStatus::complete;
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
-      nblock - 1, // Loop over blocks
-      kb.s, kb.e, // z-loop
-      jb.s, jb.e, // y-loop
-      ib.s, ib.e, // x-loop
-      KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
-        // Set up the background state
-        Tens2 cov_gamma;
-        geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
-        Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
-        Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-        LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
-        const Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                                v(iblock, pv(2), k, j, i)};
-        const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-        Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
-
-        Real J0[3] = {0.};
-        for (int ispec = 0; ispec < num_species; ++ispec) {
-          J0[ispec] = v(iblock, idx_J(ispec), k, j, i);
-        }
-
-        const Real dtau = alpha * dt / W;
-
-        const Real rho = v(iblock, prho, k, j, i);
-        const Real ug = v(iblock, peng, k, j, i);
-        const Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
-
-        // Rootfind over fluid temperature in fluid rest frame
-        root_find::RootFind root_find;
-        InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
-                                 num_species, species_d, scattering_fraction, dtau);
-        const Real T1 =
-            root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
-                             1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
-
-        // Practice multiD rootfind
-        //        root_find::MultiDRootFind<4> md_root_find;
-        //        InteractionFourMomResidual resid;
-        //        Real guess[4] = {0};
-        //        Real ans[4] = {0};
-        //        md_root_find.newton(resid, 1.e-8, guess, ans);
-
-        // If rootfind fails assume thermal equilibrium?
-
-        // Calculate energy/momentum exchange with updated fluid temperature
-
-        /// TODO: (LFR) Move beyond Eddington for this update
-        ClosureEdd<Vec, Tens2> c(con_v, &g);
-        for (int ispec = 0; ispec < num_species; ++ispec) {
-
-          Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
-          Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
-                        v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
-                        v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
-
-          Real dE;
-          Vec cov_dF;
-
-          // Treat the Eddington tensor explicitly for now
-          Real &J = v(iblock, idx_J(ispec), k, j, i);
-          Vec cov_H{{
-              J * v(iblock, idx_H(ispec, 0), k, j, i),
-              J * v(iblock, idx_H(ispec, 1), k, j, i),
-              J * v(iblock, idx_H(ispec, 2), k, j, i),
-          }};
-          Tens2 con_tilPi;
-
-          c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
-
-          Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
-          Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-              rho, T1, Ye, species_d[ispec]);
-          Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-          Real tauH = alpha * dt * kappa;
-
-          c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
-                               &cov_dF);
-
-          /*Real rescale = 1.;
-          if (v(iblock, ceng, k, j, i) < sdetgam * dE) {
-            rescale = 0.95 * v(iblock, ceng, k, j, i) / (sdetgam * dE);
-          }*/
-          // Success unless subsequent failure
-          v(iblock, ifail, k, j, i) = FailFlags::success;
-
-          // Add source corrections to conserved iration variables
-          if (-sdetgam * dE > v(iblock, idx_E(ispec), k, j, i)) {
-            v(iblock, ifail, k, j, i) = FailFlags::fail;
-          }
-          v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
-          for (int idir = 0; idir < 3; ++idir) {
-            v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
-          }
-
-          // Add source corrections to conserved fluid variables
-          if (update_fluid) {
-            if (cye > 0) {
-              v(iblock, cye, k, j, i) -= sdetgam * 0.0;
-            }
-#if USE_VALENCIA
-            //            if (v(iblock, ceng, k, j, i) < sdetgam * dE) {
-            //    printf("too large source! [%i %i %i] ceng = %e sdg*dE = %e alpha =
-            //    %e\n", k, j, i, v(iblock, ceng, k, j, i), sdetgam*dE, alpha);
-            //              printf("ispec: %i\n", ispec);
-            //    printf("rho: %e T: %e peng: %e Ye: %e\n", rho, v(iblock, pT, k, j, i),
-            //    ug, Ye); printf("J0: %e tauJ: %e tauH: %e\n", J0, tauJ, tauH);
-            //    printf("T1: %e JBB: %e\n", T1, JBB);
-            //    PARTHENON_FAIL("negative ceng");
-            //  }
-            if (sdetgam * dE > v(iblock, ceng, k, j, i)) {
-              v(iblock, ifail, k, j, i) = FailFlags::fail;
-            }
-            v(iblock, ceng, k, j, i) -= sdetgam * dE;
-#else
-            // TODO(BRR) This is not correct
-            v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
-#endif
-            SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
-          }
-
-        } // for ispec
-
-        /* for (int ispec = 0; ispec < num_species; ++ispec) {
-
-           /// TODO: (LFR) Move beyond Eddington for this update
-           ClosureEdd<Vec, Tens2> c(con_v, &g);
-
-           Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
-           Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
-                         v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
-                         v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
-
-           Real dE;
-           Vec cov_dF;
-
-           // Treat the Eddington tensor explicitly for now
-           Real &J = v(iblock, idx_J(ispec), k, j, i);
-           Vec cov_H{{
-               J * v(iblock, idx_H(ispec, 0), k, j, i),
-               J * v(iblock, idx_H(ispec, 1), k, j, i),
-               J * v(iblock, idx_H(ispec, 2), k, j, i),
-           }};
-           Tens2 con_tilPi;
-
-           c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
-
-           Real B = v(iblock, idx_JBB(ispec), k, j, i);
-           Real tauJ = alpha * dt * v(iblock, idx_kappaJ(ispec), k, j, i);
-           Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
-           Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
-           c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE,
- &cov_dF);
-
-           // Add source corrections to conserved iration variables
-           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
-           for (int idir = 0; idir < 3; ++idir) {
-             v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
-           }
-
-           // Add source corrections to conserved fluid variables
-           if (update_fluid) {
-             if (cye > 0) {
-               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
-             }
- #if USE_VALENCIA
-             v(iblock, ceng, k, j, i) -= sdetgam * dE;
- #else
-             // TODO(BRR) This is not correct
-             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
- #endif
-             v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
-             v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
-             v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
-           }
-         }*/
       });
   return TaskStatus::complete;
 }
