@@ -97,13 +97,6 @@ class SourceResidual4 {
     Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
     CLOSURE c(con_v, &g_);
     c.Con2Prim(U_rad[0] / sdetgam_, cov_F, conTilPi_, &(P_rad[0]), &cov_H);
-        SPACELOOP2(ii, jj) {
-          printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi_(ii,jj));
-        }
-        printf("con_v: %e %e %e\n", con_v(0), con_v(1), con_v(2));
-        printf("E: %e cov_F: %e %e %e J: %e cov_H: %e %e %e\n", U_rad[0], cov_F(0),
-        cov_F(1), cov_F(2),
-          P_rad[0], cov_H(0), cov_H(1), cov_H(2));
     SPACELOOP(ii) { P_rad[ii + 1] = cov_H(ii); }
   }
 
@@ -149,8 +142,7 @@ class SourceResidual4 {
   const Real sdetgam_;
 
   const Tens2 &conTilPi_;
-  typename CLOSURE::LocalGeometryType &g_; //(geom, CellLocation::Cent, 0, b, j, i);
-  // CLOSURE c_;
+  typename CLOSURE::LocalGeometryType &g_;
 
   Real U_mhd_0_[4];
   Real U_rad_0_[4];
@@ -1201,25 +1193,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                            v(iblock, pb_lo + 2, k, j, i)};
         }
         Real lambda[2] = {Ye, 0.};
-        // Real J = v(iblock, idx_J(ispec), k, j, i);
-        // Real cov_H[3] = {v(iblock, idx_H(0, ispec), k, j, i),
-        //                 v(iblock, idx_H(1, ispec), k, j, i),
-        //                 v(iblock, idx_H(2, ispec), k, j, i)};
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
-        // Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-        // Real con_v[3] = {con_vp[0] / W, con_vp[1] / W, con_vp[2] / W};
-        // Real cov_v[3] = {0};
-        // SPACELOOP2(ii, jj) { cov_v[ii] += cov_gamma(ii, jj) * con_v[jj]; }
-        // Real vdH = 0.;
-        // SPACELOOP(ii) { vdH += con_v[ii] * cov_H[ii]; }
 
-        // Real Pguess[4] = {ug, con_vp[0], con_vp[1], con_vp[2]};
         Real Pguess[4] = {ug, v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
-        Real U_mhd_0[4]; // = {v(iblock, ceng, k, j, i), v(iblock, cmom_lo, k, j, i),
-                         //   v(iblock, cmom_lo + 1, k, j, i),
-                         //   v(iblock, cmom_lo + 2, k, j, i)};
+        Real U_mhd_0[4];
         const Real Pg0 = eos.PressureFromDensityInternalEnergy(rho, ug / rho, lambda);
         const Real gam1 =
             eos.BulkModulusFromDensityInternalEnergy(rho, ug / rho, lambda) / Pg0;
@@ -1235,9 +1214,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
-        SPACELOOP2(ii, jj) {
-          conTilPi(ii, jj) = 0.;
-        }
+        //SPACELOOP2(ii, jj) {
+        //  conTilPi(ii, jj) = 0.;
+        //}
         SourceResidual4<ClosureEdd<Vec, Tens2>> srm(
             eos, d_opacity, d_mean_opacity, rho, Ye, bprim, species_d[ispec], conTilPi,
             cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g, U_mhd_0,
@@ -1269,12 +1248,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // TODO(BRR) different for non-valencia
           resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
         }
-
-if (i == 64) {
-        printf("Pmhd Prad Umhd Urad\n");
-        for (int n = 0; n < 4; n++) {
-          printf("%e %e %e %e\n", Pguess[n], P_rad_guess[n], U_mhd_guess[n], U_rad_guess[n]);
-        }}
 
         bool success = false;
         // TODO(BRR) These will need to be per-species later
@@ -1369,10 +1342,6 @@ if (i == 64) {
           SPACELOOP(ii) {
             cov_dF(ii) = U_rad_guess[ii + 1] - v(iblock, idx_F(ispec, ii), k, j, i);
           }
-            if (i == 64) {
-              printf("4D dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
-              exit(-1);
-            }
         }
 
         // FORCING USE OF 1D ROOTFIND!
@@ -1425,9 +1394,6 @@ if (i == 64) {
 
             c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
                                  &cov_dF);
-            if (i == 64) {
-              printf("1D dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
-            }
           }
 
           if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0.) {
