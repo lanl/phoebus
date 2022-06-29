@@ -88,9 +88,20 @@ class SourceResidual4 {
   void CalculateRadPrimitive(Real P_mhd[4], Real U_rad[4], Real P_rad[4]) {
     Vec cov_F{U_rad[1] / sdetgam_, U_rad[2] / sdetgam_, U_rad[3] / sdetgam_};
     Vec cov_H;
-    Vec con_v{P_mhd[1], P_mhd[2], P_mhd[3]};
+    Real W = 0.;
+    SPACELOOP2(ii, jj) { W += gcov_[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
+    W = std::sqrt(1. + W);
+    Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
     CLOSURE c(con_v, &g_);
     c.Con2Prim(U_rad[0] / sdetgam_, cov_F, conTilPi_, &(P_rad[0]), &cov_H);
+//    SPACELOOP2(ii, jj) {
+//      printf("conTilPi(%i, %i) = %e\n", ii, jj, conTilPi_(ii,jj));
+//    }
+//    SPACELOOP(ii) {
+//      printf("con_v: %e %e %e\n", con_v(0), con_v(1), con_v(2));
+//    }
+//    printf("E: %e cov_F: %e %e %e J: %e cov_H: %e %e %e\n", U_rad[0], cov_F(0), cov_F(1), cov_F(2),
+//      P_rad[0], cov_H(0), cov_H(1), cov_H(2));
     SPACELOOP(ii) { P_rad[ii + 1] = cov_H(ii); }
   }
 
@@ -109,7 +120,7 @@ class SourceResidual4 {
       cov_v[ii] += gcov_[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1] / (W * W);
     }
     Real vdH = 0.;
-    SPACELOOP(ii) { vdH += P_mhd[ii + 1] * P_rad[ii + 1]; }
+    SPACELOOP(ii) { vdH += P_mhd[ii + 1] / W * P_rad[ii + 1]; }
 
     S[0] = alpha_ * sdetgam_ * (kappaJ * W * (JBB - P_rad[0]) - kappaH * vdH);
     SPACELOOP(ii) {
@@ -1188,20 +1199,22 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                            v(iblock, pb_lo + 2, k, j, i)};
         }
         Real lambda[2] = {Ye, 0.};
-        Real J = v(iblock, idx_J(ispec), k, j, i);
-        Real cov_H[3] = {v(iblock, idx_H(0, ispec), k, j, i),
-                         v(iblock, idx_H(1, ispec), k, j, i),
-                         v(iblock, idx_H(2, ispec), k, j, i)};
+        //Real J = v(iblock, idx_J(ispec), k, j, i);
+        //Real cov_H[3] = {v(iblock, idx_H(0, ispec), k, j, i),
+        //                 v(iblock, idx_H(1, ispec), k, j, i),
+        //                 v(iblock, idx_H(2, ispec), k, j, i)};
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
-        Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-        Real con_v[3] = {con_vp[0] / W, con_vp[1] / W, con_vp[2] / W};
-        Real cov_v[3] = {0};
-        SPACELOOP2(ii, jj) { cov_v[ii] += cov_gamma(ii, jj) * con_v[jj]; }
-        Real vdH = 0.;
-        SPACELOOP(ii) { vdH += con_v[ii] * cov_H[ii]; }
+        //Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+        //Real con_v[3] = {con_vp[0] / W, con_vp[1] / W, con_vp[2] / W};
+        //Real cov_v[3] = {0};
+        //SPACELOOP2(ii, jj) { cov_v[ii] += cov_gamma(ii, jj) * con_v[jj]; }
+        //Real vdH = 0.;
+        //SPACELOOP(ii) { vdH += con_v[ii] * cov_H[ii]; }
 
-        Real Pguess[4] = {ug, con_vp[0], con_vp[1], con_vp[2]};
+        //Real Pguess[4] = {ug, con_vp[0], con_vp[1], con_vp[2]};
+        Real Pguess[4] = {ug, v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                          v(iblock, pv(2), k, j, i)};
         Real U_mhd_0[4]; // = {v(iblock, ceng, k, j, i), v(iblock, cmom_lo, k, j, i),
                          //   v(iblock, cmom_lo + 1, k, j, i),
                          //   v(iblock, cmom_lo + 2, k, j, i)};
@@ -1215,8 +1228,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                       con_gamma.data, beta, alpha, sdetgam, D, &(U_mhd_0[1]), bcons,
                       U_mhd_0[0], ye_cons);
         Real U_rad_0[4] = {
-            v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(0, ispec), k, j, i),
-            v(iblock, idx_F(1, ispec), k, j, i), v(iblock, idx_F(2, ispec), k, j, i)};
+            v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
+            v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i)};
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
@@ -1251,6 +1264,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // TODO(BRR) different for valencia
           resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
         }
+          if (i == 64) {
+            printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2], U_mhd_guess[3]);
+            printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2], U_rad_guess[3]);
+            printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
+            printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+          }
         //        printf("[%i %i %i]\n", k, j, i);
         //        printf("Ug0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1],
         //        U_mhd_guess[2],
@@ -1356,6 +1375,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           }
           //          printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2],
           //          resid[3]); printf("niter: %i err: %e\n", niter, err);
+          if (i == 64) {
+            printf("[%i] err: %e Pguess: %e %e %e %e\n", niter, err, Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
+          }
 
           niter++;
           if (niter == max_iter) {
@@ -1378,12 +1400,15 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
           // Update conserved variables
           v(iblock, idx_E(ispec), k, j, i) = U_rad_guess[0];
-          SPACELOOP(ii) { v(iblock, idx_F(ii, ispec), k, j, i) = U_rad_guess[ii + 1]; }
+          SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) = U_rad_guess[ii + 1]; }
 
           if (update_fluid) {
             // TODO(BRR) Update Ye somehow
             v(iblock, ceng, k, j, i) = U_mhd_guess[0];
             SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) = U_mhd_guess[ii + 1]; }
+          }
+          if (i == 64) {
+            printf("Urad: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2], U_rad_guess[3]);
           }
         }
       });
