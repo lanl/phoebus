@@ -892,19 +892,19 @@ TaskStatus SourceFixup(T *rc) {
 //        eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
 
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
-          const Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
-          const Real gdetim1 = geom.DetG(CellLocation::Cent, k, j, i - 1);
-          const Real gdetip1 = geom.DetG(CellLocation::Cent, k, j, i + 1);
+          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+          const Real gdetim1 = geom.DetGamma(CellLocation::Cent, k, j, i - 1);
+          const Real gdetip1 = geom.DetGamma(CellLocation::Cent, k, j, i + 1);
           v(b, iv, k, j, i) = gdet * (v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) / gdetim1 +
                               v(b, ifail, k, j, i + 1) * v(b, iv, k, j, i + 1) / gdetip1 );
           if (ndim > 1) {
-            const Real gdetjm1 = geom.DetG(CellLocation::Cent, k, j - 1, i);
-            const Real gdetjp1 = geom.DetG(CellLocation::Cent, k, j + 1, i);
+            const Real gdetjm1 = geom.DetGamma(CellLocation::Cent, k, j - 1, i);
+            const Real gdetjp1 = geom.DetGamma(CellLocation::Cent, k, j + 1, i);
             v(b, iv, k, j, i) += gdet * (v(b, ifail, k, j - 1, i) * v(b, iv, k, j - 1, i) / gdetjm1 +
                                  v(b, ifail, k, j + 1, i) * v(b, iv, k, j + 1, i) / gdetjp1 );
             if (ndim == 3) {
-              const Real gdetkm1 = geom.DetG(CellLocation::Cent, k - 1, j, i);
-              const Real gdetkp1 = geom.DetG(CellLocation::Cent, k + 1, j, i);
+              const Real gdetkm1 = geom.DetGamma(CellLocation::Cent, k - 1, j, i);
+              const Real gdetkp1 = geom.DetGamma(CellLocation::Cent, k + 1, j, i);
               v(b, iv, k, j, i) += gdet * (v(b, ifail, k - 1, j, i) * v(b, iv, k - 1, j, i) / gdetkm1 +
                                    v(b, ifail, k + 1, j, i) * v(b, iv, k + 1, j, i) / gdetkp1);
             }
