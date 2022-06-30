@@ -1203,9 +1203,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
-        // SPACELOOP2(ii, jj) {
-        //  conTilPi(ii, jj) = 0.;
-        //}
         SourceResidual4<ClosureEdd<Vec, Tens2>> srm(
             eos, d_opacity, d_mean_opacity, rho, Ye, bprim, species_d[ispec], conTilPi,
             cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g, U_mhd_0,
@@ -1236,6 +1233,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         for (int n = 0; n < 4; n++) {
           // TODO(BRR) different for non-valencia
           resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
+        }
+        if (i == 64 && j == 64) {
+          printf("Pmhd Prad Umhd Urad:\n");
+          for (int n = 0; n < 4; n++) {
+            printf("%e %e %e %e\n", Pguess[n], U_mhd_guess[n], P_rad_guess[n], U_rad_guess[n]);
+          }
         }
 
         bool success = false;
@@ -1323,6 +1326,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           }
         } while (err > TOL);
 
+        if (i == 64 && j == 64) {
+          printf("First success? %i err = %e (%i)\n", static_cast<int>(success), err, niter);
+        }
         if (niter == max_iter && err > TOL) {
           success = false;
         } else {
@@ -1331,10 +1337,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           SPACELOOP(ii) {
             cov_dF(ii) = U_rad_guess[ii + 1] - v(iblock, idx_F(ispec, ii), k, j, i);
           }
+        if (i == 64 && j == 64) {
+         printf("first: dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
+        }
         }
 
         // FORCING USE OF 1D ROOTFIND!
-        success = false;
+        //success = false;
 
         // If 4D rootfind failed, try operator splitting the energy and momentum updates.
         // TODO(BRR) Only do this if J << ug?
