@@ -148,9 +148,7 @@ void PhoebusDriver::PostInitializationCommunication() {
     // IndexDomain::entire);
   }
 
-  printf("%s:%i\n", __FILE__, __LINE__);
   tc.Execute();
-  printf("%s:%i\n", __FILE__, __LINE__);
 }
 
 TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
@@ -404,7 +402,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
   // Radiation source terms
   //auto num_independent_task_lists = blocks.size();
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
@@ -459,7 +456,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto floors_2 = tl.AddTask(fixup_2, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
   }
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
 
   //const int num_partitions = pmesh->DefaultNumPartitions();
   TaskRegion &sync_region_2 = tc.AddRegion(num_partitions);
@@ -566,7 +562,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fill_from_bufs =
         tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, sc1);
   }
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
 
   TaskRegion &async_region_3 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
@@ -618,7 +613,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       }
     }
   }
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
 
   return tc;
 } // namespace phoebus
