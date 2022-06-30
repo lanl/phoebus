@@ -43,6 +43,13 @@ static struct X1RhoSieFloor {
 static struct RRhoSieFloor {
 } r_rho_sie_floor_tag;
 
+// TODO(BRR) finish this
+enum class RadiationFloorFlag { ConstantJ, ExpX1J };
+class RadiationFloors {
+  public:
+   RadiationFloors() {}
+};
+
 enum class FloorFlag { ConstantRhoSie, ExpX1RhoSie, ExpX1RhoU, X1RhoSie, RRhoSie };
 
 class Floors {
