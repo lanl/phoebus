@@ -41,26 +41,16 @@ class SourceResidual4 {
   SourceResidual4(const EOS &eos, const Opacity &opac, const MeanOpacity &mopac,
                   const Real rho, const Real Ye, const Real bprim[3],
                   const RadiationType species, const Tens2 &conTilPi,
-                  const Real gcov[4][4], const Real gammacon[3][3], const Real alpha,
+                  const Real (&gcov)[4][4], const Real (&gammacon)[3][3], const Real alpha,
                   const Real beta[3], const Real sdetgam, const Real scattering_fraction,
-                  typename CLOSURE::LocalGeometryType &g, Real U_mhd_0[4],
-                  Real U_rad_0[4])
-      : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), species_(species),
-        conTilPi_(conTilPi), alpha_(alpha), sdetgam_(sdetgam),
-        scattering_fraction_(scattering_fraction), g_(g) {
+                  typename CLOSURE::LocalGeometryType &g, Real (&U_mhd_0)[4],
+                  Real (&U_rad_0)[4])
+      : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), bprim_(&(bprim[0])), species_(species),
+        conTilPi_(conTilPi), gcov_(&gcov), gammacon_(&gammacon), alpha_(alpha), beta_(&(beta[0])), sdetgam_(sdetgam),
+        scattering_fraction_(scattering_fraction), g_(g), U_mhd_0_(&U_mhd_0),
+        U_rad_0_(&U_rad_0) {
     lambda_[0] = Ye;
     lambda_[1] = 0.;
-    SPACELOOP(ii) {
-      bprim_[ii] = bprim[ii];
-      beta_[ii] = beta[ii];
-      SPACELOOP(jj) { gammacon_[ii][jj] = gammacon[ii][jj]; }
-    }
-    SPACETIMELOOP2(mu, nu) { gcov_[mu][nu] = gcov[mu][nu]; }
-    // TODO(BRR) A Vec-like object would be handy here for passing a reference
-    for (int n = 0; n < 4; n++) {
-      U_mhd_0_[n] = U_mhd_0[n];
-      U_rad_0_[n] = U_rad_0[n];
-    }
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -71,15 +61,15 @@ class SourceResidual4 {
     Real D;
     Real bcons[3];
     Real ye_cons;
-    prim2con::p2c(rho_, &(P_mhd[1]), bprim_, P_mhd[0], lambda_[0], Pg, gam1, gcov_,
-                  gammacon_, beta_, alpha_, sdetgam_, D, &(U_mhd[1]), bcons, U_mhd[0],
+    prim2con::p2c(rho_, &(P_mhd[1]), bprim_, P_mhd[0], lambda_[0], Pg, gam1, *gcov_,
+                  *gammacon_, beta_, alpha_, sdetgam_, D, &(U_mhd[1]), bcons, U_mhd[0],
                   ye_cons);
   }
 
   KOKKOS_INLINE_FUNCTION
   void CalculateRadConserved(Real U_mhd[4], Real U_rad[4]) {
     for (int n = 0; n < 4; n++) {
-      U_rad[n] = U_rad_0_[n] - (U_mhd[n] - U_mhd_0_[n]);
+      U_rad[n] = (*U_rad_0_)[n] - (U_mhd[n] - (*U_mhd_0_)[n]);
       // TODO(BRR) different for non-valencia
     }
   }
@@ -92,7 +82,7 @@ class SourceResidual4 {
     Vec cov_F{U_rad[1] / sdetgam_, U_rad[2] / sdetgam_, U_rad[3] / sdetgam_};
     Vec cov_H;
     Real W = 0.;
-    SPACELOOP2(ii, jj) { W += gcov_[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
+    SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
     Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
     CLOSURE c(con_v, &g_);
@@ -108,11 +98,11 @@ class SourceResidual4 {
         mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
     Real kappaJ = (1. - scattering_fraction_) * kappaH;
     Real W = 0.;
-    SPACELOOP2(ii, jj) { W += gcov_[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
+    SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
     Real cov_v[3] = {0};
     SPACELOOP2(ii, jj) {
-      cov_v[ii] += gcov_[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1] / (W * W);
+      cov_v[ii] += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1] / (W * W);
     }
     Real vdH = 0.;
     SPACELOOP(ii) { vdH += P_mhd[ii + 1] / W * P_rad[ii + 1]; }
@@ -129,23 +119,22 @@ class SourceResidual4 {
   const Opacity &opac_;
   const MeanOpacity &mopac_;
   const Real rho_;
-  Real bprim_[3];
+  const Real *bprim_;
   const RadiationType species_;
-  const Real scattering_fraction_;
   Real lambda_[2];
-
-  // TODO(BRR) do this without copying memory?
-  Real gcov_[4][4];
-  Real gammacon_[3][3];
-  const Real alpha_;
-  Real beta_[3];
-  const Real sdetgam_;
-
   const Tens2 &conTilPi_;
+
+  const Real (*gcov_)[4][4];
+  const Real (*gammacon_)[3][3];
+  const Real alpha_;
+  const Real *beta_;
+  const Real sdetgam_;
+  const Real scattering_fraction_;
+
   typename CLOSURE::LocalGeometryType &g_;
 
-  Real U_mhd_0_[4];
-  Real U_rad_0_[4];
+  const Real (*U_mhd_0_)[4];
+  const Real (*U_rad_0_)[4];
 };
 
 class InteractionTResidual {
@@ -1214,7 +1203,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
-        //SPACELOOP2(ii, jj) {
+        // SPACELOOP2(ii, jj) {
         //  conTilPi(ii, jj) = 0.;
         //}
         SourceResidual4<ClosureEdd<Vec, Tens2>> srm(
