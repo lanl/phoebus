@@ -42,8 +42,7 @@ constexpr int entr = 7;
 int inline Get1DProfileNumZones(const std::string& model_filename){
 
     // open file
-    std::ifstream inputfile;
-    inputfile.open("1d_model.txt"); //model_filename
+    std::ifstream inputfile((model_filename); //"2dinput.txt" works when harcoded and lives in /bin
 
     // error check    
     if (!inputfile.is_open()){ 

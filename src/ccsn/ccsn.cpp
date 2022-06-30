@@ -126,7 +126,7 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   // CCSN::State_t_raw ccsn_state_raw("CCSN state raw", CCSN::NCCSN, num_zones);
   // auto ccsn_state_raw_h = Kokkos::create_mirror_view(ccsn_state_raw);
 
-  const Real 1d_model = Get1DProfileData(model_filename,num_zones);
+  //const Real 1d_model = Get1DProfileData(model_filename,num_zones);
 
   //printf("%s:%i model_filename = %s\n", __FILE__, __LINE__, model_filename.c_str());
 
