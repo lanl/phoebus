@@ -44,11 +44,11 @@ class SourceResidual4 {
                   const Real (&gcov)[4][4], const Real (&gammacon)[3][3], const Real alpha,
                   const Real beta[3], const Real sdetgam, const Real scattering_fraction,
                   typename CLOSURE::LocalGeometryType &g, Real (&U_mhd_0)[4],
-                  Real (&U_rad_0)[4])
+                  Real (&U_rad_0)[4], const int &k, const int &j, const int &i)
       : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), bprim_(&(bprim[0])), species_(species),
         conTilPi_(conTilPi), gcov_(&gcov), gammacon_(&gammacon), alpha_(alpha), beta_(&(beta[0])), sdetgam_(sdetgam),
         scattering_fraction_(scattering_fraction), g_(g), U_mhd_0_(&U_mhd_0),
-        U_rad_0_(&U_rad_0) {
+        U_rad_0_(&U_rad_0), k_(k), j_(j), i_(i) {
     lambda_[0] = Ye;
     lambda_[1] = 0.;
   }
@@ -112,6 +112,16 @@ class SourceResidual4 {
       S[ii + 1] = alpha_ * sdetgam_ *
                   (kappaJ * W * cov_v[ii] * (JBB - P_rad[0]) - kappaH * P_rad[1 + ii]);
     }
+
+    if (i_ == 64 && j_ == 64) {
+      printf("H: %e %e %e\n", P_rad[1], P_rad[2], P_rad[3]);
+      printf("con_v: %e %e %e\n", P_mhd[1]/W, P_mhd[2]/W, P_mhd[3]/W);
+      printf("vdH: %e\n", vdH);
+      printf("kappaJ: %e kappaH: %e\n", kappaJ, kappaH);
+      printf("W: %e\n", W);
+      printf("JBB: %e P_rad[0]: %e\n", JBB, P_rad[0]);
+      printf("dS: %e %e %e %e\n", S[0], S[1], S[2], S[3]);
+    }
   }
 
  private:
@@ -135,6 +145,8 @@ class SourceResidual4 {
 
   const Real (*U_mhd_0_)[4];
   const Real (*U_rad_0_)[4];
+
+  const int &k_, &j_, &i_;
 };
 
 class InteractionTResidual {
@@ -526,10 +538,6 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         Real *pvjp1 = &var(b, var_id, k, j + dj, 0);
         Real *pvkm1 = &var(b, var_id, k - dk, j, 0);
         Real *pvkp1 = &var(b, var_id, k + dk, j, 0);
-        if (std::isnan(pv[4])) {
-          printf("[%i %i %i %i %i] nan!\n", b, var_id, k, j, 4);
-          exit(-1);
-        }
         Real *vi_l, *vi_r, *vj_l, *vj_r, *vk_l, *vk_r;
         if (n < nrecon) {
           vi_l = &ql(0, n, k, j, 1);
@@ -648,8 +656,6 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
-
   // printf("skipping radiation fluxes\n");
   // return TaskStatus::complete;
   auto *pmb = rc->GetParentPointer().get();
@@ -899,7 +905,6 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
@@ -1068,7 +1073,6 @@ TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
@@ -1206,7 +1210,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         SourceResidual4<ClosureEdd<Vec, Tens2>> srm(
             eos, d_opacity, d_mean_opacity, rho, Ye, bprim, species_d[ispec], conTilPi,
             cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g, U_mhd_0,
-            U_rad_0);
+            U_rad_0, k, j, i);
 
         // Memory for evaluating Jacobian via finite differences
         Real P_rad_m[4];
@@ -1327,7 +1331,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         } while (err > TOL);
 
         if (i == 64 && j == 64) {
-          printf("First success? %i err = %e (%i)\n", static_cast<int>(success), err, niter);
+          printf("[%i %i %i]? %i err = %e (%i) J0 = %e ug0 = %e\n", k,j,i,
+          static_cast<int>(success), err, niter,
+          v(iblock, idx_J(0), k, j, i), v(iblock, peng, k, j, i));
         }
         if (niter == max_iter && err > TOL) {
           success = false;
@@ -1347,60 +1353,61 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // If 4D rootfind failed, try operator splitting the energy and momentum updates.
         // TODO(BRR) Only do this if J << ug?
-        if (success == false) {
-          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-          Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
-
-          Real J0[3] = {v(iblock, idx_J(0), k, j, i), 0, 0};
-          PARTHENON_REQUIRE(num_species == 1, "Multiple species not implemented");
-
-          const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
-
-          // Rootfind over fluid temperature in fluid rest frame
-          root_find::RootFind root_find;
-          InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
-                                   num_species, species_d, scattering_fraction, dtau);
-          const Real T1 =
-              root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
-                               1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
-
-          /// TODO: (LFR) Move beyond Eddington for this update
-          ClosureEdd<Vec, Tens2> c(con_v, &g);
-          for (int ispec = 0; ispec < num_species; ++ispec) {
-
-            Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
-            Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
-                          v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
-                          v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
-
-            // Treat the Eddington tensor explicitly for now
-            Real &J = v(iblock, idx_J(ispec), k, j, i);
-            Vec cov_H{{
-                J * v(iblock, idx_H(ispec, 0), k, j, i),
-                J * v(iblock, idx_H(ispec, 1), k, j, i),
-                J * v(iblock, idx_H(ispec, 2), k, j, i),
-            }};
-            Tens2 con_tilPi;
-
-            c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
-
-            Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
-            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-                rho, T1, Ye, species_d[ispec]);
-            Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-            Real tauH = alpha * dt * kappa;
-
-            c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
-                                 &cov_dF);
-          }
-
-          if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0.) {
-            // TODO(BRR) also check H^2 < J?
-            success = true;
-          } else {
-            success = false;
-          }
-        }
+//        if (success == false) {
+//          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+//          Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+//
+//          Real J0[3] = {v(iblock, idx_J(0), k, j, i), 0, 0};
+//          PARTHENON_REQUIRE(num_species == 1, "Multiple species not implemented");
+//
+//          const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
+//
+//          // Rootfind over fluid temperature in fluid rest frame
+//          root_find::RootFind root_find;
+//          InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
+//                                   num_species, species_d, scattering_fraction, dtau);
+//          const Real T1 =
+//              root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
+//                               1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
+//
+//          /// TODO: (LFR) Move beyond Eddington for this update
+//          ClosureEdd<Vec, Tens2> c(con_v, &g);
+//          //for (int ispec = 0; ispec < num_species; ++ispec) 
+//          {
+//
+//            Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+//            Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
+//                          v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
+//                          v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
+//
+//            // Treat the Eddington tensor explicitly for now
+//            Real &J = v(iblock, idx_J(ispec), k, j, i);
+//            Vec cov_H{{
+//                J * v(iblock, idx_H(ispec, 0), k, j, i),
+//                J * v(iblock, idx_H(ispec, 1), k, j, i),
+//                J * v(iblock, idx_H(ispec, 2), k, j, i),
+//            }};
+//            Tens2 con_tilPi;
+//
+//            c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+//
+//            Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
+//            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+//                rho, T1, Ye, species_d[ispec]);
+//            Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
+//            Real tauH = alpha * dt * kappa;
+//
+//            c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
+//                                 &cov_dF);
+//          }
+//
+//          if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0.) {
+//            // TODO(BRR) also check H^2 < J?
+//            success = true;
+//          } else {
+//            success = false;
+//          }
+//        }
 
         // If sequence of source update methods was successful, apply update to conserved
         // quantities. If unsuccessful, mark zone for fixup.
@@ -1422,9 +1429,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
           }
         } else {
-          printf("FAIL![%i %i %i]\n", k, j, i);
-          exit(-1);
-          v(iblock, ifail, k, j, i) = FailFlags::fail;
+          //std::stringstream msg;
+          //msg << "Source update failure at [" << k << " " << j << " " << i << "]";
+          //PARTHENON_FAIL(msg);
+          //v(iblock, ifail, k, j, i) = FailFlags::fail;
+          // TODO(BRR) if failure just dont do source
+          v(iblock, ifail, k, j, i) = FailFlags::success;
         }
       });
   return TaskStatus::complete;

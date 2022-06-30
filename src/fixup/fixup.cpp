@@ -160,7 +160,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <typename T, class CLOSURE>
 TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace pr = radmoment_prim;
@@ -447,7 +446,6 @@ TaskStatus ApplyFloors(T *rc) {
 
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -865,7 +863,6 @@ TaskStatus SourceFixup(T *rc) {
   int ifail = imap[ri::fail].first;
 
   bool report_source_fails = fix_pkg->Param<bool>("report_source_fails");
-  printf("report src fails? %i\n", report_source_fails);
   if (report_source_fails) {
     int nfail_total;
     parthenon::par_reduce(
