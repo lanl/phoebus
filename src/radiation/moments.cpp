@@ -320,6 +320,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
           printf("E: %e covF: %e %e %e\n", E, covF(0), covF(1), covF(2));
           printf("J: %e covH: %e %e %e\n", J, covH(0), covH(1), covH(2));
+          printf("con_v: %e %e %e\n", con_v(0), con_v(1), con_v(2));
+          SPACELOOP2(ii, jj) printf("conTilPi[%i %i] = %e\n", ii, jj, conTilPi(ii, jj));
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
         }
 
