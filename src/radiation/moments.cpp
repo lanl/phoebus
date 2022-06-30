@@ -336,6 +336,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
 
 template <class T>
 TaskStatus MomentCon2Prim(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
@@ -437,6 +438,7 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
 
 template <class T>
 TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
@@ -891,6 +893,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
 template <class T>
 TaskStatus CalculateFluxes(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
@@ -1048,6 +1051,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 }
 template <class T>
 TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
@@ -1079,6 +1083,7 @@ TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
 
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
@@ -1446,9 +1451,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           //std::stringstream msg;
           //msg << "Source update failure at [" << k << " " << j << " " << i << "]";
           //PARTHENON_FAIL(msg);
-          //v(iblock, ifail, k, j, i) = FailFlags::fail;
+          v(iblock, ifail, k, j, i) = FailFlags::fail;
           // TODO(BRR) if failure just dont do source
-          v(iblock, ifail, k, j, i) = FailFlags::success;
+          //v(iblock, ifail, k, j, i) = FailFlags::success;
         }
       });
   return TaskStatus::complete;
