@@ -113,15 +113,21 @@ class SourceResidual4 {
                   (kappaJ * W * cov_v[ii] * (JBB - P_rad[0]) - kappaH * P_rad[1 + ii]);
     }
 
-    if (i_ == 64 && j_ == 64) {
-      printf("H: %e %e %e\n", P_rad[1], P_rad[2], P_rad[3]);
-      printf("con_v: %e %e %e\n", P_mhd[1]/W, P_mhd[2]/W, P_mhd[3]/W);
-      printf("vdH: %e\n", vdH);
-      printf("kappaJ: %e kappaH: %e\n", kappaJ, kappaH);
-      printf("W: %e\n", W);
-      printf("JBB: %e P_rad[0]: %e\n", JBB, P_rad[0]);
-      printf("dS: %e %e %e %e\n", S[0], S[1], S[2], S[3]);
-    }
+//    if (i_ == 64 && j_ == 64) {
+//      printf("\nCalculate sources");
+//      printf("H: %e %e %e\n", P_rad[1], P_rad[2], P_rad[3]);
+//      printf("con_v: %e %e %e\n", P_mhd[1]/W, P_mhd[2]/W, P_mhd[3]/W);
+//      printf("vdH: %e\n", vdH);
+//      printf("kappaJ: %e kappaH: %e\n", kappaJ, kappaH);
+//      printf("W: %e\n", W);
+//      printf("JBB: %e P_rad[0]: %e\n", JBB, P_rad[0]);
+//      printf("S0 terms: %e %e\n", alpha_ * sdetgam_ * (kappaJ * W * (JBB - P_rad[0])),
+//        alpha_ * sdetgam_ * (- kappaH * vdH));
+//      printf("dS: %e %e %e %e\n", S[0], S[1], S[2], S[3]);
+//      printf("U_mhd_0: %e %e %e %e\n", (*U_mhd_0_)[0], (*U_mhd_0_)[1], (*U_mhd_0_)[2], (*U_mhd_0_)[3]);
+//      printf("U_rad_0: %e %e %e %e\n", (*U_rad_0_)[0], (*U_rad_0_)[1], (*U_rad_0_)[2], (*U_rad_0_)[3]);
+//      printf("alpha: %e sdetgam: %e\n", alpha_, sdetgam_);
+//    }
   }
 
  private:
@@ -1227,6 +1233,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real *U_rad_guess = &(U_rad_p[0]);
         Real *P_rad_guess = &(P_rad_p[0]);
         Real *dS_guess = &(dS_p[0]);
+//        if (i == 64 && j == 64) {
+//        printf("Initial cons mhd rad:\n");
+//        printf("mhd: %e %e %e %e\n", v(iblock, ceng, k, j, i), v(iblock, cmom_lo, k, j, i),
+//          v(iblock, cmom_lo+1, k, j, i), v(iblock, cmom_lo+2, k, j, i));
+//        printf("rad: %e %e %e %e\n", v(iblock, idx_E(0), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
+//          v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i));
+//        }
 
         // Initialize residuals
         Real resid[4];
@@ -1238,12 +1251,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // TODO(BRR) different for non-valencia
           resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
         }
-        if (i == 64 && j == 64) {
-          printf("Pmhd Prad Umhd Urad:\n");
-          for (int n = 0; n < 4; n++) {
-            printf("%e %e %e %e\n", Pguess[n], U_mhd_guess[n], P_rad_guess[n], U_rad_guess[n]);
-          }
-        }
+//        if (i == 64 && j == 64) {
+//          printf("Pmhd Umhd Prad Urad:\n");
+//          for (int n = 0; n < 4; n++) {
+//            printf("%e %e %e %e\n", Pguess[n], U_mhd_guess[n], P_rad_guess[n], U_rad_guess[n]);
+//          }
+//        }
 
         bool success = false;
         // TODO(BRR) These will need to be per-species later
@@ -1330,22 +1343,23 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           }
         } while (err > TOL);
 
-        if (i == 64 && j == 64) {
-          printf("[%i %i %i]? %i err = %e (%i) J0 = %e ug0 = %e\n", k,j,i,
-          static_cast<int>(success), err, niter,
-          v(iblock, idx_J(0), k, j, i), v(iblock, peng, k, j, i));
-        }
+//        if (i == 64 && j == 64) {
+//          printf("[%i %i %i]? %i err = %e (%i) J0 = %e ug0 = %e\n", k,j,i,
+//          static_cast<int>(success), err, niter,
+//          v(iblock, idx_J(0), k, j, i), v(iblock, peng, k, j, i));
+//          exit(-1);
+//        }
         if (niter == max_iter && err > TOL) {
           success = false;
         } else {
           success = true;
-          dE = U_rad_guess[0] - v(iblock, idx_E(ispec), k, j, i);
+          dE = (U_rad_guess[0] - v(iblock, idx_E(ispec), k, j, i)) / sdetgam;
           SPACELOOP(ii) {
-            cov_dF(ii) = U_rad_guess[ii + 1] - v(iblock, idx_F(ispec, ii), k, j, i);
+            cov_dF(ii) = (U_rad_guess[ii + 1] - v(iblock, idx_F(ispec, ii), k, j, i)) / sdetgam;
           }
-        if (i == 64 && j == 64) {
-         printf("first: dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
-        }
+//        if (i == 64 && j == 64) {
+//         printf("first: dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
+//        }
         }
 
         // FORCING USE OF 1D ROOTFIND!
@@ -1372,7 +1386,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 //
 //          /// TODO: (LFR) Move beyond Eddington for this update
 //          ClosureEdd<Vec, Tens2> c(con_v, &g);
-//          //for (int ispec = 0; ispec < num_species; ++ispec) 
+//          //for (int ispec = 0; ispec < num_species; ++ispec)
 //          {
 //
 //            Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;

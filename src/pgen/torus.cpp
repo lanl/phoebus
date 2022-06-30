@@ -303,6 +303,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               v(iH(0, ispec), k, j, i) = 0.0;
               v(iH(1, ispec), k, j, i) = 0.0;
               v(iH(2, ispec), k, j, i) = 0.0;
+              if (i == 64 && j == 64 && ispec == 0) {
+                printf("J: %e H: %e %e %e\n", v(iJ(ispec), k, j, i),
+                  v(iH(0, ispec), k, j, i), v(iH(1, ispec), k, j, i),
+                  v(iH(2, ispec), k, j, i));
+              }
             }
           } else {
             // In the atmosphere set some small radiation energy
