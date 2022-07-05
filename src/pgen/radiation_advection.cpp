@@ -136,9 +136,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                 J0 * std::max(exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10);
           }
 
-          v(idH(0, ispec), k, j, i) = Hx;
-          v(idH(1, ispec), k, j, i) = Hy;
-          v(idH(2, ispec), k, j, i) = Hz;
+          v(idH(ispec, 0), k, j, i) = Hx;
+          v(idH(ispec, 1), k, j, i) = Hy;
+          v(idH(ispec, 2), k, j, i) = Hz;
         }
       });
 

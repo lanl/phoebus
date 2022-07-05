@@ -300,13 +300,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                   v(irho, k, j, i), v(itmp, k, j, i), lambda);
 
               // Zero comoving frame fluxes
-              v(iH(0, ispec), k, j, i) = 0.0;
-              v(iH(1, ispec), k, j, i) = 0.0;
-              v(iH(2, ispec), k, j, i) = 0.0;
+              v(iH(ispec, 0), k, j, i) = 0.0;
+              v(iH(ispec, 1), k, j, i) = 0.0;
+              v(iH(ispec, 2), k, j, i) = 0.0;
               if (i == 64 && j == 64 && ispec == 0) {
                 printf("J: %e H: %e %e %e\n", v(iJ(ispec), k, j, i),
-                  v(iH(0, ispec), k, j, i), v(iH(1, ispec), k, j, i),
-                  v(iH(2, ispec), k, j, i));
+                  v(iH(ispec, 0), k, j, i), v(iH(ispec, 1), k, j, i),
+                  v(iH(ispec, 2), k, j, i));
               }
             }
           } else {
@@ -315,9 +315,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               v(iJ(ispec), k, j, i) = 1.e-5 * v(ieng, k, j, i);
 
               // Zero comoving frame fluxes
-              v(iH(0, ispec), k, j, i) = 0.0;
-              v(iH(1, ispec), k, j, i) = 0.0;
-              v(iH(2, ispec), k, j, i) = 0.0;
+              v(iH(ispec, 0), k, j, i) = 0.0;
+              v(iH(ispec, 1), k, j, i) = 0.0;
+              v(iH(ispec, 2), k, j, i) = 0.0;
             }
           }
         }
