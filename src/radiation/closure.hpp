@@ -265,6 +265,10 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Prim2Con(const Real J
   Real vvPi;
   Vec cov_vPi;
   GetTilPiContractions(con_tilPi, &cov_vPi, &vvPi);
+ // if (cov_H(0)*cov_H(0) + cov_H(1)*cov_H(1) + cov_H(2)*cov_H(2) < J*J) {
+ //   printf("J: %e covH: %e %e %e\n", J, cov_H(0), cov_H(1), cov_H(2));
+ // }
+  //PARTHENON_DEBUG_REQUIRE(cov_H(0)*cov_H(0) + cov_H(1)*cov_H(1) + cov_H(2)*cov_H(2) < J*J, "H2 >= 1!");
 
   Real vH = 0.0;
   SPACELOOP(i) vH += con_v(i) * cov_H(i);

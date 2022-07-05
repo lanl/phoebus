@@ -315,17 +315,17 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             }
 
             // Limit magnitude of flux
-            const Real Hmag = std::sqrt(std::pow(v(b, idx_H(0, ispec), k, j, i), 2) +
-                                        std::pow(v(b, idx_H(1, ispec), k, j, i), 2) +
-                                        std::pow(v(b, idx_H(2, ispec), k, j, i), 2));
-            if (Hmag > 1.) {
-              //              printf("Hmag = %e! [%i %i %i]\n", Hmag, k,j,i);
-              //              PARTHENON_FAIL("Hmag");
-              floor_applied = true;
-
-              const Real rescale = 0.99 / Hmag;
-              SPACELOOP(ii) { v(b, idx_H(ii, ispec), k, j, i) *= rescale; }
-            }
+//            const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j, i), 2) +
+//                                        std::pow(v(b, idx_H(ispec, 1), k, j, i), 2) +
+//                                        std::pow(v(b, idx_H(ispec, 2), k, j, i), 2));
+//            if (Hmag > 1.) {
+//              //              printf("Hmag = %e! [%i %i %i]\n", Hmag, k,j,i);
+//              //              PARTHENON_FAIL("Hmag");
+//              floor_applied = true;
+//
+//              const Real rescale = 0.99 / Hmag;
+//              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= rescale; }
+//            }
           }
         }
 
@@ -932,6 +932,10 @@ TaskStatus SourceFixup(T *rc) {
           Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+          
+          Real gcov[4][4];
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          
           if (num_valid > 0.5) {
             const Real norm = 1.0 / num_valid;
 
@@ -939,6 +943,18 @@ TaskStatus SourceFixup(T *rc) {
             v(b, peng, k, j, i) = fixup(peng, norm);
             SPACELOOP(ii) {
               v(b, idx_pvel(ii), k, j, i) = fixup(idx_pvel(ii), norm);
+            }
+        
+            // Ensure subluminal fluid velocity
+            // TODO(BRR) apply floors after this!
+            Real con_vp[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
+                              v(b, idx_pvel(2), k, j, i)};
+            const Real W = phoebus::GetLorentzFactor(con_vp, gcov);
+            // TODO(BRR) use ceilings
+            const Real Wmax = 50.;
+            if (W > Wmax) {
+              const Real rescale = std::sqrt((Wmax * Wmax - 1.) / (W * W - 1.));
+              SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) *= rescale; }
             }
 
             for (int ispec = 0; ispec < nspec; ispec++) {
@@ -990,8 +1006,6 @@ TaskStatus SourceFixup(T *rc) {
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-          Real gcov[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           Real gcon[3][3];
           geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
           Real S[3];
@@ -1037,6 +1051,16 @@ TaskStatus SourceFixup(T *rc) {
             Real J = v(b, idx_J(ispec), k, j, i);
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
                          v(b, idx_H(ispec, 2), k, j, i)};
+            // Limit fixed-up H to H^2 < 1
+            //Real Hmag = std::sqrt(v(b, idx_H(ispec, 0), k, j, i)*v(b, idx_H(ispec, 0), k, j, i) + 
+            //                      v(b, idx_H(ispec, 1), k, j, i)*v(b, idx_H(ispec, 1), k, j, i) +
+            //                      v(b, idx_H(ispec, 2), k, j, i)*v(b, idx_H(ispec, 2), k, j, i));
+            //constexpr Real Hmag_max = 0.99;
+            //if (Hmag > Hmag_max) {
+            //  SPACELOOP(ii) {
+            //    v(b, idx_H(ispec, ii), k, j, i) *= Hmag_max/Hmag;
+            //  }
+            //}
             c.Prim2Con(J, cov_H, conTilPi, &E, &cov_F);
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) {

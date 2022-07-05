@@ -82,9 +82,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(idJ(ispec), k, j, i) = J;
           printf("i = %i r = %e J = %e rho = %e\n", i, r, v(idJ(ispec), k, j, i),
                  v(prho, k, j, i));
-          v(idH(0, ispec), k, j, i) = Hx;
-          v(idH(1, ispec), k, j, i) = Hy;
-          v(idH(2, ispec), k, j, i) = Hz;
+          v(idH(ispec, 0), k, j, i) = Hx;
+          v(idH(ispec, 1), k, j, i) = Hy;
+          v(idH(ispec, 2), k, j, i) = Hz;
         }
       });
 

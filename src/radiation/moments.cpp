@@ -112,22 +112,6 @@ class SourceResidual4 {
       S[ii + 1] = alpha_ * sdetgam_ *
                   (kappaJ * W * cov_v[ii] * (JBB - P_rad[0]) - kappaH * P_rad[1 + ii]);
     }
-
-//    if (i_ == 64 && j_ == 64) {
-//      printf("\nCalculate sources");
-//      printf("H: %e %e %e\n", P_rad[1], P_rad[2], P_rad[3]);
-//      printf("con_v: %e %e %e\n", P_mhd[1]/W, P_mhd[2]/W, P_mhd[3]/W);
-//      printf("vdH: %e\n", vdH);
-//      printf("kappaJ: %e kappaH: %e\n", kappaJ, kappaH);
-//      printf("W: %e\n", W);
-//      printf("JBB: %e P_rad[0]: %e\n", JBB, P_rad[0]);
-//      printf("S0 terms: %e %e\n", alpha_ * sdetgam_ * (kappaJ * W * (JBB - P_rad[0])),
-//        alpha_ * sdetgam_ * (- kappaH * vdH));
-//      printf("dS: %e %e %e %e\n", S[0], S[1], S[2], S[3]);
-//      printf("U_mhd_0: %e %e %e %e\n", (*U_mhd_0_)[0], (*U_mhd_0_)[1], (*U_mhd_0_)[2], (*U_mhd_0_)[3]);
-//      printf("U_rad_0: %e %e %e %e\n", (*U_rad_0_)[0], (*U_rad_0_)[1], (*U_rad_0_)[2], (*U_rad_0_)[3]);
-//      printf("alpha: %e sdetgam: %e\n", alpha_, sdetgam_);
-//    }
   }
 
  private:
