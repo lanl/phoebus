@@ -40,8 +40,7 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Params &params = geometry->AllParams();
   Real dxfd_geom = pin->GetOrAddReal("geometry", "finite_differences_dx", 1e-8);
   Real dxfd = pin->GetOrAddReal("coordinates", "finite_differences_dx", dxfd_geom);
-  bool derefine_poles =
-      pin->GetOrAddBoolean("coordinates", "derefine_poles", true);
+  bool derefine_poles = pin->GetOrAddBoolean("coordinates", "derefine_poles", true);
   Real h = pin->GetOrAddReal("coordinates", "hslope", 0.3);
   Real xt = pin->GetOrAddReal("coordinates", "poly_xt", 0.82);
   Real alpha = pin->GetOrAddReal("coordinates", "poly_alpha", 14);
@@ -57,7 +56,10 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   params.Add("x0", x0);
   params.Add("smooth", smooth);
 }
-template <> void SetGeometry<FMKSMeshBlock>(MeshBlockData<Real> *rc) {}
+template <>
+void SetGeometry<FMKSMeshBlock>(MeshBlockData<Real> *rc) {}
+template <>
+void SetGeometry<FMKSMesh>(MeshData<Real> *rc) {}
 
 template <>
 FMKSMeshBlock GetCoordinateSystem<FMKSMeshBlock>(MeshBlockData<Real> *rc) {
@@ -68,7 +70,8 @@ FMKSMeshBlock GetCoordinateSystem<FMKSMeshBlock>(MeshBlockData<Real> *rc) {
   auto transformation = GetTransformation<McKinneyGammieRyan>(pkg.get());
   return FMKSMeshBlock(indexer, dxfd, transformation, a);
 }
-template <> FMKSMesh GetCoordinateSystem<FMKSMesh>(MeshData<Real> *rc) {
+template <>
+FMKSMesh GetCoordinateSystem<FMKSMesh>(MeshData<Real> *rc) {
   auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
@@ -78,19 +81,23 @@ template <> FMKSMesh GetCoordinateSystem<FMKSMesh>(MeshData<Real> *rc) {
 }
 
 template <>
-void Initialize<CFMKSMeshBlock>(ParameterInput *pin,
-                                StateDescriptor *geometry) {
+void Initialize<CFMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   InitializeCachedCoordinateSystem<FMKSMeshBlock>(pin, geometry);
 }
 template <>
 CFMKSMeshBlock GetCoordinateSystem<CFMKSMeshBlock>(MeshBlockData<Real> *rc) {
   return GetCachedCoordinateSystem<FMKSMeshBlock>(rc);
 }
-template <> CFMKSMesh GetCoordinateSystem<CFMKSMesh>(MeshData<Real> *rc) {
+template <>
+CFMKSMesh GetCoordinateSystem<CFMKSMesh>(MeshData<Real> *rc) {
   return GetCachedCoordinateSystem<FMKSMesh>(rc);
 }
-template <> void SetGeometry<CFMKSMeshBlock>(MeshBlockData<Real> *rc) {
+template <>
+void SetGeometry<CFMKSMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<FMKSMeshBlock>(rc);
 }
-
+template <>
+void SetGeometry<CFMKSMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<FMKSMesh>(rc);
+}
 } // namespace Geometry

@@ -178,6 +178,22 @@ The input files are in `phoebus/inputs/*`. There's typically one input file per 
 - `MPI` for distributed memory parallelism
 - `python3` for visualization
 
+## Clang-format
+
+We use clang format for code cleanliness. The current version of
+`clang-format` is pinned to `clang-format-12`, however, you can try
+formatting with other versions at your own risk.
+
+You can format all files in git history automatically by calling
+`scripts/bash/format.sh` from anywhere within the Phoebus repo (but
+outside of submodules).
+
+You can specify which clang-format you use in the script with the CFM
+environment variable. For example:
+```bash
+CFM=clang-format-12 ./scripts/bash/format.sh
+```
+
 # Copyright
 
 © 2021. Triad National Security, LLC. All rights reserved.  This

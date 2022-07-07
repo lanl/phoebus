@@ -14,11 +14,17 @@
 // stdlib
 #include <cmath>
 #include <cstdio>
+#include <iostream>
+#include <limits>
 #include <memory>
 #include <sstream>
+#include <string>
+#include <utility>
 
 // Parthenon
+#include <globals.hpp>
 #include <kokkos_abstraction.hpp>
+#include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
@@ -28,11 +34,13 @@
 // Phoebus
 #include "geometry/geometry_utils.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
+#include "phoebus_utils/robust.hpp"
 
-#include "monopole_gr.hpp"
+#include "monopole_gr_interface.hpp"
 #include "monopole_gr_utils.hpp"
 
 using namespace parthenon::package::prelude;
+using parthenon::AllReduce;
 
 namespace MonopoleGR {
 
@@ -42,7 +50,28 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   bool enable_monopole_gr = pin->GetOrAddBoolean("monopole_gr", "enabled", false);
   params.Add("enable_monopole_gr", enable_monopole_gr);
-  if (!enable_monopole_gr) return monopole_gr; // Short-circuit with nothing
+
+  // Kill time derivatives. Only run on initialization
+  bool force_static = pin->GetOrAddBoolean("monopole_gr", "force_static", false);
+  params.Add("force_static", force_static);
+
+  // Only run the first n subcycles
+  int run_n_times = pin->GetOrAddInteger("monopole_gr", "run_n_times", -1);
+  params.Add("run_n_times", run_n_times);
+  int nth_call = 0;
+  params.Add("nth_call", nth_call, true); // mutable
+
+  // Time step control. Equivalent to CFL
+  // Empirical. controls
+  Real dtfac = pin->GetOrAddReal("monopole_gr", "dtfac", 0.9);
+  PARTHENON_REQUIRE_THROWS(0 < dtfac && dtfac <= 1., "dtfac must be between 0 and 1");
+  params.Add("dtfac", dtfac);
+
+  // Warn if the change in lapse is too different from dalpha/dt
+  bool warn_on_dt = pin->GetOrAddBoolean("monopole_gr", "warn_on_dt", false);
+  Real dtwarn_eps = pin->GetOrAddReal("monopole_gr", "dtwarn_eps", 1e-5);
+  params.Add("warn_on_dt", warn_on_dt);
+  params.Add("dtwarn_eps", dtwarn_eps);
 
   // Points
   int npoints = pin->GetOrAddInteger("monopole_gr", "npoints", 100);
@@ -52,6 +81,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_REQUIRE_THROWS(npoints >= MIN_NPOINTS, msg);
   }
   params.Add("npoints", npoints);
+
+  // Short-circuit without allocating any memory
+  if (!enable_monopole_gr) return monopole_gr;
 
   // Rin and Rout are not necessarily the same as
   // bounds for the fluid
@@ -63,13 +95,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real x3max = pin->GetReal("parthenon/mesh", "x3max");
 
   // Estimate r since we may not know if we're Spherical or Cartesian
-  Real r_fluid_est = std::sqrt(x1max*x1max + x2max*x2max + x3max*x3max);
+  Real r_fluid_est = std::sqrt(x1max * x1max + x2max * x2max + x3max * x3max);
   if (r_fluid_est < rout) {
     std::stringstream msg;
     msg << "Outer radius of fluid may be less than outer radius of of spacetime.\n"
-	<< "x1max, x2max, x3max, rout_spacetime = "
-	<< x1max << ", " << x2max << ", " << x3max << ", " << rout
-	<< std::endl;
+        << "x1max, x2max, x3max, rout_spacetime = " << x1max << ", " << x2max << ", "
+        << x3max << ", " << rout << std::endl;
     PARTHENON_WARN(msg);
   }
 
@@ -78,25 +109,45 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // These are registered in Params, not as variables,
   // because they have unique shapes are 1-copy
-  Matter_t matter("monopole_gr matter grid", NMAT, npoints);
+  // TODO(JMM): Extra arrays for cell-centered matter?
+  // Probably fine.
+  // matter_cells is just shifte to r + dr/2, but contains same number of points.
+  Matter_t matter("monopole_gr matter grid. face centered.", NMAT, npoints);
+  Matter_t matter_cells("monopole_gr matter grid. cell centered.", NMAT, npoints);
+  Volumes_t integration_volumes("monopole_gr matter integration volumes", npoints);
   Hypersurface_t hypersurface("monopole_gr hypersurface grid", NHYPER, npoints);
+
+  // Keep two copies of alpha around... one from this cycle and one
+  // from the last. They'll be swapped every cycle.
   Alpha_t alpha("monopole_gr lapse grid", npoints);
+  Alpha_t alpha_last("monopole_gr lapse grid", npoints);
 
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "monopole_gr initialize grids",
       parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
         for (int v = 0; v < NMAT; ++v) {
           matter(v, i) = 0;
+          matter_cells(v, i) = 0;
         }
         hypersurface(Hypersurface::A, i) = 1;
         hypersurface(Hypersurface::K, i) = 0;
+        integration_volumes(i) = 0;
         alpha(i) = 1;
+        alpha_last(i) = 1;
       });
 
   // Host mirrors
   auto matter_h = Kokkos::create_mirror_view(matter);
+  auto matter_cells_h = Kokkos::create_mirror_view(matter_cells);
+  auto integration_vols_h = Kokkos::create_mirror_view(integration_volumes);
   auto hypersurface_h = Kokkos::create_mirror_view(hypersurface);
   auto alpha_h = Kokkos::create_mirror_view(alpha);
+
+  // Reduction objects.
+  AllReduce<Matter_host_t> matter_reducer;
+  matter_reducer.val = matter_h;
+  AllReduce<Volumes_host_t> volumes_reducer;
+  volumes_reducer.val = integration_vols_h;
 
   // Host-only scratch arrays for Thomas' Method
   Alpha_host_t alpha_m_l("monopole_gr alpha matrix, band below diagonal", npoints);
@@ -110,10 +161,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("matter", matter);
   params.Add("matter_h", matter_h);
+  params.Add("matter_cells", matter_cells);
+  params.Add("matter_cells_h", matter_cells_h);
+  params.Add("integration_volumes", integration_volumes);
+  params.Add("integration_volumes_h", integration_vols_h);
   params.Add("hypersurface", hypersurface);
   params.Add("hypersurface_h", hypersurface_h);
-  params.Add("lapse", alpha);
   params.Add("lapse_h", alpha_h);
+  // Lapse is mutable because we swap between alpha and alpha_last
+  params.Add("lapse", alpha, true);
+  params.Add("lapse_last", alpha_last, true);
+  // mutable because the reducer is stateful
+  params.Add("matter_reducer", matter_reducer, true);
+  params.Add("volumes_reducer", volumes_reducer, true);
   // M . alpha = b
   params.Add("alpha_m_l", alpha_m_l); // hostonly arrays
   params.Add("alpha_m_d", alpha_m_d);
@@ -127,23 +187,74 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Radius radius(rin, rout, npoints);
   params.Add("radius", radius);
 
+  monopole_gr->EstimateTimestepBlock = EstimateTimestepBlock;
+
   return monopole_gr;
 }
 
-TaskStatus MatterToHost(StateDescriptor *pkg) {
+Real EstimateTimeStep(StateDescriptor *pkg) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
+  auto &params = pkg->AllParams();
+  const auto force_static = params.Get<bool>("force_static");
+  if (force_static) {
+    return std::numeric_limits<Real>::max();
+  }
+
+  const auto dtfac = params.Get<Real>("dtfac");
+  const auto npoints = params.Get<int>("npoints");
+  auto alpha = params.Get<Alpha_t>("lapse");
+  auto gradients = params.Get<Gradients_t>("gradients");
+
+  Real min_dt;
+  parthenon::par_reduce(
+      parthenon::loop_pattern_flatrange_tag, "monopole_gr time step",
+      parthenon::DevExecSpace(), 0, npoints - 1,
+      KOKKOS_LAMBDA(const int i, Real &lmin_dt) {
+        Real alpha_tscale =
+            std::abs(robust::ratio(alpha(i), gradients(Gradients::DALPHADT, i)));
+        lmin_dt = std::min(lmin_dt, alpha_tscale);
+      },
+      Kokkos::Min<Real>(min_dt));
+  return dtfac * min_dt;
+}
+
+// Could template this but whatever. I'd only save like 4 lines.
+Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+  auto pmb = rc->GetParentPointer();
+  StateDescriptor *pkg = pmb->packages.Get("monopole_gr").get();
+  return EstimateTimeStep(pkg);
+}
+Real EstimateTimeStepMesh(MeshData<Real> *rc) {
+  auto pmesh = rc->GetParentPointer();
+  StateDescriptor *pkg = pmesh->packages.Get("monopole_gr").get();
+  return EstimateTimeStep(pkg);
+}
+
+TaskStatus MatterToHost(StateDescriptor *pkg, bool do_vols) {
   PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
                            "Requires the monopole_gr package");
   auto &params = pkg->AllParams();
   auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
-  auto matter = params.Get<Matter_t>("matter");
-  auto matter_h = params.Get<Matter_host_t>("matter_h");
+  const std::string matter_name = do_vols ? "matter_cells" : "matter";
+  const std::string matter_h_name = do_vols ? "matter_cells_h" : "matter_h";
+  auto matter = params.Get<Matter_t>(matter_name);
+  auto matter_h = params.Get<Matter_host_t>(matter_h_name);
   Kokkos::deep_copy(matter_h, matter);
+
+  if (do_vols) {
+    auto vols = params.Get<Volumes_t>("integration_volumes");
+    auto vols_h = params.Get<Volumes_host_t>("integration_volumes_h");
+    Kokkos::deep_copy(vols_h, vols);
+  }
 
   return TaskStatus::complete;
 }
 
+// TODO(JMM): This could leverage the cell-centered values
+// we compute.
 TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   using namespace ShootingMethod;
 
@@ -186,7 +297,6 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
     for (int v = 0; v < NMAT_H; ++v) {
       src[v] = matter_h(v, i);
     }
-
     HypersurfaceRHS(r, state, src, rhs);
 #pragma omp simd
     for (int v = 0; v < NHYPER; ++v) {
@@ -200,6 +310,11 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
 #pragma omp simd
     for (int v = 0; v < NHYPER; ++v) {
       hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr * rhs_k[v];
+    }
+  }
+  for (int v = 0; v < NHYPER; ++v) {
+    if (std::isnan(hypersurface_h(v, npoints - 1))) {
+      PARTHENON_FAIL("Bad ODE integration.");
     }
   }
 
@@ -295,41 +410,56 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
   auto enabled = params.Get<bool>("enable_monopole_gr");
   if (!enabled) return TaskStatus::complete;
 
+  const auto force_static = params.Get<bool>("force_static");
+
   auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
   auto hypersurface_h = params.Get<Hypersurface_host_t>("hypersurface_h");
   Kokkos::deep_copy(hypersurface, hypersurface_h);
 
   auto alpha = params.Get<Alpha_t>("lapse");
+  auto alpha_last = params.Get<Alpha_t>("lapse_last");
+
+  // Swap alpha and alpha last
+  // Params must be updated with new references.
+  std::swap(alpha, alpha_last);
+  params.Update("lapse", alpha);
+  params.Update("lapse_last", alpha_last);
+
   auto alpha_h = params.Get<Alpha_host_t>("lapse_h");
   Kokkos::deep_copy(alpha, alpha_h);
+
+  auto matter = params.Get<Matter_t>("matter");
+  auto matter_h = params.Get<Matter_host_t>("matter_h");
+  Kokkos::deep_copy(matter, matter_h);
 
   // Fill device-side arrays
   auto npoints = params.Get<int>("npoints");
   auto radius = params.Get<MonopoleGR::Radius>("radius");
-  Real dr = radius.dx();
-  Real dr2 = dr * dr;
-  auto matter = params.Get<Matter_t>("matter");
+  const Real dr = radius.dx();
+  const Real dr2 = dr * dr;
   auto beta = params.Get<Beta_t>("shift");
   auto gradients = params.Get<Gradients_t>("gradients");
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "monopole_gr gradients and shift",
       parthenon::DevExecSpace(), 0, npoints - 1, KOKKOS_LAMBDA(const int i) {
+        if (force_static) {
+          hypersurface(Hypersurface::K, i) = 0;
+        }
+
+        auto mask = !(force_static);
         Real r = radius.x(i);
         Real a = hypersurface(Hypersurface::A, i);
-        Real K = hypersurface(Hypersurface::K, i);
+        Real K = mask * hypersurface(Hypersurface::K, i);
         Real rho = matter(Matter::RHO, i);
         Real j = matter(Matter::J_R, i);
         Real S = matter(Matter::trcS, i);
         Real Srr = matter(Matter::Srr, i);
         Real dadr = ShootingMethod::GetARHS(a, K, r, rho);
-        Real dKdr = ShootingMethod::GetKRHS(a, K, r, j);
+        Real dKdr = mask * ShootingMethod::GetKRHS(a, K, r, j);
 
         Real a2 = a * a;
         Real a3 = a2 * a;
         Real K2 = K * K;
-        Real beta2 = beta(i) * beta(i);
-        Real beta3 = beta(i) * beta2;
-
         Real dalphadr, d2alphadr2;
         if (i == 0) {
           dalphadr = 0;
@@ -342,8 +472,11 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
           d2alphadr2 = (alpha(i - 1) + alpha(i + 1) - 2 * alpha(i)) / dr2;
         }
 
-        beta(i) = -0.5 * alpha(i) * r * K;
-        Real dbetadr = -0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr);
+        beta(i) = mask * (-0.5 * alpha(i) * r * K);
+        Real dbetadr =
+            mask * (-0.5 * (r * K * dalphadr + alpha(i) * K + alpha(i) * r * dKdr));
+        Real beta2 = beta(i) * beta(i);
+        Real beta3 = beta(i) * beta2;
 
         gradients(Gradients::DADR, i) = dadr;
         gradients(Gradients::DKDR, i) = dKdr;
@@ -358,16 +491,85 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
         Real dadror = (r > 1e-2) ? dadr / r : 1;
         Real dKdt = beta(i) * dKdr - (d2alphadr2 / a2) + (dadr / a3) * dalphadr +
                     alpha(i) * ((2 * dadror / a3) - 4 * K * K) +
-                    4 * M_PI * alpha(i) * (S - rho - 2*Srr);
+                    4 * M_PI * alpha(i) * (S - rho - 2 * Srr);
         if (i == 0) dKdt = 0;
         Real dbetadt = -0.5 * r * (alpha(i) * dKdt + K * dalphadt);
 
-	//printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
-        gradients(Gradients::DADT, i) = dadt;
-        gradients(Gradients::DALPHADT, i) = dalphadt;
-        gradients(Gradients::DKDT, i) = dKdt;
-        gradients(Gradients::DBETADT, i) = dbetadt;
+        // printf("%d: %.15e %.15e %.15e %.15e\n", i, dadt, dalphadt, dKdt, dbetadt);
+        gradients(Gradients::DADT, i) = mask * dadt;
+        gradients(Gradients::DALPHADT, i) = mask * dalphadt;
+        gradients(Gradients::DKDT, i) = mask * dKdt;
+        gradients(Gradients::DBETADT, i) = mask * dbetadt;
       });
+
+  return TaskStatus::complete;
+}
+
+TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt) {
+  PARTHENON_REQUIRE_THROWS(pkg->label() == "monopole_gr",
+                           "Requires the monopole_gr package");
+  auto &params = pkg->AllParams();
+  auto enabled = params.Get<bool>("enable_monopole_gr");
+  if (!enabled) return TaskStatus::complete;
+
+  auto warn_on_dt = params.Get<bool>("warn_on_dt");
+  if (warn_on_dt && parthenon::Globals::my_rank == 0) {
+    auto alpha = params.Get<Alpha_t>("lapse");
+    auto alpha_last = params.Get<Alpha_t>("lapse_last");
+    auto npoints = params.Get<int>("npoints");
+    auto gradients = params.Get<Gradients_t>("gradients");
+    auto dtwarn_eps = params.Get<Real>("dtwarn_eps");
+
+    Real err;
+    parthenon::par_reduce(
+        parthenon::loop_pattern_flatrange_tag, "monopole_gr check evolution time scales",
+        parthenon::DevExecSpace(), 0, npoints - 1,
+        KOKKOS_LAMBDA(const int i, Real &lmax_err) {
+          Real diff_alpha = (alpha(i) - alpha_last(i)) / dt;
+          Real diff_dalpha = robust::ratio(
+              std::abs(diff_alpha - gradients(Gradients::DALPHADT, i)), alpha(i));
+          lmax_err = std::max(lmax_err, diff_dalpha);
+        },
+        Kokkos::Max<Real>(err));
+    if (err > dtwarn_eps) {
+      std::cerr
+          << "\tWarning! (alpha^i+1 - alpha^i)/dt is very different from dalpha/dt.\n"
+          << "\t\tTolerance set to " << dtwarn_eps << " but value is " << err << "."
+          << std::endl;
+    }
+  }
+  return TaskStatus::complete;
+}
+
+TaskStatus DivideVols(StateDescriptor *pkg) {
+  using robust::ratio;
+
+  auto &params = pkg->AllParams();
+  auto enabled = params.Get<bool>("enable_monopole_gr");
+  if (!enabled) return TaskStatus::complete;
+
+  auto npoints = params.Get<int>("npoints");
+  auto matter_cells_h = params.Get<Matter_host_t>("matter_cells_h");
+  auto matter_h = params.Get<Matter_host_t>("matter_h");
+  auto vols_h = params.Get<Volumes_host_t>("integration_volumes_h");
+
+  // Divide by volumes
+  for (int i = 0; i < npoints; ++i) {
+    for (int v = 0; v < NMAT; ++v) {
+      matter_cells_h(v, i) = ratio(matter_cells_h(v, i), std::abs(vols_h(i)));
+    }
+  }
+  // Shift to the face-centered grid
+  for (int i = 1; i < npoints; ++i) {
+    for (int v = 0; v < NMAT; ++v) {
+      matter_h(v, i) = 0.5 * (matter_cells_h(v, i) + matter_cells_h(v, i - 1));
+    }
+  }
+  matter_cells_h(Matter::J_R, 0) = 0;
+  matter_cells_h(Matter::Srr, 0) = 0;
+  for (int v = 0; v < NMAT; ++v) {
+    matter_h(v, 0) = matter_cells_h(v, 0);
+  }
 
   return TaskStatus::complete;
 }
@@ -393,6 +595,9 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
   auto gradients = params.Get<Gradients_t>("gradients");
   auto gradients_h = Kokkos::create_mirror_view(gradients);
 
+  auto matter_cells_h = params.Get<Matter_host_t>("matter_cells_h");
+  auto vols_h = params.Get<Volumes_host_t>("integration_volumes_h");
+
   Kokkos::deep_copy(matter_h, matter);
   Kokkos::deep_copy(hypersurface_h, hypersurface);
   Kokkos::deep_copy(alpha_h, alpha);
@@ -405,14 +610,17 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
     Real r = radius.x(i);
     fprintf(pf,
             "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e "
-            "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e\n",
+            "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e "
+            "%.14e %.14e %.14e %.14e %.14e\n",
             r, hypersurface_h(Hypersurface::A, i), hypersurface_h(Hypersurface::K, i),
             alpha_h(i), matter_h(Matter::RHO, i), matter_h(Matter::J_R, i),
             matter_h(Matter::trcS, i), matter_h(Matter::Srr, i),
             gradients_h(Gradients::DADR, i), gradients_h(Gradients::DKDR, i),
             gradients_h(Gradients::DALPHADR, i), gradients_h(Gradients::DBETADR, i),
             gradients_h(Gradients::DADT, i), gradients_h(Gradients::DALPHADT, i),
-            gradients_h(Gradients::DKDR, i), gradients_h(Gradients::DBETADT, i));
+            gradients_h(Gradients::DKDR, i), gradients_h(Gradients::DBETADT, i),
+            matter_cells_h(Matter::RHO, i), matter_cells_h(Matter::J_R, i),
+            matter_cells_h(Matter::trcS, i), matter_cells_h(Matter::Srr, i), vols_h(i));
   }
   fclose(pf);
 }

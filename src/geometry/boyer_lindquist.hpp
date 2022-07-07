@@ -25,6 +25,7 @@
 #include "geometry/cached_system.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace Geometry {
 
@@ -35,7 +36,7 @@ namespace Geometry {
 // Assumes WLOG that G = c = M = 1.
 // TODO(JMM): Should we modify to accept arbitrary M?
 class BoyerLindquist {
-public:
+ public:
   BoyerLindquist() = default;
   KOKKOS_INLINE_FUNCTION
   BoyerLindquist(Real a) : dx_(1e-8), a_(a), a2_(a * a) {}
@@ -51,14 +52,12 @@ public:
     const Real rm2 = r * mu - 2;
     const Real a2 = a2_;
     const Real num = a2 * (2 * r * mu - 4) +
-                     r2 * (-4 + r * mu * (2 - 2 * DD + r * DD * mu)) +
-                     4 * a2 * sth * sth;
+                     r2 * (-4 + r * mu * (2 - 2 * DD + r * DD * mu)) + 4 * a2 * sth * sth;
     const Real den = r3 * DD * mu * rm2;
-    return std::sqrt(Utils::ratio(num, den));
+    return std::sqrt(robust::ratio(num, den));
   }
   KOKKOS_INLINE_FUNCTION
-  void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
-                          Real beta[NDSPACE]) const {
+  void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     LinearAlgebra::SetZero(beta, NDSPACE);
     const Real r = std::abs(X1);
     const Real th = X2;
@@ -67,31 +66,31 @@ public:
     // -g^{33}/g^{00} = g^{33}*alpha^2
     const Real num = -2 * a_ * r * sth * sth;
     const Real den = (r - 2) * r + a2_ * cth * cth;
-    beta[3 - 1] = Utils::ratio(num, den);
+    beta[3 - 1] = robust::ratio(num, den);
   }
   // TODO(JMM): SpacetimeMetric and metric could be combined?
   KOKKOS_INLINE_FUNCTION
-  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
-                       Real g[NDFULL][NDFULL]) const {
+  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
     ComputeDeltaMu_(r, th, r2, r3, sth, cth, DD, mu);
     const Real r3dm = r3 * DD * mu;
-    const Real sth2 = sth*sth;
+    const Real sth2 = sth * sth;
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
-    g[0][0] = -(1.0 - ratio(2.0,r*mu));
-    g[0][3] = g[3][0] = -ratio(2.0 * a_ * sth2, r*mu);
+    g[0][0] = -(1.0 - ratio(2.0, r * mu));
+    g[0][3] = g[3][0] = -ratio(2.0 * a_ * sth2, r * mu);
     g[1][1] = mu / DD;
     g[2][2] = r2 * mu;
-    g[3][3] = r2 * sth2 * (1.0 + ratio(a2_,r2) + ratio(2.0*a2_*sth2,r3*mu));
-
+    g[3][3] = r2 * sth2 * (1.0 + ratio(a2_, r2) + ratio(2.0 * a2_ * sth2, r3 * mu));
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
                               Real g[NDFULL][NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
@@ -104,17 +103,17 @@ public:
         2 * a2_ * rm2 + r2 * (-4 + rm * (2 + DD * rm2)) + 4 * a2_ * sth2;
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
     g[0][0] = ratio(-r3dm * rm2, common_denom);
-    g[0][3] = g[3][0] = -ratio(
-        a_ * r3dm * sth2,
-        a2_ * rm2 + r2 * (-2 + rm * (1 - DD + 0.5 * DD * rm)) + 2 * a2_ * sth2);
+    g[0][3] = g[3][0] =
+        -ratio(a_ * r3dm * sth2,
+               a2_ * rm2 + r2 * (-2 + rm * (1 - DD + 0.5 * DD * rm)) + 2 * a2_ * sth2);
     g[1][1] = ratio(mu, DD);
     g[2][2] = r2 * mu;
     g[3][3] = ratio(r3dm * (2 * a2_ + r2 * (2 + DD * rm)) * sth2, common_denom);
   }
   KOKKOS_INLINE_FUNCTION
-  void Metric(Real X0, Real X1, Real X2, Real X3,
-              Real g[NDSPACE][NDSPACE]) const {
+  void Metric(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
@@ -122,13 +121,13 @@ public:
     const Real r3dm = r3 * DD * mu;
     LinearAlgebra::SetZero(g, NDSPACE, NDSPACE);
     g[0][0] = ratio(DD, mu);
-    g[1][1] = ratio(1, r2 * mu);
+    g[1][1] = ratio(1., r2 * mu);
     g[2][2] = ratio((r * mu - 2) * sth * sth, r3dm);
   }
   KOKKOS_INLINE_FUNCTION
-  void MetricInverse(Real X0, Real X1, Real X2, Real X3,
-                     Real g[NDSPACE][NDSPACE]) const {
+  void MetricInverse(Real X0, Real X1, Real X2, Real X3, Real g[NDSPACE][NDSPACE]) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
@@ -137,8 +136,7 @@ public:
     const Real rm2 = rm - 2;
     const Real sth2 = sth * sth;
     const Real r3dm = r3 * DD * mu;
-    const Real denom =
-        2 * a2_ * rm2 + r2 * (-4 + rm * (2 + DD * rm2)) + 4 * a2_ * sth2;
+    const Real denom = 2 * a2_ * rm2 + r2 * (-4 + rm * (2 + DD * rm2)) + 4 * a2_ * sth2;
 
     // TODO(JMM): This is a lot less performant but much cleaner
     const Real alpha = Lapse(X0, X1, X2, X3);
@@ -154,6 +152,7 @@ public:
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
     using namespace Utils;
+    using namespace robust;
     const Real r = std::abs(X1);
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
@@ -182,6 +181,7 @@ public:
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
                         Real dg[NDFULL][NDFULL][NDFULL]) const {
     using namespace Utils;
+    using namespace robust;
     LinearAlgebra::SetZero(dg, NDFULL, NDFULL, NDFULL);
     const Real r = std::abs(X1);
     const Real th = X2;
@@ -207,14 +207,13 @@ public:
                             a2_ * (-a4 - 2 * a2_ * r2 + (4 - r) * r3) * c2th,
                         denom2);
     dg[0][3][1] = dg[3][0][1] =
-        2 * a_ *
-        ratio(r2 * (a2_ + r * r3m4) + a2_ * (r - a_) * (r + a_) * cth2, denom2);
+        2 * a_ * ratio(r2 * (a2_ + r * r3m4) + a2_ * (r - a_) * (r + a_) * cth2, denom2);
     dg[1][1][1] = 2 * ratio(r * (r - a2_) + a2_ * (r - 1) * cth2, denom1);
     dg[2][2][1] = -ratio(2 * r, denom1);
-    dg[3][3][1] = ratio(2 * r2 * (a2_ - rm2 * rm2 * r) -
-                            2 * a2_ * (a2_ + r2 * (2 * r - 3)) * cth2 -
-                            2 * a4 * (r - 1) * cth4,
-                        denom2 * sth2);
+    dg[3][3][1] =
+        ratio(2 * r2 * (a2_ - rm2 * rm2 * r) - 2 * a2_ * (a2_ + r2 * (2 * r - 3)) * cth2 -
+                  2 * a4 * (r - 1) * cth4,
+              denom2 * sth2);
 
     dg[0][0][2] = -ratio(4 * a2_ * r * (a2_ + r2) * cth * sth, denom2);
     dg[0][3][2] = dg[3][0][2] = -ratio(4 * a3 * r * cth * sth, denom2);
@@ -223,11 +222,10 @@ public:
 
     // g[3][3][2] is its own beast
     const Real a2pr2 = a2_ + r2;
-    const Real num =
-        -a2pr2 * cth *
-        (3 * a4 + 8 * a2_ * r2 + 8 * rm2 * r3 +
-         4 * a2_ * (a2_ + 2 * rm2 * r) * c2th + a4 * std::cos(4 * th)) *
-        sth;
+    const Real num = -a2pr2 * cth *
+                     (3 * a4 + 8 * a2_ * r2 + 8 * rm2 * r3 +
+                      4 * a2_ * (a2_ + 2 * rm2 * r) * c2th + a4 * std::cos(4 * th)) *
+                     sth;
     Real den = (a2_ + 2 * r2 + a2_ * c2th) * sth2;
     den *= den;
     den *= (a2_ + rm2 * r) * a2pr2;
@@ -252,32 +250,34 @@ public:
     C[3] = r * cth;
   }
 
-private:
+ private:
   KOKKOS_INLINE_FUNCTION
-  void ComputeInternals_(const Real r, const Real th, Real &bl_fact, Real &cth2, Real &sth2) const {
+  void ComputeInternals_(const Real r, const Real th, Real &bl_fact, Real &cth2,
+                         Real &sth2) const {
     cth2 = std::cos(th);
     cth2 *= cth2;
     sth2 = 1.0 - cth2;
-    bl_fact = r*r + a2_*cth2;
+    bl_fact = r * r + a2_ * cth2;
   }
   KOKKOS_INLINE_FUNCTION
-  void ComputeDeltaMu_(Real r, Real th, Real &r2, Real &r3, Real &sth,
-                       Real &cth, Real &DD, Real &mu) const {
+  void ComputeDeltaMu_(Real r, Real th, Real &r2, Real &r3, Real &sth, Real &cth,
+                       Real &DD, Real &mu) const {
     using namespace Utils;
+    using namespace robust;
     sth = std::sin(th);
     cth = std::cos(th);
     /*
-    if (std::abs(sth) < SMALL) {
-      sth = sgn(sth) * SMALL;
+    if (std::abs(sth) < EPS()) {
+      sth = sgn(sth) * EPS();
     }
-    if (std::abs(cth) < SMALL) {
-      cth = sgn(cth) * SMALL;
+    if (std::abs(cth) < EPS()) {
+      cth = sgn(cth) * EPS();
     }
     */
     r2 = r * r;
     r3 = r2 * r;
-    DD = 1. - Utils::ratio(2., r) + Utils::ratio(a2_, r2);
-    mu = 1. + Utils::ratio(a2_ * cth * cth, r2);
+    DD = 1. - ratio(2., r) + ratio(a2_, r2);
+    mu = 1. + ratio(a2_ * cth * cth, r2);
   }
   Real dx_ = 1e-8;
   Real a_ = 0;
@@ -289,8 +289,7 @@ using BoyerLindquistMesh = Analytic<BoyerLindquist, IndexerMesh>;
 
 using CBoyerLindquistMeshBlock =
     CachedOverMeshBlock<Analytic<BoyerLindquist, IndexerMeshBlock>>;
-using CBoyerLindquistMesh =
-    CachedOverMesh<Analytic<BoyerLindquist, IndexerMesh>>;
+using CBoyerLindquistMesh = CachedOverMesh<Analytic<BoyerLindquist, IndexerMesh>>;
 
 template <>
 void Initialize<BoyerLindquistMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);

@@ -23,7 +23,7 @@
 
 namespace leptoneq {
 
-parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
+using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   namespace p = fluid_prim;
@@ -38,7 +38,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap[p::velocity].first;
   const int ivhi = imap[p::velocity].second;
   const int ieng = imap[p::energy].first;
-  const int iye  = imap[p::ye].first;
+  const int iye = imap[p::ye].first;
   const int iprs = imap[p::pressure].first;
   const int itmp = imap[p::temperature].first;
 
@@ -49,13 +49,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &coords = pmb->coords;
   auto eospkg = pmb->packages.Get("eos");
   auto eos = eospkg->Param<singularity::EOS>("d.EOS");
-  auto &unit_conv = eospkg.get()->Param<phoebus::UnitConversions>("unit_conv");
+  auto &unit_conv =
+      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
   const Real rho0 = 1.e10 * unit_conv.GetMassDensityCGSToCode();
-  const Real T0 = 2.5*1.e6*pc.eV/pc.kb * unit_conv.GetTemperatureCGSToCode();
+  const Real T0 = 2.5 * 1.e6 * pc::eV / pc::kb * unit_conv.GetTemperatureCGSToCode();
 
   pmb->par_for(
-      "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      "Phoebus::ProblemGenerator::LeptonEq", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const Real x = coords.x1v(i);
         const Real y = coords.x2v(j);
@@ -71,18 +72,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         double lambda[2] = {v(iye, k, j, i), 0.};
-        v(ieng, k, j, i) = rho0*eos.InternalEnergyFromDensityTemperature(rho0, T0, lambda);
+        v(ieng, k, j, i) =
+            rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T0, lambda);
         v(iprs, k, j, i) = eos.PressureFromDensityTemperature(rho0, T0, lambda);
-
-        printf("rho: %e eng: %e prs: %e\n", v(irho, k, j, i),
-          v(ieng,k,j,i), v(iprs,k,j,i));
 
         for (int d = 0; d < 3; d++)
           v(ivlo + d, k, j, i) = 0.0;
       });
-  pmb->exec_space.fence(); exit(-1);
 
   fluid::PrimitiveToConserved(rc.get());
 }
 
-} // namespace thin_cooling
+} // namespace leptoneq

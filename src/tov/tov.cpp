@@ -22,14 +22,19 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
+using namespace parthenon::package::prelude;
+
 // Singularity
 #include <singularity-eos/eos/eos.hpp>
 
 // Phoebus
 #include "geometry/geometry_utils.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
-#include "monopole_gr/monopole_gr.hpp"
+#include "monopole_gr/monopole_gr_base.hpp"
+#include "monopole_gr/monopole_gr_interface.hpp"
 #include "monopole_gr/monopole_gr_utils.hpp"
+#include "phoebus_utils/history.hpp"
+#include "phoebus_utils/variables.hpp"
 
 #include "tov.hpp"
 
@@ -39,7 +44,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto tov = std::make_shared<StateDescriptor>("tov");
   Params &params = tov->AllParams();
 
-  bool do_tov = pin->GetOrAddBoolean("TOV", "enabled", false);
+  bool do_tov = pin->GetOrAddBoolean("tov", "enabled", false);
   params.Add("enabled", do_tov);
   if (!do_tov) return tov; // short-circuit with nothing
 
@@ -62,15 +67,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("npoints", npoints);
 
   // Central pressure
-  Real pc = pin->GetOrAddReal("TOV", "Pc", 10);
+  Real pc = pin->GetOrAddReal("tov", "Pc", 10);
   params.Add("pc", pc);
 
   // Pressure floor
-  Real pmin = pin->GetOrAddReal("TOV", "Pmin", 1e-9);
+  Real pmin = pin->GetOrAddReal("tov", "Pmin", 1e-9);
   params.Add("pmin", pmin);
 
-  // Etnropy
-  Real s = pin->GetOrAddReal("TOV", "entropy", 8);
+  // Entropy
+  Real s = pin->GetOrAddReal("tov", "entropy", 8);
   params.Add("entropy", s);
 
   // Arrays for TOV stuff
@@ -85,6 +90,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("tov_intrinsic", tov_intrinsic);
   params.Add("tov_intrinsic_h", tov_intrinsic_h);
 
+  // Redutions for history file
+  auto HstMax = parthenon::UserHistoryOperation::max;
+  auto ReducePress = [](MeshData<Real> *md) {
+    return History::ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::pressure, 0);
+  };
+  auto ReduceDens = [](MeshData<Real> *md) {
+    return History::ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::density, 0);
+  };
+  parthenon::HstVar_list hst_vars = {};
+  hst_vars.emplace_back(parthenon::HistoryOutputVar(HstMax, ReducePress, "max pressure"));
+  hst_vars.emplace_back(parthenon::HistoryOutputVar(HstMax, ReduceDens, "max Density"));
+  params.Add(parthenon::hist_param_key, hst_vars);
+
   return tov;
 }
 
@@ -93,7 +111,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   PARTHENON_REQUIRE_THROWS(tovpkg->label() == "tov", "Requires the tov package");
   PARTHENON_REQUIRE_THROWS(monopolepkg->label() == "monopole_gr",
                            "Requires the monopole_gr package");
-  PARTHENON_REQUIRE_THROWS(eospkg->label() == "eos", "REquires the eos package");
+  PARTHENON_REQUIRE_THROWS(eospkg->label() == "eos", "Requires the eos package");
 
   auto &params = tovpkg->AllParams();
 
@@ -113,6 +131,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   auto state_h = params.Get<TOV::State_host_t>("tov_state_h");
   auto intrinsic_h = params.Get<TOV::State_host_t>("tov_intrinsic_h");
 
+  // Currently only works with ideal gas.
   auto pc = params.Get<Real>("pc");
   auto s = params.Get<Real>("entropy");
   auto Pmin = params.Get<Real>("pmin");
@@ -154,6 +173,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     Real mass = state_h(TOV::M, i);
     Real press = state_h(TOV::P, i);
     Real rho, eps;
+    // needed for analytic solution. Bad for actual code.
     if (press <= 1.1 * Pmin) {
       press = rho = eps = 0;
     } else {
@@ -166,6 +186,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
     matter_h(MonopoleGR::Matter::Srr, i) = press;
   }
+  printf("TOV star constructed. Total mass = %.14e\n", state_h(TOV::M, npoints - 1));
 
   // Copy to device
   auto matter_d = monopolepkg->Param<MonopoleGR::Matter_t>("matter");

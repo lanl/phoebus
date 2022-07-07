@@ -14,12 +14,13 @@
 #ifndef GEOMETRY_TETRADS_HPP_
 #define GEOMETRY_TETRADS_HPP_
 
+#include "phoebus_utils/robust.hpp"
 #include <parthenon/package.hpp>
 
 namespace Geometry {
 
 class Tetrads {
-public:
+ public:
   KOKKOS_FUNCTION
   Tetrads(const double Ucon[NDFULL], const double Trial[NDFULL],
           const double Gcov[NDFULL][NDFULL]) {
@@ -64,7 +65,7 @@ public:
     }
   }
 
-private:
+ private:
   KOKKOS_FUNCTION
   void ConstructTetrads_(const double Ucon[NDFULL], const double Trial[NDFULL],
                          const double Gcov[NDFULL][NDFULL]) {
@@ -95,7 +96,7 @@ private:
       Econ_[3][mu] = Geometry::Utils::KroneckerDelta(mu, 3);
     }
 
-    if (norm > SMALL) {
+    if (norm > robust::EPS()) {
       // We can use the Trial vector
       if (X1ness > X2ness && X1ness > X3ness) {
         // Trial vector is closest to X1. Overwrite

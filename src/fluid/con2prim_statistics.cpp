@@ -11,11 +11,11 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#include "initial_conditions.hpp"
+#include "con2prim_statistics.hpp"
 
-namespace phoebus {
+namespace con2prim_statistics {
 
-void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
-}
+std::map<int, int> Stats::hist = {};
+int Stats::max_val = -1;
 
-} // namespace phoebus
+} // namespace con2prim_statistics

@@ -15,11 +15,17 @@ add_executable(phoebus
   main.cpp # first
 
   # alphabetical
+  fixup/fixup.cpp
+  fixup/fixup.hpp
 
   fluid/con2prim.hpp
+  fluid/con2prim_robust.hpp
+  fluid/con2prim_statistics.cpp
+  fluid/con2prim_statistics.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
   fluid/riemann.hpp
+  fluid/tmunu.cpp
   fluid/tmunu.hpp
 
   geometry/analytic_system.hpp
@@ -29,12 +35,16 @@ add_executable(phoebus
   geometry/boyer_lindquist.cpp
   geometry/cached_system.hpp
   geometry/coordinate_systems.hpp
+  geometry/flrw.hpp
+  geometry/flrw.cpp
   geometry/fmks.hpp
   geometry/fmks.cpp
   geometry/geometry.cpp
   geometry/geometry.hpp
   geometry/geometry_defaults.hpp
   geometry/geometry_utils.hpp
+  geometry/sph2cart.cpp
+  geometry/sph2cart.hpp
   geometry/tetrads.hpp
 
   geometry/inchworm.hpp
@@ -60,7 +70,10 @@ add_executable(phoebus
   microphysics/opac_phoebus/opac_phoebus.hpp
   microphysics/opac_phoebus/opac_phoebus.cpp
 
+  monopole_gr/interp_3d_to_1d.hpp
   monopole_gr/monopole_gr.hpp
+  monopole_gr/monopole_gr_base.hpp
+  monopole_gr/monopole_gr_interface.hpp
   monopole_gr/monopole_gr_utils.hpp
   monopole_gr/monopole_gr.cpp
 
@@ -69,31 +82,48 @@ add_executable(phoebus
   pgen/advection.cpp
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
+  pgen/check_cached_geom.cpp
+  pgen/friedmann.cpp
+  pgen/homogeneous_sphere.cpp
   pgen/kh.cpp
   pgen/leptoneq.cpp
   pgen/linear_modes.cpp
+  pgen/p2c2p.cpp
+  pgen/radiation_advection.cpp
+  pgen/radiation_equilibration.cpp
   pgen/rhs_tester.cpp
+  pgen/rotor.cpp
   pgen/shock_tube.cpp
   pgen/thin_cooling.cpp
   pgen/sedov.cpp
+  pgen/torus.cpp
+  pgen/tov.cpp
 
   phoebus_boundaries/phoebus_boundaries.hpp
   phoebus_boundaries/phoebus_boundaries.cpp
 
   phoebus_driver.cpp
   phoebus_driver.hpp
+  phoebus_package.cpp
+  phoebus_package.hpp
 
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
-  phoebus_utils/debug_utils.hpp
+  phoebus_utils/history.hpp
   phoebus_utils/linear_algebra.hpp
+  phoebus_utils/phoebus_interpolation.hpp
+  phoebus_utils/reduction.hpp
   phoebus_utils/relativity_utils.hpp
+  phoebus_utils/robust.hpp
+  phoebus_utils/root_find.hpp
   phoebus_utils/variables.hpp
 
   radiation/radiation.hpp
   radiation/radiation.cpp
   radiation/cooling_function.cpp
+  radiation/mocmc.cpp
+  radiation/moments.cpp
   radiation/monte_carlo.cpp
   radiation/geodesics.hpp
 

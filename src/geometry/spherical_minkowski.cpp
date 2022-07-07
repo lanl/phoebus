@@ -37,7 +37,9 @@ GetCoordinateSystem<SphMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
   auto indexer = GetIndexer(rc);
   return SphMinkowskiMeshBlock(indexer);
 }
-template <> void SetGeometry<SphMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {}
+
+template <>
+void SetGeometry<SphMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {}
 
 template <>
 SphMinkowskiMesh GetCoordinateSystem<SphMinkowskiMesh>(MeshData<Real> *rc) {
@@ -46,8 +48,10 @@ SphMinkowskiMesh GetCoordinateSystem<SphMinkowskiMesh>(MeshData<Real> *rc) {
 }
 
 template <>
-void Initialize<CSphMinkowskiMeshBlock>(ParameterInput *pin,
-                                        StateDescriptor *geometry) {
+void SetGeometry<SphMinkowskiMesh>(MeshData<Real> *rc) {}
+
+template <>
+void Initialize<CSphMinkowskiMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   InitializeCachedCoordinateSystem<SphMinkowskiMeshBlock>(pin, geometry);
 }
 template <>
@@ -59,8 +63,13 @@ template <>
 CSphMinkowskiMesh GetCoordinateSystem<CSphMinkowskiMesh>(MeshData<Real> *rc) {
   return GetCachedCoordinateSystem<SphMinkowskiMesh>(rc);
 }
-template <> void SetGeometry<CSphMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
+template <>
+void SetGeometry<CSphMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
   SetCachedCoordinateSystem<SphMinkowskiMeshBlock>(rc);
+}
+template <>
+void SetGeometry<CSphMinkowskiMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<SphMinkowskiMesh>(rc);
 }
 
 } // namespace Geometry

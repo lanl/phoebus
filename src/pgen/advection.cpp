@@ -21,16 +21,15 @@ namespace advection {
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski),
-    "Problem \"advection\" requires \"Minkowski\" geometry!");
+                    "Problem \"advection\" requires \"Minkowski\" geometry!");
 
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
-                         fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
-                         fluid_prim::pressure, fluid_prim::temperature},
-                        imap);
+  auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
+                              fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
+                              fluid_prim::pressure, fluid_prim::temperature},
+                             imap);
 
   const int irho = imap[fluid_prim::density].first;
   const int ivlo = imap[fluid_prim::velocity].first;
@@ -63,25 +62,33 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::advection", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        Real eos_lambda[2];
         Real x = coords.x1v(i);
         Real y = (ndim > 1 && shapedim > 1) ? coords.x2v(j) : 0;
         Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
 
+        if (iye > 0) {
+          v(iye, k, j, i) = (r * r <= rin * rin) ? 1.0 : 0.0;
+          eos_lambda[0] = v(iye, k, j, i);
+        }
+
         const Real eps = u / (rho + 1e-20);
-        const Real P = eos.PressureFromDensityInternalEnergy(rho, eps);
-        const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps);
+        const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, eos_lambda);
+        const Real P = eos.PressureFromDensityInternalEnergy(rho, eps, eos_lambda);
 
         v(irho, k, j, i) = rho;
         v(iprs, k, j, i) = P;
         v(ieng, k, j, i) = u;
         v(itmp, k, j, i) = T;
-        v(ivlo + 0, k, j, i) = vx;
-        v(ivlo + 1, k, j, i) = vy;
-        v(ivlo + 2, k, j, i) = vz;
+        Real vsq = 0.;
+        const Real vcon[3] = {vx, vy, vz};
+        SPACELOOP2(ii, jj) { vsq += vcon[ii] * vcon[jj]; }
+        const Real W = 1. / sqrt(1. - vsq);
 
-        if (iye > 0)
-          v(iye, k, j, i) = (r * r <= rin * rin) ? 1.0 : 0.0;
+        v(ivlo + 0, k, j, i) = W * vx;
+        v(ivlo + 1, k, j, i) = W * vy;
+        v(ivlo + 2, k, j, i) = W * vz;
       });
 
   fluid::PrimitiveToConserved(rc.get());

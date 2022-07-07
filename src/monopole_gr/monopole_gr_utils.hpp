@@ -14,27 +14,32 @@
 #ifndef MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
 #define MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_
 
-#include "microphysics/eos_phoebus/eos_phoebus.hpp"
+// System includes
+#include <cmath>
 
-#include "monopole_gr.hpp"
+// Parthenon includes
+#include <parthenon/package.hpp>
+
+// Phoebus includes
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
+#include "monopole_gr_base.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace MonopoleGR {
-
-constexpr unsigned int log2(unsigned int n) { return (n > 1) ? 1 + log2(n >> 1) : 0; }
-
-// ======================================================================
-
 namespace ShootingMethod {
 
 KOKKOS_INLINE_FUNCTION
 Real GetARHS(const Real a, const Real K, const Real r, const Real rho) {
-  if (r <= 0) return 0;
-  return a * (4 + a * a * (-4 + r * r * (-3 * K * K + 32 * M_PI * rho))) / (8 * r);
+  bool mask = (r > 0);
+  return mask *
+         robust::ratio(a * (4 + a * a * (-4 + r * r * (3 * K * K + 32 * M_PI * rho))),
+                       8 * r);
 }
 
 KOKKOS_INLINE_FUNCTION
 Real GetKRHS(Real a, Real K, Real r, Real j) {
-  return (r <= 0) ? 0 : 8 * M_PI * a * a * j - (3. / r) * K;
+  bool mask = (r > 0);
+  return mask * (8 * M_PI * a * a * j - robust::ratio(3. * K, r));
 }
 
 KOKKOS_INLINE_FUNCTION
@@ -60,6 +65,52 @@ KOKKOS_INLINE_FUNCTION void GetResidual(const H &h, const M &m, Real r, int npoi
 }
 } // namespace ShootingMethod
 
+namespace Interp3DTo1D {
+
+// True if a in a box centered at r with width dr.
+// False otherwise.
+KOKKOS_INLINE_FUNCTION
+bool InBoundsHelper(const Real a, const Real r, const Real dr) {
+  return ((a >= (r - 0.5 * dr)) && (a < (r + 0.5 * dr)));
+}
+
+KOKKOS_INLINE_FUNCTION
+Real GetVolIntersectHelper(const Real rsmall, const Real drsmall, const Real rbig,
+                           const Real drbig) {
+  // TODO(JMM): If drsmall > drbig, we can probably just swap all the
+  // arguments, but I haven't tested the monopole solver in this regime,
+  // so I'm forbidding it for now.
+  PARTHENON_DEBUG_REQUIRE(drsmall <= drbig, "drsmall <= drbig required.");
+  // TODO(JMM): Is this masking too cute?
+  // cast this way, there's no branching, but there are more flops maybe?
+  bool left_in_bnds = InBoundsHelper(rsmall - 0.5 * drsmall, rbig, drbig);
+  bool right_in_bnds = InBoundsHelper(rsmall + 0.5 * drsmall, rbig, drbig);
+  bool interior_mask = left_in_bnds && right_in_bnds;
+  bool left_mask = right_in_bnds && !left_in_bnds;
+  bool right_mask = left_in_bnds && !right_in_bnds;
+  Real vol_intersect = interior_mask * (drsmall / drbig);
+
+  // divide by zero impossible because these are grid deltas
+  vol_intersect += left_mask * (rsmall + 0.5 * drsmall - (rbig - 0.5 * drbig)) / drbig;
+  vol_intersect += right_mask * (rbig + 0.5 * drbig - (rsmall - 0.5 * drsmall)) / drbig;
+  return vol_intersect;
+}
+
+KOKKOS_INLINE_FUNCTION
+void GetCoordsAndDerivsSph(const int k, const int j, const int i,
+                           const parthenon::Coordinates_t &coords, Real &r, Real &th,
+                           Real &ph, Real &dr, Real &dth, Real &dph, Real &dv) {
+  r = coords.x1v(k, j, i);
+  th = coords.x2v(k, j, i);
+  ph = coords.x3v(k, j, i);
+  dr = coords.Dx(1, k, j, i);
+  dth = coords.Dx(2, k, j, i);
+  dph = coords.Dx(3, k, j, i);
+  const Real idr = (1. / 12.) * (dr * dr * dr) + dr * (r * r);
+  dv = std::sin(th) * dth * dph * idr;
+}
+
+} // namespace Interp3DTo1D
 } // namespace MonopoleGR
 
 #endif // MONOPOLE_GR_MONOPOLE_GR_UTILS_HPP_

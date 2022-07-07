@@ -1,0 +1,112 @@
+# © 2021. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract 89233218CNA000001
+# for Los Alamos National Laboratory (LANL), which is operated by Triad
+# National Security, LLC for the U.S.  Department of Energy/National
+# Nuclear Security Administration. All rights in the program are
+# reserved by Triad National Security, LLC, and the U.S. Department of
+# Energy/National Nuclear Security Administration. The Government is
+# granted for itself and others acting on its behalf a nonexclusive,
+# paid-up, irrevocable worldwide license in this material to reproduce,
+# prepare derivative works, distribute copies to the public, perform
+# publicly and display publicly, and to permit others to do so.
+
+# Sod shock tube for SFHo EOS from the nubhlight paper
+# Miller, Ryan, and Dolence, ApJS 241 30, 2019.
+
+<phoebus>
+problem = shock_tube
+ix1_bc = outflow
+ox1_bc = outflow
+
+<parthenon/job>
+problem_id  = sod       # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = p.density,  &
+	    c.density,  &
+            p.velocity, &
+            p.energy,   &
+	    pressure,	&
+	    cs, &
+	    p.ye
+
+file_type   = hdf5      # Tabular data dump
+dt          = 0.01      # time increment between outputs
+
+<parthenon/time>
+nlim        = -1       # cycle limit
+tlim        = 0.75     # time limit
+integrator  = rk2      # time integration algorithm
+ncycle_out  = 1        # interval for stdout summary info
+dt_init_fact = 1.e-6
+
+<parthenon/mesh>
+nghost = 4
+#refinement = adaptive
+#numlevel = 3
+
+nx1         = 512       # Number of zones in X1-direction
+x1min       = 0        # minimum value of X1
+x1max       = 1         # maximum value of X1
+ix1_bc      = user     # Inner-X1 boundary condition flag
+ox1_bc      = user     # Outer-X1 boundary condition flag
+
+nx2         = 1       # Number of zones in X2-direction
+x2min       = -1        # minimum value of X2
+x2max       = 1         # maximum value of X2
+ix2_bc      = periodic  # Inner-X2 boundary condition flag
+ox2_bc      = periodic  # Outer-X2 boundary condition flag
+
+nx3         = 1         # Number of zones in X3-direction
+x3min       = -1        # minimum value of X3
+x3max       = 1         # maximum value of X3
+ix3_bc      = periodic  # Inner-X3 boundary condition flag
+ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
+
+num_threads = 1         # maximum number of OMP threads
+
+<phoebus/mesh>
+bc_vars = conserved
+
+<parthenon/meshblock>
+nx1 = 512
+nx2 = 1
+nx3 = 1
+
+<parthenon/refinement0>
+field = c.c.bulk.rho
+method = derivative_order_1
+max_level = 3
+
+<eos>
+type = StellarCollapse
+filename = /home/jonahm/data/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.1_20120817.sp5
+#filename = /home/jonahm/data/ideal_gas.sp5
+
+<physics>
+hydro = true
+he = false
+3t = false
+rad = false
+
+<fluid>
+xorder = 2
+cfl = 0.8
+riemann = hll
+recon = linear
+c2p_max_iter = 100
+Ye = true
+
+# Density of roughly 1e9 g/cm^3
+<units>
+scale_free = false
+fluid_mass_g = 1e31
+geom_length_cm = 3e7
+
+<shocktube>
+rhol = 1.0
+Pl = 0.25
+vl = 0.0
+rhor = 0.25
+Pr = 0.025
+vr = 0.0

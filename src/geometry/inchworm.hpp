@@ -33,7 +33,7 @@ using namespace parthenon::package::prelude;
 namespace Geometry {
 
 class Inchworm {
-public:
+ public:
   Inchworm() = default;
   KOKKOS_INLINE_FUNCTION
   Inchworm(const Real a, const Real k) : a_(a), k_(k) {}
@@ -41,14 +41,12 @@ public:
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const { return 1.; }
   KOKKOS_INLINE_FUNCTION
-  void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
-                          Real beta[NDSPACE]) const {
+  void ContravariantShift(Real X0, Real X1, Real X2, Real X3, Real beta[NDSPACE]) const {
     for (int i = 0; i < NDSPACE; ++i)
       beta[i] = 0;
   }
   KOKKOS_INLINE_FUNCTION
-  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
-                       Real g[NDFULL][NDFULL]) const {
+  void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
     for (int mu = 0; mu < NDFULL; ++mu) {
       for (int nu = 0; nu < NDFULL; ++nu) {
         if (mu == nu) {
@@ -59,7 +57,7 @@ public:
       }
     }
     const Real d = GetDelta(X1);
-    g[1][1] = pow(d - 1,2);
+    g[1][1] = pow(d - 1, 2);
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
@@ -74,18 +72,17 @@ public:
       }
     }
     const Real d = GetDelta(X1);
-    g[1][1] = pow(d-1,-2);
+    g[1][1] = pow(d - 1, -2);
   }
   KOKKOS_INLINE_FUNCTION
-  void Metric(Real X0, Real X1, Real X2, Real X3,
-              Real gamma[NDSPACE][NDSPACE]) const {
+  void Metric(Real X0, Real X1, Real X2, Real X3, Real gamma[NDSPACE][NDSPACE]) const {
     for (int i = 0; i < NDSPACE; ++i) {
       for (int j = 0; j < NDSPACE; ++j) {
         gamma[i][j] = (i == j ? 1 : 0);
       }
     }
     const Real d = GetDelta(X1);
-    gamma[0][0] = pow(d-1,2);
+    gamma[0][0] = pow(d - 1, 2);
   }
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
@@ -96,17 +93,17 @@ public:
       }
     }
     const Real d = GetDelta(X1);
-    gamma[0][0] = pow(d-1,-2);
+    gamma[0][0] = pow(d - 1, -2);
   }
   KOKKOS_INLINE_FUNCTION
   Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
     const Real d = GetDelta(X1);
-    return sqrt(pow(d,2) - 2.*d + 1);
+    return sqrt(pow(d, 2) - 2. * d + 1);
   }
   KOKKOS_INLINE_FUNCTION
   Real DetG(Real X0, Real X1, Real X2, Real X3) const {
     const Real d = GetDelta(X1);
-    return sqrt(pow(d,2) - 2.*d + 1);
+    return sqrt(pow(d, 2) - 2. * d + 1);
   }
 
   KOKKOS_INLINE_FUNCTION
@@ -120,9 +117,9 @@ public:
       }
     }
     const Real d = GetDelta(X1);
-    const Real k2 = k_*k_;
+    const Real k2 = k_ * k_;
 
-    Gamma[1][1][1] = a_*k2*(-d + 1)*sin(k_*X1);
+    Gamma[1][1][1] = a_ * k2 * (-d + 1) * sin(k_ * X1);
   }
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
@@ -135,9 +132,9 @@ public:
       }
     }
     const Real d = GetDelta(X1);
-    const Real k2 = k_*k_;
+    const Real k2 = k_ * k_;
 
-    dg[1][1][1] = 2.*a_*k2*(-d + 1)*sin(k_*X1);
+    dg[1][1][1] = 2. * a_ * k2 * (-d + 1) * sin(k_ * X1);
   }
   KOKKOS_INLINE_FUNCTION
   void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
@@ -154,14 +151,12 @@ public:
     C[3] = X3;
   }
 
-  private:
-    Real a_;
-    Real k_;
+ private:
+  Real a_;
+  Real k_;
 
   KOKKOS_INLINE_FUNCTION
-  Real GetDelta(Real X1) const {
-    return a_*k_*cos(k_*X1);
-  }
+  Real GetDelta(Real X1) const { return a_ * k_ * cos(k_ * X1); }
 };
 
 using InchwormMeshBlock = Analytic<Inchworm, IndexerMeshBlock>;
@@ -173,8 +168,7 @@ using CInchwormMesh = CachedOverMesh<InchwormMesh>;
 template <>
 void Initialize<InchwormMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 template <>
-void Initialize<CInchwormMeshBlock>(ParameterInput *pin,
-                                     StateDescriptor *geometry);
+void Initialize<CInchwormMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 
 } // namespace Geometry
 

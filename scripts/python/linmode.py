@@ -13,7 +13,7 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
-PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
+PHDF_PATH = '../external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/'
 res_low = [8, 16, 32]
 res_high = [128, 256, 512]
 colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
@@ -236,7 +236,7 @@ for n, N in enumerate(res):
   # Run simulation
   start = time.time()
   print('Running problem at %i zones... ' % N, end='', flush=True)
-  call([EXECUTABLE, '-i', TMPINPUTFILE], stdout=DEVNULL, stderr=DEVNULL)
+  call(['mpirun', '-n', '1', EXECUTABLE, '-i', TMPINPUTFILE], stdout=DEVNULL, stderr=DEVNULL)
   stop = time.time()
   print('done in %g seconds' % (stop - start))
 
@@ -287,8 +287,8 @@ for n, N in enumerate(res):
   else:
     for var in mode['vars']:
       mode[var + '_soln'] = get_mode(x, y, t, var)
-    
-  for var in mode['vars']:  
+
+  for var in mode['vars']:
     L1[var][n] =  np.fabs(parth['d' + var] - mode[var + '_soln']).sum()/(N*N*amp)
 
   if plot_each_wave:

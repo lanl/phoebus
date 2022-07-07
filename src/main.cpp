@@ -13,13 +13,22 @@
 // so.
 //========================================================================================
 
+#include <string>
+#include <vector>
+
 #include <defs.hpp>
+#include <globals.hpp>
+#include <parthenon/driver.hpp>
+#include <parthenon/package.hpp>
 #include <parthenon_manager.hpp>
 
+#include "fluid/con2prim_statistics.hpp"
 #include "geometry/geometry.hpp"
-#include "initial_conditions.hpp"
+#include "monopole_gr/monopole_gr.hpp"
+#include "pgen/pgen.hpp"
 #include "phoebus_boundaries/phoebus_boundaries.hpp"
 #include "phoebus_driver.hpp"
+#include "radiation/radiation.hpp"
 
 int main(int argc, char *argv[]) {
   parthenon::ParthenonManager pman;
@@ -43,36 +52,29 @@ int main(int argc, char *argv[]) {
   // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
 
-  // TODO(JMM): Move this into another function somewhere?
-  const std::string bc_ix1 =
-      pman.pinput->GetOrAddString("phoebus", "bc_ix1", "reflect");
-  const std::string bc_ox1 =
-      pman.pinput->GetOrAddString("phoebus", "bc_ox1", "outflow");
+  phoebus::ProblemModifier(pman.pinput.get());
 
-  if (bc_ix1 == "reflect") {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
-        Boundaries::ReflectInnerX1;
-  } else {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::inner_x1] =
-        Boundaries::OutflowInnerX1;
-  }
-  if (bc_ox1 == "reflect") {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-        Boundaries::ReflectOuterX1;
-  } else {
-    pman.app_input->boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-        Boundaries::OutflowOuterX1;
-  }
+  Boundaries::ProcessBoundaryConditions(pman);
 
   // call ParthenonInit to set up the mesh
   pman.ParthenonInitPackagesAndMesh();
+
+  // call post-initialization
+  phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get());
 
   // Initialize the driver
   phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(),
                                 pman.pmesh.get());
 
+  // Communicate ghost buffers before executing
+  driver.PostInitializationCommunication();
+
   // This line actually runs the simulation
   auto driver_status = driver.Execute();
+
+#if CON2PRIM_STATISTICS
+  con2prim_statistics::Stats::report();
+#endif
 
   // call MPI_Finalize and Kokkos::finalize if necessary
   pman.ParthenonFinalize();

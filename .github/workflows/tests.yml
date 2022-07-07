@@ -20,7 +20,7 @@ jobs:
           run: export DEBIAN_FRONTEND=noninteractive
         - name: Install dependencies
           run: |
-            sudo apt-get update -qq
+            #sudo apt-get update -qq
             sudo apt-get install -qq --no-install-recommends tzdata
             sudo apt-get install -qq git
             sudo apt-get install -qq make cmake g++
@@ -30,8 +30,50 @@ jobs:
         - name: Run test scripts
           run: |
             cd tst/regression
-            ./linear_modes.py
-        - name: Build code
+            mkdir build_minkowski_release
+            cd build_minkowski_release
+            cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
+            cmake --build . --parallel 4
+            cd ..
+            mkdir build_fmks_release
+            cd build_fmks_release
+            cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=FMKS -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
+            cmake --build . --parallel 4
+            cd ..
+            mkdir build_minkowski_debug
+            cd build_minkowski_debug
+            cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
+            cmake --build . --parallel 4
+            cd ..
+            mkdir build_fmks_debug
+            cd build_fmks_debug
+            cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=FMKS -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
+            cmake --build . --parallel 4
+            cd ..
+            # TODO(BRR) add --use_gpu flag here if running on GPU
+            # Release suite
+            ./radiation_diffusion.py --executable build_minkowski_release/src/phoebus
+            ./mocmc_diffusion.py --executable build_minkowski_release/src/phoebus
+            ./radiation_equilibration.py --executable build_minkowski_release/src/phoebus
+            ./mocmc_equilibration.py --executable build_minkowski_release/src/phoebus
+            ./bondi.py --executable build_fmks_release/src/phoebus
+            ./linear_modes.py --executable build_minkowski_release/src/phoebus
+            ./thincooling.py --executable build_minkowski_release/src/phoebus
+            ./thincooling_coolingfunction.py --executable build_minkowski_release/src/phoebus
+
+            # Debug suite
+            ./radiation_diffusion.py --executable build_minkowski_debug/src/phoebus
+            ./mocmc_diffusion.py --executable build_minkowski_debug/src/phoebus
+            ./radiation_equilibration.py --executable build_minkowski_debug/src/phoebus
+            ./mocmc_equilibration.py --executable build_minkowski_debug/src/phoebus
+            ./bondi.py --executable build_fmks_debug/src/phoebus
+            ./linear_modes.py --executable build_minkowski_debug/src/phoebus
+            ./thincooling.py --executable build_minkowski_debug/src/phoebus
+            ./thincooling_coolingfunction.py --executable build_minkowski_debug/src/phoebus
+
+            # Custom builds
+            ./friedmann.py
+        - name: Build code for unit testing
           run: |
             mkdir build
             cd build

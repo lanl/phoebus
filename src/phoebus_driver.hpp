@@ -17,6 +17,7 @@
 #include <memory>
 
 #include <parthenon/driver.hpp>
+#include <parthenon/package.hpp>
 using namespace parthenon::driver::prelude;
 
 namespace phoebus {
@@ -26,14 +27,22 @@ class PhoebusDriver : public EvolutionDriver {
  public:
   PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm);
 
+  void PostInitializationCommunication();
+
   TaskCollection RungeKuttaStage(const int stage);
-  TaskListStatus RadiationStep();
+  TaskListStatus RadiationPreStep();
+  TaskListStatus RadiationPostStep();
   TaskListStatus MonteCarloStep();
 
   TaskListStatus Step();
+
  private:
   std::unique_ptr<StagedIntegrator> integrator;
   Real dt_init, dt_init_fact;
+
+  AllReduce<Real> dNtot;
+  AllReduce<std::vector<Real>> particle_resolution;
+  AllReduce<int> particles_outstanding;
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);

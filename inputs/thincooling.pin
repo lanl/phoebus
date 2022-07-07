@@ -13,11 +13,11 @@ variables = p.density,  &
             temperature
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1.e-2     # time increment between outputs
+dt          = 1.e-3     # time increment between outputs
 
 <parthenon/time>
 nlim        = -1       # cycle limit
-tlim = 2.e-1           # time limit
+tlim        = 1.e-1           # time limit
 integrator  = rk2      # time integration algorithm
 ncycle_out  = 1        # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -27,8 +27,7 @@ nghost = 4
 
 nx1         = 4         # Number of zones in X1-direction
 x1min       = 0         # minimum value of X1
-#x1max       = 1.e-7     # maximum value of X1 (for cooling_function)
-x1max       = 1.e-4     # maximum value of X1 (for monte_carlo)
+x1max       = 5.e-4     # maximum value of X1 (for monte_carlo)
 ix1_bc      = periodic  # Inner-X1 boundary condition flag
 ox1_bc      = periodic  # Outer-X1 boundary condition flag
 
@@ -62,7 +61,7 @@ geom_length_cm = 1.e14
 fluid_mass_g = 1.e0
 
 <physics>
-hydro = false
+hydro = true
 he = false
 3t = false
 rad = true
@@ -81,8 +80,10 @@ Ye = true
 method = monte_carlo
 nu_min = 1.e15
 nu_max = 0.9999e17
-nu_bins = 200
-tune_emiss = 1.e23
+nu_bins = 100
+tune_emission = 1.e-43
+#tune_emission = 1.e-41
+#tune_emission = 1.e-34
 num_particles = 16
 opacity_model = tophat
 absorption = false

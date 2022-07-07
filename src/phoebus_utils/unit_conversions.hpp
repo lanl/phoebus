@@ -24,8 +24,10 @@ namespace phoebus {
 
 // Object for converting between cgs and code units, based on relativistic mass
 class UnitConversions {
-public:
+ public:
   UnitConversions(ParameterInput *pin);
+
+  bool IsScaleFree() const { return scale_free_; }
 
   Real GetMassCodeToCGS() const { return mass_; }
   Real GetMassCGSToCode() const { return 1. / mass_; }
@@ -48,7 +50,8 @@ public:
   Real GetTemperatureCodeToCGS() const { return temperature_; }
   Real GetTemperatureCGSToCode() const { return 1. / temperature_; }
 
-private:
+ private:
+  bool scale_free_;
   Real mass_;
   Real length_;
   Real time_;
@@ -56,6 +59,38 @@ private:
   Real number_density_;
   Real mass_density_;
   Real temperature_;
+};
+
+// Object for holding physical constants in code units for convenience
+class CodeConstants {
+  using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
+
+ public:
+  CodeConstants(UnitConversions unit_conv)
+      : CodeConstants(MakeCodeConstants(unit_conv)) {}
+
+  CodeConstants(CodeConstants &&mE) = default;
+
+  CodeConstants(CodeConstants &mE) = default;
+
+  const Real h;
+  const Real c;
+  const Real kb;
+  const Real mp;
+
+ private:
+  CodeConstants(const Real h_, const Real c_, const Real kb_, const Real mp_)
+      : h(h_), c(c_), kb(kb_), mp(mp_) {}
+
+  static CodeConstants MakeCodeConstants(UnitConversions unit_conv) {
+    const Real TIME = unit_conv.GetTimeCGSToCode();
+    const Real MASS = unit_conv.GetMassCGSToCode();
+    const Real LENGTH = unit_conv.GetLengthCGSToCode();
+    const Real ENERGY = MASS * LENGTH * LENGTH / (TIME * TIME);
+    const Real TEMPERATURE = unit_conv.GetTemperatureCGSToCode();
+    return CodeConstants(pc::h * MASS * LENGTH * LENGTH / TIME, pc::c * LENGTH / TIME,
+                         pc::kb * ENERGY / TEMPERATURE, pc::mp * MASS);
+  }
 };
 
 constexpr Real solar_mass = 1.989e33; // g

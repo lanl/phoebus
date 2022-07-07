@@ -14,6 +14,7 @@
 #include "geometry/geometry.hpp"
 
 #include "pgen.hpp"
+#include "phoebus_utils/root_find.hpp"
 
 namespace phoebus {
 
@@ -33,37 +34,52 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   f(pmb, pin);
 }
 
+void ProblemModifier(ParameterInput *pin) {
+  std::string name = pin->GetString("phoebus", "problem");
+  if (name == "phoebus" || pmod_dict.count(name) == 0) {
+    return;
+  }
+
+  auto f = pmod_dict[name];
+  f(pin);
+}
+
+void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+  std::string name = pin->GetString("phoebus", "problem");
+  if (name == "phoebus" || pinitmod_dict.count(name) == 0) {
+    return;
+  }
+
+  auto f = pinitmod_dict[name];
+  f(pin, pmesh);
+}
+
+class PressResidual {
+ public:
+  KOKKOS_INLINE_FUNCTION
+  PressResidual(const singularity::EOS &eos, const Real rho, const Real P, const Real Ye)
+      : eos_(eos), rho_(rho), P_(P) {
+    lambda_[0] = Ye;
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real operator()(const Real e) {
+    return eos_.PressureFromDensityInternalEnergy(rho_, e, lambda_) - P_;
+  }
+
+ private:
+  const singularity::EOS &eos_;
+  Real rho_, P_;
+  Real lambda_[2];
+};
+
 KOKKOS_FUNCTION
-Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P) {
+Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P,
+                       const Real emin, const Real emax, const Real Ye) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
-
-  Real eguessl = P/rho;
-  Real Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl);
-  Real eguessr = eguessl;
-  Real Pguessr = Pguessl;
-  while (Pguessl > P) {
-    eguessl /= 2.0;
-    Pguessl = eos.PressureFromDensityInternalEnergy(rho, eguessl);
-  }
-  while (Pguessr < P) {
-    eguessr *= 2.0;
-    Pguessr = eos.PressureFromDensityInternalEnergy(rho, eguessr);
-  }
-
-  PARTHENON_REQUIRE(Pguessr>P && Pguessl<P, "Pressure not bracketed");
-
-  while (Pguessr - Pguessl > 1.e-10*P) {
-    Real emid = 0.5*(eguessl + eguessr);
-    Real Pmid = eos.PressureFromDensityInternalEnergy(rho, emid);
-    if (Pmid < P) {
-      eguessl = emid;
-      Pguessl = Pmid;
-    } else {
-      eguessr = emid;
-      Pguessr = Pmid;
-    }
-  }
-  return 0.5*rho*(eguessl + eguessr);
+  PressResidual res(eos, rho, P, Ye);
+  root_find::RootFind root;
+  Real eroot = root.regula_falsi(res, emin, emax, 1.e-10 * P, emin - 1.e10);
+  return rho * eroot;
 }
 
-}
+} // namespace phoebus

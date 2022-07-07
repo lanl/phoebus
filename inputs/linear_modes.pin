@@ -63,10 +63,10 @@ num_threads = 1         # maximum number of OMP threads
 <phoebus/mesh>
 #bc_vars = primitive
 
-<parthenon/meshblock>
-nx1 = 128
-nx2 = 128
-nx3 = 1
+# <parthenon/meshblock>
+# nx1 = 128
+# nx2 = 128
+# nx3 = 1
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -77,8 +77,8 @@ max_level = 3
 <coordinates>
 # vx = 0.308606699924204
 # vy = 0.308606699924204
-vx = 0.436436
-vy = 0.436436
+vx = 0. # 0.436436
+vy = 0. # 0.436436
 
 # Uses this one for boosted snake coordinates
 # TODO(JMM): Should we unify this interface
@@ -86,11 +86,12 @@ vy = 0.436436
 # k = 25.1327 # wave number. Default is 2*pi
 kmult = 4     # Multiply k by this factor
 a = 0.3       # amplitude of wiggle
-alpha = 0.85    # lapse
-vy = 0.524631
+alpha = 1. # 0.85    # lapse
+vy = 0. # 0.524631
 # vy = 0.81     # shift. Default is 0.
 # vy = 0.617213 # shift. Default is 0.
 # vy = 0      # shift. Default is 0.
+do_fd_on_grid = false
 
 <eos>
 type = IdealGas
@@ -109,9 +110,10 @@ xorder = 2
 cfl = 0.4
 riemann = hll
 c2p_max_iter = 100
-#recon = weno5
 recon = linear
 c2p_tol = 1.e-12
+#c2p_method = classic
+c2p_method = robust
 
 <hydro_modes>
 physics = hydro

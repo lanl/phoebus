@@ -18,18 +18,52 @@
 
 #include <memory>
 
+#include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
+#include <parthenon_manager.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
 namespace Boundaries {
 
+void ProcessBoundaryConditions(parthenon::ParthenonManager &pman);
+
 void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
 void ReflectInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void ReflectOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 
-TaskStatus ConvertBoundaryConditions (std::shared_ptr<MeshBlockData<Real>> &rc);
+void OutflowInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+void OutflowOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
+void ReflectInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+void ReflectOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
+void OutflowInnerX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+void OutflowOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
+void ReflectInnerX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+void ReflectOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
+
+class ParticleBoundNoWork : public parthenon::ParticleBound {
+ public:
+  KOKKOS_INLINE_FUNCTION void
+  Apply(const int n, double &x, double &y, double &z,
+        const parthenon::SwarmDeviceContext &swarm_d) const override {}
+};
+
+inline auto SetSwarmIX1Outflow() {
+  return parthenon::DeviceAllocate<parthenon::ParticleBoundIX1Outflow>();
+}
+inline auto SetSwarmOX1Outflow() {
+  return parthenon::DeviceAllocate<parthenon::ParticleBoundOX1Outflow>();
+}
+inline auto SetSwarmNoWorkBC() {
+  return parthenon::DeviceAllocate<ParticleBoundNoWork>();
+}
+
+TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc);
 
 } // namespace Boundaries
 
