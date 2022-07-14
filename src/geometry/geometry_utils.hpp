@@ -198,7 +198,7 @@ KOKKOS_INLINE_FUNCTION int SymSize() {
 }
 
 KOKKOS_INLINE_FUNCTION
-void InvertMetric(Real gcov[NDFULL][NDFULL], Real gcon[NDFULL][NDFULL]) {
+void InvertSpacetimeMetric(Real gcov[NDFULL][NDFULL], Real gcon[NDFULL][NDFULL]) {
   // A^{-1} = Ajdugate(A)/Determinant(A)
   Real determinant = LinearAlgebra::Determinant4D(gcov);
   //calculate adjugates

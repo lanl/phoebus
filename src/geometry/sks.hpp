@@ -108,11 +108,37 @@ private:
   }
 public:
   KOKKOS_INLINE_FUNCTION
-  Real Lapse(Real X0, Real X1, Real X2, Real X3) const {}
+  Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
+    Real alpha_sq;
+    Real beta[NDSPACE];
+    Real gammainv[NDSPACE][NDSPACE];
+    Real gcov[NDFULL][NDFULL];
+    MetricInverse(X0,X1,X2,X3,gammainv);
+    SpacetimeMetric(X0,X1,X2,X3,gcov);
+    SPACELOOP(i) {
+      beta[i] = gcov[0][i];
+    }
+    alpha_sq = 0.;
+    SPACELOOP2(i,j) {
+      alpha_sq += gammainv[i][j]*beta[i]*beta[j];
+    }
+    alpha_sq -= gcov[0][0];
+    return sqrt(alpha_sq);    
+  }
   KOKKOS_INLINE_FUNCTION
   void ContravariantShift(Real X0, Real X1, Real X2, Real X3,
-                          Real beta[NDSPACE]) const {}
-
+                          Real beta[NDSPACE]) const {
+    Real betacov[NDSPACE];
+    Real gcov[NDFULL][NDFULL];
+    Real gammainv[NDSPACE][NDSPACE];
+    SpacetimeMetric(X0,X1,X2,X3,gcov);
+    MetricInverse(X0,X1,X2,X3,gammainv);
+    SPACELOOP(i) betacov[i] = gcov[0][i];
+    LinearAlgebra::SetZero(beta,NDSPACE);
+    SPACELOOP2(i,k) {
+      beta[i] += gammainv[i][k]*beta[k];
+    }
+  }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
                        Real g[NDFULL][NDFULL]) const {
@@ -174,22 +200,45 @@ public:
     LinearAlgebra::SetZero(gcov,NDFULL,NDFULL);
     SpacetimeMetric(X0,X1,X2,X3,gcov);
     LinearAlgebra::SetZero(g,NDFULL,NDFULL);
-    Utils::InvertMetric(gcov,g);
+    Utils::InvertSpacetimeMetric(gcov,g);
   }
   KOKKOS_INLINE_FUNCTION
   void Metric(Real X0, Real X1, Real X2, Real X3,
-              Real g[NDSPACE][NDSPACE]) const {}
+              Real g[NDSPACE][NDSPACE]) const {
+    Real gcov[NDFULL][NDFULL];
+    SpacetimeMetric(X0,X1,X2,X3,gcov);
+    SPACELOOP2(i,j) {
+      g[i][j] = gcov[i][j];
+    }
+  }
   KOKKOS_INLINE_FUNCTION
   void MetricInverse(Real X0, Real X1, Real X2, Real X3,
-                     Real g[NDSPACE][NDSPACE]) const {}
+                     Real g[NDSPACE][NDSPACE]) const {
+    struct gcov_t {
+      Real data[NDSPACE][NDSPACE];
+      KOKKOS_FORCEINLINE_FUNCTION
+      Real &operator()(const int i, const int j) {return data[i][j];}
+    };
+    Real gdet;
+    gcov_t gcov_in, gcon_out;
+    Metric(X0,X1,X2,X3,gcov_in.data);
+    gdet = LinearAlgebra::matrixInverse3x3(gcov_in,gcon_out);
+    SPACELOOP2(i,j) {
+      g[i][j] = gcon_out(i,j);
+    }
+  }
   KOKKOS_INLINE_FUNCTION
-  Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {}
+  Real DetGamma(Real X0, Real X1, Real X2, Real X3) const {
+    Real gamma[NDSPACE][NDSPACE];
+    Metric(X0,X1,X2,X3,gamma);
+    return sqrt(LinearAlgebra::Determinant3D(gamma));
+  }
   KOKKOS_INLINE_FUNCTION
   Real DetG(Real X0, Real X1, Real X2, Real X3) const {
     Real gcov[NDFULL][NDFULL];
     LinearAlgebra::SetZero(gcov,NDFULL,NDFULL);
     SpacetimeMetric(X0,X1,X2,X3,gcov);
-    return std::sqrt(-LinearAlgebra::Determinant4D(gcov));
+    return sqrt(-LinearAlgebra::Determinant4D(gcov));
   }
   // Gamma^mu_{nu sigma}
   KOKKOS_INLINE_FUNCTION
