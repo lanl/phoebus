@@ -39,6 +39,10 @@ class SuperimposedKerrSchild {
   // Federico G. Lopez Armengol et al. 2021
   // https://iopscience.iop.org/article/10.3847/1538-4357/abf0af/meta
 private:
+  // m1_, a1_ : BH1 mass/spin (initial location +x axis)
+  // m2_, a2_ : BH2 mass/spin (initial location -x axis)
+  // bb_ : binary separation
+  Real dx_, m1_, m2_, a1_, a2_, bb_;
   // Auxiliary functions
   KOKKOS_INLINE_FUNCTION
   Real Rho(Real x, Real y, Real z) const { return sqrt(x*x + y*y + z*z); }
@@ -107,6 +111,11 @@ private:
     Lambda[3][3] = 1.;
   }
 public:
+  SuperimposedKerrSchild() = default;
+  SuperimposedKerrSchild(Real m1, Real m2, Real a1, Real a2, Real bb) : 
+    dx_(1e-8), m1_(m1), m2_(m2), a1_(a1), a2_(a2), bb_(bb) {}
+  SuperimposedKerrSchild(Real m1, Real m2, Real a1, Real a2, Real bb, Real dx) : 
+    dx_(dx), m1_(m1), m2_(m2), a1_(a1), a2_(a2), bb_(bb) {}
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
     Real alpha_sq;
@@ -143,8 +152,7 @@ public:
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3,
                        Real g[NDFULL][NDFULL]) const {
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
-    Real m1, m2, a1, a2, b, Omega;
-    Real Sx, Sy, vx, vy, phase;
+    Real Sx, Sy, vx, vy, phase, Omega;
     Real HBH1,HBH2;
     Real CoordsBH1[NDFULL], CoordsBH2[NDFULL];
     Real LBH[NDFULL], LBH1[NDFULL], LBH2[NDFULL];
@@ -154,19 +162,18 @@ public:
     eta_flat[0][0] = -1.;
     for(int i=1; i < NDFULL; i++) { eta_flat[i][i] = 1.; }
 
-    //set trajectories - do better later
-    m1 = 0.5; m2 = 0.5; a1 = 0; a2 = 0; b = 20.; //dennis for now hard set
-    Omega = sqrt((m1+m2)/pow(b,3));
+    //set trajectories
+    Omega = sqrt((m1_+m2_)/pow(bb_,3));
     
     //BH1 contribution
     phase = Omega*X0;
-    Sx = m2*b*cos(phase)/(m1+m2);
-    Sy = m2*b*sin(phase)/(m1+m2);
-    vx = -Omega*m2*b*sin(phase)/(m1+m2);
-    vy = Omega*m2*b*cos(phase)/(m1+m2);
+    Sx = m2_*bb_*cos(phase)/(m1_+m2_);
+    Sy = m2_*bb_*sin(phase)/(m1_+m2_);
+    vx = -Omega*m2_*bb_*sin(phase)/(m1_+m2_);
+    vy = Omega*m2_*bb_*cos(phase)/(m1_+m2_);
     CoordsBH(X0,X1,X2,X3,Sx,Sy,vx,vy,CoordsBH1);
-    HBH1 = H(CoordsBH1[1], CoordsBH1[2], CoordsBH1[3],a1,m1);
-    Lmu(CoordsBH1[1],CoordsBH1[2],CoordsBH1[3],a1,LBH);
+    HBH1 = H(CoordsBH1[1], CoordsBH1[2], CoordsBH1[3],a1_,m1_);
+    Lmu(CoordsBH1[1],CoordsBH1[2],CoordsBH1[3],a1_,LBH);
     BoostBH(vx, vy, Lambda);
     LinearAlgebra::SetZero(LBH1,NDFULL);
     SPACETIMELOOP2(mu,kappa) {
@@ -175,13 +182,13 @@ public:
 
     //BH2 contribution
     phase += 4.0 * atan(1.0);
-    Sx = m1*b*cos(phase)/(m1+m2);
-    Sy = m1*b*sin(phase)/(m1+m2);
-    vx = -Omega*m1*b*sin(phase)/(m1+m2);
-    vy = Omega*m1*b*cos(phase)/(m1+m2);
+    Sx = m1_*bb_*cos(phase)/(m1_+m2_);
+    Sy = m1_*bb_*sin(phase)/(m1_+m2_);
+    vx = -Omega*m1_*bb_*sin(phase)/(m1_+m2_);
+    vy = Omega*m1_*bb_*cos(phase)/(m1_+m2_);
     CoordsBH(X0,X1,X2,X3,Sx,Sy,vx,vy,CoordsBH2);
-    HBH2 = H(CoordsBH2[1], CoordsBH2[2], CoordsBH2[3],a2,m2);
-    Lmu(CoordsBH2[1],CoordsBH2[2],CoordsBH2[3],a2,LBH);
+    HBH2 = H(CoordsBH2[1], CoordsBH2[2], CoordsBH2[3],a2_,m2_);
+    Lmu(CoordsBH2[1],CoordsBH2[2],CoordsBH2[3],a2_,LBH);
     BoostBH(vx,vy,Lambda);
     LinearAlgebra::SetZero(LBH2,NDFULL);
     SPACETIMELOOP2(mu,kappa) {
@@ -249,9 +256,13 @@ public:
 
   KOKKOS_INLINE_FUNCTION
   void MetricDerivative(Real X0, Real X1, Real X2, Real X3,
-                        Real dg[NDFULL][NDFULL][NDFULL]) const {}
+                        Real dg[NDFULL][NDFULL][NDFULL]) const {
+    Utils::SetMetricGradientByFD(*this, dx_, X0, X1, X2, X3, dg);
+  }
   KOKKOS_INLINE_FUNCTION
-  void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {}
+  void GradLnAlpha(Real X0, Real X1, Real X2, Real X3, Real da[NDFULL]) const {
+    Utils::SetGradLnAlphaByFD(*this, dx_, X0, X1, X2, X3, da);
+  }
 
   KOKKOS_INLINE_FUNCTION
   void Coords(Real X0, Real X1, Real X2, Real X3, Real C[NDFULL]) const {
