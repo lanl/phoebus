@@ -851,12 +851,12 @@ TaskStatus SourceFixup(T *rc) {
   if (!enable_source_fixup) {
     return TaskStatus::complete;
   }
-  
+
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
-  const std::vector<std::string> vars({p::density, c::density, p::velocity, c::momentum, p::energy, 
-    c::energy, p::bfield, p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, 
+  const std::vector<std::string> vars({p::density, c::density, p::velocity, c::momentum, p::energy,
+    c::energy, p::bfield, p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E,
     cr::F, impl::cell_signal_speed, ri::fail});
 
   PackIndexMap imap;
@@ -905,11 +905,23 @@ TaskStatus SourceFixup(T *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
+  // TODO(BRR) make this less ugly
+  parthenon::par_for(
+  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+      DEFAULT_LOOP_PATTERN, "Source fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
+      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+        }
+      });
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "Source fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        
+
         double eos_lambda[2]; // used for stellarcollapse eos and
                               // other EOS's that require root
                               // finding.
@@ -932,19 +944,19 @@ TaskStatus SourceFixup(T *rc) {
           Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
-          
+
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-          
+
           if (num_valid > 0.5) {
             const Real norm = 1.0 / num_valid;
 
-            v(b, prho, k, j, i) = fixup(prho, norm); 
+            v(b, prho, k, j, i) = fixup(prho, norm);
             v(b, peng, k, j, i) = fixup(peng, norm);
             SPACELOOP(ii) {
               v(b, idx_pvel(ii), k, j, i) = fixup(idx_pvel(ii), norm);
             }
-        
+
             // Ensure subluminal fluid velocity
             // TODO(BRR) apply floors after this!
             Real con_vp[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
@@ -965,7 +977,7 @@ TaskStatus SourceFixup(T *rc) {
             }
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
-        
+
             double rho_floor, sie_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
                          rho_floor, sie_floor);
@@ -989,7 +1001,7 @@ TaskStatus SourceFixup(T *rc) {
 
             // Zero primitive velocities
             SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
-          
+
             const Real r = std::exp(coords.x1v(k, j, i));
             // TODO(BRR) ar::code * T^-4?
             const Real Jmin = 1.e-4 * std::pow(r, -4);
@@ -1000,7 +1012,7 @@ TaskStatus SourceFixup(T *rc) {
               }
             }
           }
-            
+
           // Update MHD conserved variables
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
@@ -1052,7 +1064,7 @@ TaskStatus SourceFixup(T *rc) {
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
                          v(b, idx_H(ispec, 2), k, j, i)};
             // Limit fixed-up H to H^2 < 1
-            //Real Hmag = std::sqrt(v(b, idx_H(ispec, 0), k, j, i)*v(b, idx_H(ispec, 0), k, j, i) + 
+            //Real Hmag = std::sqrt(v(b, idx_H(ispec, 0), k, j, i)*v(b, idx_H(ispec, 0), k, j, i) +
             //                      v(b, idx_H(ispec, 1), k, j, i)*v(b, idx_H(ispec, 1), k, j, i) +
             //                      v(b, idx_H(ispec, 2), k, j, i)*v(b, idx_H(ispec, 2), k, j, i));
             //constexpr Real Hmag_max = 0.99;
