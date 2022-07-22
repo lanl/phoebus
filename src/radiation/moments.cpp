@@ -1358,65 +1358,69 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // If 4D rootfind failed, try operator splitting the energy and momentum updates.
         // TODO(BRR) Only do this if J << ug?
-//        if (success == false) {
-//          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-//          Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
-//
-//          Real J0[3] = {v(iblock, idx_J(0), k, j, i), 0, 0};
-//          PARTHENON_REQUIRE(num_species == 1, "Multiple species not implemented");
-//
-//          const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
-//
-//          // Rootfind over fluid temperature in fluid rest frame
-//          root_find::RootFind root_find;
-//          InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
-//                                   num_species, species_d, scattering_fraction, dtau);
-//          const Real T1 =
-//              root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
-//                               1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
-//
-//          /// TODO: (LFR) Move beyond Eddington for this update
-//          ClosureEdd<Vec, Tens2> c(con_v, &g);
-//          //for (int ispec = 0; ispec < num_species; ++ispec)
-//          {
-//
-//            Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
-//            Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
-//                          v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
-//                          v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
-//
-//            // Treat the Eddington tensor explicitly for now
-//            Real &J = v(iblock, idx_J(ispec), k, j, i);
-//            Vec cov_H{{
-//                J * v(iblock, idx_H(ispec, 0), k, j, i),
-//                J * v(iblock, idx_H(ispec, 1), k, j, i),
-//                J * v(iblock, idx_H(ispec, 2), k, j, i),
-//            }};
-//            Tens2 con_tilPi;
-//
-//            c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
-//
-//            Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
-//            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-//                rho, T1, Ye, species_d[ispec]);
-//            Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-//            Real tauH = alpha * dt * kappa;
-//
-//            c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
-//                                 &cov_dF);
-//          }
-//
-//          if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0.) {
-//            // TODO(BRR) also check H^2 < J?
-//            success = true;
-//          } else {
-//            success = false;
-//          }
-//        }
+        if (success == false) {
+          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+          Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+
+          Real J0[3] = {v(iblock, idx_J(0), k, j, i), 0, 0};
+          PARTHENON_REQUIRE(num_species == 1, "Multiple species not implemented");
+
+          const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
+
+          // Rootfind over fluid temperature in fluid rest frame
+          root_find::RootFind root_find;
+          InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
+                                   num_species, species_d, scattering_fraction, dtau);
+          const Real T1 =
+              root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
+                               1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
+
+          /// TODO: (LFR) Move beyond Eddington for this update
+          ClosureEdd<Vec, Tens2> c(con_v, &g);
+          //for (int ispec = 0; ispec < num_species; ++ispec)
+          {
+
+            Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+            Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
+                          v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
+                          v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
+
+            // Treat the Eddington tensor explicitly for now
+            Real &J = v(iblock, idx_J(ispec), k, j, i);
+            Vec cov_H{{
+                J * v(iblock, idx_H(ispec, 0), k, j, i),
+                J * v(iblock, idx_H(ispec, 1), k, j, i),
+                J * v(iblock, idx_H(ispec, 2), k, j, i),
+            }};
+            Tens2 con_tilPi;
+
+            c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+
+            Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
+            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+                rho, T1, Ye, species_d[ispec]);
+            Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
+            Real tauH = alpha * dt * kappa;
+
+            c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
+                                 &cov_dF);
+          }
+
+          if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0.) {
+            // TODO(BRR) also check H^2 < J?
+            success = true;
+          } else {
+            success = false;
+          }
+        }
 
         // If sequence of source update methods was successful, apply update to conserved
         // quantities. If unsuccessful, mark zone for fixup.
         if (success == true) {
+          //if (i > 60 && i < 80) {
+          //  printf("[%i] dE: %e dF: %e %e %e update_fluid: %i\n", i,
+          //    dE, cov_dF(0), cov_dF(1), cov_dF(2), update_fluid);
+         // }
           v(iblock, ifail, k, j, i) = FailFlags::success;
 
           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
