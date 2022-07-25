@@ -906,14 +906,17 @@ TaskStatus SourceFixup(T *rc) {
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
   // TODO(BRR) make this less ugly
-  parthenon::par_for(
   IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "Source fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
       kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+          // Do not use ghost zones as data for averaging
+          // TODO(BRR) need to allow ghost zones from neighboring blocks
+          v(b, ifail, k, j, i) = radiation::FailFlags::fail;
         }
       });
 
@@ -955,18 +958,6 @@ TaskStatus SourceFixup(T *rc) {
             v(b, peng, k, j, i) = fixup(peng, norm);
             SPACELOOP(ii) {
               v(b, idx_pvel(ii), k, j, i) = fixup(idx_pvel(ii), norm);
-            }
-
-            // Ensure subluminal fluid velocity
-            // TODO(BRR) apply floors after this!
-            Real con_vp[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
-                              v(b, idx_pvel(2), k, j, i)};
-            const Real W = phoebus::GetLorentzFactor(con_vp, gcov);
-            // TODO(BRR) use ceilings
-            const Real Wmax = 50.;
-            if (W > Wmax) {
-              const Real rescale = std::sqrt((Wmax * Wmax - 1.) / (W * W - 1.));
-              SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) *= rescale; }
             }
 
             for (int ispec = 0; ispec < nspec; ispec++) {
@@ -1013,6 +1004,33 @@ TaskStatus SourceFixup(T *rc) {
             }
           }
 
+          // Maybe redundantly apply floors
+          double rho_floor, sie_floor;
+          bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+                       rho_floor, sie_floor);
+          v(b, prho, k, j, i) = std::max<Real>(v(b, prho, k, j, i), rho_floor);
+          v(b, peng, k, j, i) = std::max<Real>(v(b, peng, k, j, i), rho_floor*sie_floor);
+
+          // Ensure subluminal fluid velocity
+          Real con_vp[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
+                            v(b, idx_pvel(2), k, j, i)};
+          Real W = phoebus::GetLorentzFactor(con_vp, gcov);
+          // TODO(BRR) use ceilings
+          const Real Wmax = 50.;
+          if (W > Wmax) {
+            const Real rescale = std::sqrt((Wmax * Wmax - 1.) / (W * W - 1.));
+            SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) *= rescale; }
+          }
+          const Real r = std::exp(coords.x1v(k, j, i));
+          // TODO(BRR) ar::code * T^-4?
+          const Real Jmin = 1.e-4 * std::pow(r, -4);
+          for (int ispec = 0; ispec < nspec; ispec++) {
+            v(b, idx_J(ispec), k, j, i) = std::max<Real>(v(b, idx_J(ispec), k, j, i), Jmin);
+          //  SPACELOOP(ii) {
+          //    v(b, idx_H(ispec, ii), k, j, i) = 0.;
+          //  }
+          }
+
           // Update MHD conserved variables
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
@@ -1053,7 +1071,7 @@ TaskStatus SourceFixup(T *rc) {
 //        typename ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent,
 //                                                             iblock, k, j, i);
           typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
-          const Real W = phoebus::GetLorentzFactor(vel, gcov);
+          W = phoebus::GetLorentzFactor(vel, gcov);
           Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
           radiation::ClosureEdd<Vec, Tens2> c(con_v, &g);
           for (int ispec = 0; ispec < nspec; ispec++) {
