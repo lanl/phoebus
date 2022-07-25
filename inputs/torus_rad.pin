@@ -42,7 +42,7 @@ file_type   = hdf5      # Tabular data dump
 dt          = 0.1 # 1.0
 
 <parthenon/time>
-nlim        = -1        # cycle limit
+nlim        = 1        # cycle limit
 tlim        = 100.0    # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
