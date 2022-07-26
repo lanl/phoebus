@@ -56,7 +56,8 @@ constexpr char kappaH[] = "r.i.kappaH";
 constexpr char JBB[] = "r.i.JBB";
 constexpr char tilPi[] = "r.i.tilPi";
 constexpr char kappaH_mean[] = "r.i.kappaH_mean";
-constexpr char fail[] = "r.i.fail";
+constexpr char c2pfail[] = "r.i.c2p_fail";
+constexpr char srcfail[] = "r.i.src_fail";
 } // namespace radmoment_internal
 
 namespace mocmc_internal {

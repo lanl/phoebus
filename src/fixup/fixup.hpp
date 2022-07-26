@@ -28,6 +28,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc);
 template <typename T>
 TaskStatus ApplyFloors(T *rc);
 template <typename T>
+TaskStatus RadConservedToPrimitiveFixup(T *rc);
+template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc);
 template <typename T>
 TaskStatus SourceFixup(T *rc);

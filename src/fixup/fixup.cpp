@@ -446,7 +446,137 @@ TaskStatus ApplyFloors(T *rc) {
 }
 
 template <typename T>
+TaskStatus RadConservedToPrimitiveFixup(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
+  namespace impl = internal_variables;
+  namespace ri = radmoment_internal;
+  namespace pr = radmoment_prim;
+  namespace cr = radmoment_cons;
+  
+  auto *pmb = rc->GetParentPointer().get();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  
+  const std::vector<std::string> vars({p::density, c::density, p::velocity, c::momentum, p::energy,
+    c::energy, p::bfield, p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E,
+    cr::F, impl::cell_signal_speed, ri::c2pfail, impl::fail});
+
+  PackIndexMap imap;
+  auto v = rc->PackVariables(vars, imap);
+
+  const int prho = imap[p::density].first;
+  const int crho = imap[c::density].first;
+  auto idx_pvel = imap.GetFlatIdx(p::velocity);
+  auto idx_cmom = imap.GetFlatIdx(c::momentum);
+  const int peng = imap[p::energy].first;
+  const int ceng = imap[c::energy].first;
+  const int prs = imap[p::pressure].first;
+  const int tmp = imap[p::temperature].first;
+  const int gm1 = imap[p::gamma1].first;
+  const int slo = imap[impl::cell_signal_speed].first;
+  const int shi = imap[impl::cell_signal_speed].second;
+  int pye = imap[p::ye].second; // negative if not present
+  int cye = imap[c::ye].second;
+  const int pb_lo = imap[p::bfield].first;
+  const int pb_hi = imap[p::bfield].second;
+  auto idx_J = imap.GetFlatIdx(pr::J);
+  auto idx_H = imap.GetFlatIdx(pr::H);
+  auto idx_E = imap.GetFlatIdx(cr::E);
+  auto idx_F = imap.GetFlatIdx(cr::F);
+  int ifluidfail = imap[impl::fail].first;
+  int iradfail = imap[ri::c2pfail].first;
+  
+  // TODO(BRR) make this less ugly
+  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
+      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+          // Do not use ghost zones as data for averaging
+          // TODO(BRR) need to allow ghost zones from neighboring blocks
+          v(b, ifluidfail, k, j, i) = con2prim_robust::FailFlags::fail;
+          v(b, iradfail, k, j, i) = radiation::FailFlags::fail;
+        }
+      });
+  
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  auto bounds = fix_pkg->Param<Bounds>("bounds");
+
+  Coordinates_t coords = rc->GetParentPointer().get()->coords;
+  
+  const int nspec = idx_E.DimSize(1);
+  
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+
+        // if fluid fail but rad success, recalculate rad c2p and set iradfail with result, then 
+        // still process if (fluid fail && rad fail) check
+        // Note that it is assumed that the fluid is already fixed up
+
+        if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail || 
+            v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
+          // TODO(BRR) very crude hack just set H = 0 and J to floor
+          // (a better solution would be J = max(J, J_floor) and clamping xi to 0, 0.999)
+            const Real r = std::exp(coords.x1v(k, j, i));
+            // TODO(BRR) ar::code * T^-4?
+            const Real Jmin = 1.e-4 * std::pow(r, -4);
+            for (int ispec = 0; ispec < nspec; ispec++) {
+              v(b, idx_J(ispec), k, j, i) = Jmin;
+              SPACELOOP(ii) {
+                v(b, idx_H(ispec, ii), k, j, i) = 0.;
+              }
+            }
+          
+          const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
+          //const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          //Real beta[3];
+          //geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+          //Real gcon[3][3];
+          //geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+          //Real S[3];
+          Real gcov[4][4];
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          const Real vel[] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
+                              v(b, idx_pvel(2), k, j, i)};
+          
+          // TODO(BRR) go beyond Eddington
+          typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
+          const Real W = phoebus::GetLorentzFactor(vel, gcov);
+          Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
+          radiation::ClosureEdd<Vec, Tens2> c(con_v, &g);
+          for (int ispec = 0; ispec < nspec; ispec++) {
+            Real E;
+            Vec cov_F;
+            Tens2 conTilPi{0}; // TODO(BRR) go beyond Eddington
+            Real J = v(b, idx_J(ispec), k, j, i);
+            Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
+                         v(b, idx_H(ispec, 2), k, j, i)};
+            c.Prim2Con(J, cov_H, conTilPi, &E, &cov_F);
+            v(b, idx_E(ispec), k, j, i) = sdetgam * E;
+            SPACELOOP(ii) {
+              v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii);
+            }
+          }
+        }
+      });
+
+  return TaskStatus::complete;
+}
+
+template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -510,6 +640,21 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
+  
+  // TODO(BRR) make this less ugly
+  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
+      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+          // Do not use ghost zones as data for averaging
+          // TODO(BRR) need to allow ghost zones from neighboring blocks
+          v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
+        }
+      });
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
@@ -822,9 +967,6 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-template TaskStatus
-ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
-
 // If radiation source terms fail (probably due to a rootfind failing to converge) average
 // the de-densitized conserved variables over good neighbors
 template <typename T>
@@ -857,7 +999,7 @@ TaskStatus SourceFixup(T *rc) {
 
   const std::vector<std::string> vars({p::density, c::density, p::velocity, c::momentum, p::energy,
     c::energy, p::bfield, p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E,
-    cr::F, impl::cell_signal_speed, ri::fail});
+    cr::F, impl::cell_signal_speed, ri::srcfail});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -881,7 +1023,7 @@ TaskStatus SourceFixup(T *rc) {
   auto idx_H = imap.GetFlatIdx(pr::H);
   auto idx_E = imap.GetFlatIdx(cr::E);
   auto idx_F = imap.GetFlatIdx(cr::F);
-  int ifail = imap[ri::fail].first;
+  int ifail = imap[ri::srcfail].first;
   // TODO(BRR) get iTilPi for MOCMC
 
   bool report_source_fails = fix_pkg->Param<bool>("report_source_fails");
@@ -959,11 +1101,14 @@ TaskStatus SourceFixup(T *rc) {
             SPACELOOP(ii) {
               v(b, idx_pvel(ii), k, j, i) = fixup(idx_pvel(ii), norm);
             }
+            // TODO(BRR) ye
 
             for (int ispec = 0; ispec < nspec; ispec++) {
               v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
               SPACELOOP(ii) {
                 v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
+                // TODO(BRR) temporarily zeroing Hs!
+                v(b, idx_H(ispec, ii), k, j, i) = 0.;
               }
             }
           } else {
@@ -974,21 +1119,6 @@ TaskStatus SourceFixup(T *rc) {
                          rho_floor, sie_floor);
             v(b, prho, k, j, i) = rho_floor;
             v(b, peng, k, j, i) = rho_floor*sie_floor;
-
-            // Safe value for ye
-            if (pye > 0) {
-              v(b, pye, k, j, i) = 0.5;
-            }
-
-            if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-                eos_lambda);
-            v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-            v(b, gm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                v(b, prho, k, j, i), ratio(v(b, tmp, k, j, i), v(b, prs, k, j, i)),
-                eos_lambda);
 
             // Zero primitive velocities
             SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
@@ -1003,6 +1133,21 @@ TaskStatus SourceFixup(T *rc) {
               }
             }
           }
+
+          // Auxiliary primitives
+          // Safe value for ye
+          if (pye > 0) {
+            v(b, pye, k, j, i) = 0.5;
+          }
+
+          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+              eos_lambda);
+          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+          v(b, gm1, k, j, i) = ratio(eos.BulkModulusFromDensityTemperature(
+              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda), v(b, prs, k, j, i));
 
           // Maybe redundantly apply floors
           double rho_floor, sie_floor;
@@ -1105,5 +1250,11 @@ TaskStatus SourceFixup(T *rc) {
 
 template TaskStatus
 SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+
+template TaskStatus
+RadConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+
+template TaskStatus
+ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 } // namespace fixup

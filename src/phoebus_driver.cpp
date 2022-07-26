@@ -424,7 +424,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fixup = tl.AddTask(
         fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
-    auto floors = tl.AddTask(fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+    auto radfixup = tl.AddTask(fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+
+    auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
 
     if (rad_mocmc_active) {
       auto impl_update = tl.AddTask(floors, radiation::MOCMCFluidSource<MeshBlockData<Real>>,
@@ -432,12 +434,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto impl_edd =
           tl.AddTask(impl_update, radiation::MOCMCEddington<MeshBlockData<Real>>, sc1.get());
 
-      fixup = fixup | impl_update;
+      radfixup = radfixup | impl_update;
     } else if (rad_moments_active) {
-      auto impl_update = tl.AddTask(fixup, radiation::MomentFluidSource<MeshBlockData<Real>>,
+      auto impl_update = tl.AddTask(radfixup, radiation::MomentFluidSource<MeshBlockData<Real>>,
                                     sc1.get(), beta * dt, fluid_active);
 
-      fixup = fixup | impl_update;
+      radfixup = radfixup | impl_update;
     }
 
     // Need send/recv here?
@@ -454,7 +456,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fixup_2 = tl.AddTask(
         fill_derived_2, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
-    auto floors_2 = tl.AddTask(fixup_2, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+    auto radfixup_2 = tl.AddTask(
+      fixup_2, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+
+    auto floors_2 = tl.AddTask(radfixup_2, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
   }
 
   //const int num_partitions = pmesh->DefaultNumPartitions();

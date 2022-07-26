@@ -230,7 +230,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
   std::vector<std::string> variables{cr::E,  cr::F,  pr::J, pr::H, fluid_prim::velocity,
-                                     ir::xi, ir::phi};
+                                     ir::xi, ir::phi, ir::c2pfail};
   if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
     variables.push_back(ir::tilPi);
   }
@@ -252,6 +252,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
 
   auto iXi = imap.GetFlatIdx(ir::xi);
   auto iPhi = imap.GetFlatIdx(ir::phi);
+
+  auto ifail = imap[ir::c2pfail].first;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   const Real pi = acos(-1);
@@ -300,7 +302,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
             v(b, iPhi(ispec), k, j, i) = phi;
           }
         }
-        c.Con2Prim(E, covF, conTilPi, &J, &covH);
+        auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
           printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
@@ -317,6 +319,10 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           //  covH(idir) /
           //  J; // Used the scaled value of the rest frame flux for reconstruction
         }
+
+        v(b, ifail, k, j, i) = (status == ClosureStatus::success 
+                                ? FailFlags::success 
+                                : FailFlags::fail); 
       });
 
   return TaskStatus::complete;
@@ -1085,7 +1091,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   std::vector<std::string> vars{cr::E,          cr::F,     c::bfield, p::density,
                                 p::temperature, p::energy, p::ye,     p::velocity,
                                 p::bfield,      pr::J,     pr::H,     ir::kappaJ,
-                                ir::kappaH,     ir::JBB,   ir::fail};
+                                ir::kappaH,     ir::JBB,   ir::srcfail};
   // printf("skipping fluid update\n"); update_fluid = false;
   //  if (update_fluid) {
   vars.push_back(c::energy);
@@ -1103,7 +1109,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
-  auto ifail = imap[ir::fail].first;
+  auto ifail = imap[ir::srcfail].first;
   auto pv = imap.GetFlatIdx(p::velocity);
 
   int prho = imap[p::density].first;

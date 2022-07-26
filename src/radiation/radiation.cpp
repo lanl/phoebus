@@ -369,7 +369,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata m_scalar =
         Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
                   Metadata::Intensive, Metadata::FillGhost});
-    physics->AddField(i::fail, m_scalar);
+    physics->AddField(i::c2pfail, m_scalar);
+    physics->AddField(i::srcfail, m_scalar);
 
     // Make Eddington tensor an independent quantity for MOCMC to supply
     if (method == "mocmc") {
