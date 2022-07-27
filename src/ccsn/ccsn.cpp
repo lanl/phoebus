@@ -119,20 +119,26 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   const Real dr = radius.dx();
 
   //printf("Current working dir: %s\n", get_current_dir_name());
+  
+  printf("My name filename requested is %s.\n", model_filename.c_str());
 
   // read 1d model
   const int num_zones = Get1DProfileNumZones(model_filename);
 
+  printf("1D model read in with %d number of zones. \n",num_zones);
+
   // CCSN::State_t_raw ccsn_state_raw("CCSN state raw", CCSN::NCCSN, num_zones);
   // auto ccsn_state_raw_h = Kokkos::create_mirror_view(ccsn_state_raw);
+  //
 
-  //const Real 1d_model = Get1DProfileData(model_filename,num_zones);
+  //Real model_1d[num_zones][9]; 
+  Get1DProfileData(model_filename,num_zones);
 
   //printf("%s:%i model_filename = %s\n", __FILE__, __LINE__, model_filename.c_str());
 
   // const Real model_1d[9][num_zones] = {{CCSN::Get1DProfileData("model_filename",num_zones)}};
 
-  // printf("1D model read in. Max radius is  = %.14e\n", model_1d[0][num_zones],"with ",0,"number of zones.");
+  //printf("1D model read in. Max radius is  = %.14e\n", model_1d[0][num_zones],"with ",0,"number of zones.");
 
   // allocate state size of NCCSN which should equal num vars for CCSN ?
   //  Real state[NCCSN];

@@ -39,14 +39,15 @@ constexpr int TEMP = 5;
 constexpr int grav = 6;
 constexpr int entr = 7;
 
-int inline Get1DProfileNumZones(const std::string& model_filename){
+KOKKOS_INLINE_FUNCTION
+int Get1DProfileNumZones(const std::string model_filename){
 
     // open file
-    std::ifstream inputfile("2dinput.txt"); // works when harcoded and lives in /bin
-
+    //   const char* model_filename_conv = model_filename.c_str();
+    std::ifstream inputfile("input.txt"); // works when harcoded and lives in /bin
     // error check    
     if (!inputfile.is_open()){ 
-        std::cout <<  model_filename << "not found :( \n.";
+        std::cout <<  model_filename << " not found :( \n.";
 	//std::cout << typeid(model_filename).name() << "input of type";
         //std::cout << typeid(test).name() << "should be of type";
     	return 0;
@@ -62,43 +63,49 @@ int inline Get1DProfileNumZones(const std::string& model_filename){
             num_zones ++;
     }
 
-    std::cout << num_zones-1 << "zones read in.\n";
+    //std::cout << num_zones-1 << " zones read in.\n";
     inputfile.close();
 
     return num_zones-1;
 }
 
-Real inline Get1DProfileData(const std::string model_filename, const int num_zones){
+KOKKOS_INLINE_FUNCTION
+void Get1DProfileData(const std::string model_filename, const int num_zones){
 
-    // open file
-    std::ifstream inputfile;
-    inputfile.open("1d_model.txt"); //model_filename
-
-    // error check
-    if (!inputfile.is_open()){
-        std::cout<<"Error opening file",model_filename;
-	return 0;
-    }
+    std::ifstream inputfile("input.txt"); // works when harcoded and lives in /bin
 
     const int num_vars = 9; // 8 + radius
-    Real model_1d[num_vars][num_zones];
+    Real model_1d[num_zones][num_vars]; //num_zones = rows = i | num_vars = columns = j
 
     // read file into model_1d
-    for (int k = 0; k < num_vars; k++) // number of vars
+    for (int i = 0; i < num_zones; i++) // number of vars
     {
-        for (int j = 0; j < num_zones; j++) //  number of zones
+        for (int j = 0; j < num_vars; j++) //  number of zones
         {
-          inputfile >> model_1d(k,j);
+	  //std::cout << inputfile;
+          inputfile >> model_1d[i][j];
         }
     }
 
-    std::cout << "Read 1D profile into state array.";
+    std::cout << "Read 1D profile into state array.\n";
 
     inputfile.close();
 
-    return model_1d;
+    /*
+    for (int i = 0; i < num_zones; i++)
+    {
+        for (int j = 0; j < num_vars; j++)
+        {
+		std::cout << model_1d[i][j] << "\t";
+        }
+	std::cout<<std::endl;
+    }
+    */
+
+    std::cout << "first cell of radius read in as " << model_1d[0][0]<< "\n.";
 
 }
+
 
 /*
 KOKKOS_INLINE_FUNCTION
