@@ -315,17 +315,17 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             }
 
             // Limit magnitude of flux
-//            const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j, i), 2) +
-//                                        std::pow(v(b, idx_H(ispec, 1), k, j, i), 2) +
-//                                        std::pow(v(b, idx_H(ispec, 2), k, j, i), 2));
-//            if (Hmag > 1.) {
-//              //              printf("Hmag = %e! [%i %i %i]\n", Hmag, k,j,i);
-//              //              PARTHENON_FAIL("Hmag");
-//              floor_applied = true;
-//
-//              const Real rescale = 0.99 / Hmag;
-//              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= rescale; }
-//            }
+            const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j, i), 2) +
+                                        std::pow(v(b, idx_H(ispec, 1), k, j, i), 2) +
+                                        std::pow(v(b, idx_H(ispec, 2), k, j, i), 2));
+            if (Hmag > 1.) {
+              //              printf("Hmag = %e! [%i %i %i]\n", Hmag, k,j,i);
+              //              PARTHENON_FAIL("Hmag");
+              floor_applied = true;
+
+              const Real rescale = 0.99 / Hmag;
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= rescale; }
+            }
           }
         }
 
@@ -448,6 +448,8 @@ TaskStatus ApplyFloors(T *rc) {
 template <typename T>
 TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+  printf("SKIPPING THIS FIXUP\n");
+  return TaskStatus::complete;
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -531,11 +533,29 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
             const Real r = std::exp(coords.x1v(k, j, i));
             // TODO(BRR) ar::code * T^-4?
             const Real Jmin = 1.e-4 * std::pow(r, -4);
+            const Real ximax = 0.99;
+            Tens2 con_gamma;
+            geom.MetricInverse(CellLocation::Cent, b, k, j, i, con_gamma.data);
+            
             for (int ispec = 0; ispec < nspec; ispec++) {
-              v(b, idx_J(ispec), k, j, i) = Jmin;
-              SPACELOOP(ii) {
-                v(b, idx_H(ispec, ii), k, j, i) = 0.;
+              Real xi = 0.;
+              SPACELOOP2(ii, jj) {
+                xi += con_gamma(ii, jj) * v(b, idx_H(ispec, ii), k, j, i) 
+                      * v(b, idx_H(ispec, jj), k, j, i);
               }
+              xi = std::sqrt(xi);
+              
+              v(b, idx_J(ispec), k, j, i) = std::max(Jmin, v(b, idx_J(ispec), k, j, i));
+              if (xi > ximax) {
+                SPACELOOP(ii) {
+                  v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi;
+                }
+              }
+
+              //v(b, idx_J(ispec), k, j, i) = Jmin;
+              //SPACELOOP(ii) {
+              //  v(b, idx_H(ispec, ii), k, j, i) = 0.;
+              //}
             }
           
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -586,6 +606,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+  StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
 
   const std::vector<std::string> vars({p::density, c::density, p::velocity, c::momentum,
@@ -615,6 +636,10 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   int cye = imap[c::ye].second;
   int ifail = imap[impl::fail].first;
 
+  bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
+  bool update_fluid = fluid_pkg->Param<bool>("active");
+  if (!enable_c2p_fixup || !update_fluid) return TaskStatus::complete;
+
   bool report_c2p_fails = fix_pkg->Param<bool>("report_c2p_fails");
   if (report_c2p_fails) {
     int nfail_total;
@@ -629,9 +654,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
         Kokkos::Sum<int>(nfail_total));
     printf("total nfail: %i\n", nfail_total);
   }
-
-  bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
-  if (!enable_c2p_fixup) return TaskStatus::complete;
 
   const int ndim = pmb->pmy_mesh->ndim;
 
@@ -799,7 +821,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             flux.flux(X1DIR, 0, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
-//            flux.flux(X1DIR, 1, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
+          //  flux.flux(X1DIR, 1, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
           });
     } else if (ix1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(
@@ -823,7 +845,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.e + 1, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             flux.flux(X1DIR, 0, k, j, i) = std::max(flux.flux(X1DIR, 0, k, j, i), 0.0);
-  //          flux.flux(X1DIR, 1, k, j, i) = std::max(flux.flux(X1DIR, 0, k, j, i), 0.0);
+     //       flux.flux(X1DIR, 1, k, j, i) = std::max(flux.flux(X1DIR, 0, k, j, i), 0.0);
           });
     } else if (ox1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(
@@ -972,6 +994,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 template <typename T>
 TaskStatus SourceFixup(T *rc) {
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+  printf("SKIPPING!\n");
+  return TaskStatus::complete;
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -1108,7 +1132,7 @@ TaskStatus SourceFixup(T *rc) {
               SPACELOOP(ii) {
                 v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
                 // TODO(BRR) temporarily zeroing Hs!
-                v(b, idx_H(ispec, ii), k, j, i) = 0.;
+                //v(b, idx_H(ispec, ii), k, j, i) = 0.;
               }
             }
           } else {
@@ -1155,6 +1179,8 @@ TaskStatus SourceFixup(T *rc) {
                        rho_floor, sie_floor);
           v(b, prho, k, j, i) = std::max<Real>(v(b, prho, k, j, i), rho_floor);
           v(b, peng, k, j, i) = std::max<Real>(v(b, peng, k, j, i), rho_floor*sie_floor);
+          
+          typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 
           // Ensure subluminal fluid velocity
           Real con_vp[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
@@ -1174,6 +1200,24 @@ TaskStatus SourceFixup(T *rc) {
           //  SPACELOOP(ii) {
           //    v(b, idx_H(ispec, ii), k, j, i) = 0.;
           //  }
+            // Limit xi = 0.99
+            // H here is H/J
+            Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i),
+                         v(b, idx_H(ispec, 1), k, j, i),
+                         v(b, idx_H(ispec, 2), k, j, i)};
+            Vec con_H;
+            g.raise3Vector(cov_H, &con_H);
+            Real xi = 0.;
+            SPACELOOP(ii) {
+              xi += cov_H(ii)*con_H(ii);
+            }
+            xi = std::sqrt(xi);
+            const Real ximax = 0.99;
+            if (xi > ximax) {
+              SPACELOOP(ii) {
+                v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi;
+              }
+            }
           }
 
           // Update MHD conserved variables
@@ -1215,7 +1259,6 @@ TaskStatus SourceFixup(T *rc) {
           // TODO(BRR) go beyond Eddington
 //        typename ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent,
 //                                                             iblock, k, j, i);
-          typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
           W = phoebus::GetLorentzFactor(vel, gcov);
           Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
           radiation::ClosureEdd<Vec, Tens2> c(con_v, &g);
@@ -1224,8 +1267,8 @@ TaskStatus SourceFixup(T *rc) {
             Vec cov_F;
             Tens2 conTilPi{0}; // TODO(BRR) go beyond Eddington
             Real J = v(b, idx_J(ispec), k, j, i);
-            Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
-                         v(b, idx_H(ispec, 2), k, j, i)};
+            Vec cov_H = {J*v(b, idx_H(ispec, 0), k, j, i), J*v(b, idx_H(ispec, 1), k, j, i),
+                         J*v(b, idx_H(ispec, 2), k, j, i)};
             // Limit fixed-up H to H^2 < 1
             //Real Hmag = std::sqrt(v(b, idx_H(ispec, 0), k, j, i)*v(b, idx_H(ispec, 0), k, j, i) +
             //                      v(b, idx_H(ispec, 1), k, j, i)*v(b, idx_H(ispec, 1), k, j, i) +

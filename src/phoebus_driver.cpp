@@ -434,18 +434,20 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto impl_edd =
           tl.AddTask(impl_update, radiation::MOCMCEddington<MeshBlockData<Real>>, sc1.get());
 
-      radfixup = radfixup | impl_update;
+      //radfixup = radfixup | impl_edd;
+      floors = floors | impl_edd;
     } else if (rad_moments_active) {
-      auto impl_update = tl.AddTask(radfixup, radiation::MomentFluidSource<MeshBlockData<Real>>,
+      auto impl_update = tl.AddTask(floors, radiation::MomentFluidSource<MeshBlockData<Real>>,
                                     sc1.get(), beta * dt, fluid_active);
 
-      radfixup = radfixup | impl_update;
+      floors = floors | impl_update;
+      //radfixup = radfixup | impl_update;
     }
 
     // Need send/recv here?
 
     // Fixup for interaction failures
-    auto src_fixup = tl.AddTask(fixup, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get());
+    auto src_fixup = tl.AddTask(floors, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get());
 
     // Need send/recv here?
 
@@ -590,6 +592,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto fixup = tl.AddTask(
         fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+
+    // TODO(BRR) rad fixup here?
 
     auto floors = tl.AddTask(fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
 
