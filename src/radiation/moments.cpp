@@ -314,6 +314,11 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
         }
 
+        if (ispec == 0 && i == 64 && j > 43 && j < 48) {
+          printf("[%i %i %i] E = %e F = %e %e %e J = %e H = %e %e %e\n", k,j,i,
+            E, covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2));
+        }
+
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
           v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
@@ -321,9 +326,9 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           //  J; // Used the scaled value of the rest frame flux for reconstruction
         }
 
-        v(b, ifail, k, j, i) = (status == ClosureStatus::success 
-                                ? FailFlags::success 
-                                : FailFlags::fail); 
+        v(b, ifail, k, j, i) = (status == ClosureStatus::success
+                                ? FailFlags::success
+                                : FailFlags::fail);
       });
 
   return TaskStatus::complete;
@@ -771,7 +776,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
-                    if (idir == 1 && i == 64 && j > 20 && j < 50 && ispec == 0) {
+                    if (idir == 1 && i == 64 && j > 43 && j < 48 && ispec == 0) {
                       printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
                       printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
                         con_vl(0), con_vl(1), con_vl(2),
@@ -855,9 +860,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           //            printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
           //            PARTHENON_FAIL("nan flux");
           //          }
-                    if (idir == 1 && i == 64 && j > 20 && j < 50 && ispec == 0) {
+                    if (idir == 1 && i == 64 && j > 43 && j < 48 && ispec == 0) {
             printf("[%i %i %i] flux[0]: %e\n",
               k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
+            printf("El: %e Er: %e\n", El, Er);
                     }
 
           /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
@@ -1442,12 +1448,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                 if (update_fluid == false) {
                   const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
                   Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
-        
+
                   Real J0[3] = {v(iblock, idx_J(0), k, j, i), 0, 0};
                   PARTHENON_REQUIRE(num_species == 1, "Multiple species not implemented");
-        
+
                   const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
-        
+
                   // Rootfind over fluid temperature in fluid rest frame
                   root_find::RootFind root_find;
                   InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye,
@@ -1458,17 +1464,17 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                       root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
                                        1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k,
                                        j, i));
-        
+
                   /// TODO: (LFR) Move beyond Eddington for this update
                   ClosureEdd<Vec, Tens2> c(con_v, &g);
                   //for (int ispec = 0; ispec < num_species; ++ispec)
                   {
-        
+
                     Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
                     Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
                                   v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
                                   v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
-        
+
                     // Treat the Eddington tensor explicitly for now
                     Real &J = v(iblock, idx_J(ispec), k, j, i);
                     Vec cov_H{{
@@ -1477,21 +1483,21 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                         J * v(iblock, idx_H(ispec, 2), k, j, i),
                     }};
                     Tens2 con_tilPi;
-        
+
                     c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
-        
+
                     Real JBB = d_opacity.EnergyDensityFromTemperature(T1,
                     species_d[ispec]); Real kappa =
                     d_mean_opacity.RosselandMeanAbsorptionCoefficient(
                         rho, T1, Ye, species_d[ispec]);
                     Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
                     Real tauH = alpha * dt * kappa;
-        
+
                     c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                     &dE,
                                          &cov_dF);
                   }
-        
+
                   if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0.) {
                     // TODO(BRR) also check H^2 < J?
                     success = true;

@@ -160,8 +160,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <typename T, class CLOSURE>
 TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
-  printf("Skipping floors!");
-  return TaskStatus::complete;
+  //printf("Skipping floors!");
+  //return TaskStatus::complete;
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace pr = radmoment_prim;
@@ -304,6 +304,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         }
 
         if (enable_rad_floors) {
+          printf("DOING RAD FLOORS!\n");
+          exit(-1);
           const Real r = std::exp(coords.x1v(k, j, i));
           // TODO(BRR) ar::code * T^-4?
           const Real Jmin = 1.e-4 * std::pow(r, -4);
@@ -320,12 +322,15 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j, i), 2) +
                                         std::pow(v(b, idx_H(ispec, 1), k, j, i), 2) +
                                         std::pow(v(b, idx_H(ispec, 2), k, j, i), 2));
-            if (Hmag > 1.) {
+            //if (Hmag > 1.) {
+              // TODO(BRR) nonsense tiny comoving flux!
+            if (Hmag > 0.01) {
               //              printf("Hmag = %e! [%i %i %i]\n", Hmag, k,j,i);
               //              PARTHENON_FAIL("Hmag");
               floor_applied = true;
 
-              const Real rescale = 0.99 / Hmag;
+              //const Real rescale = 0.99 / Hmag;
+              const Real rescale = 0.01 / Hmag;
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= rescale; }
             }
           }
@@ -459,7 +464,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   namespace ri = radmoment_internal;
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
-  
+
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -467,7 +472,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  
+
   const std::vector<std::string> vars({p::density, c::density, p::velocity, c::momentum, p::energy,
     c::energy, p::bfield, p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E,
     cr::F, impl::cell_signal_speed, ri::c2pfail, impl::fail});
@@ -496,7 +501,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   auto idx_F = imap.GetFlatIdx(cr::F);
   int ifluidfail = imap[impl::fail].first;
   int iradfail = imap[ri::c2pfail].first;
-  
+
   // TODO(BRR) make this less ugly
   IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -512,24 +517,24 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
           v(b, iradfail, k, j, i) = radiation::FailFlags::fail;
         }
       });
-  
+
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
-  
+
   const int nspec = idx_E.DimSize(1);
-  
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
 
-        // if fluid fail but rad success, recalculate rad c2p and set iradfail with result, then 
+        // if fluid fail but rad success, recalculate rad c2p and set iradfail with result, then
         // still process if (fluid fail && rad fail) check
         // Note that it is assumed that the fluid is already fixed up
 
-        if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail || 
+        if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail ||
             v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
           // TODO(BRR) very crude hack just set H = 0 and J to floor
           // (a better solution would be J = max(J, J_floor) and clamping xi to 0, 0.999)
@@ -539,15 +544,15 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
             const Real ximax = 0.99;
             Tens2 con_gamma;
             geom.MetricInverse(CellLocation::Cent, b, k, j, i, con_gamma.data);
-            
+
             for (int ispec = 0; ispec < nspec; ispec++) {
               Real xi = 0.;
               SPACELOOP2(ii, jj) {
-                xi += con_gamma(ii, jj) * v(b, idx_H(ispec, ii), k, j, i) 
+                xi += con_gamma(ii, jj) * v(b, idx_H(ispec, ii), k, j, i)
                       * v(b, idx_H(ispec, jj), k, j, i);
               }
               xi = std::sqrt(xi);
-              
+
               v(b, idx_J(ispec), k, j, i) = std::max(Jmin, v(b, idx_J(ispec), k, j, i));
               if (xi > ximax) {
                 SPACELOOP(ii) {
@@ -560,7 +565,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
               //  v(b, idx_H(ispec, ii), k, j, i) = 0.;
               //}
             }
-          
+
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
           //const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           //Real beta[3];
@@ -572,7 +577,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           const Real vel[] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
                               v(b, idx_pvel(2), k, j, i)};
-          
+
           // TODO(BRR) go beyond Eddington
           typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
           const Real W = phoebus::GetLorentzFactor(vel, gcov);
@@ -665,7 +670,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
-  
+
   // TODO(BRR) make this less ugly
   IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -1183,7 +1188,7 @@ TaskStatus SourceFixup(T *rc) {
                        rho_floor, sie_floor);
           v(b, prho, k, j, i) = std::max<Real>(v(b, prho, k, j, i), rho_floor);
           v(b, peng, k, j, i) = std::max<Real>(v(b, peng, k, j, i), rho_floor*sie_floor);
-          
+
           typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 
           // Ensure subluminal fluid velocity
