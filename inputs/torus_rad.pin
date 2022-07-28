@@ -39,11 +39,11 @@ variables = p.density,       &
 
 file_type   = hdf5      # Tabular data dump
 #dt          = 5.0       # time increment between outputs
-dt          = 0.1 # 1.0
+dt          = 1.0
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 100.0    # time limit
+tlim        = 5.0    # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -91,8 +91,6 @@ Cv = 1.0
 
 <physics>
 hydro = true
-he = false
-3t = false
 rad = true
 
 <fluid>
@@ -123,12 +121,14 @@ do_nu_electron_anti = false
 do_nu_heavy = false
 
 scattering_fraction = 1.0
+#scattering_fraction = 0.5
 
 <opacity>
 type = gray
 #gray_kappa = 1.e-20
-gray_kappa = 1.e-10
+#gray_kappa = 1.e-10
 #gray_kappa = 1.e-5
+gray_kappa = 1.e-40
 
 <units>
 scale_free = false
