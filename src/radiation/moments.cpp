@@ -460,6 +460,7 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   using namespace PhoebusReconstruction;
 
   auto *pmb = rc->GetParentPointer().get();
@@ -659,8 +660,8 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  // printf("skipping radiation fluxes\n");
-  // return TaskStatus::complete;
+   //printf("skipping radiation fluxes\n");
+   //return TaskStatus::complete;
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -770,12 +771,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
-          //          if (idir == 1 && i == 75 && j > 50 && j < 70 && ispec == 0) {
-          //            printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
-          //            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
-          //              con_vl(0), con_vl(1), con_vl(2),
-          //              con_vr(0), con_vr(1), con_vr(2));
-          //          }
+                    if (idir == 1 && i == 64 && j > 20 && j < 50 && ispec == 0) {
+                      printf("[%i %i %i] Jl: %e Jr: %e\n", k,j,i,Jl, Jr);
+                      printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n",k,j,i,
+                        con_vl(0), con_vl(1), con_vl(2),
+                        con_vr(0), con_vr(1), con_vr(2));
+                    }
 
           // Calculate the geometric mean of the opacity on either side of the interface,
           // this is necessary for handling the asymptotic limit near sharp surfaces
@@ -854,6 +855,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           //            printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
           //            PARTHENON_FAIL("nan flux");
           //          }
+                    if (idir == 1 && i == 64 && j > 20 && j < 50 && ispec == 0) {
+            printf("[%i %i %i] flux[0]: %e\n",
+              k,j,i,v.flux(idir_in, idx_Ef(ispec), k, j, i));
+                    }
 
           /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
             printf("[%i %i %i] flux[0]: %e\n",
