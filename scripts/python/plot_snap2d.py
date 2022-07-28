@@ -60,6 +60,16 @@ def plot_dump(filename, varname,
     y = coord[...,2]
     x = coord[...,1]
 
+    # Calculate volume integral (SMR)
+    gdet = data.Get("g.c.detgam", False)
+    print(gdet)
+    print(np.min(gdet))
+    print(np.max(gdet))
+    print(np.min(q))
+    print(np.max(q))
+    total = np.sum(gdet*q[:,:,:,:,0])
+    print(f"Volume integral: {total}")
+
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)
         x = rho

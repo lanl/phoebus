@@ -160,6 +160,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <typename T, class CLOSURE>
 TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
+  printf("Skipping floors!");
+  return TaskStatus::complete;
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace pr = radmoment_prim;
@@ -417,6 +419,7 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 template <typename T>
 TaskStatus ApplyFloors(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
@@ -789,6 +792,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 }
 
 TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   using parthenon::BoundaryFace;
   using parthenon::BoundaryFlag;
   auto *pmb = rc->GetParentPointer().get();
