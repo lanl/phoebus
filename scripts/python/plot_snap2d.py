@@ -61,14 +61,12 @@ def plot_dump(filename, varname,
     x = coord[...,1]
 
     # Calculate volume integral (SMR)
-    gdet = data.Get("g.c.detgam", False)
-    print(gdet)
-    print(np.min(gdet))
-    print(np.max(gdet))
-    print(np.min(q))
-    print(np.max(q))
-    total = np.sum(gdet*q[:,:,:,:,0])
-    print(f"Volume integral: {total}")
+    # Calculate total energy
+    econs = data.Get("r.c.E", False)
+    print(np.min(econs))
+    print(np.max(econs))
+    total = np.sum(econs[:,:,:,:,0])
+    print(f"Volume integral E: {total}")
 
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)
