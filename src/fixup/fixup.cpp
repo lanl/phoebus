@@ -304,8 +304,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         }
 
         if (enable_rad_floors) {
-          printf("DOING RAD FLOORS!\n");
-          exit(-1);
           const Real r = std::exp(coords.x1v(k, j, i));
           // TODO(BRR) ar::code * T^-4?
           const Real Jmin = 1.e-4 * std::pow(r, -4);
@@ -322,17 +320,19 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j, i), 2) +
                                         std::pow(v(b, idx_H(ispec, 1), k, j, i), 2) +
                                         std::pow(v(b, idx_H(ispec, 2), k, j, i), 2));
+
+
             //if (Hmag > 1.) {
               // TODO(BRR) nonsense tiny comoving flux!
-            if (Hmag > 0.01) {
-              //              printf("Hmag = %e! [%i %i %i]\n", Hmag, k,j,i);
-              //              PARTHENON_FAIL("Hmag");
-              floor_applied = true;
-
-              //const Real rescale = 0.99 / Hmag;
-              const Real rescale = 0.01 / Hmag;
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= rescale; }
-            }
+//            if (Hmag > 0.01) {
+//              //              printf("Hmag = %e! [%i %i %i]\n", Hmag, k,j,i);
+//              //              PARTHENON_FAIL("Hmag");
+//              floor_applied = true;
+//
+//              //const Real rescale = 0.99 / Hmag;
+//              const Real rescale = 0.01 / Hmag;
+//              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= rescale; }
+//            }
           }
         }
 
@@ -456,8 +456,8 @@ TaskStatus ApplyFloors(T *rc) {
 template <typename T>
 TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
-  printf("SKIPPING THIS FIXUP\n");
-  return TaskStatus::complete;
+  //printf("SKIPPING THIS FIXUP\n");
+  //return TaskStatus::complete;
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -541,7 +541,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
             const Real r = std::exp(coords.x1v(k, j, i));
             // TODO(BRR) ar::code * T^-4?
             const Real Jmin = 1.e-4 * std::pow(r, -4);
-            const Real ximax = 0.99;
+            const Real ximax = 0.; //0.99;
             Tens2 con_gamma;
             geom.MetricInverse(CellLocation::Cent, b, k, j, i, con_gamma.data);
 

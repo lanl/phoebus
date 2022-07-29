@@ -329,6 +329,10 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         v(b, ifail, k, j, i) = (status == ClosureStatus::success
                                 ? FailFlags::success
                                 : FailFlags::fail);
+        //if (v(b, ifail, k, j, i) == FailFlags::fail) {
+        if (status != ClosureStatus::success) {
+          printf("fail! %i %i %i\n", k, j, i);
+        }
       });
 
   return TaskStatus::complete;
