@@ -222,6 +222,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
     }
   }
   const int nspec = idx_J.DimSize(1);
+  printf("nspec: %i\n", nspec);
 
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -315,11 +316,25 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               // v(b, idx_J(ispec), k, j, i) = 1.e-5 * v(b, peng, k, j, i);
               v(b, idx_J(ispec), k, j, i) = Jmin;
             }
+            
+            Real con_gamma[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma);
+            Real xi = 0.;
+            SPACELOOP2(ii, jj) {
+              xi += con_gamma[ii][jj]*v(b, idx_H(ispec, ii), k, j, i)*
+                v(b, idx_H(ispec, jj), k, j, i);
+            }
+            xi = std::sqrt(xi);
+            constexpr Real ximax = 0.99;
+            if (xi > ximax) {
+              floor_applied = true;
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi; }
+            }
 
             // Limit magnitude of flux
-            const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j, i), 2) +
-                                        std::pow(v(b, idx_H(ispec, 1), k, j, i), 2) +
-                                        std::pow(v(b, idx_H(ispec, 2), k, j, i), 2));
+//            const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j, i), 2) +
+//                                        std::pow(v(b, idx_H(ispec, 1), k, j, i), 2) +
+//                                        std::pow(v(b, idx_H(ispec, 2), k, j, i), 2));
 
 
             //if (Hmag > 1.) {
@@ -337,6 +352,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         }
 
         if (floor_applied) {
+          //printf("Floor applied! %i %i %i\n", k, j, i);
           // Update dependent primitives
           if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
           v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
@@ -400,6 +416,19 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                          v(b, idx_H(ispec, 1), k, j, i) * J,
                          v(b, idx_H(ispec, 2), k, j, i) * J}};
 
+                         // TODO(BRR) temporarily check xi here
+            //Vec conH{0};
+            Real con_gamma[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma);
+            Real xi = 0.;
+            SPACELOOP2(ii, jj) {
+              xi += con_gamma[ii][jj]*covH(ii)*covH(jj);
+            }
+            xi = std::sqrt(xi) / J;
+            if (xi > 1.0) {
+              printf("[%i %i %i] bad xi in applyfloor: %e\n", k,j,i,xi);
+            }
+
             if (programming::is_specialization_of<CLOSURE,
                                                   radiation::ClosureMOCMC>::value) {
               SPACELOOP2(ii, jj) {
@@ -411,6 +440,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
             c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
+            // TODO(BRR) temporarily not updating rad cons with floors
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * covF(ii); }
           }
@@ -501,6 +531,21 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   auto idx_F = imap.GetFlatIdx(cr::F);
   int ifluidfail = imap[impl::fail].first;
   int iradfail = imap[ri::c2pfail].first;
+  
+  bool report_c2p_fails = fix_pkg->Param<bool>("report_c2p_fails");
+  if (report_c2p_fails) {
+    int nfail_total;
+    parthenon::par_reduce(
+        parthenon::loop_pattern_mdrange_tag, "Rad ConToPrim::Solve fixup failures",
+        DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+          if (v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
+            nf++;
+          }
+        },
+        Kokkos::Sum<int>(nfail_total));
+    printf("total rad nfail: %i\n", nfail_total);
+  }
 
   // TODO(BRR) make this less ugly
   IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -536,12 +581,15 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
 
         if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail ||
             v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
+          //printf("[%i %i %i] fluidfail: %i radfail: %i\n", k, j, i, 
+          //  v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail,
+          //  v(b, iradfail, k, j, i) == radiation::FailFlags::fail);
           // TODO(BRR) very crude hack just set H = 0 and J to floor
           // (a better solution would be J = max(J, J_floor) and clamping xi to 0, 0.999)
             const Real r = std::exp(coords.x1v(k, j, i));
             // TODO(BRR) ar::code * T^-4?
             const Real Jmin = 1.e-4 * std::pow(r, -4);
-            const Real ximax = 0.; //0.99;
+            const Real ximax = 0.99;
             Tens2 con_gamma;
             geom.MetricInverse(CellLocation::Cent, b, k, j, i, con_gamma.data);
 
@@ -556,7 +604,13 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
               v(b, idx_J(ispec), k, j, i) = std::max(Jmin, v(b, idx_J(ispec), k, j, i));
               if (xi > ximax) {
                 SPACELOOP(ii) {
+                  if (i == 0 && j == 62) {
+                    printf("H(%i): %e\n", ii, v(b, idx_H(ispec, ii), k, j, i));
+                  }
                   v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi;
+                  if (i == 0 && j == 62) {
+                    printf("after H(%i): %e\n", ii, v(b, idx_H(ispec, ii), k, j, i));
+                  }
                 }
               }
 
@@ -588,8 +642,8 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
             Vec cov_F;
             Tens2 conTilPi{0}; // TODO(BRR) go beyond Eddington
             Real J = v(b, idx_J(ispec), k, j, i);
-            Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
-                         v(b, idx_H(ispec, 2), k, j, i)};
+            Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i) * J, v(b, idx_H(ispec, 1), k, j, i) * J,
+                         v(b, idx_H(ispec, 2), k, j, i) * J};
             c.Prim2Con(J, cov_H, conTilPi, &E, &cov_F);
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) {
