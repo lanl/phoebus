@@ -593,9 +593,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fixup = tl.AddTask(
         fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
+    auto rad_fixup = tl.AddTask(
+        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+
     // TODO(BRR) rad fixup here?
 
-    auto floors = tl.AddTask(fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+    auto floors = tl.AddTask(rad_fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
 
     // TODO(JMM): Should this be at the beginning of a cycle? The end?
     // After the monopole solver is done?

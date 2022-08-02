@@ -317,19 +317,19 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               v(b, idx_J(ispec), k, j, i) = Jmin;
             }
             
-            Real con_gamma[3][3];
-            geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma);
-            Real xi = 0.;
-            SPACELOOP2(ii, jj) {
-              xi += con_gamma[ii][jj]*v(b, idx_H(ispec, ii), k, j, i)*
-                v(b, idx_H(ispec, jj), k, j, i);
-            }
-            xi = std::sqrt(xi);
-            constexpr Real ximax = 0.99;
-            if (xi > ximax) {
-              floor_applied = true;
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi; }
-            }
+//            Real con_gamma[3][3];
+//            geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma);
+//            Real xi = 0.;
+//            SPACELOOP2(ii, jj) {
+//              xi += con_gamma[ii][jj]*v(b, idx_H(ispec, ii), k, j, i)*
+//                v(b, idx_H(ispec, jj), k, j, i);
+//            }
+//            xi = std::sqrt(xi);
+//            constexpr Real ximax = 0.99;
+//            if (xi > ximax) {
+//              floor_applied = true;
+//              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi; }
+//            }
 
             // Limit magnitude of flux
 //            const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j, i), 2) +
@@ -426,7 +426,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             }
             xi = std::sqrt(xi) / J;
             if (xi > 1.0) {
-              printf("[%i %i %i] bad xi in applyfloor: %e\n", k,j,i,xi);
+              printf("[%i %i %i] ispec = %i bad xi in applyfloor: %e\n", k,j,i,ispec,xi);
             }
 
             if (programming::is_specialization_of<CLOSURE,
@@ -496,9 +496,9 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   namespace cr = radmoment_cons;
 
   auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
@@ -548,20 +548,20 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   }
 
   // TODO(BRR) make this less ugly
-  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
-      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
-          // Do not use ghost zones as data for averaging
-          // TODO(BRR) need to allow ghost zones from neighboring blocks
-          v(b, ifluidfail, k, j, i) = con2prim_robust::FailFlags::fail;
-          v(b, iradfail, k, j, i) = radiation::FailFlags::fail;
-        }
-      });
+//  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+//  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+//  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+//  parthenon::par_for(
+//      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
+//      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+//      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+//        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+//          // Do not use ghost zones as data for averaging
+//          // TODO(BRR) need to allow ghost zones from neighboring blocks
+//          v(b, ifluidfail, k, j, i) = con2prim_robust::FailFlags::fail;
+//          v(b, iradfail, k, j, i) = radiation::FailFlags::fail;
+//        }
+//      });
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
@@ -571,8 +571,9 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   const int nspec = idx_E.DimSize(1);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
-      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "RadConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
+      // TODO(BRR) need to account for no stencils outside of ghost zones
+      kb.s, kb.e, jb.s+1, jb.e-1, ib.s+1, ib.e-1,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
 
         // if fluid fail but rad success, recalculate rad c2p and set iradfail with result, then
@@ -663,9 +664,9 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   namespace c = fluid_cons;
   namespace impl = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
@@ -726,23 +727,24 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
   // TODO(BRR) make this less ugly
-  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
-      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
-          // Do not use ghost zones as data for averaging
-          // TODO(BRR) need to allow ghost zones from neighboring blocks
-          v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
-        }
-      });
+//  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+//  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+//  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+//  parthenon::par_for(
+//      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
+//      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+//      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+//        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+//          // Do not use ghost zones as data for averaging
+//          // TODO(BRR) need to allow ghost zones from neighboring blocks
+//          v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
+//        }
+//      });
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
-      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      // TODO(BRR) need to account for not stenciling outside of ghost zones
+      kb.s, kb.e, jb.s+1, jb.e-1, ib.s+1, ib.e-1,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         Real eos_lambda[2]; // use last temp as initial guess
         eos_lambda[0] = 0.5;
