@@ -330,7 +330,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
             (status == ClosureStatus::success ? FailFlags::success : FailFlags::fail);
         // if (v(b, ifail, k, j, i) == FailFlags::fail) {
         if (status != ClosureStatus::success) {
-          printf("fail! %i %i %i\n", k, j, i);
+          //printf("fail! %i %i %i J = %e H = %e %e %e\n", k, j, i, J, covH(0), covH(1), covH(2));
+          //printf("fail! %i %i %i\n", k, j, i);
         }
       });
 
@@ -1108,8 +1109,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                                 p::temperature, p::energy, p::ye,      p::velocity,
                                 p::bfield,      pr::J,     pr::H,      ir::kappaJ,
                                 ir::kappaH,     ir::JBB,   ir::srcfail};
-  printf("skipping fluid update\n");
-  update_fluid = false;
+  //printf("skipping fluid update\n");
+  //update_fluid = false;
   //  if (update_fluid) {
   vars.push_back(c::energy);
   vars.push_back(c::momentum);
@@ -1226,6 +1227,14 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real U_rad_0[4] = {
             v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
             v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i)};
+          
+
+           if (i == 32 && j == 32 && ispec == 0) {
+            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+                rho, Tg, Ye, species_d[ispec]);
+            Real tau = alpha * dt * kappa;
+            printf("tau[32, 32] = %e\n", tau);
+           }
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};

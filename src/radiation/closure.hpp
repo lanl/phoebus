@@ -324,6 +324,7 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Con2Prim(
   }
   xi = std::sqrt(xi) / *J;
   if (xi >= 1. || *J < 0.) {
+    //printf("xi = %e J = %e\n", xi, *J);
     return ClosureStatus::failure;
   }
 
