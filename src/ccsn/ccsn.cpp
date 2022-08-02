@@ -84,13 +84,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real epsmin = pin->GetOrAddReal("ccsn", "epsmin", 1e-12);
   params.Add("epsmin", epsmin);
 
-  // Arrays for CCSN stuff
-  //  CCSN::State_t ccsn_state("CCSN state", CCSN::NCCSN, npoints);
-  //  auto ccsn_state_h = Kokkos::create_mirror_view(ccsn_state);
-
-  //  params.Add("ccsn_state", ccsn_state);
-  //  params.Add("ccsn_state_h", ccsn_state_h);
-
   return ccsn;
 }
 
@@ -112,10 +105,6 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   auto model_filename = params.Get<std::string>("model_filename");
   auto npoints = params.Get<int>("npoints");
   auto radius = monopolepkg->Param<MonopoleGR::Radius>("radius");
-
-  // auto matter_h = monopolepkg->Param<MonopoleGR::Matter_host_t>("matter_h");
-  // auto state_h = params.Get<CCSN::State_host_t>("ccsn_state_h");
-
   const Real dr = radius.dx();
 
   //printf("Current working dir: %s\n", get_current_dir_name());
@@ -123,22 +112,32 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   printf("My name filename requested is %s.\n", model_filename.c_str());
 
   // read 1d model
-  const int num_zones = Get1DProfileNumZones(model_filename);
+  std::pair<int,int> p = Get1DProfileNumZones(model_filename);
+  const int num_zones = p.first;
+  const int num_comments = p.second;
 
   printf("1D model read in with %d number of zones. \n",num_zones);
+  printf("1D model read in with %d number of comments. \n",num_comments);
 
-  // CCSN::State_t_raw ccsn_state_raw("CCSN state raw", CCSN::NCCSN, num_zones);
-  // auto ccsn_state_raw_h = Kokkos::create_mirror_view(ccsn_state_raw);
-  //
+  // create 1d model arrays
+  CCSN::State_t ccsn_state_raw_d("CCSN state raw", num_zones, CCSN::NCCSN); // create raw array on device
+  CCSN::State_host_t ccsn_state_raw_h = Kokkos::create_mirror_view(ccsn_state_raw_d);     // create raw array on host 
 
-  //Real model_1d[num_zones][9]; 
-  Get1DProfileData(model_filename,num_zones);
+  // add arays to CCSN namespace?
+  params.Add("ccsn_state_raw_d", ccsn_state_raw_d);
+  params.Add("ccsn_state_raw_h", ccsn_state_raw_h);
+
+  // actually get host array
+  //auto ccsn_state_h = params.Get<CCSN::State_host_t>("ccsn_state_raw_h");
+
+  // pass 1d model array and fill from text file
+  Get1DProfileData(model_filename,num_zones,num_comments,ccsn_state_raw_h);
 
   //printf("%s:%i model_filename = %s\n", __FILE__, __LINE__, model_filename.c_str());
 
   // const Real model_1d[9][num_zones] = {{CCSN::Get1DProfileData("model_filename",num_zones)}};
 
-  //printf("1D model read in. Max radius is  = %.14e\n", model_1d[0][num_zones],"with ",0,"number of zones.");
+  printf("1D model read in, max radius is  = %.14e\n", ccsn_state_raw_h(0,0),"with ",num_zones,"number of zones.");
 
   // allocate state size of NCCSN which should equal num vars for CCSN ?
   //  Real state[NCCSN];

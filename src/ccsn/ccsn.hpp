@@ -20,15 +20,11 @@
 #include <utils/error_checking.hpp>
 
 namespace CCSN {
-constexpr int NCCSN = 8;
+constexpr int NCCSN = 9;
 
-// NVAR::NPOINTS
+// NVAR:NUM_ZONES
 using State_t = parthenon::ParArray2D<Real>;
 using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
-
-// NVAR:NUMZONES
-using State_t_raw = parthenon::ParArray2D<Real>;
-using State_host_t_raw = typename parthenon::ParArray2D<Real>::HostMirror;
 
 constexpr int RHO = 0;
 constexpr int V = 1;
@@ -40,50 +36,54 @@ constexpr int grav = 6;
 constexpr int entr = 7;
 
 KOKKOS_INLINE_FUNCTION
-int Get1DProfileNumZones(const std::string model_filename){
+std::pair<int, int> Get1DProfileNumZones(const std::string model_filename){
 
     // open file
-    //   const char* model_filename_conv = model_filename.c_str();
     std::ifstream inputfile("input.txt"); // works when harcoded and lives in /bin
+
     // error check    
     if (!inputfile.is_open()){ 
         std::cout <<  model_filename << " not found :( \n.";
-	//std::cout << typeid(model_filename).name() << "input of type";
-        //std::cout << typeid(test).name() << "should be of type";
-    	return 0;
+    	exit(-1);
     }
 
-    const int num_vars = 9; // 8 + radius
-    int num_zones = 0;
+    int nz = 0;
+    int nc = 0;
     std::string line;
 
     // get number of zones from 1d file
     while(!inputfile.eof()){ 
             getline(inputfile, line);
-            num_zones ++;
+	    if( line.find("//") != std::string::npos ){ 
+		nc ++;
+	    }
+	    else{
+            nz ++;
+	    }
     }
 
-    //std::cout << num_zones-1 << " zones read in.\n";
     inputfile.close();
 
-    return num_zones-1;
+    return std::make_pair(nz-nc, nc);
 }
 
+template <typename HostArray2D>
 KOKKOS_INLINE_FUNCTION
-void Get1DProfileData(const std::string model_filename, const int num_zones){
+void Get1DProfileData(const std::string model_filename, const int num_zones,const int num_comments, HostArray2D &ccsn_state_raw_h){
 
     std::ifstream inputfile("input.txt"); // works when harcoded and lives in /bin
 
     const int num_vars = 9; // 8 + radius
-    Real model_1d[num_zones][num_vars]; //num_zones = rows = i | num_vars = columns = j
+    Real val = 0;
+    std::string line;
 
     // read file into model_1d
-    for (int i = 0; i < num_zones; i++) // number of vars
+    for (int i = num_comments; i < num_zones; i++) // number of vars
     {
         for (int j = 0; j < num_vars; j++) //  number of zones
         {
-	  //std::cout << inputfile;
-          inputfile >> model_1d[i][j];
+          inputfile >> val;
+	  ccsn_state_raw_h(i-num_comments,j) = val;
         }
     }
 
@@ -102,7 +102,7 @@ void Get1DProfileData(const std::string model_filename, const int num_zones){
     }
     */
 
-    std::cout << "first cell of radius read in as " << model_1d[0][0]<< "\n.";
+    //std::cout << "first cell of radius read in as " << ccsn_state_raw_h(0,0) << "\n.";
 
 }
 
