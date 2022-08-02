@@ -1003,8 +1003,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 template <typename T>
 TaskStatus SourceFixup(T *rc) {
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
-  printf("SKIPPING!\n");
-  return TaskStatus::complete;
+  //printf("SKIPPING!\n");
+  //return TaskStatus::complete;
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
