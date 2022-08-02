@@ -1094,8 +1094,8 @@ TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
-  printf("SKIPPING FLUID SOURCE\n");
-  return TaskStatus::complete;
+  //printf("SKIPPING FLUID SOURCE\n");
+  //return TaskStatus::complete;
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
