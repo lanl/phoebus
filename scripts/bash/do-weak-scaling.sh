@@ -1,45 +1,35 @@
 #!/bin/bash
 
 # Set modules and environment variables here
-# LOAD MODULEFILES, INSERT CODE, AND RUN YOUR PROGRAMS HERE
-module list
-module swap PrgEnv-cray PrgEnv-gnu
-module list
-module load cpe-cuda
-module list
-module load cuda cray-hdf5-parallel cmake
-module list
-module swap craype-network-ofi craype-network-ucx
-module list
-module swap cray-mpich cray-mpich-ucx
-module list
-export UCX_TLS="self,ud,cuda,sm"
-export CRAY_ACCEL_TARGET=nvidia80
-
+module purge
+module load gcc/10.3.0
+module load openmpi/4.1.1
+module load hdf5-parallel/1.10.7
+module load cmake/3.20.3
 
 TIMING_FILE_NAME="timings.dat"
 
 EXEC=./phoebus # executable
 INP=torus.pin # input deck
-PART=gpu # partition
+PART=standard # partition
 NT_P_NODE=4 # cores per node
 
 # Base grid (smallest size)
-#NXBASE=64
-NXBASE=256
+NXBASE=64
 NX=(${NXBASE} ${NXBASE} ${NXBASE})
 
 # Meshblock sizes to test
-#MESHBLOCK_SIZES=(8 16 32 64)
-MESHBLOCK_SIZES=(64 128 256)
+MESHBLOCK_SIZES=(8 16 32 64)
 
 # Pack sizes to test
-#PACK_SIZES=(-1 1 2 4 8 16)
-PACK_SIZES=(-1 1 2 4)
+PACK_SIZES=(-1 1 2 4 8 16)
+
+# Walltime needed
+WALLTIME="00:30:00"
 
 # Array of powers of 2 from which we will compute core counts
 CORE_P_START=0
-CORE_P_STOP=3
+CORE_P_STOP=10
 CORE_POWERS=$(seq ${CORE_P_START} ${CORE_P_STOP})
 
 echo "Saving timing to ${TIMING_FILE_NAME}"
@@ -56,7 +46,9 @@ for p in ${CORE_POWERS}; do
     echo "Node count = ${nodes}"
     # update base grid. Double appropriately
     d=$(((${p} - 1) % 3))
-    NX[${d}]=$((${d} < 0 ? ${NX[${d}]} : 2 * ${NX[${d}]}))
+    if [ ${d} -ge 0 ]; then
+        NX[${d}]=$((${d} < 0 ? ${NX[${d}]} : 2 * ${NX[${d}]}))
+    fi
     echo "Grid size = ${NX[@]}"
     for nxb in ${MESHBLOCK_SIZES[@]}; do
         echo "Meshblock size = ${nxb}"
@@ -72,7 +64,7 @@ for p in ${CORE_POWERS}; do
             # So I use slurm's output handling with the --output and --error flags
             # This DOES seem to work as intended.
             ARGS="${EXEC} -i ${INP} parthenon/mesh/nx1=${NX[0]} parthenon/mesh/nx2=${NX[1]} parthenon/mesh/nx3=${NX[2]} parthenon/meshblock/nx1=${nxb} parthenon/meshblock/nx2=${nxb} parthenon/meshblock/nx3=${nxb} parthenon/mesh/pack_size=${pack}"
-            CMD="srun --output=${outfile} --error=${errfile} --time=00:10:00 --partition ${PART} -n ${count} --nodes ${nodes} ${ARGS}"
+            CMD="srun --output=${outfile} --error=${errfile} --time=${WALLTIME} --partition ${PART} -n ${count} --nodes ${nodes} ${ARGS}"
             echo ${CMD}
             ${CMD}
             # Pull out performance, and save it to text file.
