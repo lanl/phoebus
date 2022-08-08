@@ -298,6 +298,18 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   const auto local = parthenon::BoundaryType::local;
   const auto nonlocal = parthenon::BoundaryType::nonlocal;
 
+  if (stage == 1) {
+    for (int i = 0; i < blocks.size(); i++) {
+      auto &pmb = blocks[i];
+      auto &base = pmb->meshblock_data.Get();
+      pmb->meshblock_data.Add("dUdt", base);
+      pmb->meshblock_data.Add("geometric source terms", base, src_w_diag);
+      for (int s = 1; s < integrator->nstages; s++) {
+        pmb->meshblock_data.Add(stage_name[s], base);
+      }
+    }
+  }
+
   TaskRegion &single_tasklist_per_pack_1 = tc.AddRegion(num_partitions);
   for (int i = 0; i < num_partitions; i++) {
     auto &tl = single_tasklist_per_pack_1[i];
@@ -316,15 +328,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region_1[ib];
 
-    // first make other useful containers
-    auto &base = pmb->meshblock_data.Get();
-    if (stage == 1) {
-      pmb->meshblock_data.Add("dUdt", base);
-      for (int i = 1; i < integrator->nstages; i++) {
-        pmb->meshblock_data.Add(stage_name[i], base);
-      }
-      pmb->meshblock_data.Add("geometric source terms", base, src_w_diag);
-    }
 
     // pull out the container we'll use to get fluxes and/or compute RHSs
     auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);

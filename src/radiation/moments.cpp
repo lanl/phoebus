@@ -100,6 +100,7 @@ class SourceResidual4 {
     Real kappaH =
         mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
     Real kappaJ = (1. - scattering_fraction_) * kappaH;
+    printf("Tg: %e JBB: %e kappaH: %e kappaJ: %e\n", Tg, JBB, kappaH, kappaJ);
     Real W = 0.;
     SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
@@ -1202,6 +1203,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real rho = v(iblock, prho, k, j, i);
         Real ug = v(iblock, peng, k, j, i);
         Real Tg = v(iblock, pT, k, j, i);
+        if (i == 5 && j == 4) {
+          printf("[%i %i %i] rho = %e ug = %e Tg = %e\n", k, j, i, rho, ug, Tg);
+        }
         Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
         Real bprim[3] = {0};
         if (pb_lo > -1) {
@@ -1227,7 +1231,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real U_rad_0[4] = {
             v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
             v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i)};
-          
+
 
            if (i == 32 && j == 32 && ispec == 0) {
             Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
@@ -1242,6 +1246,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             eos, d_opacity, d_mean_opacity, rho, Ye, bprim, species_d[ispec], conTilPi,
             cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g, U_mhd_0,
             U_rad_0, k, j, i);
+
+        // TODO(BRR) use Htilde instead of H = J*Htilde for rad prims because mhd prims
+        // are like 0 - 1?
 
         // Memory for evaluating Jacobian via finite differences
         Real P_rad_m[4];
@@ -1279,15 +1286,15 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // TODO(BRR) different for non-valencia
           resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
         }
-        if (i == 20 && j == 64) {
-          printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
-          printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2],
-                 U_mhd_guess[3]);
-          printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
-                 P_rad_guess[3]);
-          printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
-                 U_rad_guess[3]);
-        }
+//        if (i == 20 && j == 64) {
+//          printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
+//          printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2],
+//                 U_mhd_guess[3]);
+//          printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
+//                 P_rad_guess[3]);
+//          printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
+//                 U_rad_guess[3]);
+//        }
         //        if (i == 64 && j == 64) {
         //          printf("Pmhd Umhd Prad Urad:\n");
         //          for (int n = 0; n < 4; n++) {
@@ -1303,24 +1310,38 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         Real err = 1.e100;
         constexpr Real TOL = 1.e-8;
-        constexpr int max_iter = 10;
+        constexpr int max_iter = 100;
         int niter = 0;
         do {
           // Numerically calculate Jacobian
           Real jac[4][4] = {0};
           constexpr Real EPS = 1.e-8;
 
+          // Minimum non-zero magnitude from Pguess
+          Real P_mhd_mag_min = robust::LARGE();
+          for (int m = 0; m < 4; m++) {
+            if (std::fabs(Pguess[m]) > 0.) {
+              P_mhd_mag_min = std::min<Real>(P_mhd_mag_min, std::fabs(Pguess[m]));
+            }
+          }
+
           bool bad_guess = false;
           for (int m = 0; m < 4; m++) {
             Real P_mhd_m[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
             Real P_mhd_p[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
-            // TODO(BRR) Use minimum non-zero magnitude from Pguess[]
-            Real P_mhd_mag_min = std::max<Real>(
-                std::max<Real>(std::max<Real>(std::fabs(Pguess[0]), std::fabs(Pguess[1])),
-                               std::fabs(Pguess[2])),
-                std::fabs(Pguess[3]));
+//            // TODO(BRR) Use minimum non-zero magnitude from Pguess[]
+//            Real P_mhd_mag_min = std::max<Real>(
+//                std::max<Real>(std::max<Real>(std::fabs(Pguess[0]), std::fabs(Pguess[1])),
+//                               std::fabs(Pguess[2])),
+//                std::fabs(Pguess[3]));
+            printf("Pguess: %e %e %e %e P_mhd_mag_min: %e\n",
+              Pguess[0], Pguess[1], Pguess[2], Pguess[3], P_mhd_mag_min);
             P_mhd_m[m] -= std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
             P_mhd_p[m] += std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
+            printf("m: %i delta: %e (%e %e)\n", m,
+            std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m])),
+            EPS * P_mhd_mag_min,
+            EPS * std::fabs(P_mhd_m[m]));
 
             srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
             srm.CalculateRadConserved(U_mhd_m, U_rad_m);
@@ -1358,21 +1379,21 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           //            bad_guess = true;
           //          }
 
-          //          if (i == 20 && j == 64) {
-          //            printf("\n[%i]\n", niter);
-          //            printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
-          //            Pguess[3]); printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0],
-          //            U_mhd_guess[1], U_mhd_guess[2],
-          //                   U_mhd_guess[3]);
-          //            printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1],
-          //            P_rad_guess[2],
-          //                   P_rad_guess[3]);
-          //            printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
-          //            U_rad_guess[2],
-          //                   U_rad_guess[3]);
-          //            printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2],
-          //            resid[3]);
-          //          }
+                    if (i == 5 && j == 4) {
+                      printf("\n[%i]\n", niter);
+                      printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
+                      Pguess[3]); printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0],
+                      U_mhd_guess[1], U_mhd_guess[2],
+                             U_mhd_guess[3]);
+                      printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1],
+                      P_rad_guess[2],
+                             P_rad_guess[3]);
+                      printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
+                      U_rad_guess[2],
+                             U_rad_guess[3]);
+                      printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2],
+                      resid[3]);
+                    }
 
           // Update guess
           for (int m = 0; m < 4; m++) {
@@ -1380,6 +1401,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               Pguess[m] -= jacinv[m][n] * resid[n];
             }
           }
+                    if (i == 5 && j == 4) {
+                      printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
+                      Pguess[3]);
+                    }
           srm.CalculateMHDConserved(Pguess, U_mhd_guess);
           srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
           status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
@@ -1396,12 +1421,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // Update residuals
           for (int n = 0; n < 4; n++) {
             resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
-            //            if (i == 20 && j == 64) {
-            //              printf("resid[%i] = %e (%e - %e + %e) (dt = %e dS = %e)\n", n,
-            //              resid[n],
-            //                     U_mhd_guess[n], U_mhd_0[n], dt * dS_guess[n], dt,
-            //                     dS_guess[n]);
-            //            }
+//                        if (i == 4 && j == 4) {
+//                          printf("resid[%i] = %e (%e - %e + %e) (dt = %e dS = %e)\n", n,
+//                          resid[n],
+//                                 U_mhd_guess[n], U_mhd_0[n], dt * dS_guess[n], dt,
+//                                 dS_guess[n]);
+//                        }
           }
 
           // Calculate error
@@ -1427,6 +1452,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               err = suberr;
             }
           }
+          printf("[%i] err: %e TOL: %e\n", niter, err, TOL);
 
           niter++;
           if (niter == max_iter) {
@@ -1444,6 +1470,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             std::isnan(U_rad_guess[1]) || std::isnan(U_rad_guess[2]) ||
             std::isnan(U_rad_guess[3])) {
           success = false;
+          printf("[%i %i %i] FAILURE niter = %i err = %e U_rad_guess: %e %e %e %e\n",
+            k, j, i, niter, err, U_rad_guess[0], U_rad_guess[1], U_rad_guess[2], U_rad_guess[3]);
+          exit(-1);
         } else {
           success = true;
           dE = (U_rad_guess[0] - v(iblock, idx_E(ispec), k, j, i)) / sdetgam;
@@ -1455,6 +1484,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           //         printf("first: dE: %e cov_dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1),
           //         cov_dF(2));
           //        }
+        }
+
+        if (i == 5 && j == 4) {
+          printf("EXIT!\n");
+          exit(-1);
         }
 
         // FORCING USE OF 1D ROOTFIND!
