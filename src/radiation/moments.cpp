@@ -99,8 +99,11 @@ class SourceResidual4 {
     Real JBB = opac_.EnergyDensityFromTemperature(Tg, species_);
     Real kappaH =
         mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
+    // TODO(BRR) this is arguably cheating, arguably not. Should include dt though
+    // kappaH * dt < 1 / eps
+    kappaH = std::min<Real>(kappaH, 1.e5);
     Real kappaJ = (1. - scattering_fraction_) * kappaH;
-    printf("Tg: %e JBB: %e kappaH: %e kappaJ: %e\n", Tg, JBB, kappaH, kappaJ);
+    //printf("Tg: %e JBB: %e kappaH: %e kappaJ: %e\n", Tg, JBB, kappaH, kappaJ);
     Real W = 0.;
     SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
@@ -1173,6 +1176,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
   //  InteractionUpdateType interaction_update = InteractionUpdateType::explicit;
 
+  constexpr int izone = 44;
+  constexpr int jzone = 36;
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
@@ -1203,9 +1209,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real rho = v(iblock, prho, k, j, i);
         Real ug = v(iblock, peng, k, j, i);
         Real Tg = v(iblock, pT, k, j, i);
-        if (i == 5 && j == 4) {
-          printf("[%i %i %i] rho = %e ug = %e Tg = %e\n", k, j, i, rho, ug, Tg);
-        }
         Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
         Real bprim[3] = {0};
         if (pb_lo > -1) {
@@ -1233,12 +1236,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i)};
 
 
-           if (i == 32 && j == 32 && ispec == 0) {
-            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-                rho, Tg, Ye, species_d[ispec]);
-            Real tau = alpha * dt * kappa;
-            printf("tau[32, 32] = %e\n", tau);
-           }
+//           if (i == 32 && j == 32 && ispec == 0) {
+//            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+//                rho, Tg, Ye, species_d[ispec]);
+//            Real tau = alpha * dt * kappa;
+//            printf("tau[32, 32] = %e\n", tau);
+//           }
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
@@ -1281,6 +1284,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         srm.CalculateMHDConserved(Pguess, U_mhd_guess);
         srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
         auto status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
+        if (i == 44 && j == 36) {
+          printf("[%i %i %i] rho = %e ug = %e Tg = %e Prad0: %e %e %e %e\n", k, j, i, rho, ug, Tg,
+            P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+        }
         srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
         for (int n = 0; n < 4; n++) {
           // TODO(BRR) different for non-valencia
@@ -1334,14 +1341,14 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 //                std::max<Real>(std::max<Real>(std::fabs(Pguess[0]), std::fabs(Pguess[1])),
 //                               std::fabs(Pguess[2])),
 //                std::fabs(Pguess[3]));
-            printf("Pguess: %e %e %e %e P_mhd_mag_min: %e\n",
-              Pguess[0], Pguess[1], Pguess[2], Pguess[3], P_mhd_mag_min);
+//            printf("Pguess: %e %e %e %e P_mhd_mag_min: %e\n",
+//              Pguess[0], Pguess[1], Pguess[2], Pguess[3], P_mhd_mag_min);
             P_mhd_m[m] -= std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
             P_mhd_p[m] += std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
-            printf("m: %i delta: %e (%e %e)\n", m,
-            std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m])),
-            EPS * P_mhd_mag_min,
-            EPS * std::fabs(P_mhd_m[m]));
+//            printf("m: %i delta: %e (%e %e)\n", m,
+//i              std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m])),
+//              EPS * P_mhd_mag_min,
+//              EPS * std::fabs(P_mhd_m[m]));
 
             srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
             srm.CalculateRadConserved(U_mhd_m, U_rad_m);
@@ -1379,7 +1386,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           //            bad_guess = true;
           //          }
 
-                    if (i == 5 && j == 4) {
+                    if (i == izone && j == jzone) {
                       printf("\n[%i]\n", niter);
                       printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
                       Pguess[3]); printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0],
@@ -1401,7 +1408,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               Pguess[m] -= jacinv[m][n] * resid[n];
             }
           }
-                    if (i == 5 && j == 4) {
+                    if (i == izone && j == jzone) {
                       printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
                       Pguess[3]);
                     }
@@ -1421,12 +1428,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // Update residuals
           for (int n = 0; n < 4; n++) {
             resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
-//                        if (i == 4 && j == 4) {
-//                          printf("resid[%i] = %e (%e - %e + %e) (dt = %e dS = %e)\n", n,
-//                          resid[n],
-//                                 U_mhd_guess[n], U_mhd_0[n], dt * dS_guess[n], dt,
-//                                 dS_guess[n]);
-//                        }
+                        if (i == izone && j == jzone) {
+                          printf("resid[%i] = %e (%e - %e + %e) (dt = %e dS = %e)\n", n,
+                          resid[n],
+                                 U_mhd_guess[n], U_mhd_0[n], dt * dS_guess[n], dt,
+                                 dS_guess[n]);
+                        }
           }
 
           // Calculate error
@@ -1443,16 +1450,19 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                 // std::fabs(U_mhd_0[n]) +
                 //                       std::fabs(dt * dS_guess[n]));
                 std::fabs(resid[n]) / max_divisor;
-            if (i == 25 && j == 101) {
-              printf("suberr[%i] = %e (%e / %e + %e + %e) dt = %e\n", n, suberr,
-                     std::fabs(resid[n]), std::fabs(U_mhd_guess[n]),
-                     std::fabs(U_mhd_0[n]), std::fabs(dt * dS_guess[n]), dt);
-            }
+//            if (i == 25 && j == 101) {
+//              printf("suberr[%i] = %e (%e / %e + %e + %e) dt = %e\n", n, suberr,
+//                     std::fabs(resid[n]), std::fabs(U_mhd_guess[n]),
+//                     std::fabs(U_mhd_0[n]), std::fabs(dt * dS_guess[n]), dt);
+//            }
             if (suberr > err) {
               err = suberr;
             }
           }
-          printf("[%i] err: %e TOL: %e\n", niter, err, TOL);
+
+          if (i == izone && j == jzone) {
+            printf("[%i] err: %e TOL: %e\n", niter, err, TOL);
+          }
 
           niter++;
           if (niter == max_iter) {
@@ -1472,7 +1482,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           success = false;
           printf("[%i %i %i] FAILURE niter = %i err = %e U_rad_guess: %e %e %e %e\n",
             k, j, i, niter, err, U_rad_guess[0], U_rad_guess[1], U_rad_guess[2], U_rad_guess[3]);
-          exit(-1);
+//          exit(-1);
+          if (i == izone && j == jzone) {
+            exit(-1);
+          }
         } else {
           success = true;
           dE = (U_rad_guess[0] - v(iblock, idx_E(ispec), k, j, i)) / sdetgam;
@@ -1486,10 +1499,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           //        }
         }
 
-        if (i == 5 && j == 4) {
-          printf("EXIT!\n");
-          exit(-1);
-        }
+//        if (i == 5 && j == 4) {
+//          printf("EXIT!\n");
+//          exit(-1);
+//        }
 
         // FORCING USE OF 1D ROOTFIND!
         // success = false;
