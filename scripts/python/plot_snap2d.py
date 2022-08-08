@@ -65,7 +65,8 @@ def plot_dump(filename, varname,
     econs = data.Get("r.c.E", False)
     print(np.min(econs))
     print(np.max(econs))
-    total = np.sum(econs[:,:,:,:,0])
+    #total = np.sum(econs[:,:,:,:,0])
+    total = np.sum(econs[:,:,:,:])
     print(f"Volume integral E: {total}")
 
     if plane == 'xz':
