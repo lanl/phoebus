@@ -4,6 +4,16 @@
 # We need to modify this to account for radiation at
 # some point in the future.
 
+# TODO(JMM): Luke suggests making this a class
+# and makeing the variable registration
+# object-oriented. E.g.,
+# mem_size = memory_footprint()
+# mem_size.AddINdependent(3, "c.bfield")
+# and have compute_footprint be a class method
+# This is probably a good way to generalize
+# when we move to radiation/etc.
+# Also maybe translates nicely to parthenon.
+
 import numpy as np
 from argparse import ArgumentParser
 
