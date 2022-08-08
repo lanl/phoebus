@@ -273,15 +273,17 @@ public:
   }
 };
 
-using SKSMeshBlock = Analytic<SuperimposedKerrSchild, IndexerMeshBlock>;
-using SKSMesh = Analytic<SuperimposedKerrSchild, IndexerMesh>;
+using SuperimposedKerrSchildMeshBlock = Analytic<SuperimposedKerrSchild, IndexerMeshBlock>;
+using SuperimposedKerrSchildMesh = Analytic<SuperimposedKerrSchild, IndexerMesh>;
 
-using CSKSMeshBlock = CachedOverMeshBlock<SKSMeshBlock>;
-using CSKSMesh = CachedOverMesh<SKSMesh>;
+using CSuperimposedKerrSchildMeshBlock =
+    CachedOverMeshBlock<Analytic<SuperimposedKerrSchild, IndexerMeshBlock>>;
+using CSuperimposedKerrSchildMesh = CachedOverMesh<Analytic<SuperimposedKerrSchild, IndexerMesh>>;
 
 template <>
-void Initialize<CSKSMeshBlock>(ParameterInput *pin,
-                                        StateDescriptor *geometry); 
+void Initialize<SuperimposedKerrSchildMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
+template <>
+void Initialize<CSuperimposedKerrSchildMeshBlock>(ParameterInput *pin, StateDescriptor *geometry);
 
 } // namespace Geometry
 

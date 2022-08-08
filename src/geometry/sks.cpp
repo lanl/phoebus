@@ -16,9 +16,6 @@
 
 // Parthenon includes
 #include <kokkos_abstraction.hpp>
-#include <parthenon/package.hpp>
-#include <utils/error_checking.hpp>
-using namespace parthenon::package::prelude;
 
 // phoebus includes
 #include "geometry/analytic_system.hpp"
@@ -31,36 +28,76 @@ using namespace parthenon::package::prelude;
 
 namespace Geometry {
 
+// Don't need to overwrite SetGeometry
 template <>
-SKSMeshBlock
-GetCoordinateSystem<SKSMeshBlock>(MeshBlockData<Real> *rc) {
+void Initialize<SuperimposedKerrSchildMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
+  Params &params = geometry->AllParams();
+  Real m1 = pin->GetOrAddReal("geometry", "m1", 0.5);
+  Real m2 = pin->GetOrAddReal("geometry", "m2", 0.5);
+  Real a1 = pin->GetOrAddReal("geometry", "a1", 0);
+  Real a2 = pin->GetOrAddReal("geometry", "a2", 0);
+  Real b  = pin->GetOrAddReal("geometry", "b", 20);
+  Real dxfd = pin->GetOrAddReal("geometry", "finite_differences_dx", 1e-8);
+  params.Add("m1", m1);
+  params.Add("m2", m2);
+  params.Add("a1", a1);
+  params.Add("a2", a2);
+  params.Add("b", b);
+  params.Add("dxfd", dxfd);
+}
+
+template <>
+void SetGeometry<SuperimposedKerrSchildMeshBlock>(MeshBlockData<Real> *rc) {}
+
+template <>
+void SetGeometry<SuperimposedKerrSchildMesh>(MeshData<Real> *rc) {}
+
+template <>
+SuperimposedKerrSchildMeshBlock
+GetCoordinateSystem<SuperimposedKerrSchildMeshBlock>(MeshBlockData<Real> *rc) {
+  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
-  return SKSMeshBlock(indexer);
+  Real m1 = pkg->Param<Real>("m1");
+  Real m2 = pkg->Param<Real>("m2");
+  Real a1 = pkg->Param<Real>("a1");
+  Real a2 = pkg->Param<Real>("a2");
+  Real b  = pkg->Param<Real>("b");
+  Real dxfd = pkg->Param<Real>("dxfd");
+  return SuperimposedKerrSchildMeshBlock(indexer, m1, m2, a1, a2, b, dxfd);
 }
-template <> void SetGeometry<SKSMeshBlock>(MeshBlockData<Real> *rc) {}
-
 template <>
-SKSMesh GetCoordinateSystem<SKSMesh>(MeshData<Real> *rc) {
+SuperimposedKerrSchildMesh GetCoordinateSystem<SuperimposedKerrSchildMesh>(MeshData<Real> *rc) {
+  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
-  return SKSMesh(indexer);
+  Real m1 = pkg->Param<Real>("m1");
+  Real m2 = pkg->Param<Real>("m2");
+  Real a1 = pkg->Param<Real>("a1");
+  Real a2 = pkg->Param<Real>("a2");
+  Real b  = pkg->Param<Real>("b");
+  Real dxfd = pkg->Param<Real>("dxfd");
+  return SuperimposedKerrSchildMesh(indexer, m1, m2, a1, a2, b, dxfd);
 }
 
 template <>
-void Initialize<CSKSMeshBlock>(ParameterInput *pin,
-                                        StateDescriptor *geometry) {
-  InitializeCachedCoordinateSystem<SKSMeshBlock>(pin, geometry);
+void Initialize<CSuperimposedKerrSchildMeshBlock>(ParameterInput *pin,
+                                          StateDescriptor *geometry) {
+  InitializeCachedCoordinateSystem<SuperimposedKerrSchildMeshBlock>(pin, geometry);
 }
 template <>
-CSKSMeshBlock
-GetCoordinateSystem<CSKSMeshBlock>(MeshBlockData<Real> *rc) {
-  return GetCachedCoordinateSystem<SKSMeshBlock>(rc);
+CSuperimposedKerrSchildMeshBlock
+GetCoordinateSystem<CSuperimposedKerrSchildMeshBlock>(MeshBlockData<Real> *rc) {
+  return GetCachedCoordinateSystem<SuperimposedKerrSchildMeshBlock>(rc);
 }
 template <>
-CSKSMesh GetCoordinateSystem<CSKSMesh>(MeshData<Real> *rc) {
-  return GetCachedCoordinateSystem<SKSMesh>(rc);
+CSuperimposedKerrSchildMesh GetCoordinateSystem<CSuperimposedKerrSchildMesh>(MeshData<Real> *rc) {
+  return GetCachedCoordinateSystem<SuperimposedKerrSchildMesh>(rc);
 }
-template <> void SetGeometry<CSKSMeshBlock>(MeshBlockData<Real> *rc) {
-  SetCachedCoordinateSystem<SKSMeshBlock>(rc);
+template <>
+void SetGeometry<CSuperimposedKerrSchildMeshBlock>(MeshBlockData<Real> *rc) {
+  SetCachedCoordinateSystem<SuperimposedKerrSchildMeshBlock>(rc);
 }
-
+template <>
+void SetGeometry<CSuperimposedKerrSchildMesh>(MeshData<Real> *rc) {
+  SetCachedCoordinateSystem<SuperimposedKerrSchildMesh>(rc);
+}
 } // namespace Geometry

@@ -47,6 +47,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/snake.hpp"
 #include "geometry/spherical_kerr_schild.hpp"
 #include "geometry/spherical_minkowski.hpp"
+#include "geometry/sks.hpp"
 
 namespace Geometry {
 
