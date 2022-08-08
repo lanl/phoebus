@@ -1174,10 +1174,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-  //  InteractionUpdateType interaction_update = InteractionUpdateType::explicit;
-
-  constexpr int izone = 44;
-  constexpr int jzone = 36;
+  constexpr int izone = -1;//33;
+  constexpr int jzone = -1;//26;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1355,6 +1353,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             status = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
             srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
             if (status == ClosureStatus::failure) {
+              printf("bad guess! P_rad_m = %e %e %e %e\n", P_rad_m[0], P_rad_m[1],
+                P_rad_m[2], P_rad_m[3]);
               bad_guess = true;
             }
 
@@ -1363,6 +1363,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             status = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
             srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
             if (status == ClosureStatus::failure) {
+              printf("bad guess! P_rad_p = %e %e %e %e\n", P_rad_p[0], P_rad_p[1],
+                P_rad_p[2], P_rad_p[3]);
               bad_guess = true;
             }
 
@@ -1408,6 +1410,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               Pguess[m] -= jacinv[m][n] * resid[n];
             }
           }
+
+          // TODO(BRR) check that this guess is sane i.e. ug > 0 J > 0 xi < 1, if not,
+          // recalculate the guess with some rescaled jacinv*resid
+
+
                     if (i == izone && j == jzone) {
                       printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
                       Pguess[3]);
@@ -1416,7 +1423,21 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
           status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
           srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+                    if (i == izone && j == jzone) {
+                      printf("\n[%i]\n", niter);
+                      printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
+                      Pguess[3]); printf("Umhdg: %e %e %e %e\n", U_mhd_guess[0],
+                      U_mhd_guess[1], U_mhd_guess[2],
+                             U_mhd_guess[3]);
+                      printf("Pradg: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1],
+                      P_rad_guess[2],
+                             P_rad_guess[3]);
+                      printf("Uradg: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
+                      U_rad_guess[2],
+                             U_rad_guess[3]);
+                    }
           if (status == ClosureStatus::failure) {
+            printf("bad guess Pguess: %e %e %e %e Pr: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3], P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
             bad_guess = true;
           }
 

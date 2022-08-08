@@ -314,9 +314,9 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Con2Prim(
   // Calculate fluid rest frame (i.e. primitive) quantities
   *J = ratio((2 * W2 - 1) * E - 2 * W2 * vF, lam);
   SPACELOOP(i) (*cov_tilH)(i) = (cov_F(i) - (*J) * cov_vTilPi(i) - cov_v(i) * a) / W;
-  
+
   // Check xi
-  Vec con_tilH;  
+  Vec con_tilH;
   gamma->raise3Vector(*cov_tilH, &con_tilH);
   Real xi = 0.;
   SPACELOOP(ii) {
@@ -324,7 +324,8 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Con2Prim(
   }
   xi = std::sqrt(xi) / *J;
   if (xi >= 1. || *J < 0.) {
-    //printf("xi = %e J = %e\n", xi, *J);
+    printf("E: %e F: %e %e %e\n", E, cov_F(0), cov_F(1), cov_F(2));
+    printf("xi = %e J = %e\n", xi, *J);
     return ClosureStatus::failure;
   }
 
