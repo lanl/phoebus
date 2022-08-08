@@ -1530,7 +1530,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // If 4D rootfind failed, try operator splitting the energy and momentum updates.
         // TODO(BRR) Only do this if J << ug?
-        // if (success == false) {
+        //if (success == false) {
         // Need to use this update if update fluid is false because 4D rootfind updates
         // the fluid state internally
         if (update_fluid == false) {
@@ -1591,18 +1591,18 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // If sequence of source update methods was successful, apply update to conserved
         // quantities. If unsuccessful, mark zone for fixup.
-        if (i == 25 && j == 101) {
-          printf("sucess? %i\n", success);
-        }
+//        if (i == 25 && j == 101) {
+//          printf("sucess? %i\n", success);
+//        }
         if (success == true) {
           // if (i > 60 && i < 80) {
           //  printf("[%i] dE: %e dF: %e %e %e update_fluid: %i\n", i,
           //    dE, cov_dF(0), cov_dF(1), cov_dF(2), update_fluid);
           // }
           v(iblock, ifail, k, j, i) = FailFlags::success;
-          if (i == 25 && j == 101) {
-            printf("dE: %e dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
-          }
+//          if (i == 25 && j == 101) {
+//            printf("dE: %e dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
+//          }
 
           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
           SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF(ii); }

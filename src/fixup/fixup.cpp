@@ -316,20 +316,22 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               // v(b, idx_J(ispec), k, j, i) = 1.e-5 * v(b, peng, k, j, i);
               v(b, idx_J(ispec), k, j, i) = Jmin;
             }
-            
-//            Real con_gamma[3][3];
-//            geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma);
-//            Real xi = 0.;
-//            SPACELOOP2(ii, jj) {
-//              xi += con_gamma[ii][jj]*v(b, idx_H(ispec, ii), k, j, i)*
-//                v(b, idx_H(ispec, jj), k, j, i);
-//            }
-//            xi = std::sqrt(xi);
-//            constexpr Real ximax = 0.99;
-//            if (xi > ximax) {
-//              floor_applied = true;
-//              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi; }
-//            }
+
+            Real con_gamma[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma);
+            Real xi = 0.;
+            SPACELOOP2(ii, jj) {
+              xi += con_gamma[ii][jj]*v(b, idx_H(ispec, ii), k, j, i)*
+                v(b, idx_H(ispec, jj), k, j, i);
+            }
+            xi = std::sqrt(xi);
+            constexpr Real ximax = 0.991;
+            if (xi > ximax) {
+              floor_applied = true;
+              printf("Applying xi floor! [%i %i %i] xi old = %e\n", k, j, i, xi);
+              exit(-1);
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi; }
+            }
 
             // Limit magnitude of flux
 //            const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j, i), 2) +
@@ -531,7 +533,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   auto idx_F = imap.GetFlatIdx(cr::F);
   int ifluidfail = imap[impl::fail].first;
   int iradfail = imap[ri::c2pfail].first;
-  
+
   bool report_c2p_fails = fix_pkg->Param<bool>("report_c2p_fails");
   if (report_c2p_fails) {
     int nfail_total;
@@ -582,7 +584,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
 
         if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail ||
             v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
-          //printf("[%i %i %i] fluidfail: %i radfail: %i\n", k, j, i, 
+          //printf("[%i %i %i] fluidfail: %i radfail: %i\n", k, j, i,
           //  v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail,
           //  v(b, iradfail, k, j, i) == radiation::FailFlags::fail);
           // TODO(BRR) very crude hack just set H = 0 and J to floor
