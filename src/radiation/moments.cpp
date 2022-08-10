@@ -253,7 +253,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
     iTilPi = imap.GetFlatIdx(ir::tilPi);
   }
   auto specB = cE.GetBounds(1);
-  auto dirB = pH.GetBounds(1);
+  auto dirB = pH.GetBounds(2);
 
   auto iXi = imap.GetFlatIdx(ir::xi);
   auto iPhi = imap.GetFlatIdx(ir::phi);
@@ -308,6 +308,12 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
+        if (i == 48 && j == 63) {
+          printf("[%i %i %i] rad fail here? %i\n",
+            k, j, i, status == ClosureStatus::failure);
+          printf("J = %e covH = %e %e %e\n", J, covH(0), covH(1), covH(2));
+          printf("dirB.s: %i dirB.e: %i\n", dirB.s, dirB.e);
+        }
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
           printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
@@ -395,7 +401,7 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   }
 
   auto specB = cE.GetBounds(1);
-  auto dirB = pH.GetBounds(1);
+  auto dirB = pH.GetBounds(2);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -1438,7 +1444,46 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                     }
           if (status == ClosureStatus::failure) {
             printf("bad guess Pguess: %e %e %e %e Pr: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3], P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+            printf("[%i %i %i]\n", k, j, i);
+            printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
             bad_guess = true;
+            //exit(-1);
+          }
+
+          // Try reducing the size of the step
+          if (bad_guess) {
+            double xi = 0.1;
+            for (int m = 0; m < 4; m++) {
+              for (int n = 0; n < 4; n++) {
+                Pguess[m] += (1. - xi) * jacinv[m][n] * resid[n];
+              }
+            }
+            srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+            srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+            status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
+            srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+            if (status == ClosureStatus::success) {
+              bad_guess = false;
+            }
+            printf("after fix? bad guess = %i\n", static_cast<int>(bad_guess));
+          }
+
+          // Try reducing the size of the step again
+          if (bad_guess) {
+            double xi = 0.01;
+            for (int m = 0; m < 4; m++) {
+              for (int n = 0; n < 4; n++) {
+                Pguess[m] += (1. - xi) * jacinv[m][n] * resid[n];
+              }
+            }
+            srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+            srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+            status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
+            srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+            if (status == ClosureStatus::success) {
+              bad_guess = false;
+            }
+            printf("after fix? bad guess = %i\n", static_cast<int>(bad_guess));
           }
 
           // If guess was invalid, break and mark this zone as a failure

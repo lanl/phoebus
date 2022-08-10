@@ -329,6 +329,12 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             if (xi > ximax) {
               floor_applied = true;
               printf("Applying xi floor! [%i %i %i] xi old = %e\n", k, j, i, xi);
+              printf("old: J: %e covH: %e %e %e\n",
+                v(b, idx_J(ispec), k, j, i),
+                v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 0), k, j, i),
+                v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 1), k, j, i),
+                v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 2), k, j, i));
+
               exit(-1);
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi; }
             }
@@ -582,6 +588,19 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
         // still process if (fluid fail && rad fail) check
         // Note that it is assumed that the fluid is already fixed up
 
+        if (i == 48 && j == 63) {
+          const int ispec = 0;
+          printf("[%i %i %i] fluid fail? %i rad fail: %i\n",
+          k, j, i,
+          v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail,
+          v(b, iradfail, k, j, i) == radiation::FailFlags::fail);
+          printf("J = %e covH = %e %e %e\n",
+            v(b, idx_J(ispec), k, j, i),
+            v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 0), k, j, i),
+            v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 1), k, j, i),
+            v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 2), k, j, i));
+        }
+
         if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail ||
             v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
           //printf("[%i %i %i] fluidfail: %i radfail: %i\n", k, j, i,
@@ -607,11 +626,11 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
               v(b, idx_J(ispec), k, j, i) = std::max(Jmin, v(b, idx_J(ispec), k, j, i));
               if (xi > ximax) {
                 SPACELOOP(ii) {
-                  if (i == 0 && j == 62) {
+                  if (i == 48 && j == 63) {
                     printf("H(%i): %e\n", ii, v(b, idx_H(ispec, ii), k, j, i));
                   }
                   v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi;
-                  if (i == 0 && j == 62) {
+                  if (i == 48 && j == 63) {
                     printf("after H(%i): %e\n", ii, v(b, idx_H(ispec, ii), k, j, i));
                   }
                 }
