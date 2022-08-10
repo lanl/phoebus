@@ -103,7 +103,7 @@ class SourceResidual4 {
     // kappaH * dt < 1 / eps
     kappaH = std::min<Real>(kappaH, 1.e5);
     Real kappaJ = (1. - scattering_fraction_) * kappaH;
-    //printf("Tg: %e JBB: %e kappaH: %e kappaJ: %e\n", Tg, JBB, kappaH, kappaJ);
+    // printf("Tg: %e JBB: %e kappaH: %e kappaJ: %e\n", Tg, JBB, kappaH, kappaJ);
     Real W = 0.;
     SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
@@ -309,8 +309,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
         if (i == 48 && j == 63) {
-          printf("[%i %i %i] rad fail here? %i\n",
-            k, j, i, status == ClosureStatus::failure);
+          printf("[%i %i %i] rad fail here? %i\n", k, j, i,
+                 status == ClosureStatus::failure);
           printf("J = %e covH = %e %e %e\n", J, covH(0), covH(1), covH(2));
           printf("dirB.s: %i dirB.e: %i\n", dirB.s, dirB.e);
         }
@@ -324,10 +324,11 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           PARTHENON_FAIL("Radiation Con2Prim NaN.");
         }
 
-//        if (ispec == 0 && i == 64 && j > 43 && j < 48) {
-//          printf("[%i %i %i] E = %e F = %e %e %e J = %e H = %e %e %e\n", k, j, i, E,
-//                 covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2));
-//        }
+        //        if (ispec == 0 && i == 64 && j > 43 && j < 48) {
+        //          printf("[%i %i %i] E = %e F = %e %e %e J = %e H = %e %e %e\n", k, j,
+        //          i, E,
+        //                 covF(0), covF(1), covF(2), J, covH(0), covH(1), covH(2));
+        //        }
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -340,8 +341,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
             (status == ClosureStatus::success ? FailFlags::success : FailFlags::fail);
         // if (v(b, ifail, k, j, i) == FailFlags::fail) {
         if (status != ClosureStatus::success) {
-          //printf("fail! %i %i %i J = %e H = %e %e %e\n", k, j, i, J, covH(0), covH(1), covH(2));
-          //printf("fail! %i %i %i\n", k, j, i);
+          // printf("fail! %i %i %i J = %e H = %e %e %e\n", k, j, i, J, covH(0), covH(1),
+          // covH(2)); printf("fail! %i %i %i\n", k, j, i);
         }
       });
 
@@ -790,11 +791,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                       v(idx_dJ(ispec, 1, idir), k, j, i),
                       v(idx_dJ(ispec, 2, idir), k, j, i)}};
 
-//          if (idir == 1 && i == 64 && j > 43 && j < 48 && ispec == 0) {
-//            printf("[%i %i %i] Jl: %e Jr: %e\n", k, j, i, Jl, Jr);
-//            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n", k, j, i, con_vl(0),
-//                   con_vl(1), con_vl(2), con_vr(0), con_vr(1), con_vr(2));
-//          }
+          //          if (idir == 1 && i == 64 && j > 43 && j < 48 && ispec == 0) {
+          //            printf("[%i %i %i] Jl: %e Jr: %e\n", k, j, i, Jl, Jr);
+          //            printf("[%i %i %i] vl: %e %e %e vr: %e %e %e\n", k, j, i,
+          //            con_vl(0),
+          //                   con_vl(1), con_vl(2), con_vr(0), con_vr(1), con_vr(2));
+          //          }
 
           // Calculate the geometric mean of the opacity on either side of the interface,
           // this is necessary for handling the asymptotic limit near sharp surfaces
@@ -873,11 +875,11 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           //            printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
           //            PARTHENON_FAIL("nan flux");
           //          }
-//          if (idir == 1 && i == 64 && j > 43 && j < 48 && ispec == 0) {
-//            printf("[%i %i %i] flux[0]: %e\n", k, j, i,
-//                   v.flux(idir_in, idx_Ef(ispec), k, j, i));
-//            printf("El: %e Er: %e\n", El, Er);
-//          }
+          //          if (idir == 1 && i == 64 && j > 43 && j < 48 && ispec == 0) {
+          //            printf("[%i %i %i] flux[0]: %e\n", k, j, i,
+          //                   v.flux(idir_in, idx_Ef(ispec), k, j, i));
+          //            printf("El: %e Er: %e\n", El, Er);
+          //          }
 
           /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
             printf("[%i %i %i] flux[0]: %e\n",
@@ -1119,8 +1121,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                                 p::temperature, p::energy, p::ye,      p::velocity,
                                 p::bfield,      pr::J,     pr::H,      ir::kappaJ,
                                 ir::kappaH,     ir::JBB,   ir::srcfail};
-  //printf("skipping fluid update\n");
-  //update_fluid = false;
+  // printf("skipping fluid update\n");
+  // update_fluid = false;
   //  if (update_fluid) {
   vars.push_back(c::energy);
   vars.push_back(c::momentum);
@@ -1180,8 +1182,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-  constexpr int izone = -1;//33;
-  constexpr int jzone = -1;//26;
+  constexpr int izone = -1; // 33;
+  constexpr int jzone = -1; // 26;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1239,13 +1241,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
             v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i)};
 
-
-//           if (i == 32 && j == 32 && ispec == 0) {
-//            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-//                rho, Tg, Ye, species_d[ispec]);
-//            Real tau = alpha * dt * kappa;
-//            printf("tau[32, 32] = %e\n", tau);
-//           }
+        //           if (i == 32 && j == 32 && ispec == 0) {
+        //            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+        //                rho, Tg, Ye, species_d[ispec]);
+        //            Real tau = alpha * dt * kappa;
+        //            printf("tau[32, 32] = %e\n", tau);
+        //           }
 
         // TODO(BRR) go beyond Eddington
         Tens2 conTilPi = {0};
@@ -1289,23 +1290,26 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
         auto status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
         if (i == 44 && j == 36) {
-          printf("[%i %i %i] rho = %e ug = %e Tg = %e Prad0: %e %e %e %e\n", k, j, i, rho, ug, Tg,
-            P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+          printf("[%i %i %i] rho = %e ug = %e Tg = %e Prad0: %e %e %e %e\n", k, j, i, rho,
+                 ug, Tg, P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
         }
         srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
         for (int n = 0; n < 4; n++) {
           // TODO(BRR) different for non-valencia
           resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
         }
-//        if (i == 20 && j == 64) {
-//          printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
-//          printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2],
-//                 U_mhd_guess[3]);
-//          printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
-//                 P_rad_guess[3]);
-//          printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
-//                 U_rad_guess[3]);
-//        }
+        //        if (i == 20 && j == 64) {
+        //          printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
+        //          Pguess[3]); printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0],
+        //          U_mhd_guess[1], U_mhd_guess[2],
+        //                 U_mhd_guess[3]);
+        //          printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1],
+        //          P_rad_guess[2],
+        //                 P_rad_guess[3]);
+        //          printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
+        //          U_rad_guess[2],
+        //                 U_rad_guess[3]);
+        //        }
         //        if (i == 64 && j == 64) {
         //          printf("Pmhd Umhd Prad Urad:\n");
         //          for (int n = 0; n < 4; n++) {
@@ -1340,27 +1344,28 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           for (int m = 0; m < 4; m++) {
             Real P_mhd_m[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
             Real P_mhd_p[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
-//            // TODO(BRR) Use minimum non-zero magnitude from Pguess[]
-//            Real P_mhd_mag_min = std::max<Real>(
-//                std::max<Real>(std::max<Real>(std::fabs(Pguess[0]), std::fabs(Pguess[1])),
-//                               std::fabs(Pguess[2])),
-//                std::fabs(Pguess[3]));
-//            printf("Pguess: %e %e %e %e P_mhd_mag_min: %e\n",
-//              Pguess[0], Pguess[1], Pguess[2], Pguess[3], P_mhd_mag_min);
+            //            // TODO(BRR) Use minimum non-zero magnitude from Pguess[]
+            //            Real P_mhd_mag_min = std::max<Real>(
+            //                std::max<Real>(std::max<Real>(std::fabs(Pguess[0]),
+            //                std::fabs(Pguess[1])),
+            //                               std::fabs(Pguess[2])),
+            //                std::fabs(Pguess[3]));
+            //            printf("Pguess: %e %e %e %e P_mhd_mag_min: %e\n",
+            //              Pguess[0], Pguess[1], Pguess[2], Pguess[3], P_mhd_mag_min);
             P_mhd_m[m] -= std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
             P_mhd_p[m] += std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
-//            printf("m: %i delta: %e (%e %e)\n", m,
-//i              std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m])),
-//              EPS * P_mhd_mag_min,
-//              EPS * std::fabs(P_mhd_m[m]));
+            //            printf("m: %i delta: %e (%e %e)\n", m,
+            // i              std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m])),
+            //              EPS * P_mhd_mag_min,
+            //              EPS * std::fabs(P_mhd_m[m]));
 
             srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
             srm.CalculateRadConserved(U_mhd_m, U_rad_m);
             status = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
             srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
             if (status == ClosureStatus::failure) {
-              printf("bad guess! P_rad_m = %e %e %e %e\n", P_rad_m[0], P_rad_m[1],
-                P_rad_m[2], P_rad_m[3]);
+              // printf("bad guess! P_rad_m = %e %e %e %e\n", P_rad_m[0], P_rad_m[1],
+              //  P_rad_m[2], P_rad_m[3]);
               bad_guess = true;
             }
 
@@ -1369,8 +1374,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             status = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
             srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
             if (status == ClosureStatus::failure) {
-              printf("bad guess! P_rad_p = %e %e %e %e\n", P_rad_p[0], P_rad_p[1],
-                P_rad_p[2], P_rad_p[3]);
+              // printf("bad guess! P_rad_p = %e %e %e %e\n", P_rad_p[0], P_rad_p[1],
+              //  P_rad_p[2], P_rad_p[3]);
               bad_guess = true;
             }
 
@@ -1394,96 +1399,91 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           //            bad_guess = true;
           //          }
 
-                    if (i == izone && j == jzone) {
-                      printf("\n[%i]\n", niter);
-                      printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
-                      Pguess[3]); printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0],
-                      U_mhd_guess[1], U_mhd_guess[2],
-                             U_mhd_guess[3]);
-                      printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1],
-                      P_rad_guess[2],
-                             P_rad_guess[3]);
-                      printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
-                      U_rad_guess[2],
-                             U_rad_guess[3]);
-                      printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2],
-                      resid[3]);
-                    }
-
-          // Update guess
-          for (int m = 0; m < 4; m++) {
-            for (int n = 0; n < 4; n++) {
-              Pguess[m] -= jacinv[m][n] * resid[n];
-            }
+          if (i == izone && j == jzone) {
+            printf("\n[%i]\n", niter);
+            printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
+            printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2],
+                   U_mhd_guess[3]);
+            printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
+                   P_rad_guess[3]);
+            printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
+                   U_rad_guess[3]);
+            printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2], resid[3]);
           }
 
-          // TODO(BRR) check that this guess is sane i.e. ug > 0 J > 0 xi < 1, if not,
-          // recalculate the guess with some rescaled jacinv*resid
+          if (bad_guess == false) {
 
-
-                    if (i == izone && j == jzone) {
-                      printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
-                      Pguess[3]);
-                    }
-          srm.CalculateMHDConserved(Pguess, U_mhd_guess);
-          srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-          status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
-          srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
-                    if (i == izone && j == jzone) {
-                      printf("\n[%i]\n", niter);
-                      printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
-                      Pguess[3]); printf("Umhdg: %e %e %e %e\n", U_mhd_guess[0],
-                      U_mhd_guess[1], U_mhd_guess[2],
-                             U_mhd_guess[3]);
-                      printf("Pradg: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1],
-                      P_rad_guess[2],
-                             P_rad_guess[3]);
-                      printf("Uradg: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
-                      U_rad_guess[2],
-                             U_rad_guess[3]);
-                    }
-          if (status == ClosureStatus::failure) {
-            printf("bad guess Pguess: %e %e %e %e Pr: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3], P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
-            printf("[%i %i %i]\n", k, j, i);
-            printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
-            bad_guess = true;
-            //exit(-1);
-          }
-
-          // Try reducing the size of the step
-          if (bad_guess) {
-            double xi = 0.1;
+            // Update guess
             for (int m = 0; m < 4; m++) {
               for (int n = 0; n < 4; n++) {
-                Pguess[m] += (1. - xi) * jacinv[m][n] * resid[n];
+                Pguess[m] -= jacinv[m][n] * resid[n];
               }
+            }
+
+            // TODO(BRR) check that this guess is sane i.e. ug > 0 J > 0 xi < 1, if not,
+            // recalculate the guess with some rescaled jacinv*resid
+
+            if (i == izone && j == jzone) {
+              printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
             }
             srm.CalculateMHDConserved(Pguess, U_mhd_guess);
             srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
             status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
             srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
-            if (status == ClosureStatus::success) {
-              bad_guess = false;
+            if (i == izone && j == jzone) {
+              printf("\n[%i]\n", niter);
+              printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
+              printf("Umhdg: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1],
+                     U_mhd_guess[2], U_mhd_guess[3]);
+              printf("Pradg: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1],
+                     P_rad_guess[2], P_rad_guess[3]);
+              printf("Uradg: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1],
+                     U_rad_guess[2], U_rad_guess[3]);
             }
-            printf("after fix? bad guess = %i\n", static_cast<int>(bad_guess));
-          }
+            if (status == ClosureStatus::failure) {
+              // printf("bad guess Pguess: %e %e %e %e Pr: %e %e %e %e\n", Pguess[0],
+              // Pguess[1], Pguess[2], Pguess[3], P_rad_guess[0], P_rad_guess[1],
+              // P_rad_guess[2], P_rad_guess[3]); printf("[%i %i %i]\n", k, j, i);
+              // printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
+              bad_guess = true;
+              // exit(-1);
+            }
 
-          // Try reducing the size of the step again
-          if (bad_guess) {
-            double xi = 0.01;
-            for (int m = 0; m < 4; m++) {
-              for (int n = 0; n < 4; n++) {
-                Pguess[m] += (1. - xi) * jacinv[m][n] * resid[n];
+            // Try reducing the size of the step
+            if (bad_guess) {
+              double xi = 0.1;
+              for (int m = 0; m < 4; m++) {
+                for (int n = 0; n < 4; n++) {
+                  Pguess[m] += (1. - xi) * jacinv[m][n] * resid[n];
+                }
               }
+              srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+              srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+              status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
+              srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+              if (status == ClosureStatus::success) {
+                bad_guess = false;
+              }
+              // printf("after fix? bad guess = %i\n", static_cast<int>(bad_guess));
             }
-            srm.CalculateMHDConserved(Pguess, U_mhd_guess);
-            srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-            status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
-            srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
-            if (status == ClosureStatus::success) {
-              bad_guess = false;
+
+            // Try reducing the size of the step again
+            if (bad_guess) {
+              double xi = 0.01;
+              for (int m = 0; m < 4; m++) {
+                for (int n = 0; n < 4; n++) {
+                  Pguess[m] += (1. - xi) * jacinv[m][n] * resid[n];
+                }
+              }
+              srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+              srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+              status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
+              srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+              if (status == ClosureStatus::success) {
+                bad_guess = false;
+              }
+              // printf("after fix? bad guess = %i\n", static_cast<int>(bad_guess));
             }
-            printf("after fix? bad guess = %i\n", static_cast<int>(bad_guess));
           }
 
           // If guess was invalid, break and mark this zone as a failure
@@ -1494,12 +1494,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // Update residuals
           for (int n = 0; n < 4; n++) {
             resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
-                        if (i == izone && j == jzone) {
-                          printf("resid[%i] = %e (%e - %e + %e) (dt = %e dS = %e)\n", n,
-                          resid[n],
-                                 U_mhd_guess[n], U_mhd_0[n], dt * dS_guess[n], dt,
-                                 dS_guess[n]);
-                        }
+            if (i == izone && j == jzone) {
+              printf("resid[%i] = %e (%e - %e + %e) (dt = %e dS = %e)\n", n, resid[n],
+                     U_mhd_guess[n], U_mhd_0[n], dt * dS_guess[n], dt, dS_guess[n]);
+            }
           }
 
           // Calculate error
@@ -1516,11 +1514,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                 // std::fabs(U_mhd_0[n]) +
                 //                       std::fabs(dt * dS_guess[n]));
                 std::fabs(resid[n]) / max_divisor;
-//            if (i == 25 && j == 101) {
-//              printf("suberr[%i] = %e (%e / %e + %e + %e) dt = %e\n", n, suberr,
-//                     std::fabs(resid[n]), std::fabs(U_mhd_guess[n]),
-//                     std::fabs(U_mhd_0[n]), std::fabs(dt * dS_guess[n]), dt);
-//            }
+            //            if (i == 25 && j == 101) {
+            //              printf("suberr[%i] = %e (%e / %e + %e + %e) dt = %e\n", n,
+            //              suberr,
+            //                     std::fabs(resid[n]), std::fabs(U_mhd_guess[n]),
+            //                     std::fabs(U_mhd_0[n]), std::fabs(dt * dS_guess[n]),
+            //                     dt);
+            //            }
             if (suberr > err) {
               err = suberr;
             }
@@ -1546,9 +1546,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             std::isnan(U_rad_guess[1]) || std::isnan(U_rad_guess[2]) ||
             std::isnan(U_rad_guess[3])) {
           success = false;
-          printf("[%i %i %i] FAILURE niter = %i err = %e U_rad_guess: %e %e %e %e\n",
-            k, j, i, niter, err, U_rad_guess[0], U_rad_guess[1], U_rad_guess[2], U_rad_guess[3]);
-//          exit(-1);
+          printf("[%i %i %i] FAILURE niter = %i err = %e U_rad_guess: %e %e %e %e\n", k,
+                 j, i, niter, err, U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
+                 U_rad_guess[3]);
+          //          exit(-1);
           if (i == izone && j == jzone) {
             exit(-1);
           }
@@ -1565,17 +1566,17 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           //        }
         }
 
-//        if (i == 5 && j == 4) {
-//          printf("EXIT!\n");
-//          exit(-1);
-//        }
+        //        if (i == 5 && j == 4) {
+        //          printf("EXIT!\n");
+        //          exit(-1);
+        //        }
 
         // FORCING USE OF 1D ROOTFIND!
         // success = false;
 
         // If 4D rootfind failed, try operator splitting the energy and momentum updates.
         // TODO(BRR) Only do this if J << ug?
-        //if (success == false) {
+        // if (success == false) {
         // Need to use this update if update fluid is false because 4D rootfind updates
         // the fluid state internally
         if (update_fluid == false) {
@@ -1636,18 +1637,19 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // If sequence of source update methods was successful, apply update to conserved
         // quantities. If unsuccessful, mark zone for fixup.
-//        if (i == 25 && j == 101) {
-//          printf("sucess? %i\n", success);
-//        }
+        //        if (i == 25 && j == 101) {
+        //          printf("sucess? %i\n", success);
+        //        }
         if (success == true) {
           // if (i > 60 && i < 80) {
           //  printf("[%i] dE: %e dF: %e %e %e update_fluid: %i\n", i,
           //    dE, cov_dF(0), cov_dF(1), cov_dF(2), update_fluid);
           // }
           v(iblock, ifail, k, j, i) = FailFlags::success;
-//          if (i == 25 && j == 101) {
-//            printf("dE: %e dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1), cov_dF(2));
-//          }
+          //          if (i == 25 && j == 101) {
+          //            printf("dE: %e dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1),
+          //            cov_dF(2));
+          //          }
 
           v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
           SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF(ii); }
