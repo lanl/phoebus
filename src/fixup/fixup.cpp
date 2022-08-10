@@ -1223,6 +1223,7 @@ TaskStatus SourceFixup(T *rc) {
             }
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
+            printf("No valid source fixup neighbors! [%i %i %i]\n", k, j, i);
 
             double rho_floor, sie_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
@@ -1250,6 +1251,13 @@ TaskStatus SourceFixup(T *rc) {
             v(b, pye, k, j, i) = 0.5;
           }
 
+          // Maybe redundantly apply floors
+          double rho_floor, sie_floor;
+          bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+                       rho_floor, sie_floor);
+          v(b, prho, k, j, i) = std::max<Real>(v(b, prho, k, j, i), rho_floor);
+          v(b, peng, k, j, i) = std::max<Real>(v(b, peng, k, j, i), rho_floor*sie_floor);
+
           if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
           v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
               v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
@@ -1258,13 +1266,6 @@ TaskStatus SourceFixup(T *rc) {
               v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
           v(b, gm1, k, j, i) = ratio(eos.BulkModulusFromDensityTemperature(
               v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda), v(b, prs, k, j, i));
-
-          // Maybe redundantly apply floors
-          double rho_floor, sie_floor;
-          bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
-                       rho_floor, sie_floor);
-          v(b, prho, k, j, i) = std::max<Real>(v(b, prho, k, j, i), rho_floor);
-          v(b, peng, k, j, i) = std::max<Real>(v(b, peng, k, j, i), rho_floor*sie_floor);
 
           typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 

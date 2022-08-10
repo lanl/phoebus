@@ -44,8 +44,8 @@ file_type   = hdf5      # Tabular data dump
 dt          = 0.1
 
 <parthenon/time>
-nlim        = -1        # cycle limit
-tlim        = 1.5    # time limit
+nlim        = 77        # cycle limit
+tlim        = 0.7    # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.0 # 1.e-6
@@ -129,8 +129,8 @@ scattering_fraction = 0.5
 type = gray
 #gray_kappa = 1.e-20
 #gray_kappa = 1.e-10
-#gray_kappa = 1.e-5 # dtau/dt ~ 1e10
-gray_kappa = 1.e-40
+gray_kappa = 1.e-5 # dtau/dt ~ 1e10
+#gray_kappa = 1.e-40
 
 <units>
 scale_free = false
