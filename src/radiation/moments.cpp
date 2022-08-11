@@ -1225,7 +1225,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
 
-        Real Pguess[4] = {ug, v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+        Real P_mhd_guess[4] = {ug, v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
         Real U_mhd_0[4];
         const Real Pg0 = eos.PressureFromDensityInternalEnergy(rho, ug / rho, lambda);
@@ -1234,7 +1234,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real D;
         Real bcons[3];
         Real ye_cons;
-        prim2con::p2c(rho, &(Pguess[1]), bprim, Pguess[0], lambda[0], Pg0, gam1, cov_g,
+        prim2con::p2c(rho, &(P_mhd_guess[1]), bprim, P_mhd_guess[0], lambda[0], Pg0, gam1, cov_g,
                       con_gamma.data, beta, alpha, sdetgam, D, &(U_mhd_0[1]), bcons,
                       U_mhd_0[0], ye_cons);
         Real U_rad_0[4] = {
@@ -1268,11 +1268,14 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         Real dS_m[4];
         Real dS_p[4];
 
-        // Alias existing allocated memory to save space
-        Real *U_mhd_guess = &(U_mhd_p[0]);
-        Real *U_rad_guess = &(U_rad_p[0]);
-        Real *P_rad_guess = &(P_rad_p[0]);
-        Real *dS_guess = &(dS_p[0]);
+        //Real *U_mhd_guess = &(U_mhd_p[0]);
+        //Real *U_rad_guess = &(U_rad_p[0]);
+        //Real *P_rad_guess = &(P_rad_p[0]);
+        //Real *dS_guess = &(dS_p[0]);
+        Real U_mhd_guess[4];
+        Real U_rad_guess[4];
+        Real P_rad_guess[4];
+        Real dS_guess[4];
         //        if (i == 64 && j == 64) {
         //        printf("Initial cons mhd rad:\n");
         //        printf("mhd: %e %e %e %e\n", v(iblock, ceng, k, j, i), v(iblock,
@@ -1286,21 +1289,21 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // Initialize residuals
         Real resid[4];
-        srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+        srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
         srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-        auto status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
-        if (i == 44 && j == 36) {
+        auto status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
+        if (i == izone && j == jzone) {
           printf("[%i %i %i] rho = %e ug = %e Tg = %e Prad0: %e %e %e %e\n", k, j, i, rho,
                  ug, Tg, P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
         }
-        srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+        srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
         for (int n = 0; n < 4; n++) {
           // TODO(BRR) different for non-valencia
           resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
         }
         //        if (i == 20 && j == 64) {
-        //          printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2],
-        //          Pguess[3]); printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0],
+        //          printf("Pmhd0: %e %e %e %e\n", P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
+        //          P_mhd_guess[3]); printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0],
         //          U_mhd_guess[1], U_mhd_guess[2],
         //                 U_mhd_guess[3]);
         //          printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1],
@@ -1313,7 +1316,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         //        if (i == 64 && j == 64) {
         //          printf("Pmhd Umhd Prad Urad:\n");
         //          for (int n = 0; n < 4; n++) {
-        //            printf("%e %e %e %e\n", Pguess[n], U_mhd_guess[n], P_rad_guess[n],
+        //            printf("%e %e %e %e\n", P_mhd_guess[n], U_mhd_guess[n], P_rad_guess[n],
         //            U_rad_guess[n]);
         //          }
         //        }
@@ -1332,51 +1335,43 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           Real jac[4][4] = {0};
           constexpr Real EPS = 1.e-8;
 
-          // Minimum non-zero magnitude from Pguess
+          // Minimum non-zero magnitude from P_mhd_guess
           Real P_mhd_mag_min = robust::LARGE();
           for (int m = 0; m < 4; m++) {
-            if (std::fabs(Pguess[m]) > 0.) {
-              P_mhd_mag_min = std::min<Real>(P_mhd_mag_min, std::fabs(Pguess[m]));
+            if (std::fabs(P_mhd_guess[m]) > 0.) {
+              P_mhd_mag_min = std::min<Real>(P_mhd_mag_min, std::fabs(P_mhd_guess[m]));
             }
           }
 
           bool bad_guess = false;
+          bool bad_guess_m = false;
+          bool bad_guess_p = false;
           for (int m = 0; m < 4; m++) {
-            Real P_mhd_m[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
-            Real P_mhd_p[4] = {Pguess[0], Pguess[1], Pguess[2], Pguess[3]};
-            //            // TODO(BRR) Use minimum non-zero magnitude from Pguess[]
-            //            Real P_mhd_mag_min = std::max<Real>(
-            //                std::max<Real>(std::max<Real>(std::fabs(Pguess[0]),
-            //                std::fabs(Pguess[1])),
-            //                               std::fabs(Pguess[2])),
-            //                std::fabs(Pguess[3]));
-            //            printf("Pguess: %e %e %e %e P_mhd_mag_min: %e\n",
-            //              Pguess[0], Pguess[1], Pguess[2], Pguess[3], P_mhd_mag_min);
+            Real P_mhd_m[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]};
+            Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]};
             P_mhd_m[m] -= std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
             P_mhd_p[m] += std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
-            //            printf("m: %i delta: %e (%e %e)\n", m,
-            // i              std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m])),
-            //              EPS * P_mhd_mag_min,
-            //              EPS * std::fabs(P_mhd_m[m]));
 
             srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
             srm.CalculateRadConserved(U_mhd_m, U_rad_m);
-            status = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
+            auto status_m = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
             srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
-            if (status == ClosureStatus::failure) {
-              // printf("bad guess! P_rad_m = %e %e %e %e\n", P_rad_m[0], P_rad_m[1],
-              //  P_rad_m[2], P_rad_m[3]);
-              bad_guess = true;
+            if (status_m == ClosureStatus::failure) {
+//               printf("bad guess! [%i %i %i] P_rad_m = %e %e %e %e\n", k,j,i,P_rad_m[0], P_rad_m[1],
+//                P_rad_m[2], P_rad_m[3]);
+         //     bad_guess = true;
+              bad_guess_m = true;
             }
 
             srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
             srm.CalculateRadConserved(U_mhd_p, U_rad_p);
-            status = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
+            auto status_p = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
             srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
-            if (status == ClosureStatus::failure) {
-              // printf("bad guess! P_rad_p = %e %e %e %e\n", P_rad_p[0], P_rad_p[1],
-              //  P_rad_p[2], P_rad_p[3]);
-              bad_guess = true;
+            if (status_p == ClosureStatus::failure) {
+//               printf("bad guess! [%i %i %i] P_rad_p = %e %e %e %e\n", k,j,i,P_rad_p[0], P_rad_p[1],
+//                P_rad_p[2], P_rad_p[3]);
+           //   bad_guess = true;
+              bad_guess_p = true;
             }
 
             for (int n = 0; n < 4; n++) {
@@ -1387,26 +1382,70 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             }
           }
 
+          // Fail or repair if jacobian evaluation was pathological
+          if (bad_guess_m == true && bad_guess_p == true) {
+            // If both + and - finite difference support points are bad, this
+            // interaction fails
+            bad_guess = true;
+            break;
+          } else if (bad_guess_m == true) {
+            // If only - finite difference support point is bad, do one-sided difference
+            // with + support point
+//            printf("Using forward FD!\n");
+            for (int m = 0; m < 4; m++) {
+              Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]};
+              P_mhd_p[m] += std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
+              srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
+              srm.CalculateRadConserved(U_mhd_p, U_rad_p);
+              auto status_p = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
+              srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
+              PARTHENON_DEBUG_REQUIRE(status_p == ClosureStatus::success, "This inversion should have already worked!");
+              for (int n = 0; n < 4; n++) {
+                Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
+                Real fguess = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
+                jac[n][m] = (fp - fguess) / (P_mhd_p[m] - P_mhd_guess[m]);
+              }
+            }
+          } else if (bad_guess_p == true) {
+            // If only + finite difference support point is bad, do one-sided difference
+            // with - support point
+//            printf("Using backward FD!\n");
+            for (int m = 0; m < 4; m++) {
+              Real P_mhd_m[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]};
+              P_mhd_m[m] -= std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
+              srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
+              srm.CalculateRadConserved(U_mhd_m, U_rad_m);
+              auto status_m = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
+              srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
+              PARTHENON_DEBUG_REQUIRE(status_m == ClosureStatus::success, "This inversion should have already worked!");
+              for (int n = 0; n < 4; n++) {
+                Real fguess = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
+                Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
+                jac[n][m] = (fguess - fm) / (P_mhd_guess[m] - P_mhd_m[m]);
+              }
+            }
+          }
+
           Real jacinv[4][4];
           LinearAlgebra::Invert4x4Matrix(jac, jacinv);
 
           // Calculate residual (unneeded, use value from end of last step?)
-          //          srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+          //          srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
           //          srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-          //          status = srm.CalculateRadPrimitive(Pguess, U_rad_guess,
-          //          P_rad_guess); srm.CalculateSource(Pguess, P_rad_guess, dS_guess); if
+          //          status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess,
+          //          P_rad_guess); srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess); if
           //          (status == ClosureStatus::failure) {
           //            bad_guess = true;
           //          }
 
           if (i == izone && j == jzone) {
             printf("\n[%i]\n", niter);
-            printf("Pmhd0: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
-            printf("Umhd0: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2],
+            printf("Pmhdg: %e %e %e %e\n", P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]);
+            printf("Umhdg: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2],
                    U_mhd_guess[3]);
-            printf("Prad0: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
+            printf("Pradg: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
                    P_rad_guess[3]);
-            printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
+            printf("Uradg: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
                    U_rad_guess[3]);
             printf("resid: %e %e %e %e\n", resid[0], resid[1], resid[2], resid[3]);
           }
@@ -1416,7 +1455,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             // Update guess
             for (int m = 0; m < 4; m++) {
               for (int n = 0; n < 4; n++) {
-                Pguess[m] -= jacinv[m][n] * resid[n];
+                P_mhd_guess[m] -= jacinv[m][n] * resid[n];
               }
             }
 
@@ -1424,15 +1463,15 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             // recalculate the guess with some rescaled jacinv*resid
 
             if (i == izone && j == jzone) {
-              printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
+              printf("Pmhdg: %e %e %e %e\n", P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]);
             }
-            srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+            srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
             srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-            status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
-            srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+            status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
+            srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
             if (i == izone && j == jzone) {
               printf("\n[%i]\n", niter);
-              printf("Pmhdg: %e %e %e %e\n", Pguess[0], Pguess[1], Pguess[2], Pguess[3]);
+              printf("Pmhdg: %e %e %e %e\n", P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]);
               printf("Umhdg: %e %e %e %e\n", U_mhd_guess[0], U_mhd_guess[1],
                      U_mhd_guess[2], U_mhd_guess[3]);
               printf("Pradg: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1],
@@ -1441,26 +1480,29 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                      U_rad_guess[2], U_rad_guess[3]);
             }
             if (status == ClosureStatus::failure) {
-              // printf("bad guess Pguess: %e %e %e %e Pr: %e %e %e %e\n", Pguess[0],
-              // Pguess[1], Pguess[2], Pguess[3], P_rad_guess[0], P_rad_guess[1],
-              // P_rad_guess[2], P_rad_guess[3]); printf("[%i %i %i]\n", k, j, i);
-              // printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
-              bad_guess = true;
+               printf("bad guess P_mhd_guess: %e %e %e %e Pr: %e %e %e %e\n", P_mhd_guess[0],
+               P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3], P_rad_guess[0], P_rad_guess[1],
+               P_rad_guess[2], P_rad_guess[3]); printf("[%i %i %i]\n", k, j, i);
+               printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
+               bad_guess = true;
               // exit(-1);
             }
 
             // Try reducing the size of the step
             if (bad_guess) {
+              // Check xi, urad, ugas for badness. Rescale xi to fix the worst offender. Or
+              // if they are all fine, fail
+
               double xi = 0.1;
               for (int m = 0; m < 4; m++) {
                 for (int n = 0; n < 4; n++) {
-                  Pguess[m] += (1. - xi) * jacinv[m][n] * resid[n];
+                  P_mhd_guess[m] += (1. - xi) * jacinv[m][n] * resid[n];
                 }
               }
-              srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+              srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
               srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-              status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
-              srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+              status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
+              srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
               if (status == ClosureStatus::success) {
                 bad_guess = false;
               }
@@ -1472,13 +1514,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               double xi = 0.01;
               for (int m = 0; m < 4; m++) {
                 for (int n = 0; n < 4; n++) {
-                  Pguess[m] += (1. - xi) * jacinv[m][n] * resid[n];
+                  P_mhd_guess[m] += (1. - xi) * jacinv[m][n] * resid[n];
                 }
               }
-              srm.CalculateMHDConserved(Pguess, U_mhd_guess);
+              srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
               srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-              status = srm.CalculateRadPrimitive(Pguess, U_rad_guess, P_rad_guess);
-              srm.CalculateSource(Pguess, P_rad_guess, dS_guess);
+              status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
+              srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
               if (status == ClosureStatus::success) {
                 bad_guess = false;
               }
