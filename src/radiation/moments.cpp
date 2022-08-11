@@ -1578,12 +1578,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           }
         } while (err > TOL);
 
-        //        if (i == 20 && j == 64) {
-        //          printf("[%i %i %i]? %i err = %e (%i) J0 = %e ug0 = %e\n", k, j, i,
-        //                 static_cast<int>(success), err, niter, v(iblock, idx_J(0), k,
-        //                 j, i), v(iblock, peng, k, j, i));
-        //          exit(-1);
-        //        }
+                if (niter == 0) {
+                  printf("[%i %i %i]? %i err = %e (%i) J0 = %e ug0 = %e rho0 = %e\n", k, j, i,
+                         static_cast<int>(success), err, niter, v(iblock, idx_J(0), k,
+                         j, i), v(iblock, peng, k, j, i), v(iblock, prho, k, j, i));
+                  exit(-1);
+                }
         if (niter == max_iter || err > TOL || std::isnan(U_rad_guess[0]) ||
             std::isnan(U_rad_guess[1]) || std::isnan(U_rad_guess[2]) ||
             std::isnan(U_rad_guess[3])) {
