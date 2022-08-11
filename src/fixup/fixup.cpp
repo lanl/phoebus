@@ -962,6 +962,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ix2_bc == "reflect") {
       PackIndexMap imap;
       auto flux = rc->PackVariablesAndFluxes(
+//<<<<<<< HEAD
           std::vector<std::string>({fluid_cons::density, fluid_cons::energy,
                                     fluid_cons::momentum, radmoment_cons::E,
                                     radmoment_cons::F}),
@@ -974,6 +975,15 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
       auto idx_E = imap.GetFlatIdx(cr::E);
       auto idx_F = imap.GetFlatIdx(cr::F);
       int nspec = idx_E.DimSize(1);
+//=======
+//          std::vector<std::string>(
+//              {fluid_cons::density, fluid_cons::energy, fluid_cons::momentum}),
+//          std::vector<std::string>(
+//              {fluid_cons::density, fluid_cons::energy, fluid_cons::momentum}),
+//          imap);
+//      const int cmom_lo = imap[c::momentum].first;
+//      const int cmom_hi = imap[c::momentum].second;
+//>>>>>>> origin
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -981,11 +991,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
             flux.flux(X2DIR, 1, k, j, i) = 0.0;
             flux.flux(X2DIR, cmom_lo, k, j, i) = 0.0;
             flux.flux(X2DIR, cmom_lo + 2, k, j, i) = 0.0;
+//<<<<<<< HEAD
             for (int ispec = 0; ispec < nspec; ispec++) {
               flux.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
               flux.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
               flux.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
             }
+//=======
+//>>>>>>> origin
           });
     }
   }
@@ -1002,6 +1015,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ox2_bc == "reflect") {
       PackIndexMap imap;
       auto flux = rc->PackVariablesAndFluxes(
+//<<<<<<< HEAD
           std::vector<std::string>({fluid_cons::density, fluid_cons::energy,
                                     fluid_cons::momentum, cr::E, cr::F}),
           std::vector<std::string>({fluid_cons::density, fluid_cons::energy,
@@ -1012,6 +1026,15 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
       auto idx_E = imap.GetFlatIdx(cr::E);
       auto idx_F = imap.GetFlatIdx(cr::F);
       int nspec = idx_E.DimSize(1);
+//=======
+//          std::vector<std::string>(
+//              {fluid_cons::density, fluid_cons::energy, fluid_cons::momentum}),
+//          std::vector<std::string>(
+//              {fluid_cons::density, fluid_cons::energy, fluid_cons::momentum}),
+//          imap);
+//      const int cmom_lo = imap[c::momentum].first;
+//      const int cmom_hi = imap[c::momentum].second;
+//>>>>>>> origin
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e + 1,
           jb.e + 1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -1019,11 +1042,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
             flux.flux(X2DIR, 1, k, j, i) = 0.0;
             flux.flux(X2DIR, cmom_lo, k, j, i) = 0.0;
             flux.flux(X2DIR, cmom_lo + 2, k, j, i) = 0.0;
+//<<<<<<< HEAD
             for (int ispec = 0; ispec < nspec; ispec++) {
               flux.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
               flux.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
               flux.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
             }
+//=======
+//>>>>>>> origin
           });
     }
   }
