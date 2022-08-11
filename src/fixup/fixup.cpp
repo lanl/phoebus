@@ -1229,7 +1229,8 @@ TaskStatus SourceFixup(T *rc) {
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
 
-          if (num_valid > 0.5) {
+          if (num_valid > 0.5 && false) { // TODO(BRR) short-circuiting the averaging now
+          //if (num_valid > 0.5) { // TODO(BRR) short-circuiting the averaging now
             const Real norm = 1.0 / num_valid;
 
             v(b, prho, k, j, i) = fixup(prho, norm);
@@ -1242,9 +1243,9 @@ TaskStatus SourceFixup(T *rc) {
             for (int ispec = 0; ispec < nspec; ispec++) {
               v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
               SPACELOOP(ii) {
-                v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
+                //v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
                 // TODO(BRR) temporarily zeroing Hs!
-                //v(b, idx_H(ispec, ii), k, j, i) = 0.;
+                v(b, idx_H(ispec, ii), k, j, i) = 0.;
               }
             }
           } else {
@@ -1378,7 +1379,13 @@ TaskStatus SourceFixup(T *rc) {
           for (int ispec = 0; ispec < nspec; ispec++) {
             Real E;
             Vec cov_F;
-            Tens2 conTilPi{0}; // TODO(BRR) go beyond Eddington
+            Tens2 conTilPi = {0}; // TODO(BRR) go beyond Eddington
+            /*if (j == 11 && i == 47) {
+              SPACELOOP2(ii, jj) {
+                printf("[%i %i %i] conTilPi(%i, %i) = %e\n", k, j, i, ii, jj, conTilPi(ii,jj));
+              }
+              exit(-1);
+            }*/
             Real J = v(b, idx_J(ispec), k, j, i);
             Vec cov_H = {J*v(b, idx_H(ispec, 0), k, j, i), J*v(b, idx_H(ispec, 1), k, j, i),
                          J*v(b, idx_H(ispec, 2), k, j, i)};
@@ -1393,6 +1400,12 @@ TaskStatus SourceFixup(T *rc) {
             //  }
             //}
             c.Prim2Con(J, cov_H, conTilPi, &E, &cov_F);
+            // Sanity check:
+            //auto status = c.Con2Prim(E, cov_F, conTilPi, &J, &cov_H);
+            //if (status == radiation::ClosureStatus::failure) {
+            //  printf("c2p failed here!!!!!!!!!!!!!1\n");
+            //  exit(-1);
+            //}
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) {
               v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii);
