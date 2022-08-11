@@ -1364,8 +1364,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             status = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
             srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
             if (status == ClosureStatus::failure) {
-              // printf("bad guess! P_rad_m = %e %e %e %e\n", P_rad_m[0], P_rad_m[1],
-              //  P_rad_m[2], P_rad_m[3]);
+              printf("bad guess! P_rad_m = %e %e %e %e\n", P_rad_m[0], P_rad_m[1],
+               P_rad_m[2], P_rad_m[3]);
               bad_guess = true;
             }
 
@@ -1374,8 +1374,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             status = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
             srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
             if (status == ClosureStatus::failure) {
-              // printf("bad guess! P_rad_p = %e %e %e %e\n", P_rad_p[0], P_rad_p[1],
-              //  P_rad_p[2], P_rad_p[3]);
+              printf("bad guess! P_rad_p = %e %e %e %e\n", P_rad_p[0], P_rad_p[1],
+               P_rad_p[2], P_rad_p[3]);
               bad_guess = true;
             }
 
@@ -1441,10 +1441,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                      U_rad_guess[2], U_rad_guess[3]);
             }
             if (status == ClosureStatus::failure) {
-              // printf("bad guess Pguess: %e %e %e %e Pr: %e %e %e %e\n", Pguess[0],
-              // Pguess[1], Pguess[2], Pguess[3], P_rad_guess[0], P_rad_guess[1],
-              // P_rad_guess[2], P_rad_guess[3]); printf("[%i %i %i]\n", k, j, i);
-              // printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
+               printf("bad guess Pguess: %e %e %e %e Pr: %e %e %e %e\n", Pguess[0],
+               Pguess[1], Pguess[2], Pguess[3], P_rad_guess[0], P_rad_guess[1],
+               P_rad_guess[2], P_rad_guess[3]); printf("[%i %i %i]\n", k, j, i);
+               printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
               bad_guess = true;
               // exit(-1);
             }
@@ -1536,12 +1536,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           }
         } while (err > TOL);
 
-        //        if (i == 20 && j == 64) {
-        //          printf("[%i %i %i]? %i err = %e (%i) J0 = %e ug0 = %e\n", k, j, i,
-        //                 static_cast<int>(success), err, niter, v(iblock, idx_J(0), k,
-        //                 j, i), v(iblock, peng, k, j, i));
-        //          exit(-1);
-        //        }
+                if (niter == 0) {
+                  printf("[%i %i %i]? %i err = %e (%i) J0 = %e ug0 = %e rho0 = %e\n", k, j, i,
+                         static_cast<int>(success), err, niter, v(iblock, idx_J(0), k,
+                         j, i), v(iblock, peng, k, j, i), v(iblock, prho, k, j, i));
+                  exit(-1);
+                }
         if (niter == max_iter || err > TOL || std::isnan(U_rad_guess[0]) ||
             std::isnan(U_rad_guess[1]) || std::isnan(U_rad_guess[2]) ||
             std::isnan(U_rad_guess[3])) {
