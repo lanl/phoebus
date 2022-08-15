@@ -1222,6 +1222,7 @@ TaskStatus SourceFixup(T *rc) {
           return inv_mask_sum * v(b, iv, k, j, i);
         };
         if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
+
           Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
@@ -1229,8 +1230,7 @@ TaskStatus SourceFixup(T *rc) {
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
 
-          if (num_valid > 0.5 && false) { // TODO(BRR) short-circuiting the averaging now
-          //if (num_valid > 0.5) { // TODO(BRR) short-circuiting the averaging now
+          if (num_valid > 0.5) {
             const Real norm = 1.0 / num_valid;
 
             v(b, prho, k, j, i) = fixup(prho, norm);
