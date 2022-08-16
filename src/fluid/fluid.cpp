@@ -493,40 +493,6 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   return TaskStatus::complete;
 }
 
-#if SET_FLUX_SRC_DIAGS
-TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc) {
-  auto *pmb = rc->GetParentPointer().get();
-  auto &fluid = pmb->packages.Get("fluid");
-  if (!fluid->Param<bool>("active")) return TaskStatus::complete;
-
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-
-  std::vector<std::string> vars(
-      {fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
-  PackIndexMap imap;
-  auto divf = rc->PackVariables(vars, imap);
-  const int crho = imap[fluid_cons::density].first;
-  const int cmom_lo = imap[fluid_cons::momentum].first;
-  const int cmom_hi = imap[fluid_cons::momentum].second;
-  const int ceng = imap[fluid_cons::energy].first;
-  std::vector<std::string> diag_vars({diagnostic_variables::divf});
-  auto diag = rc->PackVariables(diag_vars);
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
-      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        diag(0, k, j, i) = divf(crho, k, j, i);
-        diag(1, k, j, i) = divf(cmom_lo, k, j, i);
-        diag(2, k, j, i) = divf(cmom_lo + 1, k, j, i);
-        diag(3, k, j, i) = divf(cmom_lo + 2, k, j, i);
-        diag(4, k, j, i) = divf(ceng, k, j, i);
-      });
-  return TaskStatus::complete;
-}
-#endif
-
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src) {
   constexpr int ND = Geometry::NDFULL;

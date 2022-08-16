@@ -173,14 +173,6 @@ include(cmake/Geometry.cmake)
 # Fluid
 include(cmake/Fluid.cmake)
 
-# Print RHS
-option(PHOEBUS_PRINT_RHS "Print right hand sides" OFF)
-if (PHOEBUS_PRINT_RHS)
-   set(PRINT_RHS 1)
-else()
-   set(PRINT_RHS 0)
-endif()
-
 # Phoebus src
 message("\nConfiguring src")
 add_subdirectory(src)
