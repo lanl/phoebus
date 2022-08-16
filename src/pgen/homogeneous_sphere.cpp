@@ -52,7 +52,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real vx = pin->GetOrAddReal("homogeneous_sphere", "vx", 0.0);
 
   auto &coords = pmb->coords;
-  auto pmesh = pmb->pmy_mesh;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);

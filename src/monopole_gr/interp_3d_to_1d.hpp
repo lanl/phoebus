@@ -225,9 +225,9 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom,
     const Real X2 = coords.x2v(j);
     const Real X3 = coords.x3v(k);
     transform(X1, X2, X3, C, c2s, s2c);
-    const Real r = C[0];
-    const Real th = C[1];
-    const Real ph = C[2];
+    // const Real r = C[0];
+    // const Real th = C[1];
+    // const Real ph = C[2];
 
     // J
     jr = 0;
