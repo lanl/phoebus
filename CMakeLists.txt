@@ -159,6 +159,10 @@ set(SINGULARITY_SUBMODULE_MODE ON CACHE BOOL "" FORCE)
 set(SINGULARITY_USE_KOKKOSKERNELS OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_BUILD_CLOSURE OFF CACHE BOOL "" FORCE)
 
+# Kill cmake's package registry because it can interfere
+set(CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
+set(CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
+
 # singularity eos
 message("Configuring singularity-eos")
 add_subdirectory(external/singularity-eos singularity-eos)
