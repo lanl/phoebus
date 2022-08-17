@@ -156,8 +156,6 @@ endif()
 # target_compile_options(phoebus PUBLIC -G -lineinfo)
 
 target_link_libraries(phoebus PRIVATE parthenon
-  singularity-eos::flags
-  singularity-eos
+  singularity-eos::singularity-eos
   singularity-opac::singularity-opac
-  $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
 )
