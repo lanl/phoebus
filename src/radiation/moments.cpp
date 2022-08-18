@@ -727,6 +727,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
+  auto bounds = fix_pkg->Param<Bounds>("bounds");
+
   const Real kappaH_min = 1.e-20;
 
   auto &coords = pmb->coords;
