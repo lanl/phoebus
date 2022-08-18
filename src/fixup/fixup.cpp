@@ -1131,6 +1131,8 @@ TaskStatus SourceFixup(T *rc) {
   }
 
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  StateDescriptor *opac = pmb->packages.Get("opacity").get();
+  const auto &d_opacity = opac->Param<Opacity>("d.opacity");
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   const std::vector<std::string> vars({p::density, c::density, p::velocity, c::momentum, p::energy,
@@ -1261,11 +1263,22 @@ TaskStatus SourceFixup(T *rc) {
             // Zero primitive velocities
             SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
 
+            // Auxiliary primitives
+            // Safe value for ye
+            if (pye > 0) {
+              v(b, pye, k, j, i) = 0.5;
+            }
+            if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+                v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+                eos_lambda);
+
             const Real r = std::exp(coords.x1v(k, j, i));
             // TODO(BRR) ar::code * T^-4?
-            const Real Jmin = 1.e-4 * std::pow(r, -4);
+            //const Real Jmin = 1.e-4 * std::pow(r, -4);
             for (int ispec = 0; ispec < nspec; ispec++) {
-              v(b, idx_J(ispec), k, j, i) = Jmin;
+              //v(b, idx_J(ispec), k, j, i) = Jmin;
+              v(b, idx_J(ispec), k, j, i) = d_opacity_.EnergyDensityFromTemperature(v(b, tmp, k, j, i), species_[ispec]);
               SPACELOOP(ii) {
                 v(b, idx_H(ispec, ii), k, j, i) = 0.;
               }
@@ -1274,6 +1287,7 @@ TaskStatus SourceFixup(T *rc) {
 
           // Auxiliary primitives
           // Safe value for ye
+          // TODO(BRR) actually interp Ye above
           if (pye > 0) {
             v(b, pye, k, j, i) = 0.5;
           }
