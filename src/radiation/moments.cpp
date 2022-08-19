@@ -17,6 +17,7 @@
 
 #include <singularity-eos/eos/eos.hpp>
 
+#include "fixup/fixup.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -33,6 +34,7 @@ namespace radiation {
 
 using namespace singularity::neutrinos;
 using singularity::EOS;
+using fixup::Bounds;
 
 template <typename CLOSURE>
 class SourceResidual4 {
@@ -686,6 +688,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   // return TaskStatus::complete;
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const int di = (pmb->pmy_mesh->ndim > 0 ? 1 : 0);
@@ -1218,8 +1221,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-  constexpr int izone = -1; // 46; // 47; // 33;
-  constexpr int jzone = -1; // 11; // 11; // 26;
+  constexpr int izone = 47; // 46; // 47; // 33;
+  constexpr int jzone = 12; // 11; // 11; // 26;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1331,6 +1334,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         if (i == izone && j == jzone) {
           printf("[%i %i %i] rho = %e ug = %e Tg = %e Prad0: %e %e %e %e\n", k, j, i, rho,
                  ug, Tg, P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+          Real xi0 = 0.;
+          SPACELOOP2(ii, jj) {
+            xi0 += con_gamma(ii,jj) * P_rad_guess[ii+1]*P_rad_guess[jj+1];
+          }
+          xi0 = std::sqrt(xi0)/P_rad_guess[0];
+          printf("xi0: %e\n", xi0);
         }
         srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
         for (int n = 0; n < 4; n++) {
@@ -1393,9 +1402,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             auto status_m = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
             srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
             if (status_m == ClosureStatus::failure) {
-        //      printf("bad - guess! [%i %i %i][%i] P_rad_m = %e %e %e %e\n", k, j, i, m,
-        //             P_rad_m[0], P_rad_m[1], P_rad_m[2], P_rad_m[3]);
-              //     bad_guess = true;
+              if (izone == i && jzone == j) {
+              printf("bad - guess! [%i %i %i][%i] P_rad_m = %e %e %e %e\n", k, j, i, m,
+                     P_rad_m[0], P_rad_m[1], P_rad_m[2], P_rad_m[3]);
+                   bad_guess = true;
+              }
               bad_guess_m = true;
             }
 
@@ -1404,9 +1415,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             auto status_p = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
             srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
             if (status_p == ClosureStatus::failure) {
-          //    printf("bad + guess! [%i %i %i][%i] P_rad_p = %e %e %e %e\n", k, j, i, m,
-           //          P_rad_p[0], P_rad_p[1], P_rad_p[2], P_rad_p[3]);
-              //   bad_guess = true;
+              if (izone == i && jzone == j) {
+              printf("bad + guess! [%i %i %i][%i] P_rad_p = %e %e %e %e\n", k, j, i, m,
+                     P_rad_p[0], P_rad_p[1], P_rad_p[2], P_rad_p[3]);
+                bad_guess = true;
+              }
               bad_guess_p = true;
             }
 
@@ -1422,7 +1435,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           if (bad_guess_m == true && bad_guess_p == true) {
             // If both + and - finite difference support points are bad, this
             // interaction fails
-       //     printf("[%i %i %i] both guesses are bad!\n", k, j, i);
+            if (izone == i && jzone == j) {
+            printf("[%i %i %i] both guesses are bad!\n", k, j, i);
+            }
             bad_guess = true;
             break;
           } else if (bad_guess_m == true) {

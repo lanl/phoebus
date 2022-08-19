@@ -34,6 +34,13 @@ TaskStatus ConservedToPrimitiveFixup(T *rc);
 template <typename T>
 TaskStatus SourceFixup(T *rc);
 
+// TODO(BRR) finish this
+enum class RadiationFloorFlag { ConstantJ, ExpX1J };
+class RadiationFloors {
+  public:
+   RadiationFloors() {}
+};
+
 static struct ConstantRhoSieFloor {
 } constant_rho_sie_floor_tag;
 static struct ExpX1RhoSieFloor {
@@ -44,13 +51,6 @@ static struct X1RhoSieFloor {
 } x1_rho_sie_floor_tag;
 static struct RRhoSieFloor {
 } r_rho_sie_floor_tag;
-
-// TODO(BRR) finish this
-enum class RadiationFloorFlag { ConstantJ, ExpX1J };
-class RadiationFloors {
-  public:
-   RadiationFloors() {}
-};
 
 enum class FloorFlag { ConstantRhoSie, ExpX1RhoSie, ExpX1RhoU, X1RhoSie, RRhoSie };
 

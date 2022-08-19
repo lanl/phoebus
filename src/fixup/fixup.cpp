@@ -37,6 +37,8 @@ using radiation::ClosureVerbosity;
 using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
+using singularity::neutrinos::Opacity;
+using singularity::RadiationType;
 
 #define FIXUP_PRINT_TOTAL_NFAIL 0
 
@@ -1185,6 +1187,13 @@ TaskStatus SourceFixup(T *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
+  auto species = rad_pkg->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad_pkg->Param<int>("num_species");
+  RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+
   // TODO(BRR) make this less ugly
   IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -1253,6 +1262,7 @@ TaskStatus SourceFixup(T *rc) {
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
             printf("No valid source fixup neighbors! [%i %i %i]\n", k, j, i);
+            //PARTHENON_FAIL("yuck");
 
             double rho_floor, sie_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
@@ -1278,7 +1288,7 @@ TaskStatus SourceFixup(T *rc) {
             //const Real Jmin = 1.e-4 * std::pow(r, -4);
             for (int ispec = 0; ispec < nspec; ispec++) {
               //v(b, idx_J(ispec), k, j, i) = Jmin;
-              v(b, idx_J(ispec), k, j, i) = d_opacity_.EnergyDensityFromTemperature(v(b, tmp, k, j, i), species_[ispec]);
+              v(b, idx_J(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(v(b, tmp, k, j, i), species_d[ispec]);
               SPACELOOP(ii) {
                 v(b, idx_H(ispec, ii), k, j, i) = 0.;
               }
@@ -1424,6 +1434,25 @@ TaskStatus SourceFixup(T *rc) {
             SPACELOOP(ii) {
               v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii);
             }
+          }
+          if (i == 47 && j == 12) {
+            printf("after fixup:\n");
+            int ispec = 0;
+            printf("prad: %e %e %e %e\n", v(b, idx_E(ispec), k, j, i),
+              v(b, idx_F(ispec, 0), k, j, i),
+              v(b, idx_F(ispec, 1), k, j, i),
+              v(b, idx_F(ispec, 2), k, j, i));
+            Real xi0 = 0.;
+            SPACELOOP2(ii, jj) {
+              xi0 += gcon[ii][jj]*v(b, idx_F(ispec, ii), k, j, i)*v(b, idx_F(ispec, jj), k, j, i);
+            }
+            xi0 = std::sqrt(xi0)/v(b, idx_E(ispec), k, j, i);
+            printf("xi0: %e\n", xi0);
+            printf("pmhd: %e %e %e %e\n",
+            v(b, peng, k, j, i),
+            v(b, idx_pvel(0), k, j, i),
+            v(b, idx_pvel(1), k, j, i),
+            v(b, idx_pvel(2), k, j, i));
           }
         }
       });
