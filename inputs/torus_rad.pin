@@ -45,7 +45,7 @@ dt          = 0.1
 
 <parthenon/time>
 nlim        = -1 # 84        # cycle limit
-tlim        = 1.2    # time limit
+tlim        = 1.5    # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.0 # 1.e-6
@@ -129,8 +129,8 @@ scattering_fraction = 0.5
 type = gray
 #gray_kappa = 1.e-20
 #gray_kappa = 1.e-10
-gray_kappa = 1.e-5 # dtau/dt ~ 1e10
-#gray_kappa = 1.e-40
+#gray_kappa = 1.e-5 # dtau/dt ~ 1e10
+gray_kappa = 1.e-15
 
 <units>
 scale_free = false
@@ -142,23 +142,21 @@ enable_floors = true
 enable_mhd_floors = true
 enable_rad_floors = true
 enable_ceilings = true
+enable_radiation_ceilings = true
 enable_flux_fixup = true
 enable_c2p_fixup = true
 enable_source_fixup = true
 report_c2p_fails = true
 report_source_fails = true
-#floor_type = ExpX1RhoSie
 floor_type = ExpX1RhoU
-#rho0_floor = 1.0e-8
-rho0_floor = 1.0e-3
-u0_floor = 1.0e-5
-#sie0_floor = 1.0e-3
+rho0_floor = 1.0e-5
+u0_floor = 1.0e-7
 rho_exp_floor = -2.0
-#sie_exp_floor = -1.0
-u_exp_floor = -3.0
+u_exp_floor = -3.0 # -2.5
 ceiling_type = ConstantGamSie
 sie0_ceiling = 1.0
 gam0_ceiling = 10.0
+xi0_ceiling = 0.99
 
 <torus>
 target_beta = 100.

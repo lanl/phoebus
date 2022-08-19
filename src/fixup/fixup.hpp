@@ -37,8 +37,8 @@ TaskStatus SourceFixup(T *rc);
 // TODO(BRR) finish this
 enum class RadiationFloorFlag { ConstantJ, ExpX1J };
 class RadiationFloors {
-  public:
-   RadiationFloors() {}
+ public:
+  RadiationFloors() {}
 };
 
 static struct ConstantRhoSieFloor {
@@ -138,26 +138,61 @@ class Ceilings {
   const int ceiling_flag_;
 };
 
+static struct ConstantXi0RadiationCeiling {
+} constant_xi0_radiation_ceiling_tag;
+
+class RadiationCeilings {
+ public:
+  RadiationCeilings()
+      : RadiationCeilings(constant_xi0_radiation_ceiling_tag, std::numeric_limits<Real>::max()) {
+  }
+  RadiationCeilings(ConstantXi0RadiationCeiling, const Real xi0)
+      : xi0_(xi0), radiation_ceiling_flag_(1) {}
+
+  KOKKOS_INLINE_FUNCTION
+  void GetRadiationCeilings(const Real x1, const Real x2, const Real x3,
+                            Real &ximax) const {
+    switch (radiation_ceiling_flag_) {
+    case 1:
+      ximax = xi0_;
+      break;
+    default:
+      PARTHENON_FAIL("No valid radiation ceiling set.");
+    }
+  }
+
+ private:
+  Real xi0_;
+  const int radiation_ceiling_flag_;
+};
+
 class Bounds {
  public:
-  Bounds() : floors_(Floors()), ceilings_(Ceilings()) {}
-  Bounds(const Floors &fl, const Ceilings &cl) : floors_(fl), ceilings_(cl) {}
-  explicit Bounds(const Floors &fl) : floors_(fl), ceilings_(Ceilings()) {}
-  explicit Bounds(const Ceilings &cl) : floors_(Floors()), ceilings_(cl) {}
+  Bounds() : floors_(Floors()), ceilings_(Ceilings()), radiation_ceilings_(RadiationCeilings()) {}
+  Bounds(const Floors &fl, const Ceilings &cl, const RadiationCeilings &rcl) : floors_(fl), ceilings_(cl),
+    radiation_ceilings_(rcl) {}
+  explicit Bounds(const Floors &fl) : floors_(fl), ceilings_(Ceilings()), radiation_ceilings_(RadiationCeilings()) {}
+  explicit Bounds(const Ceilings &cl) : floors_(Floors()), ceilings_(cl), radiation_ceilings_(RadiationCeilings()) {}
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetFloors(Args &&...args) const {
+  KOKKOS_INLINE_FUNCTION void GetFloors(Args &&... args) const {
     floors_.GetFloors(std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetCeilings(Args &&...args) const {
+  KOKKOS_INLINE_FUNCTION void GetCeilings(Args &&... args) const {
     ceilings_.GetCeilings(std::forward<Args>(args)...);
+  }
+
+  template <class... Args>
+  KOKKOS_INLINE_FUNCTION void GetRadiationCeilings(Args &&... args) const {
+    radiation_ceilings_.GetRadiationCeilings(std::forward<Args>(args)...);
   }
 
  private:
   const Floors floors_;
   const Ceilings ceilings_;
+  const RadiationCeilings radiation_ceilings_;
 };
 
 } // namespace fixup

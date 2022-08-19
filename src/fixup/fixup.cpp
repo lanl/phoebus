@@ -59,6 +59,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("enable_source_fixup", enable_source_fixup);
   bool enable_ceilings = pin->GetOrAddBoolean("fixup", "enable_ceilings", false);
   params.Add("enable_ceilings", enable_ceilings);
+  bool enable_radiation_ceilings = pin->GetOrAddBoolean("fixup", "enable_radiation_ceilings", false);
+  params.Add("enable_radiation_ceilings", enable_radiation_ceilings);
   bool report_c2p_fails = pin->GetOrAddBoolean("fixup", "report_c2p_fails", false);
   params.Add("report_c2p_fails", report_c2p_fails);
   bool report_source_fails = pin->GetOrAddBoolean("fixup", "report_source_fails", false);
@@ -145,6 +147,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("ceiling", Ceilings());
   }
 
+  if (enable_radiation_ceilings) {
+    const std::string radiation_ceiling_type = pin->GetOrAddString("fixup", "radiation_ceiling_type", "ConstantXi0");
+    if (radiation_ceiling_type == "ConstantXi0") {
+      Real xi0 = pin->GetOrAddReal("fixup", "xi0_ceiling", 0.99);
+      params.Add("radiation_ceiling", RadiationCeilings(constant_xi0_radiation_ceiling_tag, xi0));
+    }
+  } else {
+    params.Add("radiation_ceiling", RadiationCeilings());
+  }
+
   if (enable_mhd_floors) {
     Real bsqorho_max = pin->GetOrAddReal("fixup", "bsqorho_max", 50.);
     Real bsqou_max = pin->GetOrAddReal("fixup", "bsqou_max", 2500.);
@@ -155,7 +167,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   params.Add("bounds",
-             Bounds(params.Get<Floors>("floor"), params.Get<Ceilings>("ceiling")));
+             Bounds(params.Get<Floors>("floor"), params.Get<Ceilings>("ceiling"),
+             params.Get<RadiationCeilings>("radiation_ceiling")));
 
   return fix;
 }
@@ -224,7 +237,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
     }
   }
   const int nspec = idx_J.DimSize(1);
-  printf("nspec: %i\n", nspec);
 
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -579,6 +591,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
   const int nspec = idx_E.DimSize(1);
+  const int ndim = pmb->pmy_mesh->ndim;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
@@ -590,59 +603,34 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
         // still process if (fluid fail && rad fail) check
         // Note that it is assumed that the fluid is already fixed up
 
-        if (i == 48 && j == 63) {
-          const int ispec = 0;
-          printf("[%i %i %i] fluid fail? %i rad fail: %i\n",
-          k, j, i,
-          v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail,
-          v(b, iradfail, k, j, i) == radiation::FailFlags::fail);
-          printf("J = %e covH = %e %e %e\n",
-            v(b, idx_J(ispec), k, j, i),
-            v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 0), k, j, i),
-            v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 1), k, j, i),
-            v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 2), k, j, i));
-        }
+//        if (i == 48 && j == 63) {
+//          const int ispec = 0;
+//          printf("[%i %i %i] fluid fail? %i rad fail: %i\n",
+//          k, j, i,
+//          v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail,
+//          v(b, iradfail, k, j, i) == radiation::FailFlags::fail);
+//          printf("J = %e covH = %e %e %e\n",
+//            v(b, idx_J(ispec), k, j, i),
+//            v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 0), k, j, i),
+//            v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 1), k, j, i),
+//            v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 2), k, j, i));
+//        }
+        auto fixup = [&](const int iv, const Real inv_mask_sum) {
+          v(b, iv, k, j, i) = v(b, iradfail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
+                              v(b, iradfail, k, j, i + 1) * v(b, iv, k, j, i + 1);
+          if (ndim > 1) {
+            v(b, iv, k, j, i) += v(b, iradfail, k, j - 1, i) * v(b, iv, k, j - 1, i) +
+                                 v(b, iradfail, k, j + 1, i) * v(b, iv, k, j + 1, i);
+            if (ndim == 3) {
+              v(b, iv, k, j, i) += v(b, iradfail, k - 1, j, i) * v(b, iv, k - 1, j, i) +
+                                   v(b, iradfail, k + 1, j, i) * v(b, iv, k + 1, j, i);
+            }
+          }
+          return inv_mask_sum * v(b, iv, k, j, i);
+        };
 
         if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail ||
             v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
-          //printf("[%i %i %i] fluidfail: %i radfail: %i\n", k, j, i,
-          //  v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail,
-          //  v(b, iradfail, k, j, i) == radiation::FailFlags::fail);
-          // TODO(BRR) very crude hack just set H = 0 and J to floor
-          // (a better solution would be J = max(J, J_floor) and clamping xi to 0, 0.999)
-            const Real r = std::exp(coords.x1v(k, j, i));
-            // TODO(BRR) ar::code * T^-4?
-            const Real Jmin = 1.e-4 * std::pow(r, -4);
-            const Real ximax = 0.99;
-            Tens2 con_gamma;
-            geom.MetricInverse(CellLocation::Cent, b, k, j, i, con_gamma.data);
-
-            for (int ispec = 0; ispec < nspec; ispec++) {
-              Real xi = 0.;
-              SPACELOOP2(ii, jj) {
-                xi += con_gamma(ii, jj) * v(b, idx_H(ispec, ii), k, j, i)
-                      * v(b, idx_H(ispec, jj), k, j, i);
-              }
-              xi = std::sqrt(xi);
-
-              v(b, idx_J(ispec), k, j, i) = std::max(Jmin, v(b, idx_J(ispec), k, j, i));
-              if (xi > ximax) {
-                SPACELOOP(ii) {
-                  if (i == 48 && j == 63) {
-                    printf("H(%i): %e\n", ii, v(b, idx_H(ispec, ii), k, j, i));
-                  }
-                  v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi;
-                  if (i == 48 && j == 63) {
-                    printf("after H(%i): %e\n", ii, v(b, idx_H(ispec, ii), k, j, i));
-                  }
-                }
-              }
-
-              //v(b, idx_J(ispec), k, j, i) = Jmin;
-              //SPACELOOP(ii) {
-              //  v(b, idx_H(ispec, ii), k, j, i) = 0.;
-              //}
-            }
 
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
           //const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
@@ -656,10 +644,78 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
           const Real vel[] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
                               v(b, idx_pvel(2), k, j, i)};
 
-          // TODO(BRR) go beyond Eddington
           typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
+
+        Real num_valid = v(b, iradfail, k, j, i - 1) + v(b, iradfail, k, j, i + 1);
+          if (ndim > 1) num_valid += v(b, iradfail, k, j - 1, i) + v(b, iradfail, k, j + 1, i);
+          if (ndim == 3) num_valid += v(b, iradfail, k - 1, j, i) + v(b, iradfail, k + 1, j, i);
+          if (num_valid > 0.5) {
+            const Real norm = 1.0 / num_valid;
+            for (int ispec = 0; ispec < nspec; ispec++) {
+              v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
+              SPACELOOP(ii) {
+                v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
+              }
+            }
+          } else {
+            for (int ispec = 0; ispec < nspec; ispec++) {
+              v(b, idx_J(ispec), k, j, i) = 1.e-10;
+              SPACELOOP(ii) {
+                v(b, idx_H(ispec, ii), k, j, i) = 0.;
+              }
+            }
+          }
+
+          // Clamp variables
+          for (int ispec = 0; ispec < nspec; ispec++) {
+            v(b, idx_J(ispec), k, j, i) = std::max<Real>(v(b, idx_J(ispec), k, j, i), 1.e-10);
+            Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
+                         v(b, idx_H(ispec, 2), k, j, i)};
+            Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H));
+            const Real ximax = 0.99;
+            if (xi > ximax) {
+              SPACELOOP(ii) {
+                v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi;
+              }
+            }
+          }
+
+          //printf("[%i %i %i] fluidfail: %i radfail: %i\n", k, j, i,
+          //  v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail,
+          //  v(b, iradfail, k, j, i) == radiation::FailFlags::fail);
+          // TODO(BRR) very crude hack just set H = 0 and J to floor
+          // (a better solution would be J = max(J, J_floor) and clamping xi to 0, 0.999)
+//            const Real r = std::exp(coords.x1v(k, j, i));
+//            // TODO(BRR) ar::code * T^-4?
+//            const Real Jmin = 1.e-4 * std::pow(r, -4);
+//            const Real ximax = 0.99;
+//            Tens2 con_gamma;
+//            geom.MetricInverse(CellLocation::Cent, b, k, j, i, con_gamma.data);
+//
+//            for (int ispec = 0; ispec < nspec; ispec++) {
+//              Real xi = 0.;
+//              SPACELOOP2(ii, jj) {
+//                xi += con_gamma(ii, jj) * v(b, idx_H(ispec, ii), k, j, i)
+//                      * v(b, idx_H(ispec, jj), k, j, i);
+//              }
+//              xi = std::sqrt(xi);
+//
+//              v(b, idx_J(ispec), k, j, i) = std::max(Jmin, v(b, idx_J(ispec), k, j, i));
+//              if (xi > ximax) {
+//                SPACELOOP(ii) {
+//                  v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi;
+//                }
+//              }
+//
+//              //v(b, idx_J(ispec), k, j, i) = Jmin;
+//              //SPACELOOP(ii) {
+//              //  v(b, idx_H(ispec, ii), k, j, i) = 0.;
+//              //}
+//            }
+
           const Real W = phoebus::GetLorentzFactor(vel, gcov);
           Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
+          // TODO(BRR) go beyond Eddington
           radiation::ClosureEdd<Vec, Tens2> c(con_v, &g);
           for (int ispec = 0; ispec < nspec; ispec++) {
             Real E;
@@ -1254,9 +1310,7 @@ TaskStatus SourceFixup(T *rc) {
             for (int ispec = 0; ispec < nspec; ispec++) {
               v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
               SPACELOOP(ii) {
-                //v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
-                // TODO(BRR) temporarily zeroing Hs!
-                v(b, idx_H(ispec, ii), k, j, i) = 0.;
+                v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
               }
             }
           } else {
@@ -1283,12 +1337,12 @@ TaskStatus SourceFixup(T *rc) {
                 v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
                 eos_lambda);
 
-            const Real r = std::exp(coords.x1v(k, j, i));
+            //const Real r = std::exp(coords.x1v(k, j, i));
             // TODO(BRR) ar::code * T^-4?
             //const Real Jmin = 1.e-4 * std::pow(r, -4);
             for (int ispec = 0; ispec < nspec; ispec++) {
               //v(b, idx_J(ispec), k, j, i) = Jmin;
-              v(b, idx_J(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(v(b, tmp, k, j, i), species_d[ispec]);
+              v(b, idx_J(ispec), k, j, i) = 1.e-10;//d_opacity.EnergyDensityFromTemperature(v(b, tmp, k, j, i), species_d[ispec]);
               SPACELOOP(ii) {
                 v(b, idx_H(ispec, ii), k, j, i) = 0.;
               }
@@ -1332,7 +1386,8 @@ TaskStatus SourceFixup(T *rc) {
           }
           const Real r = std::exp(coords.x1v(k, j, i));
           // TODO(BRR) ar::code * T^-4?
-          const Real Jmin = 1.e-4 * std::pow(r, -4);
+          //const Real Jmin = 1.e-4 * std::pow(r, -4);
+          const Real Jmin = 1.e-10;
           for (int ispec = 0; ispec < nspec; ispec++) {
             v(b, idx_J(ispec), k, j, i) = std::max<Real>(v(b, idx_J(ispec), k, j, i), Jmin);
           //  SPACELOOP(ii) {
@@ -1394,9 +1449,6 @@ TaskStatus SourceFixup(T *rc) {
           }
 
           // Update radiation conserved variables
-          // TODO(BRR) go beyond Eddington
-//        typename ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent,
-//                                                             iblock, k, j, i);
           W = phoebus::GetLorentzFactor(vel, gcov);
           Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
           radiation::ClosureEdd<Vec, Tens2> c(con_v, &g);
@@ -1404,12 +1456,6 @@ TaskStatus SourceFixup(T *rc) {
             Real E;
             Vec cov_F;
             Tens2 conTilPi = {0}; // TODO(BRR) go beyond Eddington
-            /*if (j == 11 && i == 47) {
-              SPACELOOP2(ii, jj) {
-                printf("[%i %i %i] conTilPi(%i, %i) = %e\n", k, j, i, ii, jj, conTilPi(ii,jj));
-              }
-              exit(-1);
-            }*/
             Real J = v(b, idx_J(ispec), k, j, i);
             Vec cov_H = {J*v(b, idx_H(ispec, 0), k, j, i), J*v(b, idx_H(ispec, 1), k, j, i),
                          J*v(b, idx_H(ispec, 2), k, j, i)};
@@ -1434,25 +1480,6 @@ TaskStatus SourceFixup(T *rc) {
             SPACELOOP(ii) {
               v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii);
             }
-          }
-          if (i == 47 && j == 12) {
-            printf("after fixup:\n");
-            int ispec = 0;
-            printf("prad: %e %e %e %e\n", v(b, idx_E(ispec), k, j, i),
-              v(b, idx_F(ispec, 0), k, j, i),
-              v(b, idx_F(ispec, 1), k, j, i),
-              v(b, idx_F(ispec, 2), k, j, i));
-            Real xi0 = 0.;
-            SPACELOOP2(ii, jj) {
-              xi0 += gcon[ii][jj]*v(b, idx_F(ispec, ii), k, j, i)*v(b, idx_F(ispec, jj), k, j, i);
-            }
-            xi0 = std::sqrt(xi0)/v(b, idx_E(ispec), k, j, i);
-            printf("xi0: %e\n", xi0);
-            printf("pmhd: %e %e %e %e\n",
-            v(b, peng, k, j, i),
-            v(b, idx_pvel(0), k, j, i),
-            v(b, idx_pvel(1), k, j, i),
-            v(b, idx_pvel(2), k, j, i));
           }
         }
       });

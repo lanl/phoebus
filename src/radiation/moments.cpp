@@ -312,12 +312,12 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
-        if (i == 48 && j == 63) {
-          printf("[%i %i %i] rad fail here? %i\n", k, j, i,
-                 status == ClosureStatus::failure);
-          printf("J = %e covH = %e %e %e\n", J, covH(0), covH(1), covH(2));
-          printf("dirB.s: %i dirB.e: %i\n", dirB.s, dirB.e);
-        }
+//        if (i == 48 && j == 63) {
+//          printf("[%i %i %i] rad fail here? %i\n", k, j, i,
+//                 status == ClosureStatus::failure);
+//          printf("J = %e covH = %e %e %e\n", J, covH(0), covH(1), covH(2));
+//          printf("dirB.s: %i dirB.e: %i\n", dirB.s, dirB.e);
+//        }
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
           printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
@@ -1221,8 +1221,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-  constexpr int izone = 47; // 46; // 47; // 33;
-  constexpr int jzone = 12; // 11; // 11; // 26;
+  constexpr int izone = -1; //47; // 46; // 47; // 33;
+  constexpr int jzone = -1; //12; // 11; // 11; // 26;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1743,10 +1743,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // If 4D rootfind failed, try operator splitting the energy and momentum updates.
         // TODO(BRR) Only do this if J << ug?
-        // if (success == false) {
+        //if (success == false) {
         // Need to use this update if update fluid is false because 4D rootfind updates
         // the fluid state internally
         if (update_fluid == false) {
+        //  if (true) {
           const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
           Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
 
@@ -1766,7 +1767,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           /// TODO: (LFR) Move beyond Eddington for this update
           ClosureEdd<Vec, Tens2> c(con_v, &g);
           // for (int ispec = 0; ispec < num_species; ++ispec)
-          {
+          //{
 
             Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
             Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
@@ -1774,7 +1775,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                           v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
 
             // Treat the Eddington tensor explicitly for now
-            Real &J = v(iblock, idx_J(ispec), k, j, i);
+            Real J = v(iblock, idx_J(ispec), k, j, i);
             Vec cov_H{{
                 J * v(iblock, idx_H(ispec, 0), k, j, i),
                 J * v(iblock, idx_H(ispec, 1), k, j, i),
@@ -1792,9 +1793,15 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
             c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
                                  &cov_dF);
-          }
+         // }
 
-          if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0.) {
+          // Check xi
+          Estar += dE;
+          SPACELOOP(ii) cov_Fstar(ii) += cov_dF(ii);
+          c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
+          Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+
+          if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0. && xi < 0.99) {
             // TODO(BRR) also check H^2 < J?
             success = true;
           } else {
@@ -1830,7 +1837,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             PARTHENON_FAIL("This update for non-Valencia energy eqn is not correct");
             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
 #endif
-            SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
+           SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
           }
         } else {
           // std::stringstream msg;
