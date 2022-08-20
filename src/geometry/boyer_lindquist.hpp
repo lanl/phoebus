@@ -77,7 +77,6 @@ class BoyerLindquist {
     const Real th = X2;
     Real r2, r3, sth, cth, DD, mu;
     ComputeDeltaMu_(r, th, r2, r3, sth, cth, DD, mu);
-    const Real r3dm = r3 * DD * mu;
     const Real sth2 = sth * sth;
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
     g[0][0] = -(1.0 - ratio(2.0, r * mu));
