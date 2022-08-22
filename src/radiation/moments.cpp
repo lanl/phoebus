@@ -768,17 +768,30 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         geom.Metric(face, k, j, i, cov_gamma.data);
         geom.ContravariantShift(face, k, j, i, con_beta.data);
         const Real sdetgam = geom.DetGamma(face, k, j, i);
-        //const Real detg = geom.DetG(face, k, j, i);
-        typename CLOSURE::LocalGeometryType g(geom, face, 0, k, j, i);
-
-        // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt. depth) cs_rad = 1)
         Tens2 con_gamma;
         geom.MetricInverse(face, k, j, i, con_gamma.data);
         const Real alpha = geom.Lapse(face, k, j, i);
-        const Real sigp = alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
-        const Real sigm = -alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
+        typename CLOSURE::LocalGeometryType g(geom, face, 0, k, j, i);
 
         const Real dx = coords.Dx(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
+
+
+        const Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i),
+                                 v(idx_qlv(1, idir), k, j, i),
+                                 v(idx_qlv(2, idir), k, j, i)};
+        const Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i),
+                                 v(idx_qrv(1, idir), k, j, i),
+                                 v(idx_qrv(2, idir), k, j, i)};
+        const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
+        const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
+        Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
+        Vec con_vr{{con_vpr[0] / Wr, con_vpr[1] / Wr, con_vpr[2] / Wr}};
+
+        // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt. depth) cs_rad = 1)
+        const Real sigp = alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
+        const Real sigm = -alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
+        const Real asym_sigl = alpha * con_vl(idir) - con_beta(idir);
+        const Real asym_sigr = alpha * con_vr(idir) - con_beta(idir);
 
         for (int ispec = 0; ispec < num_species; ++ispec) {
 
@@ -809,18 +822,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           //    Hr(ii) *= ximax / xir;
           //  }
           //}
-
-
-          const Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i),
-                                   v(idx_qlv(1, idir), k, j, i),
-                                   v(idx_qlv(2, idir), k, j, i)};
-          const Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i),
-                                   v(idx_qrv(1, idir), k, j, i),
-                                   v(idx_qrv(2, idir), k, j, i)};
-          const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
-          const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
-          Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
-          Vec con_vr{{con_vpr[0] / Wr, con_vpr[1] / Wr, con_vpr[2] / Wr}};
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
@@ -883,13 +884,15 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
           // TODO(BRR) is this actually the wavespeed dx^i/dx^0 for LLF?
-          const Real speed = a * 1.0 + (1 - a) * std::max(sqrt(cl.v2), sqrt(cr.v2));
+          //const Real speed = a * 1.0 + (1 - a) * std::max(sqrt(cl.v2), sqrt(cr.v2));
           conFl = a * conFl + (1 - a) * conFl_asym;
           conFr = a * conFr + (1 - a) * conFr_asym;
           Pl = a * Pl + (1 - a) * Pl_asym;
           Pr = a * Pr + (1 - a) * Pr_asym;
 
-          const Real sigspeed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
+          const Real rad_sigspeed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
+          const Real asym_sigspeed = std::max<Real>(std::fabs(asym_sigl), std::fabs(asym_sigr));
+          const Real sigspeed = a * rad_sigspeed + (1. - a) * asym_sigspeed;
 
           // Correct the fluxes with the shift terms
           conFl(idir) -= con_beta(idir) * El;
@@ -926,7 +929,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                 //0.5 *
                 //(detg * (Pl(idir, ii) + Pr(idir, ii)) + speed * sdetgam * (covFl(ii) - covFr(ii)));
                 0.5 * sdetgam *
-                (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
+                (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
           }
           if (sdetgam < robust::SMALL()) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;

@@ -434,6 +434,9 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
 }
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+  namespace ir = radmoment_internal;
+  namespace p = fluid_prim;
+
   // Note that this is still used for the cooling function even though that option
   // contains no transport. This is useful for consistency between methods.
   auto pmb = rc->GetBlockPointer();
@@ -441,14 +444,17 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+
   auto &coords = pmb->coords;
   const int ndim = pmb->pmy_mesh->ndim;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   PackIndexMap imap;
-  std::vector<std::string> vars{ir::kappaH};
+  std::vector<std::string> vars{ir::kappaH, p::velocity};
   auto v = rc->PackVariables(vars, imap);
+  auto idx_v = imap.GetFlatIdx(p::velocity);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
 
   auto num_species = rad->Param<int>("num_species");
@@ -462,11 +468,13 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
         Vec con_beta;
         geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
+        Tens2 cov_gamma;
+        geom.Metric(CellLocation::Cent, k, j, i, cov_gamma.data);
         Tens2 con_gamma;
         geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma.data);
         const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
 
-        for (int ispec = 0; ispec < nspec; ispec++) {
+        for (int ispec = 0; ispec < num_species; ispec++) {
 
           Real kappaH = v(idx_kappaH(ispec), k, j, i);
 
@@ -474,7 +482,13 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
             // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt. depth) cs_rad = 1)
             const Real sigp = alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
             const Real sigm = -alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
-   //         const Real csig = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
+            const Real asym_sigl = alpha * v(idx_v(d), k, j, i) - con_beta(d);
+            const Real rad_speed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
+            const Real asym_speed = std::fabs(asym_sigl);
+
+            const Real dx = coords.Dx(X1DIR + d, k, j, i) * sqrt(cov_gamma(d, d));
+            const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
+            const Real csig = a * rad_speed + (1. - a) * asym_speed;
 
             lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
           }
