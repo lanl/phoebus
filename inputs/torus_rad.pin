@@ -45,7 +45,7 @@ dt          = 0.1
 
 <parthenon/time>
 nlim        = -1 # 84        # cycle limit
-tlim        = 2.    # time limit
+tlim        = 4.    # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.0 # 1.e-6
