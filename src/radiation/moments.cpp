@@ -684,8 +684,8 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  // printf("skipping radiation fluxes\n");
-  // return TaskStatus::complete;
+ //  printf("skipping radiation fluxes\n");
+ //  return TaskStatus::complete;
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
@@ -768,7 +768,15 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         geom.Metric(face, k, j, i, cov_gamma.data);
         geom.ContravariantShift(face, k, j, i, con_beta.data);
         const Real sdetgam = geom.DetGamma(face, k, j, i);
+        //const Real detg = geom.DetG(face, k, j, i);
         typename CLOSURE::LocalGeometryType g(geom, face, 0, k, j, i);
+
+        // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt. depth) cs_rad = 1)
+        Tens2 con_gamma;
+        geom.MetricInverse(face, k, j, i, con_gamma.data);
+        const Real alpha = geom.Lapse(face, k, j, i);
+        const Real sigp = alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
+        const Real sigm = -alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
 
         const Real dx = coords.Dx(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
 
@@ -788,31 +796,19 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                     Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
           Real xil = std::sqrt(g.contractCov3Vectors(Hl, Hl)) / Jl;
           Real xir = std::sqrt(g.contractCov3Vectors(Hr, Hr)) / Jr;
-          // TODO(BRR) use floor variable
           constexpr Real ximax = 0.99;
-          if (xil > ximax) {
-            SPACELOOP(ii) {
-              Hl(ii) *= ximax / xil;
-            }
-          }
-          if (xir > ximax) {
-            SPACELOOP(ii) {
-              Hr(ii) *= ximax / xir;
-            }
-          }
-          //if (xil > 0.99 || xir > 0.99) {
-          //if ((j == 4 && i == 20) || (j == 68 && i == 20) || (j == 5 && i == 20)) {
-//          if (j == 4 && i == 20) {
-//            printf("[%i %i %i][idir: %i] Bad reconstructed xi! xil: %e xir: %e\n", k, j, i, idir, xil, xir);
-//            SPACELOOP2(ii, jj) {
-//              printf("cov_gamma[%i][%i] = %e\n", ii, jj, cov_gamma(ii,jj));
-//            }
-//            //printf("Jl: %e Jr: %e\n", Jl, Jr);
-//            //printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0), Hr(1), Hr(2));
-// //           printf("Hl.Hl = %e Hr.Hr = %e\n",
-// //             g.contractCov3Vectors(Hl, Hl), g.contractCov3Vectors(Hr, Hr));
-////            exit(-1);
-//          }
+          // TODO(BRR) for j = 4, j = 68 zones, xir/xil for idir = 1 are like 1e10 -- seems
+          // like BCs are not copying data correctly
+          //if (xil > ximax) {
+          //  SPACELOOP(ii) {
+          //    Hl(ii) *= ximax / xil;
+          //  }
+          //}
+          //if (xir > ximax) {
+          //  SPACELOOP(ii) {
+          //    Hr(ii) *= ximax / xir;
+          //  }
+          //}
 
 
           const Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i),
@@ -843,6 +839,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                               v(idx_kappaH(ispec), k - koff, j - joff, i - ioff)));
 
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
+          // TODO(BRR) turning off asymp fluxes
+          //const Real a = 1.;
 
           // Calculate the observer frame quantities on either side of the interface
           /// TODO: (LFR) Add other contributions to the asymptotic flux
@@ -891,6 +889,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           Pl = a * Pl + (1 - a) * Pl_asym;
           Pr = a * Pr + (1 - a) * Pr_asym;
 
+          const Real sigspeed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
+
           // Correct the fluxes with the shift terms
           conFl(idir) -= con_beta(idir) * El;
           conFr(idir) -= con_beta(idir) * Er;
@@ -902,24 +902,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
-              0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
-          //          if (std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i))) {
-          //            printf("NAN flux! %i %i %i F: %e Fl Fr: %e %e speed: %e El Er: %e
-          //            %e\n", k, j,
-          //                   i, v.flux(idir_in, idx_Ef(ispec), k, j, i), conFl(idir),
-          //                   conFr(idir), speed, El, Er);
-          //            printf("Jl: %e Jr: %e\n", Jl, Jr);
-          //            printf("Hl: %e %e %e Hr: %e %e %e\n", Hl(0), Hl(1), Hl(2), Hr(0),
-          //            Hr(1),
-          //                   Hr(2));
-          //            printf("F asym: %e %e\n", conFl_asym(idir), conFr_asym(idir));
-          //            PARTHENON_FAIL("nan flux");
-          //          }
-          //          if (idir == 1 && i == 64 && j > 43 && j < 48 && ispec == 0) {
-          //            printf("[%i %i %i] flux[0]: %e\n", k, j, i,
-          //                   v.flux(idir_in, idx_Ef(ispec), k, j, i));
-          //            printf("El: %e Er: %e\n", El, Er);
-          //          }
+              //0.5 * (detg * (conFl(idir) + conFr(idir)) + sigspeed * sdetgam * (El - Er));
+              0.5 * sdetgam * (conFl(idir) + conFr(idir) + sigspeed * (El - Er));
 
           /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
             printf("[%i %i %i] flux[0]: %e\n",
@@ -939,10 +923,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
+                //0.5 *
+                //(detg * (Pl(idir, ii) + Pr(idir, ii)) + speed * sdetgam * (covFl(ii) - covFr(ii)));
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
           }
-          if (sdetgam < std::numeric_limits<Real>::min() * 10) {
+          if (sdetgam < robust::SMALL()) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
@@ -979,8 +965,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
-  // printf("skipping radiation geometric sources\n");
-  // return TaskStatus::complete;
+   //printf("skipping radiation geometric sources\n");
+   //return TaskStatus::complete;
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
@@ -1813,22 +1799,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // If sequence of source update methods was successful, apply update to conserved
         // quantities. If unsuccessful, mark zone for fixup.
-        //        if (i == 25 && j == 101) {
-        //          printf("sucess? %i\n", success);
-        //        }
+        // TODO(BRR) hack
         if (success == true) {
-          // if (i > 60 && i < 80) {
-          //  printf("[%i] dE: %e dF: %e %e %e update_fluid: %i\n", i,
-          //    dE, cov_dF(0), cov_dF(1), cov_dF(2), update_fluid);
-          // }
           v(iblock, ifail, k, j, i) = FailFlags::success;
-          //          if (i == 25 && j == 101) {
-          //            printf("dE: %e dF: %e %e %e\n", dE, cov_dF(0), cov_dF(1),
-          //            cov_dF(2));
-          //          }
 
-          v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
-          SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF(ii); }
+         v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
+         SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF(ii); }
           if (update_fluid) {
             if (cye > 0) {
               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
@@ -1842,12 +1818,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
            SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
           }
         } else {
-          // std::stringstream msg;
-          // msg << "Source update failure at [" << k << " " << j << " " << i << "]";
-          // PARTHENON_FAIL(msg);
           v(iblock, ifail, k, j, i) = FailFlags::fail;
-          // TODO(BRR) if failure just dont do source
-          // v(iblock, ifail, k, j, i) = FailFlags::success;
         }
       });
   return TaskStatus::complete;

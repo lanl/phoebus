@@ -15,6 +15,7 @@
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/variables.hpp"
+#include "radiation/local_three_geometry.hpp"
 
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
@@ -443,16 +444,40 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   auto &coords = pmb->coords;
   const int ndim = pmb->pmy_mesh->ndim;
 
-  // TODO(BRR) Can't just use dx^i/dx^0 = 1 for speed of light
-  // TODO(BRR) add a cfl-like fudge factor to radiation
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
+  PackIndexMap imap;
+  std::vector<std::string> vars{ir::kappaH};
+  auto v = rc->PackVariables(vars, imap);
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
+
+  auto num_species = rad->Param<int>("num_species");
+
   auto &pars = pmb->packages.Get("radiation")->AllParams();
   Real min_dt;
   pmb->par_reduce(
       "Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
         Real csig = 1.0;
-        for (int d = 0; d < ndim; d++) {
-          lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
+
+        Vec con_beta;
+        geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
+        Tens2 con_gamma;
+        geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma.data);
+        const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+
+        for (int ispec = 0; ispec < nspec; ispec++) {
+
+          Real kappaH = v(idx_kappaH(ispec), k, j, i);
+
+          for (int d = 0; d < ndim; d++) {
+            // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt. depth) cs_rad = 1)
+            const Real sigp = alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
+            const Real sigm = -alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
+   //         const Real csig = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
+
+            lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
+          }
         }
       },
       Kokkos::Min<Real>(min_dt));

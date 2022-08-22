@@ -127,9 +127,9 @@ scattering_fraction = 0.5
 
 <opacity>
 type = gray
-#gray_kappa = 1.e-20
+gray_kappa = 1.e-40
 #gray_kappa = 1.e-10
-gray_kappa = 1.e-5 # dtau/dt ~ 1e10
+#gray_kappa = 1.e-5 # dtau/dt ~ 1e10
 #gray_kappa = 1.e-15
 
 <units>
