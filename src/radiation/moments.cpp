@@ -1211,8 +1211,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-  constexpr int izone = -1; //47; // 46; // 47; // 33;
-  constexpr int jzone = -1; //12; // 11; // 11; // 26;
+  constexpr int izone = 9; //47; // 46; // 47; // 33;
+  constexpr int jzone = 10; //12; // 11; // 11; // 26;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1554,7 +1554,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               constexpr Real ximax = 0.99;
 
               constexpr Real umin = 1.e-20; // TODO(BRR) use floors
-              constexpr Real Jmin = 1.e-10;
+              constexpr Real Jmin = 1.e-20; // TODO(BRR) needs to be a bit smaller than Jr floor! otherwise scaling fac is 0
 
               Real scaling_factor = 0.;
               if (xi > ximax) {
@@ -1563,7 +1563,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               if (P_mhd_guess[0] < umin) {
                 scaling_factor = std::max<Real>(scaling_factor, (ug0 - umin) / (ug0 - P_mhd_guess[0]));
               }
-              if (P_rad_guess[0] < umin) {
+              if (P_rad_guess[0] < Jmin) {
                 scaling_factor = std::max<Real>(scaling_factor, (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
               }
               //printf("[%i %i %i] scaling_factor = %e (%e %e %e)\n",k,j,i,
@@ -1573,7 +1573,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               if (scaling_factor < robust::SMALL() || scaling_factor >= 1.) {
                 // TODO(BRR) remove this branch?
                 printf("Pmhd0: %e Prad0: %e umin: %e xi: %e\n", P_mhd_guess[0], P_rad_guess[0], umin, xi);
-                printf("[%i %i %i] Can't rescale (fac: %e)!\n", k, j, i, scaling_factor);
+                printf("ug0: %e ur0: %e facs: %e %e %e\n",
+                ug0, ur0,
+                  ximax/xi, (ug0 - umin) / (ug0 - P_mhd_guess[0]),
+                  (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
+                printf("[%i %i %i][niter: %i] Can't rescale (fac: %e)!\n", k, j, i, niter, scaling_factor);
                 //exit(-1);
               } else {
                 for (int m = 0; m < 4; m++) {
@@ -1802,7 +1806,6 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // If sequence of source update methods was successful, apply update to conserved
         // quantities. If unsuccessful, mark zone for fixup.
-        // TODO(BRR) hack
         if (success == true) {
           v(iblock, ifail, k, j, i) = FailFlags::success;
 
