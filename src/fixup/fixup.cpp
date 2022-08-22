@@ -343,14 +343,14 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             constexpr Real ximax = 0.991;
             if (xi > ximax) {
               floor_applied = true;
-              printf("Applying xi floor! [%i %i %i] xi old = %e\n", k, j, i, xi);
-              printf("old: J: %e covH: %e %e %e\n",
-                v(b, idx_J(ispec), k, j, i),
-                v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 0), k, j, i),
-                v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 1), k, j, i),
-                v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 2), k, j, i));
+              //printf("Applying xi floor! [%i %i %i] xi old = %e\n", k, j, i, xi);
+              //printf("old: J: %e covH: %e %e %e\n",
+              //  v(b, idx_J(ispec), k, j, i),
+              //  v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 0), k, j, i),
+              //  v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 1), k, j, i),
+              //  v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 2), k, j, i));
 
-              exit(-1);
+              //exit(-1);
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi; }
             }
 
@@ -585,20 +585,20 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   }
 
   // TODO(BRR) make this less ugly
-//  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-//  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-//  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-//  parthenon::par_for(
-//      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
-//      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
-//      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-//        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
-//          // Do not use ghost zones as data for averaging
-//          // TODO(BRR) need to allow ghost zones from neighboring blocks
-//          v(b, ifluidfail, k, j, i) = con2prim_robust::FailFlags::fail;
-//          v(b, iradfail, k, j, i) = radiation::FailFlags::fail;
-//        }
-//      });
+  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
+      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+          // Do not use ghost zones as data for averaging
+          // TODO(BRR) need to allow ghost zones from neighboring blocks
+          v(b, ifluidfail, k, j, i) = con2prim_robust::FailFlags::fail;
+          v(b, iradfail, k, j, i) = radiation::FailFlags::fail;
+        }
+      });
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
@@ -821,19 +821,19 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
   // TODO(BRR) make this less ugly
-//  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-//  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-//  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-//  parthenon::par_for(
-//      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
-//      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
-//      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-//        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
-//          // Do not use ghost zones as data for averaging
-//          // TODO(BRR) need to allow ghost zones from neighboring blocks
-//          v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
-//        }
-//      });
+  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
+      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+          // Do not use ghost zones as data for averaging
+          // TODO(BRR) need to allow ghost zones from neighboring blocks
+          v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
+        }
+      });
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
@@ -974,13 +974,17 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
     if (ix1_bc == "outflow") {
       auto flux = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({fluid_cons::density, radmoment_cons::E}),
-          std::vector<std::string>({fluid_cons::density, radmoment_cons::E}));
+          std::vector<std::string>({fluid_cons::density, radmoment_cons::E, radmoment_cons::F}),
+          std::vector<std::string>({fluid_cons::density, radmoment_cons::E, radmoment_cons::F}));
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             flux.flux(X1DIR, 0, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
-          //  flux.flux(X1DIR, 1, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
+            flux.flux(X1DIR, 1, k, j, i) = std::min(flux.flux(X1DIR, 1, k, j, i), 0.0);
+            //flux.flux(X1DIR, 1, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
+            //flux.flux(X1DIR, 2, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
+            //flux.flux(X1DIR, 3, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
+            //flux.flux(X1DIR, 4, k, j, i) = std::min(flux.flux(X1DIR, 0, k, j, i), 0.0);
           });
     } else if (ix1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(
@@ -1004,7 +1008,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.e + 1, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             flux.flux(X1DIR, 0, k, j, i) = std::max(flux.flux(X1DIR, 0, k, j, i), 0.0);
-     //       flux.flux(X1DIR, 1, k, j, i) = std::max(flux.flux(X1DIR, 0, k, j, i), 0.0);
+            flux.flux(X1DIR, 1, k, j, i) = std::max(flux.flux(X1DIR, 1, k, j, i), 0.0);
           });
     } else if (ox1_bc == "reflect") {
       auto flux = rc->PackVariablesAndFluxes(
@@ -1331,7 +1335,7 @@ TaskStatus SourceFixup(T *rc) {
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
             printf("No valid source fixup neighbors! [%i %i %i]\n", k, j, i);
-            //PARTHENON_FAIL("yuck");
+            PARTHENON_FAIL("yuck");
 
             double rho_floor, sie_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
