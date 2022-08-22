@@ -321,7 +321,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         if (enable_rad_floors) {
           const Real r = std::exp(coords.x1v(k, j, i));
           // TODO(BRR) ar::code * T^-4?
-          const Real Jmin = 1.e-4 * std::pow(r, -4);
+//          const Real Jmin = 1.e-4 * std::pow(r, -4);
+          const Real Jmin = 1.e-10;
           for (int ispec = 0; ispec < nspec; ++ispec) {
             // if (v(b, idx_J(ispec), k, j, i) < 1.e-5 * v(b, peng, k, j, i)) {
             if (v(b, idx_J(ispec), k, j, i) < Jmin) {
@@ -567,6 +568,20 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
         },
         Kokkos::Sum<int>(nfail_total));
     printf("total rad nfail: %i\n", nfail_total);
+  IndexRange ibi = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jbi = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kbi = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  nfail_total = 0;
+    parthenon::par_reduce(
+        parthenon::loop_pattern_mdrange_tag, "Rad ConToPrim::Solve fixup failures",
+        DevExecSpace(), 0, v.GetDim(5) - 1, kbi.s, kbi.e, jbi.s, jbi.e, ibi.s, ibi.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+          if (v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
+            nf++;
+          }
+        },
+        Kokkos::Sum<int>(nfail_total));
+    printf("total rad interior nfail: %i\n", nfail_total);
   }
 
   // TODO(BRR) make this less ugly

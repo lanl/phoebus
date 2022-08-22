@@ -98,7 +98,7 @@ def plot_dump(filename, varname,
         val = q[i,0,:,:]
         if len(val.shape) > 2:
           print("WARNING plotting the 0th index of multidimensional variable!")
-          val = val[:,:,0]
+          val = val[:,:,2]
         mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:], shading='gouraud',
         #mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:], shading='gouraud',
         #mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:,0], shading='gouraud',
