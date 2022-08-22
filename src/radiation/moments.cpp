@@ -1211,8 +1211,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-  constexpr int izone = 9; //47; // 46; // 47; // 33;
-  constexpr int jzone = 10; //12; // 11; // 11; // 26;
+  constexpr int izone = -1; //9; //47; // 46; // 47; // 33;
+  constexpr int jzone = -1; //10; //12; // 11; // 11; // 26;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,

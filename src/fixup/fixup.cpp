@@ -343,14 +343,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             constexpr Real ximax = 0.991;
             if (xi > ximax) {
               floor_applied = true;
-              //printf("Applying xi floor! [%i %i %i] xi old = %e\n", k, j, i, xi);
-              //printf("old: J: %e covH: %e %e %e\n",
-              //  v(b, idx_J(ispec), k, j, i),
-              //  v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 0), k, j, i),
-              //  v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 1), k, j, i),
-              //  v(b, idx_J(ispec), k, j, i)*v(b, idx_H(ispec, 2), k, j, i));
-
-              //exit(-1);
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi; }
             }
 
@@ -439,19 +431,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                          v(b, idx_H(ispec, 1), k, j, i) * J,
                          v(b, idx_H(ispec, 2), k, j, i) * J}};
 
-                         // TODO(BRR) temporarily check xi here
-            //Vec conH{0};
-            Real con_gamma[3][3];
-            geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma);
-            Real xi = 0.;
-            SPACELOOP2(ii, jj) {
-              xi += con_gamma[ii][jj]*covH(ii)*covH(jj);
-            }
-            xi = std::sqrt(xi) / J;
-            if (xi > 1.0) {
-              printf("[%i %i %i] ispec = %i bad xi in applyfloor: %e\n", k,j,i,ispec,xi);
-            }
-
             if (programming::is_specialization_of<CLOSURE,
                                                   radiation::ClosureMOCMC>::value) {
               SPACELOOP2(ii, jj) {
@@ -463,7 +442,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
             c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
-            // TODO(BRR) temporarily not updating rad cons with floors
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * covF(ii); }
           }
@@ -1307,6 +1285,19 @@ TaskStatus SourceFixup(T *rc) {
           }
           return inv_mask_sum * v(b, iv, k, j, i);
         };
+        auto fixupall = [&](const int iv) {
+          v(b, iv, k, j, i) = v(b, iv, k, j, i - 1) +
+                              v(b, iv, k, j, i + 1);
+          if (ndim > 1) {
+            v(b, iv, k, j, i) += v(b, iv, k, j - 1, i) +
+                                 v(b, iv, k, j + 1, i);
+            if (ndim == 3) {
+              v(b, iv, k, j, i) += v(b, iv, k - 1, j, i) +
+                                   v(b, iv, k + 1, j, i);
+            }
+          }
+          return v(b, iv, k, j, i);
+        };
         if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
 
           Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
@@ -1344,7 +1335,17 @@ TaskStatus SourceFixup(T *rc) {
             v(b, peng, k, j, i) = rho_floor*sie_floor;
 
             // Zero primitive velocities
-            SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
+            //SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
+
+            // Average fluid, radiation in equilibrium
+            //v(b, prho, k, j, i) = fixupall(prho);
+            //v(b, peng, k, j, i) = fixupall(peng);
+            //SPACELOOP(ii) {
+            //  v(b, idx_pvel(ii), k, j, i) = fixupall(idx_pvel(ii));
+            //}
+
+            // Don't modify fluid at all
+
 
             // Auxiliary primitives
             // Safe value for ye
@@ -1362,6 +1363,7 @@ TaskStatus SourceFixup(T *rc) {
             for (int ispec = 0; ispec < nspec; ispec++) {
               //v(b, idx_J(ispec), k, j, i) = Jmin;
               v(b, idx_J(ispec), k, j, i) = 1.e-10;//d_opacity.EnergyDensityFromTemperature(v(b, tmp, k, j, i), species_d[ispec]);
+              //v(b, idx_J(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(v(b, tmp, k, j, i), species_d[ispec]);
               SPACELOOP(ii) {
                 v(b, idx_H(ispec, ii), k, j, i) = 0.;
               }
