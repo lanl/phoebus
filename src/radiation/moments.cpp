@@ -776,10 +776,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           // TODO(BRR) magic number
           // THIS CAUSES EXPLOSIONS?? maybe floor is too high
-          //const Real Jl = std::max<Real>(v(idx_ql(ispec, 0, idir), k, j, i), 1.e-15);
-          //const Real Jr = std::max<Real>(v(idx_qr(ispec, 0, idir), k, j, i), 1.e-15);
-          const Real Jl = v(idx_ql(ispec, 0, idir), k, j, i);
-          const Real Jr = v(idx_qr(ispec, 0, idir), k, j, i);
+          const Real Jl = std::max<Real>(v(idx_ql(ispec, 0, idir), k, j, i), 1.e-10);
+          const Real Jr = std::max<Real>(v(idx_qr(ispec, 0, idir), k, j, i), 1.e-10);
+          //const Real Jl = v(idx_ql(ispec, 0, idir), k, j, i);
+          //const Real Jr = v(idx_qr(ispec, 0, idir), k, j, i);
           Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 2, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
@@ -884,6 +884,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
+          // TODO(BRR) is this actually the wavespeed dx^i/dx^0 for LLF?
           const Real speed = a * 1.0 + (1 - a) * std::max(sqrt(cl.v2), sqrt(cr.v2));
           conFl = a * conFl + (1 - a) * conFl_asym;
           conFr = a * conFr + (1 - a) * conFr_asym;
@@ -1564,6 +1565,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               constexpr Real ximax = 0.99;
 
               constexpr Real umin = 1.e-20; // TODO(BRR) use floors
+              constexpr Real Jmin = 1.e-10;
 
               Real scaling_factor = 0.;
               if (xi > ximax) {
@@ -1573,7 +1575,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                 scaling_factor = std::max<Real>(scaling_factor, (ug0 - umin) / (ug0 - P_mhd_guess[0]));
               }
               if (P_rad_guess[0] < umin) {
-                scaling_factor = std::max<Real>(scaling_factor, (ur0 - umin) / (ur0 - P_rad_guess[0]));
+                scaling_factor = std::max<Real>(scaling_factor, (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
               }
               //printf("[%i %i %i] scaling_factor = %e (%e %e %e)\n",k,j,i,
               //  scaling_factor, ximax/xi, umin/P_mhd_guess[0], umin/P_rad_guess[0]);
@@ -1583,7 +1585,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                 // TODO(BRR) remove this branch?
                 printf("Pmhd0: %e Prad0: %e umin: %e xi: %e\n", P_mhd_guess[0], P_rad_guess[0], umin, xi);
                 printf("[%i %i %i] Can't rescale (fac: %e)!\n", k, j, i, scaling_factor);
-                exit(-1);
+                //exit(-1);
               } else {
                 for (int m = 0; m < 4; m++) {
                   for (int n = 0; n < 4; n++) {
