@@ -45,7 +45,7 @@ dt          = 0.1
 
 <parthenon/time>
 nlim        = -1 # 84        # cycle limit
-tlim        = 4.    # time limit
+tlim        = 50.    # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.0 # 1.e-6
@@ -148,11 +148,19 @@ enable_c2p_fixup = true
 enable_source_fixup = true
 report_c2p_fails = true
 report_source_fails = true
-floor_type = ExpX1RhoU
-rho0_floor = 1.0e-5
-u0_floor = 1.0e-7
+
+floor_type = ExpX1RhoSie
+rho0_floor = 1.0e-8
+sie0_floor = 1.0e-3
 rho_exp_floor = -2.0
-u_exp_floor = -3.0 # -2.5
+sie_exp_floor = -1.0
+
+#floor_type = ExpX1RhoU
+#rho0_floor = 1.0e-5
+#u0_floor = 1.0e-7
+#rho_exp_floor = -2.0
+#u_exp_floor = -3.0 # -2.5
+
 ceiling_type = ConstantGamSie
 sie0_ceiling = 1.0
 gam0_ceiling = 10.0

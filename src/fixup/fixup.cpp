@@ -262,6 +262,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         double rho_floor, sie_floor;
         bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
                          rho_floor, sie_floor);
+        if (i == 12 && j == 40) {
+          printf("rho_floor: %e u_floor: %e\n", rho_floor, rho_floor*sie_floor);
+        }
 
         bool floor_applied = false;
         if (v(b, prho, k, j, i) < rho_floor) {

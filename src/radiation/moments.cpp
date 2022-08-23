@@ -1212,8 +1212,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-  constexpr int izone = 5; //9; //47; // 46; // 47; // 33;
-  constexpr int jzone = 57; //10; //12; // 11; // 11; // 26;
+  constexpr int izone = 12; //5; //9; //47; // 46; // 47; // 33;
+  constexpr int jzone = 40; //57; //10; //12; // 11; // 11; // 26;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1569,9 +1569,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                      U_rad_guess[2], U_rad_guess[3]);
             }
             if (status == ClosureStatus::failure) {
-            //  printf("[%i] bad guess P_mhd_guess: %e %e %e %e Pr: %e %e %e %e\n", niter,
-             //        P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3],
-            //         P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+             if (i == izone && j == jzone) {
+             printf("[%i] bad guess P_mhd_guess: %e %e %e %e Pr: %e %e %e %e\n", niter,
+                    P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3],
+                    P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+             }
             //  printf("[%i %i %i]\n", k, j, i);
             //  printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
               bad_guess = true;
@@ -1624,10 +1626,14 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                 status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
                 srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
                 if (status == ClosureStatus::success) {
-                  //printf("[%i %i %i] scaled reguess worked\n", k, j, i);
+                  if (i == izone && j == jzone) {
+                  printf("[%i %i %i] scaled reguess worked\n", k, j, i);
+                  }
                   bad_guess = false;
                 } else {
-                  //printf("[%i %i %i] scaled reguess failed\n", k, j, i);
+                  if (i == izone && j == jzone) {
+                  printf("[%i %i %i] scaled reguess failed\n", k, j, i);
+                  }
                 }
               }
             }
