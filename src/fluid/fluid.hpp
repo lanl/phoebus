@@ -20,6 +20,8 @@
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
+#include "phoebus_utils/variables.hpp"
+
 namespace fluid {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
@@ -40,17 +42,55 @@ TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib,
                                            const IndexRange &jb, const IndexRange &kb);
 TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src);
-TaskStatus CopyFluxDivergence(MeshBlockData<Real> *rc);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
 TaskStatus FluxCT(MeshBlockData<Real> *rc);
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc);
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
+
+template <class T>
+TaskStatus CopyFluxDivergence(T *rc);
 
 template <typename T>
 using c2p_type = TaskStatus (*)(T *, const IndexRange &, const IndexRange &,
                                 const IndexRange &);
 using c2p_meshblock_type = c2p_type<MeshBlockData<Real>>;
 using c2p_mesh_type = c2p_type<MeshData<Real>>;
+
+#if SET_FLUX_SRC_DIAGS
+template <class T>
+TaskStatus CopyFluxDivergence(T *rc) {
+  auto pmb = rc->GetParentPointer();
+  auto &fluid = pmb->packages.Get("fluid");
+  const Params &params = fluid->AllParams();
+  if (!params.Get<bool>("active")) return TaskStatus::complete;
+
+  std::vector<std::string> vars(
+      {fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
+  PackIndexMap imap;
+  auto divf = rc->PackVariables(vars, imap);
+  const int crho = imap[fluid_cons::density].first;
+  const int cmom_lo = imap[fluid_cons::momentum].first;
+  const int cmom_hi = imap[fluid_cons::momentum].second;
+  const int ceng = imap[fluid_cons::energy].first;
+  std::vector<std::string> diag_vars({diagnostic_variables::divf});
+  auto diag = rc->PackVariables(diag_vars);
+
+  // TODO(JMM): If we expose a way to get cellbounds from the mesh or
+  // meshdata object, that would be better.
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "CopyDivF", DevExecSpace(), 0, divf.GetDim(5) - 1, 0,
+      divf.GetDim(3) - 1, 0, divf.GetDim(2) - 1, 0, divf.GetDim(1) - 1,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        diag(b, 0, k, j, i) = divf(b, crho, k, j, i);
+        diag(b, 1, k, j, i) = divf(b, cmom_lo, k, j, i);
+        diag(b, 2, k, j, i) = divf(b, cmom_lo + 1, k, j, i);
+        diag(b, 3, k, j, i) = divf(b, cmom_lo + 2, k, j, i);
+        diag(b, 4, k, j, i) = divf(b, ceng, k, j, i);
+      });
+  return TaskStatus::complete;
+}
+
+#endif
 
 } // namespace fluid
 

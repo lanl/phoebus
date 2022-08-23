@@ -17,7 +17,9 @@
 #include <vector>
 
 // TODO(JCD): this should be exported by parthenon
+#include <bvals/cc/bvals_cc_in_one.hpp>
 #include <globals.hpp>
+#include <mesh/refinement_cc_in_one.hpp>
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 #include <refinement/refinement.hpp>
@@ -99,8 +101,6 @@ void PhoebusDriver::PostInitializationCommunication() {
   TaskID none(0);
   BlockList_t &blocks = pmesh->block_list;
 
-  const auto &stage_name = integrator->stage_name;
-
   auto rad = pmesh->packages.Get("radiation");
   auto fluid = pmesh->packages.Get("fluid");
   const bool rad_active = rad->Param<bool>("active");
@@ -112,27 +112,46 @@ void PhoebusDriver::PostInitializationCommunication() {
     rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
   }
 
+  const int num_partitions = pmesh->DefaultNumPartitions();
+  TaskRegion &sync_region = tc.AddRegion(num_partitions);
+  for (int ib = 0; ib < num_partitions; ib++) {
+    auto &md = pmesh->mesh_data.GetOrAdd("base", ib);
+    auto &tl = sync_region[ib];
+
+    const auto any = parthenon::BoundaryType::any;
+    const auto local = parthenon::BoundaryType::local;
+    const auto nonlocal = parthenon::BoundaryType::nonlocal;
+
+    auto start_recv =
+        tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveBoundBufs<any>, md);
+
+    auto send = tl.AddTask(start_recv,
+                           parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, md);
+
+    auto send_local =
+        tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundBufs<local>, md);
+    auto recv_local = tl.AddTask(
+        start_recv, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, md);
+    auto set_local =
+        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, md);
+
+    auto recv = tl.AddTask(
+        start_recv, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, md);
+    auto set = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBounds<nonlocal>, md);
+
+    if (pmesh->multilevel) {
+      tl.AddTask(set | set_local,
+                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, md.get());
+    }
+  }
+
   TaskRegion &async_region = tc.AddRegion(blocks.size());
   for (int ib = 0; ib < blocks.size(); ib++) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region[ib];
     auto &sc = pmb->meshblock_data.Get();
-    auto &md =
-        pmesh->mesh_data.GetOrAdd(stage_name[0], ib); // TODO(BRR) This gives an empty md
 
-    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc.get(),
-                                 BoundaryCommSubset::all);
-    auto send =
-        tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundaryBuffers, md);
-    auto recv =
-        tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, md);
-    auto fill_from_bufs =
-        tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, md);
-    auto clear_comm_flags =
-        tl.AddTask(fill_from_bufs, &MeshBlockData<Real>::ClearBoundary, sc.get(),
-                   BoundaryCommSubset::all);
-
-    auto prolongBound = tl.AddTask(clear_comm_flags, parthenon::ProlongateBoundaries, sc);
+    auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
 
     auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
 
@@ -223,21 +242,40 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   }
   bool time_dependent_geom = geom_params.Get("time_dependent", false);
 
+  // First we need to make all the meshblock-level containers
+  if (stage == 1) {
+    for (int i = 0; i < blocks.size(); ++i) {
+      auto &pmb = blocks[i];
+      auto &base = pmb->meshblock_data.Get();
+      pmb->meshblock_data.Add("dUdt", base);
+      for (int i = 1; i < integrator->nstages; i++) {
+        pmb->meshblock_data.Add(stage_name[i], base);
+        pmb->meshblock_data.Add("geometric source terms", base, src_w_diag);
+      }
+    }
+  }
+
+  // be ready for flux corrections and boundary comms
+  const int num_partitions = pmesh->DefaultNumPartitions();
+  TaskRegion &sync_region_0 = tc.AddRegion(num_partitions);
+  for (int ib = 0; ib < num_partitions; ++ib) {
+    auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
+    auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
+    auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
+    auto &tl = sync_region_0[ib];
+
+    const auto any = parthenon::BoundaryType::any;
+    tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveBoundBufs<any>, sc1);
+    if (pmesh->multilevel) {
+      tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveFluxCorrections, sc0);
+    }
+  }
+
   auto num_independent_task_lists = blocks.size();
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region_1[ib];
-
-    // first make other useful containers
-    auto &base = pmb->meshblock_data.Get();
-    if (stage == 1) {
-      pmb->meshblock_data.Add("dUdt", base);
-      for (int i = 1; i < integrator->nstages; i++) {
-        pmb->meshblock_data.Add(stage_name[i], base);
-      }
-      pmb->meshblock_data.Add("geometric source terms", base, src_w_diag);
-    }
 
     // pull out the container we'll use to get fluxes and/or compute RHSs
     auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
@@ -250,8 +288,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // pull out a container for the geometric source terms
     auto &gsrc = pmb->meshblock_data.Get("geometric source terms");
 
-    auto start_recv = tl.AddTask(none, &MeshBlockData<Real>::StartReceiving, sc1.get(),
-                                 BoundaryCommSubset::all);
     TaskID geom_src(0);
     TaskID sndrcv_flux_depend(0);
 
@@ -299,34 +335,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
       geom_src = geom_src | eddington;
     }
-
-    auto send_flux = tl.AddTask(sndrcv_flux_depend,
-                                &MeshBlockData<Real>::SendFluxCorrection, sc0.get());
-
-    auto recv_flux = tl.AddTask(sndrcv_flux_depend,
-                                &MeshBlockData<Real>::ReceiveFluxCorrection, sc0.get());
-
-    // compute the divergence of fluxes of conserved variables
-    auto flux_div =
-        tl.AddTask(recv_flux, parthenon::Update::FluxDivergence<MeshBlockData<Real>>,
-                   sc0.get(), dudt.get());
-
-#if SET_FLUX_SRC_DIAGS
-    auto copy_flux_div =
-        tl.AddTask(flux_div | geom_src, fluid::CopyFluxDivergence, dudt.get());
-#endif
-
-    auto add_rhs =
-        tl.AddTask(flux_div | geom_src, SumData<std::string, MeshBlockData<Real>>,
-                   src_names, dudt.get(), gsrc.get(), dudt.get());
-
-#if PRINT_RHS
-    auto print_rhs =
-        tl.AddTask(add_rhs, Debug::PrintRHS<MeshBlockData<Real>>, dudt.get());
-    auto next = print_rhs;
-#else
-    auto next = add_rhs;
-#endif
   }
 
   if (rad_mocmc_active && stage == integrator->nstages) {
@@ -370,13 +378,13 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
   }
 
-  const int num_partitions = pmesh->DefaultNumPartitions();
   TaskRegion &sync_region = tc.AddRegion(num_partitions);
   for (int ib = 0; ib < num_partitions; ib++) {
     auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
     auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
     auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
     auto &dudt = pmesh->mesh_data.GetOrAdd("dUdt", ib);
+    auto &gsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", ib);
     auto &tl = sync_region[ib];
     int reg_dep_id = 0;
 
@@ -393,8 +401,29 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       sync_region.AddRegionalDependencies(reg_dep_id++, ib, interp_to_monopole);
     }
 
+    // fluxes now sent/received in mesh-data.
+    auto send_flux =
+        tl.AddTask(none, parthenon::cell_centered_bvars::LoadAndSendFluxCorrections, sc0);
+    auto recv_flux =
+        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveFluxCorrections, sc0);
+    auto set_flux =
+        tl.AddTask(recv_flux, parthenon::cell_centered_bvars::SetFluxCorrections, sc0);
+
+    // compute the divergence of fluxes of conserved variables
+    auto flux_div =
+        tl.AddTask(set_flux, parthenon::Update::FluxDivergence<MeshData<Real>>, sc0.get(),
+                   dudt.get());
+
+#if SET_FLUX_SRC_DIAGS
+    auto copy_flux_div =
+        tl.AddTask(flux_div, fluid::CopyFluxDivergence<MeshData<Real>>, dudt.get());
+#endif
+
+    auto add_rhs = tl.AddTask(flux_div, SumData<std::string, MeshData<Real>>, src_names,
+                              dudt.get(), gsrc.get(), dudt.get());
+
     // update step
-    auto avg_data = tl.AddTask(none, AverageIndependentData<MeshData<Real>>, sc0.get(),
+    auto avg_data = tl.AddTask(add_rhs, AverageIndependentData<MeshData<Real>>, sc0.get(),
                                base.get(), beta);
     auto update = tl.AddTask(avg_data, UpdateIndependentData<MeshData<Real>>, sc0.get(),
                              dudt.get(), beta * dt, sc1.get());
@@ -456,12 +485,26 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
 
     // update ghost cells
+    const auto local = parthenon::BoundaryType::local;
+    const auto nonlocal = parthenon::BoundaryType::nonlocal;
     auto send =
-        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
-    auto recv =
-        tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
-    auto fill_from_bufs =
-        tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, sc1);
+        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, sc1);
+
+    auto send_local =
+        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundBufs<local>, sc1);
+    auto recv_local =
+        tl.AddTask(update, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, sc1);
+    auto set_local =
+        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, sc1);
+
+    auto recv = tl.AddTask(
+        update, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, sc1);
+    auto set = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBounds<nonlocal>, sc1);
+
+    if (pmesh->multilevel) {
+      tl.AddTask(set | set_local,
+                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, sc1.get());
+    }
   }
 
   TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);
@@ -469,9 +512,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region_2[ib];
     auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
-
-    auto clear_comm_flags = tl.AddTask(none, &MeshBlockData<Real>::ClearBoundary,
-                                       sc1.get(), BoundaryCommSubset::all);
 
     auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc1);
 
