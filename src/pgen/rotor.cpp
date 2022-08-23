@@ -64,9 +64,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
   auto gpkg = pmb->packages.Get("geometry");
   auto geom = Geometry::GetCoordinateSystem(rc.get());
-  Real a_snake, k_snake, alpha, betax, betay, betaz;
+  Real a_snake, k_snake, alpha, betay;
   alpha = 1;
-  a_snake = k_snake = betax = betay = betaz = 0;
+  a_snake = k_snake = betay = 0;
   Real tf = pin->GetReal("parthenon/time", "tlim");
   if (is_snake) {
     a_snake = gpkg->Param<Real>("a");
