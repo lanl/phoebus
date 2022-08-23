@@ -113,7 +113,8 @@ class SourceResidual4 {
     W = std::sqrt(1. + W);
     Real cov_v[3] = {0};
     SPACELOOP2(ii, jj) {
-      cov_v[ii] += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1] / (W * W);
+      //cov_v[ii] += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1] / (W * W);
+      cov_v[ii] += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] / W;
     }
     Real vdH = 0.;
     SPACELOOP(ii) { vdH += P_mhd[ii + 1] / W * P_rad[ii + 1]; }
@@ -1211,8 +1212,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-  constexpr int izone = -1; //9; //47; // 46; // 47; // 33;
-  constexpr int jzone = -1; //10; //12; // 11; // 11; // 26;
+  constexpr int izone = 5; //9; //47; // 46; // 47; // 33;
+  constexpr int jzone = 57; //10; //12; // 11; // 11; // 26;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1345,6 +1346,38 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                  P_rad_guess[3]);
           printf("Urad0: %e %e %e %e\n", U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
                  U_rad_guess[3]);
+
+          // Inspect sources
+          {
+            Real lambda[2] = {Ye, 0};
+            Real Tg = eos.TemperatureFromDensityInternalEnergy(rho, P_mhd_guess[0] / rho, lambda);
+            const Real JBB = d_opacity.EnergyDensityFromTemperature(Tg, species_d[ispec]);
+            printf("Tg: %e JBB: %e\n", Tg, JBB);
+            const Real kappaH = d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, lambda[0],
+            species_d[ispec]);
+            Real kappaJ = (1. - scattering_fraction) * kappaH;
+            printf("kappaH: %e kappaJ: %e\n", kappaH, kappaJ);
+            Real W = 0.;
+            SPACELOOP2(ii, jj) { W += cov_g[ii + 1][jj + 1] * P_mhd_guess[ii + 1] * P_mhd_guess[jj + 1]; }
+            W = std::sqrt(1. + W);
+            printf("W: %e\n", W);
+            Real cov_v[3] = {0};
+            SPACELOOP2(ii, jj) {
+              //cov_v[ii] += cov_g[ii + 1][jj + 1] * P_mhd_guess[ii + 1] * P_mhd_guess[jj + 1] / (W * W);
+              cov_v[ii] += cov_g[ii + 1][jj + 1] * P_mhd_guess[jj + 1] / W;
+            }
+            Real vdH = 0.;
+            SPACELOOP(ii) { vdH += P_mhd_guess[ii + 1] / W * P_rad_guess[ii + 1]; }
+            printf("cov_v: %e %e %e\n", cov_v[0], cov_v[1], cov_v[2]);
+            printf("vdH = %e\n", vdH);
+            Real S[4] = {0};
+            S[0] = alpha * sdetgam * (kappaJ * W * (JBB - P_rad_guess[0]) - kappaH * vdH);
+            SPACELOOP(ii) {
+      S[ii + 1] = alpha * sdetgam *
+                  (kappaJ * W * cov_v[ii] * (JBB - P_rad_guess[0]) - kappaH * P_rad_guess[1 + ii]);
+            }
+            printf("S: %e %e %e %e\n", S[0], S[1], S[2], S[3]);
+          }
         }
         //        if (i == 64 && j == 64) {
         //          printf("Pmhd Umhd Prad Urad:\n");
@@ -1384,8 +1417,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                                P_mhd_guess[3]};
             Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
                                P_mhd_guess[3]};
-            P_mhd_m[m] -= std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
-            P_mhd_p[m] += std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
+            const Real fd_step = std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_guess[m]));
+            P_mhd_m[m] -= fd_step;
+            P_mhd_p[m] += fd_step;
 
             srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
             srm.CalculateRadConserved(U_mhd_m, U_rad_m);
@@ -1395,7 +1429,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               if (izone == i && jzone == j) {
               printf("bad - guess! [%i %i %i][%i] P_rad_m = %e %e %e %e\n", k, j, i, m,
                      P_rad_m[0], P_rad_m[1], P_rad_m[2], P_rad_m[3]);
-                   bad_guess = true;
+               //    bad_guess = true;
               }
               bad_guess_m = true;
             }
@@ -1408,7 +1442,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               if (izone == i && jzone == j) {
               printf("bad + guess! [%i %i %i][%i] P_rad_p = %e %e %e %e\n", k, j, i, m,
                      P_rad_p[0], P_rad_p[1], P_rad_p[2], P_rad_p[3]);
-                bad_guess = true;
+             //   bad_guess = true;
               }
               bad_guess_p = true;
             }
@@ -1824,6 +1858,23 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
            SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
           }
         } else {
+          printf("source fail! %i %i %i\n", k,j,i);
+          printf("sdetgam: %e\n", sdetgam);
+          printf("rho: %e Tg: %e ug: %e\n", rho, Tg, ug);
+          int nspec = 0;
+          printf("J: %e H: %e %e %e\n", v(iblock, idx_E(ispec), k, j, i),
+            v(iblock, idx_H(ispec, 0), k, j, i),
+            v(iblock, idx_H(ispec, 1), k, j, i),
+            v(iblock, idx_H(ispec, 2), k, j, i));
+          Real J = v(iblock, idx_J(ispec), k, j, i);
+          Vec cov_H{{
+              J * v(iblock, idx_H(ispec, 0), k, j, i),
+              J * v(iblock, idx_H(ispec, 1), k, j, i),
+              J * v(iblock, idx_H(ispec, 2), k, j, i),
+          }};
+          Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+          printf("xi: %e\n", xi);
+          exit(-1);
           v(iblock, ifail, k, j, i) = FailFlags::fail;
         }
       });

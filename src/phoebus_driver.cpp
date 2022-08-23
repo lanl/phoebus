@@ -526,8 +526,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // TODO(BRR) we could avoid this by communicating both derived and independent
     // quantities for stencils... but we need to FillDerived earlier to do the whole fixup
     // routine.
-    auto fill_derived =
-        tl.AddTask(none, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+    //auto fill_derived =
+    //    tl.AddTask(none, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+    // TODO(BRR) don't do fill derived here?
+    TaskID fill_derived(0);
 
     if (rad_mocmc_active) {
       auto impl_update =

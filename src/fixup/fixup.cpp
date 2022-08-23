@@ -340,7 +340,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                 v(b, idx_H(ispec, jj), k, j, i);
             }
             xi = std::sqrt(xi);
-            constexpr Real ximax = 0.991;
+            constexpr Real ximax = 0.99;
             if (xi > ximax) {
               floor_applied = true;
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax/xi; }
