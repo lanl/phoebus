@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -98,8 +98,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("dlnu", dlnu);
   }
 
-  int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
-  params.Add("num_species", num_species);
+  //int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
   std::vector<RadiationType> species;
   if (do_nu_electron) {
     species.push_back(RadiationType::NU_ELECTRON);
@@ -110,9 +109,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (do_nu_heavy) {
     species.push_back(RadiationType::NU_HEAVY);
   }
+  const int num_species = species.size();
+  params.Add("num_species", num_species);
   params.Add("species", species);
-  PARTHENON_REQUIRE(num_species == species.size(),
-                    "Number of species does not match requested species!");
 
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
@@ -130,7 +129,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata fourv_swarmvalue_metadata({Metadata::Real}, std::vector<int>{4});
     physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
     Metadata Inu_swarmvalue_metadata({Metadata::Real},
-                                     std::vector<int>{NumRadiationTypes, nu_bins});
+                                     std::vector<int>{num_species, nu_bins});
     physics->AddSwarmValue("Inuinv", swarm_name, Inu_swarmvalue_metadata);
 
     // Boundary temperatures for outflow sample boundary conditions
@@ -186,7 +185,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     params.Add("mocmc_recon", mocmc_recon);
 
-    std::vector<int> Inu_size{NumRadiationTypes, nu_bins};
+    std::vector<int> Inu_size{num_species, nu_bins};
     Metadata mInu = Metadata({Metadata::Cell, Metadata::OneCopy}, Inu_size);
     physics->AddField(mocmc_internal::Inu0, mInu);
     physics->AddField(mocmc_internal::Inu1, mInu);
@@ -212,12 +211,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("species", swarm_name, int_swarmvalue_metadata);
 
     Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy},
-                                        std::vector<int>(1, NumRadiationTypes));
+                                        std::vector<int>{num_species});
     physics->AddField("dNdlnu_max", mspecies_scalar);
     physics->AddField("dN", mspecies_scalar);
     physics->AddField("Ns", mspecies_scalar);
 
-    std::vector<int> dNdlnu_size{NumRadiationTypes, params.Get<int>("nu_bins") + 1};
+    std::vector<int> dNdlnu_size{num_species, params.Get<int>("nu_bins") + 1};
     Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
     physics->AddField("dNdlnu", mdNdlnu);
 
@@ -312,20 +311,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata mspecies_three_vector =
         Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
                   Metadata::Intensive, Metadata::FillGhost, Metadata::Vector},
-                 std::vector<int>{NumRadiationTypes, 3});
+                 std::vector<int>{num_species, 3});
     Metadata mspecies_scalar =
         Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
                   Metadata::Intensive, Metadata::FillGhost},
-                 std::vector<int>{NumRadiationTypes});
+                 std::vector<int>{num_species});
 
     Metadata mspecies_three_vector_cons = Metadata(
         {Metadata::Cell, Metadata::Independent, Metadata::Conserved, Metadata::Intensive,
          Metadata::WithFluxes, Metadata::FillGhost, Metadata::Vector},
-        std::vector<int>{NumRadiationTypes, 3});
+        std::vector<int>{num_species, 3});
     Metadata mspecies_scalar_cons =
         Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
                   Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost},
-                 std::vector<int>{NumRadiationTypes});
+                 std::vector<int>{num_species});
 
     physics->AddField(c::E, mspecies_scalar_cons);
     physics->AddField(c::F, mspecies_three_vector_cons);
@@ -345,7 +344,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       nrecon += 9; // Reconstruct conTilPi // TODO(BRR) Use 6 elements by symmetry
     }
     Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-                               std::vector<int>{NumRadiationTypes, nrecon, ndim});
+                               std::vector<int>{num_species, nrecon, ndim});
     Metadata mrecon_v = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                  std::vector<int>{3, ndim});
     physics->AddField(i::ql, mrecon);
@@ -355,12 +354,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     // Add variable for calculating gradients of rest frame energy density
     Metadata mdJ = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-                            std::vector<int>{NumRadiationTypes, ndim, ndim});
+                            std::vector<int>{num_species, ndim, ndim});
     physics->AddField(i::dJ, mdJ);
 
     // Add variables for source functions
     Metadata mSourceVar = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-                                   std::vector<int>{NumRadiationTypes});
+                                   std::vector<int>{num_species});
     physics->AddField(i::kappaJ, mSourceVar);
     physics->AddField(i::kappaH, mSourceVar);
     physics->AddField(i::JBB, mSourceVar);
@@ -376,7 +375,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     if (method == "mocmc") {
       Metadata mspecies_three_tensor = Metadata(
           {Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
-          std::vector<int>{NumRadiationTypes, 3, 3});
+          std::vector<int>{num_species, 3, 3});
 
       physics->AddField(i::tilPi, mspecies_three_tensor);
       physics->AddField(mocmc_internal::dnsamp, mscalar);
@@ -389,12 +388,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
-  printf("Done initializing\n");
-
   return physics;
 }
 
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
+  PARTHENON_REQUIRE(USE_VALENCIA, "Covariant GRMHD formulation not supported!");
+
   namespace c = fluid_cons;
   namespace iv = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
@@ -417,12 +416,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-// TODO(BRR) check this
-#if USE_VALENCIA
         v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
-#else
-        v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
-#endif
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;

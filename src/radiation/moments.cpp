@@ -657,7 +657,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
   auto species = rad_pkg->Param<std::vector<RadiationType>>("species");
   auto num_species = rad_pkg->Param<int>("num_species");
-  RadiationType species_d[3] = {};
+  RadiationType species_d[MaxNumRadiationSpecies] = {};
   for (int s = 0; s < num_species; s++) {
     species_d[s] = species[s];
   }
