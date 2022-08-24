@@ -98,7 +98,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("dlnu", dlnu);
   }
 
-  //int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
   std::vector<RadiationType> species;
   if (do_nu_electron) {
     species.push_back(RadiationType::NU_ELECTRON);
