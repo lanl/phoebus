@@ -91,10 +91,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto rad = pmb->packages.Get("radiation").get();
   auto species = rad->Param<std::vector<singularity::RadiationType>>("species");
   auto num_species = rad->Param<int>("num_species");
-  singularity::RadiationType species_d[3] = {};
-  for (int s = 0; s < num_species; s++) {
-    species_d[s] = species[s];
-  }
 
   const Real W = 1 / sqrt(1 - vx * vx);
   const Real t0p = 1.5 * kappa * width * width;

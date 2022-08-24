@@ -52,10 +52,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const auto specB = idJ.GetBounds(1);
   const Real J = pin->GetOrAddReal("radiation_equilibration", "J", 0.0);
 
-  auto &coords = pmb->coords;
-  auto pmesh = pmb->pmy_mesh;
-  int ndim = pmesh->ndim;
-
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);

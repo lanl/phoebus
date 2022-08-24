@@ -99,6 +99,9 @@ if(PHOEBUS_ENABLE_CUDA)
   set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
   set(Kokkos_ENABLE_CUDA_RELOCATABLE_DEVICE_CODE ON CACHE BOOL "" FORCE)
   set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
+  # Get around a bug with atomics on Cray
+  # This option will eventually be deprecated, so care required.
+  set(Kokkos_ENABLE_IMPL_DESUL_ATOMICS OFF CACHE BOOL "" FORCE)
 endif()
 
 # HDF5
@@ -159,6 +162,10 @@ set(SINGULARITY_SUBMODULE_MODE ON CACHE BOOL "" FORCE)
 set(SINGULARITY_USE_KOKKOSKERNELS OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_BUILD_CLOSURE OFF CACHE BOOL "" FORCE)
 
+# Kill cmake's package registry because it can interfere
+set(CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
+set(CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
+
 # singularity eos
 message("Configuring singularity-eos")
 add_subdirectory(external/singularity-eos singularity-eos)
@@ -172,14 +179,6 @@ include(cmake/Geometry.cmake)
 
 # Fluid
 include(cmake/Fluid.cmake)
-
-# Print RHS
-option(PHOEBUS_PRINT_RHS "Print right hand sides" OFF)
-if (PHOEBUS_PRINT_RHS)
-   set(PRINT_RHS 1)
-else()
-   set(PRINT_RHS 0)
-endif()
 
 # Phoebus src
 message("\nConfiguring src")

@@ -37,8 +37,8 @@ namespace cr = radmoment_cons;
 namespace pr = radmoment_prim;
 namespace ir = radmoment_internal;
 namespace im = mocmc_internal;
-using namespace singularity;
 using namespace singularity::neutrinos;
+using singularity::EOS;
 using singularity::RadiationType;
 using vpack_types::FlatIdx;
 
