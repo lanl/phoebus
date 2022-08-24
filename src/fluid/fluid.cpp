@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -542,9 +542,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_sources"))
     return TaskStatus::complete;
 
-  // printf("skipping fluid sources\n");
-  // return TaskStatus::complete;
-
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -635,9 +632,6 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   auto &fluid = pmb->packages.Get("fluid");
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
-
-  // printf("skipping fluid fluxes\n");
-  // return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
   auto sig = rc->Get(internal_variables::face_signal_speed).data;

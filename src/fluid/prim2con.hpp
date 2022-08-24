@@ -1,15 +1,15 @@
-//========================================================================================
-// (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
-//
-// This program was produced under U.S. Government contract 89233218CNA000001 for Los
-// Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
-// for the U.S. Department of Energy/National Nuclear Security Administration. All rights
-// in the program are reserved by Triad National Security, LLC, and the U.S. Department
-// of Energy/National Nuclear Security Administration. The Government is granted for
-// itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
-// license in this material to reproduce, prepare derivative works, distribute copies to
-// the public, perform publicly and display publicly, and to permit others to do so.
-//========================================================================================
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
+// 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
+// is operated by Triad National Security, LLC for the U.S.
+// Department of Energy/National Nuclear Security Administration. All
+// rights in the program are reserved by Triad National Security, LLC,
+// and the U.S. Department of Energy/National Nuclear Security
+// Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works,
+// distribute copies to the public, perform publicly and display
+// publicly, and to permit others to do so.
 
 #ifndef FLUID_PRIM2CON_HPP_
 #define FLUID_PRIM2CON_HPP_
@@ -77,10 +77,6 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
     SPACELOOP(n) { vcov += gcov[m + 1][n + 1] * v[n]; }
     S[m] = gdet * (rho_rel * vcov - b0 * bcov[m]);
     bcons[m] = gdet * b[m];
-    // TODO(BRR) why is vcov[3] ~ 1.e-17 * vcov[1,2]??
-    // printf("[%i] S = %e (gdet %e rhorel %e vcov %e (v: %e %e %e gcov: %e %e %e) %e)\n",
-    //  m, S[m], gdet, rho_rel, vcov, v[0], v[1], v[2], gcov[m+1][1], gcov[m+1][2],
-    //  gcov[m+1][3], b0*bcov[m]);
   }
 
 #if USE_VALENCIA

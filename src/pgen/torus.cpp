@@ -107,12 +107,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int itmp = imap[fluid_prim::temperature].first;
   const int igm1 = imap[fluid_prim::gamma1].first;
 
-  vpack_types::FlatIdx iJ({-1}, -1);
-  vpack_types::FlatIdx iH({-1}, -1);
-  if (do_rad) {
-    iJ = imap.GetFlatIdx(radmoment_prim::J);
-    iH = imap.GetFlatIdx(radmoment_prim::H);
-  }
+  auto iJ = imap.GetFlatIdx(radmoment_prim::J, false);
+  auto iH = imap.GetFlatIdx(radmoment_prim::H, false);
   const auto specB = iJ.GetBounds(1);
 
   // this only works with ideal gases
@@ -166,8 +162,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   }
   /// TODO: (LFR) Fix this junk
   RadiationType d_species[3] = {species[0], species[1], species[2]};
-  auto &unit_conv =
-      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
   // set up transformation stuff
   auto gpkg = pmb->packages.Get("geometry");
@@ -307,11 +301,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               v(iH(ispec, 0), k, j, i) = 0.0;
               v(iH(ispec, 1), k, j, i) = 0.0;
               v(iH(ispec, 2), k, j, i) = 0.0;
-              if (i == 64 && j == 64 && ispec == 0) {
-                printf("J: %e H: %e %e %e\n", v(iJ(ispec), k, j, i),
-                       v(iH(ispec, 0), k, j, i), v(iH(ispec, 1), k, j, i),
-                       v(iH(ispec, 2), k, j, i));
-              }
             }
           } else {
             // In the atmosphere set some small radiation energy
