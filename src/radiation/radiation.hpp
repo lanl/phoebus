@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -46,9 +46,9 @@ enum class MOCMCBoundaries { outflow, fixed_temp, periodic };
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
 
-constexpr RadiationType species[3] = {
+constexpr int MaxNumRadiationSpecies = 3;
+constexpr RadiationType species[MaxNumRadiationSpecies] = {
     RadiationType::NU_ELECTRON, RadiationType::NU_ELECTRON_ANTI, RadiationType::NU_HEAVY};
-constexpr int NumRadiationTypes = 1; // TODO(BRR) testing new indexing
 
 KOKKOS_INLINE_FUNCTION
 Real LogLinearInterp(Real x, int sidx, int k, int j, int i, ParArrayND<Real> table,
