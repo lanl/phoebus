@@ -209,8 +209,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata int_swarmvalue_metadata({Metadata::Integer});
     physics->AddSwarmValue("species", swarm_name, int_swarmvalue_metadata);
 
-    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy},
-                                        std::vector<int>{num_species});
+    Metadata mspecies_scalar =
+        Metadata({Metadata::Cell, Metadata::OneCopy}, std::vector<int>{num_species});
     physics->AddField("dNdlnu_max", mspecies_scalar);
     physics->AddField("dN", mspecies_scalar);
     physics->AddField("Ns", mspecies_scalar);
