@@ -312,15 +312,10 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
         if (enable_rad_floors) {
           const Real r = std::exp(coords.x1v(k, j, i));
-          // TODO(BRR) ar::code * T^-4?
-          //          const Real Jmin = 1.e-4 * std::pow(r, -4);
           const Real Jmin = 1.e-10;
           for (int ispec = 0; ispec < num_species; ++ispec) {
-            // if (v(b, idx_J(ispec), k, j, i) < 1.e-5 * v(b, peng, k, j, i)) {
             if (v(b, idx_J(ispec), k, j, i) < Jmin) {
               floor_applied = true;
-              // printf("Applying rad floor to [%i %i %i]\n", k, j, i);
-              // v(b, idx_J(ispec), k, j, i) = 1.e-5 * v(b, peng, k, j, i);
               v(b, idx_J(ispec), k, j, i) = Jmin;
             }
 
@@ -337,31 +332,10 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               floor_applied = true;
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi; }
             }
-
-            // Limit magnitude of flux
-            //            const Real Hmag = std::sqrt(std::pow(v(b, idx_H(ispec, 0), k, j,
-            //            i), 2) +
-            //                                        std::pow(v(b, idx_H(ispec, 1), k, j,
-            //                                        i), 2) + std::pow(v(b, idx_H(ispec,
-            //                                        2), k, j, i), 2));
-
-            // if (Hmag > 1.) {
-            // TODO(BRR) nonsense tiny comoving flux!
-            //            if (Hmag > 0.01) {
-            //              //              printf("Hmag = %e! [%i %i %i]\n", Hmag,
-            //              k,j,i);
-            //              //              PARTHENON_FAIL("Hmag");
-            //              floor_applied = true;
-            //
-            //              //const Real rescale = 0.99 / Hmag;
-            //              const Real rescale = 0.01 / Hmag;
-            //              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= rescale; }
-            //            }
           }
         }
 
         if (floor_applied) {
-          // printf("Floor applied! %i %i %i\n", k, j, i);
           // Update dependent primitives
           if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
           v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
@@ -1027,8 +1001,6 @@ TaskStatus SourceFixup(T *rc) {
             }
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
-            printf("No valid source fixup neighbors! [%i %i %i]\n", k, j, i);
-            PARTHENON_FAIL("yuck");
 
             double rho_floor, sie_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
@@ -1038,15 +1010,6 @@ TaskStatus SourceFixup(T *rc) {
 
             // Zero primitive velocities
             SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
-
-            // Average fluid, radiation in equilibrium
-            // v(b, prho, k, j, i) = fixupall(prho);
-            // v(b, peng, k, j, i) = fixupall(peng);
-            // SPACELOOP(ii) {
-            //  v(b, idx_pvel(ii), k, j, i) = fixupall(idx_pvel(ii));
-            //}
-
-            // Don't modify fluid at all
 
             // Auxiliary primitives
             // Safe value for ye
@@ -1058,16 +1021,8 @@ TaskStatus SourceFixup(T *rc) {
                 v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
                 eos_lambda);
 
-            // const Real r = std::exp(coords.x1v(k, j, i));
-            // TODO(BRR) ar::code * T^-4?
-            // const Real Jmin = 1.e-4 * std::pow(r, -4);
             for (int ispec = 0; ispec < num_species; ispec++) {
-              // v(b, idx_J(ispec), k, j, i) = Jmin;
-              v(b, idx_J(ispec), k, j, i) =
-                  1.e-10; // d_opacity.EnergyDensityFromTemperature(v(b,
-                          // tmp, k, j, i), species_d[ispec]);
-              // v(b, idx_J(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(v(b,
-              // tmp, k, j, i), species_d[ispec]);
+              v(b, idx_J(ispec), k, j, i) = 1.e-10;
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
             }
           }
@@ -1105,8 +1060,6 @@ TaskStatus SourceFixup(T *rc) {
             SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) *= rescale; }
           }
           const Real r = std::exp(coords.x1v(k, j, i));
-          // TODO(BRR) ar::code * T^-4?
-          // const Real Jmin = 1.e-4 * std::pow(r, -4);
           const Real Jmin = 1.e-10;
           for (int ispec = 0; ispec < num_species; ispec++) {
             v(b, idx_J(ispec), k, j, i) =
