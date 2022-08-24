@@ -20,8 +20,7 @@ add_library(radiation_unit_tests OBJECT
 target_link_libraries(radiation_unit_tests
   PRIVATE
   parthenon
-  singularity-eos::flags
-  singularity-eos
+  singularity-eos::singularity-eos
   Catch2::Catch2
   Kokkos::kokkos)
 

@@ -18,9 +18,7 @@ target_link_libraries(phoebus_unit_tests
     parthenon
     Catch2::Catch2
     Kokkos::kokkos
-    singularity-eos::flags
-    singularity-eos
-    $<$<BOOL:${PHOEBUS_ENABLE_HDF5}>:singularity-eos::hdf5>
+    singularity-eos::singularity-eos
     )
 if (PHOEBUS_ENABLE_MPI)
   target_compile_definitions(phoebus_unit_tests
