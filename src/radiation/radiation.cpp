@@ -367,9 +367,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     // this fail flag should really be an enum or something
     // but parthenon doesn't yet support that kind of thing
-    Metadata m_scalar =
-        Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
-                  Metadata::Intensive, Metadata::FillGhost});
+    Metadata m_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
+                                  Metadata::Intensive, Metadata::FillGhost});
     physics->AddField(i::c2pfail, m_scalar);
     physics->AddField(i::srcfail, m_scalar);
 
@@ -479,7 +478,8 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
           Real kappaH = v(idx_kappaH(ispec), k, j, i);
 
           for (int d = 0; d < ndim; d++) {
-            // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt. depth) cs_rad = 1)
+            // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt.
+            // depth) cs_rad = 1)
             const Real sigp = alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
             const Real sigm = -alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
             const Real asym_sigl = alpha * v(idx_v(d), k, j, i) - con_beta(d);

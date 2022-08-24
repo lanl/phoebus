@@ -144,8 +144,8 @@ static struct ConstantXi0RadiationCeiling {
 class RadiationCeilings {
  public:
   RadiationCeilings()
-      : RadiationCeilings(constant_xi0_radiation_ceiling_tag, std::numeric_limits<Real>::max()) {
-  }
+      : RadiationCeilings(constant_xi0_radiation_ceiling_tag,
+                          std::numeric_limits<Real>::max()) {}
   RadiationCeilings(ConstantXi0RadiationCeiling, const Real xi0)
       : xi0_(xi0), radiation_ceiling_flag_(1) {}
 
@@ -168,24 +168,28 @@ class RadiationCeilings {
 
 class Bounds {
  public:
-  Bounds() : floors_(Floors()), ceilings_(Ceilings()), radiation_ceilings_(RadiationCeilings()) {}
-  Bounds(const Floors &fl, const Ceilings &cl, const RadiationCeilings &rcl) : floors_(fl), ceilings_(cl),
-    radiation_ceilings_(rcl) {}
-  explicit Bounds(const Floors &fl) : floors_(fl), ceilings_(Ceilings()), radiation_ceilings_(RadiationCeilings()) {}
-  explicit Bounds(const Ceilings &cl) : floors_(Floors()), ceilings_(cl), radiation_ceilings_(RadiationCeilings()) {}
+  Bounds()
+      : floors_(Floors()), ceilings_(Ceilings()),
+        radiation_ceilings_(RadiationCeilings()) {}
+  Bounds(const Floors &fl, const Ceilings &cl, const RadiationCeilings &rcl)
+      : floors_(fl), ceilings_(cl), radiation_ceilings_(rcl) {}
+  explicit Bounds(const Floors &fl)
+      : floors_(fl), ceilings_(Ceilings()), radiation_ceilings_(RadiationCeilings()) {}
+  explicit Bounds(const Ceilings &cl)
+      : floors_(Floors()), ceilings_(cl), radiation_ceilings_(RadiationCeilings()) {}
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetFloors(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetFloors(Args &&...args) const {
     floors_.GetFloors(std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetCeilings(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetCeilings(Args &&...args) const {
     ceilings_.GetCeilings(std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetRadiationCeilings(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetRadiationCeilings(Args &&...args) const {
     radiation_ceilings_.GetRadiationCeilings(std::forward<Args>(args)...);
   }
 

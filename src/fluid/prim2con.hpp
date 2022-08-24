@@ -78,8 +78,9 @@ void p2c(const Real &rho, const Real vp[], const Real b[], const Real &u,
     S[m] = gdet * (rho_rel * vcov - b0 * bcov[m]);
     bcons[m] = gdet * b[m];
     // TODO(BRR) why is vcov[3] ~ 1.e-17 * vcov[1,2]??
-    //printf("[%i] S = %e (gdet %e rhorel %e vcov %e (v: %e %e %e gcov: %e %e %e) %e)\n",
-    //  m, S[m], gdet, rho_rel, vcov, v[0], v[1], v[2], gcov[m+1][1], gcov[m+1][2], gcov[m+1][3], b0*bcov[m]);
+    // printf("[%i] S = %e (gdet %e rhorel %e vcov %e (v: %e %e %e gcov: %e %e %e) %e)\n",
+    //  m, S[m], gdet, rho_rel, vcov, v[0], v[1], v[2], gcov[m+1][1], gcov[m+1][2],
+    //  gcov[m+1][3], b0*bcov[m]);
   }
 
 #if USE_VALENCIA

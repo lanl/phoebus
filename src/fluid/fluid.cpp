@@ -193,7 +193,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // TODO(BRR) logic gets very complicated accounting for this in situations where
   // radiation is active but fluid isn't -- for example we want fluid prims from c2p to
   // calculate opacities.
-  //if (!active) return physics;
+  // if (!active) return physics;
 
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
@@ -542,8 +542,8 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_sources"))
     return TaskStatus::complete;
 
-  //printf("skipping fluid sources\n");
-  //return TaskStatus::complete;
+  // printf("skipping fluid sources\n");
+  // return TaskStatus::complete;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -636,8 +636,8 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
 
-  //printf("skipping fluid fluxes\n");
-  //return TaskStatus::complete;
+  // printf("skipping fluid fluxes\n");
+  // return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
   auto sig = rc->Get(internal_variables::face_signal_speed).data;

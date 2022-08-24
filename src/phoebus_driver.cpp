@@ -332,7 +332,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region_1[ib];
 
-
     // pull out the container we'll use to get fluxes and/or compute RHSs
     auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
     // pull out a container we'll use to store dU/dt.
@@ -423,13 +422,14 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         tl.AddTask(set_flux, parthenon::Update::FluxDivergence<MeshData<Real>>, mc0.get(),
                    mdudt.get());
 
-    auto add_rhs = tl.AddTask(flux_div, SumData<std::string, MeshData<Real>>, src_names, mdudt.get(), mgsrc.get(), mdudt.get());
+    auto add_rhs = tl.AddTask(flux_div, SumData<std::string, MeshData<Real>>, src_names,
+                              mdudt.get(), mgsrc.get(), mdudt.get());
 
     auto avg_data = tl.AddTask(flux_div, AverageIndependentData<MeshData<Real>>,
                                mc0.get(), mbase.get(), beta);
 
     auto update = tl.AddTask(avg_data, UpdateIndependentData<MeshData<Real>>, mc0.get(),
-      mdudt.get(), beta * dt, mc1.get());
+                             mdudt.get(), beta * dt, mc1.get());
   }
 
   // Store flux divergences and geometric sources for output if requested
@@ -526,8 +526,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // TODO(BRR) we could avoid this by communicating both derived and independent
     // quantities for stencils... but we need to FillDerived earlier to do the whole fixup
     // routine.
-    //auto fill_derived =
-    //    tl.AddTask(none, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+    // auto fill_derived =
+    //    tl.AddTask(none, parthenon::Update::FillDerived<MeshBlockData<Real>>,
+    //    sc1.get());
     // TODO(BRR) don't do fill derived here?
     TaskID fill_derived(0);
 
@@ -586,8 +587,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     using MDT = std::remove_pointer<decltype(sc0.get())>::type;
 
     // Fixup for interaction failures
-    auto src_fixup =
-        tl.AddTask(none, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get());
+    auto src_fixup = tl.AddTask(none, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get());
 
     // fill in derived fields after source update
     auto fill_derived_2 = tl.AddTask(
@@ -697,14 +697,16 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                    : none);
     }
 
-//    // update ghost cells
-//    auto send =
-//        // tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
-//        tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundaryBuffers, sc1);
-//    auto recv =
-//        tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers, sc1);
-//    auto fill_from_bufs =
-//        tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, sc1);
+    //    // update ghost cells
+    //    auto send =
+    //        // tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundaryBuffers,
+    //        sc1); tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundaryBuffers,
+    //        sc1);
+    //    auto recv =
+    //        tl.AddTask(send, parthenon::cell_centered_bvars::ReceiveBoundaryBuffers,
+    //        sc1);
+    //    auto fill_from_bufs =
+    //        tl.AddTask(recv, parthenon::cell_centered_bvars::SetBoundaries, sc1);
   }
 
   // Evaluate and report particle statistics
@@ -775,8 +777,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       // Update refinement
       if (pmesh->adaptive) {
         // using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
-        auto tag_refine = tl.AddTask(
-            none, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
+        auto tag_refine =
+            tl.AddTask(none, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
       }
     }
   }

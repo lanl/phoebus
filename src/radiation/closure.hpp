@@ -151,7 +151,8 @@ KOKKOS_FUNCTION ClosureEdd<Vec, Tens2, SET>::ClosureEdd(const Vec con_v_in,
   W = 1 / std::sqrt(1 - v2);
   W2 = W * W;
   if (std::isinf(W)) {
-    printf("conv: %e %e %e covv: %e %e %e, v2 = %e\n", con_v(0), con_v(1), con_v(2), cov_v(0), cov_v(1), cov_v(2), v2);
+    printf("conv: %e %e %e covv: %e %e %e, v2 = %e\n", con_v(0), con_v(1), con_v(2),
+           cov_v(0), cov_v(1), cov_v(2), v2);
   }
 }
 
@@ -265,10 +266,11 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Prim2Con(const Real J
   Real vvPi;
   Vec cov_vPi;
   GetTilPiContractions(con_tilPi, &cov_vPi, &vvPi);
- // if (cov_H(0)*cov_H(0) + cov_H(1)*cov_H(1) + cov_H(2)*cov_H(2) < J*J) {
- //   printf("J: %e covH: %e %e %e\n", J, cov_H(0), cov_H(1), cov_H(2));
- // }
-  //PARTHENON_DEBUG_REQUIRE(cov_H(0)*cov_H(0) + cov_H(1)*cov_H(1) + cov_H(2)*cov_H(2) < J*J, "H2 >= 1!");
+  // if (cov_H(0)*cov_H(0) + cov_H(1)*cov_H(1) + cov_H(2)*cov_H(2) < J*J) {
+  //   printf("J: %e covH: %e %e %e\n", J, cov_H(0), cov_H(1), cov_H(2));
+  // }
+  // PARTHENON_DEBUG_REQUIRE(cov_H(0)*cov_H(0) + cov_H(1)*cov_H(1) + cov_H(2)*cov_H(2) <
+  // J*J, "H2 >= 1!");
 
   Real vH = 0.0;
   SPACELOOP(i) vH += con_v(i) * cov_H(i);
@@ -278,8 +280,8 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Prim2Con(const Real J
     *E = W * J + vH;
   }
   if (std::isnan(*E)) {
-    printf("E: %e J: %e covH: %e %e %e W2: %e vvPi: %e W: %e vH: %e\n",
-      *E, J, cov_H(0), cov_H(1), cov_H(2), W2, vvPi, W, vH);
+    printf("E: %e J: %e covH: %e %e %e W2: %e vvPi: %e W: %e vH: %e\n", *E, J, cov_H(0),
+           cov_H(1), cov_H(2), W2, vvPi, W, vH);
     PARTHENON_FAIL("nan in p2c");
   }
   SPACELOOP(i)
@@ -319,15 +321,13 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Con2Prim(
   Vec con_tilH;
   gamma->raise3Vector(*cov_tilH, &con_tilH);
   Real xi = 0.;
-  SPACELOOP(ii) {
-    xi += (*cov_tilH)(ii) * con_tilH(ii);
-  }
+  SPACELOOP(ii) { xi += (*cov_tilH)(ii)*con_tilH(ii); }
   xi = std::sqrt(xi) / *J;
   constexpr Real xi_max = 0.99;
-  //if (xi >= xi_max || *J < 0.) {
+  // if (xi >= xi_max || *J < 0.) {
   if (*J < 0.) {
-    //printf("E: %e F: %e %e %e\n", E, cov_F(0), cov_F(1), cov_F(2));
-    //printf("xi = %e J = %e\n", xi, *J);
+    // printf("E: %e F: %e %e %e\n", E, cov_F(0), cov_F(1), cov_F(2));
+    // printf("xi = %e J = %e\n", xi, *J);
     return ClosureStatus::failure;
   }
 
