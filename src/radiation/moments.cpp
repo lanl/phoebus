@@ -33,8 +33,8 @@
 namespace radiation {
 
 using namespace singularity::neutrinos;
-using singularity::EOS;
 using fixup::Bounds;
+using singularity::EOS;
 
 template <typename CLOSURE>
 class SourceResidual4 {
@@ -113,7 +113,7 @@ class SourceResidual4 {
     W = std::sqrt(1. + W);
     Real cov_v[3] = {0};
     SPACELOOP2(ii, jj) {
-      //cov_v[ii] += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1] / (W * W);
+      // cov_v[ii] += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1] / (W * W);
       cov_v[ii] += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] / W;
     }
     Real vdH = 0.;
@@ -313,12 +313,12 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
-//        if (i == 48 && j == 63) {
-//          printf("[%i %i %i] rad fail here? %i\n", k, j, i,
-//                 status == ClosureStatus::failure);
-//          printf("J = %e covH = %e %e %e\n", J, covH(0), covH(1), covH(2));
-//          printf("dirB.s: %i dirB.e: %i\n", dirB.s, dirB.e);
-//        }
+        //        if (i == 48 && j == 63) {
+        //          printf("[%i %i %i] rad fail here? %i\n", k, j, i,
+        //                 status == ClosureStatus::failure);
+        //          printf("J = %e covH = %e %e %e\n", J, covH(0), covH(1), covH(2));
+        //          printf("dirB.s: %i dirB.e: %i\n", dirB.s, dirB.e);
+        //        }
         if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
             std::isnan(covH(2))) {
           printf("k: %i j: %i i: %i ispec: %i\n", k, j, i, ispec);
@@ -685,8 +685,8 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
- //  printf("skipping radiation fluxes\n");
- //  return TaskStatus::complete;
+  //  printf("skipping radiation fluxes\n");
+  //  return TaskStatus::complete;
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
@@ -776,7 +776,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
         const Real dx = coords.Dx(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
 
-
         const Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i),
                                  v(idx_qlv(1, idir), k, j, i),
                                  v(idx_qlv(2, idir), k, j, i)};
@@ -788,7 +787,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
         Vec con_vr{{con_vpr[0] / Wr, con_vpr[1] / Wr, con_vpr[2] / Wr}};
 
-        // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt. depth) cs_rad = 1)
+        // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt. depth)
+        // cs_rad = 1)
         const Real sigp = alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
         const Real sigm = -alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
         const Real asym_sigl = alpha * con_vl(idir) - con_beta(idir);
@@ -800,8 +800,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // THIS CAUSES EXPLOSIONS?? maybe floor is too high
           const Real Jl = std::max<Real>(v(idx_ql(ispec, 0, idir), k, j, i), 1.e-10);
           const Real Jr = std::max<Real>(v(idx_qr(ispec, 0, idir), k, j, i), 1.e-10);
-          //const Real Jl = v(idx_ql(ispec, 0, idir), k, j, i);
-          //const Real Jr = v(idx_qr(ispec, 0, idir), k, j, i);
+          // const Real Jl = v(idx_ql(ispec, 0, idir), k, j, i);
+          // const Real Jr = v(idx_qr(ispec, 0, idir), k, j, i);
           Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 2, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
@@ -811,14 +811,14 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           Real xil = std::sqrt(g.contractCov3Vectors(Hl, Hl)) / Jl;
           Real xir = std::sqrt(g.contractCov3Vectors(Hr, Hr)) / Jr;
           constexpr Real ximax = 0.99;
-          // TODO(BRR) for j = 4, j = 68 zones, xir/xil for idir = 1 are like 1e10 -- seems
-          // like BCs are not copying data correctly
-          //if (xil > ximax) {
+          // TODO(BRR) for j = 4, j = 68 zones, xir/xil for idir = 1 are like 1e10 --
+          // seems like BCs are not copying data correctly
+          // if (xil > ximax) {
           //  SPACELOOP(ii) {
           //    Hl(ii) *= ximax / xil;
           //  }
           //}
-          //if (xir > ximax) {
+          // if (xir > ximax) {
           //  SPACELOOP(ii) {
           //    Hr(ii) *= ximax / xir;
           //  }
@@ -842,7 +842,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
           // TODO(BRR) turning off asymp fluxes
-          //const Real a = 1.;
+          // const Real a = 1.;
 
           // Calculate the observer frame quantities on either side of the interface
           /// TODO: (LFR) Add other contributions to the asymptotic flux
@@ -885,14 +885,15 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
           // TODO(BRR) is this actually the wavespeed dx^i/dx^0 for LLF?
-          //const Real speed = a * 1.0 + (1 - a) * std::max(sqrt(cl.v2), sqrt(cr.v2));
+          // const Real speed = a * 1.0 + (1 - a) * std::max(sqrt(cl.v2), sqrt(cr.v2));
           conFl = a * conFl + (1 - a) * conFl_asym;
           conFr = a * conFr + (1 - a) * conFr_asym;
           Pl = a * Pl + (1 - a) * Pl_asym;
           Pr = a * Pr + (1 - a) * Pr_asym;
 
           const Real rad_sigspeed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
-          const Real asym_sigspeed = std::max<Real>(std::fabs(asym_sigl), std::fabs(asym_sigr));
+          const Real asym_sigspeed =
+              std::max<Real>(std::fabs(asym_sigl), std::fabs(asym_sigr));
           const Real sigspeed = a * rad_sigspeed + (1. - a) * asym_sigspeed;
 
           // Correct the fluxes with the shift terms
@@ -906,7 +907,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
-              //0.5 * (detg * (conFl(idir) + conFr(idir)) + sigspeed * sdetgam * (El - Er));
+              // 0.5 * (detg * (conFl(idir) + conFr(idir)) + sigspeed * sdetgam * (El -
+              // Er));
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + sigspeed * (El - Er));
 
           /*if (j == 97 && (i == 4 || i == 5) && idir == 0) {
@@ -927,8 +929,9 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
-                //0.5 *
-                //(detg * (Pl(idir, ii) + Pr(idir, ii)) + speed * sdetgam * (covFl(ii) - covFr(ii)));
+                // 0.5 *
+                //(detg * (Pl(idir, ii) + Pr(idir, ii)) + speed * sdetgam * (covFl(ii) -
+                //covFr(ii)));
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
           }
@@ -969,8 +972,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
-   //printf("skipping radiation geometric sources\n");
-   //return TaskStatus::complete;
+  // printf("skipping radiation geometric sources\n");
+  // return TaskStatus::complete;
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
@@ -1212,8 +1215,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
-  constexpr int izone = 12; //5; //9; //47; // 46; // 47; // 33;
-  constexpr int jzone = 40; //57; //10; //12; // 11; // 11; // 26;
+  constexpr int izone = 12; // 5; //9; //47; // 46; // 47; // 33;
+  constexpr int jzone = 40; // 57; //10; //12; // 11; // 11; // 26;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1327,9 +1330,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                  ug, Tg, P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
           Real xi0 = 0.;
           SPACELOOP2(ii, jj) {
-            xi0 += con_gamma(ii,jj) * P_rad_guess[ii+1]*P_rad_guess[jj+1];
+            xi0 += con_gamma(ii, jj) * P_rad_guess[ii + 1] * P_rad_guess[jj + 1];
           }
-          xi0 = std::sqrt(xi0)/P_rad_guess[0];
+          xi0 = std::sqrt(xi0) / P_rad_guess[0];
           printf("xi0: %e\n", xi0);
         }
         srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
@@ -1350,20 +1353,24 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // Inspect sources
           {
             Real lambda[2] = {Ye, 0};
-            Real Tg = eos.TemperatureFromDensityInternalEnergy(rho, P_mhd_guess[0] / rho, lambda);
+            Real Tg = eos.TemperatureFromDensityInternalEnergy(rho, P_mhd_guess[0] / rho,
+                                                               lambda);
             const Real JBB = d_opacity.EnergyDensityFromTemperature(Tg, species_d[ispec]);
             printf("Tg: %e JBB: %e\n", Tg, JBB);
-            const Real kappaH = d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, lambda[0],
-            species_d[ispec]);
+            const Real kappaH = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+                rho, Tg, lambda[0], species_d[ispec]);
             Real kappaJ = (1. - scattering_fraction) * kappaH;
             printf("kappaH: %e kappaJ: %e\n", kappaH, kappaJ);
             Real W = 0.;
-            SPACELOOP2(ii, jj) { W += cov_g[ii + 1][jj + 1] * P_mhd_guess[ii + 1] * P_mhd_guess[jj + 1]; }
+            SPACELOOP2(ii, jj) {
+              W += cov_g[ii + 1][jj + 1] * P_mhd_guess[ii + 1] * P_mhd_guess[jj + 1];
+            }
             W = std::sqrt(1. + W);
             printf("W: %e\n", W);
             Real cov_v[3] = {0};
             SPACELOOP2(ii, jj) {
-              //cov_v[ii] += cov_g[ii + 1][jj + 1] * P_mhd_guess[ii + 1] * P_mhd_guess[jj + 1] / (W * W);
+              // cov_v[ii] += cov_g[ii + 1][jj + 1] * P_mhd_guess[ii + 1] * P_mhd_guess[jj
+              // + 1] / (W * W);
               cov_v[ii] += cov_g[ii + 1][jj + 1] * P_mhd_guess[jj + 1] / W;
             }
             Real vdH = 0.;
@@ -1373,8 +1380,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             Real S[4] = {0};
             S[0] = alpha * sdetgam * (kappaJ * W * (JBB - P_rad_guess[0]) - kappaH * vdH);
             SPACELOOP(ii) {
-      S[ii + 1] = alpha * sdetgam *
-                  (kappaJ * W * cov_v[ii] * (JBB - P_rad_guess[0]) - kappaH * P_rad_guess[1 + ii]);
+              S[ii + 1] = alpha * sdetgam *
+                          (kappaJ * W * cov_v[ii] * (JBB - P_rad_guess[0]) -
+                           kappaH * P_rad_guess[1 + ii]);
             }
             printf("S: %e %e %e %e\n", S[0], S[1], S[2], S[3]);
           }
@@ -1417,7 +1425,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                                P_mhd_guess[3]};
             Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
                                P_mhd_guess[3]};
-            const Real fd_step = std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_guess[m]));
+            const Real fd_step =
+                std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_guess[m]));
             P_mhd_m[m] -= fd_step;
             P_mhd_p[m] += fd_step;
 
@@ -1427,9 +1436,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
             if (status_m == ClosureStatus::failure) {
               if (izone == i && jzone == j) {
-              printf("bad - guess! [%i %i %i][%i] P_rad_m = %e %e %e %e\n", k, j, i, m,
-                     P_rad_m[0], P_rad_m[1], P_rad_m[2], P_rad_m[3]);
-               //    bad_guess = true;
+                printf("bad - guess! [%i %i %i][%i] P_rad_m = %e %e %e %e\n", k, j, i, m,
+                       P_rad_m[0], P_rad_m[1], P_rad_m[2], P_rad_m[3]);
+                //    bad_guess = true;
               }
               bad_guess_m = true;
             }
@@ -1440,9 +1449,9 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
             if (status_p == ClosureStatus::failure) {
               if (izone == i && jzone == j) {
-              printf("bad + guess! [%i %i %i][%i] P_rad_p = %e %e %e %e\n", k, j, i, m,
-                     P_rad_p[0], P_rad_p[1], P_rad_p[2], P_rad_p[3]);
-             //   bad_guess = true;
+                printf("bad + guess! [%i %i %i][%i] P_rad_p = %e %e %e %e\n", k, j, i, m,
+                       P_rad_p[0], P_rad_p[1], P_rad_p[2], P_rad_p[3]);
+                //   bad_guess = true;
               }
               bad_guess_p = true;
             }
@@ -1460,7 +1469,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             // If both + and - finite difference support points are bad, this
             // interaction fails
             if (izone == i && jzone == j) {
-            printf("[%i %i %i] both guesses are bad!\n", k, j, i);
+              printf("[%i %i %i] both guesses are bad!\n", k, j, i);
             }
             bad_guess = true;
             break;
@@ -1484,7 +1493,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                 jac[n][m] = (fp - fguess) / (P_mhd_p[m] - P_mhd_guess[m]);
               }
             }
-        //    printf("[%i %i %i] - guess is bad!\n", k, j, i);
+            //    printf("[%i %i %i] - guess is bad!\n", k, j, i);
           } else if (bad_guess_p == true) {
             // If only + finite difference support point is bad, do one-sided difference
             // with - support point
@@ -1505,7 +1514,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                 jac[n][m] = (fguess - fm) / (P_mhd_guess[m] - P_mhd_m[m]);
               }
             }
-          //  printf("[%i %i %i] + guess is bad!\n", k, j, i);
+            //  printf("[%i %i %i] + guess is bad!\n", k, j, i);
           }
 
           Real jacinv[4][4];
@@ -1569,13 +1578,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                      U_rad_guess[2], U_rad_guess[3]);
             }
             if (status == ClosureStatus::failure) {
-             if (i == izone && j == jzone) {
-             printf("[%i] bad guess P_mhd_guess: %e %e %e %e Pr: %e %e %e %e\n", niter,
-                    P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3],
-                    P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
-             }
-            //  printf("[%i %i %i]\n", k, j, i);
-            //  printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
+              if (i == izone && j == jzone) {
+                printf("[%i] bad guess P_mhd_guess: %e %e %e %e Pr: %e %e %e %e\n", niter,
+                       P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3],
+                       P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+              }
+              //  printf("[%i %i %i]\n", k, j, i);
+              //  printf("rho: %e T: %e ug: %e\n", rho, Tg, ug);
               bad_guess = true;
               // exit(-1);
             }
@@ -1590,31 +1599,35 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               constexpr Real ximax = 0.99;
 
               constexpr Real umin = 1.e-20; // TODO(BRR) use floors
-              constexpr Real Jmin = 1.e-20; // TODO(BRR) needs to be a bit smaller than Jr floor! otherwise scaling fac is 0
+              constexpr Real Jmin = 1.e-20; // TODO(BRR) needs to be a bit smaller than Jr
+                                            // floor! otherwise scaling fac is 0
 
               Real scaling_factor = 0.;
               if (xi > ximax) {
                 scaling_factor = std::max<Real>(scaling_factor, ximax / xi);
               }
               if (P_mhd_guess[0] < umin) {
-                scaling_factor = std::max<Real>(scaling_factor, (ug0 - umin) / (ug0 - P_mhd_guess[0]));
+                scaling_factor =
+                    std::max<Real>(scaling_factor, (ug0 - umin) / (ug0 - P_mhd_guess[0]));
               }
               if (P_rad_guess[0] < Jmin) {
-                scaling_factor = std::max<Real>(scaling_factor, (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
+                scaling_factor =
+                    std::max<Real>(scaling_factor, (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
               }
-              //printf("[%i %i %i] scaling_factor = %e (%e %e %e)\n",k,j,i,
+              // printf("[%i %i %i] scaling_factor = %e (%e %e %e)\n",k,j,i,
               //  scaling_factor, ximax/xi, umin/P_mhd_guess[0], umin/P_rad_guess[0]);
               // Nudge it a bit
               scaling_factor *= 0.5;
               if (scaling_factor < robust::SMALL() || scaling_factor >= 1.) {
                 // TODO(BRR) remove this branch?
-                printf("Pmhd0: %e Prad0: %e umin: %e xi: %e\n", P_mhd_guess[0], P_rad_guess[0], umin, xi);
-                printf("ug0: %e ur0: %e facs: %e %e %e\n",
-                ug0, ur0,
-                  ximax/xi, (ug0 - umin) / (ug0 - P_mhd_guess[0]),
-                  (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
-                printf("[%i %i %i][niter: %i] Can't rescale (fac: %e)!\n", k, j, i, niter, scaling_factor);
-                //exit(-1);
+                printf("Pmhd0: %e Prad0: %e umin: %e xi: %e\n", P_mhd_guess[0],
+                       P_rad_guess[0], umin, xi);
+                printf("ug0: %e ur0: %e facs: %e %e %e\n", ug0, ur0, ximax / xi,
+                       (ug0 - umin) / (ug0 - P_mhd_guess[0]),
+                       (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
+                printf("[%i %i %i][niter: %i] Can't rescale (fac: %e)!\n", k, j, i, niter,
+                       scaling_factor);
+                // exit(-1);
               } else {
                 for (int m = 0; m < 4; m++) {
                   for (int n = 0; n < 4; n++) {
@@ -1627,12 +1640,12 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
                 srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
                 if (status == ClosureStatus::success) {
                   if (i == izone && j == jzone) {
-                  printf("[%i %i %i] scaled reguess worked\n", k, j, i);
+                    printf("[%i %i %i] scaled reguess worked\n", k, j, i);
                   }
                   bad_guess = false;
                 } else {
                   if (i == izone && j == jzone) {
-                  printf("[%i %i %i] scaled reguess failed\n", k, j, i);
+                    printf("[%i %i %i] scaled reguess failed\n", k, j, i);
                   }
                 }
               }
@@ -1686,7 +1699,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
           // If guess was invalid, break and mark this zone as a failure
           if (bad_guess) {
-            //printf("[%i %i %i] bad guess! breaking\n", k, j, i);
+            // printf("[%i %i %i] bad guess! breaking\n", k, j, i);
             break;
           }
 
@@ -1748,9 +1761,10 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             std::isnan(U_rad_guess[3]) || bad_guess) {
           //        if (niter == max_iter || err > TOL || bad_guess) {
           success = false;
-//          printf("[%i %i %i] FAILURE niter = %i err = %e U_rad_guess: %e %e %e %e\n", k,
-//                 j, i, niter, err, U_rad_guess[0], U_rad_guess[1], U_rad_guess[2],
-//                 U_rad_guess[3]);
+          //          printf("[%i %i %i] FAILURE niter = %i err = %e U_rad_guess: %e %e %e
+          //          %e\n", k,
+          //                 j, i, niter, err, U_rad_guess[0], U_rad_guess[1],
+          //                 U_rad_guess[2], U_rad_guess[3]);
           //          exit(-1);
           // if (i == izone && j == jzone) {
           //  exit(-1);
@@ -1778,11 +1792,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
 
         // If 4D rootfind failed, try operator splitting the energy and momentum updates.
         // TODO(BRR) Only do this if J << ug?
-        //if (success == false) {
+        // if (success == false) {
         // Need to use this update if update fluid is false because 4D rootfind updates
         // the fluid state internally
         if (update_fluid == false) {
-        //  if (true) {
+          //  if (true) {
           const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
           Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
 
@@ -1804,31 +1818,31 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           // for (int ispec = 0; ispec < num_species; ++ispec)
           //{
 
-            Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
-            Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
-                          v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
-                          v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
+          Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+          Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
+                        v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
+                        v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
 
-            // Treat the Eddington tensor explicitly for now
-            Real J = v(iblock, idx_J(ispec), k, j, i);
-            Vec cov_H{{
-                J * v(iblock, idx_H(ispec, 0), k, j, i),
-                J * v(iblock, idx_H(ispec, 1), k, j, i),
-                J * v(iblock, idx_H(ispec, 2), k, j, i),
-            }};
-            Tens2 con_tilPi;
+          // Treat the Eddington tensor explicitly for now
+          Real J = v(iblock, idx_J(ispec), k, j, i);
+          Vec cov_H{{
+              J * v(iblock, idx_H(ispec, 0), k, j, i),
+              J * v(iblock, idx_H(ispec, 1), k, j, i),
+              J * v(iblock, idx_H(ispec, 2), k, j, i),
+          }};
+          Tens2 con_tilPi;
 
-            c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+          c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
 
-            Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
-            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-                rho, T1, Ye, species_d[ispec]);
-            Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-            Real tauH = alpha * dt * kappa;
+          Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
+          Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+              rho, T1, Ye, species_d[ispec]);
+          Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
+          Real tauH = alpha * dt * kappa;
 
-            c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
-                                 &cov_dF);
-         // }
+          c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
+                               &cov_dF);
+          // }
 
           // Check xi
           Estar += dE;
@@ -1849,8 +1863,8 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         if (success == true) {
           v(iblock, ifail, k, j, i) = FailFlags::success;
 
-         v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
-         SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF(ii); }
+          v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
+          SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF(ii); }
           if (update_fluid) {
             if (cye > 0) {
               v(iblock, cye, k, j, i) -= sdetgam * 0.0;
@@ -1861,17 +1875,16 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
             PARTHENON_FAIL("This update for non-Valencia energy eqn is not correct");
             v(iblock, ceng, k, j, i) += alpha * sdetgam * dE;
 #endif
-           SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
+            SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
           }
         } else {
-          printf("source fail! %i %i %i\n", k,j,i);
+          printf("source fail! %i %i %i\n", k, j, i);
           printf("sdetgam: %e\n", sdetgam);
           printf("rho: %e Tg: %e ug: %e\n", rho, Tg, ug);
           int nspec = 0;
           printf("J: %e H: %e %e %e\n", v(iblock, idx_E(ispec), k, j, i),
-            v(iblock, idx_H(ispec, 0), k, j, i),
-            v(iblock, idx_H(ispec, 1), k, j, i),
-            v(iblock, idx_H(ispec, 2), k, j, i));
+                 v(iblock, idx_H(ispec, 0), k, j, i), v(iblock, idx_H(ispec, 1), k, j, i),
+                 v(iblock, idx_H(ispec, 2), k, j, i));
           Real J = v(iblock, idx_J(ispec), k, j, i);
           Vec cov_H{{
               J * v(iblock, idx_H(ispec, 0), k, j, i),
