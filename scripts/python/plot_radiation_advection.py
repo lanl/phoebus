@@ -131,7 +131,6 @@ for file in files[0::1]:
     plt_ax.plot(xgrid, BoostedDiffusion(kappa, x0p, v, t0p, J0, xgrid/L_unit, t + t0p), linestyle='--', color='k')
 
 xl = v*L_unit # 0.3
-xl = 0
 xh = 1.0*L_unit
 yl = -0.1
 yh = 1.05*J0
