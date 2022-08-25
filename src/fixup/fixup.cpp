@@ -450,12 +450,12 @@ TaskStatus ApplyFloors(T *rc) {
   return TaskStatus::fail;
 }
 
-template <typename T>
-TaskStatus RadConservedToPrimitiveFixup(T *rc) {
+template <typename T, class CLOSURE>
+TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
-  namespace ri = radmoment_internal;
+  namespace ir = radmoment_internal;
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
 
@@ -475,7 +475,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   const std::vector<std::string> vars(
       {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
        p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
-       impl::cell_signal_speed, ri::c2pfail, impl::fail});
+       impl::cell_signal_speed, ir::tilPi, ir::c2pfail, impl::fail});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -500,7 +500,8 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   auto idx_E = imap.GetFlatIdx(cr::E, false);
   auto idx_F = imap.GetFlatIdx(cr::F, false);
   int ifluidfail = imap[impl::fail].first;
-  int iradfail = imap[ri::c2pfail].first;
+  int iradfail = imap[ir::c2pfail].first;
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
 
   bool report_c2p_fails = fix_pkg->Param<bool>("report_c2p_fails");
   if (report_c2p_fails) {
@@ -586,7 +587,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
           const Real vel[] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
                               v(b, idx_pvel(2), k, j, i)};
 
-          typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(
+          typename CLOSURE::LocalGeometryType g(
               geom, CellLocation::Cent, b, k, j, i);
 
           Real num_valid = v(b, iradfail, k, j, i - 1) + v(b, iradfail, k, j, i + 1);
@@ -624,17 +625,23 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
 
           const Real W = phoebus::GetLorentzFactor(vel, gcov);
           Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
-          // TODO(BRR) go beyond Eddington
-          radiation::ClosureEdd<Vec, Tens2> c(con_v, &g);
+          CLOSURE c(con_v, &g);
           for (int ispec = 0; ispec < nspec; ispec++) {
             Real E;
             Vec cov_F;
-            Tens2 conTilPi{0}; // TODO(BRR) go beyond Eddington
+            Tens2 con_tilPi;
             Real J = v(b, idx_J(ispec), k, j, i);
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i) * J,
                          v(b, idx_H(ispec, 1), k, j, i) * J,
                          v(b, idx_H(ispec, 2), k, j, i) * J};
-            c.Prim2Con(J, cov_H, conTilPi, &E, &cov_F);
+            if (iTilPi.IsValid()) {
+              SPACELOOP2(ii, jj) {
+                con_tilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+              }
+            } else {
+              c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+            }
+            c.Prim2Con(J, cov_H, con_tilPi, &E, &cov_F);
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii); }
           }
@@ -642,6 +649,36 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
       });
 
   return TaskStatus::complete;
+}
+
+template <typename T>
+TaskStatus RadConservedToPrimitiveFixup(T *rc) {
+  auto *pm = rc->GetParentPointer().get();
+  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+  const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
+  std::string method;
+  if (enable_rad_floors) {
+    method = rad_pkg->Param<std::string>("method");
+  }
+
+  // TODO(BRR) share these settings somewhere else. Set at configure time?
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  if (method == "moment_m1") {
+    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureM1<Vec, Tens2, settings>>(rc);
+  } else if (method == "moment_eddington") {
+    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+  } else if (method == "mocmc") {
+    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
+  } else {
+    // TODO(BRR) default to Eddington closure, check that rad floors are unused for
+    // Monte Carlo/cooling function
+    PARTHENON_REQUIRE(!enable_rad_floors,
+                      "Rad floors not supported with cooling function/Monte Carlo!");
+    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+  }
+  return TaskStatus::fail;
 }
 
 template <typename T>
@@ -841,14 +878,14 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 // If radiation source terms fail (probably due to a rootfind failing to converge) average
 // the fluid and radiation variables over good neighbors. Or if there are no good
 // neighbors, set everything to the floors
-template <typename T>
-TaskStatus SourceFixup(T *rc) {
+template <typename T, class CLOSURE>
+TaskStatus SourceFixupImpl(T *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
-  namespace ri = radmoment_internal;
+  namespace ir = radmoment_internal;
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -873,7 +910,7 @@ TaskStatus SourceFixup(T *rc) {
   const std::vector<std::string> vars(
       {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
        p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
-       impl::cell_signal_speed, ri::srcfail});
+       impl::cell_signal_speed, ir::srcfail, ir::tilPi});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -897,7 +934,8 @@ TaskStatus SourceFixup(T *rc) {
   auto idx_H = imap.GetFlatIdx(pr::H);
   auto idx_E = imap.GetFlatIdx(cr::E);
   auto idx_F = imap.GetFlatIdx(cr::F);
-  int ifail = imap[ri::srcfail].first;
+  int ifail = imap[ir::srcfail].first;
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
   // TODO(BRR) get iTilPi for MOCMC
 
   bool report_source_fails = fix_pkg->Param<bool>("report_source_fails");
@@ -1046,7 +1084,7 @@ TaskStatus SourceFixup(T *rc) {
                                                           v(b, tmp, k, j, i), eos_lambda),
                     v(b, prs, k, j, i));
 
-          typename radiation::ClosureEdd<Vec, Tens2>::LocalGeometryType g(
+          typename CLOSURE::LocalGeometryType g(
               geom, CellLocation::Cent, b, k, j, i);
 
           // Clamp fluid velocity
@@ -1115,16 +1153,23 @@ TaskStatus SourceFixup(T *rc) {
           // Update radiation conserved variables
           W = phoebus::GetLorentzFactor(vel, gcov);
           Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
-          radiation::ClosureEdd<Vec, Tens2> c(con_v, &g);
+          CLOSURE c(con_v, &g);
           for (int ispec = 0; ispec < num_species; ispec++) {
             Real E;
             Vec cov_F;
-            Tens2 conTilPi = {0}; // TODO(BRR) go beyond Eddington
+            Tens2 con_TilPi = {0};
             Real J = v(b, idx_J(ispec), k, j, i);
             Vec cov_H = {J * v(b, idx_H(ispec, 0), k, j, i),
                          J * v(b, idx_H(ispec, 1), k, j, i),
                          J * v(b, idx_H(ispec, 2), k, j, i)};
-            c.Prim2Con(J, cov_H, conTilPi, &E, &cov_F);
+            if (iTilPi.IsValid()) {
+              SPACELOOP2(ii, jj) {
+                con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+              }
+            } else {
+              c.GetCovTilPiFromPrim(J, cov_H, &con_TilPi);
+            }
+            c.Prim2Con(J, cov_H, con_TilPi, &E, &cov_F);
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii); }
           }
@@ -1132,6 +1177,36 @@ TaskStatus SourceFixup(T *rc) {
       });
 
   return TaskStatus::complete;
+}
+
+template <typename T>
+TaskStatus SourceFixup(T *rc) {
+  auto *pm = rc->GetParentPointer().get();
+  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+  const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
+  std::string method;
+  if (enable_rad_floors) {
+    method = rad_pkg->Param<std::string>("method");
+  }
+
+  // TODO(BRR) share these settings somewhere else. Set at configure time?
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  if (method == "moment_m1") {
+    return SourceFixupImpl<T, radiation::ClosureM1<Vec, Tens2, settings>>(rc);
+  } else if (method == "moment_eddington") {
+    return SourceFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+  } else if (method == "mocmc") {
+    return SourceFixupImpl<T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
+  } else {
+    // TODO(BRR) default to Eddington closure, check that rad floors are unused for
+    // Monte Carlo/cooling function
+    PARTHENON_REQUIRE(!enable_rad_floors,
+                      "Rad floors not supported with cooling function/Monte Carlo!");
+    return SourceFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+  }
+  return TaskStatus::fail;
 }
 
 TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
