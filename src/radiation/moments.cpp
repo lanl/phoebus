@@ -28,6 +28,7 @@
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
+#include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
 
 namespace radiation {
@@ -1014,19 +1015,21 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   PARTHENON_REQUIRE(USE_VALENCIA, "Covariant MHD formulation not supported!");
 
   auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
+  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E,          cr::F,     c::bfield,  p::density,
-                                p::temperature, p::energy, p::ye,      p::velocity,
-                                p::bfield,      pr::J,     pr::H,      ir::kappaJ,
-                                ir::kappaH,     ir::JBB,   ir::tilPi,  ir::srcfail};
+  std::vector<std::string> vars{cr::E,          cr::F,     c::bfield, p::density,
+                                p::temperature, p::energy, p::ye,     p::velocity,
+                                p::bfield,      pr::J,     pr::H,     ir::kappaJ,
+                                ir::kappaH,     ir::JBB,   ir::tilPi, ir::srcfail};
   vars.push_back(c::energy);
   vars.push_back(c::momentum);
   vars.push_back(c::ye);
@@ -1065,9 +1068,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   int nblock = v.GetDim(5);
-  // TODO(BRR) This updates all neutrino species (including contributions to fluid)
-  // regardless of whether they are active
-  // int nspec = idx_E.DimSize(1);
 
   auto species = rad->Param<std::vector<RadiationType>>("species");
   auto num_species = rad->Param<int>("num_species");
@@ -1076,7 +1076,12 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
     species_d[s] = species[s];
   }
 
-  PARTHENON_REQUIRE(num_species == 1, "Multiple species not implemented");
+  auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
+
+  const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
+  const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
+  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
+  auto coords = pmb->coords;
 
   const auto &d_opacity = opac->Param<Opacity>("d.opacity");
   const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
@@ -1091,9 +1096,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
       jb.s, jb.e, // y-loop
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
-        // TODO(BRR) turn this into a loop
-        const int ispec = 0;
-
         // Geometry
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
@@ -1107,392 +1109,420 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
 
-        Real rho = v(iblock, prho, k, j, i);
-        Real ug = v(iblock, peng, k, j, i);
-        Real Tg = v(iblock, pT, k, j, i);
-        Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
-        Real bprim[3] = {0};
-        if (pb_lo > -1) {
-          Real bprim[3] = {v(iblock, pb_lo, k, j, i), v(iblock, pb_lo + 1, k, j, i),
-                           v(iblock, pb_lo + 2, k, j, i)};
-        }
-        Real lambda[2] = {Ye, 0.};
-        Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                          v(iblock, pv(2), k, j, i)};
+        for (int ispec = 0; ispec < num_species; ispec++) {
 
-        bool success = false;
-        // TODO(BRR) These will need to be per-species later
-        Real dE;
-        Vec cov_dF;
-        if (update_fluid == true) {
-          // Rootfind via Newton's method over 4-momentum with some fixups inside the
-          // rootfind.
-          Real P_mhd_guess[4] = {ug, v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                                 v(iblock, pv(2), k, j, i)};
-          Real U_mhd_0[4];
-          const Real Pg0 = eos.PressureFromDensityInternalEnergy(rho, ug / rho, lambda);
-          const Real gam1 =
-              eos.BulkModulusFromDensityInternalEnergy(rho, ug / rho, lambda) / Pg0;
-          Real D;
-          Real bcons[3];
-          Real ye_cons;
-          prim2con::p2c(rho, &(P_mhd_guess[1]), bprim, P_mhd_guess[0], lambda[0], Pg0,
-                        gam1, cov_g, con_gamma.data, beta, alpha, sdetgam, D,
-                        &(U_mhd_0[1]), bcons, U_mhd_0[0], ye_cons);
-          Real U_rad_0[4] = {
-              v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
-              v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i)};
-
-          // TODO(BRR) instead update con_TilPi each substep?
-          // TODO(BRR) update v in closure each substep?
-          Vec con_v{{P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]}};
-          const Real W = phoebus::GetLorentzFactor(con_v.data, cov_gamma.data);
-          SPACELOOP(ii) { con_v(ii) /= W; }
-          CLOSURE c(con_v, &g);
-          Tens2 con_tilPi = {0};
-          if (idx_tilPi.IsValid()) {
-            SPACELOOP2(ii, jj) {
-              con_tilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i);
-            }
-          } else {
-            Real J = v(iblock, idx_J(ispec), k, j, i);
-            Vec covH{{v(iblock, idx_F(ispec, 0), k, j, i),
-                      v(iblock, idx_F(ispec, 1), k, j, i),
-                      v(iblock, idx_F(ispec, 2), k, j, i)}};
-            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
-          }
-          SourceResidual4<CLOSURE> srm(eos, d_opacity, d_mean_opacity, rho, Ye, bprim,
-                                       species_d[ispec], con_tilPi, cov_g, con_gamma.data,
-                                       alpha, beta, sdetgam, scattering_fraction, g,
-                                       U_mhd_0, U_rad_0, k, j, i);
-
-          // Memory for evaluating Jacobian via finite differences
-          Real P_rad_m[4];
-          Real P_rad_p[4];
-          Real U_mhd_m[4];
-          Real U_mhd_p[4];
-          Real U_rad_m[4];
-          Real U_rad_p[4];
-          Real dS_m[4];
-          Real dS_p[4];
-
-          Real U_mhd_guess[4];
-          Real U_rad_guess[4];
-          Real P_rad_guess[4];
-          Real dS_guess[4];
-
-          // Initialize residuals
-          Real resid[4];
-          srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
-          srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-          auto status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
-          srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
-          for (int n = 0; n < 4; n++) {
-            resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
-          }
-
-          Real err = 1.e100;
-          constexpr Real TOL = 1.e-8;
-          constexpr int max_iter = 100;
-          int niter = 0;
-          bool bad_guess = false;
-          do {
-            // Numerically calculate Jacobian
-            Real jac[4][4] = {0};
-            constexpr Real EPS = 1.e-8;
-
-            // Minimum non-zero magnitude from P_mhd_guess
-            Real P_mhd_mag_min = robust::LARGE();
-            for (int m = 0; m < 4; m++) {
-              if (std::fabs(P_mhd_guess[m]) > 0.) {
-                P_mhd_mag_min = std::min<Real>(P_mhd_mag_min, std::fabs(P_mhd_guess[m]));
-              }
-            }
-
-            bool bad_guess_m = false;
-            bool bad_guess_p = false;
-            for (int m = 0; m < 4; m++) {
-              Real P_mhd_m[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
-                                 P_mhd_guess[3]};
-              Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
-                                 P_mhd_guess[3]};
-              const Real fd_step =
-                  std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_guess[m]));
-              P_mhd_m[m] -= fd_step;
-              P_mhd_p[m] += fd_step;
-
-              srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
-              srm.CalculateRadConserved(U_mhd_m, U_rad_m);
-              auto status_m = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
-              srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
-              if (status_m == ClosureStatus::failure) {
-                bad_guess_m = true;
-              }
-
-              srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
-              srm.CalculateRadConserved(U_mhd_p, U_rad_p);
-              auto status_p = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
-              srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
-              if (status_p == ClosureStatus::failure) {
-                bad_guess_p = true;
-              }
-
-              for (int n = 0; n < 4; n++) {
-                // TODO(BRR) -dt*dS for non-valencia
-                Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
-                Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
-                jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
-              }
-            }
-
-            // Fail or repair if jacobian evaluation was pathological
-            if (bad_guess_m == true && bad_guess_p == true) {
-              // If both + and - finite difference support points are bad, this
-              // interaction fails
-              bad_guess = true;
-              break;
-            } else if (bad_guess_m == true) {
-              // If only - finite difference support point is bad, do one-sided difference
-              // with + support point
-              for (int m = 0; m < 4; m++) {
-                Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
-                                   P_mhd_guess[3]};
-                P_mhd_p[m] += std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
-                srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
-                srm.CalculateRadConserved(U_mhd_p, U_rad_p);
-                auto status_p = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
-                srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
-                PARTHENON_DEBUG_REQUIRE(status_p == ClosureStatus::success,
-                                        "This inversion should have already worked!");
-                for (int n = 0; n < 4; n++) {
-                  Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
-                  Real fguess = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
-                  jac[n][m] = (fp - fguess) / (P_mhd_p[m] - P_mhd_guess[m]);
-                }
-              }
-            } else if (bad_guess_p == true) {
-              // If only + finite difference support point is bad, do one-sided difference
-              // with - support point
-              for (int m = 0; m < 4; m++) {
-                Real P_mhd_m[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
-                                   P_mhd_guess[3]};
-                P_mhd_m[m] -= std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
-                srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
-                srm.CalculateRadConserved(U_mhd_m, U_rad_m);
-                auto status_m = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
-                srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
-                PARTHENON_DEBUG_REQUIRE(status_m == ClosureStatus::success,
-                                        "This inversion should have already worked!");
-                for (int n = 0; n < 4; n++) {
-                  Real fguess = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
-                  Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
-                  jac[n][m] = (fguess - fm) / (P_mhd_guess[m] - P_mhd_m[m]);
-                }
-              }
-            }
-
-            Real jacinv[4][4];
-            LinearAlgebra::Invert4x4Matrix(jac, jacinv);
-
-            if (bad_guess == false) {
-
-              // Save energies before update in case we need to rescale step
-              double ug0 = P_mhd_guess[0];
-              double ur0 = P_rad_guess[0];
-
-              // Update guess
-              for (int m = 0; m < 4; m++) {
-                for (int n = 0; n < 4; n++) {
-                  P_mhd_guess[m] -= jacinv[m][n] * resid[n];
-                }
-              }
-
-              // TODO(BRR) check that this guess is sane i.e. ug > 0 J > 0 xi < 1, if not,
-              // recalculate the guess with some rescaled jacinv*resid
-
-              srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
-              srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-              status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
-              srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
-              if (status == ClosureStatus::failure) {
-                bad_guess = true;
-              }
-
-              if (bad_guess) {
-                // Try reducing the step size so xi < ximax, ug > 0, J > 0
-                Real xi = 0.;
-                SPACELOOP2(ii, jj) {
-                  xi += con_gamma(ii, jj) * P_rad_guess[ii + 1] * P_rad_guess[jj + 1];
-                }
-                xi = std::sqrt(xi) / P_rad_guess[0];
-                constexpr Real ximax = 0.99;
-
-                constexpr Real umin = 1.e-20; // TODO(BRR) use floors
-                constexpr Real Jmin = 1.e-20; // TODO(BRR) needs to be a bit smaller than
-                                              // Jr floor! otherwise scaling fac is 0
-
-                Real scaling_factor = 0.;
-                if (xi > ximax) {
-                  scaling_factor = std::max<Real>(scaling_factor, ximax / xi);
-                }
-                if (P_mhd_guess[0] < umin) {
-                  scaling_factor = std::max<Real>(scaling_factor,
-                                                  (ug0 - umin) / (ug0 - P_mhd_guess[0]));
-                }
-                if (P_rad_guess[0] < Jmin) {
-                  scaling_factor = std::max<Real>(scaling_factor,
-                                                  (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
-                }
-                PARTHENON_DEBUG_REQUIRE(scaling_factor > robust::SMALL() &&
-                                            scaling_factor >= 1.,
-                                        "Got a nonsensical scaling factor!");
-                // Nudge it a bit
-                scaling_factor *= 0.5;
-                for (int m = 0; m < 4; m++) {
-                  for (int n = 0; n < 4; n++) {
-                    P_mhd_guess[m] += (1. - scaling_factor) * jacinv[m][n] * resid[n];
-                  }
-                }
-                srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
-                srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
-                status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
-                srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
-                if (status == ClosureStatus::success) {
-                  bad_guess = false;
-                }
-              }
-            }
-
-            // If guess was invalid, break and mark this zone as a failure
-            if (bad_guess) {
+          // If ispec > 0, we need to invert MHD conserved variables to account for the
+          // source term update from the previous species.
+          if (ispec > 0) {
+            auto status = invert(geom, eos, coords, k, j, i);
+            if (status == con2prim_robust::ConToPrimStatus::failure) {
+              // Something went wrong in the source update for a previous species -- mark
+              // this zone as a source failure and move on.
+              v(iblock, ifail, k, j, i) = FailFlags::fail;
               break;
             }
+          }
 
-            // Update residuals
+          Real rho = v(iblock, prho, k, j, i);
+          Real ug = v(iblock, peng, k, j, i);
+          Real Tg = v(iblock, pT, k, j, i);
+          Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
+          Real bprim[3] = {0};
+          if (pb_lo > -1) {
+            Real bprim[3] = {v(iblock, pb_lo, k, j, i), v(iblock, pb_lo + 1, k, j, i),
+                             v(iblock, pb_lo + 2, k, j, i)};
+          }
+          Real lambda[2] = {Ye, 0.};
+          Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                            v(iblock, pv(2), k, j, i)};
+
+          bool success = false;
+          // TODO(BRR) These will need to be per-species later
+          Real dE;
+          Vec cov_dF;
+          if (update_fluid == true) {
+            // Rootfind via Newton's method over 4-momentum with some fixups inside the
+            // rootfind.
+            Real P_mhd_guess[4] = {ug, v(iblock, pv(0), k, j, i),
+                                   v(iblock, pv(1), k, j, i), v(iblock, pv(2), k, j, i)};
+            Real U_mhd_0[4];
+            const Real Pg0 = eos.PressureFromDensityInternalEnergy(rho, ug / rho, lambda);
+            const Real gam1 =
+                eos.BulkModulusFromDensityInternalEnergy(rho, ug / rho, lambda) / Pg0;
+            Real D;
+            Real bcons[3];
+            Real ye_cons;
+            prim2con::p2c(rho, &(P_mhd_guess[1]), bprim, P_mhd_guess[0], lambda[0], Pg0,
+                          gam1, cov_g, con_gamma.data, beta, alpha, sdetgam, D,
+                          &(U_mhd_0[1]), bcons, U_mhd_0[0], ye_cons);
+            Real U_rad_0[4] = {
+                v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
+                v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i)};
+
+            // TODO(BRR) instead update con_TilPi each substep?
+            // TODO(BRR) update v in closure each substep?
+            Vec con_v{{P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]}};
+            const Real W = phoebus::GetLorentzFactor(con_v.data, cov_gamma.data);
+            SPACELOOP(ii) { con_v(ii) /= W; }
+            CLOSURE c(con_v, &g);
+            Tens2 con_tilPi = {0};
+            if (idx_tilPi.IsValid()) {
+              SPACELOOP2(ii, jj) {
+                con_tilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i);
+              }
+            } else {
+              Real J = v(iblock, idx_J(ispec), k, j, i);
+              Vec covH{{v(iblock, idx_F(ispec, 0), k, j, i),
+                        v(iblock, idx_F(ispec, 1), k, j, i),
+                        v(iblock, idx_F(ispec, 2), k, j, i)}};
+              c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+            }
+            SourceResidual4<CLOSURE> srm(
+                eos, d_opacity, d_mean_opacity, rho, Ye, bprim, species_d[ispec],
+                con_tilPi, cov_g, con_gamma.data, alpha, beta, sdetgam,
+                scattering_fraction, g, U_mhd_0, U_rad_0, k, j, i);
+
+            // Memory for evaluating Jacobian via finite differences
+            Real P_rad_m[4];
+            Real P_rad_p[4];
+            Real U_mhd_m[4];
+            Real U_mhd_p[4];
+            Real U_rad_m[4];
+            Real U_rad_p[4];
+            Real dS_m[4];
+            Real dS_p[4];
+
+            Real U_mhd_guess[4];
+            Real U_rad_guess[4];
+            Real P_rad_guess[4];
+            Real dS_guess[4];
+
+            // Initialize residuals
+            Real resid[4];
+            srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
+            srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+            auto status =
+                srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
+            srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
             for (int n = 0; n < 4; n++) {
               resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
             }
 
-            // Calculate error
-            err = robust::SMALL();
-            Real max_divisor = robust::SMALL();
-            for (int n = 0; n < 4; n++) {
-              max_divisor = std::max<Real>(max_divisor, std::fabs(U_mhd_guess[n]) +
-                                                            std::fabs(U_mhd_0[n]) +
-                                                            std::fabs(dt * dS_guess[n]));
-            }
-            for (int n = 0; n < 4; n++) {
-              Real suberr = std::fabs(resid[n]) / max_divisor;
-              if (suberr > err) {
-                err = suberr;
+            Real err = 1.e100;
+            constexpr Real TOL = 1.e-8;
+            constexpr int max_iter = 100;
+            int niter = 0;
+            bool bad_guess = false;
+            do {
+              // Numerically calculate Jacobian
+              Real jac[4][4] = {0};
+              constexpr Real EPS = 1.e-8;
+
+              // Minimum non-zero magnitude from P_mhd_guess
+              Real P_mhd_mag_min = robust::LARGE();
+              for (int m = 0; m < 4; m++) {
+                if (std::fabs(P_mhd_guess[m]) > 0.) {
+                  P_mhd_mag_min =
+                      std::min<Real>(P_mhd_mag_min, std::fabs(P_mhd_guess[m]));
+                }
+              }
+
+              bool bad_guess_m = false;
+              bool bad_guess_p = false;
+              for (int m = 0; m < 4; m++) {
+                Real P_mhd_m[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
+                                   P_mhd_guess[3]};
+                Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
+                                   P_mhd_guess[3]};
+                const Real fd_step =
+                    std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_guess[m]));
+                P_mhd_m[m] -= fd_step;
+                P_mhd_p[m] += fd_step;
+
+                srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
+                srm.CalculateRadConserved(U_mhd_m, U_rad_m);
+                auto status_m = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
+                srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
+                if (status_m == ClosureStatus::failure) {
+                  bad_guess_m = true;
+                }
+
+                srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
+                srm.CalculateRadConserved(U_mhd_p, U_rad_p);
+                auto status_p = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
+                srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
+                if (status_p == ClosureStatus::failure) {
+                  bad_guess_p = true;
+                }
+
+                for (int n = 0; n < 4; n++) {
+                  // TODO(BRR) -dt*dS for non-valencia
+                  Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
+                  Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
+                  jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
+                }
+              }
+
+              // Fail or repair if jacobian evaluation was pathological
+              if (bad_guess_m == true && bad_guess_p == true) {
+                // If both + and - finite difference support points are bad, this
+                // interaction fails
+                bad_guess = true;
+                break;
+              } else if (bad_guess_m == true) {
+                // If only - finite difference support point is bad, do one-sided
+                // difference with + support point
+                for (int m = 0; m < 4; m++) {
+                  Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
+                                     P_mhd_guess[3]};
+                  P_mhd_p[m] +=
+                      std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
+                  srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
+                  srm.CalculateRadConserved(U_mhd_p, U_rad_p);
+                  auto status_p = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
+                  srm.CalculateSource(P_mhd_p, P_rad_p, dS_p);
+                  PARTHENON_DEBUG_REQUIRE(status_p == ClosureStatus::success,
+                                          "This inversion should have already worked!");
+                  for (int n = 0; n < 4; n++) {
+                    Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
+                    Real fguess = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
+                    jac[n][m] = (fp - fguess) / (P_mhd_p[m] - P_mhd_guess[m]);
+                  }
+                }
+              } else if (bad_guess_p == true) {
+                // If only + finite difference support point is bad, do one-sided
+                // difference with - support point
+                for (int m = 0; m < 4; m++) {
+                  Real P_mhd_m[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
+                                     P_mhd_guess[3]};
+                  P_mhd_m[m] -=
+                      std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
+                  srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
+                  srm.CalculateRadConserved(U_mhd_m, U_rad_m);
+                  auto status_m = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
+                  srm.CalculateSource(P_mhd_m, P_rad_m, dS_m);
+                  PARTHENON_DEBUG_REQUIRE(status_m == ClosureStatus::success,
+                                          "This inversion should have already worked!");
+                  for (int n = 0; n < 4; n++) {
+                    Real fguess = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
+                    Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
+                    jac[n][m] = (fguess - fm) / (P_mhd_guess[m] - P_mhd_m[m]);
+                  }
+                }
+              }
+
+              Real jacinv[4][4];
+              LinearAlgebra::Invert4x4Matrix(jac, jacinv);
+
+              if (bad_guess == false) {
+
+                // Save energies before update in case we need to rescale step
+                double ug0 = P_mhd_guess[0];
+                double ur0 = P_rad_guess[0];
+
+                // Update guess
+                for (int m = 0; m < 4; m++) {
+                  for (int n = 0; n < 4; n++) {
+                    P_mhd_guess[m] -= jacinv[m][n] * resid[n];
+                  }
+                }
+
+                // TODO(BRR) check that this guess is sane i.e. ug > 0 J > 0 xi < 1, if
+                // not, recalculate the guess with some rescaled jacinv*resid
+
+                srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
+                srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+                status = srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
+                srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
+                if (status == ClosureStatus::failure) {
+                  bad_guess = true;
+                }
+
+                if (bad_guess) {
+                  // Try reducing the step size so xi < ximax, ug > 0, J > 0
+                  Real xi = 0.;
+                  SPACELOOP2(ii, jj) {
+                    xi += con_gamma(ii, jj) * P_rad_guess[ii + 1] * P_rad_guess[jj + 1];
+                  }
+                  xi = std::sqrt(xi) / P_rad_guess[0];
+                  constexpr Real ximax = 0.99;
+
+                  constexpr Real umin = 1.e-20; // TODO(BRR) use floors
+                  constexpr Real Jmin =
+                      1.e-20; // TODO(BRR) needs to be a bit smaller than
+                              // Jr floor! otherwise scaling fac is 0
+
+                  Real scaling_factor = 0.;
+                  if (xi > ximax) {
+                    scaling_factor = std::max<Real>(scaling_factor, ximax / xi);
+                  }
+                  if (P_mhd_guess[0] < umin) {
+                    scaling_factor = std::max<Real>(
+                        scaling_factor, (ug0 - umin) / (ug0 - P_mhd_guess[0]));
+                  }
+                  if (P_rad_guess[0] < Jmin) {
+                    scaling_factor = std::max<Real>(
+                        scaling_factor, (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
+                  }
+                  PARTHENON_DEBUG_REQUIRE(scaling_factor > robust::SMALL() &&
+                                              scaling_factor >= 1.,
+                                          "Got a nonsensical scaling factor!");
+                  // Nudge it a bit
+                  scaling_factor *= 0.5;
+                  for (int m = 0; m < 4; m++) {
+                    for (int n = 0; n < 4; n++) {
+                      P_mhd_guess[m] += (1. - scaling_factor) * jacinv[m][n] * resid[n];
+                    }
+                  }
+                  srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
+                  srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
+                  status =
+                      srm.CalculateRadPrimitive(P_mhd_guess, U_rad_guess, P_rad_guess);
+                  srm.CalculateSource(P_mhd_guess, P_rad_guess, dS_guess);
+                  if (status == ClosureStatus::success) {
+                    bad_guess = false;
+                  }
+                }
+              }
+
+              // If guess was invalid, break and mark this zone as a failure
+              if (bad_guess) {
+                break;
+              }
+
+              // Update residuals
+              for (int n = 0; n < 4; n++) {
+                resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
+              }
+
+              // Calculate error
+              err = robust::SMALL();
+              Real max_divisor = robust::SMALL();
+              for (int n = 0; n < 4; n++) {
+                max_divisor = std::max<Real>(
+                    max_divisor, std::fabs(U_mhd_guess[n]) + std::fabs(U_mhd_0[n]) +
+                                     std::fabs(dt * dS_guess[n]));
+              }
+              for (int n = 0; n < 4; n++) {
+                Real suberr = std::fabs(resid[n]) / max_divisor;
+                if (suberr > err) {
+                  err = suberr;
+                }
+              }
+
+              niter++;
+              if (niter == max_iter) {
+                break;
+              }
+            } while (err > TOL);
+
+            if (niter == max_iter || err > TOL || std::isnan(U_rad_guess[0]) ||
+                std::isnan(U_rad_guess[1]) || std::isnan(U_rad_guess[2]) ||
+                std::isnan(U_rad_guess[3]) || bad_guess) {
+              success = false;
+            } else {
+              success = true;
+              dE = (U_rad_guess[0] - v(iblock, idx_E(ispec), k, j, i)) / sdetgam;
+              SPACELOOP(ii) {
+                cov_dF(ii) =
+                    (U_rad_guess[ii + 1] - v(iblock, idx_F(ispec, ii), k, j, i)) /
+                    sdetgam;
               }
             }
+          }
 
-            niter++;
-            if (niter == max_iter) {
-              break;
+          // If 4D rootfind failed, try operator splitting the energy and momentum
+          // updates.
+          // TODO(BRR) Only do this if J << ug?
+          // Need to use this update if update fluid is false because 4D rootfind updates
+          // the fluid state internally
+          if (update_fluid == false) {
+            const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+            Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+
+            Real J0[3] = {v(iblock, idx_J(0), k, j, i), 0, 0};
+            PARTHENON_REQUIRE(num_species == 1, "Multiple species not implemented");
+
+            const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
+
+            // Rootfind over fluid temperature in fluid rest frame
+            root_find::RootFind root_find;
+            InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
+                                     num_species, species_d, scattering_fraction, dtau);
+            const Real T1 =
+                root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
+                                 1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
+
+            CLOSURE c(con_v, &g);
+
+            Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+            Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
+                          v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
+                          v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
+
+            // Treat the Eddington tensor explicitly for now
+            Real J = v(iblock, idx_J(ispec), k, j, i);
+            Vec cov_H{{
+                J * v(iblock, idx_H(ispec, 0), k, j, i),
+                J * v(iblock, idx_H(ispec, 1), k, j, i),
+                J * v(iblock, idx_H(ispec, 2), k, j, i),
+            }};
+            Tens2 con_tilPi;
+
+            if (idx_tilPi.IsValid()) {
+              SPACELOOP2(ii, jj) {
+                con_tilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i);
+              }
+            } else {
+              c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
             }
-          } while (err > TOL);
 
-          if (niter == max_iter || err > TOL || std::isnan(U_rad_guess[0]) ||
-              std::isnan(U_rad_guess[1]) || std::isnan(U_rad_guess[2]) ||
-              std::isnan(U_rad_guess[3]) || bad_guess) {
-            success = false;
-          } else {
-            success = true;
-            dE = (U_rad_guess[0] - v(iblock, idx_E(ispec), k, j, i)) / sdetgam;
+            Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
+            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+                rho, T1, Ye, species_d[ispec]);
+            Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
+            Real tauH = alpha * dt * kappa;
+
+            c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
+                                 &cov_dF);
+
+            // Check xi
+            Estar += dE;
+            SPACELOOP(ii) cov_Fstar(ii) += cov_dF(ii);
+            c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
+            Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+
+            if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0. && xi < 0.99) {
+              // TODO(BRR) also check H^2 < J?
+              success = true;
+            } else {
+              success = false;
+            }
+          }
+
+          // If sequence of source update methods was successful, apply update to
+          // conserved quantities. If unsuccessful, mark zone for fixup.
+          if (success == true) {
+            v(iblock, ifail, k, j, i) = FailFlags::success;
+
+            v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
             SPACELOOP(ii) {
-              cov_dF(ii) =
-                  (U_rad_guess[ii + 1] - v(iblock, idx_F(ispec, ii), k, j, i)) / sdetgam;
+              v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF(ii);
             }
-          }
-        }
-
-        // If 4D rootfind failed, try operator splitting the energy and momentum updates.
-        // TODO(BRR) Only do this if J << ug?
-        // Need to use this update if update fluid is false because 4D rootfind updates
-        // the fluid state internally
-        if (update_fluid == false) {
-          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-          Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
-
-          Real J0[3] = {v(iblock, idx_J(0), k, j, i), 0, 0};
-          PARTHENON_REQUIRE(num_species == 1, "Multiple species not implemented");
-
-          const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
-
-          // Rootfind over fluid temperature in fluid rest frame
-          root_find::RootFind root_find;
-          InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
-                                   num_species, species_d, scattering_fraction, dtau);
-          const Real T1 =
-              root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
-                               1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
-
-          CLOSURE c(con_v, &g);
-
-          Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
-          Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
-                        v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
-                        v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
-
-          // Treat the Eddington tensor explicitly for now
-          Real J = v(iblock, idx_J(ispec), k, j, i);
-          Vec cov_H{{
-              J * v(iblock, idx_H(ispec, 0), k, j, i),
-              J * v(iblock, idx_H(ispec, 1), k, j, i),
-              J * v(iblock, idx_H(ispec, 2), k, j, i),
-          }};
-          Tens2 con_tilPi;
-
-          if (idx_tilPi.IsValid()) {
-            SPACELOOP2(ii, jj) {
-              con_tilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i);
+            if (update_fluid) {
+              if (cye > 0) {
+                v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+              }
+              v(iblock, ceng, k, j, i) -= sdetgam * dE;
+              SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
             }
           } else {
-            c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+            v(iblock, ifail, k, j, i) = FailFlags::fail;
+            // Do not continue looping through species if any species fails -- wait for
+            // fixup
+            break;
           }
-
-          Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
-          Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-              rho, T1, Ye, species_d[ispec]);
-          Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-          Real tauH = alpha * dt * kappa;
-
-          c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH, &dE,
-                               &cov_dF);
-
-          // Check xi
-          Estar += dE;
-          SPACELOOP(ii) cov_Fstar(ii) += cov_dF(ii);
-          c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
-          Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
-
-          if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0. && xi < 0.99) {
-            // TODO(BRR) also check H^2 < J?
-            success = true;
-          } else {
-            success = false;
-          }
-        }
-
-        // If sequence of source update methods was successful, apply update to conserved
-        // quantities. If unsuccessful, mark zone for fixup.
-        if (success == true) {
-          v(iblock, ifail, k, j, i) = FailFlags::success;
-
-          v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
-          SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF(ii); }
-          if (update_fluid) {
-            if (cye > 0) {
-              v(iblock, cye, k, j, i) -= sdetgam * 0.0;
-            }
-            v(iblock, ceng, k, j, i) -= sdetgam * dE;
-            SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF(ii); }
-          }
-        } else {
-          v(iblock, ifail, k, j, i) = FailFlags::fail;
-        }
+        } // ispec
       });
   return TaskStatus::complete;
 }
