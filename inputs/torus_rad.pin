@@ -144,8 +144,8 @@ enable_radiation_ceilings = true
 enable_flux_fixup = true
 enable_c2p_fixup = true
 enable_source_fixup = true
-report_c2p_fails = false
-report_source_fails = false
+report_c2p_fails = true
+report_source_fails = true
 
 floor_type = ExpX1RhoSie
 rho0_floor = 1.0e-8
