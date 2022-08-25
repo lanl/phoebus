@@ -42,7 +42,7 @@ class SourceResidual4 {
   KOKKOS_FUNCTION
   SourceResidual4(const EOS &eos, const Opacity &opac, const MeanOpacity &mopac,
                   const Real rho, const Real Ye, const Real bprim[3],
-                  const RadiationType species, const Tens2 &conTilPi,
+                  const RadiationType species, /*const*/ Tens2 &conTilPi,
                   const Real (&gcov)[4][4], const Real (&gammacon)[3][3],
                   const Real alpha, const Real beta[3], const Real sdetgam,
                   const Real scattering_fraction, typename CLOSURE::LocalGeometryType &g,
@@ -84,6 +84,7 @@ class SourceResidual4 {
 
   KOKKOS_INLINE_FUNCTION
   ClosureStatus CalculateRadPrimitive(Real P_mhd[4], Real U_rad[4], Real P_rad[4]) {
+    const Real E = U_rad[0] / sdetgam_;
     Vec cov_F{U_rad[1] / sdetgam_, U_rad[2] / sdetgam_, U_rad[3] / sdetgam_};
     Vec cov_H;
     Real W = 0.;
@@ -91,7 +92,12 @@ class SourceResidual4 {
     W = std::sqrt(1. + W);
     Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
     CLOSURE c(con_v, &g_);
-    auto status = c.Con2Prim(U_rad[0] / sdetgam_, cov_F, conTilPi_, &(P_rad[0]), &cov_H);
+    // TODO(BRR) Accept separately calculated con_tilPi as an option
+    // TODO(BRR) Store xi, phi guesses
+    Real xi;
+    Real phi;
+    c.GetCovTilPiFromCon(E, cov_F, xi, phi, &conTilPi_);
+    auto status = c.Con2Prim(E, cov_F, conTilPi_, &(P_rad[0]), &cov_H);
     SPACELOOP(ii) { P_rad[ii + 1] = cov_H(ii); }
     return status;
   }
@@ -129,7 +135,7 @@ class SourceResidual4 {
   const Real *bprim_;
   const RadiationType species_;
   Real lambda_[2];
-  const Tens2 &conTilPi_;
+  Tens2 &conTilPi_;
 
   const Real (*gcov_)[4][4];
   const Real (*gammacon_)[3][3];
@@ -235,10 +241,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
   std::vector<std::string> variables{
-      cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity, ir::xi, ir::phi, ir::c2pfail};
-  if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    variables.push_back(ir::tilPi);
-  }
+      cr::E,  cr::F,   pr::J,       pr::H,    fluid_prim::velocity,
+      ir::xi, ir::phi, ir::c2pfail, ir::tilPi};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -953,7 +957,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           g.raise3Vector(covF, &conF);
           Tens2 conP, con_tilPi;
 
-          if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
+          if (iTilPi.IsValid()) {
             SPACELOOP2(ii, jj) {
               con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
             }
@@ -1005,17 +1009,8 @@ TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
 template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<Real> *,
                                                                   MeshBlockData<Real> *);
 
-// TODO(BRR) Unsure how else to get radiation parameters from MeshData
-template <>
-TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
-  for (int n = 0; n < rc->NumBlocks(); n++) {
-    MomentFluidSource(rc->GetBlockData(n).get(), dt, update_fluid);
-  }
-  return TaskStatus::complete;
-}
-
-template <class T>
-TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
+template <class T, class CLOSURE>
+TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   PARTHENON_REQUIRE(USE_VALENCIA, "Covariant MHD formulation not supported!");
 
   auto *pmb = rc->GetParentPointer().get();
@@ -1031,7 +1026,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   std::vector<std::string> vars{cr::E,          cr::F,     c::bfield,  p::density,
                                 p::temperature, p::energy, p::ye,      p::velocity,
                                 p::bfield,      pr::J,     pr::H,      ir::kappaJ,
-                                ir::kappaH,     ir::JBB,   ir::srcfail};
+                                ir::kappaH,     ir::JBB,   ir::tilPi,  ir::srcfail};
   vars.push_back(c::energy);
   vars.push_back(c::momentum);
   vars.push_back(c::ye);
@@ -1046,6 +1041,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
+  auto idx_tilPi = imap.GetFlatIdx(ir::tilPi);
   auto ifail = imap[ir::srcfail].first;
   auto pv = imap.GetFlatIdx(p::velocity);
 
@@ -1109,9 +1105,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
         geom.ContravariantShift(CellLocation::Cent, iblock, k, j, i, beta);
         Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
         Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-        // TODO(BRR) go beyond Eddington
-        typename ClosureEdd<Vec, Tens2>::LocalGeometryType g(geom, CellLocation::Cent,
-                                                             iblock, k, j, i);
+        typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
 
         Real rho = v(iblock, prho, k, j, i);
         Real ug = v(iblock, peng, k, j, i);
@@ -1149,12 +1143,28 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
               v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i)};
 
-          // TODO(BRR) go beyond Eddington
-          Tens2 conTilPi = {0};
-          SourceResidual4<ClosureEdd<Vec, Tens2>> srm(
-              eos, d_opacity, d_mean_opacity, rho, Ye, bprim, species_d[ispec], conTilPi,
-              cov_g, con_gamma.data, alpha, beta, sdetgam, scattering_fraction, g,
-              U_mhd_0, U_rad_0, k, j, i);
+          // TODO(BRR) instead update con_TilPi each substep?
+          // TODO(BRR) update v in closure each substep?
+          Vec con_v{{P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]}};
+          const Real W = phoebus::GetLorentzFactor(con_v.data, cov_gamma.data);
+          SPACELOOP(ii) { con_v(ii) /= W; }
+          CLOSURE c(con_v, &g);
+          Tens2 con_tilPi = {0};
+          if (idx_tilPi.IsValid()) {
+            SPACELOOP2(ii, jj) {
+              con_tilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i);
+            }
+          } else {
+            Real J = v(iblock, idx_J(ispec), k, j, i);
+            Vec covH{{v(iblock, idx_F(ispec, 0), k, j, i),
+                      v(iblock, idx_F(ispec, 1), k, j, i),
+                      v(iblock, idx_F(ispec, 2), k, j, i)}};
+            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+          }
+          SourceResidual4<CLOSURE> srm(eos, d_opacity, d_mean_opacity, rho, Ye, bprim,
+                                       species_d[ispec], con_tilPi, cov_g, con_gamma.data,
+                                       alpha, beta, sdetgam, scattering_fraction, g,
+                                       U_mhd_0, U_rad_0, k, j, i);
 
           // Memory for evaluating Jacobian via finite differences
           Real P_rad_m[4];
@@ -1419,8 +1429,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
               root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
                                1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
 
-          /// TODO: (LFR) Move beyond Eddington for this update
-          ClosureEdd<Vec, Tens2> c(con_v, &g);
+          CLOSURE c(con_v, &g);
 
           Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
           Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
@@ -1436,7 +1445,13 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
           }};
           Tens2 con_tilPi;
 
-          c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+          if (idx_tilPi.IsValid()) {
+            SPACELOOP2(ii, jj) {
+              con_tilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i);
+            }
+          } else {
+            c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+          }
 
           Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
           Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
@@ -1481,8 +1496,27 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
       });
   return TaskStatus::complete;
 }
-
-// template TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *, Real, bool);
+template <class T>
+TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
+  auto *pm = rc->GetParentPointer().get();
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
+  auto method = rad->Param<std::string>("method");
+  using settings =
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  if (method == "moment_m1") {
+    return MomentFluidSourceImpl<T, ClosureM1<Vec, Tens2, settings>>(rc, dt,
+                                                                     update_fluid);
+  } else if (method == "moment_eddington") {
+    return MomentFluidSourceImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, dt,
+                                                                      update_fluid);
+  } else if (method == "mocmc") {
+    return MomentFluidSourceImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc, dt,
+                                                                        update_fluid);
+  } else {
+    PARTHENON_FAIL("Radiation method unknown!");
+  }
+  return TaskStatus::fail;
+}
 template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real,
                                                            bool);
 
