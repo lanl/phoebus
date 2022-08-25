@@ -170,6 +170,7 @@ ClosureM1<Vec, Tens2, SET>::GetM1GuessesFromEddington(const Real E, const Vec co
   Real vHEdd = gamma->contractConCov3Vectors(con_v, cov_HEdd);
   Real HEdd = sqrt(gamma->contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd * vHEdd);
 
+  // TODO(BRR) Use radiation ceilings value here?
   *xi = std::min(ratio(HEdd, JEdd), 0.99);
   *phi = 1.000001 * acos(-1);
 }
