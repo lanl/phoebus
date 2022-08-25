@@ -54,13 +54,13 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 64           # Number of zones in X1-direction
+nx1         = 128           # Number of zones in X1-direction
 x1min       = 0.59          # minimum value of X1; overwritten for the torus problem
 x1max       = 3.69          # maximum value of X1; set by <coordinates>/r_outer for the torus problem
 ix1_bc      = user          # Inner-X1 boundary condition flag
 ox1_bc      = user          # Outer-X1 boundary condition flag
 
-nx2         = 64           # Number of zones in X2-direction
+nx2         = 128           # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
 x2max       = 1             # maximum value of X2. X2 = 1 -> theta = pi
 ix2_bc      = user          # Inner-X2 boundary condition flag
@@ -107,7 +107,6 @@ mhd = true
 
 <geometry>
 a = 0.9375
-#a = 0
 
 <coordinates>
 derefine_poles = false
@@ -145,8 +144,8 @@ enable_radiation_ceilings = true
 enable_flux_fixup = true
 enable_c2p_fixup = true
 enable_source_fixup = true
-report_c2p_fails = true
-report_source_fails = true
+report_c2p_fails = false
+report_source_fails = false
 
 floor_type = ExpX1RhoSie
 rho0_floor = 1.0e-8
