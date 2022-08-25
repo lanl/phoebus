@@ -355,6 +355,75 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
   }
 
+  TaskRegion &sync_region_6 = tc.AddRegion(num_partitions);
+  for (int ib = 0; ib < num_partitions; ib++) {
+    auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
+    auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
+    auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
+    auto &dudt = pmesh->mesh_data.GetOrAdd("dUdt", ib);
+    auto &tl = sync_region_6[ib];
+    auto &gsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", ib);
+    auto &tl = sync_region[ib];
+    int reg_dep_id = 0;
+
+    using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+
+    // TODO(JMM): Not sure what the optimal inter-weaving is from an
+    // accuracy point of view. The way I have it now, the metric
+    // updates before con2prim and boundaries, which is I think where
+    // it's first needed.
+    TaskID interp_to_monopole = none;
+    if (monopole_gr_active) {
+      auto interp_to_monopole =
+          tl.AddTask(none, MonopoleGR::InterpolateMatterTo1D<MDT>, sc0.get());
+      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, interp_to_monopole);
+    }
+
+    // TODO(JMM): Is this the right place for this?
+    // TODO(JMM): Should this stuff be in the synchronous region?
+    if (monopole_gr_active) {
+      auto matter_to_host =
+          (ib == 0 ? tl.AddTask(interp_to_monopole, MonopoleGR::MatterToHost,
+                                monopole.get(), true)
+                   : none);
+      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, matter_to_host);
+      auto start_reduce_matter =
+          (ib == 0 ? tl.AddTask(matter_to_host, &MonoMatRed_t::StartReduce, pmono_mat_red,
+                                MPI_SUM)
+                   : none);
+      auto start_reduce_vols =
+          (ib == 0 ? tl.AddTask(matter_to_host, &MonoVolRed_t::StartReduce, pmono_vol_red,
+                                MPI_SUM)
+                   : none);
+      auto finish_reduce_matter =
+          tl.AddTask(start_reduce_matter, &MonoMatRed_t::CheckReduce, pmono_mat_red);
+      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_matter);
+      auto finish_reduce_vols =
+          tl.AddTask(start_reduce_vols, &MonoVolRed_t::CheckReduce, pmono_vol_red);
+      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_vols);
+      auto finish_mono_reds = finish_reduce_matter | finish_reduce_vols;
+      auto divide_vols =
+          (ib == 0 ? tl.AddTask(finish_mono_reds, MonopoleGR::DivideVols, monopole.get())
+                   : none);
+      auto integrate_hypersurface =
+          (ib == 0 ? tl.AddTask(divide_vols, MonopoleGR::IntegrateHypersurface,
+                                monopole.get())
+                   : none);
+      auto lin_solve_for_lapse =
+          (ib == 0 ? tl.AddTask(integrate_hypersurface, MonopoleGR::LinearSolveForAlpha,
+                                monopole.get())
+                   : none);
+      auto spacetime_to_device =
+          (ib == 0 ? tl.AddTask(lin_solve_for_lapse, MonopoleGR::SpacetimeToDevice,
+                                monopole.get())
+                   : none);
+      auto check_monopole_dt =
+          (ib == 0 ? tl.AddTask(spacetime_to_device, MonopoleGR::CheckRateOfChange,
+                                monopole.get(), tm.dt / 2)
+                   : none);
+    }
+  }
+
   // Communicate flux corrections and update independent data with fluxes and geometric
   // sources
   TaskRegion &sync_region_2 = tc.AddRegion(num_partitions);
@@ -572,98 +641,29 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
   }
 
-  // const int num_partitions = pmesh->DefaultNumPartitions();
-  TaskRegion &sync_region_6 = tc.AddRegion(num_partitions);
-  for (int ib = 0; ib < num_partitions; ib++) {
-    auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
-    auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
-    auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
-    auto &dudt = pmesh->mesh_data.GetOrAdd("dUdt", ib);
-    auto &tl = sync_region_6[ib];
-    auto &gsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", ib);
-    auto &tl = sync_region[ib];
-    int reg_dep_id = 0;
 
-    using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-
-    // TODO(JMM): Not sure what the optimal inter-weaving is from an
-    // accuracy point of view. The way I have it now, the metric
-    // updates before con2prim and boundaries, which is I think where
-    // it's first needed.
-    TaskID interp_to_monopole = none;
-    if (monopole_gr_active) {
-      auto interp_to_monopole =
-          tl.AddTask(none, MonopoleGR::InterpolateMatterTo1D<MDT>, sc0.get());
-      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, interp_to_monopole);
-    }
-
-    // TODO(JMM): Is this the right place for this?
-    // TODO(JMM): Should this stuff be in the synchronous region?
-    if (monopole_gr_active) {
-      auto matter_to_host =
-          (ib == 0 ? tl.AddTask(interp_to_monopole, MonopoleGR::MatterToHost,
-                                monopole.get(), true)
-                   : none);
-      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, matter_to_host);
-      auto start_reduce_matter =
-          (ib == 0 ? tl.AddTask(matter_to_host, &MonoMatRed_t::StartReduce, pmono_mat_red,
-                                MPI_SUM)
-                   : none);
-      auto start_reduce_vols =
-          (ib == 0 ? tl.AddTask(matter_to_host, &MonoVolRed_t::StartReduce, pmono_vol_red,
-                                MPI_SUM)
-                   : none);
-      auto finish_reduce_matter =
-          tl.AddTask(start_reduce_matter, &MonoMatRed_t::CheckReduce, pmono_mat_red);
-      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_matter);
-      auto finish_reduce_vols =
-          tl.AddTask(start_reduce_vols, &MonoVolRed_t::CheckReduce, pmono_vol_red);
-      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_vols);
-      auto finish_mono_reds = finish_reduce_matter | finish_reduce_vols;
-      auto divide_vols =
-          (ib == 0 ? tl.AddTask(finish_mono_reds, MonopoleGR::DivideVols, monopole.get())
-                   : none);
-      auto integrate_hypersurface =
-          (ib == 0 ? tl.AddTask(divide_vols, MonopoleGR::IntegrateHypersurface,
-                                monopole.get())
-                   : none);
-      auto lin_solve_for_lapse =
-          (ib == 0 ? tl.AddTask(integrate_hypersurface, MonopoleGR::LinearSolveForAlpha,
-                                monopole.get())
-                   : none);
-      auto spacetime_to_device =
-          (ib == 0 ? tl.AddTask(lin_solve_for_lapse, MonopoleGR::SpacetimeToDevice,
-                                monopole.get())
-                   : none);
-      auto check_monopole_dt =
-          (ib == 0 ? tl.AddTask(spacetime_to_device, MonopoleGR::CheckRateOfChange,
-                                monopole.get(), tm.dt / 2)
-                   : none);
-    }
-  }
-
-    // update ghost cells
-    const auto local = parthenon::BoundaryType::local;
-    const auto nonlocal = parthenon::BoundaryType::nonlocal;
-    auto send =
-        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, sc1);
-
-    auto send_local =
-        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundBufs<local>, sc1);
-    auto recv_local =
-        tl.AddTask(update, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, sc1);
-    auto set_local =
-        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, sc1);
-
-    auto recv = tl.AddTask(
-        update, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, sc1);
-    auto set = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBounds<nonlocal>, sc1);
-
-    if (pmesh->multilevel) {
-      tl.AddTask(set | set_local,
-                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, sc1.get());
-    }
-  }
+//    // update ghost cells
+//    const auto local = parthenon::BoundaryType::local;
+//    const auto nonlocal = parthenon::BoundaryType::nonlocal;
+//    auto send =
+//        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, sc1);
+//
+//    auto send_local =
+//        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundBufs<local>, sc1);
+//    auto recv_local =
+//        tl.AddTask(update, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, sc1);
+//    auto set_local =
+//        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, sc1);
+//
+//    auto recv = tl.AddTask(
+//        update, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, sc1);
+//    auto set = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBounds<nonlocal>, sc1);
+//
+//    if (pmesh->multilevel) {
+//      tl.AddTask(set | set_local,
+//                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, sc1.get());
+//    }
+//  }
 
   // Evaluate and report particle statistics
   if (rad_mocmc_active && stage == integrator->nstages) {
