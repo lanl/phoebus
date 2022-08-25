@@ -1027,7 +1027,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
-  auto idx_tilPi = imap.GetFlatIdx(ir::tilPi);
+  auto idx_tilPi = imap.GetFlatIdx(ir::tilPi, false);
   auto ifail = imap[ir::srcfail].first;
   auto pv = imap.GetFlatIdx(p::velocity);
 
