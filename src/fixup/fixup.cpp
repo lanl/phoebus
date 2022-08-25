@@ -788,12 +788,15 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
-      // TODO(BRR) need to account for not stenciling outside of ghost zones
-      kb.s, kb.e, jb.s + 1, jb.e - 1, ib.s + 1, ib.e - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         Real eos_lambda[2]; // use last temp as initial guess
         eos_lambda[0] = 0.5;
         eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
+
+        // Need to account for not stenciling outside of ghost zones
+        bool is_outer_ghost_layer =
+            (i == ib.s || i == ib.e || j == jb.s || j == jb.e || k == kb.s || k == kb.e);
 
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b, iv, k, j, i) = v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
@@ -809,9 +812,14 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           return inv_mask_sum * v(b, iv, k, j, i);
         };
         if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
-          Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
-          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
-          if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+          Real num_valid = 0;
+          if (!is_outer_ghost_layer) {
+            num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
+            if (ndim > 1)
+              num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
+            if (ndim == 3)
+              num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+          }
           if (num_valid > 0.5) {
             const Real norm = 1.0 / num_valid;
             v(b, prho, k, j, i) = fixup(prho, norm);
@@ -1411,10 +1419,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ox2_bc == "reflect") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({fluid_cons::density, fluid_cons::energy,
-                                    fluid_cons::momentum, cr::E, cr::F}),
-          std::vector<std::string>({fluid_cons::density, fluid_cons::energy,
-                                    fluid_cons::momentum, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, cr::E, cr::F}),
           imap);
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy].first;

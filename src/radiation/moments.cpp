@@ -541,16 +541,6 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         if (ndim > 2)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
 
-        /*ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vi_l,
-                                   vi_r);
-        // y-direction
-        if (ndim > 1)
-          ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vj_l, vj_r);
-        // z-direction
-        if (ndim > 2)
-          ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vk_l, vk_r);
-          */
-
         // Calculate spatial derivatives of J at zone faces for diffusion limit
         //    x-->
         //    +---+---+
@@ -742,21 +732,17 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                     Jr * v(idx_qr(ispec, 2, idir), k, j, i),
                     Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
           // TODO(BRR) Why does clamping xi here cause explosions?
-          // Real xil = std::sqrt(g.contractCov3Vectors(Hl, Hl)) / Jl;
-          // Real xir = std::sqrt(g.contractCov3Vectors(Hr, Hr)) / Jr;
-          // constexpr Real ximax = 0.99;
+          Real xil = std::sqrt(g.contractCov3Vectors(Hl, Hl)) / Jl;
+          Real xir = std::sqrt(g.contractCov3Vectors(Hr, Hr)) / Jr;
+          constexpr Real ximax = 0.99;
           // TODO(BRR) for j = 4, j = 68 zones, xir/xil for idir = 1 are like 1e10 --
           // seems like BCs are not copying data correctly
-          // if (xil > ximax) {
-          //  SPACELOOP(ii) {
-          //    Hl(ii) *= ximax / xil;
-          //  }
-          //}
-          // if (xir > ximax) {
-          //  SPACELOOP(ii) {
-          //    Hr(ii) *= ximax / xir;
-          //  }
-          //}
+          if (xil > ximax) {
+            SPACELOOP(ii) { Hl(ii) *= ximax / xil; }
+          }
+          if (xir > ximax) {
+            SPACELOOP(ii) { Hr(ii) *= ximax / xir; }
+          }
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
@@ -870,7 +856,6 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   constexpr int ND = Geometry::NDFULL;
-  constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
   namespace cr = radmoment_cons;
@@ -1026,13 +1011,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E,          cr::F,     c::bfield, p::density,
-                                p::temperature, p::energy, p::ye,     p::velocity,
-                                p::bfield,      pr::J,     pr::H,     ir::kappaJ,
-                                ir::kappaH,     ir::JBB,   ir::tilPi, ir::srcfail};
-  vars.push_back(c::energy);
-  vars.push_back(c::momentum);
-  vars.push_back(c::ye);
+  std::vector<std::string> vars{c::energy, c::momentum, c::ye,       cr::E,
+                                cr::F,     c::bfield,   p::density,  p::temperature,
+                                p::energy, p::ye,       p::velocity, p::bfield,
+                                pr::J,     pr::H,       ir::kappaJ,  ir::kappaH,
+                                ir::JBB,   ir::tilPi,   ir::srcfail};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -1312,7 +1295,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
 
               Real jacinv[4][4];
-              LinearAlgebra::Invert4x4Matrix(jac, jacinv);
+              LinearAlgebra::matrixInverse4x4(jac, jacinv);
 
               if (bad_guess == false) {
 
@@ -1326,9 +1309,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                     P_mhd_guess[m] -= jacinv[m][n] * resid[n];
                   }
                 }
-
-                // TODO(BRR) check that this guess is sane i.e. ug > 0 J > 0 xi < 1, if
-                // not, recalculate the guess with some rescaled jacinv*resid
 
                 srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
                 srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
