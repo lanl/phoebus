@@ -472,10 +472,26 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   bool update_rad = rad_pkg->Param<bool>("active");
   if (!enable_c2p_fixup || !update_rad) return TaskStatus::complete;
 
-  const std::vector<std::string> vars(
-      {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
-       p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
-       impl::cell_signal_speed, ir::tilPi, ir::c2pfail, impl::fail});
+  const std::vector<std::string> vars({p::density,
+                                       c::density,
+                                       p::velocity,
+                                       c::momentum,
+                                       p::energy,
+                                       c::energy,
+                                       p::bfield,
+                                       p::ye,
+                                       c::ye,
+                                       p::pressure,
+                                       p::temperature,
+                                       p::gamma1,
+                                       pr::J,
+                                       pr::H,
+                                       cr::E,
+                                       cr::F,
+                                       impl::cell_signal_speed,
+                                       ir::tilPi,
+                                       ir::c2pfail,
+                                       impl::fail});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -587,8 +603,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
           const Real vel[] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
                               v(b, idx_pvel(2), k, j, i)};
 
-          typename CLOSURE::LocalGeometryType g(
-              geom, CellLocation::Cent, b, k, j, i);
+          typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 
           Real num_valid = v(b, iradfail, k, j, i - 1) + v(b, iradfail, k, j, i + 1);
           if (ndim > 1)
@@ -666,17 +681,24 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureM1<Vec, Tens2, settings>>(rc);
+    return RadConservedToPrimitiveFixupImpl<T,
+                                            radiation::ClosureM1<Vec, Tens2, settings>>(
+        rc);
   } else if (method == "moment_eddington") {
-    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+    return RadConservedToPrimitiveFixupImpl<T,
+                                            radiation::ClosureEdd<Vec, Tens2, settings>>(
+        rc);
   } else if (method == "mocmc") {
-    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
+    return RadConservedToPrimitiveFixupImpl<
+        T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
   } else {
     // TODO(BRR) default to Eddington closure, check that rad floors are unused for
     // Monte Carlo/cooling function
     PARTHENON_REQUIRE(!enable_rad_floors,
                       "Rad floors not supported with cooling function/Monte Carlo!");
-    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+    return RadConservedToPrimitiveFixupImpl<T,
+                                            radiation::ClosureEdd<Vec, Tens2, settings>>(
+        rc);
   }
   return TaskStatus::fail;
 }
@@ -1084,8 +1106,7 @@ TaskStatus SourceFixupImpl(T *rc) {
                                                           v(b, tmp, k, j, i), eos_lambda),
                     v(b, prs, k, j, i));
 
-          typename CLOSURE::LocalGeometryType g(
-              geom, CellLocation::Cent, b, k, j, i);
+          typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 
           // Clamp fluid velocity
           Real con_vp[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
