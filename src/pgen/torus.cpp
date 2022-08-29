@@ -145,8 +145,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  // Initialize radiation, if active
-  InitialRadiation init_rad;
+  // TODO(BRR) Make this an input parameter
+  InitialRadiation init_rad = InitialRadiation::thermal;
+  
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
   Opacity d_opacity;
   if (do_rad) {
@@ -288,10 +289,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               const Real T = v(itmp, k, j, i);
               const Real Ye = iye > 0 ? v(iye, k, j, i) : 0.5;
 
-              root_find::RootFind root_find;
-              GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity,
-                                            eos, species_d[ispec], Ye);
-              v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
+              if (init_rad == InitialRadiation::thermal) {
+                root_find::RootFind root_find;
+                GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity,
+                                              eos, species_d[ispec], Ye);
+                v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
+              } else {
+                PARTHENON_FAIL("Only thermal initial radiation supported currently!");
+              }
 
               // Set fluid u/P/T and radiation J using equilibrium temperature
               v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
