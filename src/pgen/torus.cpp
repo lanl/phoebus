@@ -110,7 +110,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto iJ = imap.GetFlatIdx(radmoment_prim::J, false);
   auto iH = imap.GetFlatIdx(radmoment_prim::H, false);
-  const auto specB = iJ.GetBounds(1);
+  const auto specB = iJ.IsValid() ? iJ.GetBounds(1) : parthenon::IndexRange();
 
   // this only works with ideal gases
   // The Fishbone solver needs to know about Ye
@@ -147,9 +147,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // TODO(BRR) Make this an input parameter
   InitialRadiation init_rad = InitialRadiation::thermal;
-  
+
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
   Opacity d_opacity;
+  std::vector<RadiationType> species;
+  int num_species = 0;
+  RadiationType species_d[MaxNumRadiationSpecies] = {};
   if (do_rad) {
     d_opacity = opac->Param<Opacity>("d.opacity");
     const std::string init_rad_str =
@@ -161,13 +164,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     } else {
       PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
     }
-  }
 
-  auto species = rad_pkg->Param<std::vector<RadiationType>>("species");
-  auto num_species = rad_pkg->Param<int>("num_species");
-  RadiationType species_d[MaxNumRadiationSpecies] = {};
-  for (int s = 0; s < num_species; s++) {
-    species_d[s] = species[s];
+    species = rad_pkg->Param<std::vector<RadiationType>>("species");
+    num_species = rad_pkg->Param<int>("num_species");
+    for (int s = 0; s < num_species; s++) {
+      species_d[s] = species[s];
+    }
   }
 
   // set up transformation stuff
@@ -291,8 +293,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
               if (init_rad == InitialRadiation::thermal) {
                 root_find::RootFind root_find;
-                GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity,
-                                              eos, species_d[ispec], Ye);
+                GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i),
+                                              d_opacity, eos, species_d[ispec], Ye);
                 v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
               } else {
                 PARTHENON_FAIL("Only thermal initial radiation supported currently!");

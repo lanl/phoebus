@@ -277,14 +277,14 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   auto swarm_d = swarm->GetDeviceContext();
 
   auto ix1_bc = rad->Param<MOCMCBoundaries>("ix1_bc");
-  //auto ox1_bc = rad->Param<MOCMCBoundaries>("ox1_bc");
+  // auto ox1_bc = rad->Param<MOCMCBoundaries>("ox1_bc");
 
   Real ix1_temp = 0.;
-  //Real ox1_temp = 0.;
+  // Real ox1_temp = 0.;
   if (ix1_bc == MOCMCBoundaries::fixed_temp) {
     ix1_temp = rad->Param<Real>("ix1_temp");
   }
-  //if (ox1_bc == MOCMCBoundaries::fixed_temp) {
+  // if (ox1_bc == MOCMCBoundaries::fixed_temp) {
   //  ox1_temp = rad->Param<Real>("ox1_temp");
   //}
 
@@ -307,8 +307,8 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
               Real temp = 0.;
               if (ix1_bc == MOCMCBoundaries::outflow) {
                 // Temperature from J in ghost zone
-                temp = opac_d.TemperatureFromEnergyDensity(v(iJ(s), k, j, i),
-                                                           species_d[s]);
+                temp =
+                    opac_d.TemperatureFromEnergyDensity(v(iJ(s), k, j, i), species_d[s]);
               } else {
                 // Fixed temperature
                 temp = ix1_temp;
