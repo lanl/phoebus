@@ -105,12 +105,6 @@ void PhoebusDriver::PostInitializationCommunication() {
   auto fluid = pmesh->packages.Get("fluid");
   const bool rad_active = rad->Param<bool>("active");
   const bool fluid_active = fluid->Param<bool>("active");
-  bool rad_moments_active = false;
-  bool rad_mocmc_active = false;
-  if (rad_active) {
-    rad_moments_active = rad->Param<bool>("moments_active");
-    rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
-  }
 
   const int num_partitions = pmesh->DefaultNumPartitions();
 
@@ -276,7 +270,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
     auto &tl = sync_region_1[ib];
 
-    const auto any = parthenon::BoundaryType::any;
     tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveBoundBufs<any>, sc1);
     if (pmesh->multilevel) {
       tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveFluxCorrections, sc0);
@@ -446,7 +439,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
 #if SET_FLUX_SRC_DIAGS
     auto copy_flux_div = tl.AddTask(
-        flux_div | geom_src, fluid::CopyFluxDivergence<MeshData<Real>>, dudt.get());
+        flux_div /*| geom_src*/, fluid::CopyFluxDivergence<MeshData<Real>>, mdudt.get());
 #endif
 
     auto add_rhs = tl.AddTask(flux_div, SumData<std::string, MeshData<Real>>, src_names,

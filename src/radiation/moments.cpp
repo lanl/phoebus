@@ -452,7 +452,6 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   auto *pmb = rc->GetParentPointer().get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  const int di = (pmb->pmy_mesh->ndim > 0 ? 1 : 0);
 
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const int dj = (pmb->pmy_mesh->ndim > 1 ? 1 : 0);
@@ -646,12 +645,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   auto idx_Ff = imap.GetFlatIdx(cr::F);
   auto idx_Ef = imap.GetFlatIdx(cr::E);
 
-  auto species = rad_pkg->Param<std::vector<RadiationType>>("species");
   auto num_species = rad_pkg->Param<int>("num_species");
-  RadiationType species_d[MaxNumRadiationSpecies] = {};
-  for (int s = 0; s < num_species; s++) {
-    species_d[s] = species[s];
-  }
 
   // const int nblock = 1; //v.GetDim(5);
 
