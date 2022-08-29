@@ -87,7 +87,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto rc = pmb->meshblock_data.Get().get();
 
-  bool do_rad = pmb->packages.Get("radiation")->Param<bool>("active");
+  auto rad_pkg = pmb->packages.Get("radiation");
+  bool do_rad = rad_pkg->Param<bool>("active");
 
   PackIndexMap imap;
   auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
@@ -160,8 +161,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
     }
   }
-  /// TODO: (LFR) Fix this junk
-  RadiationType d_species[3] = {species[0], species[1], species[2]};
+
+  auto species = rad_pkg->Param<std::vector<RadiationType>>("species");
+  auto num_species = rad_pkg->Param<int>("num_species");
+  RadiationType species_d[MaxNumRadiationSpecies] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
 
   // set up transformation stuff
   auto gpkg = pmb->packages.Get("geometry");
@@ -284,12 +290,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
               root_find::RootFind root_find;
               GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i), d_opacity,
-                                            eos, d_species[ispec], Ye);
+                                            eos, species_d[ispec], Ye);
               v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
 
               // Set fluid u/P/T and radiation J using equilibrium temperature
               v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
-                  v(itmp, k, j, i), d_species[ispec]);
+                  v(itmp, k, j, i), species_d[ispec]);
               Real lambda[2] = {Ye, 0.0};
               v(ieng, k, j, i) =
                   v(irho, k, j, i) * eos.InternalEnergyFromDensityTemperature(

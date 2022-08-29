@@ -541,16 +541,6 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         if (ndim > 2)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
 
-        /*ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vi_l,
-                                   vi_r);
-        // y-direction
-        if (ndim > 1)
-          ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vj_l, vj_r);
-        // z-direction
-        if (ndim > 2)
-          ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vk_l, vk_r);
-          */
-
         // Calculate spatial derivatives of J at zone faces for diffusion limit
         //    x-->
         //    +---+---+
@@ -701,6 +691,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           break;
         }
 
+        Real xi_max;
+        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                                    coords.x3v(k, j, i), xi_max);
+
         Vec con_beta;
         Tens2 cov_gamma;
         geom.Metric(face, k, j, i, cov_gamma.data);
@@ -742,21 +736,16 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                     Jr * v(idx_qr(ispec, 2, idir), k, j, i),
                     Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
           // TODO(BRR) Why does clamping xi here cause explosions?
-          // Real xil = std::sqrt(g.contractCov3Vectors(Hl, Hl)) / Jl;
-          // Real xir = std::sqrt(g.contractCov3Vectors(Hr, Hr)) / Jr;
-          // constexpr Real ximax = 0.99;
+          Real xil = std::sqrt(g.contractCov3Vectors(Hl, Hl)) / Jl;
+          Real xir = std::sqrt(g.contractCov3Vectors(Hr, Hr)) / Jr;
           // TODO(BRR) for j = 4, j = 68 zones, xir/xil for idir = 1 are like 1e10 --
           // seems like BCs are not copying data correctly
-          // if (xil > ximax) {
-          //  SPACELOOP(ii) {
-          //    Hl(ii) *= ximax / xil;
-          //  }
-          //}
-          // if (xir > ximax) {
-          //  SPACELOOP(ii) {
-          //    Hr(ii) *= ximax / xir;
-          //  }
-          //}
+          if (xil > xi_max) {
+            SPACELOOP(ii) { Hl(ii) *= xi_max / xil; }
+          }
+          if (xir > xi_max) {
+            SPACELOOP(ii) { Hr(ii) *= xi_max / xir; }
+          }
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
@@ -870,7 +859,6 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   constexpr int ND = Geometry::NDFULL;
-  constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
   namespace cr = radmoment_cons;
@@ -1026,13 +1014,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E,          cr::F,     c::bfield, p::density,
-                                p::temperature, p::energy, p::ye,     p::velocity,
-                                p::bfield,      pr::J,     pr::H,     ir::kappaJ,
-                                ir::kappaH,     ir::JBB,   ir::tilPi, ir::srcfail};
-  vars.push_back(c::energy);
-  vars.push_back(c::momentum);
-  vars.push_back(c::ye);
+  std::vector<std::string> vars{c::energy, c::momentum, c::ye,       cr::E,
+                                cr::F,     c::bfield,   p::density,  p::temperature,
+                                p::energy, p::ye,       p::velocity, p::bfield,
+                                pr::J,     pr::H,       ir::kappaJ,  ir::kappaH,
+                                ir::JBB,   ir::tilPi,   ir::srcfail};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -1044,7 +1030,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
-  auto idx_tilPi = imap.GetFlatIdx(ir::tilPi);
+  auto idx_tilPi = imap.GetFlatIdx(ir::tilPi, false);
   auto ifail = imap[ir::srcfail].first;
   auto pv = imap.GetFlatIdx(p::velocity);
 
@@ -1108,6 +1094,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
         Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
+
+        // Bounds
+        Real xi_max;
+        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                                    coords.x3v(k, j, i), xi_max);
 
         for (int ispec = 0; ispec < num_species; ispec++) {
 
@@ -1312,7 +1303,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
 
               Real jacinv[4][4];
-              LinearAlgebra::Invert4x4Matrix(jac, jacinv);
+              LinearAlgebra::matrixInverse4x4(jac, jacinv);
 
               if (bad_guess == false) {
 
@@ -1326,9 +1317,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                     P_mhd_guess[m] -= jacinv[m][n] * resid[n];
                   }
                 }
-
-                // TODO(BRR) check that this guess is sane i.e. ug > 0 J > 0 xi < 1, if
-                // not, recalculate the guess with some rescaled jacinv*resid
 
                 srm.CalculateMHDConserved(P_mhd_guess, U_mhd_guess);
                 srm.CalculateRadConserved(U_mhd_guess, U_rad_guess);
@@ -1345,7 +1333,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                     xi += con_gamma(ii, jj) * P_rad_guess[ii + 1] * P_rad_guess[jj + 1];
                   }
                   xi = std::sqrt(xi) / P_rad_guess[0];
-                  constexpr Real ximax = 0.99;
 
                   constexpr Real umin = 1.e-20; // TODO(BRR) use floors
                   constexpr Real Jmin =
@@ -1353,8 +1340,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                               // Jr floor! otherwise scaling fac is 0
 
                   Real scaling_factor = 0.;
-                  if (xi > ximax) {
-                    scaling_factor = std::max<Real>(scaling_factor, ximax / xi);
+                  if (xi > xi_max) {
+                    scaling_factor = std::max<Real>(scaling_factor, xi_max / xi);
                   }
                   if (P_mhd_guess[0] < umin) {
                     scaling_factor = std::max<Real>(
@@ -1492,7 +1479,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
             Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
 
-            if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0. && xi < 0.99) {
+            if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE > 0. && xi <= xi_max) {
               // TODO(BRR) also check H^2 < J?
               success = true;
             } else {

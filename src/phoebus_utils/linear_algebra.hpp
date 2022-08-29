@@ -135,7 +135,7 @@ Real determinant(Real m[16]) {
 }
 
 KOKKOS_INLINE_FUNCTION
-void Invert4x4Matrix(Real mat[4][4], Real matinv[4][4]) {
+void matrixInverse4x4(Real mat[4][4], Real matinv[4][4]) {
   adjoint(&(mat[0][0]), &(matinv[0][0]));
 
   Real det = determinant(&(mat[0][0]));

@@ -638,33 +638,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
   }
 
-  //    // update ghost cells
-  //    const auto local = parthenon::BoundaryType::local;
-  //    const auto nonlocal = parthenon::BoundaryType::nonlocal;
-  //    auto send =
-  //        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>,
-  //        sc1);
-  //
-  //    auto send_local =
-  //        tl.AddTask(update, parthenon::cell_centered_bvars::SendBoundBufs<local>, sc1);
-  //    auto recv_local =
-  //        tl.AddTask(update, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>,
-  //        sc1);
-  //    auto set_local =
-  //        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, sc1);
-  //
-  //    auto recv = tl.AddTask(
-  //        update, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, sc1);
-  //    auto set = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBounds<nonlocal>,
-  //    sc1);
-  //
-  //    if (pmesh->multilevel) {
-  //      tl.AddTask(set | set_local,
-  //                 parthenon::cell_centered_refinement::RestrictPhysicalBounds,
-  //                 sc1.get());
-  //    }
-  //  }
-
   // Evaluate and report particle statistics
   if (rad_mocmc_active && stage == integrator->nstages) {
     TaskRegion &tuning_region = tc.AddRegion(num_independent_task_lists);
