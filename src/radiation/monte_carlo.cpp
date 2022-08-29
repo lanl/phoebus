@@ -504,8 +504,8 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
     // TODO(BRR): Tune based on ParticleResolution::total
   } else if (tuning == "dynamic_difference") {
 
-    // TODO(BRR) This should be Rout_rad (add it) or max cartesian size
-    const Real L = 1.;
+    // TODO(BRR) This should be Rout_rad (add it) or max cartesian size, and also actually used.
+    //const Real L = 1.;
 
     printf("t_tune_emission: %e t0 + dt: %e\n", t_tune_emission, t0 + dt);
     const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
