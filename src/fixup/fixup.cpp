@@ -65,18 +65,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool report_source_fails = pin->GetOrAddBoolean("fixup", "report_source_fails", false);
   params.Add("report_source_fails", report_source_fails);
   bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
-  params.Add("enable_mhd_floors", enable_mhd_floors);
   bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", false);
-  params.Add("enable_rad_floors", enable_rad_floors);
 
-  if (!pin->GetOrAddBoolean("fluid", "mhd", false)) {
-    PARTHENON_REQUIRE(enable_mhd_floors == false,
-                      "MHD floors enabled but MHD is disabled!");
+  const bool enable_mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
+  const bool enable_rad = pin->GetOrAddBoolean("physics", "rad", false);
+
+  if (enable_mhd_floors && !enable_mhd) {
+    enable_mhd_floors = false;
+    PARTHENON_WARN("WARNING Disabling MHD floors because MHD is disabled!");
   }
-  if (!pin->GetOrAddBoolean("physics", "rad", false)) {
-    PARTHENON_REQUIRE(enable_rad_floors == false,
-                      "Radiation floors enabled but radiation is disabled!");
+  params.Add("enable_mhd_floors", enable_mhd_floors);
+
+  if (enable_rad_floors && !enable_rad) {
+    enable_rad_floors = false;
+    PARTHENON_WARN("WARNING Disabling radiation floors because radiation is disabled!");
   }
+  params.Add("enable_rad_floors", enable_rad_floors);
 
   if (enable_c2p_fixup && !enable_floors) {
     enable_floors = true;
