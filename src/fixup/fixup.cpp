@@ -994,12 +994,7 @@ TaskStatus SourceFixupImpl(T *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
-  auto species = rad_pkg->Param<std::vector<RadiationType>>("species");
   auto num_species = rad_pkg->Param<int>("num_species");
-  RadiationType species_d[3] = {};
-  for (int s = 0; s < num_species; s++) {
-    species_d[s] = species[s];
-  }
 
   // TODO(BRR) make this less ugly
   IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -1037,16 +1032,6 @@ TaskStatus SourceFixupImpl(T *rc) {
             }
           }
           return inv_mask_sum * v(b, iv, k, j, i);
-        };
-        auto fixupall = [&](const int iv) {
-          v(b, iv, k, j, i) = v(b, iv, k, j, i - 1) + v(b, iv, k, j, i + 1);
-          if (ndim > 1) {
-            v(b, iv, k, j, i) += v(b, iv, k, j - 1, i) + v(b, iv, k, j + 1, i);
-            if (ndim == 3) {
-              v(b, iv, k, j, i) += v(b, iv, k - 1, j, i) + v(b, iv, k + 1, j, i);
-            }
-          }
-          return v(b, iv, k, j, i);
         };
         if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
 

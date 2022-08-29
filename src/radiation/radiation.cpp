@@ -456,8 +456,6 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   pmb->par_reduce(
       "Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
-        Real csig = 1.0;
-
         Vec con_beta;
         geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
         Tens2 cov_gamma;
@@ -468,7 +466,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
         for (int ispec = 0; ispec < num_species; ispec++) {
 
-          Real kappaH = v(idx_kappaH(ispec), k, j, i);
+          const Real kappaH = v(idx_kappaH(ispec), k, j, i);
 
           for (int d = 0; d < ndim; d++) {
             // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt.
