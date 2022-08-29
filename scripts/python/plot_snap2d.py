@@ -60,15 +60,6 @@ def plot_dump(filename, varname,
     y = coord[...,2]
     x = coord[...,1]
 
-    # Calculate volume integral (SMR)
-    # Calculate total energy
-    econs = data.Get("r.c.E", False)
-    print(np.min(econs))
-    print(np.max(econs))
-    #total = np.sum(econs[:,:,:,:,0])
-    total = np.sum(econs[:,:,:,:])
-    print(f"Volume integral E: {total}")
-
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)
         x = rho
@@ -99,9 +90,7 @@ def plot_dump(filename, varname,
         if len(val.shape) > 2:
           print("WARNING plotting the 0th index of multidimensional variable!")
           val = val[:,:,2]
-        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:],# shading='gouraud',
-        #mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:], shading='gouraud',
-        #mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:,0], shading='gouraud',
+        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:], shading='gouraud',
                             vmin=qmin, vmax=qmax, cmap=colormap)
 
     plt.xlim(x1bounds[0], x1bounds[1])

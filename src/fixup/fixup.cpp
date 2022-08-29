@@ -254,6 +254,12 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         double rho_floor, sie_floor;
         bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
                          rho_floor, sie_floor);
+        double gamma_max, e_max;
+        bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+                           gamma_max, e_max);
+        Real xi_max;
+        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                                    coords.x3v(k, j, i), xi_max);
 
         bool floor_applied = false;
         if (v(b, prho, k, j, i) < rho_floor) {
@@ -272,11 +278,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         Real con_vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
                           v(b, pvel_lo + 2, k, j, i)};
         const Real W = phoebus::GetLorentzFactor(con_vp, gcov);
-        // TODO(BRR) use ceilings
-        const Real Wmax = 50.;
-        if (W > Wmax) {
+        if (W > gamma_max) {
           floor_applied = true;
-          const Real rescale = std::sqrt((Wmax * Wmax - 1.) / (W * W - 1.));
+          const Real rescale = std::sqrt((gamma_max * gamma_max - 1.) / (W * W - 1.));
           SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) *= rescale; }
         }
 
@@ -327,10 +331,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                     v(b, idx_H(ispec, jj), k, j, i);
             }
             xi = std::sqrt(xi);
-            constexpr Real ximax = 0.99;
-            if (xi > ximax) {
+            if (xi > xi_max) {
               floor_applied = true;
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi; }
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
             }
           }
         }
@@ -625,6 +628,10 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             }
           }
 
+          Real xi_max;
+          bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                                      coords.x3v(k, j, i), xi_max);
+
           // Clamp variables
           for (int ispec = 0; ispec < nspec; ispec++) {
             v(b, idx_J(ispec), k, j, i) =
@@ -632,9 +639,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
                          v(b, idx_H(ispec, 2), k, j, i)};
             Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H));
-            const Real ximax = 0.99;
-            if (xi > ximax) {
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi; }
+            if (xi > xi_max) {
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
             }
           }
 
@@ -788,12 +794,15 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
-      // TODO(BRR) need to account for not stenciling outside of ghost zones
-      kb.s, kb.e, jb.s + 1, jb.e - 1, ib.s + 1, ib.e - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         Real eos_lambda[2]; // use last temp as initial guess
         eos_lambda[0] = 0.5;
         eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
+
+        // Need to account for not stenciling outside of ghost zones
+        bool is_outer_ghost_layer =
+            (i == ib.s || i == ib.e || j == jb.s || j == jb.e || k == kb.s || k == kb.e);
 
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b, iv, k, j, i) = v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
@@ -809,9 +818,14 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           return inv_mask_sum * v(b, iv, k, j, i);
         };
         if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
-          Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
-          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
-          if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+          Real num_valid = 0;
+          if (!is_outer_ghost_layer) {
+            num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
+            if (ndim > 1)
+              num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
+            if (ndim == 3)
+              num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+          }
           if (num_valid > 0.5) {
             const Real norm = 1.0 / num_valid;
             v(b, prho, k, j, i) = fixup(prho, norm);
@@ -1108,17 +1122,22 @@ TaskStatus SourceFixupImpl(T *rc) {
 
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 
+          Real gamma_max, e_max;
+          bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                             coords.x3v(k, j, i), gamma_max, e_max);
+
           // Clamp fluid velocity
           Real con_vp[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
                             v(b, idx_pvel(2), k, j, i)};
           Real W = phoebus::GetLorentzFactor(con_vp, gcov);
-          // TODO(BRR) use ceilings
-          const Real Wmax = 50.;
-          if (W > Wmax) {
-            const Real rescale = std::sqrt((Wmax * Wmax - 1.) / (W * W - 1.));
+          if (W > gamma_max) {
+            const Real rescale = std::sqrt((gamma_max * gamma_max - 1.) / (W * W - 1.));
             SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) *= rescale; }
           }
           const Real r = std::exp(coords.x1v(k, j, i));
+          Real xi_max;
+          bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                                      coords.x3v(k, j, i), xi_max);
           const Real Jmin = 1.e-10;
           for (int ispec = 0; ispec < num_species; ispec++) {
             v(b, idx_J(ispec), k, j, i) =
@@ -1130,9 +1149,8 @@ TaskStatus SourceFixupImpl(T *rc) {
             Real xi = 0.;
             SPACELOOP(ii) { xi += cov_H(ii) * con_H(ii); }
             xi = std::sqrt(xi);
-            const Real ximax = 0.99;
-            if (xi > ximax) {
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= ximax / xi; }
+            if (xi > xi_max) {
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
             }
           }
 
@@ -1411,10 +1429,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ox2_bc == "reflect") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({fluid_cons::density, fluid_cons::energy,
-                                    fluid_cons::momentum, cr::E, cr::F}),
-          std::vector<std::string>({fluid_cons::density, fluid_cons::energy,
-                                    fluid_cons::momentum, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, cr::E, cr::F}),
           imap);
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy].first;
