@@ -1251,7 +1251,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   const std::string ox2_bc = fluid->Param<std::string>("ox2_bc");
 
   auto rad = pmb->packages.Get("radiation");
-  int num_species;
+  int num_species = 0;
   if (rad->Param<bool>("active")) {
     num_species = rad->Param<int>("num_species");
   }
