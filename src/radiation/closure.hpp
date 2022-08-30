@@ -148,6 +148,8 @@ KOKKOS_FUNCTION ClosureEdd<Vec, Tens2, SET>::ClosureEdd(const Vec con_v_in,
   gamma->lower3Vector(con_v, &cov_v);
   v2 = 0.0;
   SPACELOOP(i) v2 += con_v(i) * cov_v(i);
+  // TODO(BRR) use gamma max ceiling (may mess with rootfind)
+  //v2 = std::min<Real>(v2, 0.999);
   W = 1 / std::sqrt(1 - v2);
   W2 = W * W;
 

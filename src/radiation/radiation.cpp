@@ -303,6 +303,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     namespace c = radmoment_cons;
     namespace i = radmoment_internal;
 
+    Real src_rootfind_eps = pin->GetOrAddReal("radiation", "src_rootfind_eps", 1.e-8);
+    params.Add("src_rootfind_eps", src_rootfind_eps);
+
     int ndim = 3;
     // if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
     // else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;

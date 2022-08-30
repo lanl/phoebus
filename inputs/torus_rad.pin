@@ -119,6 +119,7 @@ absorption = true
 do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
+src_rootfind_eps = 1.e-8
 
 #scattering_fraction = 1.0
 scattering_fraction = 0.5
