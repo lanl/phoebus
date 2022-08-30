@@ -1069,6 +1069,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   // itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
+  const auto src_rootfind_eps = rad->Param<Real>("src_rootfind_eps");
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
@@ -1149,6 +1151,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             Vec con_v{{P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]}};
             const Real W = phoebus::GetLorentzFactor(con_v.data, cov_gamma.data);
             SPACELOOP(ii) { con_v(ii) /= W; }
+            printf("\n[%i %i %i]\n", k, j, i);
+            printf("rho: %e ug: %e Tg: %e\n", rho, ug, Tg);
+            printf("W: %e con_v: %e %e %e\n", W, con_v(0), con_v(1), con_v(2));
             CLOSURE c(con_v, &g);
             Tens2 con_tilPi = {0};
             if (idx_tilPi.IsValid()) {
@@ -1201,7 +1206,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             do {
               // Numerically calculate Jacobian
               Real jac[4][4] = {0};
-              constexpr Real EPS = 1.e-8;
+              //constexpr Real EPS = 1.e-4;
+              //constexpr Real src_rootfind_eps = 1.e-8;
+              //Real src_rootfind_eps = 1.e-8;
+              printf("src_rootfind_eps: %e\n", src_rootfind_eps);
+
 
               // Minimum non-zero magnitude from P_mhd_guess
               Real P_mhd_mag_min = robust::LARGE();
@@ -1220,9 +1229,14 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
                                    P_mhd_guess[3]};
                 const Real fd_step =
-                    std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_guess[m]));
+                    std::max(src_rootfind_eps * P_mhd_mag_min, src_rootfind_eps * std::fabs(P_mhd_guess[m]));
+                    printf("fd_step[%i]: %e\n", m,fd_step);
                 P_mhd_m[m] -= fd_step;
                 P_mhd_p[m] += fd_step;
+                    printf("P_mhd_m: %28.18e %28.18e %28.18e %28.18e\n",
+                    P_mhd_m[0], P_mhd_m[1], P_mhd_m[2], P_mhd_m[3]);
+                    printf("P_mhd_p: %28.18e %28.18e %28.18e %28.18e\n",
+                    P_mhd_p[0], P_mhd_p[1], P_mhd_p[2], P_mhd_p[3]);
 
                 srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
                 srm.CalculateRadConserved(U_mhd_m, U_rad_m);
@@ -1231,6 +1245,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 if (status_m == ClosureStatus::failure) {
                   bad_guess_m = true;
                 }
+                printf("m:\n");
+                printf("U_mhd_m: %e %e %e %e\n", U_mhd_m[0], U_mhd_m[1], U_mhd_m[2], U_mhd_m[3]);
+                printf("U_rad_m: %e %e %e %e\n", U_rad_m[0], U_rad_m[1], U_rad_m[2], U_rad_m[3]);
+                printf("dS_m: %e %e %e %e\n", dS_m[0], dS_m[1], dS_m[2], dS_m[3]);
 
                 srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
                 srm.CalculateRadConserved(U_mhd_p, U_rad_p);
@@ -1245,8 +1263,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                   Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
                   Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
                   jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
+                  printf("jac[%i][%i] = %e\n", n, m, jac[n][m]);
                 }
               }
+                printf("bad guesses? %i %i\n", bad_guess_m, bad_guess_p);
 
               // Fail or repair if jacobian evaluation was pathological
               if (bad_guess_m == true && bad_guess_p == true) {
@@ -1261,7 +1281,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                   Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
                                      P_mhd_guess[3]};
                   P_mhd_p[m] +=
-                      std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_p[m]));
+                      std::max(src_rootfind_eps * P_mhd_mag_min, src_rootfind_eps * std::fabs(P_mhd_p[m]));
                   srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
                   srm.CalculateRadConserved(U_mhd_p, U_rad_p);
                   auto status_p = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
@@ -1281,7 +1301,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                   Real P_mhd_m[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
                                      P_mhd_guess[3]};
                   P_mhd_m[m] -=
-                      std::max(EPS * P_mhd_mag_min, EPS * std::fabs(P_mhd_m[m]));
+                      std::max(src_rootfind_eps * P_mhd_mag_min, src_rootfind_eps * std::fabs(P_mhd_m[m]));
                   srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
                   srm.CalculateRadConserved(U_mhd_m, U_rad_m);
                   auto status_m = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
@@ -1345,6 +1365,24 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                     scaling_factor = std::max<Real>(
                         scaling_factor, (ur0 - Jmin) / (ur0 - P_rad_guess[0]));
                   }
+                  //if (!(scaling_factor > robust::SMALL() && scaling_factor >= 1.)) {
+                  if (true) {
+                    printf("%i %i %i\n", k, j, i);
+                    printf("Pradguess: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
+                      P_rad_guess[3]);
+                    Real lambda_[2] = {0., 0.};
+                    RadiationType species_ = species_d[ispec];
+                    printf("alpha: %e\n", d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, lambda_[0], species_));
+                    printf("rho: %e Tg: %e\n", rho, Tg);
+                    printf("con_vp: %e %e %e\n", con_vp[0], con_vp[1], con_vp[2]);
+                    printf("xi: %e Pmhdg0: %e Pradg0: %e\n", xi, P_mhd_guess[0], P_rad_guess[0]);
+              printf("[%i %i %i] rho: %e Tg: %e Prad0: %e %e %e %e Pradg: %e %e %e %e\n", k, j, i, rho, Tg,
+              v(iblock, idx_J(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
+              v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i),
+              P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+              if ( i == 98 && j == 4) exit(-1);
+                    exit(-1);
+                  }
                   PARTHENON_DEBUG_REQUIRE(scaling_factor > robust::SMALL() &&
                                               scaling_factor >= 1.,
                                           "Got a nonsensical scaling factor!");
@@ -1374,6 +1412,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               // Update residuals
               for (int n = 0; n < 4; n++) {
                 resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
+                printf("[%i %i %i][%i] resid = %e (%e %e %e)\n", k,j,i,niter,resid[n],
+                  U_mhd_guess[n], U_mhd_0[n], dt*dS_guess[n]);
+                if (isnan(resid[n])) { exit(-1); }
               }
 
               // Calculate error
@@ -1409,6 +1450,13 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                     (U_rad_guess[ii + 1] - v(iblock, idx_F(ispec, ii), k, j, i)) /
                     sdetgam;
               }
+            }
+
+            if (j == 64) {
+              printf("[%i %i %i] rho: %e Tg: %e ug: %e Prad0: %e %e %e %e Pradg: %e %e %e %e\n", k, j, i, rho, Tg,ug,
+              v(iblock, idx_J(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
+              v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i),
+              P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
             }
           }
 
@@ -1480,6 +1528,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               success = false;
             }
           }
+              if ( i == 98 && j == 4) exit(-1);
 
           // If sequence of source update methods was successful, apply update to
           // conserved quantities. If unsuccessful, mark zone for fixup.
