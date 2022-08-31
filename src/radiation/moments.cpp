@@ -861,9 +861,6 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   namespace p = fluid_prim;
   PackIndexMap imap;
   std::vector<std::string> vars{cr::E, cr::F, pr::J, pr::H, p::velocity, ir::tilPi};
-#if SET_FLUX_SRC_DIAGS
-  vars.push_back(diagnostic_variables::src_terms);
-#endif
   auto v = rc->PackVariables(vars, imap);
   auto idx_E = imap.GetFlatIdx(cr::E);
   auto idx_F = imap.GetFlatIdx(cr::F);
@@ -871,13 +868,16 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   auto idx_H = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(p::velocity);
   auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
-  const int idiag = imap[diagnostic_variables::src_terms].first;
 
   PackIndexMap imap_src;
   std::vector<std::string> vars_src{cr::E, cr::F};
+#if SET_FLUX_SRC_DIAGS
+  vars_src.push_back(diagnostic_variables::src_terms);
+#endif
   auto v_src = rc_src->PackVariables(vars_src, imap_src);
   auto idx_E_src = imap_src.GetFlatIdx(cr::E);
   auto idx_F_src = imap_src.GetFlatIdx(cr::F);
+  const int idiag = imap_src[diagnostic_variables::src_terms].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -969,6 +969,11 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
           SPACELOOP(ii) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
+          }
+
+          if (i == 64 && j == 64) {
+            printf("[%i %i %i] E src: %e\n", k,j,i,v_src(iblock, idx_E_src(ispec), k, j, i));
+            exit(-1);
           }
         }
         #if SET_FLUX_SRC_DIAGS

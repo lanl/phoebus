@@ -65,12 +65,12 @@ def plot_dump(filename, varname,
     mass = np.sum(cdens)
     cener = data.Get("c.energy", False)
     sumEner = np.sum(cener)
-    cE = data.Get("r.c.E", False)
-    sumE = np.sum(cE)
+    #cE = data.Get("r.c.E", False)
+    #sumE = np.sum(cE)
     print(f"mass:         {mass}")
     print(f"fluid energy: {sumEner}")
-    print(f"rad energy:   {sumE}")
-    print(f"total energy: {sumEner + sumE}")
+    #print(f"rad energy:   {sumE}")
+    #print(f"total energy: {sumEner + sumE}")
 
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)
@@ -95,6 +95,9 @@ def plot_dump(filename, varname,
         if log:
             cbar_label = r'$\log_{10}$' + cbar_label
 
+    flux_diag = data.Get("flux_divergence", False)
+    src_diag = data.Get("src_terms", False)
+
     fig = plt.figure()
     p = fig.add_subplot(111, aspect=1)
     for i in range(NB):
@@ -102,6 +105,13 @@ def plot_dump(filename, varname,
         if len(val.shape) > 2:
           print("WARNING plotting the 0th index of multidimensional variable!")
           val = val[:,:,1]
+
+        idx = 5
+        #val = np.log10(np.fabs(flux_diag[i,0,:,:,idx]))# + src_diag[i,0,:,:,idx]))
+        val = np.log10(np.fabs(src_diag[i,0,:,:,idx]))
+        print((10.**val).max())
+        print((10.**val).min())
+
         mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:], shading='gouraud',
                             vmin=qmin, vmax=qmax, cmap=colormap)
 

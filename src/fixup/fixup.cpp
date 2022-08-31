@@ -425,8 +425,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   return TaskStatus::complete;
 }
 
-template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
-
 template <typename T>
 TaskStatus ApplyFloors(T *rc) {
   auto *pm = rc->GetParentPointer().get();
@@ -456,6 +454,8 @@ TaskStatus ApplyFloors(T *rc) {
   }
   return TaskStatus::fail;
 }
+
+template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 template <typename T, class CLOSURE>
 TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
