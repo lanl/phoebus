@@ -861,6 +861,9 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   namespace p = fluid_prim;
   PackIndexMap imap;
   std::vector<std::string> vars{cr::E, cr::F, pr::J, pr::H, p::velocity, ir::tilPi};
+#if SET_FLUX_SRC_DIAGS
+  vars.push_back(diagnostic_variables::src_terms);
+#endif
   auto v = rc->PackVariables(vars, imap);
   auto idx_E = imap.GetFlatIdx(cr::E);
   auto idx_F = imap.GetFlatIdx(cr::F);
@@ -868,6 +871,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   auto idx_H = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(p::velocity);
   auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  const int idiag = imap[diagnostic_variables::src_terms].first;
 
   PackIndexMap imap_src;
   std::vector<std::string> vars_src{cr::E, cr::F};
@@ -967,6 +971,13 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
           }
         }
+        #if SET_FLUX_SRC_DIAGS
+        // TODO(BRR) Only first species for now
+        v_src(iblock, idiag + 5, k, j, i) = v_src(iblock, idx_E_src(0), k, j, i);
+        v_src(iblock, idiag + 6, k, j, i) = v_src(iblock, idx_F_src(0, 0), k, j, i);
+        v_src(iblock, idiag + 7, k, j, i) = v_src(iblock, idx_F_src(0, 1), k, j, i);
+        v_src(iblock, idiag + 8, k, j, i) = v_src(iblock, idx_F_src(0, 2), k, j, i);
+        #endif
       });
   return TaskStatus::complete;
 }
@@ -1070,6 +1081,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
   const auto src_rootfind_eps = rad->Param<Real>("src_rootfind_eps");
+  const auto src_rootfind_tol = rad->Param<Real>("src_rootfind_tol");
+  const auto src_rootfind_maxiter = rad->Param<int>("src_rootfind_maxiter");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -1199,8 +1212,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             }
 
             Real err = 1.e100;
-            constexpr Real TOL = 1.e-8;
-            constexpr int max_iter = 100;
+//            constexpr Real TOL = 1.e-8;
+            //constexpr int max_iter = 100;
             int niter = 0;
             bool bad_guess = false;
             do {
@@ -1445,12 +1458,12 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
 
               niter++;
-              if (niter == max_iter) {
+              if (niter == src_rootfind_maxiter) {
                 break;
               }
-            } while (err > TOL);
+            } while (err > src_rootfind_tol);
 
-            if (niter == max_iter || err > TOL || std::isnan(U_rad_guess[0]) ||
+            if (niter == src_rootfind_maxiter || err > src_rootfind_tol || std::isnan(U_rad_guess[0]) ||
                 std::isnan(U_rad_guess[1]) || std::isnan(U_rad_guess[2]) ||
                 std::isnan(U_rad_guess[3]) || bad_guess) {
               success = false;

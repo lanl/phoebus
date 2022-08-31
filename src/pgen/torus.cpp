@@ -548,7 +548,8 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
 
     PackIndexMap imap;
     auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
-                                fluid_prim::bfield, fluid_prim::pressure},
+                                fluid_prim::bfield, fluid_prim::pressure,
+                                radmoment_prim::J},
                                imap);
 
     const int irho = imap[fluid_prim::density].first;
@@ -557,6 +558,8 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
     const int iblo = imap[fluid_prim::bfield].first;
     const int ibhi = imap[fluid_prim::bfield].second;
     const int iprs = imap[fluid_prim::pressure].first;
+
+    auto idx_J = imap.GetFlatIdx(radmoment_prim::J, false);
 
     if (ibhi < 0) return;
 
@@ -567,6 +570,12 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
           const Real bsq =
               GetMagneticFieldSquared(CellLocation::Cent, k, j, i, geom, v, ivlo, iblo);
+          Real Ptot = v(iprs, k, j, i);
+          // TODO(BRR) multiple species
+          if (idx_J.IsValid()) {
+            int ispec = 0;
+            Ptot += 1./3.*v(idx_J(ispec), k, j, i);
+          }
           const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
           if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
         },

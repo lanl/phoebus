@@ -66,12 +66,16 @@ TaskStatus CopyFluxDivergence(T *rc) {
 
   std::vector<std::string> vars(
       {fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
+  vars.push_back(radmoment_cons::E);
+  vars.push_back(radmoment_cons::F);
   PackIndexMap imap;
   auto divf = rc->PackVariables(vars, imap);
   const int crho = imap[fluid_cons::density].first;
   const int cmom_lo = imap[fluid_cons::momentum].first;
   const int cmom_hi = imap[fluid_cons::momentum].second;
   const int ceng = imap[fluid_cons::energy].first;
+  auto idx_E = imap.GetFlatIdx(radmoment_cons::E, false);
+  auto idx_F = imap.GetFlatIdx(radmoment_cons::F, false);
   std::vector<std::string> diag_vars({diagnostic_variables::divf});
   auto diag = rc->PackVariables(diag_vars);
 
@@ -86,6 +90,13 @@ TaskStatus CopyFluxDivergence(T *rc) {
         diag(b, 2, k, j, i) = divf(b, cmom_lo + 1, k, j, i);
         diag(b, 3, k, j, i) = divf(b, cmom_lo + 2, k, j, i);
         diag(b, 4, k, j, i) = divf(b, ceng, k, j, i);
+        // TODO(BRR) 0 species only
+        if (idx_E.IsValid()) {
+          diag(b, 5, k, j, i) = divf(b, idx_E(0), k, j, i);
+          diag(b, 6, k, j, i) = divf(b, idx_F(0, 0), k, j, i);
+          diag(b, 7, k, j, i) = divf(b, idx_F(0, 1), k, j, i);
+          diag(b, 8, k, j, i) = divf(b, idx_F(0, 2), k, j, i);
+        }
       });
   return TaskStatus::complete;
 }

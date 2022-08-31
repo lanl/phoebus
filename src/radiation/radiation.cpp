@@ -306,6 +306,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Real src_rootfind_eps = pin->GetOrAddReal("radiation", "src_rootfind_eps", 1.e-8);
     params.Add("src_rootfind_eps", src_rootfind_eps);
 
+    Real src_rootfind_tol = pin->GetOrAddReal("radiation", "src_rootfind_tol", 1.e-12);
+    params.Add("src_rootfind_tol", src_rootfind_tol);
+
+    int src_rootfind_maxiter = pin->GetOrAddInteger("radiation", "src_rootfind_maxiter", 100);
+    params.Add("src_rootfind_maxiter", src_rootfind_maxiter);
+
     int ndim = 3;
     // if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
     // else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;

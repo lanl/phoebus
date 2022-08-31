@@ -215,7 +215,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 #if SET_FLUX_SRC_DIAGS
   // DIAGNOSTIC STUFF FOR DEBUGGING
-  std::vector<int> five_vec(1, 5);
+  // TODO(BRR) temporarily adding a diag
+  std::vector<int> five_vec(1, 5 + 4);
   Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                             Metadata::Derived, Metadata::OneCopy},
                            five_vec);

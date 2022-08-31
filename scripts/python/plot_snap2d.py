@@ -60,6 +60,18 @@ def plot_dump(filename, varname,
     y = coord[...,2]
     x = coord[...,1]
 
+    # Plot some conserved quantities
+    cdens = data.Get("c.density", False)
+    mass = np.sum(cdens)
+    cener = data.Get("c.energy", False)
+    sumEner = np.sum(cener)
+    cE = data.Get("r.c.E", False)
+    sumE = np.sum(cE)
+    print(f"mass:         {mass}")
+    print(f"fluid energy: {sumEner}")
+    print(f"rad energy:   {sumE}")
+    print(f"total energy: {sumEner + sumE}")
+
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)
         x = rho
@@ -89,7 +101,7 @@ def plot_dump(filename, varname,
         val = q[i,0,:,:]
         if len(val.shape) > 2:
           print("WARNING plotting the 0th index of multidimensional variable!")
-          val = val[:,:,2]
+          val = val[:,:,1]
         mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:], shading='gouraud',
                             vmin=qmin, vmax=qmax, cmap=colormap)
 
