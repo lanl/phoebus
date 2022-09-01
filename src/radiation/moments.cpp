@@ -971,9 +971,52 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
           }
 
-          if (i == 64 && j == 64) {
-            printf("[%i %i %i] E src: %e\n", k,j,i,v_src(iblock, idx_E_src(ispec), k, j, i));
-            exit(-1);
+          //if (i == 64 && j == 64) {
+          if (true) {
+//            printf("[%i %i %i] E src: %e\n", k,j,i,v_src(iblock, idx_E_src(ispec), k, j, i));
+            Real ucon[4] = {0};
+            ucon[0] = W/alp;
+            SPACELOOP(ii) {
+              ucon[ii+1] = con_v(ii) / W + con_beta(ii) / alp;
+            }
+            Real gcon[4][4] = {0};
+            geom.SpacetimeMetricInverse(CellLocation::Cent, iblock, k, j, i, gcon);
+            Real gcov[4][4];
+            geom.SpacetimeMetric(CellLocation::Cent, iblock, k, j, i, gcov);
+            Geometry::Tetrads Tetrads(ucon, gcov);
+            Real Hcon_fluid[4] = {0};
+            SPACELOOP(ii) {
+              Hcon_fluid[ii+1] = covH(ii);
+            }
+            Real Hcon_lab[4] = {0};
+            Tetrads.TetradToCoordCon(Hcon_fluid, Hcon_lab);
+            Real hcon[4][4] = {0};
+            SPACETIMELOOP2(mu, nu) {
+              hcon[mu][nu] = gcon[mu][nu] + ucon[mu] * ucon[nu];
+            }
+            Real Rcon[4][4] = {0};
+            SPACETIMELOOP2(mu, nu) {
+              Rcon[mu][nu] = (ucon[mu] * ucon[nu] + hcon[mu][nu] / 3.)*J;
+              Rcon[mu][nu] += ucon[mu]*Hcon_lab[nu] + ucon[nu]*Hcon_lab[mu];
+  //            printf("Rcon[%i][%i] = %e\n", mu, nu, Rcon[mu][nu]);
+            }
+
+            Real newEsrc = 0.;
+            SPACETIMELOOP(mu) {
+              newEsrc += Rcon[mu][0]*dlnalp[mu];
+              SPACETIMELOOP(nu) {
+                Real Gamma_udd = 0.;
+                SPACETIMELOOP(lam) {
+                  Gamma_udd += gcon[0][lam]*Gamma[lam][nu][mu];
+                }
+                newEsrc -= Rcon[mu][nu]*Gamma_udd;
+              }
+            }
+            newEsrc *= alp * sdetgam;
+            //printf("newEsrc: %e\n", newEsrc);
+            v_src(iblock, idx_E_src(0), k, j, i) = newEsrc;
+
+    //        exit(-1);
           }
         }
         #if SET_FLUX_SRC_DIAGS
