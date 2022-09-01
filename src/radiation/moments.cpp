@@ -17,7 +17,7 @@
 
 #include <singularity-eos/eos/eos.hpp>
 
-#include "fixup/fixup.hpp"
+//#include "fixup/fixup.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -651,7 +651,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  auto bounds = fix_pkg->Param<Bounds>("bounds");
+  //auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   // TODO(BRR) add to radiation floors
   const Real kappaH_min = 1.e-20;
@@ -686,8 +686,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         }
 
         Real xi_max;
-        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max);
+        //bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+        //                            coords.x3v(k, j, i), xi_max);
+        xi_max = 0.99;
+        // TODO(BRR) compilaiton bug?
 
         Vec con_beta;
         Tens2 cov_gamma;

@@ -65,10 +65,17 @@ def plot_dump(filename, varname,
     mass = np.sum(cdens)
     cener = data.Get("c.energy", False)
     sumEner = np.sum(cener)
+<<<<<<< HEAD
+    print(f"mass:         {mass}")
+    print(f"fluid energy: {sumEner}")
+    cE = data.Get("r.c.E", False)
+    if (cE is not None):
+=======
     cE = data.Get("r.c.E", False)
     print(f"mass:         {mass}")
     print(f"fluid energy: {sumEner}")
     if cE is not None:
+>>>>>>> 17a94c558be4f47951098fd4062e8f0cfec0abbf
       sumE = np.sum(cE)
       print(f"rad energy:   {sumE}")
       print(f"total energy: {sumEner + sumE}")
@@ -107,12 +114,12 @@ def plot_dump(filename, varname,
           print("WARNING plotting the 0th index of multidimensional variable!")
           val = val[:,:,1]
 
-        idx = 5
-        val = np.log10(np.fabs(flux_diag[i,0,:,:,idx]) + src_diag[i,0,:,:,idx])
+        #idx = 5
+        #val = np.log10(np.fabs(flux_diag[i,0,:,:,idx]) + src_diag[i,0,:,:,idx])
         #val = np.log10(np.fabs(flux_diag[i,0,:,:,idx]))# + src_diag[i,0,:,:,idx]))
         #val = np.log10(np.fabs(src_diag[i,0,:,:,idx]))
-        print((10.**val).max())
-        print((10.**val).min())
+        #print((10.**val).max())
+        #print((10.**val).min())
 
         mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:], shading='gouraud',
                             vmin=qmin, vmax=qmax, cmap=colormap)
