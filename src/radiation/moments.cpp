@@ -996,7 +996,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             }
             Real Rcon[4][4] = {0};
             SPACETIMELOOP2(mu, nu) {
-              Rcon[mu][nu] = (ucon[mu] * ucon[nu] + hcon[mu][nu] / 3.)*J;
+              Rcon[mu][nu] += (ucon[mu] * ucon[nu] + hcon[mu][nu] / 3.)*J;
               Rcon[mu][nu] += ucon[mu]*Hcon_lab[nu] + ucon[nu]*Hcon_lab[mu];
   //            printf("Rcon[%i][%i] = %e\n", mu, nu, Rcon[mu][nu]);
             }
@@ -1012,9 +1012,26 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                 newEsrc -= Rcon[mu][nu]*Gamma_udd;
               }
             }
-            newEsrc *= alp * sdetgam;
-            //printf("newEsrc: %e\n", newEsrc);
+            newEsrc *= alp * alp * sdetgam;
+            Real newFsrc[3] = {0};
+            SPACELOOP(ii) {
+              SPACETIMELOOP2(mu, nu) {
+                newFsrc[ii] += Rcon[mu][nu]*Gamma[mu][nu][ii+1];
+              }
+              newFsrc[ii] *= alp * sdetgam;
+            }
+            if (i == 64 && j == 64) {
+              printf("oldEsrc: %e newEsrc: %e\n", v_src(iblock, idx_E_src(0), k, j, i), newEsrc);
+              SPACELOOP(ii) {
+                printf("[%i] oldFsrc = %e newFsrc = %e\n", ii,
+                  v_src(iblock, idx_F_src(0, ii), k, j, i),
+                  newFsrc[ii]);
+              }
+            }
             v_src(iblock, idx_E_src(0), k, j, i) = newEsrc;
+            SPACELOOP(ii) {
+              v_src(iblock, idx_F_src(0, ii), k, j, i) = newFsrc[ii];
+            }
 
     //        exit(-1);
           }
