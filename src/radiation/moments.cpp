@@ -940,6 +940,13 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Vec covH{{J * v(iblock, idx_H(ispec, 0), k, j, i),
                     J * v(iblock, idx_H(ispec, 1), k, j, i),
                     J * v(iblock, idx_H(ispec, 2), k, j, i)}};
+
+                    // TODO(BRR) temporarily turn off fluxes!
+          //          SPACELOOP(ii) { covH(ii) = 0.; }
+          //          {
+          //            Tens2 con_tilPi{0};
+          //            c.Prim2Con(J, covH, con_tilPi, &E, &covF);
+          //          }
           Vec conF;
           g.raise3Vector(covF, &conF);
           Tens2 conP, con_tilPi;
@@ -957,6 +964,11 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           SPACELOOP2(ii, jj) srcE += K(ii, jj) * conP(ii, jj);
           SPACELOOP(ii) srcE -= dlnalp[ii + 1] * conF(ii);
           srcE *= alp;
+
+          Real srcE_term1 = 0.;
+          Real srcE_term2 = 0.;
+          SPACELOOP2(ii, jj) srcE_term1 += sdetgam * alp * K(ii, jj) * conP(ii, jj);
+          SPACELOOP(ii) srcE_term2 -= sdetgam * alp * dlnalp[ii+1] * conF(ii);
 
           Vec srcF{0, 0, 0};
           SPACELOOP(ii) {
@@ -977,7 +989,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             Real ucon[4] = {0};
             ucon[0] = W/alp;
             SPACELOOP(ii) {
-              ucon[ii+1] = con_v(ii) / W + con_beta(ii) / alp;
+              //ucon[ii+1] = con_v(ii) / W + con_beta(ii) / alp;
+              ucon[ii+1] = W * con_v(ii) - con_beta(ii) / alp;
             }
             Real gcon[4][4] = {0};
             geom.SpacetimeMetricInverse(CellLocation::Cent, iblock, k, j, i, gcon);
@@ -1013,6 +1026,18 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
               }
             }
             newEsrc *= alp * alp * sdetgam;
+            Real newEsrc_term1 = 0.;
+            Real newEsrc_term2 = 0.;
+            SPACETIMELOOP(mu) newEsrc_term1 += alp*alp*sdetgam*Rcon[mu][0]*dlnalp[mu];
+            SPACETIMELOOP(mu) {
+              SPACETIMELOOP(nu) {
+                Real Gamma_udd = 0.;
+                SPACETIMELOOP(lam) {
+                  Gamma_udd += gcon[0][lam]*Gamma[lam][nu][mu];
+                }
+                newEsrc_term2 -= Rcon[mu][nu]*Gamma_udd;
+              }
+            }
             Real newFsrc[3] = {0};
             SPACELOOP(ii) {
               SPACETIMELOOP2(mu, nu) {
@@ -1022,18 +1047,21 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             }
             if (i == 64 && j == 64) {
               printf("oldEsrc: %e newEsrc: %e\n", v_src(iblock, idx_E_src(0), k, j, i), newEsrc);
+              printf("olEsrct1: %e newEsrct1: %e\n", srcE_term1, newEsrc_term1);
+              printf("olEsrct2: %e newEsrct2: %e\n", srcE_term2, newEsrc_term2);
               SPACELOOP(ii) {
                 printf("[%i] oldFsrc = %e newFsrc = %e\n", ii,
                   v_src(iblock, idx_F_src(0, ii), k, j, i),
                   newFsrc[ii]);
               }
+              printf("alp: %e sdetgam: %e\n", alp, sdetgam);
+              //exit(-1);
             }
             v_src(iblock, idx_E_src(0), k, j, i) = newEsrc;
             SPACELOOP(ii) {
               v_src(iblock, idx_F_src(0, ii), k, j, i) = newFsrc[ii];
             }
 
-    //        exit(-1);
           }
         }
         #if SET_FLUX_SRC_DIAGS
