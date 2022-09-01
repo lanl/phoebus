@@ -974,7 +974,16 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
           Vec srcF{0, 0, 0};
           SPACELOOP(ii) {
-            SPACELOOP(jj) { srcF(ii) += covF(jj) * dbeta(ii, jj); }
+            SPACELOOP(jj) { srcF(ii) += conF(jj) * dbeta(ii, jj); }
+//            // TODO(BRR) alternate expression
+//            //Real dbetacon[3] = {0.};
+//            Tens2 con_gamma;
+//            geom.MetricInverse(CellLocation::Cent, iblock, k, j, i, con_gamma.data);
+//            Tens2 dbetacon{0};
+//            SPACELOOP3(jj, kk, ll) {
+//              dbetacon(jj, kk) += con_gamma(kk, ll) * dbeta(jj, ll);
+//            }
+//            SPACELOOP(jj) { srcF(ii) += covF(jj) * dbetacon(ii, jj); }
             srcF(ii) -= alp * E * dlnalp[ii + 1];
             SPACELOOP2(jj, kk) {
               srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
