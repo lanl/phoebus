@@ -1006,14 +1006,21 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             Real gcon[4][4] = {0};
             geom.SpacetimeMetricInverse(CellLocation::Cent, iblock, k, j, i, gcon);
             Real gcov[4][4];
-            geom.SpacetimeMetric(CellLocation::Cent, iblock, k, j, i, gcov);
-            Geometry::Tetrads Tetrads(ucon, gcov);
-            Real Hcon_fluid[4] = {0};
+            //geom.SpacetimeMetric(CellLocation::Cent, iblock, k, j, i, gcov);
+            //Geometry::Tetrads Tetrads(ucon, gcov);
+            Vec Hcon{0};
+            g.raise3Vector(covH, &Hcon);
+            Real Hcon4[4] = {0};
             SPACELOOP(ii) {
-              Hcon_fluid[ii+1] = covH(ii);
+              Hcon4[ii+1] = Hcon(ii);
             }
-            Real Hcon_lab[4] = {0};
-            Tetrads.TetradToCoordCon(Hcon_fluid, Hcon_lab);
+
+            //Real Hcon_fluid[4] = {0};
+            //SPACELOOP(ii) {
+            //  Hcon_fluid[ii+1] = covH(ii);
+            //}
+            //Real Hcon_lab[4] = {0};
+            //Tetrads.TetradToCoordCon(Hcon_fluid, Hcon_lab);
             Real hcon[4][4] = {0};
             SPACETIMELOOP2(mu, nu) {
               hcon[mu][nu] = gcon[mu][nu] + ucon[mu] * ucon[nu];
@@ -1021,7 +1028,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             Real Rcon[4][4] = {0};
             SPACETIMELOOP2(mu, nu) {
               Rcon[mu][nu] += (ucon[mu] * ucon[nu] + hcon[mu][nu] / 3.)*J;
-              Rcon[mu][nu] += ucon[mu]*Hcon_lab[nu] + ucon[nu]*Hcon_lab[mu];
+              //Rcon[mu][nu] += ucon[mu]*Hcon_lab[nu] + ucon[nu]*Hcon_lab[mu];
+              Rcon[mu][nu] += ucon[mu]*Hcon4[nu] + ucon[nu]*Hcon4[mu];
   //            printf("Rcon[%i][%i] = %e\n", mu, nu, Rcon[mu][nu]);
             }
 
