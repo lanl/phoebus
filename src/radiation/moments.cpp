@@ -996,7 +996,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             }
             Real Rcon[4][4] = {0};
             SPACETIMELOOP2(mu, nu) {
-              Rcon[mu][nu] = (ucon[mu] * ucon[nu] + hcon[mu][nu] / 3.)*J;
+              Rcon[mu][nu] += (ucon[mu] * ucon[nu] + hcon[mu][nu] / 3.)*J;
               Rcon[mu][nu] += ucon[mu]*Hcon_lab[nu] + ucon[nu]*Hcon_lab[mu];
   //            printf("Rcon[%i][%i] = %e\n", mu, nu, Rcon[mu][nu]);
             }
@@ -1012,7 +1012,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                 newEsrc -= Rcon[mu][nu]*Gamma_udd;
               }
             }
-            newEsrc *= alp * sdetgam;
+            newEsrc *= alp * alp * sdetgam;
             //printf("newEsrc: %e\n", newEsrc);
             v_src(iblock, idx_E_src(0), k, j, i) = newEsrc;
 
