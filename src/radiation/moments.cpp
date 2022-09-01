@@ -17,7 +17,7 @@
 
 #include <singularity-eos/eos/eos.hpp>
 
-#include "fixup/fixup.hpp"
+//#include "fixup/fixup.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -651,7 +651,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  auto bounds = fix_pkg->Param<Bounds>("bounds");
+  //auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   // TODO(BRR) add to radiation floors
   const Real kappaH_min = 1.e-20;
@@ -686,8 +686,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         }
 
         Real xi_max;
-        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max);
+        //bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+        //                            coords.x3v(k, j, i), xi_max);
+        xi_max = 0.99;
+        // TODO(BRR) compilaiton bug?
 
         Vec con_beta;
         Tens2 cov_gamma;
@@ -1013,8 +1015,25 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
               }
             }
             newEsrc *= alp * alp * sdetgam;
-            //printf("newEsrc: %e\n", newEsrc);
+            Real newFsrc[3] = {0};
+            SPACELOOP(ii) {
+              SPACETIMELOOP2(mu, nu) {
+                newFsrc[ii] += Rcon[mu][nu]*Gamma[mu][nu][ii+1];
+              }
+              newFsrc[ii] *= alp * sdetgam;
+            }
+            if (i == 64 && j == 64) {
+              printf("oldEsrc: %e newEsrc: %e\n", v_src(iblock, idx_E_src(0), k, j, i), newEsrc);
+              SPACELOOP(ii) {
+                printf("[%i] oldFsrc = %e newFsrc = %e\n", ii,
+                  v_src(iblock, idx_F_src(0, ii), k, j, i),
+                  newFsrc[ii]);
+              }
+            }
             v_src(iblock, idx_E_src(0), k, j, i) = newEsrc;
+            SPACELOOP(ii) {
+              v_src(iblock, idx_F_src(0, ii), k, j, i) = newFsrc[ii];
+            }
 
     //        exit(-1);
           }
