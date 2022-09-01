@@ -65,12 +65,13 @@ def plot_dump(filename, varname,
     mass = np.sum(cdens)
     cener = data.Get("c.energy", False)
     sumEner = np.sum(cener)
-    #cE = data.Get("r.c.E", False)
-    #sumE = np.sum(cE)
+    cE = data.Get("r.c.E", False)
     print(f"mass:         {mass}")
     print(f"fluid energy: {sumEner}")
-    #print(f"rad energy:   {sumE}")
-    #print(f"total energy: {sumEner + sumE}")
+    if cE is not None:
+      sumE = np.sum(cE)
+      print(f"rad energy:   {sumE}")
+      print(f"total energy: {sumEner + sumE}")
 
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)
@@ -107,8 +108,9 @@ def plot_dump(filename, varname,
           val = val[:,:,1]
 
         idx = 5
+        val = np.log10(np.fabs(flux_diag[i,0,:,:,idx]) + src_diag[i,0,:,:,idx])
         #val = np.log10(np.fabs(flux_diag[i,0,:,:,idx]))# + src_diag[i,0,:,:,idx]))
-        val = np.log10(np.fabs(src_diag[i,0,:,:,idx]))
+        #val = np.log10(np.fabs(src_diag[i,0,:,:,idx]))
         print((10.**val).max())
         print((10.**val).min())
 
