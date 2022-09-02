@@ -149,8 +149,15 @@ KOKKOS_FUNCTION ClosureEdd<Vec, Tens2, SET>::ClosureEdd(const Vec con_v_in,
   v2 = 0.0;
   SPACELOOP(i) v2 += con_v(i) * cov_v(i);
   // TODO(BRR) use gamma max ceiling (may mess with rootfind)
-  //v2 = std::min<Real>(v2, 0.999);
+  //v2 = std::min<Real>(v2, 0.9999);
   W = 1 / std::sqrt(1 - v2);
+  if (std::isinf(W)) {
+    printf("Nonsense W! vin = %e %e %e\n", con_v_in(0), con_v_in(1), con_v_in(2));
+    printf("v = %e %e %e\n", con_v(0), con_v(1), con_v(2));
+    printf("cov_v: %e %e %e\n", cov_v(0), cov_v(1), cov_v(2));
+    printf("v2 = %e\n", v2);
+    printf("W = %e\n", W);
+  }
   W2 = W * W;
 
   PARTHENON_DEBUG_REQUIRE(!std::isinf(W), "Infinite Lorentz factor!");

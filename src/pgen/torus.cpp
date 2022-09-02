@@ -269,6 +269,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                v(irho, k, j, i), v(itmp, k, j, i), lambda) /
                            v(iprs, k, j, i);
+              
+        Real ucon[4] = {0};
+        Real vpcon[3] = {v(ivlo, k, j, i), 
+                    v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
+        Real gcov[4][4] = {0};
+        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+        GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
+        Geometry::Tetrads tetrads(ucon, gcov);
 
         // Radiation
         if (do_rad) {
@@ -311,9 +319,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                   v(irho, k, j, i), v(itmp, k, j, i), lambda);
 
               // Zero comoving frame fluxes
-              v(iH(ispec, 0), k, j, i) = 0.0;
-              v(iH(ispec, 1), k, j, i) = 0.0;
-              v(iH(ispec, 2), k, j, i) = 0.0;
+              Real Mcon_fluid[4] = {v(iJ(ispec), k, j, i), 0., 0., 0.};
+              Real Mcon_coord[4] = {0};
+              tetrads.TetradToCoordCon(Mcon_fluid, Mcon_coord);
+              Real Hcon[3] = {Mcon_coord[1] - ucon[1]*v(iJ(ispec), k, j, i),
+                          Mcon_coord[2] - ucon[2]*v(iJ(ispec), k, j, i),
+                          Mcon_coord[3] - ucon[3]*v(iJ(ispec), k, j, i)};
+              Real Hcov[3] = {0.};
+              SPACELOOP2(ii, jj) {
+                Hcov[ii] += gcov[ii+1][jj+1]*Hcon[jj];
+              }
+
+              SPACELOOP(ii) {
+                v(iH(ispec, 0), k, j, i) = Hcov[ii] / v(iJ(ispec), k, j, i);
+              }
             }
           } else {
             // In the atmosphere set some small radiation energy
@@ -321,9 +340,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               v(iJ(ispec), k, j, i) = 1.e-5 * v(ieng, k, j, i);
 
               // Zero comoving frame fluxes
-              v(iH(ispec, 0), k, j, i) = 0.0;
-              v(iH(ispec, 1), k, j, i) = 0.0;
-              v(iH(ispec, 2), k, j, i) = 0.0;
+              Real Mcon_fluid[4] = {v(iJ(ispec), k, j, i), 0., 0., 0.};
+              Real Mcon_coord[4] = {0};
+              tetrads.TetradToCoordCon(Mcon_fluid, Mcon_coord);
+              Real Hcon[3] = {Mcon_coord[1] - ucon[1]*v(iJ(ispec), k, j, i),
+                          Mcon_coord[2] - ucon[2]*v(iJ(ispec), k, j, i),
+                          Mcon_coord[3] - ucon[3]*v(iJ(ispec), k, j, i)};
+              Real Hcov[3] = {0.};
+              SPACELOOP2(ii, jj) {
+                Hcov[ii] += gcov[ii+1][jj+1]*Hcon[jj];
+              }
+
+              SPACELOOP(ii) {
+                v(iH(ispec, 0), k, j, i) = Hcov[ii] / v(iJ(ispec), k, j, i);
+              }
             }
           }
         }
