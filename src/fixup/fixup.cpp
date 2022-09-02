@@ -180,6 +180,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 template <typename T, class CLOSURE>
 TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace pr = radmoment_prim;
@@ -459,6 +460,7 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 template <typename T, class CLOSURE>
 TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -715,6 +717,7 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
 
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -920,6 +923,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 // neighbors, set everything to the floors
 template <typename T, class CLOSURE>
 TaskStatus SourceFixupImpl(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -1238,6 +1242,7 @@ TaskStatus SourceFixup(T *rc) {
 }
 
 TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   using parthenon::BoundaryFace;
   using parthenon::BoundaryFlag;
   auto *pmb = rc->GetParentPointer().get();

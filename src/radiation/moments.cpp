@@ -447,6 +447,7 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   using namespace PhoebusReconstruction;
 
   auto *pmb = rc->GetParentPointer().get();
@@ -612,6 +613,7 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
@@ -913,29 +915,13 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
         Vec con_beta;
         geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
-        Real beta2 = 0.0;
-        SPACELOOP2(ii, jj) beta2 += con_beta(ii) * con_beta(jj) * cov_gamma(ii, jj);
         Real con_g[4][4] = {0};
         geom.SpacetimeMetricInverse(CellLocation::Cent, iblock, k, j, i, con_g);
-
         Real dlnalp[ND];
         Real Gamma[ND][ND][ND];
         geom.GradLnAlpha(CellLocation::Cent, iblock, k, j, i, dlnalp);
         geom.ConnectionCoefficient(CellLocation::Cent, iblock, k, j, i, Gamma);
 
-        // Get the gradient of the shift from the Christoffel symbols of the first kind
-        // Get the extrinsic curvature from the Christoffel symbols of the first kind
-        // All indices are covariant
-        Tens2 dbeta, K;
-        const Real iFac = 1.0 / (alp + beta2 / alp);
-        SPACELOOP2(ii, jj) {
-          dbeta(ii, jj) = Gamma[ii + 1][jj + 1][0] + Gamma[ii + 1][0][jj + 1];
-          K(ii, jj) = Gamma[ii + 1][0][jj + 1];
-          SPACELOOP(kk) K(ii, jj) -= Gamma[ii + 1][kk + 1][jj + 1] * con_beta(kk);
-          K(ii, jj) *= iFac;
-        }
-
-        // Get fluid four-velocity for evaluating radiation stress-energy tensor
         Real con_u[4];
         con_u[0] = W / alp;
         SPACELOOP(ii) { con_u[ii + 1] = W * con_v(ii) - con_beta(ii) / alp; }
@@ -953,7 +939,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Vec conF;
           g.raise3Vector(covF, &conF);
           Tens2 conP, con_tilPi;
-{/////////////
+
           Real con_H4[4] = {0};
           SPACELOOP2(ii, jj) { con_H4[ii + 1] += g.con_gamma(ii, jj) * covH(jj); }
 
@@ -973,11 +959,6 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           }
           c.getConPFromPrim(J, covH, con_tilPi, &conP);
 
-          // v_src(iblock, idx_E_src(0), k, j, i) = newEsrc;
-          // SPACELOOP(ii) {
-          //  v_src(iblock, idx_F_src(0, ii), k, j, i) = newFsrc[ii];
-          // }
-
           Real srcE = 0.0;
           SPACETIMELOOP(mu) {
             srcE += con_T[mu][0] * dlnalp[mu];
@@ -991,201 +972,13 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
           Vec srcF{0, 0, 0};
           SPACELOOP(ii) {
-            SPACETIMELOOP2(mu, nu) {
-              srcF(ii) += con_T[mu][nu] * Gamma[mu][nu][ii + 1];
-            }
+            SPACETIMELOOP2(mu, nu) { srcF(ii) += con_T[mu][nu] * Gamma[mu][nu][ii + 1]; }
             srcF(ii) *= alp;
           }
 
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
           SPACELOOP(ii) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
-          }
-
-          if (i == 64 && j == 64) {
-            printf("Esrc: %e Fsrc: %e %e %e\n", v_src(iblock, idx_E_src(ispec), k, j, i),
-              v_src(iblock, idx_F_src(ispec, 0), k, j, i),
-              v_src(iblock, idx_F_src(ispec, 1), k, j, i),
-              v_src(iblock, idx_F_src(ispec, 2), k, j, i));
-              SPACETIMELOOP2(mu, nu) {
-                printf("con_T[%i][%i] = %e\n", mu, nu, con_T[mu][nu]);
-              }
-              SPACETIMELOOP(mu) {
-                printf("[%i] u: %e H: %e\n", mu, con_u[mu], con_H4[mu]);
-              }
-//            exit(-1);
-          }
-
-
-
-        } ////
-
-
-
-          // Real newEsrc = 0.;
-//          SPACETIMELOOP(mu) {
-//            newEsrc += Rcon[mu][0] * dlnalp[mu];
-//            SPACETIMELOOP(nu) {
-//              Real Gamma_udd = 0.;
-//              SPACETIMELOOP(lam) { Gamma_udd += gcon[0][lam] * Gamma[lam][nu][mu]; }
-//              newEsrc -= Rcon[mu][nu] * Gamma_udd;
-//            }
-//          }
-//          newEsrc *= alp * alp * sdetgam;
-//          Real newEsrc_term1 = 0.;
-//          Real newEsrc_term2 = 0.;
-//          SPACETIMELOOP(mu)
-//          newEsrc_term1 += alp * alp * sdetgam * Rcon[mu][0] * dlnalp[mu];
-//          SPACETIMELOOP(mu) {
-//            SPACETIMELOOP(nu) {
-//              Real Gamma_udd = 0.;
-//              SPACETIMELOOP(lam) { Gamma_udd += gcon[0][lam] * Gamma[lam][nu][mu]; }
-//              newEsrc_term2 -= Rcon[mu][nu] * Gamma_udd;
-//            }
-//          }
-//          Real newFsrc[3] = {0};
-//          SPACELOOP(ii) {
-//            SPACETIMELOOP2(mu, nu) {
-//              newFsrc[ii] += Rcon[mu][nu] * Gamma[mu][nu][ii + 1];
-//            }
-//            newFsrc[ii] *= alp * sdetgam;
-//          }
-
-          // TODO(BRR) temporarily turn off fluxes!
-          //          SPACELOOP(ii) { covH(ii) = 0.; }
-          //          {
-          //            Tens2 con_tilPi{0};
-          //            c.Prim2Con(J, covH, con_tilPi, &E, &covF);
-          //          }
-
-          if (iTilPi.IsValid()) {
-            SPACELOOP2(ii, jj) {
-              con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
-            }
-          } else {
-            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
-          }
-          c.getConPFromPrim(J, covH, con_tilPi, &conP);
-
-          Real srcE = 0.0;
-          SPACELOOP2(ii, jj) srcE += K(ii, jj) * conP(ii, jj);
-          SPACELOOP(ii) srcE -= dlnalp[ii + 1] * conF(ii);
-          srcE *= alp;
-
-          Real srcE_term1 = 0.;
-          Real srcE_term2 = 0.;
-          SPACELOOP2(ii, jj) srcE_term1 += sdetgam * alp * K(ii, jj) * conP(ii, jj);
-          SPACELOOP(ii) srcE_term2 -= sdetgam * alp * dlnalp[ii + 1] * conF(ii);
-
-          Vec srcF{0, 0, 0};
-          SPACELOOP(ii) {
-            SPACELOOP(jj) { srcF(ii) += conF(jj) * dbeta(ii, jj); }
-            //            // TODO(BRR) alternate expression
-            //            //Real dbetacon[3] = {0.};
-            //            Tens2 con_gamma;
-            //            geom.MetricInverse(CellLocation::Cent, iblock, k, j, i,
-            //            con_gamma.data); Tens2 dbetacon{0}; SPACELOOP3(jj, kk, ll) {
-            //              dbetacon(jj, kk) += con_gamma(kk, ll) * dbeta(jj, ll);
-            //            }
-            //            SPACELOOP(jj) { srcF(ii) += covF(jj) * dbetacon(ii, jj); }
-            srcF(ii) -= alp * E * dlnalp[ii + 1];
-            SPACELOOP2(jj, kk) {
-              srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
-            }
-          }
-          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
-          SPACELOOP(ii) {
-            v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
-          }
-
-          // if (i == 64 && j == 64) {
-
-          if (true) {
-            //            printf("[%i %i %i] E src: %e\n", k,j,i,v_src(iblock,
-            //            idx_E_src(ispec), k, j, i));
-            Real ucon[4] = {0};
-            ucon[0] = W / alp;
-            SPACELOOP(ii) {
-              // ucon[ii+1] = con_v(ii) / W + con_beta(ii) / alp;
-              ucon[ii + 1] = W * con_v(ii) - con_beta(ii) / alp;
-            }
-            Real gcon[4][4] = {0};
-            geom.SpacetimeMetricInverse(CellLocation::Cent, iblock, k, j, i, gcon);
-            Real gcov[4][4];
-            // geom.SpacetimeMetric(CellLocation::Cent, iblock, k, j, i, gcov);
-            // Geometry::Tetrads Tetrads(ucon, gcov);
-            Vec Hcon{0};
-            g.raise3Vector(covH, &Hcon);
-            Real Hcon4[4] = {0};
-            SPACELOOP(ii) { Hcon4[ii + 1] = Hcon(ii); }
-
-            // Real Hcon_fluid[4] = {0};
-            // SPACELOOP(ii) {
-            //  Hcon_fluid[ii+1] = covH(ii);
-            //}
-            // Real Hcon_lab[4] = {0};
-            // Tetrads.TetradToCoordCon(Hcon_fluid, Hcon_lab);
-            Real hcon[4][4] = {0};
-            SPACETIMELOOP2(mu, nu) { hcon[mu][nu] = gcon[mu][nu] + ucon[mu] * ucon[nu]; }
-            Real Rcon[4][4] = {0};
-            SPACETIMELOOP2(mu, nu) {
-              Rcon[mu][nu] += (ucon[mu] * ucon[nu] + hcon[mu][nu] / 3.) * J;
-              // Rcon[mu][nu] += ucon[mu]*Hcon_lab[nu] + ucon[nu]*Hcon_lab[mu];
-              Rcon[mu][nu] += ucon[mu] * Hcon4[nu] + ucon[nu] * Hcon4[mu];
-              //            printf("Rcon[%i][%i] = %e\n", mu, nu, Rcon[mu][nu]);
-            }
-
-            Real newEsrc = 0.;
-            SPACETIMELOOP(mu) {
-              newEsrc += Rcon[mu][0] * dlnalp[mu];
-              SPACETIMELOOP(nu) {
-                Real Gamma_udd = 0.;
-                SPACETIMELOOP(lam) { Gamma_udd += gcon[0][lam] * Gamma[lam][nu][mu]; }
-                newEsrc -= Rcon[mu][nu] * Gamma_udd;
-              }
-            }
-            newEsrc *= alp * alp * sdetgam;
-            Real newEsrc_term1 = 0.;
-            Real newEsrc_term2 = 0.;
-            SPACETIMELOOP(mu)
-            newEsrc_term1 += alp * alp * sdetgam * Rcon[mu][0] * dlnalp[mu];
-            SPACETIMELOOP(mu) {
-              SPACETIMELOOP(nu) {
-                Real Gamma_udd = 0.;
-                SPACETIMELOOP(lam) { Gamma_udd += gcon[0][lam] * Gamma[lam][nu][mu]; }
-                newEsrc_term2 -= Rcon[mu][nu] * Gamma_udd;
-              }
-            }
-            Real newFsrc[3] = {0};
-            SPACELOOP(ii) {
-              SPACETIMELOOP2(mu, nu) {
-                newFsrc[ii] += Rcon[mu][nu] * Gamma[mu][nu][ii + 1];
-              }
-              newFsrc[ii] *= alp * sdetgam;
-            }
-            if (i == 64 && j == 64) {
-
-              printf("prevsrc: %e %e %e %e\n",
-                newEsrc, newFsrc[0], newFsrc[1], newFsrc[2]);
-              SPACETIMELOOP(mu) {
-                printf("[%i] conu: %e conH: %e\n", mu, ucon[mu], Hcon4[mu]);
-              }
-              SPACETIMELOOP2(mu, nu) {
-                printf("Rcon[%i][%i] = %e\n", mu, nu, Rcon[mu][nu]);
-              }
-//              printf("oldEsrc: %e newEsrc: %e\n", v_src(iblock, idx_E_src(0), k, j, i),
-//                     newEsrc);
-//              printf("olEsrct1: %e newEsrct1: %e\n", srcE_term1, newEsrc_term1);
-//              printf("olEsrct2: %e newEsrct2: %e\n", srcE_term2, newEsrc_term2);
-//              SPACELOOP(ii) {
-//                printf("[%i] oldFsrc = %e newFsrc = %e\n", ii,
-//                       v_src(iblock, idx_F_src(0, ii), k, j, i), newFsrc[ii]);
-//              }
-//              printf("alp: %e sdetgam: %e\n", alp, sdetgam);
-              // exit(-1);
-            }
-            v_src(iblock, idx_E_src(0), k, j, i) = newEsrc;
-            SPACELOOP(ii) { v_src(iblock, idx_F_src(0, ii), k, j, i) = newFsrc[ii]; }
           }
         }
 #if SET_FLUX_SRC_DIAGS
@@ -1222,6 +1015,7 @@ template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<
 
 template <class T, class CLOSURE>
 TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   PARTHENON_REQUIRE(USE_VALENCIA, "Covariant MHD formulation not supported!");
 
   auto *pmb = rc->GetParentPointer().get();
