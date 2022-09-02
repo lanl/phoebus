@@ -959,6 +959,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           }
           c.getConPFromPrim(J, covH, con_tilPi, &conP);
 
+          // TODO(BRR) add Pij contribution
+
           Real srcE = 0.0;
           SPACETIMELOOP(mu) {
             srcE += con_T[mu][0] * dlnalp[mu];
