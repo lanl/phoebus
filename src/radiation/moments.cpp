@@ -993,6 +993,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
       });
   return TaskStatus::complete;
 }
+
 template <class T>
 TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
   auto *pm = rc->GetParentPointer().get();

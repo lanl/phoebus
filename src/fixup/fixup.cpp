@@ -22,6 +22,7 @@
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
+#include "geometry/tetrads.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
@@ -628,9 +629,23 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
               }
             }
           } else {
+            Real ucon[4] = {0};
+            Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), 
+                          v(b, idx_pvel(1), k, j, i), v(b, idx_pvel(2), k, j, i)};
+            GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
+            Geometry::Tetrads tetrads(ucon, gcov);
             for (int ispec = 0; ispec < nspec; ispec++) {
               v(b, idx_J(ispec), k, j, i) = 1.e-10;
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
+              Real Mcon_fluid[4] = {v(b, idx_J(ispec), k, j, i), 0., 0., 0.};
+              Real Mcon_coord[4] = {0};
+              tetrads.TetradToCoordCon(Mcon_fluid, Mcon_coord);
+              Vec Hcon = {Mcon_coord[1] - ucon[1]*v(b, idx_J(ispec), k, j, i),
+                          Mcon_coord[2] - ucon[2]*v(b, idx_J(ispec), k, j, i),
+                          Mcon_coord[3] - ucon[3]*v(b, idx_J(ispec), k, j, i)};
+              Vec Hcov;
+              g.lower3Vector(Hcon, &Hcov);
+
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov(ii) / v(b, idx_J(ispec), k, j, i); }
             }
           }
 
@@ -1088,9 +1103,35 @@ TaskStatus SourceFixupImpl(T *rc) {
                 v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
                 eos_lambda);
 
+            Real ucon[4] = {0};
+            Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), 
+                          v(b, idx_pvel(1), k, j, i), v(b, idx_pvel(2), k, j, i)};
+            GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
+            Geometry::Tetrads tetrads(ucon, gcov);
+
             for (int ispec = 0; ispec < num_species; ispec++) {
               v(b, idx_J(ispec), k, j, i) = 1.e-10;
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
+
+              Real Mcon_fluid[4] = {v(b, idx_J(ispec), k, j, i), 0., 0., 0.};
+              Real Mcon_coord[4] = {0};
+              tetrads.TetradToCoordCon(Mcon_fluid, Mcon_coord);
+              Real Hcon[3] = {Mcon_coord[1] - ucon[1]*v(b, idx_J(ispec), k, j, i),
+                          Mcon_coord[2] - ucon[2]*v(b, idx_J(ispec), k, j, i),
+                          Mcon_coord[3] - ucon[3]*v(b, idx_J(ispec), k, j, i)};
+              Real Hcov[3] = {0};
+              SPACELOOP2(ii, jj) {
+                Hcov[ii] += gcov[ii+1][jj+1]*Hcon[jj];
+              }
+
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov[ii] / v(b, idx_J(ispec), k, j, i); 
+                printf("Fail [%i %i %i] H[%i] = %e\n", k,j,i,ii,v(b, idx_H(ispec, ii), k, j, i));
+              }
+
+              // TODO(BRR) is this wrong? Want zero flux in fluid frame, this isn't it
+              //SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
+              //SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Mcon_coord[ii + 1] / v(b, idx_J(ispec), k, j, i); 
+              //  printf("Fail [%i %i %i] H[%i] = %e\n", k,j,i,ii,v(b, idx_H(ispec, ii), k, j, i));
+              //}
             }
           }
 
