@@ -651,7 +651,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  //auto bounds = fix_pkg->Param<Bounds>("bounds");
+  // auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   // TODO(BRR) add to radiation floors
   const Real kappaH_min = 1.e-20;
@@ -686,7 +686,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         }
 
         Real xi_max;
-        //bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+        // bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
         //                            coords.x3v(k, j, i), xi_max);
         xi_max = 0.99;
         // TODO(BRR) compilaiton bug?
@@ -915,6 +915,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
         Real beta2 = 0.0;
         SPACELOOP2(ii, jj) beta2 += con_beta(ii) * con_beta(jj) * cov_gamma(ii, jj);
+        Real con_g[4][4] = {0};
+        geom.SpacetimeMetricInverse(CellLocation::Cent, iblock, k, j, i, con_g);
 
         Real dlnalp[ND];
         Real Gamma[ND][ND][ND];
@@ -933,6 +935,11 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           K(ii, jj) *= iFac;
         }
 
+        // Get fluid four-velocity for evaluating radiation stress-energy tensor
+        Real con_u[4];
+        con_u[0] = W / alp;
+        SPACELOOP(ii) { con_u[ii + 1] = W * con_v(ii) - con_beta(ii) / alp; }
+
         for (int ispec = 0; ispec < nspec; ++ispec) {
           Real E = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
           Real J = v(iblock, idx_J(ispec), k, j, i);
@@ -943,15 +950,113 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                     J * v(iblock, idx_H(ispec, 1), k, j, i),
                     J * v(iblock, idx_H(ispec, 2), k, j, i)}};
 
-                    // TODO(BRR) temporarily turn off fluxes!
+          Vec conF;
+          g.raise3Vector(covF, &conF);
+          Tens2 conP, con_tilPi;
+{/////////////
+          Real con_H4[4] = {0};
+          SPACELOOP2(ii, jj) { con_H4[ii + 1] += g.con_gamma(ii, jj) * covH(jj); }
+
+          Real con_T[4][4];
+          SPACETIMELOOP2(mu, nu) {
+            Real conh_munu = con_g[mu][nu] + con_u[mu] * con_u[nu];
+            con_T[mu][nu] = (con_u[mu] * con_u[nu] + conh_munu / 3.) * J;
+            con_T[mu][nu] += con_u[mu] * con_H4[nu] + con_u[nu] * con_H4[mu];
+          }
+
+          if (iTilPi.IsValid()) {
+            SPACELOOP2(ii, jj) {
+              con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+            }
+          } else {
+            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+          }
+          c.getConPFromPrim(J, covH, con_tilPi, &conP);
+
+          // v_src(iblock, idx_E_src(0), k, j, i) = newEsrc;
+          // SPACELOOP(ii) {
+          //  v_src(iblock, idx_F_src(0, ii), k, j, i) = newFsrc[ii];
+          // }
+
+          Real srcE = 0.0;
+          SPACETIMELOOP(mu) {
+            srcE += con_T[mu][0] * dlnalp[mu];
+            SPACETIMELOOP(nu) {
+              Real Gamma_udd = 0.;
+              SPACETIMELOOP(lam) { Gamma_udd += con_g[0][lam] * Gamma[lam][nu][mu]; }
+              srcE -= con_T[mu][nu] * Gamma_udd;
+            }
+          }
+          srcE *= alp * alp;
+
+          Vec srcF{0, 0, 0};
+          SPACELOOP(ii) {
+            SPACETIMELOOP2(mu, nu) {
+              srcF(ii) += con_T[mu][nu] * Gamma[mu][nu][ii + 1];
+            }
+            srcF(ii) *= alp;
+          }
+
+          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
+          SPACELOOP(ii) {
+            v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
+          }
+
+          if (i == 64 && j == 64) {
+            printf("Esrc: %e Fsrc: %e %e %e\n", v_src(iblock, idx_E_src(ispec), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 0), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 1), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 2), k, j, i));
+              SPACETIMELOOP2(mu, nu) {
+                printf("con_T[%i][%i] = %e\n", mu, nu, con_T[mu][nu]);
+              }
+              SPACETIMELOOP(mu) {
+                printf("[%i] u: %e H: %e\n", mu, con_u[mu], con_H4[mu]);
+              }
+//            exit(-1);
+          }
+
+
+
+        } ////
+
+
+
+          // Real newEsrc = 0.;
+//          SPACETIMELOOP(mu) {
+//            newEsrc += Rcon[mu][0] * dlnalp[mu];
+//            SPACETIMELOOP(nu) {
+//              Real Gamma_udd = 0.;
+//              SPACETIMELOOP(lam) { Gamma_udd += gcon[0][lam] * Gamma[lam][nu][mu]; }
+//              newEsrc -= Rcon[mu][nu] * Gamma_udd;
+//            }
+//          }
+//          newEsrc *= alp * alp * sdetgam;
+//          Real newEsrc_term1 = 0.;
+//          Real newEsrc_term2 = 0.;
+//          SPACETIMELOOP(mu)
+//          newEsrc_term1 += alp * alp * sdetgam * Rcon[mu][0] * dlnalp[mu];
+//          SPACETIMELOOP(mu) {
+//            SPACETIMELOOP(nu) {
+//              Real Gamma_udd = 0.;
+//              SPACETIMELOOP(lam) { Gamma_udd += gcon[0][lam] * Gamma[lam][nu][mu]; }
+//              newEsrc_term2 -= Rcon[mu][nu] * Gamma_udd;
+//            }
+//          }
+//          Real newFsrc[3] = {0};
+//          SPACELOOP(ii) {
+//            SPACETIMELOOP2(mu, nu) {
+//              newFsrc[ii] += Rcon[mu][nu] * Gamma[mu][nu][ii + 1];
+//            }
+//            newFsrc[ii] *= alp * sdetgam;
+//          }
+
+          // TODO(BRR) temporarily turn off fluxes!
           //          SPACELOOP(ii) { covH(ii) = 0.; }
           //          {
           //            Tens2 con_tilPi{0};
           //            c.Prim2Con(J, covH, con_tilPi, &E, &covF);
           //          }
-          Vec conF;
-          g.raise3Vector(covF, &conF);
-          Tens2 conP, con_tilPi;
 
           if (iTilPi.IsValid()) {
             SPACELOOP2(ii, jj) {
@@ -970,20 +1075,19 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Real srcE_term1 = 0.;
           Real srcE_term2 = 0.;
           SPACELOOP2(ii, jj) srcE_term1 += sdetgam * alp * K(ii, jj) * conP(ii, jj);
-          SPACELOOP(ii) srcE_term2 -= sdetgam * alp * dlnalp[ii+1] * conF(ii);
+          SPACELOOP(ii) srcE_term2 -= sdetgam * alp * dlnalp[ii + 1] * conF(ii);
 
           Vec srcF{0, 0, 0};
           SPACELOOP(ii) {
             SPACELOOP(jj) { srcF(ii) += conF(jj) * dbeta(ii, jj); }
-//            // TODO(BRR) alternate expression
-//            //Real dbetacon[3] = {0.};
-//            Tens2 con_gamma;
-//            geom.MetricInverse(CellLocation::Cent, iblock, k, j, i, con_gamma.data);
-//            Tens2 dbetacon{0};
-//            SPACELOOP3(jj, kk, ll) {
-//              dbetacon(jj, kk) += con_gamma(kk, ll) * dbeta(jj, ll);
-//            }
-//            SPACELOOP(jj) { srcF(ii) += covF(jj) * dbetacon(ii, jj); }
+            //            // TODO(BRR) alternate expression
+            //            //Real dbetacon[3] = {0.};
+            //            Tens2 con_gamma;
+            //            geom.MetricInverse(CellLocation::Cent, iblock, k, j, i,
+            //            con_gamma.data); Tens2 dbetacon{0}; SPACELOOP3(jj, kk, ll) {
+            //              dbetacon(jj, kk) += con_gamma(kk, ll) * dbeta(jj, ll);
+            //            }
+            //            SPACELOOP(jj) { srcF(ii) += covF(jj) * dbetacon(ii, jj); }
             srcF(ii) -= alp * E * dlnalp[ii + 1];
             SPACELOOP2(jj, kk) {
               srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
@@ -994,102 +1098,103 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
           }
 
-          //if (i == 64 && j == 64) {
+          // if (i == 64 && j == 64) {
+
           if (true) {
-//            printf("[%i %i %i] E src: %e\n", k,j,i,v_src(iblock, idx_E_src(ispec), k, j, i));
+            //            printf("[%i %i %i] E src: %e\n", k,j,i,v_src(iblock,
+            //            idx_E_src(ispec), k, j, i));
             Real ucon[4] = {0};
-            ucon[0] = W/alp;
+            ucon[0] = W / alp;
             SPACELOOP(ii) {
-              //ucon[ii+1] = con_v(ii) / W + con_beta(ii) / alp;
-              ucon[ii+1] = W * con_v(ii) - con_beta(ii) / alp;
+              // ucon[ii+1] = con_v(ii) / W + con_beta(ii) / alp;
+              ucon[ii + 1] = W * con_v(ii) - con_beta(ii) / alp;
             }
             Real gcon[4][4] = {0};
             geom.SpacetimeMetricInverse(CellLocation::Cent, iblock, k, j, i, gcon);
             Real gcov[4][4];
-            //geom.SpacetimeMetric(CellLocation::Cent, iblock, k, j, i, gcov);
-            //Geometry::Tetrads Tetrads(ucon, gcov);
+            // geom.SpacetimeMetric(CellLocation::Cent, iblock, k, j, i, gcov);
+            // Geometry::Tetrads Tetrads(ucon, gcov);
             Vec Hcon{0};
             g.raise3Vector(covH, &Hcon);
             Real Hcon4[4] = {0};
-            SPACELOOP(ii) {
-              Hcon4[ii+1] = Hcon(ii);
-            }
+            SPACELOOP(ii) { Hcon4[ii + 1] = Hcon(ii); }
 
-            //Real Hcon_fluid[4] = {0};
-            //SPACELOOP(ii) {
+            // Real Hcon_fluid[4] = {0};
+            // SPACELOOP(ii) {
             //  Hcon_fluid[ii+1] = covH(ii);
             //}
-            //Real Hcon_lab[4] = {0};
-            //Tetrads.TetradToCoordCon(Hcon_fluid, Hcon_lab);
+            // Real Hcon_lab[4] = {0};
+            // Tetrads.TetradToCoordCon(Hcon_fluid, Hcon_lab);
             Real hcon[4][4] = {0};
-            SPACETIMELOOP2(mu, nu) {
-              hcon[mu][nu] = gcon[mu][nu] + ucon[mu] * ucon[nu];
-            }
+            SPACETIMELOOP2(mu, nu) { hcon[mu][nu] = gcon[mu][nu] + ucon[mu] * ucon[nu]; }
             Real Rcon[4][4] = {0};
             SPACETIMELOOP2(mu, nu) {
-              Rcon[mu][nu] += (ucon[mu] * ucon[nu] + hcon[mu][nu] / 3.)*J;
-              //Rcon[mu][nu] += ucon[mu]*Hcon_lab[nu] + ucon[nu]*Hcon_lab[mu];
-              Rcon[mu][nu] += ucon[mu]*Hcon4[nu] + ucon[nu]*Hcon4[mu];
-  //            printf("Rcon[%i][%i] = %e\n", mu, nu, Rcon[mu][nu]);
+              Rcon[mu][nu] += (ucon[mu] * ucon[nu] + hcon[mu][nu] / 3.) * J;
+              // Rcon[mu][nu] += ucon[mu]*Hcon_lab[nu] + ucon[nu]*Hcon_lab[mu];
+              Rcon[mu][nu] += ucon[mu] * Hcon4[nu] + ucon[nu] * Hcon4[mu];
+              //            printf("Rcon[%i][%i] = %e\n", mu, nu, Rcon[mu][nu]);
             }
 
             Real newEsrc = 0.;
             SPACETIMELOOP(mu) {
-              newEsrc += Rcon[mu][0]*dlnalp[mu];
+              newEsrc += Rcon[mu][0] * dlnalp[mu];
               SPACETIMELOOP(nu) {
                 Real Gamma_udd = 0.;
-                SPACETIMELOOP(lam) {
-                  Gamma_udd += gcon[0][lam]*Gamma[lam][nu][mu];
-                }
-                newEsrc -= Rcon[mu][nu]*Gamma_udd;
+                SPACETIMELOOP(lam) { Gamma_udd += gcon[0][lam] * Gamma[lam][nu][mu]; }
+                newEsrc -= Rcon[mu][nu] * Gamma_udd;
               }
             }
             newEsrc *= alp * alp * sdetgam;
             Real newEsrc_term1 = 0.;
             Real newEsrc_term2 = 0.;
-            SPACETIMELOOP(mu) newEsrc_term1 += alp*alp*sdetgam*Rcon[mu][0]*dlnalp[mu];
+            SPACETIMELOOP(mu)
+            newEsrc_term1 += alp * alp * sdetgam * Rcon[mu][0] * dlnalp[mu];
             SPACETIMELOOP(mu) {
               SPACETIMELOOP(nu) {
                 Real Gamma_udd = 0.;
-                SPACETIMELOOP(lam) {
-                  Gamma_udd += gcon[0][lam]*Gamma[lam][nu][mu];
-                }
-                newEsrc_term2 -= Rcon[mu][nu]*Gamma_udd;
+                SPACETIMELOOP(lam) { Gamma_udd += gcon[0][lam] * Gamma[lam][nu][mu]; }
+                newEsrc_term2 -= Rcon[mu][nu] * Gamma_udd;
               }
             }
             Real newFsrc[3] = {0};
             SPACELOOP(ii) {
               SPACETIMELOOP2(mu, nu) {
-                newFsrc[ii] += Rcon[mu][nu]*Gamma[mu][nu][ii+1];
+                newFsrc[ii] += Rcon[mu][nu] * Gamma[mu][nu][ii + 1];
               }
               newFsrc[ii] *= alp * sdetgam;
             }
             if (i == 64 && j == 64) {
-              printf("oldEsrc: %e newEsrc: %e\n", v_src(iblock, idx_E_src(0), k, j, i), newEsrc);
-              printf("olEsrct1: %e newEsrct1: %e\n", srcE_term1, newEsrc_term1);
-              printf("olEsrct2: %e newEsrct2: %e\n", srcE_term2, newEsrc_term2);
-              SPACELOOP(ii) {
-                printf("[%i] oldFsrc = %e newFsrc = %e\n", ii,
-                  v_src(iblock, idx_F_src(0, ii), k, j, i),
-                  newFsrc[ii]);
+
+              printf("prevsrc: %e %e %e %e\n",
+                newEsrc, newFsrc[0], newFsrc[1], newFsrc[2]);
+              SPACETIMELOOP(mu) {
+                printf("[%i] conu: %e conH: %e\n", mu, ucon[mu], Hcon4[mu]);
               }
-              printf("alp: %e sdetgam: %e\n", alp, sdetgam);
-              //exit(-1);
+              SPACETIMELOOP2(mu, nu) {
+                printf("Rcon[%i][%i] = %e\n", mu, nu, Rcon[mu][nu]);
+              }
+//              printf("oldEsrc: %e newEsrc: %e\n", v_src(iblock, idx_E_src(0), k, j, i),
+//                     newEsrc);
+//              printf("olEsrct1: %e newEsrct1: %e\n", srcE_term1, newEsrc_term1);
+//              printf("olEsrct2: %e newEsrct2: %e\n", srcE_term2, newEsrc_term2);
+//              SPACELOOP(ii) {
+//                printf("[%i] oldFsrc = %e newFsrc = %e\n", ii,
+//                       v_src(iblock, idx_F_src(0, ii), k, j, i), newFsrc[ii]);
+//              }
+//              printf("alp: %e sdetgam: %e\n", alp, sdetgam);
+              // exit(-1);
             }
             v_src(iblock, idx_E_src(0), k, j, i) = newEsrc;
-            SPACELOOP(ii) {
-              v_src(iblock, idx_F_src(0, ii), k, j, i) = newFsrc[ii];
-            }
-
+            SPACELOOP(ii) { v_src(iblock, idx_F_src(0, ii), k, j, i) = newFsrc[ii]; }
           }
         }
-        #if SET_FLUX_SRC_DIAGS
+#if SET_FLUX_SRC_DIAGS
         // TODO(BRR) Only first species for now
         v_src(iblock, idiag + 5, k, j, i) = v_src(iblock, idx_E_src(0), k, j, i);
         v_src(iblock, idiag + 6, k, j, i) = v_src(iblock, idx_F_src(0, 0), k, j, i);
         v_src(iblock, idiag + 7, k, j, i) = v_src(iblock, idx_F_src(0, 1), k, j, i);
         v_src(iblock, idiag + 8, k, j, i) = v_src(iblock, idx_F_src(0, 2), k, j, i);
-        #endif
+#endif
       });
   return TaskStatus::complete;
 }
@@ -1276,9 +1381,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             Vec con_v{{P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]}};
             const Real W = phoebus::GetLorentzFactor(con_v.data, cov_gamma.data);
             SPACELOOP(ii) { con_v(ii) /= W; }
-  //        printf("\n[%i %i %i]\n", k, j, i);
- ///         printf("rho: %e ug: %e Tg: %e\n", rho, ug, Tg);
-//          printf("W: %e con_v: %e %e %e\n", W, con_v(0), con_v(1), con_v(2));
+            //        printf("\n[%i %i %i]\n", k, j, i);
+            ///         printf("rho: %e ug: %e Tg: %e\n", rho, ug, Tg);
+            //          printf("W: %e con_v: %e %e %e\n", W, con_v(0), con_v(1),
+            //          con_v(2));
             CLOSURE c(con_v, &g);
             Tens2 con_tilPi = {0};
             if (idx_tilPi.IsValid()) {
@@ -1324,19 +1430,18 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             }
 
             Real err = 1.e100;
-//            constexpr Real TOL = 1.e-8;
-            //constexpr int max_iter = 100;
+            //            constexpr Real TOL = 1.e-8;
+            // constexpr int max_iter = 100;
             int niter = 0;
             bool bad_guess = false;
             do {
-//              printf("\nniter: %i\n", niter);
+              //              printf("\nniter: %i\n", niter);
               // Numerically calculate Jacobian
               Real jac[4][4] = {0};
-              //constexpr Real EPS = 1.e-4;
-              //constexpr Real src_rootfind_eps = 1.e-8;
-              //Real src_rootfind_eps = 1.e-8;
-//            printf("src_rootfind_eps: %e\n", src_rootfind_eps);
-
+              // constexpr Real EPS = 1.e-4;
+              // constexpr Real src_rootfind_eps = 1.e-8;
+              // Real src_rootfind_eps = 1.e-8;
+              //            printf("src_rootfind_eps: %e\n", src_rootfind_eps);
 
               // Minimum non-zero magnitude from P_mhd_guess
               Real P_mhd_mag_min = robust::LARGE();
@@ -1355,14 +1460,15 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
                                    P_mhd_guess[3]};
                 const Real fd_step =
-                    std::max(src_rootfind_eps * P_mhd_mag_min, src_rootfind_eps * std::fabs(P_mhd_guess[m]));
-//                  printf("fd_step[%i]: %e\n", m,fd_step);
+                    std::max(src_rootfind_eps * P_mhd_mag_min,
+                             src_rootfind_eps * std::fabs(P_mhd_guess[m]));
+                //                  printf("fd_step[%i]: %e\n", m,fd_step);
                 P_mhd_m[m] -= fd_step;
                 P_mhd_p[m] += fd_step;
-//                  printf("P_mhd_m: %28.18e %28.18e %28.18e %28.18e\n",
-//                  P_mhd_m[0], P_mhd_m[1], P_mhd_m[2], P_mhd_m[3]);
-//                  printf("P_mhd_p: %28.18e %28.18e %28.18e %28.18e\n",
-//                  P_mhd_p[0], P_mhd_p[1], P_mhd_p[2], P_mhd_p[3]);
+                //                  printf("P_mhd_m: %28.18e %28.18e %28.18e %28.18e\n",
+                //                  P_mhd_m[0], P_mhd_m[1], P_mhd_m[2], P_mhd_m[3]);
+                //                  printf("P_mhd_p: %28.18e %28.18e %28.18e %28.18e\n",
+                //                  P_mhd_p[0], P_mhd_p[1], P_mhd_p[2], P_mhd_p[3]);
 
                 srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
                 srm.CalculateRadConserved(U_mhd_m, U_rad_m);
@@ -1371,10 +1477,12 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 if (status_m == ClosureStatus::failure) {
                   bad_guess_m = true;
                 }
-//           printf("m:\n");
-//           printf("U_mhd_m: %e %e %e %e\n", U_mhd_m[0], U_mhd_m[1], U_mhd_m[2], U_mhd_m[3]);
-//           printf("U_rad_m: %e %e %e %e\n", U_rad_m[0], U_rad_m[1], U_rad_m[2], U_rad_m[3]);
-//           printf("dS_m: %e %e %e %e\n", dS_m[0], dS_m[1], dS_m[2], dS_m[3]);
+                //           printf("m:\n");
+                //           printf("U_mhd_m: %e %e %e %e\n", U_mhd_m[0], U_mhd_m[1],
+                //           U_mhd_m[2], U_mhd_m[3]); printf("U_rad_m: %e %e %e %e\n",
+                //           U_rad_m[0], U_rad_m[1], U_rad_m[2], U_rad_m[3]);
+                //           printf("dS_m: %e %e %e %e\n", dS_m[0], dS_m[1], dS_m[2],
+                //           dS_m[3]);
 
                 srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
                 srm.CalculateRadConserved(U_mhd_p, U_rad_p);
@@ -1389,10 +1497,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                   Real fp = U_mhd_p[n] - U_mhd_0[n] + dt * dS_p[n];
                   Real fm = U_mhd_m[n] - U_mhd_0[n] + dt * dS_m[n];
                   jac[n][m] = (fp - fm) / (P_mhd_p[m] - P_mhd_m[m]);
-               //   printf("jac[%i][%i] = %e\n", n, m, jac[n][m]);
+                  //   printf("jac[%i][%i] = %e\n", n, m, jac[n][m]);
                 }
               }
-             //   printf("bad guesses? %i %i\n", bad_guess_m, bad_guess_p);
+              //   printf("bad guesses? %i %i\n", bad_guess_m, bad_guess_p);
 
               // Fail or repair if jacobian evaluation was pathological
               if (bad_guess_m == true && bad_guess_p == true) {
@@ -1406,8 +1514,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 for (int m = 0; m < 4; m++) {
                   Real P_mhd_p[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
                                      P_mhd_guess[3]};
-                  P_mhd_p[m] +=
-                      std::max(src_rootfind_eps * P_mhd_mag_min, src_rootfind_eps * std::fabs(P_mhd_p[m]));
+                  P_mhd_p[m] += std::max(src_rootfind_eps * P_mhd_mag_min,
+                                         src_rootfind_eps * std::fabs(P_mhd_p[m]));
                   srm.CalculateMHDConserved(P_mhd_p, U_mhd_p);
                   srm.CalculateRadConserved(U_mhd_p, U_rad_p);
                   auto status_p = srm.CalculateRadPrimitive(P_mhd_p, U_rad_p, P_rad_p);
@@ -1426,8 +1534,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 for (int m = 0; m < 4; m++) {
                   Real P_mhd_m[4] = {P_mhd_guess[0], P_mhd_guess[1], P_mhd_guess[2],
                                      P_mhd_guess[3]};
-                  P_mhd_m[m] -=
-                      std::max(src_rootfind_eps * P_mhd_mag_min, src_rootfind_eps * std::fabs(P_mhd_m[m]));
+                  P_mhd_m[m] -= std::max(src_rootfind_eps * P_mhd_mag_min,
+                                         src_rootfind_eps * std::fabs(P_mhd_m[m]));
                   srm.CalculateMHDConserved(P_mhd_m, U_mhd_m);
                   srm.CalculateRadConserved(U_mhd_m, U_rad_m);
                   auto status_m = srm.CalculateRadPrimitive(P_mhd_m, U_rad_m, P_rad_m);
@@ -1496,26 +1604,34 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                     bad_guess = true;
                     break;
                   }
-//                  if (true) {
-//                    printf("%i %i %i\n", k, j, i);
-//                    printf("Pradguess: %e %e %e %e\n", P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
-//                      P_rad_guess[3]);
-//                    Real lambda_[2] = {0., 0.};
-//                    RadiationType species_ = species_d[ispec];
-//                    printf("alpha: %e\n", d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, Tg, lambda_[0], species_));
-//                    printf("rho: %e Tg: %e\n", rho, Tg);
-//                    printf("con_vp: %e %e %e\n", con_vp[0], con_vp[1], con_vp[2]);
-//                    printf("xi: %e Pmhdg0: %e Pradg0: %e\n", xi, P_mhd_guess[0], P_rad_guess[0]);
-//              printf("[%i %i %i] rho: %e Tg: %e Prad0: %e %e %e %e Pradg: %e %e %e %e\n", k, j, i, rho, Tg,
-//              v(iblock, idx_J(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
-//              v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i),
-//              P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
-//              if ( i == 98 && j == 4) exit(-1);
-//                    exit(-1);
-//                  }
-//                  PARTHENON_DEBUG_REQUIRE(scaling_factor > robust::SMALL() &&
-//                                              scaling_factor >= 1.,
-//                                          "Got a nonsensical scaling factor!");
+                  //                  if (true) {
+                  //                    printf("%i %i %i\n", k, j, i);
+                  //                    printf("Pradguess: %e %e %e %e\n", P_rad_guess[0],
+                  //                    P_rad_guess[1], P_rad_guess[2],
+                  //                      P_rad_guess[3]);
+                  //                    Real lambda_[2] = {0., 0.};
+                  //                    RadiationType species_ = species_d[ispec];
+                  //                    printf("alpha: %e\n",
+                  //                    d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho,
+                  //                    Tg, lambda_[0], species_)); printf("rho: %e Tg:
+                  //                    %e\n", rho, Tg); printf("con_vp: %e %e %e\n",
+                  //                    con_vp[0], con_vp[1], con_vp[2]); printf("xi: %e
+                  //                    Pmhdg0: %e Pradg0: %e\n", xi, P_mhd_guess[0],
+                  //                    P_rad_guess[0]);
+                  //              printf("[%i %i %i] rho: %e Tg: %e Prad0: %e %e %e %e
+                  //              Pradg: %e %e %e %e\n", k, j, i, rho, Tg, v(iblock,
+                  //              idx_J(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j,
+                  //              i), v(iblock, idx_F(ispec, 1), k, j, i), v(iblock,
+                  //              idx_F(ispec, 2), k, j, i), P_rad_guess[0],
+                  //              P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]); if ( i
+                  //              == 98 && j == 4) exit(-1);
+                  //                    exit(-1);
+                  //                  }
+                  //                  PARTHENON_DEBUG_REQUIRE(scaling_factor >
+                  //                  robust::SMALL() &&
+                  //                                              scaling_factor >= 1.,
+                  //                                          "Got a nonsensical scaling
+                  //                                          factor!");
                   // Nudge it a bit
                   scaling_factor *= 0.5;
                   for (int m = 0; m < 4; m++) {
@@ -1542,9 +1658,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               // Update residuals
               for (int n = 0; n < 4; n++) {
                 resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
-                //printf("[%i %i %i][%i] resid = %e (%e %e %e)\n", k,j,i,niter,resid[n],
+                // printf("[%i %i %i][%i] resid = %e (%e %e %e)\n", k,j,i,niter,resid[n],
                 //  U_mhd_guess[n], U_mhd_0[n], dt*dS_guess[n]);
-                //if (isnan(resid[n])) { exit(-1); }
+                // if (isnan(resid[n])) { exit(-1); }
                 if (std::isnan(resid[n])) {
                   bad_guess = true;
                   break;
@@ -1575,9 +1691,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
             } while (err > src_rootfind_tol);
 
-            if (niter == src_rootfind_maxiter || err > src_rootfind_tol || std::isnan(U_rad_guess[0]) ||
-                std::isnan(U_rad_guess[1]) || std::isnan(U_rad_guess[2]) ||
-                std::isnan(U_rad_guess[3]) || bad_guess) {
+            if (niter == src_rootfind_maxiter || err > src_rootfind_tol ||
+                std::isnan(U_rad_guess[0]) || std::isnan(U_rad_guess[1]) ||
+                std::isnan(U_rad_guess[2]) || std::isnan(U_rad_guess[3]) || bad_guess) {
               success = false;
             } else {
               success = true;
@@ -1589,11 +1705,12 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
             }
 
-            //if (j == 64) {
-            //  printf("[%i %i %i] rho: %e Tg: %e ug: %e Prad0: %e %e %e %e Pradg: %e %e %e %e\n", k, j, i, rho, Tg,ug,
-            //  v(iblock, idx_J(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
-            //  v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i),
-            //  P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3]);
+            // if (j == 64) {
+            //  printf("[%i %i %i] rho: %e Tg: %e ug: %e Prad0: %e %e %e %e Pradg: %e %e
+            //  %e %e\n", k, j, i, rho, Tg,ug, v(iblock, idx_J(ispec), k, j, i), v(iblock,
+            //  idx_F(ispec, 0), k, j, i), v(iblock, idx_F(ispec, 1), k, j, i), v(iblock,
+            //  idx_F(ispec, 2), k, j, i), P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
+            //  P_rad_guess[3]);
             //}
           }
 
@@ -1665,7 +1782,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               success = false;
             }
           }
-//              if ( i == 98 && j == 4) exit(-1);
+          //              if ( i == 98 && j == 4) exit(-1);
 
           // If sequence of source update methods was successful, apply update to
           // conserved quantities. If unsuccessful, mark zone for fixup.
