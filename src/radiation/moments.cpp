@@ -938,26 +938,33 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
           Vec conF;
           g.raise3Vector(covF, &conF);
-          Tens2 conP, con_tilPi;
+          //Tens2 conP, con_tilPi;
 
           Real con_H4[4] = {0};
           SPACELOOP2(ii, jj) { con_H4[ii + 1] += g.con_gamma(ii, jj) * covH(jj); }
+
+          Real conTilPi[4][4] = {0};
+          if (iTilPi.IsValid()) {
+            SPACELOOP2(ii, jj) {
+              //con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+              conTilPi[ii+1][jj+1] = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+            }
+          } else {
+            Tens2 con_tilPi{0};
+            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+            SPACELOOP2(ii, jj) {
+              conTilPi[ii+1][jj+1] = con_tillPi(ii, jj);
+            }
+          }
 
           Real con_T[4][4];
           SPACETIMELOOP2(mu, nu) {
             Real conh_munu = con_g[mu][nu] + con_u[mu] * con_u[nu];
             con_T[mu][nu] = (con_u[mu] * con_u[nu] + conh_munu / 3.) * J;
             con_T[mu][nu] += con_u[mu] * con_H4[nu] + con_u[nu] * con_H4[mu];
+            con_T[mu][nu] += J * conTilPi[mu][nu];
           }
-
-          if (iTilPi.IsValid()) {
-            SPACELOOP2(ii, jj) {
-              con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
-            }
-          } else {
-            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
-          }
-          c.getConPFromPrim(J, covH, con_tilPi, &conP);
+          //c.getConPFromPrim(J, covH, con_tilPi, &conP);
 
           // TODO(BRR) add Pij contribution
 
