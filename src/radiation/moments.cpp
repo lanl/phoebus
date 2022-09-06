@@ -318,6 +318,15 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
         }
 
+        if (i == 4 && j == 127) {
+          printf("[%i %i %i] c2p: %e %e %e %e success? %i\n",
+            k,j,i,v(b, pJ(ispec), k, j, i) ,
+            v(b, pH(ispec, 0), k, j, i)*v(b, pJ(ispec), k, j, i),
+            v(b, pH(ispec, 1), k, j, i)*v(b, pJ(ispec), k, j, i),
+            v(b, pH(ispec, 2), k, j, i)*v(b, pJ(ispec), k, j, i),
+            static_cast<int>(status == ClosureStatus::success));
+        }
+
         v(b, ifail, k, j, i) =
             (status == ClosureStatus::success ? FailFlags::success : FailFlags::fail);
       });
@@ -824,6 +833,17 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
           }
+          if (i == 4 && j == 127) {
+            printf("flux [%i %i %i][%i] = %e %e %e %e a = %e Jl = %e Jr = %e Fl: %e %e %e Fr: %e %e %e kappaH: %e sigspeed: %e\n", 
+            k,j,i,idir,
+              v.flux(idir_in, idx_Ef(ispec), k, j, i),
+              v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
+              v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
+              v.flux(idir_in, idx_Ff(ispec, 2), k, j, i),
+              a, Jl, covFl(0), covFl(1), covFl(2),
+              Jr, covFr(0), covFr(1), covFr(2), kappaH,
+              sigspeed);
+          }
           if (sdetgam < robust::SMALL()) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
@@ -953,7 +973,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             Tens2 con_tilPi{0};
             c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
             SPACELOOP2(ii, jj) {
-              conTilPi[ii+1][jj+1] = con_tillPi(ii, jj);
+              conTilPi[ii+1][jj+1] = con_tilPi(ii, jj);
             }
           }
 
@@ -988,6 +1008,14 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
           SPACELOOP(ii) {
             v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
+          }
+
+          if (j == 127 && i == 4) {
+            printf("geosrc [%i %i %i]: %e %e %e %e\n", k,j,i,
+              v_src(iblock, idx_E_src(ispec), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 0), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 1), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 2), k, j, i));
           }
         }
 #if SET_FLUX_SRC_DIAGS
@@ -1025,6 +1053,7 @@ template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<
 
 template <class T, class CLOSURE>
 TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
+  printf("\n");
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   PARTHENON_REQUIRE(USE_VALENCIA, "Covariant MHD formulation not supported!");
 
@@ -1156,6 +1185,20 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
           Real lambda[2] = {Ye, 0.};
           Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                             v(iblock, pv(2), k, j, i)};
+
+          if (j == 127 && i == 4) {
+            const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+            Vec Hcov{v(iblock, idx_H(ispec, 0), k, j, i), v(iblock, idx_H(ispec, 1), k, j, i), 
+              v(iblock, idx_H(ispec, 2), k, j, i)};
+            Real xi = std::sqrt(g.contractCov3Vectors(Hcov, Hcov));
+            printf("Initial [%i %i %i] ug = %e vp = %e %e %e J = %e Hi = %e %e %e W = %e xi = %e\n", k, j, i,
+              ug, con_vp[0], con_vp[1], con_vp[2],
+              v(iblock, idx_J(ispec), k, j, i),
+              v(iblock, idx_H(ispec, 0), k, j, i),
+              v(iblock, idx_H(ispec, 1), k, j, i),
+              v(iblock, idx_H(ispec, 2), k, j, i),
+              W, xi);
+          }
 
           bool success = false;
           // TODO(BRR) These will need to be per-species later
@@ -1311,6 +1354,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 // If both + and - finite difference support points are bad, this
                 // interaction fails
                 bad_guess = true;
+                printf("both guesses bad! %i %i %i\n", k, j, i);
                 break;
               } else if (bad_guess_m == true) {
                 // If only - finite difference support point is bad, do one-sided
@@ -1379,6 +1423,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 }
 
                 if (bad_guess) {
+                if (i == 4 &&j == 127) {
+                printf("bad stepsize! %i %i %i\n", k, j, i);
+                }
                   // Try reducing the step size so xi < ximax, ug > 0, J > 0
                   Real xi = 0.;
                   SPACELOOP2(ii, jj) {
@@ -1405,6 +1452,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                   }
                   if (!(scaling_factor > robust::SMALL() && scaling_factor >= 1.)) {
                     // Nonsensical scaling factor, maybe negative P_rad_guess[0]
+                    printf("bad scaling factor! breaking [%i %i %i]\n", k, j, i);
                     bad_guess = true;
                     break;
                   }
@@ -1466,6 +1514,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 //  U_mhd_guess[n], U_mhd_0[n], dt*dS_guess[n]);
                 // if (isnan(resid[n])) { exit(-1); }
                 if (std::isnan(resid[n])) {
+                  printf("nan resid[%i]! %i %i %i Umhdg: %e %e %e %e dSg: %e %e %e %e\n", n, k, j, i,
+                  U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2], U_mhd_guess[3],
+                  dS_guess[0], dS_guess[1], dS_guess[2], dS_guess[3]);
                   bad_guess = true;
                   break;
                 }
@@ -1509,12 +1560,42 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
             }
 
+            if (i == 4 && j == 127) {
+              printf("[%i %i %i] cons = %e %e %e %e dcons = %e %e %e %e (sdg = %e)\n", 
+              k, j, i, v(iblock, idx_E(ispec), k, j, i),
+              v(iblock, idx_F(ispec, 0), k, j, i),
+              v(iblock, idx_F(ispec, 1), k, j, i),
+              v(iblock, idx_F(ispec, 2), k, j, i),
+              dE*sdetgam, cov_dF(0)*sdetgam, cov_dF(1)*sdetgam, cov_dF(2)*sdetgam,
+              sdetgam);
+              printf("[%i %i %i] radguess: %e %e %e %e niter = %i err = %e\n",k,j,i,
+                P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3],
+                niter, err);
+            }
+
             // if (j == 64) {
             //  printf("[%i %i %i] rho: %e Tg: %e ug: %e Prad0: %e %e %e %e Pradg: %e %e
             //  %e %e\n", k, j, i, rho, Tg,ug, v(iblock, idx_J(ispec), k, j, i), v(iblock,
             //  idx_F(ispec, 0), k, j, i), v(iblock, idx_F(ispec, 1), k, j, i), v(iblock,
             //  idx_F(ispec, 2), k, j, i), P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
             //  P_rad_guess[3]);
+            //}
+            //
+
+          if (success == false) {
+              printf("[%i %i %i] src failed err: %e niter: %i rho: %e Pmhd0: %e %e %e %e Prad0: %e %e %e %e\n",
+              k, j, i, err, niter, rho, v(iblock, peng, k, j, i),
+              v(iblock, pv(0), k, j, i), 
+              v(iblock, pv(1), k, j, i),
+              v(iblock, pv(2), k, j, i),
+              v(iblock, idx_J(ispec), k, j, i), v(iblock,
+              idx_H(ispec, 0), k, j, i), v(iblock, idx_H(ispec, 1), k, j, i), v(iblock,
+              idx_H(ispec, 2), k, j, i));
+          }
+            
+            //if (success = false) {
+            //  // Don't process subsequent species
+            //  break;
             //}
           }
 

@@ -684,6 +684,11 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
               c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
             }
             c.Prim2Con(J, cov_H, con_tilPi, &E, &cov_F);
+            
+            Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H));
+            printf("Rad fixup [%i %i %i] J = %e cov_H = %e %e %e (xi = %e) E = %e cov_F = %e %e %e\n",
+              k,j,i,J,cov_H(0),cov_H(1),cov_H(2),xi,E,cov_F(0),cov_F(1),cov_F(2));
+            
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii); }
           }
@@ -1083,6 +1088,8 @@ TaskStatus SourceFixupImpl(T *rc) {
             }
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
+            printf("No valid neighbors! %i %i %i\n", k, j, i);
+            PARTHENON_FAIL("no valid neighbors");
 
             double rho_floor, sie_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
