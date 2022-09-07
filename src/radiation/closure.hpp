@@ -149,7 +149,7 @@ KOKKOS_FUNCTION ClosureEdd<Vec, Tens2, SET>::ClosureEdd(const Vec con_v_in,
   v2 = 0.0;
   SPACELOOP(i) v2 += con_v(i) * cov_v(i);
   // TODO(BRR) use gamma max ceiling (may mess with rootfind)
-  //v2 = std::min<Real>(v2, 0.9999);
+  // v2 = std::min<Real>(v2, 0.9999);
   W = 1 / std::sqrt(1 - v2);
   if (std::isinf(W)) {
     printf("Nonsense W! vin = %e %e %e\n", con_v_in(0), con_v_in(1), con_v_in(2));

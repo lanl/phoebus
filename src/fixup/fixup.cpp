@@ -351,9 +351,10 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               v(b, prho, k, j, i), v(b, peng, k, j, i) / v(b, prho, k, j, i), eos_lambda);
           v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
               v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-          v(b, gm1, k, j, i) = ratio(eos.BulkModulusFromDensityTemperature(
-                                   v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
-                               v(b, prs, k, j, i));
+          v(b, gm1, k, j, i) =
+              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
+                                                          v(b, tmp, k, j, i), eos_lambda),
+                    v(b, prs, k, j, i));
 
           // Update fluid conserved variables
           const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -629,10 +630,10 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
               }
             }
           } else {
-//            printf("[%i %i %i] no valid rad c2p neighbors!\n", k, j, i);
+            //            printf("[%i %i %i] no valid rad c2p neighbors!\n", k, j, i);
             Real ucon[4] = {0};
-            Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), 
-                          v(b, idx_pvel(1), k, j, i), v(b, idx_pvel(2), k, j, i)};
+            Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
+                             v(b, idx_pvel(2), k, j, i)};
             GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
             Geometry::Tetrads tetrads(ucon, gcov);
             for (int ispec = 0; ispec < nspec; ispec++) {
@@ -640,13 +641,14 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
               Real Mcon_fluid[4] = {v(b, idx_J(ispec), k, j, i), 0., 0., 0.};
               Real Mcon_coord[4] = {0};
               tetrads.TetradToCoordCon(Mcon_fluid, Mcon_coord);
-              Vec Hcon = {Mcon_coord[1] - ucon[1]*v(b, idx_J(ispec), k, j, i),
-                          Mcon_coord[2] - ucon[2]*v(b, idx_J(ispec), k, j, i),
-                          Mcon_coord[3] - ucon[3]*v(b, idx_J(ispec), k, j, i)};
+              Vec Hcon = {Mcon_coord[1] - ucon[1] * v(b, idx_J(ispec), k, j, i),
+                          Mcon_coord[2] - ucon[2] * v(b, idx_J(ispec), k, j, i),
+                          Mcon_coord[3] - ucon[3] * v(b, idx_J(ispec), k, j, i)};
               Vec Hcov;
               g.lower3Vector(Hcon, &Hcov);
 
-              //SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov(ii) / v(b, idx_J(ispec), k, j, i); }
+              // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov(ii) / v(b,
+              // idx_J(ispec), k, j, i); }
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
             }
           }
@@ -686,11 +688,12 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
               c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
             }
             c.Prim2Con(J, cov_H, con_tilPi, &E, &cov_F);
-            
-            Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H))/J;
-//            printf("Rad fixup [%i %i %i] J = %e cov_H = %e %e %e (xi = %e) E = %e cov_F = %e %e %e\n",
-//              k,j,i,J,cov_H(0),cov_H(1),cov_H(2),xi,E,cov_F(0),cov_F(1),cov_F(2));
-            
+
+            Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+            //            printf("Rad fixup [%i %i %i] J = %e cov_H = %e %e %e (xi = %e) E
+            //            = %e cov_F = %e %e %e\n",
+            //              k,j,i,J,cov_H(0),cov_H(1),cov_H(2),xi,E,cov_F(0),cov_F(1),cov_F(2));
+
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii); }
           }
@@ -870,8 +873,10 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
                 eos_lambda);
             v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
                 v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-            v(b, gm1, k, j, i) = ratio(eos.BulkModulusFromDensityTemperature(
-                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda), v(b, prs, k, j, i));
+            v(b, gm1, k, j, i) =
+                ratio(eos.BulkModulusFromDensityTemperature(
+                          v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+                      v(b, prs, k, j, i));
           } else {
             printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
@@ -891,8 +896,10 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
                 eos_lambda);
             v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
                 v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-            v(b, gm1, k, j, i) = ratio(eos.BulkModulusFromDensityTemperature(
-                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda), v(b, prs, k, j, i));
+            v(b, gm1, k, j, i) =
+                ratio(eos.BulkModulusFromDensityTemperature(
+                          v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+                      v(b, prs, k, j, i));
 
             // Zero primitive velocities
             SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = 0.; }
@@ -1112,8 +1119,8 @@ TaskStatus SourceFixupImpl(T *rc) {
                 eos_lambda);
 
             Real ucon[4] = {0};
-            Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), 
-                          v(b, idx_pvel(1), k, j, i), v(b, idx_pvel(2), k, j, i)};
+            Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
+                             v(b, idx_pvel(2), k, j, i)};
             GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
             Geometry::Tetrads tetrads(ucon, gcov);
 
@@ -1123,23 +1130,26 @@ TaskStatus SourceFixupImpl(T *rc) {
               Real Mcon_fluid[4] = {v(b, idx_J(ispec), k, j, i), 0., 0., 0.};
               Real Mcon_coord[4] = {0};
               tetrads.TetradToCoordCon(Mcon_fluid, Mcon_coord);
-              Real Hcon[3] = {Mcon_coord[1] - ucon[1]*v(b, idx_J(ispec), k, j, i),
-                          Mcon_coord[2] - ucon[2]*v(b, idx_J(ispec), k, j, i),
-                          Mcon_coord[3] - ucon[3]*v(b, idx_J(ispec), k, j, i)};
+              Real Hcon[3] = {Mcon_coord[1] - ucon[1] * v(b, idx_J(ispec), k, j, i),
+                              Mcon_coord[2] - ucon[2] * v(b, idx_J(ispec), k, j, i),
+                              Mcon_coord[3] - ucon[3] * v(b, idx_J(ispec), k, j, i)};
               Real Hcov[3] = {0};
-              SPACELOOP2(ii, jj) {
-                Hcov[ii] += gcov[ii+1][jj+1]*Hcon[jj];
-              }
+              SPACELOOP2(ii, jj) { Hcov[ii] += gcov[ii + 1][jj + 1] * Hcon[jj]; }
 
-              //SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov[ii] / v(b, idx_J(ispec), k, j, i); 
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.;
-                printf("Fail [%i %i %i] H[%i] = %e\n", k,j,i,ii,v(b, idx_H(ispec, ii), k, j, i));
+              // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov[ii] / v(b,
+              // idx_J(ispec), k, j, i);
+              SPACELOOP(ii) {
+                v(b, idx_H(ispec, ii), k, j, i) = 0.;
+                printf("Fail [%i %i %i] H[%i] = %e\n", k, j, i, ii,
+                       v(b, idx_H(ispec, ii), k, j, i));
               }
 
               // TODO(BRR) is this wrong? Want zero flux in fluid frame, this isn't it
-              //SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
-              //SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Mcon_coord[ii + 1] / v(b, idx_J(ispec), k, j, i); 
-              //  printf("Fail [%i %i %i] H[%i] = %e\n", k,j,i,ii,v(b, idx_H(ispec, ii), k, j, i));
+              // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
+              // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Mcon_coord[ii + 1] /
+              // v(b, idx_J(ispec), k, j, i);
+              //  printf("Fail [%i %i %i] H[%i] = %e\n", k,j,i,ii,v(b, idx_H(ispec, ii),
+              //  k, j, i));
               //}
             }
           }
@@ -1297,8 +1307,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   using parthenon::BoundaryFlag;
   auto *pmb = rc->GetParentPointer().get();
   auto &fixup_pkg = pmb->packages.Get("fixup");
-  if (!fixup_pkg->Param<bool>("enable_flux_fixup"))
-    return TaskStatus::complete;
+  if (!fixup_pkg->Param<bool>("enable_flux_fixup")) return TaskStatus::complete;
 
   auto fluid = pmb->packages.Get("fluid");
   const std::string ix1_bc = fluid->Param<std::string>("ix1_bc");
@@ -1335,13 +1344,13 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X1DIR, crho, k, j, i) = std::min(v.flux(X1DIR, crho, k, j, i), 0.0);
-// TODO(BRR) This seems to be unstable (at the outer boundary)
-//            if (idx_E.IsValid()) {
-//              for (int ispec = 0; ispec < num_species; ispec++) {
-//                v.flux(X1DIR, idx_E(ispec), k, j, i) =
-//                    std::min(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
-//              }
-//            }
+            // TODO(BRR) This seems to be unstable (at the outer boundary)
+            //            if (idx_E.IsValid()) {
+            //              for (int ispec = 0; ispec < num_species; ispec++) {
+            //                v.flux(X1DIR, idx_E(ispec), k, j, i) =
+            //                    std::min(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
+            //              }
+            //            }
           });
     } else if (ix1_bc == "reflect") {
       PackIndexMap imap;
@@ -1376,13 +1385,13 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.e + 1, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X1DIR, crho, k, j, i) = std::max(v.flux(X1DIR, crho, k, j, i), 0.0);
-// TODO(BRR) Unstable (see above)
-//            if (idx_E.IsValid()) {
-//              for (int ispec = 0; ispec < num_species; ispec++) {
-//                v.flux(X1DIR, idx_E(ispec), k, j, i) =
-//                    std::max(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
-//              }
-//            }
+            // TODO(BRR) Unstable (see above)
+            //            if (idx_E.IsValid()) {
+            //              for (int ispec = 0; ispec < num_species; ispec++) {
+            //                v.flux(X1DIR, idx_E(ispec), k, j, i) =
+            //                    std::max(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
+            //              }
+            //            }
           });
     } else if (ox1_bc == "reflect") {
       PackIndexMap imap;
@@ -1420,12 +1429,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X2DIR, crho, k, j, i) = std::min(v.flux(X2DIR, crho, k, j, i), 0.0);
-//            if (idx_E.IsValid()) {
-//              for (int ispec = 0; ispec < num_species; ispec++) {
-//                v.flux(X2DIR, idx_E(ispec), k, j, i) =
-//                    std::min(v.flux(X2DIR, idx_E(ispec), k, j, i), 0.0);
-//              }
-//            }
+            //            if (idx_E.IsValid()) {
+            //              for (int ispec = 0; ispec < num_species; ispec++) {
+            //                v.flux(X2DIR, idx_E(ispec), k, j, i) =
+            //                    std::min(v.flux(X2DIR, idx_E(ispec), k, j, i), 0.0);
+            //              }
+            //            }
           });
     } else if (ix2_bc == "reflect") {
       PackIndexMap imap;
@@ -1466,12 +1475,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e + 1,
           jb.e + 1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X2DIR, crho, k, j, i) = std::max(v.flux(X2DIR, crho, k, j, i), 0.0);
-//            if (idx_E.IsValid()) {
-//              for (int ispec = 0; ispec < num_species; ispec++) {
-//                v.flux(X2DIR, idx_E(ispec), k, j, i) =
-//                    std::max(v.flux(X2DIR, idx_E(ispec), k, j, i), 0.0);
-//              }
-//            }
+            //            if (idx_E.IsValid()) {
+            //              for (int ispec = 0; ispec < num_species; ispec++) {
+            //                v.flux(X2DIR, idx_E(ispec), k, j, i) =
+            //                    std::max(v.flux(X2DIR, idx_E(ispec), k, j, i), 0.0);
+            //              }
+            //            }
           });
     } else if (ox2_bc == "reflect") {
       PackIndexMap imap;
@@ -1516,12 +1525,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
         DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.s, kb.s, jb.s, jb.e,
         ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           v.flux(X3DIR, crho, k, j, i) = std::min(v.flux(X3DIR, crho, k, j, i), 0.0);
-//          if (idx_E.IsValid()) {
-//            for (int ispec = 0; ispec < num_species; ispec++) {
-//              v.flux(X3DIR, idx_E(ispec), k, j, i) =
-//                  std::min(v.flux(X3DIR, idx_E(ispec), k, j, i), 0.0);
-//            }
-//          }
+          //          if (idx_E.IsValid()) {
+          //            for (int ispec = 0; ispec < num_species; ispec++) {
+          //              v.flux(X3DIR, idx_E(ispec), k, j, i) =
+          //                  std::min(v.flux(X3DIR, idx_E(ispec), k, j, i), 0.0);
+          //            }
+          //          }
         });
   } else if (pmb->boundary_flag[BoundaryFace::inner_x3] == BoundaryFlag::reflect) {
     PackIndexMap imap;
@@ -1554,12 +1563,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
         DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.e + 1, kb.e + 1, jb.s,
         jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           v.flux(X3DIR, crho, k, j, i) = std::max(v.flux(X3DIR, crho, k, j, i), 0.0);
-//          if (idx_E.IsValid()) {
-//            for (int ispec = 0; ispec < num_species; ispec++) {
-//              v.flux(X3DIR, idx_E(ispec), k, j, i) =
-//                  std::max(v.flux(X3DIR, idx_E(ispec), k, j, i), 0.0);
-//            }
-//          }
+          //          if (idx_E.IsValid()) {
+          //            for (int ispec = 0; ispec < num_species; ispec++) {
+          //              v.flux(X3DIR, idx_E(ispec), k, j, i) =
+          //                  std::max(v.flux(X3DIR, idx_E(ispec), k, j, i), 0.0);
+          //            }
+          //          }
         });
   } else if (pmb->boundary_flag[BoundaryFace::outer_x3] == BoundaryFlag::reflect) {
     PackIndexMap imap;
