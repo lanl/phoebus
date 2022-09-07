@@ -231,6 +231,7 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;

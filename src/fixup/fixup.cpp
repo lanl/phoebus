@@ -629,6 +629,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
               }
             }
           } else {
+            printf("[%i %i %i] no valid rad c2p neighbors!\n", k, j, i);
             Real ucon[4] = {0};
             Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), 
                           v(b, idx_pvel(1), k, j, i), v(b, idx_pvel(2), k, j, i)};
@@ -645,7 +646,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
               Vec Hcov;
               g.lower3Vector(Hcon, &Hcov);
 
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov(ii) / v(b, idx_J(ispec), k, j, i); }
+              //SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov(ii) / v(b, idx_J(ispec), k, j, i); }
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
             }
           }
 
@@ -685,7 +687,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             }
             c.Prim2Con(J, cov_H, con_tilPi, &E, &cov_F);
             
-            Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H));
+            Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H))/J;
             printf("Rad fixup [%i %i %i] J = %e cov_H = %e %e %e (xi = %e) E = %e cov_F = %e %e %e\n",
               k,j,i,J,cov_H(0),cov_H(1),cov_H(2),xi,E,cov_F(0),cov_F(1),cov_F(2));
             
@@ -872,6 +874,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
                 v(b, prho, k, j, i), ratio(v(b, tmp, k, j, i), v(b, prs, k, j, i)),
                 eos_lambda);
           } else {
+            printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
             // velocities to zero
 
@@ -1130,7 +1133,8 @@ TaskStatus SourceFixupImpl(T *rc) {
                 Hcov[ii] += gcov[ii+1][jj+1]*Hcon[jj];
               }
 
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov[ii] / v(b, idx_J(ispec), k, j, i); 
+              //SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov[ii] / v(b, idx_J(ispec), k, j, i); 
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.;
                 printf("Fail [%i %i %i] H[%i] = %e\n", k,j,i,ii,v(b, idx_H(ispec, ii), k, j, i));
               }
 
@@ -1344,8 +1348,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
       auto v = rc->PackVariablesAndFluxes(
           std::vector<std::string>({c::density, c::energy, cr::E}),
           std::vector<std::string>({c::density, c::energy, cr::E}), imap);
-      const auto crho = imap[p::density].first;
-      const auto cener = imap[p::energy].first;
+      const auto crho = imap[c::density].first;
+      const auto cener = imap[c::energy].first;
       auto idx_E = imap.GetFlatIdx(cr::E, false);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,

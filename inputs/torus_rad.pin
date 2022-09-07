@@ -1,7 +1,8 @@
 
 <phoebus>
 problem = torus
-ix1_bc = outflow
+#ix1_bc = outflow # Currently broken around 80M
+ix1_bc = reflect
 ox1_bc = outflow
 ix2_bc = reflect
 ox2_bc = reflect

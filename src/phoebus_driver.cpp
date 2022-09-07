@@ -508,6 +508,23 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                  parthenon::cell_centered_refinement::RestrictPhysicalBounds, mc1.get());
     }
   }
+ 
+  // TODO(BRR) loop this in thoughtfully!
+  TaskRegion &async_region_temp1 = tc.AddRegion(blocks.size());
+  for (int i = 0; i < blocks.size(); i++) {
+    auto &pmb = blocks[i];
+    auto &tl = async_region_temp1[i];
+    auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
+
+    auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
+
+    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+
+    auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
+
+    auto fill_derived = tl.AddTask(
+        convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc.get());
+  }
 
   // Radiation/fluid interaction terms
   TaskRegion &async_region_3 = tc.AddRegion(num_independent_task_lists);
@@ -629,6 +646,22 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       tl.AddTask(set_nonlocal | set_local,
                  parthenon::cell_centered_refinement::RestrictPhysicalBounds, mc1.get());
     }
+  }
+  // TODO(BRR) loop this in thoughtfully!
+  TaskRegion &async_region_temp2 = tc.AddRegion(blocks.size());
+  for (int i = 0; i < blocks.size(); i++) {
+    auto &pmb = blocks[i];
+    auto &tl = async_region_temp2[i];
+    auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
+
+    auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
+
+    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+
+    auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
+
+    auto fill_derived = tl.AddTask(
+        convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc.get());
   }
 
   // Evaluate and report particle statistics
