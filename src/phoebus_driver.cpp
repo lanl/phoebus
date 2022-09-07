@@ -508,7 +508,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                  parthenon::cell_centered_refinement::RestrictPhysicalBounds, mc1.get());
     }
   }
- 
+
   // TODO(BRR) loop this in thoughtfully!
   TaskRegion &async_region_temp1 = tc.AddRegion(blocks.size());
   for (int i = 0; i < blocks.size(); i++) {

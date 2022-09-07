@@ -269,10 +269,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                v(irho, k, j, i), v(itmp, k, j, i), lambda) /
                            v(iprs, k, j, i);
-              
+
         Real ucon[4] = {0};
-        Real vpcon[3] = {v(ivlo, k, j, i), 
-                    v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
+        Real vpcon[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
         Real gcov[4][4] = {0};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
         GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
@@ -322,13 +321,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               Real Mcon_fluid[4] = {v(iJ(ispec), k, j, i), 0., 0., 0.};
               Real Mcon_coord[4] = {0};
               tetrads.TetradToCoordCon(Mcon_fluid, Mcon_coord);
-              Real Hcon[3] = {Mcon_coord[1] - ucon[1]*v(iJ(ispec), k, j, i),
-                          Mcon_coord[2] - ucon[2]*v(iJ(ispec), k, j, i),
-                          Mcon_coord[3] - ucon[3]*v(iJ(ispec), k, j, i)};
+              Real Hcon[3] = {Mcon_coord[1] - ucon[1] * v(iJ(ispec), k, j, i),
+                              Mcon_coord[2] - ucon[2] * v(iJ(ispec), k, j, i),
+                              Mcon_coord[3] - ucon[3] * v(iJ(ispec), k, j, i)};
               Real Hcov[3] = {0.};
-              SPACELOOP2(ii, jj) {
-                Hcov[ii] += gcov[ii+1][jj+1]*Hcon[jj];
-              }
+              SPACELOOP2(ii, jj) { Hcov[ii] += gcov[ii + 1][jj + 1] * Hcon[jj]; }
 
               SPACELOOP(ii) {
                 v(iH(ispec, 0), k, j, i) = Hcov[ii] / v(iJ(ispec), k, j, i);
@@ -343,16 +340,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               Real Mcon_fluid[4] = {v(iJ(ispec), k, j, i), 0., 0., 0.};
               Real Mcon_coord[4] = {0};
               tetrads.TetradToCoordCon(Mcon_fluid, Mcon_coord);
-              Real Hcon[3] = {Mcon_coord[1] - ucon[1]*v(iJ(ispec), k, j, i),
-                          Mcon_coord[2] - ucon[2]*v(iJ(ispec), k, j, i),
-                          Mcon_coord[3] - ucon[3]*v(iJ(ispec), k, j, i)};
+              Real Hcon[3] = {Mcon_coord[1] - ucon[1] * v(iJ(ispec), k, j, i),
+                              Mcon_coord[2] - ucon[2] * v(iJ(ispec), k, j, i),
+                              Mcon_coord[3] - ucon[3] * v(iJ(ispec), k, j, i)};
               Real Hcov[3] = {0.};
-              SPACELOOP2(ii, jj) {
-                Hcov[ii] += gcov[ii+1][jj+1]*Hcon[jj];
-              }
+              SPACELOOP2(ii, jj) { Hcov[ii] += gcov[ii + 1][jj + 1] * Hcon[jj]; }
 
               SPACELOOP(ii) {
-                //v(iH(ispec, 0), k, j, i) = Hcov[ii] / v(iJ(ispec), k, j, i);
+                // v(iH(ispec, 0), k, j, i) = Hcov[ii] / v(iJ(ispec), k, j, i);
                 v(iH(ispec, 0), k, j, i) = 0.;
               }
             }
@@ -578,10 +573,10 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
-                                fluid_prim::bfield, fluid_prim::pressure,
-                                radmoment_prim::J},
-                               imap);
+    auto v =
+        rc->PackVariables({fluid_prim::density, fluid_prim::velocity, fluid_prim::bfield,
+                           fluid_prim::pressure, radmoment_prim::J},
+                          imap);
 
     const int irho = imap[fluid_prim::density].first;
     const int ivlo = imap[fluid_prim::velocity].first;
@@ -605,7 +600,7 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
           // TODO(BRR) multiple species
           if (idx_J.IsValid()) {
             int ispec = 0;
-            Ptot += 1./3.*v(idx_J(ispec), k, j, i);
+            Ptot += 1. / 3. * v(idx_J(ispec), k, j, i);
           }
           const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
           if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;

@@ -43,6 +43,8 @@ enum class MOCMCRecon { kdgrid };
 
 enum class MOCMCBoundaries { outflow, fixed_temp, periodic };
 
+enum class SourceSolver { zerod, oned, fourd };
+
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
 

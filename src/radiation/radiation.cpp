@@ -303,13 +303,32 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     namespace c = radmoment_cons;
     namespace i = radmoment_internal;
 
+    const std::string src_solver_name =
+        pin->GetOrAddString("radiation", "src_solver", "fourd");
+    SourceSolver src_solver;
+    if (src_solver_name == "zerod") {
+      src_solver = SourceSolver::zerod;
+    } else if (src_solver_name == "oned") {
+      src_solver = SourceSolver::oned;
+    } else if (src_solver_name == "fourd") {
+      src_solver = SourceSolver::fourd;
+    } else {
+      PARTHENON_FAIL("\"radiation/src_solver\" option unrecognized!");
+    }
+    params.Add("src_solver", src_solver);
+
+    const bool src_use_oned_backup =
+        pin->GetOrAddBoolean("radiation", "src_use_oned_backup", false);
+    params.Add("src_use_oned_backup", src_use_oned_backup);
+
     Real src_rootfind_eps = pin->GetOrAddReal("radiation", "src_rootfind_eps", 1.e-8);
     params.Add("src_rootfind_eps", src_rootfind_eps);
 
     Real src_rootfind_tol = pin->GetOrAddReal("radiation", "src_rootfind_tol", 1.e-12);
     params.Add("src_rootfind_tol", src_rootfind_tol);
 
-    int src_rootfind_maxiter = pin->GetOrAddInteger("radiation", "src_rootfind_maxiter", 100);
+    int src_rootfind_maxiter =
+        pin->GetOrAddInteger("radiation", "src_rootfind_maxiter", 100);
     params.Add("src_rootfind_maxiter", src_rootfind_maxiter);
 
     int ndim = 3;
