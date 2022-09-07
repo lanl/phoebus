@@ -352,7 +352,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               }
 
               SPACELOOP(ii) {
-                v(iH(ispec, 0), k, j, i) = Hcov[ii] / v(iJ(ispec), k, j, i);
+                //v(iH(ispec, 0), k, j, i) = Hcov[ii] / v(iJ(ispec), k, j, i);
+                v(iH(ispec, 0), k, j, i) = 0.;
               }
             }
           }
