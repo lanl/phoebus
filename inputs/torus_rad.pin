@@ -1,8 +1,7 @@
 
 <phoebus>
 problem = torus
-#ix1_bc = outflow # Currently broken around 80M
-ix1_bc = reflect
+ix1_bc = outflow
 ox1_bc = outflow
 ix2_bc = reflect
 ox2_bc = reflect
@@ -120,9 +119,10 @@ absorption = true
 do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
-src_rootfind_eps = 1.e-4
+src_rootfind_eps = 1.e-6
+src_rootfind_tol = 1.e-12
+src_rootfind_maxiter = 100
 
-#scattering_fraction = 1.0
 scattering_fraction = 0.5
 
 <opacity>

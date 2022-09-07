@@ -1336,12 +1336,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X1DIR, crho, k, j, i) = std::min(v.flux(X1DIR, crho, k, j, i), 0.0);
 // TODO(BRR) This seems to be unstable (at the outer boundary)
-            if (idx_E.IsValid()) {
-              for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X1DIR, idx_E(ispec), k, j, i) =
-                    std::min(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
-              }
-            }
+//            if (idx_E.IsValid()) {
+//              for (int ispec = 0; ispec < num_species; ispec++) {
+//                v.flux(X1DIR, idx_E(ispec), k, j, i) =
+//                    std::min(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
+//              }
+//            }
           });
     } else if (ix1_bc == "reflect") {
       PackIndexMap imap;
@@ -1377,12 +1377,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           ib.e + 1, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X1DIR, crho, k, j, i) = std::max(v.flux(X1DIR, crho, k, j, i), 0.0);
 // TODO(BRR) Unstable (see above)
-            if (idx_E.IsValid()) {
-              for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X1DIR, idx_E(ispec), k, j, i) =
-                    std::max(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
-              }
-            }
+//            if (idx_E.IsValid()) {
+//              for (int ispec = 0; ispec < num_species; ispec++) {
+//                v.flux(X1DIR, idx_E(ispec), k, j, i) =
+//                    std::max(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
+//              }
+//            }
           });
     } else if (ox1_bc == "reflect") {
       PackIndexMap imap;
