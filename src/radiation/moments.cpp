@@ -94,7 +94,7 @@ class SourceResidual4 {
     Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
     // Use gamma_max from code?
     if (W > 100) {
-      printf("W = %e! [%i %i %i]\n", W, k, j, i);
+      printf("W = %e! [%i %i %i]\n", W, k_, j_, i_);
       return ClosureStatus::failure;
     }
     CLOSURE c(con_v, &g_);

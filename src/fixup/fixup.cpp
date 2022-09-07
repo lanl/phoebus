@@ -352,8 +352,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
               v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
           v(b, gm1, k, j, i) = ratio(eos.BulkModulusFromDensityTemperature(
-                                   v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda)),
-                               v(b, prs, k, j, i);
+                                   v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+                               v(b, prs, k, j, i));
 
           // Update fluid conserved variables
           const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -688,8 +688,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             c.Prim2Con(J, cov_H, con_tilPi, &E, &cov_F);
             
             Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H))/J;
-            printf("Rad fixup [%i %i %i] J = %e cov_H = %e %e %e (xi = %e) E = %e cov_F = %e %e %e\n",
-              k,j,i,J,cov_H(0),cov_H(1),cov_H(2),xi,E,cov_F(0),cov_F(1),cov_F(2));
+//            printf("Rad fixup [%i %i %i] J = %e cov_H = %e %e %e (xi = %e) E = %e cov_F = %e %e %e\n",
+//              k,j,i,J,cov_H(0),cov_H(1),cov_H(2),xi,E,cov_F(0),cov_F(1),cov_F(2));
             
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii); }
@@ -1336,12 +1336,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X1DIR, crho, k, j, i) = std::min(v.flux(X1DIR, crho, k, j, i), 0.0);
 // TODO(BRR) This seems to be unstable (at the outer boundary)
-//            if (enable_rad_flux_fixup) {
-//              for (int ispec = 0; ispec < num_species; ispec++) {
-//                v.flux(X1DIR, idx_E(ispec), k, j, i) =
-//                    std::min(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
-//              }
-//            }
+            if (idx_E.IsValid()) {
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                v.flux(X1DIR, idx_E(ispec), k, j, i) =
+                    std::min(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
+              }
+            }
           });
     } else if (ix1_bc == "reflect") {
       PackIndexMap imap;
@@ -1377,12 +1377,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           ib.e + 1, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X1DIR, crho, k, j, i) = std::max(v.flux(X1DIR, crho, k, j, i), 0.0);
 // TODO(BRR) Unstable (see above)
-//            if (idx_E.IsValid()) {
-//              for (int ispec = 0; ispec < num_species; ispec++) {
-//                v.flux(X1DIR, idx_E(ispec), k, j, i) =
-//                    std::max(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
-//              }
-//            }
+            if (idx_E.IsValid()) {
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                v.flux(X1DIR, idx_E(ispec), k, j, i) =
+                    std::max(v.flux(X1DIR, idx_E(ispec), k, j, i), 0.0);
+              }
+            }
           });
     } else if (ox1_bc == "reflect") {
       PackIndexMap imap;
