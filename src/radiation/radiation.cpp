@@ -408,6 +408,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       physics->AddField(mocmc_internal::dnsamp, mscalar);
     }
 
+#if SET_FLUX_SRC_DIAGS
+    // DIAGNOSTIC STUFF FOR DEBUGGING
+    std::vector<int> spec_four_vec{num_species, 4};
+    Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
+                              Metadata::Derived, Metadata::OneCopy},
+                             std::vector<int>{num_species, 4});
+    physics->AddField(diagnostic_variables::r_divf, mdiv);
+    Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
+                               Metadata::Derived, Metadata::OneCopy},
+                              std::vector<int>{num_species, 4});
+    physics->AddField(diagnostic_variables::r_src_terms, mdiag);
+    printf("name: %s\n", diagnostic_variables::r_src_terms);
+    printf("Added fields!\n");
+#endif
+
     physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }
 
