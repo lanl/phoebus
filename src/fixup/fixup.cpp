@@ -1097,7 +1097,6 @@ TaskStatus SourceFixupImpl(T *rc) {
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
             printf("No valid neighbors! %i %i %i\n", k, j, i);
-            PARTHENON_FAIL("no valid neighbors");
 
             double rho_floor, sie_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
