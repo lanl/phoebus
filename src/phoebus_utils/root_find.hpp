@@ -120,9 +120,11 @@ struct RootFind {
       // guard against roundoff because ya or yb is sufficiently close to zero
       if (c == a) {
         b = a;
+        iteration_count++;
         continue;
       } else if (c == b) {
         a = b;
+        iteration_count++;
         continue;
       }
       Real yc = sign * func(c);
