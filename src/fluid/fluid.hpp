@@ -76,8 +76,17 @@ TaskStatus CopyFluxDivergence(T *rc) {
   const int ceng = imap[fluid_cons::energy].first;
   auto idx_E = imap.GetFlatIdx(radmoment_cons::E, false);
   auto idx_F = imap.GetFlatIdx(radmoment_cons::F, false);
-  std::vector<std::string> diag_vars({diagnostic_variables::divf});
-  auto diag = rc->PackVariables(diag_vars);
+  std::vector<std::string> diag_vars(
+      {diagnostic_variables::divf, diagnostic_variables::r_divf});
+  PackIndexMap imap_diag;
+  auto diag = rc->PackVariables(diag_vars, imap_diag);
+  auto idx_r_divf = imap_diag.GetFlatIdx(diagnostic_variables::r_divf, false);
+
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  int num_species = 0;
+  if (idx_E.IsValid()) {
+    num_species = rad->Param<int>("num_species");
+  }
 
   // TODO(JMM): If we expose a way to get cellbounds from the mesh or
   // meshdata object, that would be better.
@@ -90,12 +99,13 @@ TaskStatus CopyFluxDivergence(T *rc) {
         diag(b, 2, k, j, i) = divf(b, cmom_lo + 1, k, j, i);
         diag(b, 3, k, j, i) = divf(b, cmom_lo + 2, k, j, i);
         diag(b, 4, k, j, i) = divf(b, ceng, k, j, i);
-        // TODO(BRR) 0 species only
-        if (idx_E.IsValid()) {
-          diag(b, 5, k, j, i) = divf(b, idx_E(0), k, j, i);
-          diag(b, 6, k, j, i) = divf(b, idx_F(0, 0), k, j, i);
-          diag(b, 7, k, j, i) = divf(b, idx_F(0, 1), k, j, i);
-          diag(b, 8, k, j, i) = divf(b, idx_F(0, 2), k, j, i);
+        for (int ispec = 0; ispec < num_species; ispec++) {
+          if (idx_E.IsValid()) {
+            diag(b, idx_r_divf(ispec, 0), k, j, i) = divf(b, idx_E(ispec), k, j, i);
+            diag(b, idx_r_divf(ispec, 1), k, j, i) = divf(b, idx_F(ispec, 0), k, j, i);
+            diag(b, idx_r_divf(ispec, 2), k, j, i) = divf(b, idx_F(ispec, 1), k, j, i);
+            diag(b, idx_r_divf(ispec, 3), k, j, i) = divf(b, idx_F(ispec, 2), k, j, i);
+          }
         }
       });
   return TaskStatus::complete;

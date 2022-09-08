@@ -889,6 +889,10 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   namespace p = fluid_prim;
   PackIndexMap imap;
   std::vector<std::string> vars{cr::E, cr::F, pr::J, pr::H, p::velocity, ir::tilPi};
+  vars.push_back(diagnostic_variables::r_src_terms);
+#if SET_FLUX_SRC_DIAGS
+  vars.push_back(diagnostic_variables::r_src_terms);
+#endif
   auto v = rc->PackVariables(vars, imap);
   auto idx_E = imap.GetFlatIdx(cr::E);
   auto idx_F = imap.GetFlatIdx(cr::F);
@@ -896,16 +900,13 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   auto idx_H = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(p::velocity);
   auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_diag = imap.GetFlatIdx(diagnostic_variables::r_src_terms, false);
 
   PackIndexMap imap_src;
   std::vector<std::string> vars_src{cr::E, cr::F};
-#if SET_FLUX_SRC_DIAGS
-  vars_src.push_back(diagnostic_variables::src_terms);
-#endif
   auto v_src = rc_src->PackVariables(vars_src, imap_src);
   auto idx_E_src = imap_src.GetFlatIdx(cr::E);
   auto idx_F_src = imap_src.GetFlatIdx(cr::F);
-  const int idiag = imap_src[diagnostic_variables::src_terms].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -1019,14 +1020,17 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                    v_src(iblock, idx_F_src(ispec, 1), k, j, i),
                    v_src(iblock, idx_F_src(ispec, 2), k, j, i));
           }
-        }
 #if SET_FLUX_SRC_DIAGS
-        // TODO(BRR) Only first species for now
-        v_src(iblock, idiag + 5, k, j, i) = v_src(iblock, idx_E_src(0), k, j, i);
-        v_src(iblock, idiag + 6, k, j, i) = v_src(iblock, idx_F_src(0, 0), k, j, i);
-        v_src(iblock, idiag + 7, k, j, i) = v_src(iblock, idx_F_src(0, 1), k, j, i);
-        v_src(iblock, idiag + 8, k, j, i) = v_src(iblock, idx_F_src(0, 2), k, j, i);
+          v(iblock, idx_diag(ispec, 0), k, j, i) =
+              v_src(iblock, idx_E_src(ispec), k, j, i);
+          v(iblock, idx_diag(ispec, 1), k, j, i) =
+              v_src(iblock, idx_F_src(ispec, 0), k, j, i);
+          v(iblock, idx_diag(ispec, 2), k, j, i) =
+              v_src(iblock, idx_F_src(ispec, 1), k, j, i);
+          v(iblock, idx_diag(ispec, 3), k, j, i) =
+              v_src(iblock, idx_F_src(ispec, 2), k, j, i);
 #endif
+        }
       });
   return TaskStatus::complete;
 }
@@ -1121,9 +1125,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
 
-  const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
-  const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
-  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
+  // const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
+  // const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
+  // auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
   auto coords = pmb->coords;
 
   const auto &d_opacity = opac->Param<Opacity>("d.opacity");
@@ -1216,9 +1220,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
                                      num_species, species_d, scattering_fraction, dtau);
             root_find::RootFindStatus status;
-            const Real T1 =
-                root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
-                                 1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i), &status);
+            const Real T1 = root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
+                                             1.e-8 * v(iblock, pT, k, j, i),
+                                             v(iblock, pT, k, j, i), &status);
             if (status == root_find::RootFindStatus::failure) {
               success = false;
               break;
