@@ -95,7 +95,8 @@ struct RootFind {
     }
 
     if (status != nullptr) {
-      *status = iteration_count == max_iter ? RootFindStatus::failure : RootFindStatus::success;
+      *status =
+          iteration_count == max_iter ? RootFindStatus::failure : RootFindStatus::success;
     }
 
     return 0.5 * (x1 + x2);
