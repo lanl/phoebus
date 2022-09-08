@@ -172,10 +172,12 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto domain = IndexDomain::outer_x1;
 
   const int pv_lo = imap[fluid_prim::velocity].first;
+  auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
 
   auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
   auto &rad = rc->GetParentPointer()->packages.Get("radiation");
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
+  auto num_species = rad->Param<int>("num_species");
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
@@ -212,6 +214,13 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
             W = 1. / sqrt(1. - vsq);
 
             SPACELOOP(ii) { q(pv_lo + ii, k, j, i) = W * vcon[ii]; }
+          }
+
+          // No flux of radiation into the simulation
+          if (idx_H.IsValid()) {
+            for (int ispec = 0; ispec < num_species; ispec++) {
+              q(idx_H(ispec, 0), k, j, i) = std::max<Real>(q(idx_H(ispec), 0, k, j, i), 0.);
+            }
           }
         });
   }
