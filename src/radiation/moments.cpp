@@ -1212,12 +1212,17 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
 
             // Rootfind over fluid temperature in fluid rest frame
-            root_find::RootFind root_find;
+            root_find::RootFind root_find(src_rootfind_maxiter);
             InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
                                      num_species, species_d, scattering_fraction, dtau);
+            root_find::RootFindStatus status;
             const Real T1 =
                 root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
-                                 1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i));
+                                 1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i), &status);
+            if (status == root_find::RootFindStatus::failure) {
+              success = false;
+              break;
+            }
 
             CLOSURE c(con_v, &g);
 

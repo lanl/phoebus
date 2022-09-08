@@ -58,7 +58,7 @@ struct RootFind {
 
   template <typename F>
   KOKKOS_INLINE_FUNCTION Real secant(F &func, Real a, Real b, const Real tol,
-                                     const Real guess) {
+                                     const Real guess, RootFindStatus *status = nullptr) {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
     Real x1, x2, y1, y2;
@@ -93,6 +93,11 @@ struct RootFind {
       x1 = x0;
       y1 = y0;
     }
+
+    if (status != nullptr) {
+      *status = iteration_count == max_iter ? RootFindStatus::failure : RootFindStatus::success;
+    }
+
     return 0.5 * (x1 + x2);
   }
 
