@@ -129,8 +129,6 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           q(l, k, j, i) = gratio * q(l, k, j, ref);
         });
   } else if (bc_vars == "primitive") {
-    PARTHENON_REQUIRE(!rad->Param<bool>("active"),
-                      "Primitive BC vars not supported for radiation!");
     pmb->par_for_bndry(
         "OutflowInnerX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
@@ -189,8 +187,6 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           q(l, k, j, i) = gratio * q(l, k, j, ref);
         });
   } else if (bc_vars == "primitive") {
-    PARTHENON_REQUIRE(!rad->Param<bool>("active"),
-                      "Primitive BC vars not supported for radiation!");
     pmb->par_for_bndry(
         "OutflowOuterX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {

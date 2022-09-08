@@ -89,6 +89,8 @@ namespace diagnostic_variables {
 constexpr char divb[] = "divb";
 constexpr char divf[] = "flux_divergence";
 constexpr char src_terms[] = "src_terms";
+constexpr char r_divf[] = "r.flux_divergence";
+constexpr char r_src_terms[] = "r.src_terms";
 } // namespace diagnostic_variables
 
 #endif // PHOEBUS_UTILS_VARIABLES_HPP_
