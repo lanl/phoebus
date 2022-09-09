@@ -111,6 +111,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto q = rc->PackVariables(std::vector<parthenon::MetadataFlag>{Metadata::FillGhost},
                              imap, coarse);
   auto nb = IndexRange{0, q.GetDim(4) - 1};
+  auto nb1 = IndexRange{0, 0};
   auto domain = IndexDomain::inner_x1;
 
   const int pv_lo = imap[fluid_prim::velocity].first;
@@ -158,8 +159,8 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         });
 
     pmb->par_for_bndry(
-        "OutflowInnerX1PrimFixup", domain, coarse,
-        KOKKOS_LAMBDA(const int &k, const int &j, const int &i) {
+        "OutflowInnerX1PrimFixup", nb1, domain, coarse,
+        KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
           // Enforce u^1 <= 0
           Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
                           q(pv_lo + 2, k, j, i)};
@@ -195,6 +196,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto q = rc->PackVariables(std::vector<parthenon::MetadataFlag>{Metadata::FillGhost},
                              imap, coarse);
   auto nb = IndexRange{0, q.GetDim(4) - 1};
+  auto nb1 = IndexRange{0, 0};
 
   auto domain = IndexDomain::outer_x1;
 
@@ -243,8 +245,8 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         });
 
     pmb->par_for_bndry(
-        "OutflowOuterX1PrimFixup", domain, coarse,
-        KOKKOS_LAMBDA(const int &k, const int &j, const int &i) {
+        "OutflowOuterX1PrimFixup", nb1, domain, coarse,
+        KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
    //       q(l, k, j, i) = q(l, k, j, ref);
 
           // Enforce u^1 >= 0
