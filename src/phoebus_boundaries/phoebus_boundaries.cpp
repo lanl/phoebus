@@ -344,11 +344,6 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
               }
               //q(idx_H(ispec, 0), k, j, i) = std::max<Real>(q(idx_H(ispec), 0, k, j, i), 0.);
             }
-
-            if (j == 118) {
-              int ispec = 0;
-              printf("BC J: [%i %i %i] %e\n", k, j, i, q(idx_J(ispec), k, j, i));
-            }
           }
         });
   }
