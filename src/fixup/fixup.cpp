@@ -561,20 +561,20 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
 
   // TODO(BRR) make this less ugly? Do this at all?
   // TODO(BRR) if (use_ghost_for_stencil_fixup) {} ?
-  // IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  // IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  // IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  // parthenon::par_for(
-  //    DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) -
-  //    1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e, KOKKOS_LAMBDA(const int b, const int
-  //    k, const int j, const int i) {
-  //      if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
-  //        // Do not use ghost zones as data for averaging
-  //        // TODO(BRR) need to allow ghost zones from neighboring blocks
-  //        v(b, ifluidfail, k, j, i) = con2prim_robust::FailFlags::fail;
-  //        v(b, iradfail, k, j, i) = radiation::FailFlags::fail;
-  //      }
-  //    });
+   IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+   IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+   IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+   parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) -
+      1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e, KOKKOS_LAMBDA(const int b, const int
+      k, const int j, const int i) {
+        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+          // Do not use ghost zones as data for averaging
+          // TODO(BRR) need to allow ghost zones from neighboring blocks
+          v(b, ifluidfail, k, j, i) = con2prim_robust::FailFlags::fail;
+          v(b, iradfail, k, j, i) = radiation::FailFlags::fail;
+        }
+      });
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
@@ -810,19 +810,19 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
   // TODO(BRR) make this less ugly (or do this at all?)
-  //  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  //  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  //  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  //  parthenon::par_for(
-  //      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5)
-  //      - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e, KOKKOS_LAMBDA(const int b, const
-  //      int k, const int j, const int i) {
-  //        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
-  //          // Do not use ghost zones as data for averaging
-  //          // TODO(BRR) need to allow ghost zones from neighboring blocks
-  //          v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
-  //        }
-  //      });
+    IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+    IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+    IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5)
+        - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e, KOKKOS_LAMBDA(const int b, const
+        int k, const int j, const int i) {
+          if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
+            // Do not use ghost zones as data for averaging
+            // TODO(BRR) need to allow ghost zones from neighboring blocks
+            v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
+          }
+        });
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
