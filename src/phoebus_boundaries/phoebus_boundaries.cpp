@@ -115,10 +115,12 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto domain = IndexDomain::inner_x1;
 
   const int pv_lo = imap[fluid_prim::velocity].first;
+  auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
 
   auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
   auto &rad = rc->GetParentPointer()->packages.Get("radiation");
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
+  auto num_species = rad->Param<int>("num_species");
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
@@ -182,6 +184,40 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
             SPACELOOP(ii) { q(pv_lo + ii, k, j, i) = W * vcon[ii]; }
           }
+              
+          // No flux of radiation into the simulation
+          if (idx_H.IsValid()) {
+            Real gammacon[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
+            for (int ispec = 0; ispec < num_species; ispec++) {
+              Real Hcon[3] = {0};
+              SPACELOOP2(ii, jj) {
+                Hcon[ii] += gammacon[ii][jj]*q(idx_H(ispec, jj), k, j, i);
+              }
+              if (Hcon[0] > 0.) {
+                Hcon[0] = 0.;
+              
+                // Check xi
+                Real xi = 0.;
+                SPACELOOP2(ii, jj) {
+                  xi += gammacov[ii][jj]*Hcon[ii]*Hcon[jj];
+                }
+                xi = std::sqrt(xi);
+                if (xi > 0.99) {
+                  SPACELOOP(ii) {
+                    Hcon[ii] *= 0.99/xi;
+                  }
+                }
+              
+                SPACELOOP(ii) {
+                  q(idx_H(ispec, ii), k, j, i) = 0.;
+                  SPACELOOP(jj) {
+                    q(idx_H(ispec, ii), k, j, i) += gammacov[ii][jj]*Hcon[jj];
+                  }
+                }
+              }
+            }
+          }
         });
   }
 }
@@ -202,6 +238,8 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   const int pv_lo = imap[fluid_prim::velocity].first;
   auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
+  //TODO(BRR): debug
+  auto idx_J = imap.GetFlatIdx(radmoment_prim::J, false);
 
   auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
   auto &rad = rc->GetParentPointer()->packages.Get("radiation");
@@ -275,8 +313,41 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
           // No flux of radiation into the simulation
           if (idx_H.IsValid()) {
+            Real gammacon[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
             for (int ispec = 0; ispec < num_species; ispec++) {
-              q(idx_H(ispec, 0), k, j, i) = std::max<Real>(q(idx_H(ispec), 0, k, j, i), 0.);
+              Real Hcon[3] = {0};
+              SPACELOOP2(ii, jj) {
+                Hcon[ii] += gammacon[ii][jj]*q(idx_H(ispec, jj), k, j, i);
+              }
+              if (Hcon[0] < 0.) {
+                Hcon[0] = 0.;
+              
+                // Check xi
+                Real xi = 0.;
+                SPACELOOP2(ii, jj) {
+                  xi += gammacov[ii][jj]*Hcon[ii]*Hcon[jj];
+                }
+                xi = std::sqrt(xi);
+                if (xi > 0.99) {
+                  SPACELOOP(ii) {
+                    Hcon[ii] *= 0.99/xi;
+                  }
+                }
+              
+                SPACELOOP(ii) {
+                  q(idx_H(ispec, ii), k, j, i) = 0.;
+                  SPACELOOP(jj) {
+                    q(idx_H(ispec, ii), k, j, i) += gammacov[ii][jj]*Hcon[jj];
+                  }
+                }
+              }
+              //q(idx_H(ispec, 0), k, j, i) = std::max<Real>(q(idx_H(ispec), 0, k, j, i), 0.);
+            }
+
+            if (j == 118) {
+              int ispec = 0;
+              printf("BC J: [%i %i %i] %e\n", k, j, i, q(idx_J(ispec), k, j, i));
             }
           }
         });

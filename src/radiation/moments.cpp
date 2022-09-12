@@ -324,7 +324,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
         }
 
-        if (i == 4 && j == 127) {
+        if (i >= 128 && j == 118) {
           printf("[%i %i %i] c2p: %e %e %e %e success? %i\n", k, j, i,
                  v(b, pJ(ispec), k, j, i),
                  v(b, pH(ispec, 0), k, j, i) * v(b, pJ(ispec), k, j, i),
@@ -535,6 +535,8 @@ TaskStatus ReconstructEdgeStates(T *rc) {
           vj_r = &qr(1 % ndim, n, k, j, 0);
           vk_l = &ql(2 % ndim, n, k + dk, j, 0);
           vk_r = &qr(2 % ndim, n, k, j, 0);
+          if (n == 0) {
+          }
         } else {
           vi_l = &ql_v(0, var_id, k, j, 1);
           vi_r = &qr_v(0, var_id, k, j, 0);
@@ -548,6 +550,12 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // x-direction
         ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
                                    vi_r);
+        if (member.team_rank() == 0 && n == 0 && j == 118) {
+          for (int i = ib.e - 5; i <= ib.e + 1; i++) {
+            printf("[%i %i %i] (J) vi_l = %e vi_r = %e\n",
+              k, j, i, vi_l[i], vi_r[i]);
+            }
+        }
         // y-direction
         if (ndim > 1)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
@@ -569,6 +577,12 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         //  dJ/dx (@ Q) = (d - c)/dx
         //  dJ/dy (@ Q) = (a + b - e - f)/(4*dy)
         if (n < nspec) {
+          for (int i = 128; i <= ib.e + 4; i++) {
+
+          if (member.team_rank() == 0 && n == 0 && j == 118 && i > 128) {
+            printf("[%i %i %i] J recon: %e\n", k,j,i,v(b, idx_J(n), k, j, i));
+          }
+          }
           const Real idx = 1.0 / coords.Dx(X1DIR, k, j, 0);
           const Real idx4 = 0.25 * idx;
           const Real idy = 1.0 / coords.Dx(X2DIR, k, j, 0);
@@ -742,6 +756,9 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // TODO(BRR) Use floors
           const Real Jl = std::max<Real>(v(idx_ql(ispec, 0, idir), k, j, i), 1.e-10);
           const Real Jr = std::max<Real>(v(idx_qr(ispec, 0, idir), k, j, i), 1.e-10);
+          if (j == 118 && i > 128) {
+          printf("Jl = %e (ispec: %i idir: %i) (%i %i %i %i)\n", Jl, ispec, idir, idx_ql(ispec, 0, idir), k, j, i);
+          }
           Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 2, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
@@ -808,6 +825,11 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
           cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
+
+          if (j == 118 && i > 128) {
+            printf("[%i %i %i] Jl: %e Hl: %e %e %e Jr: %e Hr: %e %e %e\n",
+              k, j, i, Jl, Hl(0), Hl(1), Hl(2), Jr, Hr(0), Hr(1), Hr(2));
+          }
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
@@ -1180,19 +1202,20 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
 
-        // if (j == 127 && i == 4) {
-        //  const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-        //  Vec Hcov{v(iblock, idx_H(ispec, 0), k, j, i),
-        //           v(iblock, idx_H(ispec, 1), k, j, i),
-        //           v(iblock, idx_H(ispec, 2), k, j, i)};
-        //  Real xi = std::sqrt(g.contractCov3Vectors(Hcov, Hcov));
-        //  printf("Initial [%i %i %i] ug = %e vp = %e %e %e J = %e Hi = %e %e %e W = %e "
-        //         "xi = %e\n",
-        //         k, j, i, ug, con_vp[0], con_vp[1], con_vp[2],
-        //         v(iblock, idx_J(ispec), k, j, i), v(iblock, idx_H(ispec, 0), k, j, i),
-        //         v(iblock, idx_H(ispec, 1), k, j, i), v(iblock, idx_H(ispec, 2), k, j,
-        //         i), W, xi);
-        //}
+         if (j == 118 && i == 131) {
+           int ispec = 0;
+          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+          Vec Hcov{v(iblock, idx_H(ispec, 0), k, j, i),
+                   v(iblock, idx_H(ispec, 1), k, j, i),
+                   v(iblock, idx_H(ispec, 2), k, j, i)};
+          Real xi = std::sqrt(g.contractCov3Vectors(Hcov, Hcov));
+          printf("Initial [%i %i %i] ug = %e vp = %e %e %e J = %e Hi = %e %e %e W = %e "
+                 "xi = %e\n",
+                 k, j, i, ug, con_vp[0], con_vp[1], con_vp[2],
+                 v(iblock, idx_J(ispec), k, j, i), v(iblock, idx_H(ispec, 0), k, j, i),
+                 v(iblock, idx_H(ispec, 1), k, j, i), v(iblock, idx_H(ispec, 2), k, j,
+                 i), W, xi);
+        }
 
         // bool success = false;
         // TODO(BRR) These will need to be per-species later

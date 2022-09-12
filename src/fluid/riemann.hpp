@@ -95,7 +95,7 @@ class FluxState {
                         ? (q(dir, peng, k, j, i) / rho > sie_max ? rho * sie_max
                                                                  : q(dir, peng, k, j, i))
                         : rho * sie_floor);
-    if (i == 4 && j == 127) {
+    if (i == 118 && j == 131) {
       printf("[%i %i %i] fluid riemann u: %e v: %e %e %e\n", k, j, i, u, vpcon[0],
              vpcon[1], vpcon[2]);
     }
