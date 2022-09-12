@@ -82,9 +82,11 @@ struct RootFind {
       // guard against roundoff because ya or yb is sufficiently close to zero
       if (x0 == x1) {
         x2 = x1;
+        iteration_count++;
         continue;
       } else if (x0 == x2) {
         x1 = x2;
+        iteration_count++;
         continue;
       }
       Real y0 = sign * func(x0);
@@ -92,6 +94,7 @@ struct RootFind {
       y2 = y1;
       x1 = x0;
       y1 = y0;
+      iteration_count++;
     }
 
     if (status != nullptr) {
