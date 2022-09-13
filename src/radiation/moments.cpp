@@ -681,7 +681,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  // auto bounds = fix_pkg->Param<Bounds>("bounds");
+  auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   // TODO(BRR) add to radiation floors
   const Real kappaH_min = 1.e-20;
@@ -714,6 +714,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           face = CellLocation::Face3;
           break;
         }
+        Real X[4];
+        X[1] = (face == CellLocation::Face1 ? coords.x1f(k, j, i) : coords.x1v(k, j, i));
+        X[2] = (face == CellLocation::Face2 ? coords.x2f(k, j, i) : coords.x2v(k, j, i));
+        X[3] = (face == CellLocation::Face3 ? coords.x3f(k, j, i) : coords.x3v(k, j, i));
 
         Real xi_max;
         // bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
@@ -733,14 +737,30 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
         const Real dx = coords.Dx(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
 
-        const Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i),
-                                 v(idx_qlv(1, idir), k, j, i),
-                                 v(idx_qlv(2, idir), k, j, i)};
-        const Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i),
-                                 v(idx_qrv(1, idir), k, j, i),
-                                 v(idx_qrv(2, idir), k, j, i)};
+        Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i),
+                           v(idx_qlv(1, idir), k, j, i),
+                           v(idx_qlv(2, idir), k, j, i)};
+        Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i),
+                           v(idx_qrv(1, idir), k, j, i),
+                           v(idx_qrv(2, idir), k, j, i)};
         const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
         const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
+
+        Real Wceiling, garbage;
+        bounds.GetCeilings(X[1], X[2], X[3], Wceiling, garbage);
+        if (Wl > Wceiling) {
+          const Real rescale = std::sqrt(Wceiling * Wceiling - 1.) / (Wl * Wl - 1.);
+          SPACELOOP(ii) {
+            con_vpl[ii] *= rescale;
+          }
+        }
+        if (Wr > Wceiling) {
+          const Real rescale = std::sqrt(Wceiling * Wceiling - 1.) / (Wr * Wr - 1.);
+          SPACELOOP(ii) {
+            con_vpr[ii] *= rescale;
+          }
+        }
+        
         Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
         Vec con_vr{{con_vpr[0] / Wr, con_vpr[1] / Wr, con_vpr[2] / Wr}};
 
@@ -750,6 +770,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         const Real sigm = -alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
         const Real asym_sigl = alpha * con_vl(idir) - con_beta(idir);
         const Real asym_sigr = alpha * con_vr(idir) - con_beta(idir);
+
+        // TODO(BRR) implement
+        //Real Jfloor;
+        //bounds.GetRadiationFloors(X[1], X[2], X[3], Jfloor);
 
         for (int ispec = 0; ispec < num_species; ++ispec) {
           // TODO(BRR) Use floors
