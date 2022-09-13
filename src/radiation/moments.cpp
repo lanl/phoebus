@@ -405,7 +405,7 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
-        typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, 0, b, j, i);
+        typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 
         const Real con_vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i),
                                 v(b, pv(2), k, j, i)};
@@ -760,7 +760,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             con_vpr[ii] *= rescale;
           }
         }
-        
+
         Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
         Vec con_vr{{con_vpr[0] / Wr, con_vpr[1] / Wr, con_vpr[2] / Wr}};
 

@@ -124,7 +124,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None):
   cax = div.append_axes('right', size="5%", pad = 0.05)
   fig.colorbar(im, cax=cax, orientation='vertical')
   ax.set_aspect('equal')
-  ax.set_title(r'$\log_{10}~T_{\rm g}$')
+  ax.set_title(r'$\log_{10}~T_{\rm g}~({\rm K})$')
 
   ax = axes[1,0]
   lJ = np.log10(np.clip(dfile.Get("r.p.J", flatten=False), 1.e-20, None))

@@ -71,6 +71,9 @@ class phoedf(phdf.phdf):
       for jj in range(3):
         self.gammacon[:,:,:,:,ii,jj] = self.gcon[:,:,:,:,ii+1,jj+1] + self.betacon[:,:,:,:,ii]*self.betacon[:,:,:,:,jj]/(self.alpha[:,:,:,:]**2)
 
+    # Output quantities loaded upon request
+    self.rho = None
+
     # Derived quantities evaluated upon request
     self.Gamma = None
     self.xi = None
@@ -79,6 +82,14 @@ class phoedf(phdf.phdf):
     self.Pr = None
     self.tau = None
     self.Tg = None
+
+  def GetRho(self):
+    if self.rho is not None:
+      return self.rho
+
+    self.rho = dfile.Get("p.density", flatten=False)
+
+    return self.rho
 
   def GetEOS(self):
     return eos_type_dict[self.eos_type](self.Params)
@@ -111,7 +122,7 @@ class phoedf(phdf.phdf):
     self.Pg = np.zeros(self.ScalarField)
 
     eos = self.GetEOS()
-    rho = self.Get("p.density", flatten=False)
+    rho = self.GetRho()
     u = self.Get("p.energy", flatten=False)
     Ye = np.zeros(self.ScalarField)
     self.Pg[:,:,:,:] = eos.P_from_rho_u_Ye(rho[:,:,:,:], u[:,:,:,:], Ye[:,:,:,:])
@@ -127,7 +138,7 @@ class phoedf(phdf.phdf):
     self.Tg = np.zeros(self.ScalarField)
 
     eos = self.GetEOS()
-    rho = self.Get("p.density", flatten=False)
+    rho = self.GetRho()
     u = self.Get("p.energy", flatten=False)
     Ye = np.zeros(self.ScalarField)
     self.Tg[:,:,:,:] = eos.T_from_rho_u_Ye(rho[:,:,:,:], u[:,:,:,:], Ye[:,:,:,:])
