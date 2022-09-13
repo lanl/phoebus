@@ -77,12 +77,32 @@ class phoedf(phdf.phdf):
     self.Pg = None
     self.Pm = None
     self.Pr = None
+    self.tau = None
+    self.Tg = None
 
   def GetEOS(self):
     return eos_type_dict[self.eos_type](self.Params)
 
   def GetOpacity(self, constants='cgs'):
     return opacity_type_dict[self.opacity_model](self.Params, constants)
+
+  # Optical depth per zone
+  def GetTau(self):
+    if self.tau is not None:
+      return self.tau
+
+    self.tau = np.zeros(self.ScalarField)
+
+    kappaH = self.Get("r.i.kappaH", flatten=False)
+
+    for b in range(self.NumBlocks):
+      dX1 = (self.BlockBounds[b][1] - self.BlockBounds[b][0])/self.Nx1
+      dX2 = (self.BlockBounds[b][3] - self.BlockBounds[b][2])/self.Nx1
+      self.tau[b,:,:,:] = kappaH[b,:,:,:,]*np.sqrt((dX1*self.gcov[b,:,:,:,1,1])**2 + (dX2*self.gcov[b,:,:,:,2,2])**2)
+
+    self.tau = np.clip(self.tau, 1.e-20, 1.e20)
+
+    return self.tau
 
   def GetPg(self):
     if self.Pg is not None:
@@ -99,6 +119,24 @@ class phoedf(phdf.phdf):
     self.Pg = np.clip(self.Pg, 1.e-20, 1.e20)
 
     return self.Pg
+
+  def GetTg(self):
+    if self.Tg is not None:
+      return self.Tg
+
+    self.Tg = np.zeros(self.ScalarField)
+
+    eos = self.GetEOS()
+    rho = self.Get("p.density", flatten=False)
+    u = self.Get("p.energy", flatten=False)
+    Ye = np.zeros(self.ScalarField)
+    self.Tg[:,:,:,:] = eos.T_from_rho_u_Ye(rho[:,:,:,:], u[:,:,:,:], Ye[:,:,:,:])
+    self.Tg *= self.TemperatureCodeToCGS
+
+    self.Tg = np.clip(self.Tg, 1., 1.e20)
+
+    return self.Tg
+
 
   def GetPm(self):
     if self.Pm is not None:
