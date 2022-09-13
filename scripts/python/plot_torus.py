@@ -42,7 +42,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None):
   a = dfile.Params['geometry/a']
   hslope = dfile.Params['geometry/h']
 
-  fig, axes = plt.subplots(2, 3, figsize=(10,10))
+  fig, axes = plt.subplots(2, 4, figsize=(10,8))
 
   if geomfile is None:
     geomfile = dfile
@@ -115,6 +115,17 @@ def plot_frame(ifname, fname, savefig, geomfile=None):
   ax.set_aspect('equal')
   ax.set_title(r'$\log_{10}~\beta_{\rm M}$')
 
+  ax = axes[0,3]
+  lTg = np.log10(dfile.GetTg())
+  for b in range(nblocks):
+    im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lTg[b,0,:,:].transpose(), vmin=5, vmax=10,
+      cmap=cmap_diverging)
+  div = make_axes_locatable(ax)
+  cax = div.append_axes('right', size="5%", pad = 0.05)
+  fig.colorbar(im, cax=cax, orientation='vertical')
+  ax.set_aspect('equal')
+  ax.set_title(r'$\log_{10}~T_{\rm g}$')
+
   ax = axes[1,0]
   lJ = np.log10(np.clip(dfile.Get("r.p.J", flatten=False), 1.e-20, None))
   for b in range(nblocks):
@@ -149,6 +160,17 @@ def plot_frame(ifname, fname, savefig, geomfile=None):
   fig.colorbar(im, cax=cax, orientation='vertical')
   ax.set_aspect('equal')
   ax.set_title(r'$\log_{10}~\beta_{\rm R}$')
+
+  ax = axes[1,3]
+  ltau = np.log10(dfile.GetTau())
+  for b in range(nblocks):
+    im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], ltau[b,0,:,:].transpose(), vmin=-3, vmax=3,
+    cmap=cmap_diverging)
+  div = make_axes_locatable(ax)
+  cax = div.append_axes('right', size="5%", pad = 0.05)
+  fig.colorbar(im, cax=cax, orientation='vertical')
+  ax.set_aspect('equal')
+  ax.set_title(r'$\log_{10}~\tau_{\rm zone}$')
 
   plt.suptitle("Time = %g M" % dfile.Time)
 
