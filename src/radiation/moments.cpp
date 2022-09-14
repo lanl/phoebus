@@ -236,7 +236,6 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -341,6 +340,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
 }
 
 template <class T>
+// TODO(BRR) add domain so we can do this only over interior if we are using prims as boundary data?
 TaskStatus MomentCon2Prim(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
