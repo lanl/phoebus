@@ -161,9 +161,6 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           //            SPACELOOP(ii) { q(pv_lo + ii, k, j, i) = W * vcon[ii]; }
           //          }
           //
-          if (j == 118 && l == idx_J(0)) {
-            printf("[%i %i %i] J bc = %e J ref = %e\n", k, j, i, q(l,k,j,i), q(l,k,j,ref));
-          }
         });
 
     pmb->par_for_bndry(
@@ -218,13 +215,6 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
                   }
                 }
               }
-          if (j == 118) {
-            printf("bcfixup [%i %i %i] J = %e H = %e %e %e\n", k, j, i, 
-              q(idx_J(ispec), k, j, i),
-              q(idx_H(ispec, 0), k, j, i),
-              q(idx_H(ispec, 1), k, j, i),
-              q(idx_H(ispec, 2), k, j, i));
-          }
             }
           }
         });
@@ -430,6 +420,7 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     std::string bc_vars = pkg_rad->Param<std::string>("bc_vars");
     if (bc_vars == "primitive") {
       for (auto &domain : domains) {
+        // TODO(BRR) Make this per-region!
         radiation::MomentPrim2Con(rc.get(), domain);
       }
     }

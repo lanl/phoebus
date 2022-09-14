@@ -409,6 +409,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         if (ceiling_applied) {
           const Real rescale = std::sqrt(gamma_max * gamma_max - 1.) / (W * W - 1.);
           SPACELOOP(ii) { vpcon[ii] *= rescale; }
+          SPACELOOP(ii) {
+            v(b, pvel_lo + ii, k, j, i) = vpcon[ii];
+          }
 
           Real ye = 0.;
           if (pye > 0) {
@@ -425,8 +428,11 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         }
 
         if (rad_active) {
-          Vec con_v{v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
+          Vec con_vp{v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
                     v(b, pvel_lo + 2, k, j, i)};
+          const Real W = phoebus::GetLorentzFactor(con_vp.data, gcov);
+          Vec con_v{v(b, pvel_lo, k, j, i) / W, v(b, pvel_lo + 1, k, j, i) / W,
+                    v(b, pvel_lo + 2, k, j, i) / W};
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
           Real E;
           Real J;
@@ -445,8 +451,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             // Real cov_dF[radiation::MaxNumSpecies];
 
             for (int ispec = 0; ispec < num_species; ++ispec) {
-              E = v(b, idx_E(ispec), k, j, i);
-              SPACELOOP(ii) { cov_F(ii) = v(b, idx_F(ispec, ii), k, j, i); }
+              E = v(b, idx_E(ispec), k, j, i) / sdetgam;
+              SPACELOOP(ii) { cov_F(ii) = v(b, idx_F(ispec, ii), k, j, i) / sdetgam; }
 
               // We need the real conTilPi
               if (iTilPi.IsValid()) {
@@ -478,44 +484,67 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             if (dJ > 0.) {
               rad_floor_applied = true;
 
+              constexpr bool update_cons_vars = false;
               // Update cons vars, c2p
-              J = dJ;
-              SPACELOOP(ii) {
-                cov_H(ii) = 0.; // No flux H^i = 0 (note H^0 = 0 so H_i = 0)
-              }
-              //printf("Floor J: [%i %i %i] J = %e cov_H = %e %e %e\n", k, j, i, J, cov_H(0), cov_H(1), cov_H(2));
-              c_iso.Prim2Con(J, cov_H, con_tilPi_iso, &E, &cov_F);
-              if (j == 118 && i == 4) {
-                printf("[%i %i %i] J floor: dE: %e dF: %e %e %e dJ: %e cov_H: %e %e %e\n", k,j,i,
-                  E, cov_F(0), cov_F(1), cov_F(2), dJ, cov_H(0), cov_H(1), cov_H(2));
-              }
-
-              E += v(b, idx_E(ispec), k, j, i) / sdetgam;
-              SPACELOOP(ii) { cov_F(ii) += v(b, idx_F(ispec, ii), k, j, i) / sdetgam; }
-
-              v(b, idx_E(ispec), k, j, i) = E * sdetgam;
-              SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
-              
-              // We need the real conTilPi
-              if (iTilPi.IsValid()) {
-                SPACELOOP2(ii, jj) {
-                  con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+              if (update_cons_vars) {
+                J = dJ;
+                SPACELOOP(ii) {
+                  cov_H(ii) = 0.; // No flux H^i = 0 (note H^0 = 0 so H_i = 0)
                 }
+                PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "bad");
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(0)), "bad");
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(1)), "bad");
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(2)), "bad");
+                c_iso.Prim2Con(J, cov_H, con_tilPi_iso, &E, &cov_F);
+
+                E += v(b, idx_E(ispec), k, j, i) / sdetgam;
+                SPACELOOP(ii) { cov_F(ii) += v(b, idx_F(ispec, ii), k, j, i) / sdetgam; }
+
+                v(b, idx_E(ispec), k, j, i) = E * sdetgam;
+                SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
+                
+                // We need the real conTilPi
+                if (iTilPi.IsValid()) {
+                  SPACELOOP2(ii, jj) {
+                    con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                  }
+                } else {
+                  // TODO(BRR) don't be lazy and actually retrieve these
+                  Real xi = 0.;
+                  Real phi = acos(-1.0) * 1.000001;
+                  c.GetCovTilPiFromCon(E, cov_F, xi, phi, &con_TilPi);
+                }
+
+                c.Con2Prim(E, cov_F, con_TilPi, &J, &cov_H);
+
+                v(b, idx_J(ispec), k, j, i) = J;
+                SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J; }
               } else {
-                // TODO(BRR) don't be lazy and actually retrieve these
-                Real xi = 0.;
-                Real phi = acos(-1.0) * 1.000001;
-                c.GetCovTilPiFromCon(E, cov_F, xi, phi, &con_TilPi);
-              }
+                v(b, idx_J(ispec), k, j, i) += dJ;
+                
+                J = v(b, idx_J(ispec), k, j, i);
+                SPACELOOP(ii) {
+                  cov_H(ii) = v(b, idx_H(ispec, ii), k, j, i) * J;
+                }
+                
+                // We need the real conTilPi
+                if (iTilPi.IsValid()) {
+                  SPACELOOP2(ii, jj) {
+                    con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                  }
+                } else {
+                  c.GetCovTilPiFromPrim(J, cov_H, &con_TilPi);
+                }
 
-              c.Con2Prim(E, cov_F, con_TilPi, &J, &cov_H);
-              if (j == 118 && i == 4) {
-                printf("[%i %i %i] J floor: E: %e cov_F: %e %e %e J: %e cov_H: %e %e %e\n",
-                  k, j, i, E, cov_F(0), cov_F(1), cov_F(2), J, cov_H(0), cov_H(1), cov_H(2));
-              }
+                PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "bad");
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(0)), "bad");
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(1)), "bad");
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(2)), "bad");
 
-              v(b, idx_J(ispec), k, j, i) = J;
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J; }
+                c.Prim2Con(J, cov_H, con_TilPi, &E, &cov_F);
+                v(b, idx_E(ispec), k, j, i) = E * sdetgam;
+                SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
+              }
             }
 
             Real xi = 0.;
@@ -532,30 +561,28 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                 cov_H(ii) = (xi_max / xi) * v(b, idx_H(ispec, ii), k, j, i) * J;
                 v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J;
               }
-              if (j == 118 && i == 4) {
-                printf("[%i %i %i] xi ceil J: %e cov_H: %e %e %e\n",
-                  k,j,i,J, 
-                  v(b, idx_H(ispec, 0), k, j, i),
-                  v(b, idx_H(ispec, 1), k, j, i),
-                  v(b, idx_H(ispec, 2), k, j, i));
-              }
 
               // if conTilPi not provided, need to recalculate from prims
-              if (!iTilPi.IsValid()) {
+              //if (!iTilPi.IsValid()) {
+              //  c.GetCovTilPiFromPrim(J, cov_H, &con_TilPi);
+              //}
+              // We need the real conTilPi
+              if (iTilPi.IsValid()) {
+                SPACELOOP2(ii, jj) {
+                  con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                }
+              } else {
                 c.GetCovTilPiFromPrim(J, cov_H, &con_TilPi);
               }
 
               //printf("Ceil xi: [%i %i %i] J = %e cov_H = %e %e %e\n", k, j, i, J, cov_H(0), cov_H(1), cov_H(2));
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "bad");
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(0)), "bad");
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(1)), "bad");
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(2)), "bad");
               c.Prim2Con(J, cov_H, con_TilPi, &E, &cov_F);
               v(b, idx_E(ispec), k, j, i) = E * sdetgam;
               SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
-              if (j == 118 && i == 4) {
-                printf("[%i %i %i] xi ceil E: %e F: %e %e %e\n", k,j,i,
-                  v(b, idx_E(ispec), k, j, i),
-                  v(b, idx_F(ispec, 0), k, j, i),
-                  v(b, idx_F(ispec, 1), k, j, i),
-                  v(b, idx_F(ispec, 2), k, j, i));
-              }
             }
           }
 
