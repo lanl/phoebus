@@ -281,6 +281,11 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Prim2Con(const Real J
   } else if (SET::eqn_type == ClosureEquation::number_conserve) {
     *E = W * J + vH;
   }
+  if (std::isnan(*E)) {
+    printf("NAN E! J = %e cov_H = %e %e %e con_v = %e %e %e (a? %i) W = %e\n", J, cov_H(0), cov_H(1), cov_H(2),
+      con_v(0), con_v(1), con_v(2), static_cast<int>(SET::eqn_type == ClosureEquation::energy_conserve),
+      W);
+  }
   PARTHENON_DEBUG_REQUIRE(!std::isnan(*E), "NAN in radiation P2C!");
   SPACELOOP(i)
   (*cov_F)(i) =
