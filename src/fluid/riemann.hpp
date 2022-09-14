@@ -89,10 +89,8 @@ class FluxState {
                     q(dir, pvel_lo + 2, k, j, i)};
     Real W = phoebus::GetLorentzFactor(vpcon, g.gcov);
     if (W > gam_max) {
-      const Real rescale = std::sqrt((gam_max * gam_max - 1.) / (W * W - 1.)); 
-      SPACELOOP(ii) {
-        vpcon[ii] *= rescale;
-      }
+      const Real rescale = std::sqrt((gam_max * gam_max - 1.) / (W * W - 1.));
+      SPACELOOP(ii) { vpcon[ii] *= rescale; }
     }
     Real vcon[] = {vpcon[0] / W, vpcon[1] / W, vpcon[2] / W};
     const Real &vel = vcon[dir];

@@ -324,14 +324,14 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
         }
 
-//        if (i >= 128 && j == 118) {
-//          printf("[%i %i %i] c2p: %e %e %e %e success? %i\n", k, j, i,
-//                 v(b, pJ(ispec), k, j, i),
-//                 v(b, pH(ispec, 0), k, j, i) * v(b, pJ(ispec), k, j, i),
-//                 v(b, pH(ispec, 1), k, j, i) * v(b, pJ(ispec), k, j, i),
-//                 v(b, pH(ispec, 2), k, j, i) * v(b, pJ(ispec), k, j, i),
-//                 static_cast<int>(status == ClosureStatus::success));
-//        }
+        //        if (i >= 128 && j == 118) {
+        //          printf("[%i %i %i] c2p: %e %e %e %e success? %i\n", k, j, i,
+        //                 v(b, pJ(ispec), k, j, i),
+        //                 v(b, pH(ispec, 0), k, j, i) * v(b, pJ(ispec), k, j, i),
+        //                 v(b, pH(ispec, 1), k, j, i) * v(b, pJ(ispec), k, j, i),
+        //                 v(b, pH(ispec, 2), k, j, i) * v(b, pJ(ispec), k, j, i),
+        //                 static_cast<int>(status == ClosureStatus::success));
+        //        }
 
         v(b, ifail, k, j, i) =
             (status == ClosureStatus::success ? FailFlags::success : FailFlags::fail);
@@ -550,12 +550,12 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // x-direction
         ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
                                    vi_r);
-//        if (member.team_rank() == 0 && n == 0 && j == 118) {
-//          for (int i = ib.e - 5; i <= ib.e + 1; i++) {
-//            printf("[%i %i %i] (J) vi_l = %e vi_r = %e\n",
-//              k, j, i, vi_l[i], vi_r[i]);
-//            }
-//        }
+        //        if (member.team_rank() == 0 && n == 0 && j == 118) {
+        //          for (int i = ib.e - 5; i <= ib.e + 1; i++) {
+        //            printf("[%i %i %i] (J) vi_l = %e vi_r = %e\n",
+        //              k, j, i, vi_l[i], vi_r[i]);
+        //            }
+        //        }
         // y-direction
         if (ndim > 1)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
@@ -577,11 +577,11 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         //  dJ/dx (@ Q) = (d - c)/dx
         //  dJ/dy (@ Q) = (a + b - e - f)/(4*dy)
         if (n < nspec) {
-//          for (int i = 128; i <= ib.e + 4; i++) {
-//          if (member.team_rank() == 0 && n == 0 && j == 118 && i > 128) {
-//            printf("[%i %i %i] J recon: %e\n", k,j,i,v(b, idx_J(n), k, j, i));
-//          }
-//          }
+          //          for (int i = 128; i <= ib.e + 4; i++) {
+          //          if (member.team_rank() == 0 && n == 0 && j == 118 && i > 128) {
+          //            printf("[%i %i %i] J recon: %e\n", k,j,i,v(b, idx_J(n), k, j, i));
+          //          }
+          //          }
           const Real idx = 1.0 / coords.Dx(X1DIR, k, j, 0);
           const Real idx4 = 0.25 * idx;
           const Real idy = 1.0 / coords.Dx(X2DIR, k, j, 0);
@@ -737,11 +737,9 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
         const Real dx = coords.Dx(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
 
-        Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i),
-                           v(idx_qlv(1, idir), k, j, i),
+        Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i), v(idx_qlv(1, idir), k, j, i),
                            v(idx_qlv(2, idir), k, j, i)};
-        Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i),
-                           v(idx_qrv(1, idir), k, j, i),
+        Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
                            v(idx_qrv(2, idir), k, j, i)};
         const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
         const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
@@ -750,15 +748,11 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         bounds.GetCeilings(X[1], X[2], X[3], Wceiling, garbage);
         if (Wl > Wceiling) {
           const Real rescale = std::sqrt(Wceiling * Wceiling - 1.) / (Wl * Wl - 1.);
-          SPACELOOP(ii) {
-            con_vpl[ii] *= rescale;
-          }
+          SPACELOOP(ii) { con_vpl[ii] *= rescale; }
         }
         if (Wr > Wceiling) {
           const Real rescale = std::sqrt(Wceiling * Wceiling - 1.) / (Wr * Wr - 1.);
-          SPACELOOP(ii) {
-            con_vpr[ii] *= rescale;
-          }
+          SPACELOOP(ii) { con_vpr[ii] *= rescale; }
         }
 
         Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
@@ -772,16 +766,17 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         const Real asym_sigr = alpha * con_vr(idir) - con_beta(idir);
 
         // TODO(BRR) implement
-        //Real Jfloor;
-        //bounds.GetRadiationFloors(X[1], X[2], X[3], Jfloor);
+        // Real Jfloor;
+        // bounds.GetRadiationFloors(X[1], X[2], X[3], Jfloor);
 
         for (int ispec = 0; ispec < num_species; ++ispec) {
           // TODO(BRR) Use floors
           const Real Jl = std::max<Real>(v(idx_ql(ispec, 0, idir), k, j, i), 1.e-10);
           const Real Jr = std::max<Real>(v(idx_qr(ispec, 0, idir), k, j, i), 1.e-10);
-//          if (j == 118 && i > 128) {
-//          printf("Jl = %e (ispec: %i idir: %i) (%i %i %i %i)\n", Jl, ispec, idir, idx_ql(ispec, 0, idir), k, j, i);
-//          }
+          //          if (j == 118 && i > 128) {
+          //          printf("Jl = %e (ispec: %i idir: %i) (%i %i %i %i)\n", Jl, ispec,
+          //          idir, idx_ql(ispec, 0, idir), k, j, i);
+          //          }
           Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 2, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
@@ -849,10 +844,10 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
           cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
 
-//          if (j == 118 && i > 128) {
-//            printf("[%i %i %i] Jl: %e Hl: %e %e %e Jr: %e Hr: %e %e %e\n",
-//              k, j, i, Jl, Hl(0), Hl(1), Hl(2), Jr, Hr(0), Hr(1), Hr(2));
-//          }
+          //          if (j == 118 && i > 128) {
+          //            printf("[%i %i %i] Jl: %e Hl: %e %e %e Jr: %e Hr: %e %e %e\n",
+          //              k, j, i, Jl, Hl(0), Hl(1), Hl(2), Jr, Hr(0), Hr(1), Hr(2));
+          //          }
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
@@ -884,15 +879,17 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
           }
-//          if (i == 4 && j == 127) {
-//            printf("flux [%i %i %i][%i] = %e %e %e %e a = %e Jl = %e Jr = %e Fl: %e %e "
-//                   "%e Fr: %e %e %e kappaH: %e sigspeed: %e\n",
-//                   k, j, i, idir, v.flux(idir_in, idx_Ef(ispec), k, j, i),
-//                   v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
-//                   v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
-//                   v.flux(idir_in, idx_Ff(ispec, 2), k, j, i), a, Jl, covFl(0), covFl(1),
-//                   covFl(2), Jr, covFr(0), covFr(1), covFr(2), kappaH, sigspeed);
-//          }
+          //          if (i == 4 && j == 127) {
+          //            printf("flux [%i %i %i][%i] = %e %e %e %e a = %e Jl = %e Jr = %e
+          //            Fl: %e %e "
+          //                   "%e Fr: %e %e %e kappaH: %e sigspeed: %e\n",
+          //                   k, j, i, idir, v.flux(idir_in, idx_Ef(ispec), k, j, i),
+          //                   v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
+          //                   v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
+          //                   v.flux(idir_in, idx_Ff(ispec, 2), k, j, i), a, Jl,
+          //                   covFl(0), covFl(1), covFl(2), Jr, covFr(0), covFr(1),
+          //                   covFr(2), kappaH, sigspeed);
+          //          }
           if (sdetgam < robust::SMALL()) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
@@ -1224,20 +1221,21 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
 
-//         if (j == 118 && i == 131) {
-//           int ispec = 0;
-//          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-//          Vec Hcov{v(iblock, idx_H(ispec, 0), k, j, i),
-//                   v(iblock, idx_H(ispec, 1), k, j, i),
-//                   v(iblock, idx_H(ispec, 2), k, j, i)};
-//          Real xi = std::sqrt(g.contractCov3Vectors(Hcov, Hcov));
-//          printf("Initial [%i %i %i] ug = %e vp = %e %e %e J = %e Hi = %e %e %e W = %e "
-//                 "xi = %e\n",
-//                 k, j, i, ug, con_vp[0], con_vp[1], con_vp[2],
-//                 v(iblock, idx_J(ispec), k, j, i), v(iblock, idx_H(ispec, 0), k, j, i),
-//                 v(iblock, idx_H(ispec, 1), k, j, i), v(iblock, idx_H(ispec, 2), k, j,
-//                 i), W, xi);
-//        }
+        //         if (j == 118 && i == 131) {
+        //           int ispec = 0;
+        //          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+        //          Vec Hcov{v(iblock, idx_H(ispec, 0), k, j, i),
+        //                   v(iblock, idx_H(ispec, 1), k, j, i),
+        //                   v(iblock, idx_H(ispec, 2), k, j, i)};
+        //          Real xi = std::sqrt(g.contractCov3Vectors(Hcov, Hcov));
+        //          printf("Initial [%i %i %i] ug = %e vp = %e %e %e J = %e Hi = %e %e %e
+        //          W = %e "
+        //                 "xi = %e\n",
+        //                 k, j, i, ug, con_vp[0], con_vp[1], con_vp[2],
+        //                 v(iblock, idx_J(ispec), k, j, i), v(iblock, idx_H(ispec, 0), k,
+        //                 j, i), v(iblock, idx_H(ispec, 1), k, j, i), v(iblock,
+        //                 idx_H(ispec, 2), k, j, i), W, xi);
+        //        }
 
         // bool success = false;
         // TODO(BRR) These will need to be per-species later
@@ -1616,17 +1614,19 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             }
           }
 
-//          if (i == 4 && j == 127) {
-//            printf(
-//                "[%i %i %i] cons = %e %e %e %e dcons = %e %e %e %e (sdg = %e)\n", k, j, i,
-//                v(iblock, idx_E(ispec), k, j, i), v(iblock, idx_F(ispec, 0), k, j, i),
-//                v(iblock, idx_F(ispec, 1), k, j, i), v(iblock, idx_F(ispec, 2), k, j, i),
-//                dE[ispec] * sdetgam, cov_dF[ispec](0) * sdetgam,
-//                cov_dF[ispec](1) * sdetgam, cov_dF[ispec](2) * sdetgam, sdetgam);
-//            printf("[%i %i %i] radguess: %e %e %e %e niter = %i err = %e\n", k, j, i,
-//                   P_rad_guess[0], P_rad_guess[1], P_rad_guess[2], P_rad_guess[3], niter,
-//                   err);
-//          }
+          //          if (i == 4 && j == 127) {
+          //            printf(
+          //                "[%i %i %i] cons = %e %e %e %e dcons = %e %e %e %e (sdg =
+          //                %e)\n", k, j, i, v(iblock, idx_E(ispec), k, j, i), v(iblock,
+          //                idx_F(ispec, 0), k, j, i), v(iblock, idx_F(ispec, 1), k, j,
+          //                i), v(iblock, idx_F(ispec, 2), k, j, i), dE[ispec] * sdetgam,
+          //                cov_dF[ispec](0) * sdetgam, cov_dF[ispec](1) * sdetgam,
+          //                cov_dF[ispec](2) * sdetgam, sdetgam);
+          //            printf("[%i %i %i] radguess: %e %e %e %e niter = %i err = %e\n",
+          //            k, j, i,
+          //                   P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
+          //                   P_rad_guess[3], niter, err);
+          //          }
 
           // if (j == 64) {
           //  printf("[%i %i %i] rho: %e Tg: %e ug: %e Prad0: %e %e %e %e Pradg: %e %e
