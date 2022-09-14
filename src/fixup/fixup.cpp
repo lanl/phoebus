@@ -470,7 +470,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           const Real Jfloor = 1.e-10;
           rad_floor_applied = false;
           rad_ceiling_applied = false;
-          CLOSURE c_iso(con_v, &g);
+          Vec con_v_normalobs{0};
+          CLOSURE c_iso(con_v_normalobs, &g);
           Tens2 con_tilPi_iso{0};
           for (int ispec = 0; ispec < num_species; ++ispec) {
             Real dJ = Jfloor - v(b, idx_J(ispec), k, j, i);
@@ -482,15 +483,36 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               SPACELOOP(ii) {
                 cov_H(ii) = 0.; // No flux H^i = 0 (note H^0 = 0 so H_i = 0)
               }
+              //printf("Floor J: [%i %i %i] J = %e cov_H = %e %e %e\n", k, j, i, J, cov_H(0), cov_H(1), cov_H(2));
               c_iso.Prim2Con(J, cov_H, con_tilPi_iso, &E, &cov_F);
+              if (j == 118 && i == 4) {
+                printf("[%i %i %i] J floor: dE: %e dF: %e %e %e dJ: %e cov_H: %e %e %e\n", k,j,i,
+                  E, cov_F(0), cov_F(1), cov_F(2), dJ, cov_H(0), cov_H(1), cov_H(2));
+              }
 
               E += v(b, idx_E(ispec), k, j, i) / sdetgam;
               SPACELOOP(ii) { cov_F(ii) += v(b, idx_F(ispec, ii), k, j, i) / sdetgam; }
 
               v(b, idx_E(ispec), k, j, i) = E * sdetgam;
               SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
+              
+              // We need the real conTilPi
+              if (iTilPi.IsValid()) {
+                SPACELOOP2(ii, jj) {
+                  con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                }
+              } else {
+                // TODO(BRR) don't be lazy and actually retrieve these
+                Real xi = 0.;
+                Real phi = acos(-1.0) * 1.000001;
+                c.GetCovTilPiFromCon(E, cov_F, xi, phi, &con_TilPi);
+              }
 
               c.Con2Prim(E, cov_F, con_TilPi, &J, &cov_H);
+              if (j == 118 && i == 4) {
+                printf("[%i %i %i] J floor: E: %e cov_F: %e %e %e J: %e cov_H: %e %e %e\n",
+                  k, j, i, E, cov_F(0), cov_F(1), cov_F(2), J, cov_H(0), cov_H(1), cov_H(2));
+              }
 
               v(b, idx_J(ispec), k, j, i) = J;
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J; }
@@ -510,15 +532,30 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                 cov_H(ii) = (xi_max / xi) * v(b, idx_H(ispec, ii), k, j, i) * J;
                 v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J;
               }
+              if (j == 118 && i == 4) {
+                printf("[%i %i %i] xi ceil J: %e cov_H: %e %e %e\n",
+                  k,j,i,J, 
+                  v(b, idx_H(ispec, 0), k, j, i),
+                  v(b, idx_H(ispec, 1), k, j, i),
+                  v(b, idx_H(ispec, 2), k, j, i));
+              }
 
               // if conTilPi not provided, need to recalculate from prims
               if (!iTilPi.IsValid()) {
                 c.GetCovTilPiFromPrim(J, cov_H, &con_TilPi);
               }
 
+              //printf("Ceil xi: [%i %i %i] J = %e cov_H = %e %e %e\n", k, j, i, J, cov_H(0), cov_H(1), cov_H(2));
               c.Prim2Con(J, cov_H, con_TilPi, &E, &cov_F);
               v(b, idx_E(ispec), k, j, i) = E * sdetgam;
               SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
+              if (j == 118 && i == 4) {
+                printf("[%i %i %i] xi ceil E: %e F: %e %e %e\n", k,j,i,
+                  v(b, idx_E(ispec), k, j, i),
+                  v(b, idx_F(ispec, 0), k, j, i),
+                  v(b, idx_F(ispec, 1), k, j, i),
+                  v(b, idx_F(ispec, 2), k, j, i));
+              }
             }
           }
 
@@ -740,6 +777,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   //          }
   //        }
   //      });
+  printf("Done with %s\n", __func__);
 
   return TaskStatus::complete;
 }

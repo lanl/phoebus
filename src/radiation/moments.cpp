@@ -364,6 +364,7 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -426,6 +427,12 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         } else {
           c.GetCovTilPiFromPrim(J, covH, &conTilPi);
         }
+
+        if (std::isnan(J)) {
+          printf("NAN J! %i %i %i (%i)\n", k, j, i, ispec);
+          PARTHENON_FAIL("NAN J");
+        }
+        PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "NAN J in rad P2C!");
 
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
