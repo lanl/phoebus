@@ -416,7 +416,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           }
           prim2con::p2c(v(b, prho, k, j, i), vpcon, bp, v(b, peng, k, j, i), ye,
                         v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gammacon, betacon,
-                        alpha, gammadet, v(b, crho, k, j, i), dS, dBcons,
+                        alpha, sdetgam, v(b, crho, k, j, i), dS, dBcons,
                         v(b, ceng, k, j, i), dyecons);
           SPACELOOP(ii) { v(b, cmom_lo + ii, k, j, i) = dS[ii]; }
           if (pye > 0) {
@@ -425,14 +425,15 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         }
 
         if (rad_active) {
-          Vector con_v{v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                       v(b, pvel_lo + 2, k, j, i)};
+          Vec con_v{v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
+                    v(b, pvel_lo + 2, k, j, i)};
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
           Real E;
           Real J;
-          Vector cov_H;
-          Vector cov_F;
+          Vec cov_H;
+          Vec cov_F;
           Tens2 con_TilPi;
+          CLOSURE c(con_v, &g);
 
           // If we applied fluid floors or ceilings we modified v^i, so we need to call
           // rad c2p here before we can use radiation primitive variables
@@ -440,7 +441,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             // rad c2p
             // Vector cov_H{0}; // No flux
             // Tens2 conTilPi{0}; // Isotropic
-            CLOSURE c(con_v, &g);
             // Real dE[radiation::MaxNumSpecies];
             // Real cov_dF[radiation::MaxNumSpecies];
 
@@ -449,18 +449,18 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               SPACELOOP(ii) { cov_F(ii) = v(b, idx_F(ispec, ii), k, j, i); }
 
               // We need the real conTilPi
-              if (idx_tilPi.IsValid()) {
+              if (iTilPi.IsValid()) {
                 SPACELOOP2(ii, jj) {
-                  conTilPi(ii, jj) = v(b, idx_tilPi(ispec, ii, jj), k, j, i);
+                  con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
                 }
               } else {
                 // TODO(BRR) don't be lazy and actually retrieve these
                 Real xi = 0.;
                 Real phi = acos(-1.0) * 1.000001;
-                c.GetCovTilPiFromCon(E, cov_F, xi, phi, conTilPi);
+                c.GetCovTilPiFromCon(E, cov_F, xi, phi, &con_TilPi);
               }
 
-              c.Con2Prim(E, cov_dF, conTilPi, &J, &cov_H);
+              c.Con2Prim(E, cov_F, con_TilPi, &J, &cov_H);
               v(b, idx_J(ispec), k, j, i) = J;
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J; }
             }
@@ -490,7 +490,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               v(b, idx_E(ispec), k, j, i) = E * sdetgam;
               SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
 
-              c.Con2Prim(E, cov_F, con_tilPi, &J, &cov_H);
+              c.Con2Prim(E, cov_F, con_TilPi, &J, &cov_H);
 
               v(b, idx_J(ispec), k, j, i) = J;
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J; }
@@ -512,11 +512,11 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               }
 
               // if conTilPi not provided, need to recalculate from prims
-              if (!idx_tilPi.IsValid()) {
-                c.GetCovTilPiFromPrim(J, cov_H, con_tilPi);
+              if (!iTilPi.IsValid()) {
+                c.GetCovTilPiFromPrim(J, cov_H, &con_TilPi);
               }
 
-              c.Prim2Con(J, cov_H, con_tilPi, &E, &cov_F);
+              c.Prim2Con(J, cov_H, con_TilPi, &E, &cov_F);
               v(b, idx_E(ispec), k, j, i) = E * sdetgam;
               SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
             }
@@ -530,216 +530,216 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
           // rad ceiling applied?
         }
-        });
+      });
 
-        //        if (rad_floor_applied) {
-        //          // Add radiation energy density in normal observer frame
-        //          typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k,
-        //          j, i); Vector con_v{0}; // Normal observer frame Vector cov_H{0}; //
-        //          No flux Tens2 conTilPi{0}; // Isotropic CLOSURE c(con_v, &g); Real
-        //          dE[radiation::MaxNumSpecies]; Real cov_dF[radiation::MaxNumSpecies];
-        //          for (int ispec = 0; ispec < num_species; ++ispec) {
-        //            c.Prim2Con(dJ[ispec], cov_H, conTilPi, &(dE[ispec]),
-        //            &(cov_dF[ispec])); v(b, idx_E(ispec), k, j, i) += sdetgam *
-        //            dE[ispec]; SPACELOOP(ii) {
-        //              v(b, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF[ispec](ii);
-        //            }
-        //
-        //            // Convert back to updated primitive variables (reuse d* variables),
-        //            // need real fluid velocity
-        //            dE[ispec] = v(b, idx_E(ispec), k, j, i) / sdetgam;
-        //            SPACELOOP(ii) {
-        //              cov_dF[ispec](ii) = v(b, idx_F(ispec, ii), k, j, i) / sdetgam
-        //            }
-        //            // We need the real conTilPi
-        //            if (idx_tilPi.IsValid()) {
-        //              SPACELOOP2(ii, jj) {
-        //                conTilPi(ii, jj) = v(b, idx_tilPi(ispec, ii, jj), k, j, i);
-        //              }
-        //            } else {
-        //              // TODO(BRR) don't be lazy and actually retrieve these
-        //              Real xi = 0.;
-        //              Real phi = acos(-1.0) * 1.000001;
-        //              c.GetCovTilPiFromCon(dE[ispec], cov_dF[ispec], xi, phi, conTilPi);
-        //            }
-        //            c.Con2Prim(dE[ispec], cov_dF[ispec], conTilPi, &(dJ[ispec]),
-        //            &cov_H); v(b, idx_J(ispec), k, j, i) = dJ[ispec]; SPACELOOP(ii) {
-        //              v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii);
-        //            }
-        //          }
-        //        }
-        //
-        //        // Rad ceilings?
-        //
-        //        if (floor_applied || ceiling_applied || rad_floor_applied ||
-        //        rad_ceiling_applied) {
-        //          // Call rad p2c regardless because v^i presumably changed even if rad
-        //          prims didnt
-        //        }
+  //        if (rad_floor_applied) {
+  //          // Add radiation energy density in normal observer frame
+  //          typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k,
+  //          j, i); Vector con_v{0}; // Normal observer frame Vector cov_H{0}; //
+  //          No flux Tens2 conTilPi{0}; // Isotropic CLOSURE c(con_v, &g); Real
+  //          dE[radiation::MaxNumSpecies]; Real cov_dF[radiation::MaxNumSpecies];
+  //          for (int ispec = 0; ispec < num_species; ++ispec) {
+  //            c.Prim2Con(dJ[ispec], cov_H, conTilPi, &(dE[ispec]),
+  //            &(cov_dF[ispec])); v(b, idx_E(ispec), k, j, i) += sdetgam *
+  //            dE[ispec]; SPACELOOP(ii) {
+  //              v(b, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF[ispec](ii);
+  //            }
+  //
+  //            // Convert back to updated primitive variables (reuse d* variables),
+  //            // need real fluid velocity
+  //            dE[ispec] = v(b, idx_E(ispec), k, j, i) / sdetgam;
+  //            SPACELOOP(ii) {
+  //              cov_dF[ispec](ii) = v(b, idx_F(ispec, ii), k, j, i) / sdetgam
+  //            }
+  //            // We need the real conTilPi
+  //            if (idx_tilPi.IsValid()) {
+  //              SPACELOOP2(ii, jj) {
+  //                conTilPi(ii, jj) = v(b, idx_tilPi(ispec, ii, jj), k, j, i);
+  //              }
+  //            } else {
+  //              // TODO(BRR) don't be lazy and actually retrieve these
+  //              Real xi = 0.;
+  //              Real phi = acos(-1.0) * 1.000001;
+  //              c.GetCovTilPiFromCon(dE[ispec], cov_dF[ispec], xi, phi, conTilPi);
+  //            }
+  //            c.Con2Prim(dE[ispec], cov_dF[ispec], conTilPi, &(dJ[ispec]),
+  //            &cov_H); v(b, idx_J(ispec), k, j, i) = dJ[ispec]; SPACELOOP(ii) {
+  //              v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii);
+  //            }
+  //          }
+  //        }
+  //
+  //        // Rad ceilings?
+  //
+  //        if (floor_applied || ceiling_applied || rad_floor_applied ||
+  //        rad_ceiling_applied) {
+  //          // Call rad p2c regardless because v^i presumably changed even if rad
+  //          prims didnt
+  //        }
 
-        //        bool floor_applied = false;
-        //        if (v(b, prho, k, j, i) < rho_floor) {
-        //          floor_applied = true;
-        //          v(b, prho, k, j, i) = rho_floor;
-        //        }
-        //        if (v(b, peng, k, j, i) / v(b, prho, k, j, i) < sie_floor) {
-        //          floor_applied = true;
-        //          v(b, peng, k, j, i) = sie_floor * v(b, prho, k, j, i);
-        //        }
-        //
-        //        Real gcov[4][4];
-        //        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-        //        const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-        //
-        //        Real con_vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-        //                          v(b, pvel_lo + 2, k, j, i)};
-        //        const Real W = phoebus::GetLorentzFactor(con_vp, gcov);
-        //        if (W > gamma_max) {
-        //          floor_applied = true;
-        //          const Real rescale = std::sqrt((gamma_max * gamma_max - 1.) / (W * W
-        //          - 1.)); SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) *= rescale; }
-        //        }
-        //
-        //        if (enable_mhd_floors) {
-        //          Real Bsq = 0.0;
-        //          Real Bdotv = 0.0;
-        //          const Real vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j,
-        //          i),
-        //                              v(b, pvel_lo + 2, k, j, i)};
-        //          const Real bp[3] = {v(b, pb_lo, k, j, i), v(pb_lo + 1, k, j, i),
-        //                              v(pb_lo + 2, k, j, i)};
-        //          const Real W = phoebus::GetLorentzFactor(vp, gcov);
-        //          const Real iW = 1.0 / W;
-        //          SPACELOOP2(ii, jj) {
-        //            Bsq += gcov[ii + 1][jj + 1] * bp[ii] * bp[jj];
-        //            Bdotv += gcov[ii + 1][jj + 1] * bp[ii] * vp[jj];
-        //          }
-        //          Real bcon0 = W * Bdotv / alpha;
-        //          const Real bsq = (Bsq + alpha * alpha * bcon0 * bcon0) * iW * iW;
-        //
-        //          if (bsq / v(b, prho, k, j, i) > bsqorho_max) {
-        //            floor_applied = true;
-        //            v(b, prho, k, j, i) = bsq / bsqorho_max;
-        //          }
-        //          if (bsq / v(b, peng, k, j, i) > bsqou_max) {
-        //            floor_applied = true;
-        //            v(b, peng, k, j, i) = bsq / bsqou_max;
-        //          }
-        //          if (v(b, peng, k, j, i) / v(b, prho, k, j, i) > uorho_max) {
-        //            floor_applied = true;
-        //            v(b, peng, k, j, i) = uorho_max * v(b, prho, k, j, i);
-        //          }
-        //        }
+  //        bool floor_applied = false;
+  //        if (v(b, prho, k, j, i) < rho_floor) {
+  //          floor_applied = true;
+  //          v(b, prho, k, j, i) = rho_floor;
+  //        }
+  //        if (v(b, peng, k, j, i) / v(b, prho, k, j, i) < sie_floor) {
+  //          floor_applied = true;
+  //          v(b, peng, k, j, i) = sie_floor * v(b, prho, k, j, i);
+  //        }
+  //
+  //        Real gcov[4][4];
+  //        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+  //        const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+  //
+  //        Real con_vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
+  //                          v(b, pvel_lo + 2, k, j, i)};
+  //        const Real W = phoebus::GetLorentzFactor(con_vp, gcov);
+  //        if (W > gamma_max) {
+  //          floor_applied = true;
+  //          const Real rescale = std::sqrt((gamma_max * gamma_max - 1.) / (W * W
+  //          - 1.)); SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) *= rescale; }
+  //        }
+  //
+  //        if (enable_mhd_floors) {
+  //          Real Bsq = 0.0;
+  //          Real Bdotv = 0.0;
+  //          const Real vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j,
+  //          i),
+  //                              v(b, pvel_lo + 2, k, j, i)};
+  //          const Real bp[3] = {v(b, pb_lo, k, j, i), v(pb_lo + 1, k, j, i),
+  //                              v(pb_lo + 2, k, j, i)};
+  //          const Real W = phoebus::GetLorentzFactor(vp, gcov);
+  //          const Real iW = 1.0 / W;
+  //          SPACELOOP2(ii, jj) {
+  //            Bsq += gcov[ii + 1][jj + 1] * bp[ii] * bp[jj];
+  //            Bdotv += gcov[ii + 1][jj + 1] * bp[ii] * vp[jj];
+  //          }
+  //          Real bcon0 = W * Bdotv / alpha;
+  //          const Real bsq = (Bsq + alpha * alpha * bcon0 * bcon0) * iW * iW;
+  //
+  //          if (bsq / v(b, prho, k, j, i) > bsqorho_max) {
+  //            floor_applied = true;
+  //            v(b, prho, k, j, i) = bsq / bsqorho_max;
+  //          }
+  //          if (bsq / v(b, peng, k, j, i) > bsqou_max) {
+  //            floor_applied = true;
+  //            v(b, peng, k, j, i) = bsq / bsqou_max;
+  //          }
+  //          if (v(b, peng, k, j, i) / v(b, prho, k, j, i) > uorho_max) {
+  //            floor_applied = true;
+  //            v(b, peng, k, j, i) = uorho_max * v(b, prho, k, j, i);
+  //          }
+  //        }
 
-        //        if (enable_rad_floors) {
-        //          const Real r = std::exp(coords.x1v(k, j, i));
-        //          const Real Jmin = 1.e-10;
-        //          for (int ispec = 0; ispec < num_species; ++ispec) {
-        //            if (v(b, idx_J(ispec), k, j, i) < Jmin) {
-        //              floor_applied = true;
-        //              v(b, idx_J(ispec), k, j, i) = Jmin;
-        //            }
-        //
-        //            Real con_gamma[3][3];
-        //            geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma);
-        //            Real xi = 0.;
-        //            SPACELOOP2(ii, jj) {
-        //              xi += con_gamma[ii][jj] * v(b, idx_H(ispec, ii), k, j, i) *
-        //                    v(b, idx_H(ispec, jj), k, j, i);
-        //            }
-        //            xi = std::sqrt(xi);
-        //            if (xi > xi_max) {
-        //              floor_applied = true;
-        //              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
-        //            }
-        //          }
-        //        }
-        //
-        //        if (floor_applied) {
-        //          // Update dependent primitives
-        //          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-        //          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-        //              v(b, prho, k, j, i), v(b, peng, k, j, i) / v(b, prho, k, j, i),
-        //              eos_lambda);
-        //          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-        //              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-        //          v(b, gm1, k, j, i) =
-        //              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
-        //                                                          v(b, tmp, k, j, i),
-        //                                                          eos_lambda),
-        //                    v(b, prs, k, j, i));
-        //
-        //          // Update fluid conserved variables
-        //          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-        //          Real gcon[3][3];
-        //          geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
-        //          Real beta[3];
-        //          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-        //          Real S[3];
-        //          const Real con_vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k,
-        //          j, i),
-        //                                  v(b, pvel_hi, k, j, i)};
-        //          Real bcons[3];
-        //          Real bp[3] = {0.0, 0.0, 0.0};
-        //          if (pb_hi > 0) {
-        //            bp[0] = v(b, pb_lo, k, j, i);
-        //            bp[1] = v(b, pb_lo + 1, k, j, i);
-        //            bp[2] = v(b, pb_hi, k, j, i);
-        //          }
-        //          Real ye_cons;
-        //          Real ye_prim = 0.0;
-        //          if (pye > 0) {
-        //            ye_prim = v(b, pye, k, j, i);
-        //          }
-        //          Real sig[3];
-        //          prim2con::p2c(v(b, prho, k, j, i), con_vp, bp, v(b, peng, k, j, i),
-        //          ye_prim,
-        //                        v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gcon,
-        //                        beta, alpha, gdet, v(b, crho, k, j, i), S, bcons, v(b,
-        //                        ceng, k, j, i), ye_cons, sig);
-        //          v(b, cmom_lo, k, j, i) = S[0];
-        //          v(b, cmom_lo + 1, k, j, i) = S[1];
-        //          v(b, cmom_hi, k, j, i) = S[2];
-        //          if (pye > 0) v(b, cye, k, j, i) = ye_cons;
-        //          for (int m = slo; m <= shi; m++) {
-        //            v(b, m, k, j, i) = sig[m - slo];
-        //          }
-        //
-        //          // Update radiation conserved variables
-        //          Real cov_gamma[3][3];
-        //          geom.Metric(CellLocation::Cent, k, j, i, cov_gamma);
-        //          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma);
-        //          Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
-        //          for (int ispec = 0; ispec < num_species; ++ispec) {
-        //            const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
-        //
-        //            typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b,
-        //            k, j, i); CLOSURE c(con_v, &g);
-        //
-        //            Real E;
-        //            Vec covF;
-        //            Tens2 conTilPi;
-        //            Real J = v(b, idx_J(ispec), k, j, i);
-        //            Vec covH = {{v(b, idx_H(ispec, 0), k, j, i) * J,
-        //                         v(b, idx_H(ispec, 1), k, j, i) * J,
-        //                         v(b, idx_H(ispec, 2), k, j, i) * J}};
-        //
-        //            if (iTilPi.IsValid()) {
-        //              SPACELOOP2(ii, jj) {
-        //                conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
-        //              }
-        //            } else {
-        //              c.GetCovTilPiFromPrim(J, covH, &conTilPi);
-        //            }
-        //
-        //            c.Prim2Con(J, covH, conTilPi, &E, &covF);
-        //
-        //            v(b, idx_E(ispec), k, j, i) = sdetgam * E;
-        //            SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam *
-        //            covF(ii); }
-        //          }
-        //        }
-//      });
+  //        if (enable_rad_floors) {
+  //          const Real r = std::exp(coords.x1v(k, j, i));
+  //          const Real Jmin = 1.e-10;
+  //          for (int ispec = 0; ispec < num_species; ++ispec) {
+  //            if (v(b, idx_J(ispec), k, j, i) < Jmin) {
+  //              floor_applied = true;
+  //              v(b, idx_J(ispec), k, j, i) = Jmin;
+  //            }
+  //
+  //            Real con_gamma[3][3];
+  //            geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma);
+  //            Real xi = 0.;
+  //            SPACELOOP2(ii, jj) {
+  //              xi += con_gamma[ii][jj] * v(b, idx_H(ispec, ii), k, j, i) *
+  //                    v(b, idx_H(ispec, jj), k, j, i);
+  //            }
+  //            xi = std::sqrt(xi);
+  //            if (xi > xi_max) {
+  //              floor_applied = true;
+  //              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
+  //            }
+  //          }
+  //        }
+  //
+  //        if (floor_applied) {
+  //          // Update dependent primitives
+  //          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+  //          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+  //              v(b, prho, k, j, i), v(b, peng, k, j, i) / v(b, prho, k, j, i),
+  //              eos_lambda);
+  //          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+  //              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+  //          v(b, gm1, k, j, i) =
+  //              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
+  //                                                          v(b, tmp, k, j, i),
+  //                                                          eos_lambda),
+  //                    v(b, prs, k, j, i));
+  //
+  //          // Update fluid conserved variables
+  //          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+  //          Real gcon[3][3];
+  //          geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+  //          Real beta[3];
+  //          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+  //          Real S[3];
+  //          const Real con_vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k,
+  //          j, i),
+  //                                  v(b, pvel_hi, k, j, i)};
+  //          Real bcons[3];
+  //          Real bp[3] = {0.0, 0.0, 0.0};
+  //          if (pb_hi > 0) {
+  //            bp[0] = v(b, pb_lo, k, j, i);
+  //            bp[1] = v(b, pb_lo + 1, k, j, i);
+  //            bp[2] = v(b, pb_hi, k, j, i);
+  //          }
+  //          Real ye_cons;
+  //          Real ye_prim = 0.0;
+  //          if (pye > 0) {
+  //            ye_prim = v(b, pye, k, j, i);
+  //          }
+  //          Real sig[3];
+  //          prim2con::p2c(v(b, prho, k, j, i), con_vp, bp, v(b, peng, k, j, i),
+  //          ye_prim,
+  //                        v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gcon,
+  //                        beta, alpha, gdet, v(b, crho, k, j, i), S, bcons, v(b,
+  //                        ceng, k, j, i), ye_cons, sig);
+  //          v(b, cmom_lo, k, j, i) = S[0];
+  //          v(b, cmom_lo + 1, k, j, i) = S[1];
+  //          v(b, cmom_hi, k, j, i) = S[2];
+  //          if (pye > 0) v(b, cye, k, j, i) = ye_cons;
+  //          for (int m = slo; m <= shi; m++) {
+  //            v(b, m, k, j, i) = sig[m - slo];
+  //          }
+  //
+  //          // Update radiation conserved variables
+  //          Real cov_gamma[3][3];
+  //          geom.Metric(CellLocation::Cent, k, j, i, cov_gamma);
+  //          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma);
+  //          Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+  //          for (int ispec = 0; ispec < num_species; ++ispec) {
+  //            const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+  //
+  //            typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b,
+  //            k, j, i); CLOSURE c(con_v, &g);
+  //
+  //            Real E;
+  //            Vec covF;
+  //            Tens2 conTilPi;
+  //            Real J = v(b, idx_J(ispec), k, j, i);
+  //            Vec covH = {{v(b, idx_H(ispec, 0), k, j, i) * J,
+  //                         v(b, idx_H(ispec, 1), k, j, i) * J,
+  //                         v(b, idx_H(ispec, 2), k, j, i) * J}};
+  //
+  //            if (iTilPi.IsValid()) {
+  //              SPACELOOP2(ii, jj) {
+  //                conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+  //              }
+  //            } else {
+  //              c.GetCovTilPiFromPrim(J, covH, &conTilPi);
+  //            }
+  //
+  //            c.Prim2Con(J, covH, conTilPi, &E, &covF);
+  //
+  //            v(b, idx_E(ispec), k, j, i) = sdetgam * E;
+  //            SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam *
+  //            covF(ii); }
+  //          }
+  //        }
+  //      });
 
   return TaskStatus::complete;
 }
