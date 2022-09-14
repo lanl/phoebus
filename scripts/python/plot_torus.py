@@ -31,7 +31,7 @@ from phoebus_constants import cgs, scalefree
 import phoebus_utils
 from phoedf import phoedf
 
-def plot_frame(ifname, fname, savefig, geomfile=None):
+def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40):
   print(fname)
 
   cmap_uniform = 'viridis'
@@ -39,10 +39,15 @@ def plot_frame(ifname, fname, savefig, geomfile=None):
 
   dfile = phoedf(fname)
 
+  rad_active = dfile.Params['radiation/active']
+
   a = dfile.Params['geometry/a']
   hslope = dfile.Params['geometry/h']
 
-  fig, axes = plt.subplots(2, 4, figsize=(10,8))
+  if rad_active:
+    fig, axes = plt.subplots(2, 4, figsize=(10,8))
+  else:
+    fig, axes = plt.subplots(2, 2, figsize=(6,8))
 
   if geomfile is None:
     geomfile = dfile
@@ -91,86 +96,107 @@ def plot_frame(ifname, fname, savefig, geomfile=None):
   ax.set_aspect('equal')
   ax.set_title(r'$\Gamma$')
 
-#  ax = axes[0,1]
-#  lenergy = np.log10(np.clip(dfile.Get("p.energy", flatten=False), 1.e-20, None))
-#  for b in range(nblocks):
-#    im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lenergy[b,0,:,:].transpose(), vmin=-5, vmax=0,
-#    cmap=cmap_uniform)
-#  div = make_axes_locatable(ax)
-#  cax = div.append_axes('right', size="5%", pad = 0.05)
-#  fig.colorbar(im, cax=cax, orientation='vertical')
-#  ax.set_aspect('equal')
-#  ax.set_title('p.energy')
+  if rad_active:
 
-  ax = axes[0,2]
-  Pg = dfile.GetPg()
-  Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
-  lbeta = np.log10(Pg/Pm)
-  for b in range(nblocks):
-    im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lbeta[b,0,:,:].transpose(), vmin=-2, vmax=2,
+    ax = axes[0,2]
+    Pg = dfile.GetPg()
+    Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
+    lbeta = np.log10(Pg/Pm)
+    for b in range(nblocks):
+      im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lbeta[b,0,:,:].transpose(), vmin=-2, vmax=2,
+        cmap=cmap_diverging)
+    div = make_axes_locatable(ax)
+    cax = div.append_axes('right', size="5%", pad = 0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
+    ax.set_aspect('equal')
+    ax.set_title(r'$\log_{10}~\beta_{\rm M}$')
+
+    ax = axes[0,3]
+    lTg = np.log10(dfile.GetTg())
+    for b in range(nblocks):
+      im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lTg[b,0,:,:].transpose(), vmin=5, vmax=10,
+        cmap=cmap_diverging)
+    div = make_axes_locatable(ax)
+    cax = div.append_axes('right', size="5%", pad = 0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
+    ax.set_aspect('equal')
+    ax.set_title(r'$\log_{10}~T_{\rm g}~({\rm K})$')
+
+    ax = axes[1,0]
+    lJ = np.log10(np.clip(dfile.Get("r.p.J", flatten=False), 1.e-20, None))
+    for b in range(nblocks):
+      im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lJ[b,0,:,:].transpose(), vmin=-5, vmax=0,
+      cmap=cmap_uniform)
+    div = make_axes_locatable(ax)
+    cax = div.append_axes('right', size="5%", pad = 0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
+    ax.set_aspect('equal')
+    ax.set_title(r'$\log_{10}~J$')
+
+    ax = axes[1,1]
+    lxi = np.log10(dfile.GetXi())
+    for b in range(nblocks):
+      im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lxi[b,0,:,:].transpose(), vmin=-3, vmax=0,
+      cmap=cmap_uniform)
+    div = make_axes_locatable(ax)
+    cax = div.append_axes('right', size="5%", pad = 0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
+    ax.set_aspect('equal')
+    ax.set_title(r'$\log_{10}~\xi$')
+
+    ax = axes[1,2]
+    Pg = dfile.GetPg()
+    Pr = dfile.GetPr()
+    lbetar = np.log10(Pg/Pr)
+    for b in range(nblocks):
+      im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lbetar[b,0,:,:].transpose(), vmin=-2, vmax=2,
       cmap=cmap_diverging)
-  div = make_axes_locatable(ax)
-  cax = div.append_axes('right', size="5%", pad = 0.05)
-  fig.colorbar(im, cax=cax, orientation='vertical')
-  ax.set_aspect('equal')
-  ax.set_title(r'$\log_{10}~\beta_{\rm M}$')
+    div = make_axes_locatable(ax)
+    cax = div.append_axes('right', size="5%", pad = 0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
+    ax.set_aspect('equal')
+    ax.set_title(r'$\log_{10}~\beta_{\rm R}$')
 
-  ax = axes[0,3]
-  lTg = np.log10(dfile.GetTg())
-  for b in range(nblocks):
-    im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lTg[b,0,:,:].transpose(), vmin=5, vmax=10,
+    ax = axes[1,3]
+    ltau = np.log10(dfile.GetTau())
+    for b in range(nblocks):
+      im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], ltau[b,0,:,:].transpose(), vmin=-3, vmax=3,
       cmap=cmap_diverging)
-  div = make_axes_locatable(ax)
-  cax = div.append_axes('right', size="5%", pad = 0.05)
-  fig.colorbar(im, cax=cax, orientation='vertical')
-  ax.set_aspect('equal')
-  ax.set_title(r'$\log_{10}~T_{\rm g}~({\rm K})$')
+    div = make_axes_locatable(ax)
+    cax = div.append_axes('right', size="5%", pad = 0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
+    ax.set_aspect('equal')
+    ax.set_title(r'$\log_{10}~\tau_{\rm zone}$')
 
-  ax = axes[1,0]
-  lJ = np.log10(np.clip(dfile.Get("r.p.J", flatten=False), 1.e-20, None))
-  for b in range(nblocks):
-    im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lJ[b,0,:,:].transpose(), vmin=-5, vmax=0,
-    cmap=cmap_uniform)
-  div = make_axes_locatable(ax)
-  cax = div.append_axes('right', size="5%", pad = 0.05)
-  fig.colorbar(im, cax=cax, orientation='vertical')
-  ax.set_aspect('equal')
-  ax.set_title(r'$\log_{10}~J$')
+  else:
+    ax = axes[1,0]
+    lenergy = np.log10(np.clip(dfile.Get("p.energy", flatten=False), 1.e-20, None))
+    for b in range(nblocks):
+      im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lenergy[b,0,:,:].transpose(), vmin=-5, vmax=0,
+      cmap=cmap_uniform)
+    div = make_axes_locatable(ax)
+    cax = div.append_axes('right', size="5%", pad = 0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
+    ax.set_aspect('equal')
+    ax.set_title(r'$\log_{10}~u$')
+    
+    ax = axes[1,1]
+    Pg = dfile.GetPg()
+    Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
+    lbeta = np.log10(Pg/Pm)
+    for b in range(nblocks):
+      im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lbeta[b,0,:,:].transpose(), vmin=-2, vmax=2,
+        cmap=cmap_diverging)
+    div = make_axes_locatable(ax)
+    cax = div.append_axes('right', size="5%", pad = 0.05)
+    fig.colorbar(im, cax=cax, orientation='vertical')
+    ax.set_aspect('equal')
+    ax.set_title(r'$\log_{10}~\beta_{\rm M}$')
 
-  ax = axes[1,1]
-  lxi = np.log10(dfile.GetXi())
-  for b in range(nblocks):
-    im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lxi[b,0,:,:].transpose(), vmin=-3, vmax=0,
-    cmap=cmap_uniform)
-  div = make_axes_locatable(ax)
-  cax = div.append_axes('right', size="5%", pad = 0.05)
-  fig.colorbar(im, cax=cax, orientation='vertical')
-  ax.set_aspect('equal')
-  ax.set_title(r'$\log_{10}~\xi$')
-
-  ax = axes[1,2]
-  Pg = dfile.GetPg()
-  Pr = dfile.GetPr()
-  lbetar = np.log10(Pg/Pr)
-  for b in range(nblocks):
-    im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lbetar[b,0,:,:].transpose(), vmin=-2, vmax=2,
-    cmap=cmap_diverging)
-  div = make_axes_locatable(ax)
-  cax = div.append_axes('right', size="5%", pad = 0.05)
-  fig.colorbar(im, cax=cax, orientation='vertical')
-  ax.set_aspect('equal')
-  ax.set_title(r'$\log_{10}~\beta_{\rm R}$')
-
-  ax = axes[1,3]
-  ltau = np.log10(dfile.GetTau())
-  for b in range(nblocks):
-    im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], ltau[b,0,:,:].transpose(), vmin=-3, vmax=3,
-    cmap=cmap_diverging)
-  div = make_axes_locatable(ax)
-  cax = div.append_axes('right', size="5%", pad = 0.05)
-  fig.colorbar(im, cax=cax, orientation='vertical')
-  ax.set_aspect('equal')
-  ax.set_title(r'$\log_{10}~\tau_{\rm zone}$')
+  for tmp_ax in axes:
+    for ax in tmp_ax:
+      ax.set_xlim([0, rlim])
+      ax.set_ylim([-rlim, rlim])
 
   plt.suptitle("Time = %g M" % dfile.Time)
 
@@ -179,6 +205,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None):
   #if savefig:
   savename = str(ifname).rjust(5,"0") + '.png'
   plt.savefig(savename, dpi=300, bbox_inches='tight')
+  plt.close(fig)
  # else:
  #   plt.show()
 

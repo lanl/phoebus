@@ -87,7 +87,7 @@ class phoedf(phdf.phdf):
     if self.rho is not None:
       return self.rho
 
-    self.rho = dfile.Get("p.density", flatten=False)
+    self.rho = self.Get("p.density", flatten=False)
 
     return self.rho
 
