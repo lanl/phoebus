@@ -484,7 +484,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             if (dJ > 0.) {
               rad_floor_applied = true;
 
-              constexpr bool update_cons_vars = false;
+              constexpr bool update_cons_vars = true;//false;
               // Update cons vars, c2p
               if (update_cons_vars) {
                 J = dJ;
