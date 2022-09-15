@@ -331,12 +331,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           SPACELOOP(ii) { bp[ii] = v(b, pb_lo + ii, k, j, i); }
         }
 
-        if (i == 131 && j == 100) {
-          printf("floor applied? %i\n", static_cast<int>(floor_applied));
-          printf("rho: %e eng: %e\n", v(b, prho, k, j, i), v(b, peng, k, j, i));
-          printf("rho_floor_max: %e u_floor_max: %e\n", rho_floor_max, u_floor_max);
-        }
-
         if (floor_applied) {
           Real vp_normalobs[3] = {0}; // Inject floors at rest in normal observer frame
           Real ye_prim_default = 0.5;
