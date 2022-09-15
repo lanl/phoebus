@@ -62,7 +62,7 @@ class Residual {
     bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
 
 #if !USE_C2P_ROBUST_FLOORS
-    rho_floor_ = 1.e-20;
+    rho_floor_ = 1.e-100;
 #endif
   }
 
@@ -107,7 +107,7 @@ class Residual {
     Real rho = rhohat_mu(1.0 / What);
     bounds_.GetFloors(x1_, x2_, x3_, rho, e_floor_);
 #if !USE_C2P_ROBUST_FLOORS
-    e_floor_ = 1.e-20;
+    e_floor_ = 1.e-100;
 #endif
     const Real ehat_trial =
         What * (qbar - mu * rbarsq) + vhatsq * What * What / (1.0 + What);
@@ -303,8 +303,8 @@ class ConToPrim {
     Real epsflr;
     bounds.GetFloors(x1, x2, x3, rhoflr, epsflr);
 #if !USE_C2P_ROBUST_FLOORS
-    rhoflr = 1.e-20;
-    epsflr = 1.e-20;
+    rhoflr = 1.e-100;
+    epsflr = 1.e-100;
 #endif
     Real gam_max, eps_max;
     bounds.GetCeilings(x1, x2, x3, gam_max, eps_max);
