@@ -339,8 +339,14 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         Real du = u_floor_max - v(b, peng, k, j, i);
         if (drho > 0. || du > 0.) {
           floor_applied = true;
-          drho = std::max<Real>(drho, 1.e-100); // > 0 so EOS calls are happy
-          du = std::max<Real>(du, 1.e-100);
+          //drho = std::max<Real>(drho, 1.e-100); // > 0 so EOS calls are happy
+          if (drho < 0.) {
+            drho = du / e_max;
+          }
+          if (du < 0.) {
+            du = sie_floor * drho;
+          }
+          //du = std::max<Real>(du, 1.e-100);
           // set min du to be drho*sie_floor?
         }
 
@@ -383,7 +389,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             }
 
             // Update auxiliary primitives
-            eos_lambda[0] = v(b, pye, k, j, i);
+            if (pye > 0) {
+              eos_lambda[0] = v(b, pye, k, j, i);
+            }
             v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
                 v(b, prho, k, j, i), v(b, peng, k, j, i) / v(b, prho, k, j, i),
                 eos_lambda);
@@ -748,7 +756,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadConToPrim::Solve fixup", DevExecSpace(), 0,
-      v.GetDim(5) - 1, kb.s, kb.e, jb.s + 1, jb.e - 1, ib.s + 1, ib.e - 1,
+      v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         // If fluid fail but rad success, recalculate rad c2p and set iradfail with
         // result, then still process if (fluid fail && rad fail) check.
@@ -783,7 +791,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             num_valid += v(b, iradfail, k, j - 1, i) + v(b, iradfail, k, j + 1, i);
           if (ndim == 3)
             num_valid += v(b, iradfail, k - 1, j, i) + v(b, iradfail, k + 1, j, i);
-          if (num_valid > 0.5 && false) {
+          if (num_valid > 0.5) {
             const Real norm = 1.0 / num_valid;
             for (int ispec = 0; ispec < nspec; ispec++) {
               v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
@@ -792,11 +800,6 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
               }
             }
           } else {
-            //            printf("[%i %i %i] no valid rad c2p neighbors!\n", k, j, i);
-            // Real ucon[4] = {0};
-            // Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
-            //                 v(b, idx_pvel(2), k, j, i)};
-            // GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
             for (int ispec = 0; ispec < nspec; ispec++) {
               v(b, idx_J(ispec), k, j, i) = 1.e-100;
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
@@ -1020,7 +1023,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             if (ndim == 3)
               num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
           }
-          if (num_valid > 0.5 && false) {
+          if (num_valid > 0.5) {
             const Real norm = 1.0 / num_valid;
             v(b, prho, k, j, i) = fixup(prho, norm);
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
@@ -1029,16 +1032,16 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             v(b, peng, k, j, i) = fixup(peng, norm);
 
             if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
-            if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-                eos_lambda);
-            v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-            v(b, gm1, k, j, i) =
-                ratio(eos.BulkModulusFromDensityTemperature(
-                          v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
-                      v(b, prs, k, j, i));
+          //  if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+          //  v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+          //      v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+          //      eos_lambda);
+          //  v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+          //      v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+          //  v(b, gm1, k, j, i) =
+          //      ratio(eos.BulkModulusFromDensityTemperature(
+          //                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+          //            v(b, prs, k, j, i));
           } else {
             // printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
@@ -1054,20 +1057,20 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
               v(b, pye, k, j, i) = 0.5;
             }
 
-            if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-                eos_lambda);
-            v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-            v(b, gm1, k, j, i) =
-                ratio(eos.BulkModulusFromDensityTemperature(
-                          v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
-                      v(b, prs, k, j, i));
-
             // Zero primitive velocities
             SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = 0.; }
           }
+            
+          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+              eos_lambda);
+          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+          v(b, gm1, k, j, i) =
+              ratio(eos.BulkModulusFromDensityTemperature(
+                        v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+                    v(b, prs, k, j, i));
 
           //          // Update conserved variables
           //          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -1248,7 +1251,7 @@ TaskStatus SourceFixupImpl(T *rc) {
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
 
-          if (num_valid > 0.5 && false) {
+          if (num_valid > 0.5) {
             const Real norm = 1.0 / num_valid;
 
             v(b, prho, k, j, i) = fixup(prho, norm);
@@ -1278,7 +1281,7 @@ TaskStatus SourceFixupImpl(T *rc) {
             // No valid neighbors; set to floors with zero spatial velocity
             //            printf("No valid source neighbors! %i %i %i\n", k, j, i);
 
-            double rho_floor, sie_floor;
+            //double rho_floor, sie_floor;
             // bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
             //                 coords.x3v(k, j, i), rho_floor, sie_floor);
             // v(b, prho, k, j, i) = rho_floor;
