@@ -379,6 +379,10 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         }
 
         Real sig[3];
+        if (v(b, prho, k, j, i) < 1.e-20) {
+          printf("rho = %e u = %e k j i = %i %i %i\n", v(b, prho, k, j, i),
+                 v(b, peng, k, j, i), k, j, i);
+        }
         prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
                       v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov4, gcon, shift, lapse,
                       gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,

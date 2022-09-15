@@ -97,6 +97,13 @@ void GenericBC(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         const Real detg_ref = geom.DetGamma(CellLocation::Cent, kref, jref, iref);
         const Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
         const Real gratio = robust::ratio(detg, detg_ref);
+
+        //        if ((i == 117 && j == 0)) {
+        //          printf("[%i %i %i][%i] ref: q(%i %i %i %i) = %e result: %e sgn = %i
+        //          gratio = %e\n",
+        //            k, j, i, l, l, kref, jref, iref, q(l, kref, jref, iref),
+        //              q(l, k, j, i), sgn, gratio);
+        //        }
         q(l, k, j, i) = sgn * gratio * q(l, kref, jref, iref);
       });
 }
