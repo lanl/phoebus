@@ -135,6 +135,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40):
 
     ax = axes[1,1]
     lxi = np.log10(dfile.GetXi())
+    print(lxi.min())
+    print(lxi.max())
     for b in range(nblocks):
       im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lxi[b,0,:,:].transpose(), vmin=-3, vmax=0,
       cmap=cmap_uniform)
