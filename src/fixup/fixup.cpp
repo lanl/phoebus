@@ -58,9 +58,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("enable_source_fixup", enable_source_fixup);
   bool enable_ceilings = pin->GetOrAddBoolean("fixup", "enable_ceilings", false);
   params.Add("enable_ceilings", enable_ceilings);
-  bool enable_radiation_ceilings =
-      pin->GetOrAddBoolean("fixup", "enable_radiation_ceilings", false);
-  params.Add("enable_radiation_ceilings", enable_radiation_ceilings);
+  bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", false);
+  params.Add("enable_rad_ceilings", enable_rad_ceilings);
   bool report_c2p_fails = pin->GetOrAddBoolean("fixup", "report_c2p_fails", false);
   params.Add("report_c2p_fails", report_c2p_fails);
   bool report_source_fails = pin->GetOrAddBoolean("fixup", "report_source_fails", false);
@@ -151,16 +150,32 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("ceiling", Ceilings());
   }
 
-  if (enable_radiation_ceilings) {
+  if (enable_rad_floors) {
+    const std::string floor_type = pin->GetString("fixup", "rad_floor_type");
+    if (floor_type == "ConstantJ") {
+      Real J0 = pin->GetOrAddReal("fixup", "J0_floor", 0.0);
+      params.Add("rad_floor", RadiationFloors(constant_j_floor_tag, J0));
+    } else if (floor_type == "ExpX1J") {
+      Real J0 = pin->GetOrAddReal("fixup", "J0_floor", 0.0);
+      Real Jp = pin->GetOrAddReal("fixup", "J_exp_floor", -2.0);
+      params.Add("rad_floor", RadiationFloors(exp_x1_j_floor_tag, J0, Jp));
+    } else {
+      PARTHENON_FAIL("invalid <fixup>/rad_floor_type input");
+    }
+  } else {
+    params.Add("rad_floor", RadiationFloors());
+  }
+
+  if (enable_rad_ceilings) {
     const std::string radiation_ceiling_type =
         pin->GetOrAddString("fixup", "radiation_ceiling_type", "ConstantXi0");
     if (radiation_ceiling_type == "ConstantXi0") {
       Real xi0 = pin->GetOrAddReal("fixup", "xi0_ceiling", 0.99);
-      params.Add("radiation_ceiling",
+      params.Add("rad_ceiling",
                  RadiationCeilings(constant_xi0_radiation_ceiling_tag, xi0));
     }
   } else {
-    params.Add("radiation_ceiling", RadiationCeilings());
+    params.Add("rad_ceiling", RadiationCeilings());
   }
 
   if (enable_mhd_floors) {
@@ -174,7 +189,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("bounds",
              Bounds(params.Get<Floors>("floor"), params.Get<Ceilings>("ceiling"),
-                    params.Get<RadiationCeilings>("radiation_ceiling")));
+                    params.Get<RadiationFloors>("rad_floor"),
+                    params.Get<RadiationCeilings>("rad_ceiling")));
 
   return fix;
 }
@@ -273,6 +289,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         double gamma_max, e_max;
         bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
                            gamma_max, e_max);
+        Real J_floor;
+        bounds.GetRadiationFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                                  coords.x3v(k, j, i), J_floor);
         Real xi_max;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                     coords.x3v(k, j, i), xi_max);
@@ -463,12 +482,11 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           }
 
           // TODO(BRR) use Bounds class
-          const Real Jfloor = 1.e-10;
           Vec con_v_normalobs{0};
           CLOSURE c_iso(con_v_normalobs, &g);
           Tens2 con_tilPi_iso{0};
           for (int ispec = 0; ispec < num_species; ++ispec) {
-            Real dJ = Jfloor - v(b, idx_J(ispec), k, j, i);
+            Real dJ = J_floor - v(b, idx_J(ispec), k, j, i);
             if (dJ > 0.) {
 
               constexpr bool update_cons_vars = true; // false;
@@ -612,9 +630,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   namespace cr = radmoment_cons;
 
   auto *pmb = rc->GetParentPointer().get();
-  //IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  //IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  //IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  // IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  // IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  // IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -775,12 +793,11 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             }
           } else {
             //            printf("[%i %i %i] no valid rad c2p neighbors!\n", k, j, i);
-            //Real ucon[4] = {0};
-            //Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
+            // Real ucon[4] = {0};
+            // Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
             //                 v(b, idx_pvel(2), k, j, i)};
-            //GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
+            // GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
             for (int ispec = 0; ispec < nspec; ispec++) {
-              // v(b, idx_J(ispec), k, j, i) = 1.e-10;
               v(b, idx_J(ispec), k, j, i) = 1.e-100;
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
             }
@@ -889,9 +906,9 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   namespace c = fluid_cons;
   namespace impl = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
-  //IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  //IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  //IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  // IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  // IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  // IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -1023,7 +1040,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
                           v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
                       v(b, prs, k, j, i));
           } else {
-            //printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
+            // printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
             // velocities to zero
 
@@ -1231,7 +1248,7 @@ TaskStatus SourceFixupImpl(T *rc) {
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
 
-          if (num_valid > 0.5 && false ) {
+          if (num_valid > 0.5 && false) {
             const Real norm = 1.0 / num_valid;
 
             v(b, prho, k, j, i) = fixup(prho, norm);
@@ -1259,11 +1276,11 @@ TaskStatus SourceFixupImpl(T *rc) {
             }
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
-//            printf("No valid source neighbors! %i %i %i\n", k, j, i);
+            //            printf("No valid source neighbors! %i %i %i\n", k, j, i);
 
             double rho_floor, sie_floor;
-            bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                             coords.x3v(k, j, i), rho_floor, sie_floor);
+            // bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
+            //                 coords.x3v(k, j, i), rho_floor, sie_floor);
             // v(b, prho, k, j, i) = rho_floor;
             // v(b, peng, k, j, i) = rho_floor * sie_floor;
             v(b, prho, k, j, i) = 1.e-100;
@@ -1296,7 +1313,7 @@ TaskStatus SourceFixupImpl(T *rc) {
               // idx_J(ispec), k, j, i);
               SPACELOOP(ii) {
                 v(b, idx_H(ispec, ii), k, j, i) = 0.;
-                //printf("Fail [%i %i %i] H[%i] = %e\n", k, j, i, ii,
+                // printf("Fail [%i %i %i] H[%i] = %e\n", k, j, i, ii,
                 //       v(b, idx_H(ispec, ii), k, j, i));
               }
 

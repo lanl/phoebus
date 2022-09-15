@@ -436,7 +436,7 @@ class ConToPrim {
 
     num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
 
-    //if (num_nans > 0 || res.used_gamma_max()) {
+    // if (num_nans > 0 || res.used_gamma_max()) {
     if (num_nans > 0 || res.used_density_floor() || res.used_energy_floor()) {
       return ConToPrimStatus::failure;
     }

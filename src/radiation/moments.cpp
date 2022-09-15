@@ -340,7 +340,8 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
 }
 
 template <class T>
-// TODO(BRR) add domain so we can do this only over interior if we are using prims as boundary data?
+// TODO(BRR) add domain so we can do this only over interior if we are using prims as
+// boundary data?
 TaskStatus MomentCon2Prim(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
@@ -726,11 +727,14 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         X[2] = (face == CellLocation::Face2 ? coords.x2f(k, j, i) : coords.x2v(k, j, i));
         X[3] = (face == CellLocation::Face3 ? coords.x3f(k, j, i) : coords.x3v(k, j, i));
 
-        Real xi_max;
-        // bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-        //                            coords.x3v(k, j, i), xi_max);
-        xi_max = 0.99;
-        // TODO(BRR) compilaiton bug?
+        Real W_ceiling, garbage;
+        bounds.GetCeilings(X[1], X[2], X[3], W_ceiling, garbage);
+
+        Real J_floor;
+        bounds.GetRadiationFloors(X[1], X[2], X[3], J_floor);
+
+        Real xi_ceiling;
+        bounds.GetRadiationCeilings(X[1], X[2], X[3], xi_ceiling);
 
         Vec con_beta;
         Tens2 cov_gamma;
@@ -751,14 +755,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
         const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
 
-        Real Wceiling, garbage;
-        bounds.GetCeilings(X[1], X[2], X[3], Wceiling, garbage);
-        if (Wl > Wceiling) {
-          const Real rescale = std::sqrt(Wceiling * Wceiling - 1.) / (Wl * Wl - 1.);
+        if (Wl > W_ceiling) {
+          const Real rescale = std::sqrt(W_ceiling * W_ceiling - 1.) / (Wl * Wl - 1.);
           SPACELOOP(ii) { con_vpl[ii] *= rescale; }
         }
-        if (Wr > Wceiling) {
-          const Real rescale = std::sqrt(Wceiling * Wceiling - 1.) / (Wr * Wr - 1.);
+        if (Wr > W_ceiling) {
+          const Real rescale = std::sqrt(W_ceiling * W_ceiling - 1.) / (Wr * Wr - 1.);
           SPACELOOP(ii) { con_vpr[ii] *= rescale; }
         }
 
@@ -772,34 +774,23 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         const Real asym_sigl = alpha * con_vl(idir) - con_beta(idir);
         const Real asym_sigr = alpha * con_vr(idir) - con_beta(idir);
 
-        // TODO(BRR) implement
-        // Real Jfloor;
-        // bounds.GetRadiationFloors(X[1], X[2], X[3], Jfloor);
-
         for (int ispec = 0; ispec < num_species; ++ispec) {
           // TODO(BRR) Use floors
-          const Real Jl = std::max<Real>(v(idx_ql(ispec, 0, idir), k, j, i), 1.e-10);
-          const Real Jr = std::max<Real>(v(idx_qr(ispec, 0, idir), k, j, i), 1.e-10);
-          //          if (j == 118 && i > 128) {
-          //          printf("Jl = %e (ispec: %i idir: %i) (%i %i %i %i)\n", Jl, ispec,
-          //          idir, idx_ql(ispec, 0, idir), k, j, i);
-          //          }
+          const Real Jl = std::max<Real>(v(idx_ql(ispec, 0, idir), k, j, i), J_floor);
+          const Real Jr = std::max<Real>(v(idx_qr(ispec, 0, idir), k, j, i), J_floor);
           Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 2, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
           Vec Hr = {Jr * v(idx_qr(ispec, 1, idir), k, j, i),
                     Jr * v(idx_qr(ispec, 2, idir), k, j, i),
                     Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
-          // TODO(BRR) Why does clamping xi here cause explosions?
           Real xil = std::sqrt(g.contractCov3Vectors(Hl, Hl)) / Jl;
           Real xir = std::sqrt(g.contractCov3Vectors(Hr, Hr)) / Jr;
-          // TODO(BRR) for j = 4, j = 68 zones, xir/xil for idir = 1 are like 1e10 --
-          // seems like BCs are not copying data correctly
-          if (xil > xi_max) {
-            SPACELOOP(ii) { Hl(ii) *= xi_max / xil; }
+          if (xil > xi_ceiling) {
+            SPACELOOP(ii) { Hl(ii) *= xi_ceiling / xil; }
           }
-          if (xir > xi_max) {
-            SPACELOOP(ii) { Hr(ii) *= xi_max / xir; }
+          if (xir > xi_ceiling) {
+            SPACELOOP(ii) { Hr(ii) *= xi_ceiling / xir; }
           }
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
@@ -850,11 +841,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
           cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
-
-          //          if (j == 118 && i > 128) {
-          //            printf("[%i %i %i] Jl: %e Hl: %e %e %e Jr: %e Hr: %e %e %e\n",
-          //              k, j, i, Jl, Hl(0), Hl(1), Hl(2), Jr, Hr(0), Hr(1), Hr(2));
-          //          }
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
