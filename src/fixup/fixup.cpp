@@ -338,15 +338,23 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         Real drho = rho_floor_max - v(b, prho, k, j, i);
         Real du = u_floor_max - v(b, peng, k, j, i);
         if (drho > 0. || du > 0.) {
+          //          if (i == 117 && (j == 4 || j == 7)) {
+          //            printf("[%i %i %i] floor applied! drho = %e du = %e\n",
+          //            k,j,i,drho, du);
+          //          }
           floor_applied = true;
-          //drho = std::max<Real>(drho, 1.e-100); // > 0 so EOS calls are happy
-          if (drho < 0.) {
+          // drho = std::max<Real>(drho, 1.e-100); // > 0 so EOS calls are happy
+          if (drho < robust::SMALL()) {
             drho = du / e_max;
           }
-          if (du < 0.) {
+          if (du < robust::SMALL()) {
             du = sie_floor * drho;
           }
-          //du = std::max<Real>(du, 1.e-100);
+          //          if (i == 117 && (j == 4 || j == 7)) {
+          //            printf("[%i %i %i] floor applied! new drho = %e du = %e\n",
+          //            k,j,i,drho, du);
+          //          }
+          // du = std::max<Real>(du, 1.e-100);
           // set min du to be drho*sie_floor?
         }
 
@@ -407,12 +415,21 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           }
         }
 
+        //        if (i == 117 && (j == 4 || j == 7)) {
+        //          printf("[%i %i %i] post-mhd fixup rho: %e u: %e\n",
+        //            k, j, i, v(b, prho, k, j, i), v(b, peng, k, j, i));
+        //        }
+
         // Fluid ceilings?
         Real vpcon[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
                          v(b, pvel_lo + 2, k, j, i)};
         const Real W = phoebus::GetLorentzFactor(vpcon, gcov);
         if (W > gamma_max || v(b, peng, k, j, i) / v(b, prho, k, j, i) > e_max) {
           ceiling_applied = true;
+
+          //          if (i == 117 && (j == 4 || j == 7)) {
+          //            printf("[%i %i %i] ceiling applied!\n", k, j, i);
+          //          }
         }
 
         if (ceiling_applied) {
@@ -1032,16 +1049,16 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             v(b, peng, k, j, i) = fixup(peng, norm);
 
             if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
-          //  if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-          //  v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-          //      v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-          //      eos_lambda);
-          //  v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-          //      v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-          //  v(b, gm1, k, j, i) =
-          //      ratio(eos.BulkModulusFromDensityTemperature(
-          //                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
-          //            v(b, prs, k, j, i));
+            //  if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+            //  v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+            //      v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+            //      eos_lambda);
+            //  v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+            //      v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+            //  v(b, gm1, k, j, i) =
+            //      ratio(eos.BulkModulusFromDensityTemperature(
+            //                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+            //            v(b, prs, k, j, i));
           } else {
             // printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
@@ -1060,7 +1077,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             // Zero primitive velocities
             SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = 0.; }
           }
-            
+
           if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
           v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
               v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
@@ -1068,8 +1085,8 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
               v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
           v(b, gm1, k, j, i) =
-              ratio(eos.BulkModulusFromDensityTemperature(
-                        v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
+                                                          v(b, tmp, k, j, i), eos_lambda),
                     v(b, prs, k, j, i));
 
           //          // Update conserved variables
@@ -1281,7 +1298,7 @@ TaskStatus SourceFixupImpl(T *rc) {
             // No valid neighbors; set to floors with zero spatial velocity
             //            printf("No valid source neighbors! %i %i %i\n", k, j, i);
 
-            //double rho_floor, sie_floor;
+            // double rho_floor, sie_floor;
             // bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
             //                 coords.x3v(k, j, i), rho_floor, sie_floor);
             // v(b, prho, k, j, i) = rho_floor;
