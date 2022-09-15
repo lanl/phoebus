@@ -331,6 +331,12 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           SPACELOOP(ii) { bp[ii] = v(b, pb_lo + ii, k, j, i); }
         }
 
+        if (i == 131 && j == 100) {
+          printf("floor applied? %i\n", static_cast<int>(floor_applied));
+          printf("rho: %e eng: %e\n", v(b, prho, k, j, i), v(b, peng, k, j, i));
+          printf("rho_floor_max: %e u_floor_max: %e\n", rho_floor_max, u_floor_max);
+        }
+
         if (floor_applied) {
           Real vp_normalobs[3] = {0}; // Inject floors at rest in normal observer frame
           Real ye_prim_default = 0.5;
@@ -1023,7 +1029,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
                           v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
                       v(b, prs, k, j, i));
           } else {
-            printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
+            //printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
             // velocities to zero
 
@@ -1259,7 +1265,7 @@ TaskStatus SourceFixupImpl(T *rc) {
             }
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
-            printf("No valid neighbors! %i %i %i\n", k, j, i);
+//            printf("No valid source neighbors! %i %i %i\n", k, j, i);
 
             double rho_floor, sie_floor;
             bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
