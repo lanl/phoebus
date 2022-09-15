@@ -1213,6 +1213,15 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real lambda[2] = {Ye, 0.};
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
+        //                          if ( j == 108 && i == 111) {
+        //            const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+        //
+        //                            printf("[%i %i %i] rho = %e u = %e v = %e %e %e W =
+        //                            %e\n",
+        //                               k, j, i, rho, ug, con_vp[0], con_vp[1],
+        //                               con_vp[2], W);
+        //                            exit(-1);
+        //                          }
 
         //         if (j == 118 && i == 131) {
         //           int ispec = 0;
@@ -1561,10 +1570,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             for (int n = 0; n < 4; n++) {
               resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
               if (std::isnan(resid[n])) {
-                printf("nan resid[%i]! %i %i %i Umhdg: %e %e %e %e dSg: %e %e %e %e\n", n,
-                       k, j, i, U_mhd_guess[0], U_mhd_guess[1], U_mhd_guess[2],
-                       U_mhd_guess[3], dS_guess[0], dS_guess[1], dS_guess[2],
-                       dS_guess[3]);
+                //                printf("nan resid[%i]! %i %i %i Umhdg: %e %e %e %e dSg:
+                //                %e %e %e %e\n", n,
+                //                       k, j, i, U_mhd_guess[0], U_mhd_guess[1],
+                //                       U_mhd_guess[2], U_mhd_guess[3], dS_guess[0],
+                //                       dS_guess[1], dS_guess[2], dS_guess[3]);
                 bad_guess = true;
                 break;
               }
@@ -1631,14 +1641,15 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
           //
 
           if (success == false) {
-            printf("[%i %i %i] src failed err: %e niter: %i rho: %e Pmhd0: %e %e %e %e "
-                   "Prad0: %e %e %e %e\n",
-                   k, j, i, err, niter, rho, v(iblock, peng, k, j, i),
-                   v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                   v(iblock, pv(2), k, j, i), v(iblock, idx_J(ispec), k, j, i),
-                   v(iblock, idx_H(ispec, 0), k, j, i),
-                   v(iblock, idx_H(ispec, 1), k, j, i),
-                   v(iblock, idx_H(ispec, 2), k, j, i));
+            //            printf("[%i %i %i] src failed err: %e niter: %i rho: %e Pmhd0:
+            //            %e %e %e %e "
+            //                   "Prad0: %e %e %e %e\n",
+            //                   k, j, i, err, niter, rho, v(iblock, peng, k, j, i),
+            //                   v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+            //                   v(iblock, pv(2), k, j, i), v(iblock, idx_J(ispec), k, j,
+            //                   i), v(iblock, idx_H(ispec, 0), k, j, i), v(iblock,
+            //                   idx_H(ispec, 1), k, j, i), v(iblock, idx_H(ispec, 2), k,
+            //                   j, i));
             // Fall back to oned solver if fourd encounters an issue
             if (src_use_oned_backup) {
               goto oned_solver_begin;
