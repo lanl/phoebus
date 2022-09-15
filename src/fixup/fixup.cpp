@@ -771,7 +771,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             num_valid += v(b, iradfail, k, j - 1, i) + v(b, iradfail, k, j + 1, i);
           if (ndim == 3)
             num_valid += v(b, iradfail, k - 1, j, i) + v(b, iradfail, k + 1, j, i);
-          if (num_valid > 0.5) {
+          if (num_valid > 0.5 && false) {
             const Real norm = 1.0 / num_valid;
             for (int ispec = 0; ispec < nspec; ispec++) {
               v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
@@ -1009,7 +1009,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
             if (ndim == 3)
               num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
           }
-          if (num_valid > 0.5) {
+          if (num_valid > 0.5 && false) {
             const Real norm = 1.0 / num_valid;
             v(b, prho, k, j, i) = fixup(prho, norm);
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
@@ -1237,7 +1237,7 @@ TaskStatus SourceFixupImpl(T *rc) {
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
 
-          if (num_valid > 0.5) {
+          if (num_valid > 0.5 && false ) {
             const Real norm = 1.0 / num_valid;
 
             v(b, prho, k, j, i) = fixup(prho, norm);
