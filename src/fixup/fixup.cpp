@@ -609,9 +609,12 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   namespace cr = radmoment_cons;
 
   auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  //IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  //IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  //IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
@@ -769,10 +772,10 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             }
           } else {
             //            printf("[%i %i %i] no valid rad c2p neighbors!\n", k, j, i);
-            Real ucon[4] = {0};
-            Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
-                             v(b, idx_pvel(2), k, j, i)};
-            GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
+            //Real ucon[4] = {0};
+            //Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
+            //                 v(b, idx_pvel(2), k, j, i)};
+            //GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
             for (int ispec = 0; ispec < nspec; ispec++) {
               // v(b, idx_J(ispec), k, j, i) = 1.e-10;
               v(b, idx_J(ispec), k, j, i) = 1.e-100;
@@ -883,9 +886,12 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   namespace c = fluid_cons;
   namespace impl = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  //IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+  //IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+  //IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
@@ -1231,6 +1237,16 @@ TaskStatus SourceFixupImpl(T *rc) {
             if (pye > 0) {
               v(b, pye, k, j, i) = fixup(pye, norm);
             }
+            if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+                v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+                eos_lambda);
+            v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+            v(b, gm1, k, j, i) =
+                ratio(eos.BulkModulusFromDensityTemperature(
+                          v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+                      v(b, prs, k, j, i));
 
             for (int ispec = 0; ispec < num_species; ispec++) {
               v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
@@ -1277,8 +1293,8 @@ TaskStatus SourceFixupImpl(T *rc) {
               // idx_J(ispec), k, j, i);
               SPACELOOP(ii) {
                 v(b, idx_H(ispec, ii), k, j, i) = 0.;
-                printf("Fail [%i %i %i] H[%i] = %e\n", k, j, i, ii,
-                       v(b, idx_H(ispec, ii), k, j, i));
+                //printf("Fail [%i %i %i] H[%i] = %e\n", k, j, i, ii,
+                //       v(b, idx_H(ispec, ii), k, j, i));
               }
 
               // TODO(BRR) is this wrong? Want zero flux in fluid frame, this isn't it
