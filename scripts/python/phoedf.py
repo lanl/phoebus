@@ -210,8 +210,12 @@ class phoedf(phdf.phdf):
       for jj in range(3):
         self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj]
     self.xi = np.sqrt(self.xi)
+    print(self.xi.max())
+    print(self.xi.min())
 
     self.xi = np.clip(self.xi, 1.e-10, 1.)
+    print(self.xi.max())
+    print(self.xi.min())
 
     return self.xi
 
