@@ -106,6 +106,9 @@ class Residual {
                const Real What) {
     Real rho = rhohat_mu(1.0 / What);
     bounds_.GetFloors(x1_, x2_, x3_, rho, e_floor_);
+#if !USE_C2P_ROBUST_FLOORS
+    e_floor_ = 1.e-20;
+#endif
     const Real ehat_trial =
         What * (qbar - mu * rbarsq) + vhatsq * What * What / (1.0 + What);
     used_energy_floor_ = false;
@@ -299,6 +302,10 @@ class ConToPrim {
     Real rhoflr = 0.0;
     Real epsflr;
     bounds.GetFloors(x1, x2, x3, rhoflr, epsflr);
+#if !USE_C2P_ROBUST_FLOORS
+    rhoflr = 1.e-20;
+    epsflr = 1.e-20;
+#endif
     Real gam_max, eps_max;
     bounds.GetCeilings(x1, x2, x3, gam_max, eps_max);
 
@@ -429,7 +436,8 @@ class ConToPrim {
 
     num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
 
-    if (num_nans > 0 || res.used_gamma_max()) {
+    //if (num_nans > 0 || res.used_gamma_max()) {
+    if (num_nans > 0 || res.used_density_floor() || res.used_energy_floor()) {
       return ConToPrimStatus::failure;
     }
     return ConToPrimStatus::success;

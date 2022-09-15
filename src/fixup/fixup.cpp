@@ -179,6 +179,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return fix;
 }
 
+/// Given a valid state (including consistency between prim and cons variables),
+/// this function returns another valid state that is within the bounds of specified
+/// floors and ceilings.
 template <typename T, class CLOSURE>
 TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
