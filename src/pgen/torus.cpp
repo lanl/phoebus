@@ -397,6 +397,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   if (do_rad) {
     radiation::MomentPrim2Con(rc);
   }
+
+  fixup::ApplyFloors(rc);
 }
 
 void ProblemModifier(ParameterInput *pin) {
