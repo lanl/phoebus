@@ -236,6 +236,7 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -321,6 +322,14 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
           // Use the scaled value of the rest frame flux for reconstruction
           v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
+        }
+
+        const Real xi = std::sqrt(g.contractCov3Vectors(covH, covH))/J;
+        if (xi > 1.) {
+          printf("[%i %i %i] xi = %e\n", k,j,i,xi);
+        }
+        if (j == 108 && i == 111) {
+          printf("[%i %i %i] J = %e\n", k, j, i, J);
         }
 
         //        if (i >= 128 && j == 118) {
@@ -558,12 +567,14 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // x-direction
         ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
                                    vi_r);
-        //        if (member.team_rank() == 0 && n == 0 && j == 118) {
+                if (member.team_rank() == 0 && n == 0 && j == 108) {
+                  int i = 111;
+
         //          for (int i = ib.e - 5; i <= ib.e + 1; i++) {
-        //            printf("[%i %i %i] (J) vi_l = %e vi_r = %e\n",
-        //              k, j, i, vi_l[i], vi_r[i]);
-        //            }
-        //        }
+                    printf("[%i %i %i] (J) = %e\n",
+                      k, j, i, v(b, idx_J(n), k, j, 0));
+                    }
+                //}
         // y-direction
         if (ndim > 1)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
