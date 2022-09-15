@@ -405,7 +405,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           // TODO(BRR) Get K^0 via metric
           Real Kcon0 = -k0(n);
-          Real dlam = dt / Kcon0;
+          //Real dlam = dt / Kcon0;
 
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
