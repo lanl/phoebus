@@ -792,8 +792,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
           return inv_mask_sum * v(b, iv, k, j, i);
         };
 
-        if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail ||
-            v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
+        //if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail ||
+        //    v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
+        if (v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
 
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
           Real gcov[4][4];
@@ -1089,6 +1090,8 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
                                                           v(b, tmp, k, j, i), eos_lambda),
                     v(b, prs, k, j, i));
 
+          // Need to update radiation primitives
+
           //          // Update conserved variables
           //          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
           //          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
@@ -1129,6 +1132,10 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           //          }
         }
       });
+          
+  // Need to update radiation primitives
+  // TODO(BRR) This is very inefficient!
+  radiation::MomentCon2Prim(rc);
 
   // TODO(BRR) This is inefficient!
   ApplyFloors(rc);
