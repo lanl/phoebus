@@ -545,10 +545,19 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
     uorho_max = fix_pkg->Param<Real>("uorho_max");
   }
 
+  //FloorsAndCeilingsApplicator<T> floor_ceil(rc);
+
+  BoundsApplier<T> bnds(rc, bounds);
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+
+        //floor_ceil.ApplyFloors(b, k, j, j);
+        bnds.ApplyMHDFloors(b, k, j, i);
+        PARTHENON_FAIL("exit here");
+
         double eos_lambda[2]; // used for stellarcollapse eos and
                               // other EOS's that require root
                               // finding.
