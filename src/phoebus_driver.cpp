@@ -808,6 +808,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
   packages.Add(Microphysics::Opacity::Initialize(pin.get()));
   packages.Add(Geometry::Initialize(pin.get()));
+  // packages.Add(radiation::Initialize(pin.get()));
   packages.Add(fluid::Initialize(pin.get()));
   packages.Add(radiation::Initialize(pin.get()));
   packages.Add(fixup::Initialize(pin.get()));

@@ -42,6 +42,10 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc);
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc);
 template <typename T>
+TaskStatus AllConservedToPrimitiveFixup(T *rc);
+template <typename T>
+TaskStatus AllC2P(T *rc);
+template <typename T>
 TaskStatus SourceFixup(T *rc);
 
 static struct ConstantRhoSieFloor {

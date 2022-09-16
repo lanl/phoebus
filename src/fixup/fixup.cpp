@@ -21,6 +21,7 @@
 #include <singularity-eos/eos/eos.hpp>
 
 #include "fluid/con2prim_robust.hpp"
+#include "fluid/fluid.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
 //#include "geometry/tetrads.hpp"
@@ -230,6 +231,30 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   return fix;
 }
+
+template <typename T>
+TaskStatus AllC2P(T *rc) {
+
+  // Must updated fluid vars first to have prim velocity for updating rad prims
+  fluid::ConservedToPrimitive(rc);
+  radiation::MomentCon2Prim(rc);
+
+  return TaskStatus::complete;
+}
+
+template TaskStatus AllC2P<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+
+template <typename T>
+TaskStatus AllConservedToPrimitiveFixup(T *rc) {
+
+  RadConservedToPrimitiveFixup(rc);
+  ConservedToPrimitiveFixup(rc);
+
+  return TaskStatus::complete;
+}
+
+template TaskStatus
+AllConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 /// Given a valid state (including consistency between prim and cons variables),
 /// this function returns another valid state that is within the bounds of specified

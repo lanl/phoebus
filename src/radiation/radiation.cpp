@@ -424,9 +424,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     printf("Added fields!\n");
 #endif
 
-    physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
+    // physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
+    physics->FillDerivedBlock = fixup::AllC2P<MeshBlockData<Real>>;
     physics->PostFillDerivedBlock =
-        fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>;
+        fixup::AllConservedToPrimitiveFixup<MeshBlockData<Real>>;
   }
 
   params.Add("moments_active", moments_active);
