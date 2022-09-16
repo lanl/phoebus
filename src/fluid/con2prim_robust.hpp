@@ -223,6 +223,7 @@ struct CellGeom {
     geom.ContravariantShift(CellLocation::Cent, b, k, j, i, beta);
   }
   Real gcov[3][3];
+  // TODO(BRR) Don't need gcov and gcov4
   Real gcov4[4][4];
   Real gcon[3][3];
   Real beta[3];
