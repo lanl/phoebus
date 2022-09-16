@@ -14,6 +14,7 @@
 #include <cmath>
 
 #include "fixup.hpp"
+#include "fixup_applier.hpp"
 
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
@@ -22,7 +23,7 @@
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
-#include "geometry/tetrads.hpp"
+//#include "geometry/tetrads.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
@@ -179,16 +180,29 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   if (enable_mhd_floors) {
-    Real bsqorho_max = pin->GetOrAddReal("fixup", "bsqorho_max", 50.);
-    Real bsqou_max = pin->GetOrAddReal("fixup", "bsqou_max", 2500.);
-    Real uorho_max = pin->GetOrAddReal("fixup", "uorho_max", 50.);
-    params.Add("bsqorho_max", bsqorho_max);
-    params.Add("bsqou_max", bsqou_max);
-    params.Add("uorho_max", uorho_max);
+    const std::string mhd_ceiling_type = pin->GetOrAddString("fixup", "mhd_ceiling_type", "ConstantBsqRat");
+    if (mhd_ceiling_type == "ConstantBsqRat") {
+      Real bsqorho0 = pin->GetOrAddReal("fixup", "bsqorho0_ceiling", 50.);
+      Real bsqou0 = pin->GetOrAddReal("fixup", "bsqou0_ceiling", 2500.);
+      params.Add("mhd_ceiling", MHDCeilings(constant_bsq_rat_ceiling_tag, bsqorho0, bsqou0));
+    } else {
+      PARTHENON_FAIL("invalid <fixup>/mhd_ceiling_type input");
+    }
+  } else {
+    params.Add("mhd_ceiling", MHDCeilings());
   }
+
+//    Real bsqorho_max = pin->GetOrAddReal("fixup", "bsqorho_max", 50.);
+//    Real bsqou_max = pin->GetOrAddReal("fixup", "bsqou_max", 2500.);
+////    Real uorho_max = pin->GetOrAddReal("fixup", "uorho_max", 50.);
+//    params.Add("bsqorho_max", bsqorho_max);
+//    params.Add("bsqou_max", bsqou_max);
+////    params.Add("uorho_max", uorho_max);
+//  }
 
   params.Add("bounds",
              Bounds(params.Get<Floors>("floor"), params.Get<Ceilings>("ceiling"),
+             params.Get<MHDCeilings>("mhd_ceiling"),
                     params.Get<RadiationFloors>("rad_floor"),
                     params.Get<RadiationCeilings>("rad_ceiling")));
 
@@ -264,12 +278,12 @@ TaskStatus ApplyFluidFloors(T *rc, IndexDomain domain = IndexDomain::entire) {
   auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
-  Real bsqorho_max, bsqou_max, uorho_max;
-  if (enable_mhd_floors) {
-    bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
-    bsqou_max = fix_pkg->Param<Real>("bsqou_max");
-    uorho_max = fix_pkg->Param<Real>("uorho_max");
-  }
+//  Real bsqorho_max, bsqou_max, uorho_max;
+//  if (enable_mhd_floors) {
+//    bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
+//    bsqou_max = fix_pkg->Param<Real>("bsqou_max");
+//    uorho_max = fix_pkg->Param<Real>("uorho_max");
+//  }
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
@@ -292,6 +306,10 @@ TaskStatus ApplyFluidFloors(T *rc, IndexDomain domain = IndexDomain::entire) {
         Real xi_max;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                     coords.x3v(k, j, i), xi_max);
+
+        Real bsqorho_max, bsqou_max;
+        bounds.GetMHDCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+        bsqorho_max, bsqou_max);
 
         Real rho_floor_max = rho_floor;
         Real u_floor_max = rho_floor * sie_floor;
@@ -329,7 +347,7 @@ TaskStatus ApplyFluidFloors(T *rc, IndexDomain domain = IndexDomain::entire) {
 
           rho_floor_max = std::max<Real>(
               rho_floor_max,
-              std::max<Real>(v(b, peng, k, j, i), u_floor_max) / uorho_max);
+              std::max<Real>(v(b, peng, k, j, i), u_floor_max) / e_max);
         }
 
         Real drho = rho_floor_max - v(b, prho, k, j, i);
@@ -538,16 +556,20 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
-  Real bsqorho_max, bsqou_max, uorho_max;
-  if (enable_mhd_floors) {
-    bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
-    bsqou_max = fix_pkg->Param<Real>("bsqou_max");
-    uorho_max = fix_pkg->Param<Real>("uorho_max");
-  }
+//  Real bsqorho_max, bsqou_max, uorho_max;
+//  if (enable_mhd_floors) {
+//    bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
+//    bsqou_max = fix_pkg->Param<Real>("bsqou_max");
+//    uorho_max = fix_pkg->Param<Real>("uorho_max");
+//  }
 
   //FloorsAndCeilingsApplicator<T> floor_ceil(rc);
 
-  BoundsApplier<T> bnds(rc, bounds);
+  //using GEOM = std::remove_pointer<decltype(geom)>::type;
+  // TODO(BRR) There must be a way to use decltype() to do this instead
+  using GEOM = Geometry::CoordSysMeshBlock;
+  using C2P = con2prim_robust::C2P_Block_t;
+  BoundsApplier<T, GEOM, C2P> bnds(rc, bounds, coords, geom);//, invert);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
@@ -569,6 +591,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         double gamma_max, e_max;
         bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
                            gamma_max, e_max);
+        Real bsqorho_max, bsqou_max;
+        bounds.GetMHDCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+        bsqorho_max, bsqou_max);
         Real J_floor;
         bounds.GetRadiationFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                   coords.x3v(k, j, i), J_floor);
@@ -612,7 +637,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
           rho_floor_max = std::max<Real>(
               rho_floor_max,
-              std::max<Real>(v(b, peng, k, j, i), u_floor_max) / uorho_max);
+              std::max<Real>(v(b, peng, k, j, i), u_floor_max) / e_max);
         }
 
         Real drho = rho_floor_max - v(b, prho, k, j, i);
