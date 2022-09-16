@@ -261,9 +261,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       }
     }
   }
-  
+
   const auto num_independent_task_lists = blocks.size();
-  
+
   // Fix up flux failures
   // TODO(BRR) Need to fix up after RK2 step??
   TaskRegion &async_region_begin = tc.AddRegion(num_independent_task_lists);
@@ -276,11 +276,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     // pull out the container we'll use to get fluxes and/or compute RHSs
     auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
-    //auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
+    // auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
     using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-    
-    auto floors =
-        tl.AddTask(none, fixup::ApplyFloors<MeshBlockData<Real>>, sc0.get());
+
+    auto floors = tl.AddTask(none, fixup::ApplyFloors<MeshBlockData<Real>>, sc0.get());
   }
   // TODO(BRR) would need to do fixup in ghost zones...
 
@@ -632,14 +631,14 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fill_derived = tl.AddTask(
         src_fixup, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
 
-    auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+    // auto fixup = tl.AddTask(
+    //    fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
-    auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+    // auto radfixup = tl.AddTask(
+    //    fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
-    auto floors =
-        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+    // auto floors =
+    //    tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
   }
 
   // Communicate (after applying stencil-based fixup)

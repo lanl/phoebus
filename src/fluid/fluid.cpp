@@ -15,6 +15,7 @@
 
 #include "con2prim.hpp"
 #include "con2prim_robust.hpp"
+#include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
@@ -299,6 +300,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Fill Derived and Estimate Timestep
   physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
+  physics->PostFillDerivedBlock = fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
