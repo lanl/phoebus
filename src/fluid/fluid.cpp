@@ -299,8 +299,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add(parthenon::hist_param_key, hst_vars);
 
   // Fill Derived and Estimate Timestep
-  physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
-  physics->PostFillDerivedBlock = fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>;
+  // Only set this if rad=false
+  const bool rad_active = pin->GetBoolean("physics", "rad");
+  if (!rad_active) {
+    physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
+    physics->PostFillDerivedBlock = fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>;
+  }
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
@@ -418,6 +422,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
