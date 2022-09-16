@@ -213,6 +213,17 @@ class phoedf(phdf.phdf):
     print(self.xi.max())
     print(self.xi.min())
 
+    for b in range(self.NumBlocks):
+      for k in range(self.Nx3):
+        for j in range(self.Nx2):
+          for i in range(self.Nx1):
+            if self.xi[b,k,j,i] > 1.0:
+              print(f"xi[{b},{k},{j},{i}] = {self.xi[b,k,j,i]} (H = {Hcov[b,k,j,i,0]} {Hcov[b,k,j,i,1]} {Hcov[b,k,j,i,2]}")
+
+    print(self.xi[0,0,52,54])
+    print(Hcov[0,0,52,54])
+    print(self.gammacon[0,0,52,54])
+
     self.xi = np.clip(self.xi, 1.e-10, 1.)
     print(self.xi.max())
     print(self.xi.min())
