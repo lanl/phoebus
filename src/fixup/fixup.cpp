@@ -667,6 +667,15 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                     v(b, idx_H(ispec, jj), k, j, i);
             }
             xi = std::sqrt(xi);
+            if ((i == 58 && j == 56) || (i == 56 && j == 58)) {
+              SPACELOOP2(ii, jj) {
+                printf("gammacon[%i][%i] = %e\n", ii,jj,gammacon[ii][jj]);
+              }
+              printf("[%i %i %i] xi: %e xi_max: %e H = %e %e %e\n", k,j,i,xi, xi_max,
+                v(b, idx_H(ispec, 0), k, j, i),
+                v(b, idx_H(ispec, 1), k, j, i),
+                v(b, idx_H(ispec, 2), k, j, i));
+            }
             if (xi > xi_max) {
 
               J = v(b, idx_J(ispec), k, j, i);
