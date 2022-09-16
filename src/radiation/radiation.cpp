@@ -12,6 +12,7 @@
 // publicly, and to permit others to do so.
 
 #include "radiation.hpp"
+#include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -424,6 +425,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 #endif
 
     physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
+    physics->PostFillDerivedBlock =
+        fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>;
   }
 
   params.Add("moments_active", moments_active);

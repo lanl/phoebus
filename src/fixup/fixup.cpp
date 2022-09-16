@@ -180,11 +180,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   if (enable_mhd_floors) {
-    const std::string mhd_ceiling_type = pin->GetOrAddString("fixup", "mhd_ceiling_type", "ConstantBsqRat");
+    const std::string mhd_ceiling_type =
+        pin->GetOrAddString("fixup", "mhd_ceiling_type", "ConstantBsqRat");
     if (mhd_ceiling_type == "ConstantBsqRat") {
       Real bsqorho0 = pin->GetOrAddReal("fixup", "bsqorho0_ceiling", 50.);
       Real bsqou0 = pin->GetOrAddReal("fixup", "bsqou0_ceiling", 2500.);
-      params.Add("mhd_ceiling", MHDCeilings(constant_bsq_rat_ceiling_tag, bsqorho0, bsqou0));
+      params.Add("mhd_ceiling",
+                 MHDCeilings(constant_bsq_rat_ceiling_tag, bsqorho0, bsqou0));
     } else {
       PARTHENON_FAIL("invalid <fixup>/mhd_ceiling_type input");
     }
@@ -192,296 +194,41 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("mhd_ceiling", MHDCeilings());
   }
 
-//    Real bsqorho_max = pin->GetOrAddReal("fixup", "bsqorho_max", 50.);
-//    Real bsqou_max = pin->GetOrAddReal("fixup", "bsqou_max", 2500.);
-////    Real uorho_max = pin->GetOrAddReal("fixup", "uorho_max", 50.);
-//    params.Add("bsqorho_max", bsqorho_max);
-//    params.Add("bsqou_max", bsqou_max);
-////    params.Add("uorho_max", uorho_max);
-//  }
+  FAILURE_STRATEGY c2p_failure_strategy;
+  std::string c2p_failure_strategy_str =
+      pin->GetOrAddString("fixup", "c2p_failure_strategy", "interpolate");
+  if (c2p_failure_strategy_str == "interpolate") {
+    c2p_failure_strategy == FAILURE_STRATEGY::interpolate;
+  } else if (c2p_failure_strategy_str == "floors") {
+    c2p_failure_strategy == FAILURE_STRATEGY::floors;
+  }
+  params.Add("c2p_failure_strategy", c2p_failure_strategy);
+
+  FAILURE_STRATEGY src_failure_strategy;
+  std::string src_failure_strategy_str =
+      pin->GetOrAddString("fixup", "src_failure_strategy", "interpolate");
+  if (src_failure_strategy_str == "interpolate") {
+    src_failure_strategy == FAILURE_STRATEGY::interpolate;
+  } else if (src_failure_strategy_str == "floors") {
+    src_failure_strategy == FAILURE_STRATEGY::floors;
+  }
+  params.Add("src_failure_strategy", src_failure_strategy);
+
+  //    Real bsqorho_max = pin->GetOrAddReal("fixup", "bsqorho_max", 50.);
+  //    Real bsqou_max = pin->GetOrAddReal("fixup", "bsqou_max", 2500.);
+  ////    Real uorho_max = pin->GetOrAddReal("fixup", "uorho_max", 50.);
+  //    params.Add("bsqorho_max", bsqorho_max);
+  //    params.Add("bsqou_max", bsqou_max);
+  ////    params.Add("uorho_max", uorho_max);
+  //  }
 
   params.Add("bounds",
              Bounds(params.Get<Floors>("floor"), params.Get<Ceilings>("ceiling"),
-             params.Get<MHDCeilings>("mhd_ceiling"),
+                    params.Get<MHDCeilings>("mhd_ceiling"),
                     params.Get<RadiationFloors>("rad_floor"),
                     params.Get<RadiationCeilings>("rad_ceiling")));
 
   return fix;
-}
-
-template <typename T>
-TaskStatus ApplyFluidFloors(T *rc, IndexDomain domain = IndexDomain::entire) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
-  namespace p = fluid_prim;
-  namespace c = fluid_cons;
-  namespace pr = radmoment_prim;
-  namespace cr = radmoment_cons;
-  namespace ir = radmoment_internal;
-  namespace impl = internal_variables;
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
-
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
-  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
-
-  bool rad_active = rad_pkg->Param<bool>("active");
-
-  bool enable_floors = fix_pkg->Param<bool>("enable_floors");
-  bool enable_mhd_floors = fix_pkg->Param<bool>("enable_mhd_floors");
-  bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
-
-  if (!enable_floors) return TaskStatus::complete;
-
-  const std::vector<std::string> vars(
-      {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
-       p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
-       impl::cell_signal_speed, impl::fail, ir::tilPi});
-
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-
-  const int prho = imap[p::density].first;
-  const int crho = imap[c::density].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
-  const int cmom_lo = imap[c::momentum].first;
-  const int cmom_hi = imap[c::momentum].second;
-  const int peng = imap[p::energy].first;
-  const int ceng = imap[c::energy].first;
-  const int prs = imap[p::pressure].first;
-  const int tmp = imap[p::temperature].first;
-  const int gm1 = imap[p::gamma1].first;
-  const int slo = imap[impl::cell_signal_speed].first;
-  const int shi = imap[impl::cell_signal_speed].second;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
-  int pye = imap[p::ye].second; // negative if not present
-  int cye = imap[c::ye].second;
-  auto idx_J = imap.GetFlatIdx(pr::J, false);
-  auto idx_H = imap.GetFlatIdx(pr::H, false);
-  auto idx_E = imap.GetFlatIdx(cr::E, false);
-  auto idx_F = imap.GetFlatIdx(cr::F, false);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
-
-  const int num_species = enable_rad_floors ? rad_pkg->Param<int>("num_species") : 0;
-
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
-  auto geom = Geometry::GetCoordinateSystem(rc);
-  auto bounds = fix_pkg->Param<Bounds>("bounds");
-
-  const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
-  const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
-  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
-
-  Coordinates_t coords = rc->GetParentPointer().get()->coords;
-//  Real bsqorho_max, bsqou_max, uorho_max;
-//  if (enable_mhd_floors) {
-//    bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
-//    bsqou_max = fix_pkg->Param<Real>("bsqou_max");
-//    uorho_max = fix_pkg->Param<Real>("uorho_max");
-//  }
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
-      jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        double eos_lambda[2]; // used for stellarcollapse eos and
-                              // other EOS's that require root
-                              // finding.
-        eos_lambda[1] = std::log10(v(b, tmp, k, j, i)); // use last temp as initial guess
-
-        double rho_floor, sie_floor;
-        bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
-                         rho_floor, sie_floor);
-        double gamma_max, e_max;
-        bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
-                           gamma_max, e_max);
-        Real J_floor;
-        bounds.GetRadiationFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                  coords.x3v(k, j, i), J_floor);
-        Real xi_max;
-        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max);
-
-        Real bsqorho_max, bsqou_max;
-        bounds.GetMHDCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
-        bsqorho_max, bsqou_max);
-
-        Real rho_floor_max = rho_floor;
-        Real u_floor_max = rho_floor * sie_floor;
-
-        bool floor_applied = false;
-        bool ceiling_applied = false;
-
-        Real gcov[4][4];
-        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-        Real gammacon[3][3];
-        geom.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
-        const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-        Real betacon[3];
-        geom.ContravariantShift(CellLocation::Cent, k, j, i, betacon);
-        const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
-
-        if (enable_mhd_floors) {
-          Real Bsq = 0.0;
-          Real Bdotv = 0.0;
-          const Real vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                              v(b, pvel_lo + 2, k, j, i)};
-          const Real bp[3] = {v(b, pb_lo, k, j, i), v(pb_lo + 1, k, j, i),
-                              v(pb_lo + 2, k, j, i)};
-          const Real W = phoebus::GetLorentzFactor(vp, gcov);
-          const Real iW = 1.0 / W;
-          SPACELOOP2(ii, jj) {
-            Bsq += gcov[ii + 1][jj + 1] * bp[ii] * bp[jj];
-            Bdotv += gcov[ii + 1][jj + 1] * bp[ii] * vp[jj];
-          }
-          Real bcon0 = W * Bdotv / alpha;
-          const Real bsq = (Bsq + alpha * alpha * bcon0 * bcon0) * iW * iW;
-
-          rho_floor_max = std::max<Real>(rho_floor_max, bsq / bsqorho_max);
-          u_floor_max = std::max<Real>(u_floor_max, bsq / bsqou_max);
-
-          rho_floor_max = std::max<Real>(
-              rho_floor_max,
-              std::max<Real>(v(b, peng, k, j, i), u_floor_max) / e_max);
-        }
-
-        Real drho = rho_floor_max - v(b, prho, k, j, i);
-        Real du = u_floor_max - v(b, peng, k, j, i);
-        if (drho > 0. || du > 0.) {
-          //          if (i == 117 && (j == 4 || j == 7)) {
-          //            printf("[%i %i %i] floor applied! drho = %e du = %e\n",
-          //            k,j,i,drho, du);
-          //          }
-          floor_applied = true;
-          // drho = std::max<Real>(drho, 1.e-100); // > 0 so EOS calls are happy
-          if (drho < robust::SMALL()) {
-            drho = du / e_max;
-          }
-          if (du < robust::SMALL()) {
-            du = sie_floor * drho;
-          }
-          //          if (i == 117 && (j == 4 || j == 7)) {
-          //            printf("[%i %i %i] floor applied! new drho = %e du = %e\n",
-          //            k,j,i,drho, du);
-          //          }
-          // du = std::max<Real>(du, 1.e-100);
-          // set min du to be drho*sie_floor?
-        }
-
-        Real dcrho, dS[3], dBcons[3], dtau, dyecons;
-        Real bp[3] = {0};
-        if (pb_hi > 0) {
-          SPACELOOP(ii) { bp[ii] = v(b, pb_lo + ii, k, j, i); }
-        }
-
-        if (floor_applied) {
-          Real vp_normalobs[3] = {0}; // Inject floors at rest in normal observer frame
-          Real ye_prim_default = 0.5;
-          eos_lambda[0] = ye_prim_default;
-          Real dprs =
-              eos.PressureFromDensityInternalEnergy(drho, ratio(du, drho), eos_lambda);
-          Real dgm1 = ratio(
-              eos.BulkModulusFromDensityInternalEnergy(drho, ratio(du, drho), eos_lambda),
-              dprs);
-          prim2con::p2c(drho, vp_normalobs, bp, du, ye_prim_default, dprs, dgm1, gcov,
-                        gammacon, betacon, alpha, sdetgam, dcrho, dS, dBcons, dtau,
-                        dyecons);
-
-          // Update cons vars (not B field)
-          v(b, crho, k, j, i) += dcrho;
-          SPACELOOP(ii) { v(b, cmom_lo + ii, k, j, i) += dS[ii]; }
-          v(b, ceng, k, j, i) += dtau;
-          if (pye > 0) {
-            v(b, cye, k, j, i) += dyecons;
-          }
-
-          // fluid c2p
-          auto status = invert(geom, eos, coords, k, j, i);
-          if (status == con2prim_robust::ConToPrimStatus::failure) {
-            // If fluid c2p fails, set to floors
-            v(b, prho, k, j, i) = drho;
-            SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = vp_normalobs[ii]; }
-            v(b, peng, k, j, i) = du;
-            if (pye > 0) {
-              v(b, pye, k, j, i) = ye_prim_default;
-            }
-
-            // Update auxiliary primitives
-            if (pye > 0) {
-              eos_lambda[0] = v(b, pye, k, j, i);
-            }
-            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                v(b, prho, k, j, i), v(b, peng, k, j, i) / v(b, prho, k, j, i),
-                eos_lambda);
-
-            // Update cons vars (not B field)
-            prim2con::p2c(drho, vp_normalobs, bp, du, ye_prim_default, dprs, dgm1, gcov,
-                          gammacon, betacon, alpha, sdetgam, v(b, crho, k, j, i), dS,
-                          dBcons, v(b, ceng, k, j, i), dyecons);
-            SPACELOOP(ii) { v(b, cmom_lo + ii, k, j, i) = dS[ii]; }
-            if (pye > 0) {
-              v(b, cye, k, j, i) = dyecons;
-            }
-          }
-        }
-
-        //        if (i == 117 && (j == 4 || j == 7)) {
-        //          printf("[%i %i %i] post-mhd fixup rho: %e u: %e\n",
-        //            k, j, i, v(b, prho, k, j, i), v(b, peng, k, j, i));
-        //        }
-
-        // Fluid ceilings?
-        Real vpcon[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                         v(b, pvel_lo + 2, k, j, i)};
-        const Real W = phoebus::GetLorentzFactor(vpcon, gcov);
-        if (W > gamma_max || v(b, peng, k, j, i) / v(b, prho, k, j, i) > e_max) {
-          ceiling_applied = true;
-
-          //          if (i == 117 && (j == 4 || j == 7)) {
-          //            printf("[%i %i %i] ceiling applied!\n", k, j, i);
-          //          }
-        }
-
-        if (ceiling_applied) {
-          const Real rescale = std::sqrt(gamma_max * gamma_max - 1.) / (W * W - 1.);
-          SPACELOOP(ii) { vpcon[ii] *= rescale; }
-          SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = vpcon[ii]; }
-
-          Real ye = 0.;
-          if (pye > 0) {
-            ye = v(b, pye, k, j, i);
-          }
-          prim2con::p2c(v(b, prho, k, j, i), vpcon, bp, v(b, peng, k, j, i), ye,
-                        v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gammacon, betacon,
-                        alpha, sdetgam, v(b, crho, k, j, i), dS, dBcons,
-                        v(b, ceng, k, j, i), dyecons);
-          SPACELOOP(ii) { v(b, cmom_lo + ii, k, j, i) = dS[ii]; }
-          if (pye > 0) {
-            v(b, cye, k, j, i) = dyecons;
-          }
-        }
-
-        if (floor_applied || ceiling_applied) {
-          // Update derived prims
-          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-              eos_lambda);
-          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-          v(b, gm1, k, j, i) =
-              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
-                                                          v(b, tmp, k, j, i), eos_lambda),
-                    v(b, prs, k, j, i));
-        }
-      });
-
-  return TaskStatus::complete;
 }
 
 /// Given a valid state (including consistency between prim and cons variables),
@@ -556,29 +303,28 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
-//  Real bsqorho_max, bsqou_max, uorho_max;
-//  if (enable_mhd_floors) {
-//    bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
-//    bsqou_max = fix_pkg->Param<Real>("bsqou_max");
-//    uorho_max = fix_pkg->Param<Real>("uorho_max");
-//  }
+  //  Real bsqorho_max, bsqou_max, uorho_max;
+  //  if (enable_mhd_floors) {
+  //    bsqorho_max = fix_pkg->Param<Real>("bsqorho_max");
+  //    bsqou_max = fix_pkg->Param<Real>("bsqou_max");
+  //    uorho_max = fix_pkg->Param<Real>("uorho_max");
+  //  }
 
-  //FloorsAndCeilingsApplicator<T> floor_ceil(rc);
+  // FloorsAndCeilingsApplicator<T> floor_ceil(rc);
 
-  //using GEOM = std::remove_pointer<decltype(geom)>::type;
+  // using GEOM = std::remove_pointer<decltype(geom)>::type;
   // TODO(BRR) There must be a way to use decltype() to do this instead
-  using GEOM = Geometry::CoordSysMeshBlock;
-  using C2P = con2prim_robust::C2P_Block_t;
-  BoundsApplier<T, GEOM, C2P> bnds(rc, bounds, coords, geom);//, invert);
+  // using GEOM = Geometry::CoordSysMeshBlock;
+  // using C2P = con2prim_robust::C2P_Block_t;
+  // BoundsApplier<T, GEOM, C2P> bnds(rc, bounds, coords, geom, eos, c2p_tol,
+  // c2p_max_iter, enable_mhd_floors, enable_rad_floors);//, invert);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-
-        //floor_ceil.ApplyFloors(b, k, j, j);
-        bnds.ApplyMHDFloors(b, k, j, i);
-        PARTHENON_FAIL("exit here");
+        // floor_ceil.ApplyFloors(b, k, j, j);
+        //        bnds.ApplyMHDFloors(b, k, j, i);
 
         double eos_lambda[2]; // used for stellarcollapse eos and
                               // other EOS's that require root
@@ -592,8 +338,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
                            gamma_max, e_max);
         Real bsqorho_max, bsqou_max;
-        bounds.GetMHDCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
-        bsqorho_max, bsqou_max);
+        bounds.GetMHDCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                              coords.x3v(k, j, i), bsqorho_max, bsqou_max);
         Real J_floor;
         bounds.GetRadiationFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                   coords.x3v(k, j, i), J_floor);
@@ -636,8 +382,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           u_floor_max = std::max<Real>(u_floor_max, bsq / bsqou_max);
 
           rho_floor_max = std::max<Real>(
-              rho_floor_max,
-              std::max<Real>(v(b, peng, k, j, i), u_floor_max) / e_max);
+              rho_floor_max, std::max<Real>(v(b, peng, k, j, i), u_floor_max) / e_max);
         }
 
         Real drho = rho_floor_max - v(b, prho, k, j, i);
@@ -720,10 +465,10 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           }
         }
 
-        if (j == 108 && i == 111) {
-          printf("[%i %i %i] post-mhd floor rho: %e u: %e\n", k, j, i,
-                 v(b, prho, k, j, i), v(b, peng, k, j, i));
-        }
+        //        if (j == 108 && i == 111) {
+        //          printf("[%i %i %i] post-mhd floor rho: %e u: %e\n", k, j, i,
+        //                 v(b, prho, k, j, i), v(b, peng, k, j, i));
+        //        }
 
         // Fluid ceilings?
         Real vpcon[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
@@ -755,11 +500,12 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             v(b, cye, k, j, i) = dyecons;
           }
         }
-        if (j == 108 && i == 111) {
-          printf("[%i %i %i] post-mhd ceil rho: %e u: %e v: %e %e %e\n", k, j, i,
-                 v(b, prho, k, j, i), v(b, peng, k, j, i), v(b, pvel_lo, k, j, i),
-                 v(b, pvel_lo + 1, k, j, i), v(b, pvel_lo + 2, k, j, i));
-        }
+        //        if (j == 108 && i == 111) {
+        //          printf("[%i %i %i] post-mhd ceil rho: %e u: %e v: %e %e %e\n", k, j,
+        //          i,
+        //                 v(b, prho, k, j, i), v(b, peng, k, j, i), v(b, pvel_lo, k, j,
+        //                 i), v(b, pvel_lo + 1, k, j, i), v(b, pvel_lo + 2, k, j, i));
+        //        }
 
         if (floor_applied || ceiling_applied) {
           // Update derived prims
@@ -789,9 +535,10 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           Tens2 con_TilPi;
           CLOSURE c(con_v, &g);
 
-          if (j == 108 && i == 111) {
-            printf("[%i %i %i] pre-fixup J=%e\n", k, j, i, v(b, idx_J(0), k, j, i));
-          }
+          //          if (j == 108 && i == 111) {
+          //            printf("[%i %i %i] pre-fixup J=%e\n", k, j, i, v(b, idx_J(0), k,
+          //            j, i));
+          //          }
 
           // If we applied fluid floors or ceilings we modified v^i, so we need to call
           // rad c2p here before we can use radiation primitive variables
@@ -920,9 +667,10 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
             }
           }
-          if (j == 108 && i == 111) {
-            printf("[%i %i %i] post-fixup J=%e\n", k, j, i, v(b, idx_J(0), k, j, i));
-          }
+          //          if (j == 108 && i == 111) {
+          //            printf("[%i %i %i] post-fixup J=%e\n", k, j, i, v(b, idx_J(0), k,
+          //            j, i));
+          //          }
         }
       });
 
@@ -961,8 +709,8 @@ TaskStatus ApplyFloors(T *rc) {
 
 template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
-//template <typename T, class CLOSURE>
-//TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
+// template <typename T, class CLOSURE>
+// TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
 //  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
 //  namespace p = fluid_prim;
 //  namespace c = fluid_cons;
@@ -1069,9 +817,9 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
 //  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 //  parthenon::par_for(
-//      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
-//      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
-//      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+//      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) -
+//      1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e, KOKKOS_LAMBDA(const int b, const int
+//      k, const int j, const int i) {
 //        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
 //          // Do not use ghost zones as data for averaging
 //          // TODO(BRR) need to allow ghost zones from neighboring blocks
@@ -1184,7 +932,7 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //            //            (xi = %e) E
 //            //            = %e cov_F = %e %e %e\n",
 //            //
-//            //          k,j,i,J,cov_H(0),cov_H(1),cov_H(2),xi,E,cov_F(0),cov_F(1),cov_F(2));
+//            // k,j,i,J,cov_H(0),cov_H(1),cov_H(2),xi,E,cov_F(0),cov_F(1),cov_F(2));
 //
 //            v(b, idx_E(ispec), k, j, i) = sdetgam * E;
 //            SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii); }
@@ -1198,8 +946,8 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //  return TaskStatus::complete;
 //}
 //
-//template <typename T>
-//TaskStatus RadConservedToPrimitiveFixup(T *rc) {
+// template <typename T>
+// TaskStatus RadConservedToPrimitiveFixup(T *rc) {
 //  auto *pm = rc->GetParentPointer().get();
 //  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
 //  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
@@ -1218,7 +966,8 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //        rc);
 //  } else if (method == "moment_eddington") {
 //    return RadConservedToPrimitiveFixupImpl<T,
-//                                            radiation::ClosureEdd<Vec, Tens2, settings>>(
+//                                            radiation::ClosureEdd<Vec, Tens2,
+//                                            settings>>(
 //        rc);
 //  } else if (method == "mocmc") {
 //    return RadConservedToPrimitiveFixupImpl<
@@ -1229,14 +978,15 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //    PARTHENON_REQUIRE(!enable_rad_floors,
 //                      "Rad floors not supported with cooling function/Monte Carlo!");
 //    return RadConservedToPrimitiveFixupImpl<T,
-//                                            radiation::ClosureEdd<Vec, Tens2, settings>>(
+//                                            radiation::ClosureEdd<Vec, Tens2,
+//                                            settings>>(
 //        rc);
 //  }
 //  return TaskStatus::fail;
 //}
 
-//template <typename T>
-//TaskStatus ConservedToPrimitiveFixup(T *rc) {
+// template <typename T>
+// TaskStatus ConservedToPrimitiveFixup(T *rc) {
 //  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
 //  namespace p = fluid_prim;
 //  namespace c = fluid_cons;
@@ -1312,9 +1062,9 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
 //  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 //  parthenon::par_for(
-//      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
-//      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
-//      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+//      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) -
+//      1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e, KOKKOS_LAMBDA(const int b, const int
+//      k, const int j, const int i) {
 //        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
 //          // Do not use ghost zones as data for averaging
 //          // TODO(BRR) need to allow ghost zones from neighboring blocks
@@ -1323,9 +1073,9 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //      });
 //
 //  parthenon::par_for(
-//      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
-//      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-//      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+//      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) -
+//      1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int b, const int k,
+//      const int j, const int i) {
 //        Real eos_lambda[2]; // use last temp as initial guess
 //        eos_lambda[0] = 0.5;
 //        eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
@@ -1353,8 +1103,9 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //          Real num_valid = 0;
 //          // if (!is_outer_ghost_layer) {
 //          num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
-//          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
-//          if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+//          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1,
+//          i); if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1,
+//          j, i);
 //          //}
 //          if (num_valid > 0.5) {
 //            //            printf("[%i %i %i] num_valid: %e\n", k, j, i, num_valid);
@@ -1368,7 +1119,8 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //            if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
 //            //  if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
 //            //  v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-//            //      v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+//            //      v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j,
+//            i)),
 //            //      eos_lambda);
 //            //  v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
 //            //      v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
@@ -1411,7 +1163,8 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
 //          v(b, gm1, k, j, i) =
 //              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
-//                                                          v(b, tmp, k, j, i), eos_lambda),
+//                                                          v(b, tmp, k, j, i),
+//                                                          eos_lambda),
 //                    v(b, prs, k, j, i));
 //
 //          // Need to update radiation primitives
@@ -1443,8 +1196,8 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //          Real sig[3];
 //          prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
 //                        v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gcon, beta, alpha,
-//                        gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,
-//                        sig);
+//                        gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i),
+//                        ye_cons, sig);
 //          v(b, cmom_lo, k, j, i) = S[0];
 //          v(b, cmom_lo + 1, k, j, i) = S[1];
 //          v(b, cmom_hi, k, j, i) = S[2];
@@ -1570,6 +1323,8 @@ TaskStatus SourceFixupImpl(T *rc) {
         }
       });
 
+  auto src_failure_strategy = fix_pkg->Param<FAILURE_STRATEGY>("src_failure_strategy");
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "Source fixup", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s,
       kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -1601,7 +1356,7 @@ TaskStatus SourceFixupImpl(T *rc) {
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
 
-          if (num_valid > 0.5) {
+          if (num_valid > 0.5 && src_failure_strategy == FAILURE_STRATEGY::interpolate) {
             const Real norm = 1.0 / num_valid;
 
             v(b, prho, k, j, i) = fixup(prho, norm);
@@ -2137,10 +1892,10 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 
 template TaskStatus SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
-//template TaskStatus
-//RadConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+// template TaskStatus
+// RadConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
-//template TaskStatus
-//ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+// template TaskStatus
+// ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 } // namespace fixup

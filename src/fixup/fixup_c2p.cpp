@@ -130,6 +130,8 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
         }
       });
 
+  auto c2p_failure_strategy = fix_pkg->Param<FAILURE_STRATEGY>("c2p_failure_strategy");
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -164,7 +166,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
           //}
-          if (num_valid > 0.5) {
+          if (num_valid > 0.5 && c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
             //            printf("[%i %i %i] num_valid: %e\n", k, j, i, num_valid);
             const Real norm = 1.0 / num_valid;
             v(b, prho, k, j, i) = fixup(prho, norm);
@@ -258,8 +260,8 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
   // TODO(BRR) This is inefficient!
   // ONLY FOR MHD!
-   ApplyFloors(rc);
-  //ApplyFluidFloors(rc);
+  ApplyFloors(rc);
+  // ApplyFluidFloors(rc);
 
   // Need to update radiation primitives
   // TODO(BRR) This is very inefficient!

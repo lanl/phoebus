@@ -24,6 +24,8 @@ using namespace parthenon::package::prelude;
 using namespace parthenon::driver::prelude;
 using namespace parthenon;
 
+#include <singularity-eos/eos/eos.hpp>
+
 #include "fixup.hpp"
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
@@ -31,6 +33,7 @@ using namespace parthenon;
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
+#include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 
 namespace fixup {
@@ -83,6 +86,12 @@ class FluidAccessor {
   Real &pb(const int ii, const int b, const int k, const int j, const int i) const {
     return v_(b, pb_(ii), k, j, i);
   }
+
+  KOKKOS_INLINE_FUNCTION
+  bool b_valid() { return pb_.IsValid(); }
+
+  KOKKOS_INLINE_FUNCTION
+  bool ye_valid() { return (pye_ >= 0); }
 
   KOKKOS_INLINE_FUNCTION
   Real &pye(const int b, const int k, const int j, const int i) const {
@@ -199,6 +208,12 @@ class LocalFluidAccessor {
   KOKKOS_FORCEINLINE_FUNCTION
   Real &fail() const { return fld_.fail(b_, k_, j_, i_); }
 
+  KOKKOS_INLINE_FUNCTION
+  bool b_valid() { return fld_.b_valid(); }
+
+  KOKKOS_INLINE_FUNCTION
+  bool ye_valid() { return fld_.ye_valid(); }
+
  private:
   FluidAccessor<T> &fld_;
   const int b_;
@@ -211,13 +226,17 @@ class LocalFluidAccessor {
 template <typename T, typename GEOM, typename C2P>
 class BoundsApplier {
  public:
-  BoundsApplier(T *rc, Bounds bounds, Coordinates_t coords, GEOM geom)
-      : bounds_(bounds), coords_(coords), geom_(geom),
-        fld_(FluidAccessor<T>(rc)), c2p_(con2prim_robust::ConToPrimSetup(rc, bounds, 1.e-8, 100)) {
-          }
-  //BoundsApplier(T *rc, Bounds bounds, FluidAccessor<T> fld)
+  BoundsApplier(T *rc, Bounds bounds, Coordinates_t coords, GEOM geom,
+                singularity::EOS eos, Real c2p_tol, int c2p_maxiter,
+                bool enable_mhd_floors, bool enable_rad_floors)
+      : bounds_(bounds), coords_(coords), geom_(geom), eos_(eos),
+        fld_(FluidAccessor<T>(rc)),
+        c2p_(con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_maxiter)),
+        enable_mhd_floors_(enable_mhd_floors), enable_rad_floors_(enable_rad_floors) {}
+  // BoundsApplier(T *rc, Bounds bounds, FluidAccessor<T> fld)
   //    : bounds_(bounds), fld_(fld) {}
 
+  // TODO(BRR) another class that takes a struct of local geometry to avoid re-evals
   template <class... Args>
   KOKKOS_INLINE_FUNCTION bool ApplyMHDFloors(const int b, const int k, const int j,
                                              const int i) const {
@@ -232,25 +251,126 @@ class BoundsApplier {
     Real gamma_ceiling, sie_ceiling;
     bounds_.GetCeilings(X1, X2, X3, gamma_ceiling, sie_ceiling);
 
+    Real bsqorho_ceiling, bsqou_ceiling;
+    bounds_.GetMHDCeilings(X1, X2, X3, bsqorho_ceiling, bsqou_ceiling);
+
     Real rho_floor_max = rho_floor;
     Real u_floor_max = rho_floor * sie_floor;
 
     Real gcov[4][4];
     geom_.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
     Real gammacon[3][3];
-        geom_.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
+    geom_.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
     const Real alpha = geom_.Lapse(CellLocation::Cent, k, j, i);
     Real betacon[3];
     geom_.ContravariantShift(CellLocation::Cent, k, j, i, betacon);
     const Real sdetgam = geom_.DetGamma(CellLocation::Cent, b, k, j, i);
 
     LocalFluidAccessor<T> mhd(fld_, b, k, j, i);
-    mhd.prho() = 1.;
+
+    bool mhd_active = mhd.b_valid();
+    bool ye_active = mhd.ye_valid();
+    // bool rad_active = rad.E_valid();
 
     bool floor_applied = false;
     bool ceiling_applied = false;
 
+    if (enable_mhd_floors_) {
+      Real Bsq = 0.0;
+      Real Bdotv = 0.0;
+      const Real vp[3] = {mhd.pvel(0), mhd.pvel(1), mhd.pvel(2)};
+      const Real bp[3] = {mhd.pb(0), mhd.pb(1), mhd.pb(2)};
+      const Real W = phoebus::GetLorentzFactor(vp, gcov);
+      const Real iW = 1.0 / W;
+      SPACELOOP2(ii, jj) {
+        Bsq += gcov[ii + 1][jj + 1] * bp[ii] * bp[jj];
+        Bdotv += gcov[ii + 1][jj + 1] * bp[ii] * vp[jj];
+      }
+      Real bcon0 = W * Bdotv / alpha;
+      const Real bsq = (Bsq + alpha * alpha * bcon0 * bcon0) * iW * iW;
+
+      rho_floor_max = std::max<Real>(rho_floor_max, bsq / bsqorho_ceiling);
+      u_floor_max = std::max<Real>(u_floor_max, bsq / bsqou_ceiling);
+
+      rho_floor_max = std::max<Real>(
+          rho_floor_max, std::max<Real>(mhd.pener(), u_floor_max) / sie_ceiling);
+    }
+
+    Real drho = rho_floor_max - mhd.prho();
+    Real du = u_floor_max - mhd.pener();
+
+    if (drho > 0. || du > 0.) {
+      floor_applied = true;
+      if (drho < robust::SMALL()) {
+        drho = du / sie_ceiling;
+      }
+      if (du < robust::SMALL()) {
+        du = sie_floor * drho;
+      }
+    }
+
+    Real dcrho, dS[3], dBcons[3], dtau, dyecons;
+    Real bp[3] = {0};
+    Real eos_lambda[2] = {0};
+    if (mhd.b_valid()) {
+      SPACELOOP(ii) { bp[ii] = mhd.pb(ii); }
+    }
+
+    if (floor_applied) {
+      Real vp_normalobs[3] = {0}; // Inject floors at rest in normal observer frame
+      Real ye_prim_default = 0.5;
+      eos_lambda[0] = ye_prim_default;
+      Real dprs = eos_.PressureFromDensityInternalEnergy(drho, robust::ratio(du, drho),
+                                                         eos_lambda);
+      Real dgm1 = robust::ratio(eos_.BulkModulusFromDensityInternalEnergy(
+                                    drho, robust::ratio(du, drho), eos_lambda),
+                                dprs);
+      prim2con::p2c(drho, vp_normalobs, bp, du, ye_prim_default, dprs, dgm1, gcov,
+                    gammacon, betacon, alpha, sdetgam, dcrho, dS, dBcons, dtau, dyecons);
+
+      // Update cons vars (not B field)
+      mhd.crho() += dcrho;
+      SPACELOOP(ii) { mhd.cmom(ii) += dS[ii]; }
+      mhd.cener() += dtau;
+      if (mhd.ye_valid()) {
+        mhd.cye() += dyecons;
+      }
+
+      // Fluid c2p
+      auto status = c2p_(geom_, eos_, coords_, k, j, i);
+      if (status == con2prim_robust::ConToPrimStatus::failure) {
+        // If fluid c2p fails, set to floors
+
+        mhd.prho() = rho_floor_max;
+        SPACELOOP(ii) { mhd.pvel(ii) = vp_normalobs[ii]; }
+        mhd.pener() = u_floor_max;
+        if (mhd.ye_valid()) {
+          mhd.pye() = ye_prim_default;
+          eos_lambda[0] = mhd.pye();
+        }
+
+        // Update auxiliary primitives
+        mhd.tmp() = eos_.TemperatureFromDensityInternalEnergy(
+            mhd.prho(), mhd.pener() / mhd.prho(), eos_lambda);
+        mhd.prs() = eos_.PressureFromDensityInternalEnergy(
+            mhd.prho(), robust::ratio(mhd.pener(), mhd.prho()), eos_lambda);
+        mhd.gm1() = robust::ratio(
+            eos_.BulkModulusFromDensityInternalEnergy(
+                mhd.prho(), robust::ratio(mhd.pener(), mhd.prho()), eos_lambda),
+            mhd.prs());
+        prim2con::p2c(mhd.prho(), vp_normalobs, bp, mhd.pener(), ye_prim_default,
+                      mhd.prs(), mhd.gm1(), gcov, gammacon, betacon, alpha, sdetgam,
+                      mhd.crho(), dS, dBcons, mhd.cener(), dyecons);
+        SPACELOOP(ii) { mhd.cmom(ii) = dS[ii]; }
+        if (mhd.ye_valid()) {
+          mhd.cye() = dyecons;
+        }
+      }
+    }
+
     if (floor_applied || ceiling_applied) {
+
+      // Just update rad here if using?
       return true;
     } else {
       return false;
@@ -263,8 +383,11 @@ class BoundsApplier {
   const Bounds bounds_;
   const Coordinates_t coords_;
   const GEOM geom_;
+  const singularity::EOS eos_;
   const FluidAccessor<T> fld_;
   const C2P c2p_;
+  const bool enable_mhd_floors_;
+  const bool enable_rad_floors_;
 };
 
 } // namespace fixup

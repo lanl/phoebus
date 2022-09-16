@@ -21,8 +21,8 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
-//using namespace parthenon::driver::prelude;
-//using namespace parthenon;
+// using namespace parthenon::driver::prelude;
+// using namespace parthenon;
 
 //#include "fluid/con2prim_robust.hpp"
 //#include "fluid/prim2con.hpp"
@@ -30,6 +30,8 @@ using namespace parthenon::package::prelude;
 //#include "phoebus_utils/variables.hpp"
 
 namespace fixup {
+
+enum class FAILURE_STRATEGY { interpolate, floors };
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus FixFluxes(MeshBlockData<Real> *rc);
@@ -189,8 +191,10 @@ class MHDCeilings {
   void GetMHDCeilings(const Real x1, const Real x2, const Real x3, Real &bsqorho,
                       Real &bsqou) const {
     switch (mhd_ceiling_flag_) {
+    case 1:
       bsqorho = bsqorho0_;
       bsqou = bsqou0_;
+      break;
     default:
       PARTHENON_FAIL("No valid MHD ceiling set.");
     }
@@ -246,27 +250,27 @@ class Bounds {
         radiation_floors_(RadiationFloors()), radiation_ceilings_(RadiationCeilings()) {}
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetFloors(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetFloors(Args &&...args) const {
     floors_.GetFloors(std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetCeilings(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetCeilings(Args &&...args) const {
     ceilings_.GetCeilings(std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetMHDCeilings(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetMHDCeilings(Args &&...args) const {
     mhd_ceilings_.GetMHDCeilings(std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetRadiationFloors(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetRadiationFloors(Args &&...args) const {
     radiation_floors_.GetRadiationFloors(std::forward<Args>(args)...);
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void GetRadiationCeilings(Args &&... args) const {
+  KOKKOS_INLINE_FUNCTION void GetRadiationCeilings(Args &&...args) const {
     radiation_ceilings_.GetRadiationCeilings(std::forward<Args>(args)...);
   }
 
@@ -278,7 +282,7 @@ class Bounds {
   const RadiationCeilings radiation_ceilings_;
 };
 
-//const std::vector<std::string> FLUID_VARS = {
+// const std::vector<std::string> FLUID_VARS = {
 //    fluid_prim::density,  fluid_prim::energy,      fluid_prim::velocity,
 //    fluid_prim::pressure, fluid_prim::temperature, fluid_prim::gamma1,
 //    fluid_prim::bfield,   fluid_prim::ye,          fluid_cons::density,
@@ -286,8 +290,8 @@ class Bounds {
 //    fluid_cons::ye,       internal_variables::fail};
 //
 ///// Convenient access to all fluid quantities
-//template <typename T>
-//class FluidAccessor {
+// template <typename T>
+// class FluidAccessor {
 //
 // public:
 //  FluidAccessor(T *rc) : FluidAccessor(rc, PackIndexMap()) {}
@@ -367,10 +371,10 @@ class Bounds {
 //      : v_(rc->PackVariables(FLUID_VARS, imap)), prho_(imap[fluid_prim::density].first),
 //        pener_(imap[fluid_prim::energy].first),
 //        pvel_(imap.GetFlatIdx(fluid_prim::velocity)),
-//        prs_(imap[fluid_prim::pressure].first), tmp_(imap[fluid_prim::temperature].first),
-//        gm1_(imap[fluid_prim::gamma1].first), pb_(imap.GetFlatIdx(fluid_prim::bfield)),
-//        pye_(imap[fluid_prim::ye].first), crho_(imap[fluid_cons::density].first),
-//        cener_(imap[fluid_cons::energy].first),
+//        prs_(imap[fluid_prim::pressure].first),
+//        tmp_(imap[fluid_prim::temperature].first), gm1_(imap[fluid_prim::gamma1].first),
+//        pb_(imap.GetFlatIdx(fluid_prim::bfield)), pye_(imap[fluid_prim::ye].first),
+//        crho_(imap[fluid_cons::density].first), cener_(imap[fluid_cons::energy].first),
 //        cmom_(imap.GetFlatIdx(fluid_cons::momentum)),
 //        cb_(imap.GetFlatIdx(fluid_cons::bfield)), cye_(imap[fluid_cons::ye].first),
 //        fail_(imap[internal_variables::fail].first) {}
@@ -393,8 +397,8 @@ class Bounds {
 //  const int fail_;
 //};
 //
-//template <typename T>
-//class LocalFluidAccessor {
+// template <typename T>
+// class LocalFluidAccessor {
 // public:
 //  LocalFluidAccessor(FluidAccessor<T> fld, const int b, const int k, const int j,
 //                     const int i)
@@ -451,12 +455,13 @@ class Bounds {
 //};
 //
 //// TODO(BRR) This won't work for reconstructed vars at faces
-//template <typename T, typename GEOM, typename C2P>
-//class BoundsApplier {
+// template <typename T, typename GEOM, typename C2P>
+// class BoundsApplier {
 // public:
 //  BoundsApplier(T *rc, Bounds bounds, Coordinates_t coords, GEOM geom)
 //      : bounds_(bounds), coords_(coords), geom_(geom),
-//        fld_(FluidAccessor<T>(rc)), c2p_(con2prim_robust::ConToPrimSteup(rc, bounds, 1.e-8, 100)) {
+//        fld_(FluidAccessor<T>(rc)), c2p_(con2prim_robust::ConToPrimSteup(rc,
+//        bounds, 1.e-8, 100)) {
 //          }
 //  //BoundsApplier(T *rc, Bounds bounds, FluidAccessor<T> fld)
 //  //    : bounds_(bounds), fld_(fld) {}

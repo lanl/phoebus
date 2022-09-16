@@ -170,6 +170,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   const int nspec = idx_E.DimSize(1);
   const int ndim = pmb->pmy_mesh->ndim;
 
+  auto c2p_failure_strategy = fix_pkg->Param<FAILURE_STRATEGY>("c2p_failure_strategy");
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadConToPrim::Solve fixup", DevExecSpace(), 0,
       v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -208,7 +210,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             num_valid += v(b, iradfail, k, j - 1, i) + v(b, iradfail, k, j + 1, i);
           if (ndim == 3)
             num_valid += v(b, iradfail, k - 1, j, i) + v(b, iradfail, k + 1, j, i);
-          if (num_valid > 0.5) {
+          if (num_valid > 0.5 && c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
             const Real norm = 1.0 / num_valid;
             for (int ispec = 0; ispec < nspec; ispec++) {
               v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);

@@ -324,13 +324,13 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
         }
 
-        const Real xi = std::sqrt(g.contractCov3Vectors(covH, covH))/J;
-        if (xi > 1.) {
-          printf("[%i %i %i] xi = %e\n", k,j,i,xi);
-        }
-        if (j == 108 && i == 111) {
-          printf("[%i %i %i] J = %e\n", k, j, i, J);
-        }
+        //        const Real xi = std::sqrt(g.contractCov3Vectors(covH, covH))/J;
+        //        if (xi > 1.) {
+        //          printf("[%i %i %i] xi = %e\n", k,j,i,xi);
+        //        }
+        //        if (j == 108 && i == 111) {
+        //          printf("[%i %i %i] J = %e\n", k, j, i, J);
+        //       }
 
         //        if (i >= 128 && j == 118) {
         //          printf("[%i %i %i] c2p: %e %e %e %e success? %i\n", k, j, i,
@@ -567,14 +567,14 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         // x-direction
         ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
                                    vi_r);
-                if (member.team_rank() == 0 && n == 0 && j == 108) {
-                  int i = 111;
-
-        //          for (int i = ib.e - 5; i <= ib.e + 1; i++) {
-                    printf("[%i %i %i] (J) = %e\n",
-                      k, j, i, v(b, idx_J(n), k, j, 0));
-                    }
-                //}
+        //                if (member.team_rank() == 0 && n == 0 && j == 108) {
+        //                  int i = 111;
+        //
+        //        //          for (int i = ib.e - 5; i <= ib.e + 1; i++) {
+        //                    printf("[%i %i %i] (J) = %e\n",
+        //                      k, j, i, v(b, idx_J(n), k, j, 0));
+        //                    }
+        //}
         // y-direction
         if (ndim > 1)
           ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
