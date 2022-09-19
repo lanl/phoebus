@@ -50,7 +50,7 @@ struct ClosureSettings {
 
 /// Holds methods for closing the radiation moment equations as well as calculating
 /// radiation moment source terms.
-template <class Vec, class Tens2, class SET = ClosureSettings<>>
+template <class SET = ClosureSettings<>>
 class ClosureEdd {
  public:
   using LocalGeometryType = LocalThreeGeometry;
@@ -139,9 +139,8 @@ class ClosureEdd {
   }
 };
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION ClosureEdd<Vec, Tens2, SET>::ClosureEdd(const Vec con_v_in,
-                                                        LocalGeometryType *g)
+template <class SET>
+KOKKOS_FUNCTION ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g)
     : gamma(g) {
   SPACELOOP(i) con_v(i) = con_v_in(i);
 
@@ -163,8 +162,8 @@ KOKKOS_FUNCTION ClosureEdd<Vec, Tens2, SET>::ClosureEdd(const Vec con_v_in,
   PARTHENON_DEBUG_REQUIRE(!std::isinf(W), "Infinite Lorentz factor!");
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::LinearSourceUpdate(
+template <class SET>
+KOKKOS_FUNCTION ClosureStatus ClosureEdd<SET>::LinearSourceUpdate(
     const Real Estar, const Vec cov_Fstar, const Tens2 con_tilPi, const Real JBB,
     const Real tauJ, const Real tauH, Real *dE, Vec *cov_dF) {
 
@@ -213,10 +212,12 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::LinearSourceUpdate(
   return ClosureStatus::success;
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::getFluxesFromPrim(
-    const Real J, const Vec cov_tilH, const Tens2 con_tilPi, Vec *con_F,
-    Tens2 *concov_P) {
+template <class SET>
+KOKKOS_FUNCTION ClosureStatus ClosureEdd<SET>::getFluxesFromPrim(const Real J,
+                                                                 const Vec cov_tilH,
+                                                                 const Tens2 con_tilPi,
+                                                                 Vec *con_F,
+                                                                 Tens2 *concov_P) {
   getConCovPFromPrim(J, cov_tilH, con_tilPi, concov_P);
   if (SET::eqn_type == ClosureEquation::energy_conserve) {
     Real E;
@@ -231,8 +232,8 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::getFluxesFromPrim(
   return ClosureStatus::success;
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FORCEINLINE_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::getConPFromPrim(
+template <class SET>
+KOKKOS_FORCEINLINE_FUNCTION ClosureStatus ClosureEdd<SET>::getConPFromPrim(
     const Real J, const Vec cov_tilH, const Tens2 con_tilPi, Tens2 *con_P) {
   Vec con_tilH;
   gamma->raise3Vector(cov_tilH, &con_tilH);
@@ -244,8 +245,8 @@ KOKKOS_FORCEINLINE_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::getConPFr
   return ClosureStatus::success;
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FORCEINLINE_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::getConCovPFromPrim(
+template <class SET>
+KOKKOS_FORCEINLINE_FUNCTION ClosureStatus ClosureEdd<SET>::getConCovPFromPrim(
     const Real J, const Vec cov_tilH, const Tens2 con_tilPi, Tens2 *concov_P) {
   Vec con_tilH;
   Tens2 concov_tilPi;
@@ -265,11 +266,10 @@ KOKKOS_FORCEINLINE_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::getConCov
   return ClosureStatus::success;
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Prim2Con(const Real J,
-                                                                    const Vec cov_H,
-                                                                    const Tens2 con_tilPi,
-                                                                    Real *E, Vec *cov_F) {
+template <class SET>
+KOKKOS_FUNCTION ClosureStatus ClosureEdd<SET>::Prim2Con(const Real J, const Vec cov_H,
+                                                        const Tens2 con_tilPi, Real *E,
+                                                        Vec *cov_F) {
   Real vvPi;
   Vec cov_vPi;
   GetTilPiContractions(con_tilPi, &cov_vPi, &vvPi);
@@ -288,9 +288,10 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Prim2Con(const Real J
   return ClosureStatus::success;
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Con2Prim(
-    Real E, const Vec cov_F, const Tens2 con_tilPi, Real *J, Vec *cov_tilH) {
+template <class SET>
+KOKKOS_FUNCTION ClosureStatus ClosureEdd<SET>::Con2Prim(Real E, const Vec cov_F,
+                                                        const Tens2 con_tilPi, Real *J,
+                                                        Vec *cov_tilH) {
   Real vvTilPi;
   Vec cov_vTilPi;
   GetTilPiContractions(con_tilPi, &cov_vTilPi, &vvTilPi);
@@ -317,7 +318,7 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Con2Prim(
 
   const Real xi = std::sqrt(gamma->contractCov3Vectors(*cov_tilH, *cov_tilH)) / (*J);
 
-  if (*J < 0.) {// || xi > 0.999) {
+  if (*J < 0.) { // || xi > 0.999) {
     return ClosureStatus::failure;
   }
 

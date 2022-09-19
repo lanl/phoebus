@@ -64,7 +64,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             Vec con_v = {vmag * cos(phiv), vmag * sin(phiv), 0.0};
             Tens2 cov_gamma = {{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}};
             LocalThreeGeometry g(cov_gamma);
-            ClosureM1<Vec, Tens2> cl(con_v, &g);
+            ClosureM1<> cl(con_v, &g);
 
             // Assume a fluid frame state
             Real J = 1.0;

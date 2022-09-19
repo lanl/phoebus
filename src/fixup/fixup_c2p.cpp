@@ -44,7 +44,7 @@ using singularity::neutrinos::Opacity;
 namespace fixup {
 
 template <typename T>
-TaskStatus ConservedToPrimitiveFixup(T *rc) {
+TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
@@ -68,6 +68,8 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
+  PackIndexMap imap0;
+  auto v0 = rc0->PackVariables(vars, imap0);
 
   const int prho = imap[p::density].first;
   const int crho = imap[c::density].first;
@@ -145,6 +147,16 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
         //    (i == ib.s || i == ib.e || j == jb.s || j == jb.e || k == kb.s || k ==
         //    kb.e);
 
+        auto fixup0 = [&](const int iv) {
+          v(b, iv, k, j, i) = v0(b, iv, k, j, i - 1) + v0(b, iv, k, j, i + 1);
+          if (ndim > 1) {
+            v(b, iv, k, j, i) += v0(b, iv, k, j - 1, i) + v0(b, iv, k, j + 1, i);
+            if (ndim == 3) {
+              v(b, iv, k, j, i) += v0(b, iv, k - 1, j, i) + v0(b, iv, k + 1, j, i);
+            }
+          }
+          return v(b, iv, k, j, i) / (2 * ndim);
+        };
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b, iv, k, j, i) = v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
                               v(b, ifail, k, j, i + 1) * v(b, iv, k, j, i + 1);
@@ -159,52 +171,52 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
           return inv_mask_sum * v(b, iv, k, j, i);
         };
         if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
-          //          printf("fail! %i %i %i\n", k, j, i);
           Real num_valid = 0;
-          // if (!is_outer_ghost_layer) {
           num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
           //}
-          if (num_valid > 0.5 && c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
-            //            printf("[%i %i %i] num_valid: %e\n", k, j, i, num_valid);
-            const Real norm = 1.0 / num_valid;
-            printf("[%i %i %i] old rho: %e new rho: %e\n", k, j, i, v(b,prho,k,j,i),fixup(prho,norm));
-            v(b, prho, k, j, i) = fixup(prho, norm);
+          if (c2p_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
+            v(b, prho, k, j, i) = fixup0(prho);
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
-              v(b, pv, k, j, i) = fixup(pv, norm);
+              v(b, pv, k, j, i) = fixup0(pv);
             }
-            v(b, peng, k, j, i) = fixup(peng, norm);
+            v(b, peng, k, j, i) = fixup0(peng);
 
-            if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
-            //  if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-            //  v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-            //      v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-            //      eos_lambda);
-            //  v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-            //      v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-            //  v(b, gm1, k, j, i) =
-            //      ratio(eos.BulkModulusFromDensityTemperature(
-            //                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
-            //            v(b, prs, k, j, i));
+            if (pye > 0) v(b, pye, k, j, i) = fixup0(pye);
           } else {
-            //            printf("[%i %i %i] no valid: %e\n", k, j, i, num_valid);
-            // printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
-            // No valid neighbors; set fluid mass/energy to near-zero and set primitive
-            // velocities to zero
+            if (num_valid > 0.5 &&
+                c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
+              //            printf("[%i %i %i] num_valid: %e\n", k, j, i, num_valid);
+              const Real norm = 1.0 / num_valid;
+              printf("[%i %i %i] old rho: %e new rho: %e\n", k, j, i, v(b, prho, k, j, i),
+                     fixup(prho, norm));
+              v(b, prho, k, j, i) = fixup(prho, norm);
+              for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
+                v(b, pv, k, j, i) = fixup(pv, norm);
+              }
+              v(b, peng, k, j, i) = fixup(peng, norm);
 
-            // v(b, prho, k, j, i) = 1.e-20;
-            // v(b, peng, k, j, i) = 1.e-20;
-            v(b, prho, k, j, i) = 1.e-100;
-            v(b, peng, k, j, i) = 1.e-100;
+              if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
+            } else {
+              //            printf("[%i %i %i] no valid: %e\n", k, j, i, num_valid);
+              // printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
+              // No valid neighbors; set fluid mass/energy to near-zero and set primitive
+              // velocities to zero
 
-            // Safe value for ye
-            if (pye > 0) {
-              v(b, pye, k, j, i) = 0.5;
+              // v(b, prho, k, j, i) = 1.e-20;
+              // v(b, peng, k, j, i) = 1.e-20;
+              v(b, prho, k, j, i) = 1.e-100;
+              v(b, peng, k, j, i) = 1.e-100;
+
+              // Safe value for ye
+              if (pye > 0) {
+                v(b, pye, k, j, i) = 0.5;
+              }
+
+              // Zero primitive velocities
+              SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = 0.; }
             }
-
-            // Zero primitive velocities
-            SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = 0.; }
           }
 
           if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
@@ -274,6 +286,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 }
 
 template TaskStatus
-ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
+                                               MeshBlockData<Real> *rc0);
 
 } // namespace fixup

@@ -200,6 +200,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pin->GetOrAddString("fixup", "c2p_failure_strategy", "interpolate");
   if (c2p_failure_strategy_str == "interpolate") {
     c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
+  } else if (c2p_failure_strategy_str == "interpolate_previous") {
+    c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
   } else if (c2p_failure_strategy_str == "floors") {
     c2p_failure_strategy = FAILURE_STRATEGY::floors;
   }
@@ -210,6 +212,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pin->GetOrAddString("fixup", "src_failure_strategy", "interpolate");
   if (src_failure_strategy_str == "interpolate") {
     src_failure_strategy = FAILURE_STRATEGY::interpolate;
+  } else if (src_failure_strategy_str == "interpolate_previous") {
+    src_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
   } else if (src_failure_strategy_str == "floors") {
     src_failure_strategy = FAILURE_STRATEGY::floors;
   }
@@ -245,16 +249,17 @@ TaskStatus AllC2P(T *rc) {
 template TaskStatus AllC2P<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 template <typename T>
-TaskStatus AllConservedToPrimitiveFixup(T *rc) {
+TaskStatus AllConservedToPrimitiveFixup(T *rc, T *rc0) {
 
-  RadConservedToPrimitiveFixup(rc);
-  ConservedToPrimitiveFixup(rc);
+  RadConservedToPrimitiveFixup(rc, rc0);
+  ConservedToPrimitiveFixup(rc, rc0);
 
   return TaskStatus::complete;
 }
 
 template TaskStatus
-AllConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+AllConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
+                                                  MeshBlockData<Real> *rc0);
 
 /// Given a valid state (including consistency between prim and cons variables),
 /// this function returns another valid state that is within the bounds of specified
@@ -420,7 +425,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           floor_applied = true;
           // drho = std::max<Real>(drho, 1.e-100); // > 0 so EOS calls are happy
           if (drho < robust::SMALL()) {
-            drho = du / e_max;
+            // drho = du / e_max;
+            drho = du / sie_floor; // Inject enough material such that the injected energy
+                                   // floor is cold
           }
           if (du < robust::SMALL()) {
             du = sie_floor * drho;
@@ -718,17 +725,17 @@ TaskStatus ApplyFloors(T *rc) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return ApplyFloorsImpl<T, radiation::ClosureM1<Vec, Tens2, settings>>(rc);
+    return ApplyFloorsImpl<T, radiation::ClosureM1<settings>>(rc);
   } else if (method == "moment_eddington") {
-    return ApplyFloorsImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+    return ApplyFloorsImpl<T, radiation::ClosureEdd<settings>>(rc);
   } else if (method == "mocmc") {
-    return ApplyFloorsImpl<T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
+    return ApplyFloorsImpl<T, radiation::ClosureMOCMC<settings>>(rc);
   } else {
     // TODO(BRR) default to Eddington closure, check that rad floors are unused for
     // Monte Carlo/cooling function
     PARTHENON_REQUIRE(!enable_rad_floors,
                       "Rad floors not supported with cooling function/Monte Carlo!");
-    return ApplyFloorsImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+    return ApplyFloorsImpl<T, radiation::ClosureEdd<settings>>(rc);
   }
   return TaskStatus::fail;
 }
@@ -988,7 +995,7 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
 //  if (method == "moment_m1") {
 //    return RadConservedToPrimitiveFixupImpl<T,
-//                                            radiation::ClosureM1<Vec, Tens2, settings>>(
+//                                            radiation::ClosureM1<settings>>(
 //        rc);
 //  } else if (method == "moment_eddington") {
 //    return RadConservedToPrimitiveFixupImpl<T,
@@ -997,7 +1004,7 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //        rc);
 //  } else if (method == "mocmc") {
 //    return RadConservedToPrimitiveFixupImpl<
-//        T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
+//        T, radiation::ClosureMOCMC<settings>>(rc);
 //  } else {
 //    // TODO(BRR) default to Eddington closure, check that rad floors are unused for
 //    // Monte Carlo/cooling function
@@ -1252,8 +1259,8 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 // the fluid and radiation primitive variables over good neighbors. Or if there are no
 // good neighbors, set everything to the floors. Then call p2c on both fluid and
 // radiation.
-//template <typename T, class CLOSURE>
-//TaskStatus SourceFixupImpl(T *rc) {
+// template <typename T, class CLOSURE>
+// TaskStatus SourceFixupImpl(T *rc) {
 //  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
 //  namespace p = fluid_prim;
 //  namespace c = fluid_cons;
@@ -1283,7 +1290,8 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //  auto bounds = fix_pkg->Param<Bounds>("bounds");
 //
 //  const std::vector<std::string> vars(
-//      {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
+//      {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy,
+//      p::bfield,
 //       p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
 //       impl::cell_signal_speed, ir::srcfail, ir::tilPi});
 //
@@ -1359,7 +1367,8 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //        double eos_lambda[2]; // used for stellarcollapse eos and
 //                              // other EOS's that require root
 //                              // finding.
-//        eos_lambda[1] = std::log10(v(b, tmp, k, j, i)); // use last temp as initial guess
+//        eos_lambda[1] = std::log10(v(b, tmp, k, j, i)); // use last temp as initial
+//        guess
 //
 //        auto fixup = [&](const int iv, const Real inv_mask_sum) {
 //          v(b, iv, k, j, i) = v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
@@ -1377,13 +1386,15 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //        if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
 //
 //          Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
-//          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
-//          if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+//          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1,
+//          i); if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1,
+//          j, i);
 //
 //          Real gcov[4][4];
 //          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
 //
-//          if (num_valid > 0.5 && src_failure_strategy == FAILURE_STRATEGY::interpolate) {
+//          if (num_valid > 0.5 && src_failure_strategy == FAILURE_STRATEGY::interpolate)
+//          {
 //            const Real norm = 1.0 / num_valid;
 //
 //            v(b, prho, k, j, i) = fixup(prho, norm);
@@ -1479,13 +1490,16 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //          //
 //          //          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
 //          //          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-//          //              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j,
+//          //              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k,
+//          j,
 //          //              i)), eos_lambda);
 //          //          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
 //          //              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
 //          //          v(b, gm1, k, j, i) =
-//          //              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
-//          //                                                          v(b, tmp, k, j, i),
+//          //              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j,
+//          i),
+//          //                                                          v(b, tmp, k, j,
+//          i),
 //          //                                                          eos_lambda),
 //          //                    v(b, prs, k, j, i));
 //          //
@@ -1501,9 +1515,11 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //          //                            v(b, idx_pvel(2), k, j, i)};
 //          //          Real W = phoebus::GetLorentzFactor(con_vp, gcov);
 //          //          if (W > gamma_max) {
-//          //            const Real rescale = std::sqrt((gamma_max * gamma_max - 1.) / (W *
+//          //            const Real rescale = std::sqrt((gamma_max * gamma_max - 1.) / (W
+//          *
 //          //            W
-//          //            - 1.)); SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) *= rescale; }
+//          //            - 1.)); SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) *= rescale;
+//          }
 //          //          }
 //          //          const Real r = std::exp(coords.x1v(k, j, i));
 //          //          Real xi_max;
@@ -1594,8 +1610,8 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //  return TaskStatus::complete;
 //}
 //
-//template <typename T>
-//TaskStatus SourceFixup(T *rc) {
+// template <typename T>
+// TaskStatus SourceFixup(T *rc) {
 //  auto *pm = rc->GetParentPointer().get();
 //  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
 //  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
@@ -1609,17 +1625,17 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 //  using settings =
 //      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
 //  if (method == "moment_m1") {
-//    return SourceFixupImpl<T, radiation::ClosureM1<Vec, Tens2, settings>>(rc);
+//    return SourceFixupImpl<T, radiation::ClosureM1<settings>>(rc);
 //  } else if (method == "moment_eddington") {
-//    return SourceFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+//    return SourceFixupImpl<T, radiation::ClosureEdd<settings>>(rc);
 //  } else if (method == "mocmc") {
-//    return SourceFixupImpl<T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
+//    return SourceFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc);
 //  } else {
 //    // TODO(BRR) default to Eddington closure, check that rad floors are unused for
 //    // Monte Carlo/cooling function
 //    PARTHENON_REQUIRE(!enable_rad_floors,
 //                      "Rad floors not supported with cooling function/Monte Carlo!");
-//    return SourceFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+//    return SourceFixupImpl<T, radiation::ClosureEdd<settings>>(rc);
 //  }
 //  return TaskStatus::fail;
 //}
@@ -1917,7 +1933,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-//template TaskStatus SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+// template TaskStatus SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 // template TaskStatus
 // RadConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);

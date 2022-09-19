@@ -31,22 +31,22 @@ using namespace parthenon::package::prelude;
 
 namespace fixup {
 
-enum class FAILURE_STRATEGY { interpolate, floors };
+enum class FAILURE_STRATEGY { interpolate, interpolate_previous, floors };
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus FixFluxes(MeshBlockData<Real> *rc);
 template <typename T>
 TaskStatus ApplyFloors(T *rc);
 template <typename T>
-TaskStatus RadConservedToPrimitiveFixup(T *rc);
+TaskStatus RadConservedToPrimitiveFixup(T *rc, T *rc0);
 template <typename T>
-TaskStatus ConservedToPrimitiveFixup(T *rc);
+TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0);
 template <typename T>
-TaskStatus AllConservedToPrimitiveFixup(T *rc);
+TaskStatus AllConservedToPrimitiveFixup(T *rc, T *rc0);
 template <typename T>
 TaskStatus AllC2P(T *rc);
 template <typename T>
-TaskStatus SourceFixup(T *rc);
+TaskStatus SourceFixup(T *rc, T *rc0);
 
 static struct ConstantRhoSieFloor {
 } constant_rho_sie_floor_tag;
@@ -288,17 +288,17 @@ class Bounds {
 
 template <typename T, class CLOSURE>
 TaskStatus CheckSanity(T *rc) {
-//  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
-//  namespace p = fluid_prim;
-//  namespace c = fluid_cons;
-//  namespace impl = internal_variables;
-//  namespace pr = radmoment_prim;
-//  namespace cr = radmoment_cons;
-//  namespace ir = radmoment_internal;
-//  auto *pmb = rc->GetParentPointer().get();
-//  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-//  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-//  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  //  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+  //  namespace p = fluid_prim;
+  //  namespace c = fluid_cons;
+  //  namespace impl = internal_variables;
+  //  namespace pr = radmoment_prim;
+  //  namespace cr = radmoment_cons;
+  //  namespace ir = radmoment_internal;
+  //  auto *pmb = rc->GetParentPointer().get();
+  //  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  //  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  //  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   return TaskStatus::complete;
 }

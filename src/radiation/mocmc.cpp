@@ -615,7 +615,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             Real JBB = opac_d.EnergyDensityFromTemperature(v(iblock, pT, k, j, i),
                                                            species_d[ispec]);
 
-            ClosureMOCMC<Vec, Tens2> c(con_v, &g);
+            ClosureMOCMC<> c(con_v, &g);
 
             Real dE = 0;
             Vec cov_dF;

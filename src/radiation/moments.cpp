@@ -359,11 +359,11 @@ TaskStatus MomentCon2Prim(T *rc) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentCon2PrimImpl<T, ClosureM1<Vec, Tens2, settings>, true>(rc);
+    return MomentCon2PrimImpl<T, ClosureM1<settings>, true>(rc);
   } else if (method == "moment_eddington") {
-    return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc);
+    return MomentCon2PrimImpl<T, ClosureEdd<settings>, false>(rc);
   } else if (method == "mocmc") {
-    return MomentCon2PrimImpl<T, ClosureMOCMC<Vec, Tens2, settings>, false>(rc);
+    return MomentCon2PrimImpl<T, ClosureMOCMC<settings>, false>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown");
   }
@@ -463,11 +463,11 @@ TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentPrim2ConImpl<T, ClosureM1<Vec, Tens2, settings>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureM1<settings>>(rc, domain);
   } else if (method == "moment_eddington") {
-    return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureEdd<settings>>(rc, domain);
   } else if (method == "mocmc") {
-    return MomentPrim2ConImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureMOCMC<settings>>(rc, domain);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -912,11 +912,11 @@ TaskStatus CalculateFluxes(T *rc) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings>>(rc);
+    return CalculateFluxesImpl<T, ClosureM1<settings>>(rc);
   } else if (method == "moment_eddington") {
-    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc);
+    return CalculateFluxesImpl<T, ClosureEdd<settings>>(rc);
   } else if (method == "mocmc") {
-    return CalculateFluxesImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc);
+    return CalculateFluxesImpl<T, ClosureMOCMC<settings>>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -1089,12 +1089,11 @@ TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings>>(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureM1<settings>>(rc, rc_src);
   } else if (method == "moment_eddington") {
-    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureEdd<settings>>(rc, rc_src);
   } else if (method == "mocmc") {
-    return CalculateGeometricSourceImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc,
-                                                                               rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureMOCMC<settings>>(rc, rc_src);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -1325,7 +1324,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
             if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
                 xi <= xi_max) {
-              // TODO(BRR) also check H^2 < J?
               success = true;
             } else {
               success = false;
@@ -1700,14 +1698,11 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentFluidSourceImpl<T, ClosureM1<Vec, Tens2, settings>>(rc, dt,
-                                                                     update_fluid);
+    return MomentFluidSourceImpl<T, ClosureM1<settings>>(rc, dt, update_fluid);
   } else if (method == "moment_eddington") {
-    return MomentFluidSourceImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, dt,
-                                                                      update_fluid);
+    return MomentFluidSourceImpl<T, ClosureEdd<settings>>(rc, dt, update_fluid);
   } else if (method == "mocmc") {
-    return MomentFluidSourceImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc, dt,
-                                                                        update_fluid);
+    return MomentFluidSourceImpl<T, ClosureMOCMC<settings>>(rc, dt, update_fluid);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
