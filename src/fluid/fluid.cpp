@@ -303,7 +303,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const bool rad_active = pin->GetBoolean("physics", "rad");
   if (!rad_active) {
     physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
-    physics->PostFillDerivedBlock = fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>;
+    // physics->PostFillDerivedBlock =
+    // fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>;
   }
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
