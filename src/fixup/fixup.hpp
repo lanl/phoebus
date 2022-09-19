@@ -286,6 +286,23 @@ class Bounds {
   const RadiationCeilings radiation_ceilings_;
 };
 
+template <typename T, class CLOSURE>
+TaskStatus CheckSanity(T *rc) {
+//  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+//  namespace p = fluid_prim;
+//  namespace c = fluid_cons;
+//  namespace impl = internal_variables;
+//  namespace pr = radmoment_prim;
+//  namespace cr = radmoment_cons;
+//  namespace ir = radmoment_internal;
+//  auto *pmb = rc->GetParentPointer().get();
+//  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+//  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+//  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+  return TaskStatus::complete;
+}
+
 // const std::vector<std::string> FLUID_VARS = {
 //    fluid_prim::density,  fluid_prim::energy,      fluid_prim::velocity,
 //    fluid_prim::pressure, fluid_prim::temperature, fluid_prim::gamma1,
