@@ -184,6 +184,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           return inv_mask_sum * v(b, iv, k, j, i);
         };
 
+          if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
         if (src_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
           v(b, prho, k, j, i) = fixup0(prho);
           v(b, peng, k, j, i) = fixup0(peng);
@@ -207,7 +208,6 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
             SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = fixup0(idx_H(ispec, ii)); }
           }
         } else {
-          if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
 
             Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
             if (ndim > 1)
