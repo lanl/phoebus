@@ -15,10 +15,11 @@ add_executable(phoebus
   main.cpp # first
 
   # alphabetical
+  fixup/fixup.hpp
   fixup/fixup.cpp
   fixup/fixup_c2p.cpp
   fixup/fixup_radc2p.cpp
-  fixup/fixup.hpp
+  fixup/fixup_src.cpp
 
   fluid/con2prim.hpp
   fluid/con2prim_robust.hpp
