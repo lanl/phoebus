@@ -86,6 +86,8 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
+  PackIndexMap imap0;
+  auto v0 = rc0->PackVariables(vars, imap0);
 
   const int prho = imap[p::density].first;
   const int crho = imap[c::density].first;
@@ -158,6 +160,16 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
                               // finding.
         eos_lambda[1] = std::log10(v(b, tmp, k, j, i)); // use last temp as initial guess
 
+        auto fixup0 = [&](const int iv) {
+          v(b, iv, k, j, i) = v0(b, iv, k, j, i - 1) + v0(b, iv, k, j, i + 1);
+          if (ndim > 1) {
+            v(b, iv, k, j, i) += v0(b, iv, k, j - 1, i) + v0(b, iv, k, j + 1, i);
+            if (ndim == 3) {
+              v(b, iv, k, j, i) += v0(b, iv, k - 1, j, i) + v0(b, iv, k + 1, j, i);
+            }
+          }
+          return v(b, iv, k, j, i) / (2 * ndim);
+        };
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b, iv, k, j, i) = v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
                               v(b, ifail, k, j, i + 1) * v(b, iv, k, j, i + 1);
@@ -171,97 +183,122 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           }
           return inv_mask_sum * v(b, iv, k, j, i);
         };
-        if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
 
-          Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
-          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
-          if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+        if (src_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
+          v(b, prho, k, j, i) = fixup0(prho);
+          v(b, peng, k, j, i) = fixup0(peng);
+          SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = fixup0(idx_pvel(ii)); }
+          if (pye > 0) {
+            v(b, pye, k, j, i) = fixup0(pye);
+          }
+          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+              eos_lambda);
+          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+          v(b, gm1, k, j, i) =
+              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
+                                                          v(b, tmp, k, j, i), eos_lambda),
+                    v(b, prs, k, j, i));
 
-          Real gcov[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          for (int ispec = 0; ispec < num_species; ispec++) {
+            v(b, idx_J(ispec), k, j, i) = fixup0(idx_J(ispec));
+            SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = fixup0(idx_H(ispec, ii)); }
+          }
+        } else {
+          if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
 
-          if (num_valid > 0.5 && src_failure_strategy == FAILURE_STRATEGY::interpolate) {
-            const Real norm = 1.0 / num_valid;
+            Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
+            if (ndim > 1)
+              num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
+            if (ndim == 3)
+              num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
 
-            v(b, prho, k, j, i) = fixup(prho, norm);
-            v(b, peng, k, j, i) = fixup(peng, norm);
-            SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = fixup(idx_pvel(ii), norm); }
-            if (pye > 0) {
-              v(b, pye, k, j, i) = fixup(pye, norm);
-            }
-            if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-                eos_lambda);
-            v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-            v(b, gm1, k, j, i) =
-                ratio(eos.BulkModulusFromDensityTemperature(
-                          v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
-                      v(b, prs, k, j, i));
+            if (num_valid > 0.5 &&
+                src_failure_strategy == FAILURE_STRATEGY::interpolate) {
+              const Real norm = 1.0 / num_valid;
 
-            for (int ispec = 0; ispec < num_species; ispec++) {
-              v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
-              SPACELOOP(ii) {
-                v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
+              v(b, prho, k, j, i) = fixup(prho, norm);
+              v(b, peng, k, j, i) = fixup(peng, norm);
+              SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = fixup(idx_pvel(ii), norm); }
+              if (pye > 0) {
+                v(b, pye, k, j, i) = fixup(pye, norm);
               }
-            }
-          } else {
-            // No valid neighbors; set to floors with zero spatial velocity
-            //            printf("No valid source neighbors! %i %i %i\n", k, j, i);
+              if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+              v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+                  v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+                  eos_lambda);
+              v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+                  v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+              v(b, gm1, k, j, i) =
+                  ratio(eos.BulkModulusFromDensityTemperature(
+                            v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+                        v(b, prs, k, j, i));
 
-            // double rho_floor, sie_floor;
-            // bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
-            //                 coords.x3v(k, j, i), rho_floor, sie_floor);
-            // v(b, prho, k, j, i) = rho_floor;
-            // v(b, peng, k, j, i) = rho_floor * sie_floor;
-            v(b, prho, k, j, i) = 1.e-100;
-            v(b, peng, k, j, i) = 1.e-100;
-
-            // Zero primitive velocities
-            SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
-
-            // Auxiliary primitives
-            // Safe value for ye
-            if (pye > 0) {
-              v(b, pye, k, j, i) = 0.5;
-            }
-            if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-                eos_lambda);
-            v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-            v(b, gm1, k, j, i) =
-                ratio(eos.BulkModulusFromDensityTemperature(
-                          v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
-                      v(b, prs, k, j, i));
-
-            // Real ucon[4] = {0};
-            Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
-                             v(b, idx_pvel(2), k, j, i)};
-            // GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
-            // Geometry::Tetrads tetrads(ucon, gcov);
-
-            for (int ispec = 0; ispec < num_species; ispec++) {
-              // v(b, idx_J(ispec), k, j, i) = 1.e-10;
-              v(b, idx_J(ispec), k, j, i) = 1.e-100;
-
-              // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov[ii] / v(b,
-              // idx_J(ispec), k, j, i);
-              SPACELOOP(ii) {
-                v(b, idx_H(ispec, ii), k, j, i) = 0.;
-                // printf("Fail [%i %i %i] H[%i] = %e\n", k, j, i, ii,
-                //       v(b, idx_H(ispec, ii), k, j, i));
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
+                SPACELOOP(ii) {
+                  v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
+                }
               }
+            } else {
+              // No valid neighbors; set to floors with zero spatial velocity
+              //            printf("No valid source neighbors! %i %i %i\n", k, j, i);
 
-              // TODO(BRR) is this wrong? Want zero flux in fluid frame, this isn't it
-              // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
-              // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Mcon_coord[ii + 1] /
-              // v(b, idx_J(ispec), k, j, i);
-              //  printf("Fail [%i %i %i] H[%i] = %e\n", k,j,i,ii,v(b, idx_H(ispec, ii),
-              //  k, j, i));
-              //}
+              // double rho_floor, sie_floor;
+              // bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
+              //                 coords.x3v(k, j, i), rho_floor, sie_floor);
+              // v(b, prho, k, j, i) = rho_floor;
+              // v(b, peng, k, j, i) = rho_floor * sie_floor;
+              v(b, prho, k, j, i) = 1.e-100;
+              v(b, peng, k, j, i) = 1.e-100;
+
+              // Zero primitive velocities
+              SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
+
+              // Auxiliary primitives
+              // Safe value for ye
+              if (pye > 0) {
+                v(b, pye, k, j, i) = 0.5;
+              }
+              if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+              v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+                  v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+                  eos_lambda);
+              v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+                  v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+              v(b, gm1, k, j, i) =
+                  ratio(eos.BulkModulusFromDensityTemperature(
+                            v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+                        v(b, prs, k, j, i));
+
+              // Real ucon[4] = {0};
+              Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
+                               v(b, idx_pvel(2), k, j, i)};
+              // GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
+              // Geometry::Tetrads tetrads(ucon, gcov);
+
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                // v(b, idx_J(ispec), k, j, i) = 1.e-10;
+                v(b, idx_J(ispec), k, j, i) = 1.e-100;
+
+                // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov[ii] / v(b,
+                // idx_J(ispec), k, j, i);
+                SPACELOOP(ii) {
+                  v(b, idx_H(ispec, ii), k, j, i) = 0.;
+                  // printf("Fail [%i %i %i] H[%i] = %e\n", k, j, i, ii,
+                  //       v(b, idx_H(ispec, ii), k, j, i));
+                }
+
+                // TODO(BRR) is this wrong? Want zero flux in fluid frame, this isn't it
+                // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
+                // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Mcon_coord[ii + 1] /
+                // v(b, idx_J(ispec), k, j, i);
+                //  printf("Fail [%i %i %i] H[%i] = %e\n", k,j,i,ii,v(b, idx_H(ispec, ii),
+                //  k, j, i));
+                //}
+              }
             }
           }
 
@@ -331,6 +368,8 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
           Real gcon[3][3];
           geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+          Real gcov[4][4];
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           Real S[3];
           const Real vel[] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
                               v(b, idx_pvel(2), k, j, i)};
