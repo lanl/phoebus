@@ -125,6 +125,7 @@ add_executable(phoebus
   radiation/cooling_function.cpp
   radiation/mocmc.cpp
   radiation/moments.cpp
+  radiation/moments_source.cpp
   radiation/monte_carlo.cpp
   radiation/geodesics.hpp
 

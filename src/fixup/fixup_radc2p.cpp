@@ -92,6 +92,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
+  PackIndexMap imap0;
+  auto v0 = rc0->PackVariables(vars, imap0);
 
   const int prho = imap[p::density].first;
   const int crho = imap[c::density].first;
@@ -179,6 +181,16 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
         // If fluid fail but rad success, recalculate rad c2p and set iradfail with
         // result, then still process if (fluid fail && rad fail) check.
         // Note that it is assumed that the fluid is already fixed up
+        auto fixup0 = [&](const int iv) {
+          v(b, iv, k, j, i) = v0(b, iv, k, j, i - 1) + v0(b, iv, k, j, i + 1);
+          if (ndim > 1) {
+            v(b, iv, k, j, i) += v0(b, iv, k, j - 1, i) + v0(b, iv, k, j + 1, i);
+            if (ndim == 3) {
+              v(b, iv, k, j, i) += v0(b, iv, k - 1, j, i) + v0(b, iv, k + 1, j, i);
+            }
+          }
+          return v(b, iv, k, j, i) / (2 * ndim);
+        };
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b, iv, k, j, i) = v(b, iradfail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
                               v(b, iradfail, k, j, i + 1) * v(b, iv, k, j, i + 1);
@@ -210,18 +222,28 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
             num_valid += v(b, iradfail, k, j - 1, i) + v(b, iradfail, k, j + 1, i);
           if (ndim == 3)
             num_valid += v(b, iradfail, k - 1, j, i) + v(b, iradfail, k + 1, j, i);
-          if (num_valid > 0.5 && c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
-            const Real norm = 1.0 / num_valid;
+          if (c2p_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
             for (int ispec = 0; ispec < nspec; ispec++) {
-              v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
+              v(b, idx_J(ispec), k, j, i) = fixup0(idx_J(ispec));
               SPACELOOP(ii) {
-                v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
+                v(b, idx_H(ispec, ii), k, j, i) = fixup0(idx_H(ispec, ii));
               }
             }
           } else {
-            for (int ispec = 0; ispec < nspec; ispec++) {
-              v(b, idx_J(ispec), k, j, i) = 1.e-100;
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
+            if (num_valid > 0.5 &&
+                c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
+              const Real norm = 1.0 / num_valid;
+              for (int ispec = 0; ispec < nspec; ispec++) {
+                v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
+                SPACELOOP(ii) {
+                  v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
+                }
+              }
+            } else {
+              for (int ispec = 0; ispec < nspec; ispec++) {
+                v(b, idx_J(ispec), k, j, i) = 1.e-100;
+                SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
+              }
             }
           }
 
