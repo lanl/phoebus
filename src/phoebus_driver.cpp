@@ -490,11 +490,13 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fill_derived =
         tl.AddTask(none, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
 
-    auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+    auto fixup =
+        tl.AddTask(fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>,
+                   sc1.get(), sc0.get());
 
-    auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+    auto radfixup =
+        tl.AddTask(fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>,
+                   sc1.get(), sc0.get());
 
     auto floors =
         tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
@@ -534,6 +536,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   for (int i = 0; i < blocks.size(); i++) {
     auto &pmb = blocks[i];
     auto &tl = async_region_temp1[i];
+    auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
     auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
 
     auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
@@ -545,14 +548,15 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fill_derived = tl.AddTask(
         convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc.get());
 
-    auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
+    auto fixup =
+        tl.AddTask(fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>,
+                   sc.get(), sc0.get());
 
-    auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
+    auto radfixup =
+        tl.AddTask(fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>,
+                   sc.get(), sc0.get());
 
-    auto floors =
-        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
+    auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
   }
 
   // Radiation/fluid interaction terms
@@ -634,7 +638,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     using MDT = std::remove_pointer<decltype(sc0.get())>::type;
 
     // Fixup for interaction failures
-    auto src_fixup = tl.AddTask(none, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get());
+    auto src_fixup =
+        tl.AddTask(none, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get(), sc0.get());
 
     // fill in derived fields after source update
     // auto fill_derived = tl.AddTask(
@@ -681,6 +686,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   for (int i = 0; i < blocks.size(); i++) {
     auto &pmb = blocks[i];
     auto &tl = async_region_temp2[i];
+    auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
     auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
 
     auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
@@ -692,14 +698,15 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fill_derived = tl.AddTask(
         convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc.get());
 
-    auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
+    auto fixup =
+        tl.AddTask(fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>,
+                   sc.get(), sc0.get());
 
-    auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
+    auto radfixup =
+        tl.AddTask(fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>,
+                   sc.get(), sc0.get());
 
-    auto floors =
-        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
+    auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
   }
 
   // Evaluate and report particle statistics

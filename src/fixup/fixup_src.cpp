@@ -50,7 +50,7 @@ namespace fixup {
 // good neighbors, set everything to the floors. Then call p2c on both fluid and
 // radiation.
 template <typename T, class CLOSURE>
-TaskStatus SourceFixupImpl(T *rc) {
+TaskStatus SourceFixupImpl(T *rc, T *rc0) {
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
@@ -392,7 +392,7 @@ TaskStatus SourceFixupImpl(T *rc) {
 }
 
 template <typename T>
-TaskStatus SourceFixup(T *rc) {
+TaskStatus SourceFixup(T *rc, T *rc0) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
@@ -406,21 +406,22 @@ TaskStatus SourceFixup(T *rc) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return SourceFixupImpl<T, radiation::ClosureM1<Vec, Tens2, settings>>(rc);
+    return SourceFixupImpl<T, radiation::ClosureM1<settings>>(rc, rc0);
   } else if (method == "moment_eddington") {
-    return SourceFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+    return SourceFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0);
   } else if (method == "mocmc") {
-    return SourceFixupImpl<T, radiation::ClosureMOCMC<Vec, Tens2, settings>>(rc);
+    return SourceFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc, rc0);
   } else {
     // TODO(BRR) default to Eddington closure, check that rad floors are unused for
     // Monte Carlo/cooling function
     PARTHENON_REQUIRE(!enable_rad_floors,
                       "Rad floors not supported with cooling function/Monte Carlo!");
-    return SourceFixupImpl<T, radiation::ClosureEdd<Vec, Tens2, settings>>(rc);
+    return SourceFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0);
   }
   return TaskStatus::fail;
 }
 
-template TaskStatus SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+template TaskStatus SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
+                                                     MeshBlockData<Real> *rc0);
 
 } // namespace fixup
