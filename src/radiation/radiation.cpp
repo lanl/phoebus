@@ -426,8 +426,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     // physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
     physics->FillDerivedBlock = fixup::AllC2P<MeshBlockData<Real>>;
-    physics->PostFillDerivedBlock =
-        fixup::AllConservedToPrimitiveFixup<MeshBlockData<Real>>;
+    // physics->PostFillDerivedBlock =
+    //    fixup::AllConservedToPrimitiveFixup<MeshBlockData<Real>>;
   }
 
   params.Add("moments_active", moments_active);

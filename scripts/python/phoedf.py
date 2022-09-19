@@ -24,7 +24,10 @@ class phoedf(phdf.phdf):
   def __init__(self, filename, geomfile=None):
     super().__init__(filename)
 
-    self.eos_type = self.Params['eos/type'].decode()
+    try:
+      self.eos_type = self.Params['eos/type'].decode()
+    except (UnicodeDecodeError, AttributeError):
+      self.eos_type = self.Params['eos/type']
 
     if 'opacity/type' in self.Params:
       self.opacity_model = self.Params['opacity/type']
