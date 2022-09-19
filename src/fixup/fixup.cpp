@@ -667,14 +667,29 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                     v(b, idx_H(ispec, jj), k, j, i);
             }
             xi = std::sqrt(xi);
-            if ((i == 58 && j == 56) || (i == 56 && j == 58)) {
+            //if ((i == 58 && j == 56) || (i == 56 && j == 58)) {
+            if ((i == 58 && j == 56)) {
+        Real gammacov[3][3];
+        geom.Metric(CellLocation::Cent, k, j, i, gammacov);
+        SPACELOOP2(ii, jj) {
+          printf("gammacov[%i][%i] = %e\n", ii,jj, gammacov[ii][jj]);
+        }
               SPACELOOP2(ii, jj) {
                 printf("gammacon[%i][%i] = %e\n", ii,jj,gammacon[ii][jj]);
               }
+              SPACETIMELOOP2(mu, nu) {
+                printf("gcov[%i][%i] = %e\n", mu, nu, gcov[mu][nu]);
+              }
+        Real gcon[4][4];
+        geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon);
+        SPACETIMELOOP2(mu, nu) {
+          printf("gcon[%i][%i] = %e\n", mu, nu, gcon[mu][nu]);
+        }
               printf("[%i %i %i] xi: %e xi_max: %e H = %e %e %e\n", k,j,i,xi, xi_max,
                 v(b, idx_H(ispec, 0), k, j, i),
                 v(b, idx_H(ispec, 1), k, j, i),
                 v(b, idx_H(ispec, 2), k, j, i));
+              exit(-1);
             }
             if (xi > xi_max) {
 
