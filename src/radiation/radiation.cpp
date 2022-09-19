@@ -17,6 +17,7 @@
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "radiation/local_three_geometry.hpp"
+#include "reconstruction.hpp"
 
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
@@ -303,6 +304,40 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     namespace p = radmoment_prim;
     namespace c = radmoment_cons;
     namespace i = radmoment_internal;
+
+    std::string recon = pin->GetOrAddString("radiation", "recon", "linear");
+    PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;
+    if (recon == "weno5" || recon == "weno5z") {
+      PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                               "weno5 requires 4+ ghost cells");
+      rt = PhoebusReconstruction::ReconType::weno5z;
+    } else if (recon == "mp5") {
+      PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                               "mp5 requires 4+ ghost cells");
+      if (cfl > 0.4) {
+        PARTHENON_WARN("mp5 often requires smaller cfl numbers for stability");
+      }
+      rt = PhoebusReconstruction::ReconType::mp5;
+    } else if (recon == "linear") {
+      rt = PhoebusReconstruction::ReconType::linear;
+    } else if (recon == "constant") {
+      rt = PhoebusReconstruction::ReconType::constant;
+    } else {
+      PARTHENON_THROW("Invalid Reconstruction option.  Choose from "
+                      "[constant,linear,mp5,weno5,weno5z]");
+    }
+    params.Add("Recon", rt);
+
+    //    std::string solver = pin->GetOrAddString("radiation", "riemann", "hll");
+    //    riemann::solver rs = riemann::solver::HLL;
+    //    if (solver == "llf") {
+    //      rs = riemann::solver::LLF;
+    //    } else if (solver == "hll") {
+    //      rs = riemann::solver::HLL;
+    //    } else {
+    //      PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
+    //    }
+    //    params.Add("RiemannSolver", rs);
 
     const std::string src_solver_name =
         pin->GetOrAddString("radiation", "src_solver", "fourd");

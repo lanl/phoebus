@@ -94,7 +94,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     } else if (recon == "constant") {
       rt = PhoebusReconstruction::ReconType::constant;
     } else {
-      PARTHENON_THROW("Invalid Reconstruction option.  Choose from [linear,weno5]");
+      PARTHENON_THROW("Invalid Reconstruction option.  Choose from "
+                      "[constant,linear,mp5,weno5,weno5z]");
     }
     params.Add("Recon", rt);
 

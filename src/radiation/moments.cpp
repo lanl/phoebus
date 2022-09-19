@@ -481,6 +481,8 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   using namespace PhoebusReconstruction;
 
   auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
+  auto rt = rad_pkg->Param<ReconType>("Recon");
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
 
@@ -536,12 +538,18 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         const VariablePack<Real> &var = (n < nrecon ? v : v_vel);
         const int var_id = n % nrecon;
         Real *pv = &var(b, var_id, k, j, 0);
+        Real *pvim2 = pv - 2;
         Real *pvim1 = pv - 1;
         Real *pvip1 = pv + 1;
+        Real *pvip2 = pv + 2;
+        Real *pvjm2 = &var(b, var_id, k, j - 2 * dj, 0);
         Real *pvjm1 = &var(b, var_id, k, j - dj, 0);
         Real *pvjp1 = &var(b, var_id, k, j + dj, 0);
+        Real *pvjp2 = &var(b, var_id, k, j + 2 * dj, 0);
+        Real *pvkm2 = &var(b, var_id, k - 2 * dk, j, 0);
         Real *pvkm1 = &var(b, var_id, k - dk, j, 0);
         Real *pvkp1 = &var(b, var_id, k + dk, j, 0);
+        Real *pvkp2 = &var(b, var_id, k + 2 * dk, j, 0);
         Real *vi_l, *vi_r, *vj_l, *vj_r, *vk_l, *vk_r;
         if (n < nrecon) {
           vi_l = &ql(0, n, k, j, 1);
@@ -563,23 +571,64 @@ TaskStatus ReconstructEdgeStates(T *rc) {
 
         // TODO(JCD): do we want to enable other recon methods like weno5?
         // x-direction
-        ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
-                                   vi_r);
-        //                if (member.team_rank() == 0 && n == 0 && j == 108) {
-        //                  int i = 111;
+        //        ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1,
+        //        vi_l,
+        //                                   vi_r);
+        //        //                if (member.team_rank() == 0 && n == 0 && j == 108) {
+        //        //                  int i = 111;
+        //        //
+        //        //        //          for (int i = ib.e - 5; i <= ib.e + 1; i++) {
+        //        //                    printf("[%i %i %i] (J) = %e\n",
+        //        //                      k, j, i, v(b, idx_J(n), k, j, 0));
+        //        //                    }
+        //        //}
+        //        // y-direction
+        //        if (ndim > 1)
+        //          ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l,
+        //          vj_r);
         //
-        //        //          for (int i = ib.e - 5; i <= ib.e + 1; i++) {
-        //                    printf("[%i %i %i] (J) = %e\n",
-        //                      k, j, i, v(b, idx_J(n), k, j, 0));
-        //                    }
-        //}
-        // y-direction
-        if (ndim > 1)
-          ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
+        //        // z-direction
+        //        if (ndim > 2)
+        //          ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l,
+        //          vk_r);
 
-        // z-direction
-        if (ndim > 2)
-          ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
+        switch (rt) {
+        case ReconType::weno5z:
+          ReconLoop<WENO5Z>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2,
+                            vi_l, vi_r);
+          if (ndim > 1)
+            ReconLoop<WENO5Z>(member, ib.s, ib.e, pvjm2, pvjm1, pv, pvjp1, pvjp2, vj_l,
+                              vj_r);
+          if (ndim > 2)
+            ReconLoop<WENO5Z>(member, ib.s, ib.e, pvkm2, pvkm1, pv, pvkp1, pvkp2, vk_l,
+                              vk_r);
+          break;
+        case ReconType::mp5:
+          ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2, vi_l,
+                         vi_r);
+          if (ndim > 1)
+            ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvjm2, pvjm1, pv, pvjp1, pvjp2,
+                           vj_l, vj_r);
+          if (ndim > 2)
+            ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvkm2, pvkm1, pv, pvkp1, pvkp2,
+                           vk_l, vk_r);
+          break;
+        case ReconType::linear:
+          ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
+                                     vi_r);
+          if (ndim > 1)
+            ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
+          if (ndim > 2)
+            ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
+          break;
+        case ReconType::constant:
+          ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vi_l, vi_r);
+          if (ndim > 1) ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vj_l, vj_r);
+          if (ndim > 2) ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vk_l, vk_r);
+          break;
+        default:
+          PARTHENON_FAIL("Invalid recon option.");
+        }
 
         // Calculate spatial derivatives of J at zone faces for diffusion limit
         //    x-->
