@@ -317,7 +317,7 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<Vec, Tens2, SET>::Con2Prim(
 
   const Real xi = std::sqrt(gamma->contractCov3Vectors(*cov_tilH, *cov_tilH)) / (*J);
 
-  if (*J < 0. || xi > 0.999) {
+  if (*J < 0.) {// || xi > 0.999) {
     return ClosureStatus::failure;
   }
 
