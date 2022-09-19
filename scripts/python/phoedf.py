@@ -24,7 +24,10 @@ class phoedf(phdf.phdf):
   def __init__(self, filename, geomfile=None):
     super().__init__(filename)
 
-    self.eos_type = self.Params['eos/type']
+    try:
+      self.eos_type = self.Params['eos/type'].decode()
+    except (UnicodeDecodeError, AttributeError):
+      self.eos_type = self.Params['eos/type']
 
     if 'opacity/type' in self.Params:
       self.opacity_model = self.Params['opacity/type']
@@ -52,6 +55,7 @@ class phoedf(phdf.phdf):
       ind = [[0,1,3,6],[1,2,4,7],[3,4,5,8],[6,7,8,9]]
       return ind[mu][nu]
     self.gcov = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 4, 4])
+    print(self.flatgcov.shape)
     for mu in range(4):
       for nu in range(4):
         self.gcov[:,:,:,:,mu,nu] = self.flatgcov[:,:,:,:,flatten_indices(mu,nu)]
@@ -65,7 +69,7 @@ class phoedf(phdf.phdf):
     self.alpha = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1])
     self.alpha[:,:,:,:] = np.sqrt(-1./self.gcon[:,:,:,:,0,0])
     self.betacon = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 3])
-    self.betacon[:,:,:,:,:] = self.gcon[:,:,:,:,1:,0]/(self.alpha[:,:,:,:,np.newaxis]**2)
+    self.betacon[:,:,:,:,:] = self.gcon[:,:,:,:,1:,0]*(self.alpha[:,:,:,:,np.newaxis]**2)
     self.gammacon = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 3, 3])
     for ii in range(3):
       for jj in range(3):
@@ -92,6 +96,7 @@ class phoedf(phdf.phdf):
     return self.rho
 
   def GetEOS(self):
+    print(eos_type_dict.keys())
     return eos_type_dict[self.eos_type](self.Params)
 
   def GetOpacity(self, constants='cgs'):
@@ -212,6 +217,21 @@ class phoedf(phdf.phdf):
     self.xi = np.sqrt(self.xi)
     print(self.xi.max())
     print(self.xi.min())
+
+    for b in range(self.NumBlocks):
+      for k in range(self.Nx3):
+        for j in range(self.Nx2):
+          for i in range(self.Nx1):
+            if self.xi[b,k,j,i] > 1.0:
+              print(f"xi[{b},{k},{j},{i}] = {self.xi[b,k,j,i]} (H = {Hcov[b,k,j,i,0]} {Hcov[b,k,j,i,1]} {Hcov[b,k,j,i,2]}")
+
+    print ("52 54")
+    print(self.xi[0,0,52,54])
+    print(Hcov[0,0,52,54])
+    print(self.gcov[0,0,52,54,1:,1:])
+    print(self.gammacon[0,0,52,54])
+    print(self.gcov[0,0,52,54])
+    print(self.gcon[0,0,52,54])
 
     self.xi = np.clip(self.xi, 1.e-10, 1.)
     print(self.xi.max())

@@ -135,6 +135,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40):
 
     ax = axes[1,1]
     lxi = np.log10(dfile.GetXi())
+    print(np.argmax(dfile.GetXi()))
     print(lxi.min())
     print(lxi.max())
     for b in range(nblocks):
@@ -181,7 +182,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40):
     fig.colorbar(im, cax=cax, orientation='vertical')
     ax.set_aspect('equal')
     ax.set_title(r'$\log_{10}~u$')
-    
+
     ax = axes[1,1]
     Pg = dfile.GetPg()
     Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
