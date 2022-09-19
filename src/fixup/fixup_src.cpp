@@ -184,30 +184,32 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           return inv_mask_sum * v(b, iv, k, j, i);
         };
 
-          if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
-        if (src_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
-          v(b, prho, k, j, i) = fixup0(prho);
-          v(b, peng, k, j, i) = fixup0(peng);
-          SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = fixup0(idx_pvel(ii)); }
-          if (pye > 0) {
-            v(b, pye, k, j, i) = fixup0(pye);
-          }
-          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-              eos_lambda);
-          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-          v(b, gm1, k, j, i) =
-              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
-                                                          v(b, tmp, k, j, i), eos_lambda),
-                    v(b, prs, k, j, i));
+        if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
+          if (src_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
+            v(b, prho, k, j, i) = fixup0(prho);
+            v(b, peng, k, j, i) = fixup0(peng);
+            SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = fixup0(idx_pvel(ii)); }
+            if (pye > 0) {
+              v(b, pye, k, j, i) = fixup0(pye);
+            }
+            if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+                v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+                eos_lambda);
+            v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+            v(b, gm1, k, j, i) =
+                ratio(eos.BulkModulusFromDensityTemperature(
+                          v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+                      v(b, prs, k, j, i));
 
-          for (int ispec = 0; ispec < num_species; ispec++) {
-            v(b, idx_J(ispec), k, j, i) = fixup0(idx_J(ispec));
-            SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = fixup0(idx_H(ispec, ii)); }
-          }
-        } else {
+            for (int ispec = 0; ispec < num_species; ispec++) {
+              v(b, idx_J(ispec), k, j, i) = fixup0(idx_J(ispec));
+              SPACELOOP(ii) {
+                v(b, idx_H(ispec, ii), k, j, i) = fixup0(idx_H(ispec, ii));
+              }
+            }
+          } else {
 
             Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
             if (ndim > 1)
