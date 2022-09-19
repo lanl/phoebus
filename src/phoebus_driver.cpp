@@ -546,13 +546,13 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc.get());
 
     auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
 
     auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
 
     auto floors =
-        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
   }
 
   // Radiation/fluid interaction terms
@@ -693,13 +693,13 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc.get());
 
     auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
 
     auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
 
     auto floors =
-        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
   }
 
   // Evaluate and report particle statistics
