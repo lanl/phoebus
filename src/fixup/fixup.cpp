@@ -199,9 +199,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string c2p_failure_strategy_str =
       pin->GetOrAddString("fixup", "c2p_failure_strategy", "interpolate");
   if (c2p_failure_strategy_str == "interpolate") {
-    c2p_failure_strategy == FAILURE_STRATEGY::interpolate;
+    c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
   } else if (c2p_failure_strategy_str == "floors") {
-    c2p_failure_strategy == FAILURE_STRATEGY::floors;
+    c2p_failure_strategy = FAILURE_STRATEGY::floors;
   }
   params.Add("c2p_failure_strategy", c2p_failure_strategy);
 
@@ -209,9 +209,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string src_failure_strategy_str =
       pin->GetOrAddString("fixup", "src_failure_strategy", "interpolate");
   if (src_failure_strategy_str == "interpolate") {
-    src_failure_strategy == FAILURE_STRATEGY::interpolate;
+    src_failure_strategy = FAILURE_STRATEGY::interpolate;
   } else if (src_failure_strategy_str == "floors") {
-    src_failure_strategy == FAILURE_STRATEGY::floors;
+    src_failure_strategy = FAILURE_STRATEGY::floors;
   }
   params.Add("src_failure_strategy", src_failure_strategy);
 
