@@ -293,7 +293,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
       });
 
   // TODO(BRR) This is inefficient!
-  ApplyFloors(rc);
+  // ApplyFloors(rc);
 
   return TaskStatus::complete;
 }
