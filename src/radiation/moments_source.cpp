@@ -423,15 +423,18 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
             Real tauH = alpha * dt * kappa;
 
-            c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
-                                 &(dE[ispec]), &(cov_dF[ispec]));
+            Real xi;
+            if (status == root_find::RootFindStatus::success) {
+              c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
+                                   &(dE[ispec]), &(cov_dF[ispec]));
 
-            // Check xi
-            Estar += dE[ispec];
-            SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
-            c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
+              // Check xi
+              Estar += dE[ispec];
+              SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
+              c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
-            Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+              xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+            }
 
             if (success == true) {
               success = v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
@@ -440,8 +443,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             if (!success &&
                 oned_fixup_strategy == OneDFixupStrategy::ignore_dJ) {
               // Retry the solver update but without updating internal energy
-              Estar -= dE[ispec];
-              SPACELOOP(ii) cov_Fstar(ii) -= cov_dF[ispec](ii);
+//              Estar -= dE[ispec];
+//              SPACELOOP(ii) cov_Fstar(ii) -= cov_dF[ispec](ii);
 
               JBB = v(iblock, idx_J(ispec), k, j, i);
               kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, T1, Ye,
@@ -452,8 +455,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                                    &(dE[ispec]), &(cov_dF[ispec]));
 
               // Check xi
-              Estar += dE[ispec];
-              SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
+              Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam + dE[ispec];
+              SPACELOOP(ii) {
+                cov_Fstar(ii) = v(iblock, idx_F(ispec, ii), k, j, i)/sdetgam + cov_dF[ispec](ii);
+              }
               c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
               xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
