@@ -178,6 +178,10 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
       DEFAULT_LOOP_PATTERN, "RadConToPrim::Solve fixup", DevExecSpace(), 0,
       v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        Real xi_max;
+        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                                    coords.x3v(k, j, i), xi_max);
+        
         // If fluid fail but rad success, recalculate rad c2p and set iradfail with
         // result, then still process if (fluid fail && rad fail) check.
         // Note that it is assumed that the fluid is already fixed up
@@ -247,7 +251,6 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
             }
           }
 
-          Real xi_max = 0.99;
           for (int ispec = 0; ispec < nspec; ispec++) {
             //       v(b, idx_J(ispec), k, j, i) =
             //           std::max<Real>(v(b, idx_J(ispec), k, j, i), 1.e-10);
