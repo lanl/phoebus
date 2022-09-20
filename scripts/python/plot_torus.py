@@ -124,6 +124,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40):
 
     ax = axes[1,0]
     lJ = np.log10(np.clip(dfile.Get("r.p.J", flatten=False), 1.e-20, None))
+    #lJ = np.log10(np.clip(dfile.Get("r.c.E", flatten=False), 1.e-20, None))
     for b in range(nblocks):
       im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lJ[b,0,:,:].transpose(), vmin=-5, vmax=0,
       cmap=cmap_uniform)
@@ -135,9 +136,6 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40):
 
     ax = axes[1,1]
     lxi = np.log10(dfile.GetXi())
-    print(np.argmax(dfile.GetXi()))
-    print(lxi.min())
-    print(lxi.max())
     for b in range(nblocks):
       im = ax.pcolormesh(xblock[b,:,:], yblock[b,:,:], lxi[b,0,:,:].transpose(), vmin=-3, vmax=0,
       cmap=cmap_uniform)

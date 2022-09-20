@@ -193,8 +193,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
                 c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
               //            printf("[%i %i %i] num_valid: %e\n", k, j, i, num_valid);
               const Real norm = 1.0 / num_valid;
-              printf("[%i %i %i] old rho: %e new rho: %e\n", k, j, i, v(b, prho, k, j, i),
-                     fixup(prho, norm));
               v(b, prho, k, j, i) = fixup(prho, norm);
               for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
                 v(b, pv, k, j, i) = fixup(pv, norm);

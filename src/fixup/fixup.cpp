@@ -424,14 +424,16 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           //          }
           floor_applied = true;
           // drho = std::max<Real>(drho, 1.e-100); // > 0 so EOS calls are happy
-          if (drho < robust::SMALL()) {
-            // drho = du / e_max;
-            drho = du / sie_floor; // Inject enough material such that the injected energy
-                                   // floor is cold
-          }
-          if (du < robust::SMALL()) {
-            du = sie_floor * drho;
-          }
+          drho = std::max<Real>(drho, du/sie_floor);
+          du = std::max<Real>(du, sie_floor*drho);
+//          if (drho < robust::SMALL()) {
+//            // drho = du / e_max;
+//            drho = du / sie_floor; // Inject enough material such that the injected energy
+//                                   // floor is cold
+//          }
+//          if (du < robust::SMALL()) {
+//            du = sie_floor * drho;
+//          }
           //          if (i == 117 && (j == 4 || j == 7)) {
           //            printf("[%i %i %i] floor applied! new drho = %e du = %e\n",
           //            k,j,i,drho, du);

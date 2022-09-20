@@ -96,7 +96,6 @@ class phoedf(phdf.phdf):
     return self.rho
 
   def GetEOS(self):
-    print(eos_type_dict.keys())
     return eos_type_dict[self.eos_type](self.Params)
 
   def GetOpacity(self, constants='cgs'):
@@ -215,27 +214,10 @@ class phoedf(phdf.phdf):
       for jj in range(3):
         self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj]
     self.xi = np.sqrt(self.xi)
-    print(self.xi.max())
-    print(self.xi.min())
-
-    for b in range(self.NumBlocks):
-      for k in range(self.Nx3):
-        for j in range(self.Nx2):
-          for i in range(self.Nx1):
-            if self.xi[b,k,j,i] > 1.0:
-              print(f"xi[{b},{k},{j},{i}] = {self.xi[b,k,j,i]} (H = {Hcov[b,k,j,i,0]} {Hcov[b,k,j,i,1]} {Hcov[b,k,j,i,2]}")
-
-    print ("52 54")
-    print(self.xi[0,0,52,54])
-    print(Hcov[0,0,52,54])
-    print(self.gcov[0,0,52,54,1:,1:])
-    print(self.gammacon[0,0,52,54])
-    print(self.gcov[0,0,52,54])
-    print(self.gcon[0,0,52,54])
 
     self.xi = np.clip(self.xi, 1.e-10, 1.)
+
     print(self.xi.max())
-    print(self.xi.min())
 
     return self.xi
 
