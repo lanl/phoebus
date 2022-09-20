@@ -219,6 +219,27 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
             }
           }
 
+          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real beta[3];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+          Real gcov[4][4];
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          Real gcon[3][3];
+          geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+
+          // Clamp velocity now (for rad inversion)
+          Real vpcon[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
+                           v(b, pvel_lo + 2, k, j, i)};
+          const Real W = phoebus::GetLorentzFactor(vpcon, gcov);
+          if (W > gamma_max) {
+            const Real rescale = std::sqrt(gamma_max * gamma_max - 1.) / (W * W - 1.);
+            SPACELOOP(ii) { vpcon[ii] *= rescale; }
+            SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = vpcon[ii]; }
+            ceiling_applied = true;
+          }
+
+          // Update dependent primitives
           if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
           v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
               v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
@@ -230,20 +251,9 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
                                                           v(b, tmp, k, j, i), eos_lambda),
                     v(b, prs, k, j, i));
 
-          // Need to update radiation primitives
+          // Update conserved variables
 
-          //          // Update conserved variables
-          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-          Real beta[3];
-          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-          Real gcov[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-          Real gcon[3][3];
-          geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
           Real S[3];
-          const Real vel[] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                              v(b, pvel_hi, k, j, i)};
           Real bcons[3];
           Real bp[3] = {0.0, 0.0, 0.0};
           if (pb_hi > 0) {
@@ -257,7 +267,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
             ye_prim = v(b, pye, k, j, i);
           }
           Real sig[3];
-          prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
+          prim2con::p2c(v(b, prho, k, j, i), vpcon, bp, v(b, peng, k, j, i), ye_prim,
                         v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gcon, beta, alpha,
                         gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,
                         sig);
@@ -273,14 +283,14 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
 
   // TODO(BRR) This is inefficient!
   // ONLY FOR MHD!
-  ApplyFloors(rc);
+  // ApplyFloors(rc);
   // ApplyFluidFloors(rc);
 
   // Need to update radiation primitives
   // TODO(BRR) This is very inefficient!
-  radiation::MomentCon2Prim(rc);
+  // radiation::MomentCon2Prim(rc);
 
-  ApplyFloors(rc);
+  // ApplyFloors(rc);
 
   return TaskStatus::complete;
 }
