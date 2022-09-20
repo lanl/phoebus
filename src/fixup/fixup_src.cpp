@@ -155,6 +155,13 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
       DEFAULT_LOOP_PATTERN, "Source fixup", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s,
       kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        double gamma_max, e_max;
+        bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+                           gamma_max, e_max);
+        Real xi_max;
+        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
+                                    coords.x3v(k, j, i), xi_max);
+        
         double eos_lambda[2]; // used for stellarcollapse eos and
                               // other EOS's that require root
                               // finding.
@@ -303,6 +310,15 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
               }
             }
           }
+          
+          const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
+          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real beta[3];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+          Real gcon[3][3];
+          geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
+          Real gcov[4][4];
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
 
           //          // Apply floors (redundant with case of no valid neighbors)
           //          double rho_floor, sie_floor;
@@ -325,6 +341,18 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           //                                                          eos_lambda),
           //                    v(b, prs, k, j, i));
           //
+          
+          // Clamp velocity now (for rad inversion)
+          Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
+                           v(b, idx_pvel(2), k, j, i)};
+          Real W = phoebus::GetLorentzFactor(vpcon, gcov);
+          if (W > gamma_max) {
+            const Real rescale = std::sqrt(gamma_max * gamma_max - 1.) / (W * W - 1.);
+            SPACELOOP(ii) { vpcon[ii] *= rescale; }
+            SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = vpcon[ii]; }
+            W = gamma_max;
+          }
+          
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
           //
           //          Real gamma_max, e_max;
@@ -357,24 +385,13 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
             Real xi = 0.;
             SPACELOOP(ii) { xi += cov_H(ii) * con_H(ii); }
             xi = std::sqrt(xi);
-            constexpr Real xi_max = 0.99;
             if (xi > xi_max) {
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
             }
           }
-          //
+          
           //          // Update MHD conserved variables
-          const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
-          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-          Real beta[3];
-          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-          Real gcon[3][3];
-          geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
-          Real gcov[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           Real S[3];
-          const Real vel[] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
-                              v(b, idx_pvel(2), k, j, i)};
           Real bcons[3];
           Real bp[3] = {0.0, 0.0, 0.0};
           if (pb_hi > 0) {
@@ -388,7 +405,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
             ye_prim = v(b, pye, k, j, i);
           }
           Real sig[3];
-          prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
+          prim2con::p2c(v(b, prho, k, j, i), vpcon, bp, v(b, peng, k, j, i), ye_prim,
                         v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gcon, beta, alpha,
                         sdetgam, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i),
                         ye_cons, sig);
@@ -401,8 +418,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           }
 
           // Update radiation conserved variables
-          Real W = phoebus::GetLorentzFactor(vel, gcov);
-          Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
+          Vec con_v({vpcon[0] / W, vpcon[1] / W, vpcon[2] / W});
           CLOSURE c(con_v, &g);
           for (int ispec = 0; ispec < num_species; ispec++) {
             Real E;
@@ -427,7 +443,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
       });
 
   // TODO(BRR) This is inefficient!
-  ApplyFloors(rc);
+//  ApplyFloors(rc);
 
   return TaskStatus::complete;
 }
