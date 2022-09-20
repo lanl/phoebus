@@ -367,6 +367,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         pin->GetOrAddInteger("radiation", "src_rootfind_maxiter", 100);
     params.Add("src_rootfind_maxiter", src_rootfind_maxiter);
 
+    std::string oned_fixup_strategy_str  = pin->GetOrAddString("radiation", "oned_fixup_strategy", "none");
+    OneDFixupStrategy oned_fixup_strategy;
+    if (oned_fixup_strategy_str == "none") {
+      oned_fixup_strategy = OneDFixupStrategy::none;
+    } else if (oned_fixup_strategy_str == "ignore_dJ") {
+      oned_fixup_strategy = OneDFixupStrategy::ignore_dJ;
+    } else if (oned_fixup_strategy_str == "ignore_all") {
+      oned_fixup_strategy = OneDFixupStrategy::ignore_all;
+    } else {
+      PARTHENON_FAIL("radiation/oned_fixup_strategy has an invalid entry!");
+    }
+    params.Add("oned_fixup_strategy", oned_fixup_strategy);
+
     int ndim = 3;
     // if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
     // else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;

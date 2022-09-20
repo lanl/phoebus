@@ -45,6 +45,8 @@ enum class MOCMCBoundaries { outflow, fixed_temp, periodic };
 
 enum class SourceSolver { zerod, oned, fourd };
 
+enum class OneDFixupStrategy { none, ignore_dJ, ignore_all };
+
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
 

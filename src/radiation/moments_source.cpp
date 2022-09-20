@@ -294,6 +294,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   const auto src_rootfind_eps = rad->Param<Real>("src_rootfind_eps");
   const auto src_rootfind_tol = rad->Param<Real>("src_rootfind_tol");
   const auto src_rootfind_maxiter = rad->Param<int>("src_rootfind_maxiter");
+  const auto oned_fixup_strategy = rad->Param<OneDFixupStrategy>("oned_fixup_strategy");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -389,7 +390,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                                              v(iblock, pT, k, j, i), &status);
             if (status == root_find::RootFindStatus::failure) {
               success = false;
-              break;
+              // break;
             }
 
             CLOSURE c(con_v, &g);
@@ -429,15 +430,56 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             Estar += dE[ispec];
             SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
             c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
+
             Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
 
-            if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
-                xi <= xi_max) {
+            if (success == true) {
+              success = v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
+                        xi <= xi_max;
+            }
+            if (!success &&
+                oned_fixup_strategy == OneDFixupStrategy::ignore_dJ) {
+              // Retry the solver update but without updating internal energy
+              Estar -= dE[ispec];
+              SPACELOOP(ii) cov_Fstar(ii) -= cov_dF[ispec](ii);
+
+              JBB = v(iblock, idx_J(ispec), k, j, i);
+              kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, T1, Ye,
+                                                                        species_d[ispec]);
+              tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
+              tauH = alpha * dt * kappa;
+              c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
+                                   &(dE[ispec]), &(cov_dF[ispec]));
+
+              // Check xi
+              Estar += dE[ispec];
+              SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
+              c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
+
+              xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+              if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] <= 0. ||
+                  xi > xi_max) {
+                success = false;
+                break;
+              }
+            } else if (!success && oned_fixup_strategy == OneDFixupStrategy::ignore_all) {
+              dE[ispec] = 0.;
+              SPACELOOP(ii) {
+                cov_Fstar(ii) = 0.;
+              }
               success = true;
             } else {
-              success = false;
               break; // Don't bother with other species if this failed
             }
+
+            //            if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0.
+            //            &&
+            //                xi <= xi_max) {
+            //              success = true;
+            //            } else {
+            //              success = false;
+            //              break; // Don't bother with other species if this failed
+            //            }
 
           } // ispec
         } else if (src_solver == SourceSolver::fourd) {
