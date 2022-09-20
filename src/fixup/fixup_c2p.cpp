@@ -142,6 +142,10 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
         eos_lambda[0] = 0.5;
         eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
 
+        Real gamma_max, e_max;
+        bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+                           gamma_max, e_max);
+
         // Need to account for not stenciling outside of ghost zones
         // bool is_outer_ghost_layer =
         //    (i == ib.s || i == ib.e || j == jb.s || j == jb.e || k == kb.s || k ==
@@ -236,7 +240,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
             const Real rescale = std::sqrt(gamma_max * gamma_max - 1.) / (W * W - 1.);
             SPACELOOP(ii) { vpcon[ii] *= rescale; }
             SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = vpcon[ii]; }
-            ceiling_applied = true;
           }
 
           // Update dependent primitives
