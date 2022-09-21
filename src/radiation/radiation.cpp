@@ -367,7 +367,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         pin->GetOrAddInteger("radiation", "src_rootfind_maxiter", 100);
     params.Add("src_rootfind_maxiter", src_rootfind_maxiter);
 
-    std::string oned_fixup_strategy_str  = pin->GetOrAddString("radiation", "oned_fixup_strategy", "none");
+    std::string oned_fixup_strategy_str =
+        pin->GetOrAddString("radiation", "oned_fixup_strategy", "none");
     OneDFixupStrategy oned_fixup_strategy;
     if (oned_fixup_strategy_str == "none") {
       oned_fixup_strategy = OneDFixupStrategy::none;

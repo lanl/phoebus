@@ -423,20 +423,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
             Real tauH = alpha * dt * kappa;
 
-            if (j == 70 && i == 44) {
-              printf("T0: %e T1: %e J0: %e JBB: %e tauJ: %e tauH: %e status success? %i\n", v(iblock, pT, k, j, i),
-                T1, v(iblock, idx_J(ispec), k, j, i),
-                JBB, tauJ, tauH,
-                static_cast<int>(status == root_find::RootFindStatus::success));
-            }
-
             Real xi;
             if (status == root_find::RootFindStatus::success) {
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
-            if (j == 70 && i == 44) {
-              printf("dE: %e dF: %e %e %e\n", dE[ispec], cov_dF[ispec](0), cov_dF[ispec](1), cov_dF[ispec](2));
-            }
 
               // Check xi
               Estar += dE[ispec];
@@ -447,51 +437,33 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
               success = v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
                         xi <= xi_max;
-            if (j == 70 && i == 44) {
-              printf("first: xi: %e E-dE: %e success? %i\n",
-                xi, v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec],
-                static_cast<int>(success));
             }
-            }
-            if (!success &&
-                oned_fixup_strategy == OneDFixupStrategy::ignore_dJ) {
+            if (!success && oned_fixup_strategy == OneDFixupStrategy::ignore_dJ) {
               // Retry the solver update but without updating internal energy
-//              Estar -= dE[ispec];
-//              SPACELOOP(ii) cov_Fstar(ii) -= cov_dF[ispec](ii);
-             Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
-             SPACELOOP(ii) {
-               cov_Fstar(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
-             }
+              //              Estar -= dE[ispec];
+              //              SPACELOOP(ii) cov_Fstar(ii) -= cov_dF[ispec](ii);
+              Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+              SPACELOOP(ii) {
+                cov_Fstar(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
+              }
 
               JBB = v(iblock, idx_J(ispec), k, j, i);
-              kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(rho, v(iblock, pT, k, j, i), Ye,
-                                                                        species_d[ispec]);
+              kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+                  rho, v(iblock, pT, k, j, i), Ye, species_d[ispec]);
               tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
               tauH = alpha * dt * kappa;
-            if (j == 70 && i == 44) {
-              printf("second: T0: %e T1: %e J0: %e JBB: %e tauJ: %e tauH: %e\n", v(iblock, pT, k, j, i),
-                T1, v(iblock, idx_J(ispec), k, j, i),
-                JBB, tauJ, tauH);
-            }
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
-            if (j == 70 && i == 44) {
-              printf("dE: %e dF: %e %e %e\n", dE[ispec], cov_dF[ispec](0), cov_dF[ispec](1), cov_dF[ispec](2));
-            }
 
               // Check xi
               Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam + dE[ispec];
               SPACELOOP(ii) {
-                cov_Fstar(ii) = v(iblock, idx_F(ispec, ii), k, j, i)/sdetgam + cov_dF[ispec](ii);
+                cov_Fstar(ii) =
+                    v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam + cov_dF[ispec](ii);
               }
               c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
               xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
-            if (j == 70 && i == 44) {
-              printf("second: xi: %e E-dE: %e success? %i\n",
-                xi, v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec],
-                static_cast<int>(success));
-            }
               if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] <= 0. ||
                   xi > xi_max) {
                 success = false;
@@ -501,9 +473,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
             } else if (!success && oned_fixup_strategy == OneDFixupStrategy::ignore_all) {
               dE[ispec] = 0.;
-              SPACELOOP(ii) {
-                cov_Fstar(ii) = 0.;
-              }
+              SPACELOOP(ii) { cov_Fstar(ii) = 0.; }
               success = true;
             } else {
               break; // Don't bother with other species if this failed

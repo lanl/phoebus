@@ -181,7 +181,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
         Real xi_max;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                     coords.x3v(k, j, i), xi_max);
-        
+
         // If fluid fail but rad success, recalculate rad c2p and set iradfail with
         // result, then still process if (fluid fail && rad fail) check.
         // Note that it is assumed that the fluid is already fixed up
