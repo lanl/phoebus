@@ -35,8 +35,6 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
 
-#define CON2PRIM_ROBUST_PRINT_FAILURES 0
-
 namespace con2prim_robust {
 
 using namespace robust;

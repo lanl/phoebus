@@ -437,7 +437,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
               success = v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
                         xi <= xi_max;
+            } else {
+              success = false;
             }
+            
             if (!success && oned_fixup_strategy == OneDFixupStrategy::ignore_dJ) {
               // Retry the solver update but without updating internal energy
               //              Estar -= dE[ispec];
