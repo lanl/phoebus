@@ -294,6 +294,9 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
           for (int m = slo; m <= shi; m++) {
             v(b, m, k, j, i) = sig[m - slo];
           }
+
+          // TODO(BRR)
+          // if not iradfail here, call rad c2p with updated velocity and set iradfail to result
         }
       });
 

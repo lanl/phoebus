@@ -293,9 +293,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
 
             if (num_valid < 0.5) {
               printf("num_valid = %e! [%i %i %i]\n", num_valid, k, j, i);
-              if (j == 55 && i == 4) {
-                PARTHENON_FAIL("j = 55 i ==4 no neighbors");
-              }
+            //  if (j == 55 && i == 4) {
+            //    PARTHENON_FAIL("j = 55 i ==4 no neighbors");
+            //  }
             }
             
             //        Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
