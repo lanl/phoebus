@@ -221,11 +221,9 @@ class phoedf(phdf.phdf):
     self.xi[:,:,:,:] -= vdH*vdH
     self.xi = np.sqrt(self.xi)
     
-    print(self.xi.max())
+    print(f"xi max: {self.xi.max()}")
 
     self.xi = np.clip(self.xi, 1.e-10, 1.)
-
-    print(self.xi.max())
 
     return self.xi
 

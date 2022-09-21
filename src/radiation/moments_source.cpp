@@ -431,13 +431,18 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               // Check xi
               Estar += dE[ispec];
               SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
-              c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
+              auto c2p_status = c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
               //xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
               const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
 
               success = v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
                         xi <= xi_max;
+              if (c2p_status == ClosureStatus::success) {
+                success = true;
+              } else {
+                success = false;
+              }
             } else {
               success = false;
             }
@@ -465,12 +470,16 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 cov_Fstar(ii) =
                     v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam + cov_dF[ispec](ii);
               }
-              c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
+              auto c2p_status = c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
   //            xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
               const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
-              if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] <= 0. ||
-                  xi > xi_max) {
+              //if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] <= 0. ||
+              //    xi > xi_max) {
+              if (c2p_status == ClosureStatus::failure) {
+                printf("FAIL?? [%i %i %i] xi = %e J = %e ug = %e tauH = %e\n",
+                  k, j, i, xi, J, ug, tauH);
+
                 success = false;
                 break;
               } else {
