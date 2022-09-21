@@ -264,25 +264,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
   const auto num_independent_task_lists = blocks.size();
 
-  // Fix up flux failures
-  // TODO(BRR) Need to fix up after RK2 step??
-  TaskRegion &async_region_begin = tc.AddRegion(num_independent_task_lists);
-  for (int ib = 0; ib < num_independent_task_lists; ib++) {
-    auto pmb = blocks[ib].get();
-    auto &tl = async_region_begin[ib];
-
-    // first make other useful containers
-    auto &base = pmb->meshblock_data.Get();
-
-    // pull out the container we'll use to get fluxes and/or compute RHSs
-    auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
-    // auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
-    using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-
-    auto floors = tl.AddTask(none, fixup::ApplyFloors<MeshBlockData<Real>>, sc0.get());
-  }
-  // TODO(BRR) would need to do fixup in ghost zones...
-
   // be ready for flux corrections and boundary comms
   TaskRegion &sync_region_1 = tc.AddRegion(num_partitions);
   for (int ib = 0; ib < num_partitions; ++ib) {

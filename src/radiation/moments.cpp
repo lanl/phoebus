@@ -316,6 +316,16 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
 
+        if (j == 55 && i == 4) {
+          printf("[%i %i %i] E = %e covF = %e %e %e J = %e covH = %e %e %e\n", k,j,i,E,
+            covF(0),covF(1),covF(2),J,covH(0),covH(1),covH(2));
+          //SPACELOOP2(ii,jj) {
+          //  printf("conTilPi(%i, %i) = %e\n", ii,jj,conTilPi(ii,jj));
+          //}
+          const Real xi = std::sqrt(g.contractCov3Vectors(covH,covH) - std::pow(g.contractConCov3Vectors(con_v,covH),2))/J;
+          printf("[%i %i %i]xi  = %e\n", k,j,i,xi);
+        }
+
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
           // Use the scaled value of the rest frame flux for reconstruction
@@ -754,6 +764,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
   auto &coords = pmb->coords;
 
+  auto recon_fixup_strategy = rad_pkg->Param<ReconFixupStrategy>("recon_fixup_strategy");
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(), X1DIR,
       pmb->pmy_mesh->ndim, // Loop over directions
@@ -810,16 +822,20 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                            v(idx_qlv(2, idir), k, j, i)};
         Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
                            v(idx_qrv(2, idir), k, j, i)};
-        const Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
-        const Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
+        Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
+        Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
 
-        if (Wl > W_ceiling) {
-          const Real rescale = std::sqrt(W_ceiling * W_ceiling - 1.) / (Wl * Wl - 1.);
-          SPACELOOP(ii) { con_vpl[ii] *= rescale; }
-        }
-        if (Wr > W_ceiling) {
-          const Real rescale = std::sqrt(W_ceiling * W_ceiling - 1.) / (Wr * Wr - 1.);
-          SPACELOOP(ii) { con_vpr[ii] *= rescale; }
+        if (recon_fixup_strategy == ReconFixupStrategy::bounds) {
+          if (Wl > W_ceiling) {
+            const Real rescale = std::sqrt(W_ceiling * W_ceiling - 1.) / (Wl * Wl - 1.);
+            SPACELOOP(ii) { con_vpl[ii] *= rescale; }
+            Wl = W_ceiling;
+          }
+          if (Wr > W_ceiling) {
+            const Real rescale = std::sqrt(W_ceiling * W_ceiling - 1.) / (Wr * Wr - 1.);
+            SPACELOOP(ii) { con_vpr[ii] *= rescale; }
+            Wr = W_ceiling;
+          }
         }
 
         Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
@@ -834,21 +850,27 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
         for (int ispec = 0; ispec < num_species; ++ispec) {
           // TODO(BRR) Use floors
-          const Real Jl = std::max<Real>(v(idx_ql(ispec, 0, idir), k, j, i), J_floor);
-          const Real Jr = std::max<Real>(v(idx_qr(ispec, 0, idir), k, j, i), J_floor);
+          Real Jl = v(idx_ql(ispec, 0, idir), k, j, i);
+          Real Jr = v(idx_qr(ispec, 0, idir), k, j, i);
+          if (recon_fixup_strategy == ReconFixupStrategy::bounds) {
+            Jl = std::max<Real>(Jl, J_floor);
+            Jr = std::max<Real>(Jr, J_floor);
+          }
           Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 2, idir), k, j, i),
                     Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
           Vec Hr = {Jr * v(idx_qr(ispec, 1, idir), k, j, i),
                     Jr * v(idx_qr(ispec, 2, idir), k, j, i),
                     Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
-          Real xil = std::sqrt(g.contractCov3Vectors(Hl, Hl)) / Jl;
-          Real xir = std::sqrt(g.contractCov3Vectors(Hr, Hr)) / Jr;
-          if (xil > xi_ceiling) {
-            SPACELOOP(ii) { Hl(ii) *= xi_ceiling / xil; }
-          }
-          if (xir > xi_ceiling) {
-            SPACELOOP(ii) { Hr(ii) *= xi_ceiling / xir; }
+          if (recon_fixup_strategy == ReconFixupStrategy::bounds) {
+            const Real xil = std::sqrt(g.contractCov3Vectors(Hl,Hl) - std::pow(g.contractConCov3Vectors(con_vl,Hl),2))/Jl;
+            const Real xir = std::sqrt(g.contractCov3Vectors(Hr,Hr) - std::pow(g.contractConCov3Vectors(con_vr,Hr),2))/Jr;
+            if (xil > xi_ceiling) {
+              SPACELOOP(ii) { Hl(ii) *= xi_ceiling / xil; }
+            }
+            if (xir > xi_ceiling) {
+              SPACELOOP(ii) { Hr(ii) *= xi_ceiling / xir; }
+            }
           }
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
@@ -899,6 +921,17 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
           cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
+        
+          if (j == 55 && i == 4) {
+            printf("[%i %i %i][%i] conFl: %e %e %e conFr: %e %e %e\n", k, j, i, idir,
+              conFl(0), conFl(1), conFl(2), conFr(0), conFr(1), conFr(2));
+            printf("[%i %i %i][%i] vl: %e %e %e vr: %e %e %e\n",k,j,i,idir,
+            con_vl(0), con_vl(1), con_vl(2),
+            con_vr(0), con_vr(1), con_vr(2));
+            printf("[%i %i %i][%i] Jl: %e Hl: %e %e %e Jr: %e Hr: %e %e %e\n",
+            k,j,i,idir,Jl,Hl(0),Hl(1),Hl(2),Jr,Hr(0),Hr(1),Hr(2));
+            printf("[%i %i %i][%i] a: %e\n", k, j, i, idir, a);
+          }
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
@@ -911,6 +944,11 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           const Real asym_sigspeed =
               std::max<Real>(std::fabs(asym_sigl), std::fabs(asym_sigr));
           const Real sigspeed = a * rad_sigspeed + (1. - a) * asym_sigspeed;
+          
+          if (j == 55 && i == 4) {
+            printf("[%i %i %i][%i] rad_sigspeed = %e asym_sigspeed = %e sigspeed = %e\n",
+              k, j, i, idir, rad_sigspeed, asym_sigspeed, sigspeed);
+          }
 
           // Correct the fluxes with the shift terms
           conFl(idir) -= con_beta(idir) * El;
@@ -929,6 +967,13 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
+          }
+          
+          if ((j == 55 && i == 4) || (j == 55 && i == 5) || (j == 56 && i == 4) || (j == 56 && i == 5)) {
+            printf("flux: %e %e %e %e\n", v.flux(idir_in, idx_Ef(ispec), k, j, i),
+              v.flux(idir_in, idx_Ff(ispec, 0), k, j, i),
+              v.flux(idir_in, idx_Ff(ispec, 1), k, j, i),
+              v.flux(idir_in, idx_Ff(ispec, 2), k, j, i));
           }
           //          if (i == 4 && j == 127) {
           //            printf("flux [%i %i %i][%i] = %e %e %e %e a = %e Jl = %e Jr = %e

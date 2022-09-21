@@ -218,6 +218,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           const Real vel[] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
                               v(b, idx_pvel(2), k, j, i)};
+          const Real W = phoebus::GetLorentzFactor(vel, gcov);
+          Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
 
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 
@@ -256,14 +258,13 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
             //           std::max<Real>(v(b, idx_J(ispec), k, j, i), 1.e-10);
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
                          v(b, idx_H(ispec, 2), k, j, i)};
-            Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H));
+            //Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H));
+              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2));
             if (xi > xi_max) {
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
             }
           }
 
-          const Real W = phoebus::GetLorentzFactor(vel, gcov);
-          Vec con_v({vel[0] / W, vel[1] / W, vel[2] / W});
           CLOSURE c(con_v, &g);
           for (int ispec = 0; ispec < nspec; ispec++) {
             Real E;
@@ -282,6 +283,21 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
             }
             c.Prim2Con(J, cov_H, con_tilPi, &E, &cov_F);
 
+            // Sanity check
+            c.Con2Prim(E, cov_F, con_tilPi, &J, &cov_H);
+            //Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
+            if (J < 0 || xi >= 1.) {
+              printf("INSANE RAD C2P FIXUP! [%i %i %i] xi = %e J = %e\n", k, j, i, xi, J);
+            }
+
+            if (num_valid < 0.5) {
+              printf("num_valid = %e! [%i %i %i]\n", num_valid, k, j, i);
+              if (j == 55 && i == 4) {
+                PARTHENON_FAIL("j = 55 i ==4 no neighbors");
+              }
+            }
+            
             //        Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
             //            printf("Rad fixup [%i %i %i] J = %e cov_H = %e %e %e
             //            (xi = %e) E

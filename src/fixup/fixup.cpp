@@ -671,12 +671,17 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               }
             }
 
-            Real xi = 0.;
-            SPACELOOP2(ii, jj) {
-              xi += gammacon[ii][jj] * v(b, idx_H(ispec, ii), k, j, i) *
-                    v(b, idx_H(ispec, jj), k, j, i);
-            }
-            xi = std::sqrt(xi);
+//            Real xi = 0.;
+//            SPACELOOP2(ii, jj) {
+//              xi += gammacon[ii][jj] * v(b, idx_H(ispec, ii), k, j, i) *
+//                    v(b, idx_H(ispec, jj), k, j, i);
+//            }
+//            xi = std::sqrt(xi);
+            Vec cov_H{v(b, idx_H(ispec, 0), k, j, i),
+              v(b, idx_H(ispec, 1), k, j, i),
+              v(b, idx_H(ispec, 2), k, j, i)};
+            const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2));
+
             // if ((i == 58 && j == 56) || (i == 56 && j == 58)) {
             if (xi > xi_max) {
 

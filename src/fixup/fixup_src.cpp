@@ -352,6 +352,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
             SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = vpcon[ii]; }
             W = gamma_max;
           }
+          Vec con_v({vpcon[0] / W, vpcon[1] / W, vpcon[2] / W});
 
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
           //
@@ -380,14 +381,15 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
             //                std::max<Real>(v(b, idx_J(ispec), k, j, i), Jmin);
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
                          v(b, idx_H(ispec, 2), k, j, i)};
-            Vec con_H;
-            g.raise3Vector(cov_H, &con_H);
-            Real xi = 0.;
-            SPACELOOP(ii) { xi += cov_H(ii) * con_H(ii); }
-            xi = std::sqrt(xi);
-            if (xi > xi_max) {
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
-            }
+            //Vec con_H;
+            //g.raise3Vector(cov_H, &con_H);
+            //Real xi = 0.;
+            //SPACELOOP(ii) { xi += cov_H(ii) * con_H(ii); }
+            //xi = std::sqrt(xi);
+            //if (xi > xi_max) {
+            //  SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
+            //}
+              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2));
           }
 
           //          // Update MHD conserved variables
@@ -418,7 +420,6 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           }
 
           // Update radiation conserved variables
-          Vec con_v({vpcon[0] / W, vpcon[1] / W, vpcon[2] / W});
           CLOSURE c(con_v, &g);
           for (int ispec = 0; ispec < num_species; ispec++) {
             Real E;

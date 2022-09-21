@@ -423,7 +423,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
             Real tauH = alpha * dt * kappa;
 
-            Real xi;
+            //Real xi;
             if (status == root_find::RootFindStatus::success) {
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
@@ -433,7 +433,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
               c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
-              xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+              //xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
 
               success = v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
                         xi <= xi_max;
@@ -466,7 +467,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
               c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
-              xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+  //            xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
+              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
               if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] <= 0. ||
                   xi > xi_max) {
                 success = false;
@@ -686,11 +688,17 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
               if (bad_guess) {
                 // Try reducing the step size so xi < ximax, ug > 0, J > 0
-                Real xi = 0.;
-                SPACELOOP2(ii, jj) {
-                  xi += con_gamma(ii, jj) * P_rad_guess[ii + 1] * P_rad_guess[jj + 1];
-                }
-                xi = std::sqrt(xi) / P_rad_guess[0];
+   //             Real xi = 0.;
+  //              SPACELOOP2(ii, jj) {
+ //                 xi += con_gamma(ii, jj) * P_rad_guess[ii + 1] * P_rad_guess[jj + 1];
+//                }
+//                xi = std::sqrt(xi) / P_rad_guess[0];
+              
+                Vec cov_H{P_rad_guess[1]/P_rad_guess[0], P_rad_guess[2]/P_rad_guess[0],
+                  P_rad_guess[3]/P_rad_guess[0]};
+                Vec con_v{P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]};
+                Real J = P_rad_guess[0];
+                const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
 
                 constexpr Real umin = 1.e-20; // TODO(BRR) use floors
                 constexpr Real Jmin = 1.e-20; // TODO(BRR) needs to be a bit smaller than
