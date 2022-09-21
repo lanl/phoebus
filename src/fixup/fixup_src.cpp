@@ -192,8 +192,6 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
         };
 
         if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
-          printf("fail???? %i %i %i\n", k, j, i);
-          PARTHENON_FAIL("here");
           if (src_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
             v(b, prho, k, j, i) = fixup0(prho);
             v(b, peng, k, j, i) = fixup0(peng);
@@ -445,7 +443,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
       });
 
   // TODO(BRR) This is inefficient!
-//  ApplyFloors(rc);
+  //  ApplyFloors(rc);
 
   return TaskStatus::complete;
 }

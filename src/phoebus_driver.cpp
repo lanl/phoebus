@@ -651,7 +651,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // auto radfixup = tl.AddTask(
     //    fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
 
-     auto floors =
+    auto floors =
         tl.AddTask(src_fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
   }
 
