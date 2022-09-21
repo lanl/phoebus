@@ -107,6 +107,20 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
         },
         Kokkos::Sum<int>(nfail_total));
     printf("total nfail: %i\n", nfail_total);
+    IndexRange ibi = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+    IndexRange jbi = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+    IndexRange kbi = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+    nfail_total = 0;
+    parthenon::par_reduce(
+        parthenon::loop_pattern_mdrange_tag, "Rad ConToPrim::Solve fixup failures",
+        DevExecSpace(), 0, v.GetDim(5) - 1, kbi.s, kbi.e, jbi.s, jbi.e, ibi.s, ibi.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
+          if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
+            nf++;
+          }
+        },
+        Kokkos::Sum<int>(nfail_total));
+    printf("total interior nfail: %i\n", nfail_total);
   }
 
   const int ndim = pmb->pmy_mesh->ndim;
@@ -179,6 +193,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
           num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+          printf("fail! %i %i %i num_valid: %i\n", k, j, i, num_valid);
           //}
           if (c2p_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
             v(b, prho, k, j, i) = fixup0(prho);
