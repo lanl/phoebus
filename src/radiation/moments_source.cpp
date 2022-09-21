@@ -434,9 +434,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
               xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
-            }
 
-            if (success == true) {
               success = v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
                         xi <= xi_max;
             }
