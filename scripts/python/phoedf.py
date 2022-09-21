@@ -210,10 +210,18 @@ class phoedf(phdf.phdf):
 
     self.xi = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1])
     Hcov = self.Get("r.p.H", flatten=False)
+    vcon = self.Get("p.velocity", flatten=False)
+    Gamma = self.GetGamma()
+    vcon[:,:,:,:,:] /= Gamma[:,:,:,:,np.newaxis]
+    vdH = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1])
     for ii in range(3):
+      vdH += vcon[:,:,:,:,ii]*Hcov[:,:,:,:,ii]
       for jj in range(3):
-        self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj]
+        self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj] 
+    self.xi[:,:,:,:] -= vdH*vdH
     self.xi = np.sqrt(self.xi)
+    
+    print(self.xi.max())
 
     self.xi = np.clip(self.xi, 1.e-10, 1.)
 

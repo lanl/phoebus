@@ -328,6 +328,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     params.Add("Recon", rt);
 
+    const std::string recon_fixup_strategy_str = pin->GetOrAddString("radiation", "recon_fixup_strategy", "bounds");
+    ReconFixupStrategy recon_fixup_strategy;
+    if (recon_fixup_strategy_str == "none") {
+      recon_fixup_strategy = ReconFixupStrategy::none;
+    } else if (recon_fixup_strategy_str == "bounds") {
+      recon_fixup_strategy = ReconFixupStrategy::bounds;
+    } else {
+      PARTHENON_FAIL("\"radiation/recon_fixup_strategy\" option unrecognized!");
+    }
+    params.Add("recon_fixup_strategy", recon_fixup_strategy);
+
     //    std::string solver = pin->GetOrAddString("radiation", "riemann", "hll");
     //    riemann::solver rs = riemann::solver::HLL;
     //    if (solver == "llf") {

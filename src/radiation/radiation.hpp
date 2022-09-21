@@ -47,6 +47,8 @@ enum class SourceSolver { zerod, oned, fourd };
 
 enum class OneDFixupStrategy { none, ignore_dJ, ignore_all };
 
+enum class ReconFixupStrategy { none, bounds };
+
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
 

@@ -316,7 +316,8 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<SET>::Con2Prim(Real E, const Vec cov_F,
   *J = ratio((2 * W2 - 1) * E - 2 * W2 * vF, lam);
   SPACELOOP(i) (*cov_tilH)(i) = (cov_F(i) - (*J) * cov_vTilPi(i) - cov_v(i) * a) / W;
 
-  const Real xi = std::sqrt(gamma->contractCov3Vectors(*cov_tilH, *cov_tilH)) / (*J);
+  //const Real xi = std::sqrt(gamma->contractCov3Vectors(*cov_tilH, *cov_tilH)) / (*J);
+  const Real xi = std::sqrt(gamma->contractCov3Vectors(*cov_tilH,*cov_tilH) - std::pow(gamma->contractConCov3Vectors(con_v,*cov_tilH),2))/(*J);
 
   if (*J < 0. || xi >= 1.0) {
     return ClosureStatus::failure;
