@@ -161,7 +161,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
         Real xi_max;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                     coords.x3v(k, j, i), xi_max);
-        
+
         double eos_lambda[2]; // used for stellarcollapse eos and
                               // other EOS's that require root
                               // finding.
@@ -192,6 +192,8 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
         };
 
         if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
+          printf("fail???? %i %i %i\n", k, j, i);
+          PARTHENON_FAIL("here");
           if (src_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
             v(b, prho, k, j, i) = fixup0(prho);
             v(b, peng, k, j, i) = fixup0(peng);
@@ -310,7 +312,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
               }
             }
           }
-          
+
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
@@ -341,7 +343,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           //                                                          eos_lambda),
           //                    v(b, prs, k, j, i));
           //
-          
+
           // Clamp velocity now (for rad inversion)
           Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
                            v(b, idx_pvel(2), k, j, i)};
@@ -352,7 +354,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
             SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = vpcon[ii]; }
             W = gamma_max;
           }
-          
+
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
           //
           //          Real gamma_max, e_max;
@@ -389,7 +391,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
             }
           }
-          
+
           //          // Update MHD conserved variables
           Real S[3];
           Real bcons[3];
