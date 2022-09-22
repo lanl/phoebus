@@ -39,7 +39,6 @@ variables = p.density,       &
             flux_divergence, &
             r.i.kappaH,      &
             p.bfield
-ghost_zones = true
 
 file_type   = hdf5      # Tabular data dump
 dt          = 1.0       # time increment between outputs
@@ -160,8 +159,9 @@ enable_source_fixup = true
 report_c2p_fails = true
 report_source_fails = true
 
-c2p_failure_strategy = floors # interpolate # floors # interpolate_previous
-src_failure_strategy = floors # interpolate # interpolate_previous
+fluid_c2p_failure_strategy = interpolate
+rad_c2p_failure_strategy = interpolate
+src_failure_strategy = floors
 
 floor_type = ExpX1RhoSie
 rho0_floor = 1.0e-5

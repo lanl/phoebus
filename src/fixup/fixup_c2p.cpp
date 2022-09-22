@@ -164,7 +164,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
         }
       });
 
-  auto c2p_failure_strategy = fix_pkg->Param<FAILURE_STRATEGY>("c2p_failure_strategy");
+  auto fluid_c2p_failure_strategy = fix_pkg->Param<FAILURE_STRATEGY>("fluid_c2p_failure_strategy");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
@@ -211,8 +211,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
-          //}
-          if (c2p_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
+          
+          if (fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
             v(b, prho, k, j, i) = fixup0(prho);
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
               v(b, pv, k, j, i) = fixup0(pv);
@@ -222,7 +222,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
             if (pye > 0) v(b, pye, k, j, i) = fixup0(pye);
           } else {
             if (num_valid > 0.5 &&
-                c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
+                fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
               //            printf("[%i %i %i] num_valid: %e\n", k, j, i, num_valid);
               const Real norm = 1.0 / num_valid;
               v(b, prho, k, j, i) = fixup(prho, norm);
@@ -315,7 +315,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           // TODO(BRR)
           // if not iradfail here, call rad c2p with updated velocity and set iradfail to result
           if (irfail >= 0) {
-            if (v(b, irfail, k, j, i) == radiation::FailFlags::fail) {
+            // If rad c2p failed, we'll fix that up subsequently
+            if (v(b, irfail, k, j, i) == radiation::FailFlags::success) {
               for (int ispec = 0; ispec < num_species; ispec++) {
                 typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
                 Vec con_v{vpcon[0]/W, vpcon[1]/W, vpcon[2]/W};

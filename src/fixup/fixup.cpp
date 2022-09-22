@@ -195,17 +195,29 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("mhd_ceiling", MHDCeilings());
   }
 
-  FAILURE_STRATEGY c2p_failure_strategy;
-  std::string c2p_failure_strategy_str =
-      pin->GetOrAddString("fixup", "c2p_failure_strategy", "interpolate");
-  if (c2p_failure_strategy_str == "interpolate") {
-    c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
-  } else if (c2p_failure_strategy_str == "interpolate_previous") {
-    c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
-  } else if (c2p_failure_strategy_str == "floors") {
-    c2p_failure_strategy = FAILURE_STRATEGY::floors;
+  FAILURE_STRATEGY fluid_c2p_failure_strategy;
+  std::string fluid_c2p_failure_strategy_str =
+      pin->GetOrAddString("fixup", "fluid_c2p_failure_strategy", "interpolate");
+  if (fluid_c2p_failure_strategy_str == "interpolate") {
+    fluid_c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
+  } else if (fluid_c2p_failure_strategy_str == "interpolate_previous") {
+    fluid_c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
+  } else if (fluid_c2p_failure_strategy_str == "floors") {
+    fluid_c2p_failure_strategy = FAILURE_STRATEGY::floors;
   }
-  params.Add("c2p_failure_strategy", c2p_failure_strategy);
+  params.Add("fluid_c2p_failure_strategy", fluid_c2p_failure_strategy);
+
+  FAILURE_STRATEGY rad_c2p_failure_strategy;
+  std::string rad_c2p_failure_strategy_str =
+      pin->GetOrAddString("fixup", "rad_c2p_failure_strategy", "interpolate");
+  if (rad_c2p_failure_strategy_str == "interpolate") {
+    rad_c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
+  } else if (rad_c2p_failure_strategy_str == "interpolate_previous") {
+    rad_c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
+  } else if (rad_c2p_failure_strategy_str == "floors") {
+    rad_c2p_failure_strategy = FAILURE_STRATEGY::floors;
+  }
+  params.Add("rad_c2p_failure_strategy", rad_c2p_failure_strategy);
 
   FAILURE_STRATEGY src_failure_strategy;
   std::string src_failure_strategy_str =
