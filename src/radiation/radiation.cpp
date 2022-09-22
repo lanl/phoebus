@@ -328,7 +328,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     params.Add("Recon", rt);
 
-    const std::string recon_fixup_strategy_str = pin->GetOrAddString("radiation", "recon_fixup_strategy", "bounds");
+    const std::string recon_fixup_strategy_str =
+        pin->GetOrAddString("radiation", "recon_fixup_strategy", "bounds");
     ReconFixupStrategy recon_fixup_strategy;
     if (recon_fixup_strategy_str == "none") {
       recon_fixup_strategy = ReconFixupStrategy::none;

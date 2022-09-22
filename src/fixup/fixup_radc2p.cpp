@@ -172,7 +172,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
   const int nspec = idx_E.DimSize(1);
   const int ndim = pmb->pmy_mesh->ndim;
 
-  auto rad_c2p_failure_strategy = fix_pkg->Param<FAILURE_STRATEGY>("rad_c2p_failure_strategy");
+  auto rad_c2p_failure_strategy =
+      fix_pkg->Param<FAILURE_STRATEGY>("rad_c2p_failure_strategy");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadConToPrim::Solve fixup", DevExecSpace(), 0,
@@ -256,7 +257,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           for (int ispec = 0; ispec < nspec; ispec++) {
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
                          v(b, idx_H(ispec, 2), k, j, i)};
-              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2));
+            const Real xi =
+                std::sqrt(g.contractCov3Vectors(cov_H, cov_H) -
+                          std::pow(g.contractConCov3Vectors(con_v, cov_H), 2));
             if (xi > xi_max) {
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
             }

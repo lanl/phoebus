@@ -341,7 +341,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-
         double eos_lambda[2]; // used for stellarcollapse eos and
                               // other EOS's that require root
                               // finding.
@@ -617,10 +616,11 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               }
             }
 
-            Vec cov_H{v(b, idx_H(ispec, 0), k, j, i),
-              v(b, idx_H(ispec, 1), k, j, i),
-              v(b, idx_H(ispec, 2), k, j, i)};
-            const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2));
+            Vec cov_H{v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
+                      v(b, idx_H(ispec, 2), k, j, i)};
+            const Real xi =
+                std::sqrt(g.contractCov3Vectors(cov_H, cov_H) -
+                          std::pow(g.contractConCov3Vectors(con_v, cov_H), 2));
 
             if (xi > xi_max) {
 
@@ -719,9 +719,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
     if (ix1_bc == "outflow") {
       PackIndexMap imap;
-      auto v =
-          rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
-                                     std::vector<std::string>({c::density}), imap);
+      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
+                                          std::vector<std::string>({c::density}), imap);
       const auto crho = imap[c::density].first;
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
@@ -752,9 +751,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (pmb->boundary_flag[BoundaryFace::outer_x1] == BoundaryFlag::user) {
     if (ox1_bc == "outflow") {
       PackIndexMap imap;
-      auto v =
-          rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
-                                     std::vector<std::string>({c::density}), imap);
+      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
+                                          std::vector<std::string>({c::density}), imap);
       const auto crho = imap[c::density].first;
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
@@ -788,9 +786,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (pmb->boundary_flag[BoundaryFace::inner_x2] == BoundaryFlag::user) {
     if (ix2_bc == "outflow") {
       PackIndexMap imap;
-      auto v =
-          rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
-                                     std::vector<std::string>({c::density}), imap);
+      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
+                                          std::vector<std::string>({c::density}), imap);
       const auto crho = imap[c::density].first;
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
@@ -826,9 +823,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (pmb->boundary_flag[BoundaryFace::outer_x2] == BoundaryFlag::user) {
     if (ox2_bc == "outflow") {
       PackIndexMap imap;
-      auto v =
-          rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
-                                     std::vector<std::string>({c::density}), imap);
+      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
+                                          std::vector<std::string>({c::density}), imap);
       const auto crho = imap[c::density].first;
 
       parthenon::par_for(
@@ -870,9 +866,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   // x3-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x3] == BoundaryFlag::outflow) {
     PackIndexMap imap;
-    auto v =
-        rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
-                                   std::vector<std::string>({c::density}), imap);
+    auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
+                                        std::vector<std::string>({c::density}), imap);
     const auto crho = imap[c::density].first;
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.s, kb.s, jb.s, jb.e,
@@ -901,9 +896,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   }
   if (pmb->boundary_flag[BoundaryFace::outer_x3] == BoundaryFlag::outflow) {
     PackIndexMap imap;
-    auto v =
-        rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
-                                   std::vector<std::string>({c::density}), imap);
+    auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density}),
+                                        std::vector<std::string>({c::density}), imap);
     const auto crho = imap[c::density].first;
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.e + 1, kb.e + 1, jb.s,
