@@ -193,7 +193,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
           num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
-          printf("fail! %i %i %i num_valid: %e\n", k, j, i, num_valid);
           //}
           if (c2p_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
             v(b, prho, k, j, i) = fixup0(prho);
