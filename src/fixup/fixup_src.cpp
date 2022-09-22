@@ -14,7 +14,6 @@
 #include <cmath>
 
 #include "fixup.hpp"
-//#include "fixup_applier.hpp"
 
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
@@ -24,7 +23,6 @@
 #include "fluid/fluid.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
-//#include "geometry/tetrads.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
@@ -51,7 +49,6 @@ namespace fixup {
 // radiation.
 template <typename T, class CLOSURE>
 TaskStatus SourceFixupImpl(T *rc, T *rc0) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -100,7 +97,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
   const int gm1 = imap[p::gamma1].first;
   const int slo = imap[impl::cell_signal_speed].first;
   const int shi = imap[impl::cell_signal_speed].second;
-  int pye = imap[p::ye].second; // negative if not present
+  int pye = imap[p::ye].second;
   int cye = imap[c::ye].second;
   const int pb_lo = imap[p::bfield].first;
   const int pb_hi = imap[p::bfield].second;
@@ -110,7 +107,6 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
   auto idx_F = imap.GetFlatIdx(cr::F);
   int ifail = imap[ir::srcfail].first;
   auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
-  // TODO(BRR) get iTilPi for MOCMC
 
   bool report_source_fails = fix_pkg->Param<bool>("report_source_fails");
   if (report_source_fails) {
@@ -253,13 +249,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
               }
             } else {
               // No valid neighbors; set to floors with zero spatial velocity
-              //            printf("No valid source neighbors! %i %i %i\n", k, j, i);
-
-              // double rho_floor, sie_floor;
-              // bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
-              //                 coords.x3v(k, j, i), rho_floor, sie_floor);
-              // v(b, prho, k, j, i) = rho_floor;
-              // v(b, peng, k, j, i) = rho_floor * sie_floor;
+              
               v(b, prho, k, j, i) = 1.e-100;
               v(b, peng, k, j, i) = 1.e-100;
 
@@ -282,31 +272,12 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
                             v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
                         v(b, prs, k, j, i));
 
-              // Real ucon[4] = {0};
-              Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
-                               v(b, idx_pvel(2), k, j, i)};
-              // GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
-              // Geometry::Tetrads tetrads(ucon, gcov);
-
               for (int ispec = 0; ispec < num_species; ispec++) {
-                // v(b, idx_J(ispec), k, j, i) = 1.e-10;
                 v(b, idx_J(ispec), k, j, i) = 1.e-100;
 
-                // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Hcov[ii] / v(b,
-                // idx_J(ispec), k, j, i);
                 SPACELOOP(ii) {
                   v(b, idx_H(ispec, ii), k, j, i) = 0.;
-                  // printf("Fail [%i %i %i] H[%i] = %e\n", k, j, i, ii,
-                  //       v(b, idx_H(ispec, ii), k, j, i));
                 }
-
-                // TODO(BRR) is this wrong? Want zero flux in fluid frame, this isn't it
-                // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
-                // SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = Mcon_coord[ii + 1] /
-                // v(b, idx_J(ispec), k, j, i);
-                //  printf("Fail [%i %i %i] H[%i] = %e\n", k,j,i,ii,v(b, idx_H(ispec, ii),
-                //  k, j, i));
-                //}
               }
             }
           }
@@ -319,28 +290,6 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-
-          //          // Apply floors (redundant with case of no valid neighbors)
-          //          double rho_floor, sie_floor;
-          //          bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
-          //          coords.x3v(k, j, i),
-          //                           rho_floor, sie_floor);
-          //          v(b, prho, k, j, i) = std::max<Real>(v(b, prho, k, j, i),
-          //          rho_floor); v(b, peng, k, j, i) =
-          //              std::max<Real>(v(b, peng, k, j, i), rho_floor * sie_floor);
-          //
-          //          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-          //          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-          //              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j,
-          //              i)), eos_lambda);
-          //          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-          //              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-          //          v(b, gm1, k, j, i) =
-          //              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
-          //                                                          v(b, tmp, k, j, i),
-          //                                                          eos_lambda),
-          //                    v(b, prs, k, j, i));
-          //
 
           // Clamp velocity now (for rad inversion)
           Real vpcon[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k, j, i),
@@ -355,40 +304,10 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           Vec con_v({vpcon[0] / W, vpcon[1] / W, vpcon[2] / W});
 
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
-          //
-          //          Real gamma_max, e_max;
-          //          bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-          //                             coords.x3v(k, j, i), gamma_max, e_max);
-          //
-          //          // Clamp fluid velocity
-          //          Real con_vp[3] = {v(b, idx_pvel(0), k, j, i), v(b, idx_pvel(1), k,
-          //          j, i),
-          //                            v(b, idx_pvel(2), k, j, i)};
-          //          Real W = phoebus::GetLorentzFactor(con_vp, gcov);
-          //          if (W > gamma_max) {
-          //            const Real rescale = std::sqrt((gamma_max * gamma_max - 1.) / (W *
-          //            W
-          //            - 1.)); SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) *= rescale; }
-          //          }
-          //          const Real r = std::exp(coords.x1v(k, j, i));
-          //          Real xi_max;
-          //          bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j,
-          //          i),
-          //                                      coords.x3v(k, j, i), xi_max);
-          //          const Real Jmin = 1.e-10;
+          
           for (int ispec = 0; ispec < num_species; ispec++) {
-            //            v(b, idx_J(ispec), k, j, i) =
-            //                std::max<Real>(v(b, idx_J(ispec), k, j, i), Jmin);
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
                          v(b, idx_H(ispec, 2), k, j, i)};
-            //Vec con_H;
-            //g.raise3Vector(cov_H, &con_H);
-            //Real xi = 0.;
-            //SPACELOOP(ii) { xi += cov_H(ii) * con_H(ii); }
-            //xi = std::sqrt(xi);
-            //if (xi > xi_max) {
-            //  SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
-            //}
               const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2));
           }
 
@@ -443,9 +362,6 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
         }
       });
 
-  // TODO(BRR) This is inefficient!
-  //  ApplyFloors(rc);
-
   return TaskStatus::complete;
 }
 
@@ -458,6 +374,8 @@ TaskStatus SourceFixup(T *rc, T *rc0) {
   std::string method;
   if (enable_rad_floors) {
     method = rad_pkg->Param<std::string>("method");
+  } else {
+    return TaskStatus::complete;
   }
 
   // TODO(BRR) share these settings somewhere else. Set at configure time?
@@ -469,12 +387,6 @@ TaskStatus SourceFixup(T *rc, T *rc0) {
     return SourceFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0);
   } else if (method == "mocmc") {
     return SourceFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc, rc0);
-  } else {
-    // TODO(BRR) default to Eddington closure, check that rad floors are unused for
-    // Monte Carlo/cooling function
-    PARTHENON_REQUIRE(!enable_rad_floors,
-                      "Rad floors not supported with cooling function/Monte Carlo!");
-    return SourceFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0);
   }
   return TaskStatus::fail;
 }

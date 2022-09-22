@@ -254,11 +254,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           }
 
           for (int ispec = 0; ispec < nspec; ispec++) {
-            //       v(b, idx_J(ispec), k, j, i) =
-            //           std::max<Real>(v(b, idx_J(ispec), k, j, i), 1.e-10);
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
                          v(b, idx_H(ispec, 2), k, j, i)};
-            //Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H));
               const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2));
             if (xi > xi_max) {
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) *= xi_max / xi; }
@@ -283,36 +280,11 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
             }
             c.Prim2Con(J, cov_H, con_tilPi, &E, &cov_F);
 
-            // Sanity check
-            c.Con2Prim(E, cov_F, con_tilPi, &J, &cov_H);
-            //Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
-              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
-            if (J < 0 || xi >= 1.) {
-              printf("INSANE RAD C2P FIXUP! [%i %i %i] xi = %e J = %e\n", k, j, i, xi, J);
-            }
-
-            if (num_valid < 0.5) {
-              printf("num_valid = %e! [%i %i %i]\n", num_valid, k, j, i);
-            //  if (j == 55 && i == 4) {
-            //    PARTHENON_FAIL("j = 55 i ==4 no neighbors");
-            //  }
-            }
-            
-            //        Real xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
-            //            printf("Rad fixup [%i %i %i] J = %e cov_H = %e %e %e
-            //            (xi = %e) E
-            //            = %e cov_F = %e %e %e\n",
-            //
-            //          k,j,i,J,cov_H(0),cov_H(1),cov_H(2),xi,E,cov_F(0),cov_F(1),cov_F(2));
-
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;
             SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = sdetgam * cov_F(ii); }
           }
         }
       });
-
-  // TODO(BRR) This is inefficient!
-  // ApplyFloors(rc);
 
   return TaskStatus::complete;
 }
@@ -326,6 +298,8 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc, T *rc0) {
   std::string method;
   if (enable_rad_floors) {
     method = rad_pkg->Param<std::string>("method");
+  } else {
+    return TaskStatus::complete;
   }
 
   // TODO(BRR) share these settings somewhere else. Set at configure time?
@@ -338,12 +312,6 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc, T *rc0) {
   } else if (method == "mocmc") {
     return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc,
                                                                                   rc0);
-  } else {
-    // TODO(BRR) default to Eddington closure, check that rad floors are unused for
-    // Monte Carlo/cooling function
-    PARTHENON_REQUIRE(!enable_rad_floors,
-                      "Rad floors not supported with cooling function/Monte Carlo!");
-    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0);
   }
   return TaskStatus::fail;
 }
