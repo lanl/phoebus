@@ -17,7 +17,6 @@
 
 #include <singularity-eos/eos/eos.hpp>
 
-//#include "fixup/fixup.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -213,7 +212,6 @@ class InteractionTResidual {
 
 template <class T, class CLOSURE>
 TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   PARTHENON_REQUIRE(USE_VALENCIA, "Covariant MHD formulation not supported!");
 
   auto *pmb = rc->GetParentPointer().get();
@@ -278,9 +276,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
 
-  // const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
-  // const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
-  // auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
   auto coords = pmb->coords;
 
   const auto &d_opacity = opac->Param<Opacity>("d.opacity");
@@ -333,34 +328,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real lambda[2] = {Ye, 0.};
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
-        //                          if ( j == 108 && i == 111) {
-        //            const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-        //
-        //                            printf("[%i %i %i] rho = %e u = %e v = %e %e %e W =
-        //                            %e\n",
-        //                               k, j, i, rho, ug, con_vp[0], con_vp[1],
-        //                               con_vp[2], W);
-        //                            exit(-1);
-        //                          }
-
-        //         if (j == 118 && i == 131) {
-        //           int ispec = 0;
-        //          const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
-        //          Vec Hcov{v(iblock, idx_H(ispec, 0), k, j, i),
-        //                   v(iblock, idx_H(ispec, 1), k, j, i),
-        //                   v(iblock, idx_H(ispec, 2), k, j, i)};
-        //          Real xi = std::sqrt(g.contractCov3Vectors(Hcov, Hcov));
-        //          printf("Initial [%i %i %i] ug = %e vp = %e %e %e J = %e Hi = %e %e %e
-        //          W = %e "
-        //                 "xi = %e\n",
-        //                 k, j, i, ug, con_vp[0], con_vp[1], con_vp[2],
-        //                 v(iblock, idx_J(ispec), k, j, i), v(iblock, idx_H(ispec, 0), k,
-        //                 j, i), v(iblock, idx_H(ispec, 1), k, j, i), v(iblock,
-        //                 idx_H(ispec, 2), k, j, i), W, xi);
-        //        }
-
-        // bool success = false;
-        // TODO(BRR) These will need to be per-species later
+        
         Real dE[MaxNumRadiationSpecies];
         Vec cov_dF[MaxNumRadiationSpecies];
 
@@ -423,21 +391,15 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
             Real tauH = alpha * dt * kappa;
 
-            //Real xi;
             if (status == root_find::RootFindStatus::success) {
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
 
-              // Check xi
               Estar += dE[ispec];
               SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
+            
+              // Check result for sanity (note that this doesn't check fluid energy density)
               auto c2p_status = c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
-
-              //xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
-              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
-
-              success = v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0. &&
-                        xi <= xi_max;
               if (c2p_status == ClosureStatus::success) {
                 success = true;
               } else {
@@ -449,8 +411,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             
             if (!success && oned_fixup_strategy == OneDFixupStrategy::ignore_dJ) {
               // Retry the solver update but without updating internal energy
-              //              Estar -= dE[ispec];
-              //              SPACELOOP(ii) cov_Fstar(ii) -= cov_dF[ispec](ii);
               Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
               SPACELOOP(ii) {
                 cov_Fstar(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
@@ -472,14 +432,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
               auto c2p_status = c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
-  //            xi = std::sqrt(g.contractCov3Vectors(cov_H, cov_H)) / J;
               const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
-              //if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] <= 0. ||
-              //    xi > xi_max) {
               if (c2p_status == ClosureStatus::failure) {
-                printf("FAIL?? [%i %i %i] xi = %e J = %e ug = %e tauH = %e\n",
-                  k, j, i, xi, J, ug, tauH);
-
                 success = false;
                 break;
               } else {
@@ -492,16 +446,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             } else {
               break; // Don't bother with other species if this failed
             }
-
-            //            if (v(iblock, idx_E(ispec), k, j, i) - sdetgam * dE[ispec] > 0.
-            //            &&
-            //                xi <= xi_max) {
-            //              success = true;
-            //            } else {
-            //              success = false;
-            //              break; // Don't bother with other species if this failed
-            //            }
-
           } // ispec
         } else if (src_solver == SourceSolver::fourd) {
           // TODO(BRR) generalize to multiple species
@@ -697,21 +641,14 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
               if (bad_guess) {
                 // Try reducing the step size so xi < ximax, ug > 0, J > 0
-   //             Real xi = 0.;
-  //              SPACELOOP2(ii, jj) {
- //                 xi += con_gamma(ii, jj) * P_rad_guess[ii + 1] * P_rad_guess[jj + 1];
-//                }
-//                xi = std::sqrt(xi) / P_rad_guess[0];
-              
                 Vec cov_H{P_rad_guess[1]/P_rad_guess[0], P_rad_guess[2]/P_rad_guess[0],
                   P_rad_guess[3]/P_rad_guess[0]};
                 Vec con_v{P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]};
                 Real J = P_rad_guess[0];
                 const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
 
-                constexpr Real umin = 1.e-20; // TODO(BRR) use floors
-                constexpr Real Jmin = 1.e-20; // TODO(BRR) needs to be a bit smaller than
-                                              // Jr floor! otherwise scaling fac is 0
+                constexpr Real umin = robust::SMALL();
+                constexpr Real Jmin = robust::SMALL();
 
                 Real scaling_factor = 0.;
                 if (xi > xi_max) {
@@ -757,11 +694,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             for (int n = 0; n < 4; n++) {
               resid[n] = U_mhd_guess[n] - U_mhd_0[n] + dt * dS_guess[n];
               if (std::isnan(resid[n])) {
-                //                printf("nan resid[%i]! %i %i %i Umhdg: %e %e %e %e dSg:
-                //                %e %e %e %e\n", n,
-                //                       k, j, i, U_mhd_guess[0], U_mhd_guess[1],
-                //                       U_mhd_guess[2], U_mhd_guess[3], dS_guess[0],
-                //                       dS_guess[1], dS_guess[2], dS_guess[3]);
                 bad_guess = true;
                 break;
               }
@@ -804,40 +736,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             }
           }
 
-          //          if (i == 4 && j == 127) {
-          //            printf(
-          //                "[%i %i %i] cons = %e %e %e %e dcons = %e %e %e %e (sdg =
-          //                %e)\n", k, j, i, v(iblock, idx_E(ispec), k, j, i), v(iblock,
-          //                idx_F(ispec, 0), k, j, i), v(iblock, idx_F(ispec, 1), k, j,
-          //                i), v(iblock, idx_F(ispec, 2), k, j, i), dE[ispec] * sdetgam,
-          //                cov_dF[ispec](0) * sdetgam, cov_dF[ispec](1) * sdetgam,
-          //                cov_dF[ispec](2) * sdetgam, sdetgam);
-          //            printf("[%i %i %i] radguess: %e %e %e %e niter = %i err = %e\n",
-          //            k, j, i,
-          //                   P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
-          //                   P_rad_guess[3], niter, err);
-          //          }
-
-          // if (j == 64) {
-          //  printf("[%i %i %i] rho: %e Tg: %e ug: %e Prad0: %e %e %e %e Pradg: %e %e
-          //  %e %e\n", k, j, i, rho, Tg,ug, v(iblock, idx_J(ispec), k, j, i), v(iblock,
-          //  idx_F(ispec, 0), k, j, i), v(iblock, idx_F(ispec, 1), k, j, i), v(iblock,
-          //  idx_F(ispec, 2), k, j, i), P_rad_guess[0], P_rad_guess[1], P_rad_guess[2],
-          //  P_rad_guess[3]);
-          //}
-          //
-
           if (success == false) {
-            //            printf("[%i %i %i] src failed err: %e niter: %i rho: %e Pmhd0:
-            //            %e %e %e %e "
-            //                   "Prad0: %e %e %e %e\n",
-            //                   k, j, i, err, niter, rho, v(iblock, peng, k, j, i),
-            //                   v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-            //                   v(iblock, pv(2), k, j, i), v(iblock, idx_J(ispec), k, j,
-            //                   i), v(iblock, idx_H(ispec, 0), k, j, i), v(iblock,
-            //                   idx_H(ispec, 1), k, j, i), v(iblock, idx_H(ispec, 2), k,
-            //                   j, i));
-            // Fall back to oned solver if fourd encounters an issue
+            // Optionally fall back to oned solver if fourd encounters an issue
             if (src_use_oned_backup) {
               goto oned_solver_begin;
             }

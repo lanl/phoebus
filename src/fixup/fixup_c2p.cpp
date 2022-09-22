@@ -223,7 +223,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           } else {
             if (num_valid > 0.5 &&
                 fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
-              //            printf("[%i %i %i] num_valid: %e\n", k, j, i, num_valid);
               const Real norm = 1.0 / num_valid;
               v(b, prho, k, j, i) = fixup(prho, norm);
               for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
@@ -233,15 +232,11 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
 
               if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
             } else {
-              //            printf("[%i %i %i] no valid: %e\n", k, j, i, num_valid);
-              // printf("[%i %i %i] no valid c2p neighbors!\n", k, j, i);
               // No valid neighbors; set fluid mass/energy to near-zero and set primitive
               // velocities to zero
 
-              // v(b, prho, k, j, i) = 1.e-20;
-              // v(b, peng, k, j, i) = 1.e-20;
-              v(b, prho, k, j, i) = 1.e-100;
-              v(b, peng, k, j, i) = 1.e-100;
+              v(b, prho, k, j, i) = robust::SMALL();
+              v(b, peng, k, j, i) = robust::SMALL();
 
               // Safe value for ye
               if (pye > 0) {
@@ -265,11 +260,12 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           // Clamp velocity now (for rad inversion)
           Real vpcon[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
                            v(b, pvel_lo + 2, k, j, i)};
-          const Real W = phoebus::GetLorentzFactor(vpcon, gcov);
+          Real W = phoebus::GetLorentzFactor(vpcon, gcov);
           if (W > gamma_max) {
             const Real rescale = std::sqrt(gamma_max * gamma_max - 1.) / (W * W - 1.);
             SPACELOOP(ii) { vpcon[ii] *= rescale; }
             SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = vpcon[ii]; }
+            W = gamma_max;
           }
 
           // Update dependent primitives
@@ -356,17 +352,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           }
         }
       });
-
-  // TODO(BRR) This is inefficient!
-  // ONLY FOR MHD!
-  // ApplyFloors(rc);
-  // ApplyFluidFloors(rc);
-
-  // Need to update radiation primitives
-  // TODO(BRR) This is very inefficient!
-  // radiation::MomentCon2Prim(rc);
-
-  // ApplyFloors(rc);
 
   return TaskStatus::complete;
 }
