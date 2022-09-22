@@ -627,8 +627,14 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                     Jr * v(idx_qr(ispec, 2, idir), k, j, i),
                     Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
           if (recon_fixup_strategy == ReconFixupStrategy::bounds) {
-            const Real xil = std::sqrt(g.contractCov3Vectors(Hl,Hl) - std::pow(g.contractConCov3Vectors(con_vl,Hl),2))/Jl;
-            const Real xir = std::sqrt(g.contractCov3Vectors(Hr,Hr) - std::pow(g.contractConCov3Vectors(con_vr,Hr),2))/Jr;
+            const Real xil =
+                std::sqrt(g.contractCov3Vectors(Hl, Hl) -
+                          std::pow(g.contractConCov3Vectors(con_vl, Hl), 2)) /
+                Jl;
+            const Real xir =
+                std::sqrt(g.contractCov3Vectors(Hr, Hr) -
+                          std::pow(g.contractConCov3Vectors(con_vr, Hr), 2)) /
+                Jr;
             if (xil > xi_ceiling) {
               SPACELOOP(ii) { Hl(ii) *= xi_ceiling / xil; }
             }
@@ -716,7 +722,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
           }
-          
+
           if (sdetgam < robust::SMALL()) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;

@@ -170,7 +170,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           //
         });
 
-    //pmb->par_for_bndry(
+    // pmb->par_for_bndry(
     //    "OutflowInnerX1PrimFixup", nb1, domain, coarse,
     //    KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
     //      // Enforce u^1 <= 0

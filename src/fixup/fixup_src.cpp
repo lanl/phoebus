@@ -249,7 +249,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
               }
             } else {
               // No valid neighbors; set to floors with zero spatial velocity
-              
+
               v(b, prho, k, j, i) = 1.e-100;
               v(b, peng, k, j, i) = 1.e-100;
 
@@ -275,9 +275,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
               for (int ispec = 0; ispec < num_species; ispec++) {
                 v(b, idx_J(ispec), k, j, i) = 1.e-100;
 
-                SPACELOOP(ii) {
-                  v(b, idx_H(ispec, ii), k, j, i) = 0.;
-                }
+                SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
               }
             }
           }
@@ -304,11 +302,13 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
           Vec con_v({vpcon[0] / W, vpcon[1] / W, vpcon[2] / W});
 
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
-          
+
           for (int ispec = 0; ispec < num_species; ispec++) {
             Vec cov_H = {v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
                          v(b, idx_H(ispec, 2), k, j, i)};
-              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2));
+            const Real xi =
+                std::sqrt(g.contractCov3Vectors(cov_H, cov_H) -
+                          std::pow(g.contractConCov3Vectors(con_v, cov_H), 2));
           }
 
           //          // Update MHD conserved variables

@@ -328,7 +328,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real lambda[2] = {Ye, 0.};
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
-        
+
         Real dE[MaxNumRadiationSpecies];
         Vec cov_dF[MaxNumRadiationSpecies];
 
@@ -397,8 +397,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
               Estar += dE[ispec];
               SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
-            
-              // Check result for sanity (note that this doesn't check fluid energy density)
+
+              // Check result for sanity (note that this doesn't check fluid energy
+              // density)
               auto c2p_status = c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
               if (c2p_status == ClosureStatus::success) {
                 success = true;
@@ -408,7 +409,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             } else {
               success = false;
             }
-            
+
             if (!success && oned_fixup_strategy == OneDFixupStrategy::ignore_dJ) {
               // Retry the solver update but without updating internal energy
               Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
@@ -432,7 +433,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
               auto c2p_status = c.Con2Prim(Estar, cov_Fstar, con_tilPi, &J, &cov_H);
 
-              const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
+              const Real xi =
+                  std::sqrt(g.contractCov3Vectors(cov_H, cov_H) -
+                            std::pow(g.contractConCov3Vectors(con_v, cov_H), 2)) /
+                  J;
               if (c2p_status == ClosureStatus::failure) {
                 success = false;
                 break;
@@ -641,11 +645,15 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
               if (bad_guess) {
                 // Try reducing the step size so xi < ximax, ug > 0, J > 0
-                Vec cov_H{P_rad_guess[1]/P_rad_guess[0], P_rad_guess[2]/P_rad_guess[0],
-                  P_rad_guess[3]/P_rad_guess[0]};
+                Vec cov_H{P_rad_guess[1] / P_rad_guess[0],
+                          P_rad_guess[2] / P_rad_guess[0],
+                          P_rad_guess[3] / P_rad_guess[0]};
                 Vec con_v{P_mhd_guess[1], P_mhd_guess[2], P_mhd_guess[3]};
                 Real J = P_rad_guess[0];
-                const Real xi = std::sqrt(g.contractCov3Vectors(cov_H,cov_H) - std::pow(g.contractConCov3Vectors(con_v,cov_H),2))/J;
+                const Real xi =
+                    std::sqrt(g.contractCov3Vectors(cov_H, cov_H) -
+                              std::pow(g.contractConCov3Vectors(con_v, cov_H), 2)) /
+                    J;
 
                 constexpr Real umin = robust::SMALL();
                 constexpr Real Jmin = robust::SMALL();
