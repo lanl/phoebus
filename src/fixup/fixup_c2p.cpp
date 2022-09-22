@@ -43,12 +43,15 @@ using singularity::neutrinos::Opacity;
 
 namespace fixup {
 
-template <typename T>
-TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
+template <typename T, class CLOSURE>
+TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
   printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
+  namespace ir = radmoment_internal;
+  namespace pr = radmoment_prim;
+  namespace cr = radmoment_cons;
   auto *pmb = rc->GetParentPointer().get();
   // IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   // IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -59,12 +62,15 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
+  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
 
   const std::vector<std::string> vars({p::density, c::density, p::velocity, c::momentum,
                                        p::energy, c::energy, p::bfield, p::ye, c::ye,
                                        p::pressure, p::temperature, p::gamma1,
-                                       impl::cell_signal_speed, impl::fail});
+                                       impl::cell_signal_speed, impl::fail,
+                                       ir::c2pfail, ir::tilPi,
+                                       pr::J, pr::H, cr::E, cr::F, ir::xi, ir::phi});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -88,7 +94,19 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
   const int pb_hi = imap[p::bfield].second;
   int pye = imap[p::ye].second; // negative if not present
   int cye = imap[c::ye].second;
+
   int ifail = imap[impl::fail].first;
+  int irfail = imap[ir::c2pfail].first;
+
+  auto idx_E = imap.GetFlatIdx(cr::E, false);
+  auto idx_F = imap.GetFlatIdx(cr::F, false);
+  auto idx_J = imap.GetFlatIdx(pr::J, false);
+  auto idx_H = imap.GetFlatIdx(pr::H, false);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto iXi = imap.GetFlatIdx(ir::xi, false);
+  auto iPhi = imap.GetFlatIdx(ir::phi, false);
+
+  const auto num_species = rad_pkg->Param<int>("num_species");
 
   bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
   bool update_fluid = fluid_pkg->Param<bool>("active");
@@ -235,7 +253,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
             }
           }
 
-          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+          const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
           const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
@@ -284,7 +302,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
           Real sig[3];
           prim2con::p2c(v(b, prho, k, j, i), vpcon, bp, v(b, peng, k, j, i), ye_prim,
                         v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gcon, beta, alpha,
-                        gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,
+                        sdetgam, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,
                         sig);
           v(b, cmom_lo, k, j, i) = S[0];
           v(b, cmom_lo + 1, k, j, i) = S[1];
@@ -296,6 +314,45 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
 
           // TODO(BRR)
           // if not iradfail here, call rad c2p with updated velocity and set iradfail to result
+          if (irfail >= 0) {
+            if (v(b, irfail, k, j, i) == radiation::FailFlags::fail) {
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
+                Vec con_v{vpcon[0]/W, vpcon[1]/W, vpcon[2]/W};
+                CLOSURE c(con_v, &g);
+
+                Real E = v(b, idx_E(ispec), k, j, i) / sdetgam;
+                Vec cov_F;
+                SPACELOOP(ii) {
+                  cov_F(ii) = v(b, idx_F(ispec, ii), k, j, i) / sdetgam;
+                }
+                Tens2 con_tilPi;
+                Real J;
+                Vec cov_H;
+                if (iTilPi.IsValid()) {
+                  SPACELOOP2(ii, jj) {
+                    con_tilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                  }
+                } else {
+                  Real xi = 0.;
+                  Real phi = M_PI;
+                  // TODO(BRR) STORE_GUESS
+                  c.GetCovTilPiFromCon(E, cov_F, xi, phi, &con_tilPi);
+                }
+
+                c.Con2Prim(E, cov_F, con_tilPi, &J, &cov_H);
+
+                v(b, idx_J(ispec), k, j, i) = J;
+                SPACELOOP(ii) {
+                  v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J;
+                }
+
+                // Floors and ceilings will be applied subsequently by ApplyFloors task
+              }
+
+
+            }
+          }
         }
       });
 
@@ -311,6 +368,33 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
   // ApplyFloors(rc);
 
   return TaskStatus::complete;
+}
+
+template <typename T>
+TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
+  auto *pm = rc->GetParentPointer().get();
+  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();    
+  const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");    
+  std::string method;    
+  if (enable_rad_floors) {    
+    method = rad_pkg->Param<std::string>("method");    
+  }    
+    
+  // TODO(BRR) share these settings somewhere else. Set at configure time?    
+  using settings =    
+      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;    
+  if (method == "moment_m1") {    
+    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureM1<settings>>(rc, rc0);    
+  } else if (method == "moment_eddington") {    
+    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0);    
+  } else if (method == "mocmc") {    
+    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc,    
+                                                                                  rc0);    
+  } else {    
+    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0);    
+  }    
+  return TaskStatus::fail;    
 }
 
 template TaskStatus
