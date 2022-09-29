@@ -111,7 +111,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(prho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
                                    v(prho, k, j, i), v(pT, k, j, i), lambda);
 
-        v(idv(0), k, j, i) = vx;
+        v(idv(0), k, j, i) = W * vx;
         v(idv(1), k, j, i) = 0.0;
         v(idv(2), k, j, i) = 0.0;
 
