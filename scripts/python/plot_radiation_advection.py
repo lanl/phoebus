@@ -121,7 +121,10 @@ for file in files[0::1]:
 
   color = cmap((t - minTime)/(maxTime - minTime))
   for block in range(dfile.NumBlocks):
-    plt_ax.plot(x[block, :], J[block, iz, iy, :, ispec], color=color)
+    if J.ndim == 5:
+      plt_ax.plot(x[block, :], J[block, iz, iy, :, ispec], color=color)
+    else:
+      plt_ax.plot(x[block, :], J[block, iz, iy, :], color=color)
 
   xmin = np.amin(x)
   xmax = np.amax(x)
@@ -143,7 +146,10 @@ else:
 plt_ax.set_xlim([xl, xh])
 plt_ax.set_ylim([yl, yh])
 
-etot = sum(J[0, iz, iy, :, ispec])
+if J.ndim == 5:
+  etot = sum(J[0, iz, iy, :, ispec])
+else:
+  etot = sum(J[0, iz, iy, :])
 print("etot: ", etot)
 
 plt_ax.text(0.05*(xh-xl)+xl, 0.95*(yh-yl)+yl, '$\kappa={}$'.format(kappa))
