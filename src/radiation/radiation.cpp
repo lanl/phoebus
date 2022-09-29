@@ -485,10 +485,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     printf("Added fields!\n");
 #endif
 
-    // physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
-    physics->FillDerivedBlock = fixup::AllC2P<MeshBlockData<Real>>;
-    // physics->PostFillDerivedBlock =
-    //    fixup::AllConservedToPrimitiveFixup<MeshBlockData<Real>>;
+    // Use PostFillDerivedBlock to guarantee that fluid, if active, was already inverted
+    // (we need updated fluid primitive velocities to calculate radiation primitives)
+    physics->PostFillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }
 
   params.Add("moments_active", moments_active);

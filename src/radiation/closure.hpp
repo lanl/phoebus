@@ -106,13 +106,13 @@ class ClosureEdd {
                          Vec *cov_H);
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_tilH, Tens2 *con_tilPi) {
+  ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_tilH, Tens2 *con_tilPi) {
     SPACELOOP2(i, j) (*con_tilPi)(i, j) = 0.0;
     return ClosureStatus::success;
   }
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromCon(const Real E, const Vec cov_F, Real &xi, Real &phi,
+  ClosureStatus GetConTilPiFromCon(const Real E, const Vec cov_F, Real &xi, Real &phi,
                                    Tens2 *con_tilPi) {
     SPACELOOP2(i, j) (*con_tilPi)(i, j) = 0.0;
     xi = 0.0;
