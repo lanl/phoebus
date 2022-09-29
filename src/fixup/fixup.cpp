@@ -239,37 +239,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return fix;
 }
 
-template <typename T>
-TaskStatus AllC2P(T *rc) {
-
-  // Must updated fluid vars first to have prim velocity for updating rad prims
-  fluid::ConservedToPrimitive(rc);
-  radiation::MomentCon2Prim(rc);
-
-  return TaskStatus::complete;
-}
-
-template TaskStatus AllC2P<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
-
-template <typename T>
-TaskStatus AllConservedToPrimitiveFixup(T *rc, T *rc0) {
-
-  RadConservedToPrimitiveFixup(rc, rc0);
-  ConservedToPrimitiveFixup(rc, rc0);
-
-  return TaskStatus::complete;
-}
-
-template TaskStatus
-AllConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
-                                                  MeshBlockData<Real> *rc0);
-
 /// Given a valid state (including consistency between prim and cons variables),
 /// this function returns another valid state that is within the bounds of specified
 /// floors and ceilings.
 template <typename T, class CLOSURE>
 TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace pr = radmoment_prim;
@@ -538,7 +512,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                 // TODO(BRR) don't be lazy and actually retrieve these
                 Real xi = 0.;
                 Real phi = acos(-1.0) * 1.000001;
-                c.GetCovTilPiFromCon(E, cov_F, xi, phi, &con_TilPi);
+                c.GetConTilPiFromCon(E, cov_F, xi, phi, &con_TilPi);
               }
 
               c.Con2Prim(E, cov_F, con_TilPi, &J, &cov_H);
@@ -583,7 +557,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                   // TODO(BRR) don't be lazy and actually retrieve these
                   Real xi = 0.;
                   Real phi = acos(-1.0) * 1.000001;
-                  c.GetCovTilPiFromCon(E, cov_F, xi, phi, &con_TilPi);
+                  c.GetConTilPiFromCon(E, cov_F, xi, phi, &con_TilPi);
                 }
 
                 c.Con2Prim(E, cov_F, con_TilPi, &J, &cov_H);
@@ -602,7 +576,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                     con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
                   }
                 } else {
-                  c.GetCovTilPiFromPrim(J, cov_H, &con_TilPi);
+                  c.GetConTilPiFromPrim(J, cov_H, &con_TilPi);
                 }
 
                 PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "bad");
@@ -636,7 +610,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                   con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
                 }
               } else {
-                c.GetCovTilPiFromPrim(J, cov_H, &con_TilPi);
+                c.GetConTilPiFromPrim(J, cov_H, &con_TilPi);
               }
               PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "bad");
               PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(0)), "bad");
@@ -686,7 +660,6 @@ TaskStatus ApplyFloors(T *rc) {
 template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   using parthenon::BoundaryFace;
   using parthenon::BoundaryFlag;
   auto *pmb = rc->GetParentPointer().get();

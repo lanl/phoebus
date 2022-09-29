@@ -134,7 +134,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
             xi = v(b, iXi(ispec), k, j, i);
             phi = 1.0001 * v(b, iPhi(ispec), k, j, i);
           }
-          c.GetCovTilPiFromCon(E, covF, xi, phi, &conTilPi);
+          c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
           if (STORE_GUESS) {
             v(b, iXi(ispec), k, j, i) = xi;
             v(b, iPhi(ispec), k, j, i) = phi;
@@ -241,7 +241,7 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         if (iTilPi.IsValid()) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
         } else {
-          c.GetCovTilPiFromPrim(J, covH, &conTilPi);
+          c.GetConTilPiFromPrim(J, covH, &conTilPi);
         }
 
         PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "NAN J in rad P2C!");
@@ -675,8 +675,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
               con_tilPir(ii, jj) = v(idx_qr(ispec, 4 + ii + 3 * jj, idir), k, j, i);
             }
           } else {
-            cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
-            cr.GetCovTilPiFromPrim(Jr, HasymR, &con_tilPir);
+            cl.GetConTilPiFromPrim(Jl, HasymL, &con_tilPil);
+            cr.GetConTilPiFromPrim(Jr, HasymR, &con_tilPir);
           }
           cl.getFluxesFromPrim(Jl, HasymL, con_tilPil, &conFl_asym, &Pl_asym);
           cr.getFluxesFromPrim(Jr, HasymR, con_tilPir, &conFr_asym, &Pr_asym);
@@ -684,8 +684,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Regular fluxes
           if (!programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
             // Recalculate Eddington if using J, H
-            cl.GetCovTilPiFromPrim(Jl, Hl, &con_tilPil);
-            cr.GetCovTilPiFromPrim(Jr, Hr, &con_tilPir);
+            cl.GetConTilPiFromPrim(Jl, Hl, &con_tilPil);
+            cr.GetConTilPiFromPrim(Jr, Hr, &con_tilPir);
           }
           cl.getFluxesFromPrim(Jl, Hl, con_tilPil, &conFl, &Pl);
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
@@ -849,7 +849,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             }
           } else {
             Tens2 con_tilPi{0};
-            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+            c.GetConTilPiFromPrim(J, covH, &con_tilPi);
             SPACELOOP2(ii, jj) { conTilPi[ii + 1][jj + 1] = con_tilPi(ii, jj); }
           }
 

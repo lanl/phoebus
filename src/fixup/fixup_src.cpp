@@ -353,7 +353,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
                 con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
               }
             } else {
-              c.GetCovTilPiFromPrim(J, cov_H, &con_TilPi);
+              c.GetConTilPiFromPrim(J, cov_H, &con_TilPi);
             }
             c.Prim2Con(J, cov_H, con_TilPi, &E, &cov_F);
             v(b, idx_E(ispec), k, j, i) = sdetgam * E;

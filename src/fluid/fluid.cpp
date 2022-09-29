@@ -300,13 +300,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add(parthenon::hist_param_key, hst_vars);
 
   // Fill Derived and Estimate Timestep
-  // Only set this if rad=false
-  const bool rad_active = pin->GetBoolean("physics", "rad");
-  if (!rad_active) {
-    physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
-    // physics->PostFillDerivedBlock =
-    // fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>;
-  }
+  physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
@@ -387,14 +381,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         }
 
         Real sig[3];
-        if (v(b, prho, k, j, i) < 1.e-20) {
-          printf("rho = %e u = %e k j i = %i %i %i\n", v(b, prho, k, j, i),
-                 v(b, peng, k, j, i), k, j, i);
-        }
-        if (j == 108 && i == 111) {
-          printf("[%i %i %i] rho: %e u: %e\n", k, j, i, v(b, prho, k, j, i),
-                 v(b, peng, k, j, i));
-        }
         prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
                       v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov4, gcon, shift, lapse,
                       gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,
@@ -424,7 +410,6 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
