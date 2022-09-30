@@ -73,10 +73,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
-                              fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
-                              fluid_prim::pressure, fluid_prim::temperature},
-                             imap);
+  auto v = rc->PackVariables(
+      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
+       fluid_prim::ye, fluid_prim::pressure, fluid_prim::temperature, fluid_prim::gamma1},
+      imap);
 
   const int irho = imap[fluid_prim::density].first;
   const int ivlo = imap[fluid_prim::velocity].first;
@@ -86,6 +86,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ib_hi = imap[fluid_prim::bfield].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
+  const int igm1 = imap[fluid_prim::gamma1].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -113,6 +114,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i));
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
             v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i));
+        v(igm1, k, j, i) =
+            eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i)) /
+            v(iprs, k, j, i);
       });
 
   for (int i = 0; i < 100; i++) {

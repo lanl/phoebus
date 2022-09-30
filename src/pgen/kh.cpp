@@ -26,10 +26,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
-                              fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
-                              fluid_prim::pressure, fluid_prim::temperature},
-                             imap);
+  auto v = rc->PackVariables(
+      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
+       fluid_prim::ye, fluid_prim::pressure, fluid_prim::temperature, fluid_prim::gamma1},
+      imap);
 
   const int irho = imap[fluid_prim::density].first;
   const int ivlo = imap[fluid_prim::velocity].first;
@@ -40,6 +40,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iye = imap[fluid_prim::ye].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
+  const int igm1 = imap[fluid_prim::gamma1].first;
 
   const Real rho0 = pin->GetOrAddReal("kelvin_helmholtz", "rho0", 1.0);
   const Real rho1 = pin->GetOrAddReal("kelvin_helmholtz", "rho1", 1.0);
@@ -90,6 +91,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
             rho, v(ieng, k, j, i) / rho,
             eos_lambda); // this doesn't have to be exact, just a reasonable guess
+        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
+                           v(iprs, k, j, i);
         for (int d = 0; d < 3; d++)
           v(ivlo + d, k, j, i) = v_pert * 2.0 * (rng_gen.drand() - 0.5);
         v(ivlo, k, j, i) += vel;
