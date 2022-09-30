@@ -102,6 +102,15 @@ void MOCMCInitSamples(T *rc) {
   const int nsamp_per_zone = rad->Param<int>("nsamp_per_zone");
   int nsamp_tot = 0;
 
+  auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  const int nu_bins = rad->Param<int>("nu_bins");
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  const auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[3] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+
   // Fill nsamp per zone per species and sum over zones
   // TODO(BRR) make this a separate function and use it to update dnsamp which is then
   // used to decide whether to refine/derefine
@@ -110,7 +119,7 @@ void MOCMCInitSamples(T *rc) {
       nblock - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nsamp) {
         Real Jtot = 0.;
-        for (int s = 0; s < 3; s++) {
+        for (int s = 0; s < num_species; s++) {
           Jtot += v(b, pJ(s), k, j, i);
         }
         v(b, dn, k, j, i) =
@@ -160,15 +169,6 @@ void MOCMCInitSamples(T *rc) {
   const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
 
   auto swarm_d = swarm->GetDeviceContext();
-
-  auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
-  const int nu_bins = rad->Param<int>("nu_bins");
-  auto species = rad->Param<std::vector<RadiationType>>("species");
-  auto num_species = rad->Param<int>("num_species");
-  RadiationType species_d[3] = {};
-  for (int s = 0; s < num_species; s++) {
-    species_d[s] = species[s];
-  }
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "MOCMC::Init::Sample", DevExecSpace(), 0, nblock - 1, kb.s,
