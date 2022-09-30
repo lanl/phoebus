@@ -206,7 +206,6 @@ struct CellGeom {
       : gdet(geom.DetGamma(CellLocation::Cent, k, j, i)),
         lapse(geom.Lapse(CellLocation::Cent, k, j, i)) {
     geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
-    SPACELOOP2(m, n) { gcov[m][n] = gcov4[m + 1][n + 1]; }
     geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
     geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
   }
@@ -216,12 +215,9 @@ struct CellGeom {
       : gdet(geom.DetGamma(CellLocation::Cent, b, k, j, i)),
         lapse(geom.Lapse(CellLocation::Cent, b, k, j, i)) {
     geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, gcov4);
-    SPACELOOP2(m, n) { gcov[m][n] = gcov4[m + 1][n + 1]; }
     geom.MetricInverse(CellLocation::Cent, b, k, j, i, gcon);
     geom.ContravariantShift(CellLocation::Cent, b, k, j, i, beta);
   }
-  Real gcov[3][3];
-  // TODO(BRR) Don't need gcov and gcov4
   Real gcov4[4][4];
   Real gcon[3][3];
   Real beta[3];
@@ -350,7 +346,7 @@ class ConToPrim {
         bu[i] = v(pb_lo + i) * sD;
         bdotr += bu[i] * rcov[i];
       }
-      SPACELOOP2(i, j) bsq += g.gcov[i][j] * bu[i] * bu[j];
+      SPACELOOP2(i, j) bsq += g.gcov4[i + 1][j + 1] * bu[i] * bu[j];
       bsq = std::max(0.0, bsq);
 
       rbsq = bdotr * bdotr;
