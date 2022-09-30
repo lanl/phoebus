@@ -14,7 +14,6 @@
 #include <cmath>
 
 #include "fixup.hpp"
-#include "fixup_applier.hpp"
 
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>

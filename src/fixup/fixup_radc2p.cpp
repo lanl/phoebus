@@ -206,8 +206,6 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           return inv_mask_sum * v(b, iv, k, j, i);
         };
 
-        // if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail ||
-        //    v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
         if (v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
 
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);

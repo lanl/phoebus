@@ -194,11 +194,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
         bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
                            gamma_max, e_max);
 
-        // Need to account for not stenciling outside of ghost zones
-        // bool is_outer_ghost_layer =
-        //    (i == ib.s || i == ib.e || j == jb.s || j == jb.e || k == kb.s || k ==
-        //    kb.e);
-
         auto fixup0 = [&](const int iv) {
           v(b, iv, k, j, i) = v0(b, iv, k, j, i - 1) + v0(b, iv, k, j, i + 1);
           if (ndim > 1) {
@@ -324,9 +319,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
             v(b, m, k, j, i) = sig[m - slo];
           }
 
-          // TODO(BRR)
-          // if not iradfail here, call rad c2p with updated velocity and set iradfail to
-          // result
           if (irfail >= 0) {
             // If rad c2p failed, we'll fix that up subsequently
             if (v(b, irfail, k, j, i) == radiation::FailFlags::success) {

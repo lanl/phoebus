@@ -129,7 +129,6 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
 
     ax = axes[1,0]
     lJ = np.log10(np.clip(dfile.Get("r.p.J", flatten=False), 1.e-20, None))
-    #lJ = np.log10(np.clip(dfile.Get("r.c.E", flatten=False), 1.e-20, None))
     for b in range(nblocks):
       im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lJ[b,0,:,:].transpose(), vmin=-5, vmax=0,
       cmap=cmap_uniform)
@@ -201,23 +200,19 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
         ax.set_aspect('equal')
       if ncol > 0:
         ax.yaxis.set_ticklabels([])
-        
+
 
   plt.suptitle("Time = %g M" % dfile.Time)
 
   fig.tight_layout()
 
-  #if savefig:
   savename = str(ifname).rjust(5,"0") + '.png'
   plt.savefig(savename, dpi=300, bbox_inches='tight')
   plt.close(fig)
- # else:
- #   plt.show()
 
 if __name__ == "__main__":
 
   parser = argparse.ArgumentParser(description='Plot neutrino thermalization')
-  #parser.add_argument('-f', '--files', dest='files', nargs='*', default=['torus.out1.*.phdf'], help='List of input Parthenon hdf files to plot')
   parser.add_argument('-gf', '--geometry_file', dest='geometry_file', default=None, help='Optional dump file containing the time-independent (no AMR) geometry data')
   parser.add_argument('--savefig', type=bool, default=False, help='Whether to save figure')
   parser.add_argument('--numin', type=float, default=1.e-4, help='Minimum frequency (Hz)')
@@ -228,7 +223,6 @@ if __name__ == "__main__":
                         help='Files to take a snapshot of')
   args = parser.parse_args()
 
-  #if args.savefig:
   matplotlib.use('Agg')
 
   for i, fname in enumerate(args.files):
