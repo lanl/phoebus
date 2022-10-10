@@ -180,7 +180,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
 
   auto fluid_c2p_failure_strategy =
       fix_pkg->Param<FAILURE_STRATEGY>("fluid_c2p_failure_strategy");
-      const auto c2p_failure_force_fixup_both = fix_pkg->Param<bool>("c2p_failure_force_fixup_both");
+  const auto c2p_failure_force_fixup_both =
+      fix_pkg->Param<bool>("c2p_failure_force_fixup_both");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
@@ -217,13 +218,13 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
           }
           return v(b, iv, k, j, i) / (2 * ndim);
         };
-          auto fail = [&](const int k, const int j, const int i) {
-            if (c2p_failure_force_fixup_both) {
-              return v(b, ifail, k, j, i) * v(b, irfail, k, j, i);
-            } else {
-              return v(b, ifail, k, j, i);
-            }
-          };
+        auto fail = [&](const int k, const int j, const int i) {
+          if (c2p_failure_force_fixup_both) {
+            return v(b, ifail, k, j, i) * v(b, irfail, k, j, i);
+          } else {
+            return v(b, ifail, k, j, i);
+          }
+        };
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b, iv, k, j, i) = fail(k, j, i - 1) * v(b, iv, k, j, i - 1) +
                               fail(k, j, i + 1) * v(b, iv, k, j, i + 1);
@@ -238,26 +239,32 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
           return inv_mask_sum * v(b, iv, k, j, i);
         };
         auto get_minimum = [&](const int iv) {
-          fail(k, j, i - 1) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
-                                                                 std::fabs(v(b, iv, k, j, i - 1))) : 
-                                                                 v(b, iv, k, j, i);
-          fail(k, j, i + 1) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
-                                                                 std::fabs(v(b, iv, k, j, i + 1))) : 
-                                                                 v(b, iv, k, j, i);
+          fail(k, j, i - 1) > 0.5
+              ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                             std::fabs(v(b, iv, k, j, i - 1)))
+              : v(b, iv, k, j, i);
+          fail(k, j, i + 1) > 0.5
+              ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                             std::fabs(v(b, iv, k, j, i + 1)))
+              : v(b, iv, k, j, i);
           if (ndim > 1) {
-            fail(k, j-1, i) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
-                                                                   std::fabs(v(b, iv, k, j - 1, i))) : 
-                                                                   v(b, iv, k, j, i);
-            fail(k, j+1, i) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
-                                                                   std::fabs(v(b, iv, k, j + 1, i))) : 
-                                                                   v(b, iv, k, j, i);
+            fail(k, j - 1, i) > 0.5
+                ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                               std::fabs(v(b, iv, k, j - 1, i)))
+                : v(b, iv, k, j, i);
+            fail(k, j + 1, i) > 0.5
+                ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                               std::fabs(v(b, iv, k, j + 1, i)))
+                : v(b, iv, k, j, i);
             if (ndim > 2) {
-              fail(k-1, j, i) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
-                                                                     std::fabs(v(b, iv, k - 1, j, i))) : 
-                                                                     v(b, iv, k, j, i);
-              fail(k+1, j, i) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
-                                                                     std::fabs(v(b, iv, k + 1, j, i))) : 
-                                                                     v(b, iv, k, j, i);
+              fail(k - 1, j, i) > 0.5
+                  ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                                 std::fabs(v(b, iv, k - 1, j, i)))
+                  : v(b, iv, k, j, i);
+              fail(k + 1, j, i) > 0.5
+                  ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                                 std::fabs(v(b, iv, k + 1, j, i)))
+                  : v(b, iv, k, j, i);
             }
           }
         };
@@ -286,19 +293,18 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
               v(b, peng, k, j, i) = fixup(peng, norm);
 
               if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
-            } else if (num_valid > 0.5 && fluid_c2p_failure_strategy == FAILURE_STRATEGY::neighbor_minimum) {
+            } else if (num_valid > 0.5 &&
+                       fluid_c2p_failure_strategy == FAILURE_STRATEGY::neighbor_minimum) {
               get_minimum(prho);
-              SPACELOOP(ii) {
-                get_minimum(pvel_lo + ii);
-              }
+              SPACELOOP(ii) { get_minimum(pvel_lo + ii); }
               get_minimum(peng);
               if (pye > 0) get_minimum(pye);
             } else {
               // No valid neighbors; set fluid mass/energy to near-zero and set primitive
               // velocities to zero
 
-              v(b, prho, k, j, i) = 100.*robust::SMALL();
-              v(b, peng, k, j, i) = 100.*robust::SMALL();
+              v(b, prho, k, j, i) = 100. * robust::SMALL();
+              v(b, peng, k, j, i) = 100. * robust::SMALL();
 
               // Safe value for ye
               if (pye > 0) {
