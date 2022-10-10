@@ -174,6 +174,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
 
   auto rad_c2p_failure_strategy =
       fix_pkg->Param<FAILURE_STRATEGY>("rad_c2p_failure_strategy");
+      const auto c2p_failure_force_fixup_both = fix_pkg->Param<bool>("c2p_failure_force_fixup_both");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadConToPrim::Solve fixup", DevExecSpace(), 0,
@@ -196,24 +197,52 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
           }
           return v(b, iv, k, j, i) / (2 * ndim);
         };
+          auto fail = [&](const int k, const int j, const int i) {
+            if (c2p_failure_force_fixup_both) {
+              return v(b, ifluidfail, k, j, i) * v(b, iradfail, k, j, i);
+            } else {
+              return v(b, iradfail, k, j, i);
+            }
+          };
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
-          v(b, iv, k, j, i) = v(b, iradfail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
-                              v(b, iradfail, k, j, i + 1) * v(b, iv, k, j, i + 1);
+          v(b, iv, k, j, i) = fail(k, j, i - 1) * v(b, iv, k, j, i - 1) +
+                              fail(k, j, i + 1) * v(b, iv, k, j, i + 1);
           if (ndim > 1) {
-            v(b, iv, k, j, i) += v(b, iradfail, k, j - 1, i) * v(b, iv, k, j - 1, i) +
-                                 v(b, iradfail, k, j + 1, i) * v(b, iv, k, j + 1, i);
+            v(b, iv, k, j, i) += fail(k, j - 1, i) * v(b, iv, k, j - 1, i) +
+                                 fail(k, j + 1, i) * v(b, iv, k, j + 1, i);
             if (ndim == 3) {
-              v(b, iv, k, j, i) += v(b, iradfail, k - 1, j, i) * v(b, iv, k - 1, j, i) +
-                                   v(b, iradfail, k + 1, j, i) * v(b, iv, k + 1, j, i);
+              v(b, iv, k, j, i) += fail(k - 1, j, i) * v(b, iv, k - 1, j, i) +
+                                   fail(k + 1, j, i) * v(b, iv, k + 1, j, i);
             }
           }
           return inv_mask_sum * v(b, iv, k, j, i);
         };
+        auto get_minimum = [&](const int iv) {
+          fail(k, j, i - 1) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
+                                                                 std::fabs(v(b, iv, k, j, i - 1))) :
+                                                                 v(b, iv, k, j, i);
+          fail(k, j, i + 1) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
+                                                                 std::fabs(v(b, iv, k, j, i + 1))) : 
+                                                                 v(b, iv, k, j, i);
+          if (ndim > 1) {
+            fail(k, j-1, i) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
+                                                                   std::fabs(v(b, iv, k, j - 1, i))) : 
+                                                                   v(b, iv, k, j, i);
+            fail(k, j+1, i) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
+                                                                   std::fabs(v(b, iv, k, j + 1, i))) : 
+                                                                   v(b, iv, k, j, i);
+            if (ndim > 2) {
+              fail(k-1, j, i) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
+                                                                     std::fabs(v(b, iv, k - 1, j, i))) : 
+                                                                     v(b, iv, k, j, i);
+              fail(k+1, j, i) > 0.5 ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)), 
+                                                                     std::fabs(v(b, iv, k + 1, j, i))) : 
+                                                                     v(b, iv, k, j, i);
+            }
+          }
+        };
 
-        // if (v(b, ifluidfail, k, j, i) == con2prim_robust::FailFlags::fail ||
-        //    v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
         if (v(b, iradfail, k, j, i) == radiation::FailFlags::fail) {
-
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
@@ -234,6 +263,13 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
               v(b, idx_J(ispec), k, j, i) = fixup0(idx_J(ispec));
               SPACELOOP(ii) {
                 v(b, idx_H(ispec, ii), k, j, i) = fixup0(idx_H(ispec, ii));
+              }
+            }
+          } else if (num_valid > 0.5 && rad_c2p_failure_strategy == FAILURE_STRATEGY::neighbor_minimum) {
+            for (int ispec = 0; ispec < nspec; ispec++) {
+              get_minimum(idx_J(ispec));
+              SPACELOOP(ii) {
+                get_minimum(idx_H(ispec, ii));
               }
             }
           } else {
