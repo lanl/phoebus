@@ -66,13 +66,9 @@ def plot_dump(filename, varname,
     mass = np.sum(cdens)
     cener = data.Get("c.energy", False)
     sumEner = np.sum(cener)
-    print(f"mass:         {mass}")
-    print(f"fluid energy: {sumEner}")
     cE = data.Get("r.c.E", False)
     if (cE is not None):
       sumE = np.sum(cE)
-      print(f"rad energy:   {sumE}")
-      print(f"total energy: {sumEner + sumE}")
 
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)

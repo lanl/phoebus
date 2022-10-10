@@ -48,7 +48,7 @@ class ClosureMOCMC : public ClosureEdd<SET> {
   ClosureMOCMC(const Vec con_v_in, LocalGeometryType *g) : ClosureEdd<SET>(con_v_in, g) {}
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
+  ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
     PARTHENON_FAIL("MOCMC has already stored TilPi elsewhere!");
 
     // Do nothing
@@ -56,7 +56,7 @@ class ClosureMOCMC : public ClosureEdd<SET> {
   }
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromCon(Real E, const Vec cov_F, Real &xi, Real &phi,
+  ClosureStatus GetConTilPiFromCon(Real E, const Vec cov_F, Real &xi, Real &phi,
                                    Tens2 *con_tilPi) {
     PARTHENON_FAIL("MOCMC has already stored TilPi elsewhere!");
 

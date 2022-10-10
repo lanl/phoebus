@@ -485,10 +485,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     printf("Added fields!\n");
 #endif
 
-    // physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
-    physics->FillDerivedBlock = fixup::AllC2P<MeshBlockData<Real>>;
-    // physics->PostFillDerivedBlock =
-    //    fixup::AllConservedToPrimitiveFixup<MeshBlockData<Real>>;
+    // Use PostFillDerivedBlock to guarantee that fluid, if active, was already inverted
+    // (we need updated fluid primitive velocities to calculate radiation primitives)
+    physics->PostFillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }
 
   params.Add("moments_active", moments_active);
@@ -555,7 +554,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   std::vector<std::string> vars{ir::kappaH, p::velocity};
   auto v = rc->PackVariables(vars, imap);
   auto idx_v = imap.GetFlatIdx(p::velocity);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH, false);
 
   auto num_species = rad->Param<int>("num_species");
 
@@ -574,7 +573,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
         for (int ispec = 0; ispec < num_species; ispec++) {
 
-          const Real kappaH = v(idx_kappaH(ispec), k, j, i);
+          const Real kappaH = idx_kappaH.IsValid() ? v(idx_kappaH(ispec), k, j, i) : 0.;
 
           for (int d = 0; d < ndim; d++) {
             // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt.

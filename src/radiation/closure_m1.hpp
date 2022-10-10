@@ -64,14 +64,14 @@ class ClosureM1 : public ClosureEdd<SET> {
   ClosureM1(const Vec con_v_in, LocalGeometryType *g) : ClosureEdd<SET>(con_v_in, g) {}
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
+  ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
     Vec con_tilf;
     M1FluidPressureTensor(J, cov_H, con_tilPi, &con_tilf);
     return ClosureStatus::success;
   }
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromCon(Real E, const Vec cov_F, Real &xi, Real &phi,
+  ClosureStatus GetConTilPiFromCon(Real E, const Vec cov_F, Real &xi, Real &phi,
                                    Tens2 *con_tilPi) {
 
     if (SET::eqn_type == ClosureEquation::number_conserve) {
