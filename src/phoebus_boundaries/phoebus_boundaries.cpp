@@ -405,11 +405,50 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
       auto &face = inner_outer[outer];
       const std::string name = face + "x" + std::to_string(d) + "_bc";
       const std::string parth_bc = pman.pinput->GetString("parthenon/mesh", name);
+      printf("[%i][%i] bc: %s\n", d, outer, parth_bc.c_str());
       PARTHENON_REQUIRE(parth_bc == "user" || parth_bc == "periodic",
                         "Only \"user\" and \"periodic\" allowed for parthenon/mesh/" +
                             name);
 
       const std::string bc = pman.pinput->GetOrAddString("phoebus", name, "outflow");
+
+      if (rad_method == "mocmc") {
+        // MOCMC boundaries are handled with a different style kernel -- may move all
+        // particles to this model
+        pman.app_input->swarm_boundary_conditions[loc[d - 1][outer]] =
+            Boundaries::SetSwarmNoWorkBC;
+      } else if (rad_method == "monte_carlo") {
+        if (bc == "reflect") {
+          PARTHENON_FAIL("Reflecting BCs not supported for Monte Carlo!\n");
+        } else if (bc == "outflow") {
+          if (d == 1) {
+            if (outer == 0) {
+              pman.app_input->swarm_boundary_conditions[loc[d - 1][outer]] =
+                  Boundaries::SetSwarmIX1Outflow;
+            } else if (outer == 1) {
+              pman.app_input->swarm_boundary_conditions[loc[d - 1][outer]] =
+                  Boundaries::SetSwarmOX1Outflow;
+            }
+          } else if (d == 2) {
+            if (outer == 0) {
+              pman.app_input->swarm_boundary_conditions[loc[d - 1][outer]] =
+                  Boundaries::SetSwarmIX2Outflow;
+            } else if (outer == 1) {
+              pman.app_input->swarm_boundary_conditions[loc[d - 1][outer]] =
+                  Boundaries::SetSwarmOX2Outflow;
+            }
+          } else if (d == 3) {
+            if (outer == 0) {
+              pman.app_input->swarm_boundary_conditions[loc[d - 1][outer]] =
+                  Boundaries::SetSwarmIX3Outflow;
+            } else if (outer == 1) {
+              pman.app_input->swarm_boundary_conditions[loc[d - 1][outer]] =
+                  Boundaries::SetSwarmOX3Outflow;
+            }
+          }
+        }
+      }
+
       if (bc == "reflect") {
         pman.app_input->boundary_conditions[loc[d - 1][outer]] = reflect[d - 1][outer];
       } else if (bc == "outflow") {
@@ -434,6 +473,22 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
               pman.app_input
                   ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x1] =
                   Boundaries::SetSwarmOX1Outflow;
+            }
+          }
+        } else if (d == 2) {
+          if (outer == 0) {
+            if (rad_method == "mocmc") {
+              printf("HERE!\n");
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x2] =
+                  Boundaries::SetSwarmNoWorkBC;
+            }
+          } else if (outer == 1) {
+            if (rad_method == "mocmc") {
+              printf("ALSO HERE!\n");
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x2] =
+                  Boundaries::SetSwarmNoWorkBC;
             }
           }
         }

@@ -106,7 +106,7 @@ void MOCMCInitSamples(T *rc) {
   const int nu_bins = rad->Param<int>("nu_bins");
   auto species = rad->Param<std::vector<RadiationType>>("species");
   const auto num_species = rad->Param<int>("num_species");
-  RadiationType species_d[3] = {};
+  RadiationType species_d[MaxNumRadiationSpecies] = {};
   for (int s = 0; s < num_species; s++) {
     species_d[s] = species[s];
   }
@@ -122,9 +122,10 @@ void MOCMCInitSamples(T *rc) {
         for (int s = 0; s < num_species; s++) {
           Jtot += v(b, pJ(s), k, j, i);
         }
+        const Real ye = pye >= 0 ? v(b, pye, k, j, i) : 0.5;
         v(b, dn, k, j, i) =
             get_nsamp_per_zone(k, j, i, geom, v(b, pdens, k, j, i), v(b, pT, k, j, i),
-                               v(b, pye, k, j, i), Jtot, nsamp_per_zone);
+                               ye, Jtot, nsamp_per_zone);
         nsamp += v(b, dn, k, j, i);
       },
       Kokkos::Sum<int>(nsamp_tot));
@@ -592,6 +593,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
           const Real ucon[4] = {W / alpha, vpcon[0] - con_beta[0] * W / alpha,
                                 vpcon[1] - con_beta[1] * W / alpha,
                                 vpcon[2] - con_beta[2] * W / alpha};
+          const Real ye = pye >= 0 ? v(iblock, pye, k, j, i) : 0.5;
 
           for (int ispec = 0; ispec < num_species; ++ispec) {
             const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
@@ -642,7 +644,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             for (int bin = 0; bin < nu_bins; bin++) {
               kappaJ += opac_d.AngleAveragedAbsorptionCoefficient(
                             v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                            v(iblock, pye, k, j, i), species_d[ispec], nusamp(bin)) *
+                            ye, species_d[ispec], nusamp(bin)) *
                         v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
               Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
             }
@@ -651,13 +653,13 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             kappaJ -= 0.5 *
                       opac_d.AngleAveragedAbsorptionCoefficient(
                           v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                          v(iblock, pye, k, j, i), species_d[ispec], nusamp(0)) *
+                          ye, species_d[ispec], nusamp(0)) *
                       v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0);
             kappaJ -=
                 0.5 *
                 opac_d.AngleAveragedAbsorptionCoefficient(
                     v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                    v(iblock, pye, k, j, i), species_d[ispec], nusamp(nu_bins - 1)) *
+                    ye, species_d[ispec], nusamp(nu_bins - 1)) *
                 v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
             Itot -= 0.5 *
                     (v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0) +
@@ -713,7 +715,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                     nu_fluid * scattering_fraction *
                     opac_d.AngleAveragedAbsorptionCoefficient(
                         v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                        v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
+                        ye, species_d[ispec], nu_fluid);
                 v(iblock, ijinvs(ispec, bin), k, j, i) =
                     v(iblock, Inu0(ispec, bin), k, j, i) /
                     (nu_fluid * nu_fluid * nu_fluid) * alphainv_s;
@@ -727,12 +729,12 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                     nu_fluid * (1. - scattering_fraction) *
                     opac_d.AngleAveragedAbsorptionCoefficient(
                         v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                        v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
+                        ye, species_d[ispec], nu_fluid);
                 const Real alphainv_s =
                     nu_fluid * scattering_fraction *
                     opac_d.AngleAveragedAbsorptionCoefficient(
                         v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                        v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
+                        ye, species_d[ispec], nu_fluid);
                 const Real jinv_a =
                     opac_d.ThermalDistributionOfTNu(v(iblock, pT, k, j, i),
                                                     species_d[ispec], nu_fluid) /

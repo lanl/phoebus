@@ -59,6 +59,18 @@ inline auto SetSwarmIX1Outflow() {
 inline auto SetSwarmOX1Outflow() {
   return parthenon::DeviceAllocate<parthenon::ParticleBoundOX1Outflow>();
 }
+inline auto SetSwarmIX2Outflow() {
+  return parthenon::DeviceAllocate<parthenon::ParticleBoundIX2Outflow>();
+}
+inline auto SetSwarmOX2Outflow() {
+  return parthenon::DeviceAllocate<parthenon::ParticleBoundOX2Outflow>();
+}
+inline auto SetSwarmIX3Outflow() {
+  return parthenon::DeviceAllocate<parthenon::ParticleBoundIX3Outflow>();
+}
+inline auto SetSwarmOX3Outflow() {
+  return parthenon::DeviceAllocate<parthenon::ParticleBoundOX3Outflow>();
+}
 inline auto SetSwarmNoWorkBC() {
   return parthenon::DeviceAllocate<ParticleBoundNoWork>();
 }

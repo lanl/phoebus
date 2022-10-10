@@ -369,6 +369,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         });
   }
 
+  // Initialize samples
+  if (do_rad) {
+    if (rad_pkg->Param<std::string>("method") == "mocmc") {
+      radiation::MOCMCInitSamples(rc);
+    }
+  }
+
   fluid::PrimitiveToConserved(rc);
   if (do_rad) {
     radiation::MomentPrim2Con(rc);
