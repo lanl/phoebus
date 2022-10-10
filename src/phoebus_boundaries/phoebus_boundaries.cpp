@@ -112,7 +112,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto q = rc->PackVariables(std::vector<parthenon::MetadataFlag>{Metadata::FillGhost},
                              imap, coarse);
   auto nb = IndexRange{0, q.GetDim(4) - 1};
-  auto nb1 = IndexRange{0, 0};
+  //auto nb1 = IndexRange{0, 0};
   auto domain = IndexDomain::inner_x1;
 
   const int pv_lo = imap[fluid_prim::velocity].first;

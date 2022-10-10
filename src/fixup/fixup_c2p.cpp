@@ -122,10 +122,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
   const bool rad_active = rad_pkg->Param<bool>("active");
   const int num_species = rad_active ? rad_pkg->Param<int>("num_species") : 0;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
-
   bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
   bool update_fluid = fluid_pkg->Param<bool>("active");
   if (!enable_c2p_fixup || !update_fluid) return TaskStatus::complete;
