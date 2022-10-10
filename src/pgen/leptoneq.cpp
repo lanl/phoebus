@@ -32,7 +32,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables(
-      {p::density, p::velocity, p::energy, p::ye, p::pressure, p::temperature}, imap);
+      {p::density, p::velocity, p::energy, p::ye, p::pressure, p::temperature, p::gamma1},
+      imap);
 
   const int irho = imap[p::density].first;
   const int ivlo = imap[p::velocity].first;
@@ -41,6 +42,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iye = imap[p::ye].first;
   const int iprs = imap[p::pressure].first;
   const int itmp = imap[p::temperature].first;
+  const int igm1 = imap[p::gamma1].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -75,6 +77,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ieng, k, j, i) =
             rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T0, lambda);
         v(iprs, k, j, i) = eos.PressureFromDensityTemperature(rho0, T0, lambda);
+        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(irho, k, j, i), v(itmp, k, j, i), lambda) /
+                           v(iprs, k, j, i);
 
         for (int d = 0; d < 3; d++)
           v(ivlo + d, k, j, i) = 0.0;

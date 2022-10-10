@@ -75,7 +75,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             // Calculate comoving frame state
             Real E;
             Vec F;
-            cl.GetCovTilPiFromPrim(J, cov_tilH, &con_tilPi);
+            cl.GetConTilPiFromPrim(J, cov_tilH, &con_tilPi);
             cl.Prim2Con(J, cov_tilH, con_tilPi, &E, &F);
 
             // re-Calculate rest frame quantities using closure
@@ -85,7 +85,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
 
             Real xig, phig;
             cl.GetM1GuessesFromEddington(E, F, &xig, &phig);
-            cl.GetCovTilPiFromCon(E, F, xig, phig, &con_tilPi);
+            cl.GetConTilPiFromCon(E, F, xig, phig, &con_tilPi);
             cl.Con2Prim(E, F, con_tilPi, &J_out, &H_out);
 
             // if (result.status == radiation::Status::failure) throw 2;

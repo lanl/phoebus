@@ -98,18 +98,11 @@ void GenericBC(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         const Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
         const Real gratio = robust::ratio(detg, detg_ref);
 
-        //        if ((i == 117 && j == 0)) {
-        //          printf("[%i %i %i][%i] ref: q(%i %i %i %i) = %e result: %e sgn = %i
-        //          gratio = %e\n",
-        //            k, j, i, l, l, kref, jref, iref, q(l, kref, jref, iref),
-        //              q(l, k, j, i), sgn, gratio);
-        //        }
         q(l, k, j, i) = sgn * gratio * q(l, kref, jref, iref);
       });
 }
 
 void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
@@ -145,31 +138,9 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         "OutflowInnerX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
-
-          //          // Enforce u^1 <= 0
-          //          Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
-          //                          q(pv_lo + 2, k, j, i)};
-          //          Real gammacov[3][3];
-          //          geom.Metric(CellLocation::Cent, k, j, i, gammacov);
-          //          Real W = phoebus::GetLorentzFactor(vcon, gammacov);
-          //          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-          //          Real beta[3];
-          //          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-          //
-          //          Real ucon1 = vcon[0] - W * beta[0] / alpha;
-          //
-          //          if (ucon1 > 0) {
-          //            SPACELOOP(ii) { vcon[ii] /= W; }
-          //            vcon[0] = beta[0] / alpha;
-          //            Real vsq = 0.;
-          //            SPACELOOP2(ii, jj) { vsq += gammacov[ii][jj] * vcon[ii] *
-          //            vcon[jj]; } W = 1. / sqrt(1. - vsq);
-          //
-          //            SPACELOOP(ii) { q(pv_lo + ii, k, j, i) = W * vcon[ii]; }
-          //          }
-          //
         });
 
+    // TODO(BRR) Is this always unnecessary if BC inside BH?
     // pmb->par_for_bndry(
     //    "OutflowInnerX1PrimFixup", nb1, domain, coarse,
     //    KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
@@ -229,7 +200,6 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
@@ -267,35 +237,12 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         "OutflowOuterX1Prim", nb, domain, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
-
-          // Enforce u^1 >= 0
-          //          Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
-          //                          q(pv_lo + 2, k, j, i)};
-          //          Real gammacov[3][3];
-          //          geom.Metric(CellLocation::Cent, k, j, i, gammacov);
-          //          Real W = phoebus::GetLorentzFactor(vcon, gammacov);
-          //          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-          //          Real beta[3];
-          //          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-          //
-          //          Real ucon1 = vcon[0] - W * beta[0] / alpha;
-          //
-          //          if (ucon1 < 0) {
-          //            SPACELOOP(ii) { vcon[ii] /= W; }
-          //            vcon[0] = beta[0] / alpha;
-          //            Real vsq = 0.;
-          //            SPACELOOP2(ii, jj) { vsq += gammacov[ii][jj] * vcon[ii] *
-          //            vcon[jj]; } W = 1. / sqrt(1. - vsq);
-          //
-          //            SPACELOOP(ii) { q(pv_lo + ii, k, j, i) = W * vcon[ii]; }
-          //          }
         });
 
+    // TODO(BRR) Make this part of the same kernel? Don't have nb be a kernel index?
     pmb->par_for_bndry(
         "OutflowOuterX1PrimFixup", nb1, domain, coarse,
         KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
-          //       q(l, k, j, i) = q(l, k, j, ref);
-
           // Enforce u^1 >= 0
           Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
                           q(pv_lo + 2, k, j, i)};
@@ -345,8 +292,6 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
                   }
                 }
               }
-              // q(idx_H(ispec, 0), k, j, i) = std::max<Real>(q(idx_H(ispec), 0, k, j, i),
-              // 0.);
             }
           }
         });
@@ -394,7 +339,6 @@ void ReflectOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto pmb = rc->GetBlockPointer();
   const int ndim = pmb->pmy_mesh->ndim;
 

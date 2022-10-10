@@ -7,8 +7,8 @@ ix2_bc = reflect
 ox2_bc = reflect
 
 <phoebus/mesh>
-#bc_vars = primitive
-bc_vars = conserved
+bc_vars = primitive
+#bc_vars = conserved
 
 <parthenon/job>
 problem_id  = torus       # problem ID: basename of output filenames
@@ -37,17 +37,18 @@ variables = p.density,       &
             g.c.gcov,        &
             src_terms,       &
             flux_divergence, &
+            r.i.kappaH,      &
             p.bfield
 
 file_type   = hdf5      # Tabular data dump
 dt          = 1.0       # time increment between outputs
 
 <parthenon/time>
-nlim        = -1        # cycle limit
-tlim        = 50.       # time limit
+nlim        = -1 # cycle limit
+tlim        = 500.       # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
-dt_init_fact = 1.0 # 1.e-6
+dt_init_fact = 1.e-6
 
 <parthenon/mesh>
 nghost = 4
@@ -98,7 +99,7 @@ rad = true
 xorder = 2
 cfl = 0.8
 riemann = llf
-recon = linear # weno5
+recon = weno5
 c2p_max_iter = 100
 c2p_tol = 1.e-8
 c2p_method = robust
@@ -110,29 +111,30 @@ a = 0.9375
 
 <coordinates>
 derefine_poles = false
-r_outer = 50
+r_outer = 250
 
 <radiation>
 cfl = 0.5
+recon = weno5
 method = moment_eddington
 absorption = true
 do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
+src_solver = oned # fourd
+src_use_oned_backup = false # true
 src_rootfind_eps = 1.e-6
-src_rootfind_tol = 1.e-12
+src_rootfind_tol = 1.e-8
 src_rootfind_maxiter = 100
-src_solver = fourd
-src_use_oned_backup = true
+oned_fixup_strategy = ignore_dJ
+recon_fixup_strategy = bounds
 
+#scattering_fraction = 1.0
 scattering_fraction = 0.5
 
 <opacity>
 type = gray
-#gray_kappa = 1.e-40
-gray_kappa = 1.e-10
-#gray_kappa = 1.e-5 # dtau/dt ~ 1e10 inside disk
-#gray_kappa = 1.e-15
+gray_kappa = 1.e-10 # midplane tau/zone >1e3
 
 <units>
 scale_free = false
@@ -145,26 +147,34 @@ enable_mhd_floors = true
 enable_rad_floors = true
 enable_ceilings = true
 enable_rad_ceilings = true
-enable_flux_fixup = true
+enable_flux_fixup = false # true
 enable_c2p_fixup = true
 enable_source_fixup = true
 report_c2p_fails = true
 report_source_fails = true
 
+fluid_c2p_failure_strategy = interpolate
+rad_c2p_failure_strategy = interpolate
+src_failure_strategy = floors
+
 floor_type = ExpX1RhoSie
-rho0_floor = 1.0e-8
-sie0_floor = 1.0e-3
+rho0_floor = 1.0e-5
+sie0_floor = 1.0e-2
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
 sie0_ceiling = 1.0
 gam0_ceiling = 10.0
-xi0_ceiling = 0.99
+rad_floor_type = ExpX1J
+J0_floor = 1.e-6
+J_exp_floor = -3.0
+rad_ceiling_type = ConstantXi0
+xi0_ceiling = 0.95
 
 <torus>
 target_beta = 100.
 harm_beta_normalization = true
-u_jitter = 0 # 0.05
+u_jitter = 0.05
 kappa = 0.01
 rin = 6.0
 rmax = 12.0

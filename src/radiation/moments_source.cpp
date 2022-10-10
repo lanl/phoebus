@@ -101,7 +101,7 @@ class SourceResidual4 {
     // TODO(BRR) Store xi, phi guesses
     Real xi;
     Real phi;
-    c.GetCovTilPiFromCon(E, cov_F, xi, phi, &conTilPi_);
+    c.GetConTilPiFromCon(E, cov_F, xi, phi, &conTilPi_);
     auto status = c.Con2Prim(E, cov_F, conTilPi_, &(P_rad[0]), &cov_H);
     SPACELOOP(ii) { P_rad[ii + 1] = cov_H(ii); }
     return status;
@@ -382,7 +382,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 con_tilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i);
               }
             } else {
-              c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+              c.GetConTilPiFromPrim(J, cov_H, &con_tilPi);
             }
 
             Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
@@ -489,7 +489,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             Vec covH{{v(iblock, idx_F(ispec, 0), k, j, i),
                       v(iblock, idx_F(ispec, 1), k, j, i),
                       v(iblock, idx_F(ispec, 2), k, j, i)}};
-            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+            c.GetConTilPiFromPrim(J, covH, &con_tilPi);
           }
           SourceResidual4<CLOSURE> srm(eos, d_opacity, d_mean_opacity, rho, Ye, bprim,
                                        species_d[ispec], con_tilPi, cov_g, con_gamma.data,

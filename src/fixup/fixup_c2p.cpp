@@ -46,7 +46,6 @@ namespace fixup {
 template <typename T, class CLOSURE>
 TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
                                          IndexDomain domain = IndexDomain::interior) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -122,6 +121,10 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
 
   const bool rad_active = rad_pkg->Param<bool>("active");
   const int num_species = rad_active ? rad_pkg->Param<int>("num_species") : 0;
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
 
   bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
   bool update_fluid = fluid_pkg->Param<bool>("active");
@@ -371,9 +374,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
             v(b, m, k, j, i) = sig[m - slo];
           }
 
-          // TODO(BRR)
-          // if not iradfail here, call rad c2p with updated velocity and set iradfail to
-          // result
           if (irfail >= 0) {
             // If rad c2p failed, we'll fix that up subsequently
             if (v(b, irfail, k, j, i) == radiation::FailFlags::success) {
@@ -397,7 +397,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
                   Real xi = 0.;
                   Real phi = M_PI;
                   // TODO(BRR) STORE_GUESS
-                  c.GetCovTilPiFromCon(E, cov_F, xi, phi, &con_tilPi);
+                  c.GetConTilPiFromCon(E, cov_F, xi, phi, &con_tilPi);
                 }
 
                 c.Con2Prim(E, cov_F, con_tilPi, &J, &cov_H);

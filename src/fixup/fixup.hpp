@@ -17,17 +17,9 @@
 #include <cmath>
 #include <limits>
 
-//#include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
-// using namespace parthenon::driver::prelude;
-// using namespace parthenon;
-
-//#include "fluid/con2prim_robust.hpp"
-//#include "fluid/prim2con.hpp"
-//#include "geometry/geometry.hpp"
-//#include "phoebus_utils/variables.hpp"
 
 namespace fixup {
 
@@ -41,10 +33,6 @@ template <typename T>
 TaskStatus RadConservedToPrimitiveFixup(T *rc, T *rc0);
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0);
-template <typename T>
-TaskStatus AllConservedToPrimitiveFixup(T *rc, T *rc0);
-template <typename T>
-TaskStatus AllC2P(T *rc);
 template <typename T>
 TaskStatus SourceFixup(T *rc, T *rc0);
 

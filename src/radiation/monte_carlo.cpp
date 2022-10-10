@@ -229,7 +229,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   auto dN = rc->Get("Ns").data;
   auto dN_h = dN.GetHostMirrorAndCopy();
   int index = 0;
-  for (int sidx = 0; sidx < 3; sidx++) {
+  for (int sidx = 0; sidx < num_species; sidx++) {
     for (int k = 0; k < nx_k; k++) {
       for (int j = 0; j < nx_j; j++) {
         for (int i = 0; i < nx_i; i++) {

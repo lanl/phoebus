@@ -106,13 +106,13 @@ class ClosureEdd {
                          Vec *cov_H);
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_tilH, Tens2 *con_tilPi) {
+  ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_tilH, Tens2 *con_tilPi) {
     SPACELOOP2(i, j) (*con_tilPi)(i, j) = 0.0;
     return ClosureStatus::success;
   }
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromCon(const Real E, const Vec cov_F, Real &xi, Real &phi,
+  ClosureStatus GetConTilPiFromCon(const Real E, const Vec cov_F, Real &xi, Real &phi,
                                    Tens2 *con_tilPi) {
     SPACELOOP2(i, j) (*con_tilPi)(i, j) = 0.0;
     xi = 0.0;
@@ -316,7 +316,6 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<SET>::Con2Prim(Real E, const Vec cov_F,
   *J = ratio((2 * W2 - 1) * E - 2 * W2 * vF, lam);
   SPACELOOP(i) (*cov_tilH)(i) = (cov_F(i) - (*J) * cov_vTilPi(i) - cov_v(i) * a) / W;
 
-  // const Real xi = std::sqrt(gamma->contractCov3Vectors(*cov_tilH, *cov_tilH)) / (*J);
   const Real xi =
       std::sqrt(gamma->contractCov3Vectors(*cov_tilH, *cov_tilH) -
                 std::pow(gamma->contractConCov3Vectors(con_v, *cov_tilH), 2)) /

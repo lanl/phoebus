@@ -299,7 +299,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (fluid_active) {
       auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
-      // auto fix_flux = tl.AddTask(hydro_flux, fixup::FixFluxes, sc0.get());
       auto hydro_flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
       auto hydro_geom_src =
           tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
@@ -554,14 +553,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
     using MDT = std::remove_pointer<decltype(sc0.get())>::type;
 
-    // fill in derived fields again
-    // TODO(BRR) we could avoid this by communicating both derived and independent
-    // quantities for stencils... but we need to FillDerived earlier to do the whole fixup
-    // routine.
-    // auto fill_derived =
-    //    tl.AddTask(none, parthenon::Update::FillDerived<MeshBlockData<Real>>,
-    //    sc1.get());
-    // TODO(BRR) don't do fill derived here?
     TaskID fill_derived(0);
 
     if (rad_mocmc_active) {

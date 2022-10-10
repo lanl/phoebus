@@ -45,7 +45,6 @@ namespace fixup {
 
 template <typename T, class CLOSURE>
 TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -54,9 +53,6 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
   namespace cr = radmoment_cons;
 
   auto *pmb = rc->GetParentPointer().get();
-  // IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  // IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  // IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -315,7 +311,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc, T *rc0) {
                 con_tilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
               }
             } else {
-              c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
+              c.GetConTilPiFromPrim(J, cov_H, &con_tilPi);
             }
             c.Prim2Con(J, cov_H, con_tilPi, &E, &cov_F);
 
