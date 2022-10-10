@@ -655,8 +655,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                               std::pow(g.contractConCov3Vectors(con_v, cov_H), 2)) /
                     J;
 
-                constexpr Real umin = 100.*robust::SMALL();
-                constexpr Real Jmin = 100.*robust::SMALL();
+                constexpr Real umin = 100. * robust::SMALL();
+                constexpr Real Jmin = 100. * robust::SMALL();
 
                 Real scaling_factor = 0.;
                 if (xi > xi_max) {
