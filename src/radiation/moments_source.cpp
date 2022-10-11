@@ -27,7 +27,8 @@
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
-#include "fluid/con2prim_robust.hpp"
+//#include "fluid/con2prim_robust.hpp"
+#include "fixup/fixup.hpp"
 #include "fluid/prim2con.hpp"
 
 namespace radiation {
