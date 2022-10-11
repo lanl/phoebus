@@ -314,7 +314,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
   const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
-  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
+  const Real c2p_floor_scale_fac = fluid_pkg->Param<Real>("c2p_floor_scale_fac");
+  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter,
+                                                c2p_floor_scale_fac);
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 

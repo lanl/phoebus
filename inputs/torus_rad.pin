@@ -102,6 +102,7 @@ riemann = llf
 recon = weno5
 c2p_max_iter = 100
 c2p_tol = 1.e-8
+c2p_floor_scale_fac = 1.e-10
 c2p_method = robust
 Ye = false
 mhd = true
