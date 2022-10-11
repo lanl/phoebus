@@ -227,7 +227,8 @@ template <typename Data_t, typename T>
 class ConToPrim {
  public:
   ConToPrim(Data_t *rc, fixup::Bounds bnds, const Real tol, const int max_iterations,
-            const Real floor_scale_fac)
+            const Real floor_scale_fac, const bool fail_on_floors,
+            const bool fail_on_ceilings)
       : bounds(bnds), var(rc->PackVariables(Vars(), imap)),
         prho(imap[fluid_prim::density].first), crho(imap[fluid_cons::density].first),
         pvel_lo(imap[fluid_prim::velocity].first),
@@ -243,7 +244,8 @@ class ConToPrim {
         sig_hi(imap[internal_variables::cell_signal_speed].second),
         gm1(imap[fluid_prim::gamma1].first),
         c2p_mu(imap[internal_variables::c2p_mu].first), rel_tolerance(tol),
-        max_iter(max_iterations), h0sq_(1.0), floor_scale_fac_(floor_scale_fac) {}
+        max_iter(max_iterations), h0sq_(1.0), floor_scale_fac_(floor_scale_fac),
+        fail_on_floors_(fail_on_floors), fail_on_ceilings_(fail_on_ceilings) {}
 
   std::vector<std::string> Vars() {
     return std::vector<std::string>(
@@ -285,6 +287,8 @@ class ConToPrim {
   const int max_iter;
   const Real h0sq_;
   const Real floor_scale_fac_;
+  const bool fail_on_floors_;
+  const bool fail_on_ceilings_;
 
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g,
@@ -430,8 +434,13 @@ class ConToPrim {
 
     num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
 
-    // if (num_nans > 0 || res.used_gamma_max()) {
-    if (num_nans > 0 || res.used_density_floor() || res.used_energy_floor()) {
+    if (num_nans > 0) {
+      return ConToPrimStatus::failure;
+    }
+    if (fail_on_floors_ && (res.used_density_floor() || res.used_energy_floor())) {
+      return ConToPrimStatus::failure;
+    }
+    if (fail_on_ceilings_ == true && res.used_gamma_max()) {
       return ConToPrimStatus::failure;
     }
     return ConToPrimStatus::success;
@@ -443,8 +452,11 @@ using C2P_Mesh_t = ConToPrim<MeshData<Real>, MeshBlockPack<Real>>;
 
 inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, fixup::Bounds bounds,
                                   const Real tol, const int max_iter,
-                                  const Real c2p_floor_scale_fac) {
-  return C2P_Block_t(rc, bounds, tol, max_iter, c2p_floor_scale_fac);
+                                  const Real c2p_floor_scale_fac,
+                                  const bool fail_on_floors,
+                                  const bool fail_on_ceilings) {
+  return C2P_Block_t(rc, bounds, tol, max_iter, c2p_floor_scale_fac, fail_on_floors,
+                     fail_on_ceilings);
 }
 /*inline C2P_Mesh_t ConToPrimSetup(MeshData<Real> *rc) {
   return C2P_Mesh_t(rc);
