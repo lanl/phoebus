@@ -23,7 +23,12 @@ using namespace parthenon::package::prelude;
 
 namespace fixup {
 
-enum class FAILURE_STRATEGY { interpolate, interpolate_previous, floors };
+enum class FAILURE_STRATEGY {
+  interpolate,
+  interpolate_previous,
+  neighbor_minimum,
+  floors
+};
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus FixFluxes(MeshBlockData<Real> *rc);

@@ -53,6 +53,9 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
   auto *pmb = rc->GetParentPointer().get();
+  IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
@@ -119,10 +122,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
   const bool rad_active = rad_pkg->Param<bool>("active");
   const int num_species = rad_active ? rad_pkg->Param<int>("num_species") : 0;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
-
   bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
   bool update_fluid = fluid_pkg->Param<bool>("active");
   if (!enable_c2p_fixup || !update_fluid) return TaskStatus::complete;
@@ -181,6 +180,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
 
   auto fluid_c2p_failure_strategy =
       fix_pkg->Param<FAILURE_STRATEGY>("fluid_c2p_failure_strategy");
+  const auto c2p_failure_force_fixup_both =
+      fix_pkg->Param<bool>("c2p_failure_force_fixup_both");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
@@ -194,6 +195,19 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
         bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
                            gamma_max, e_max);
 
+        if (c2p_failure_force_fixup_both && rad_active) {
+          if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail ||
+              v(b, irfail, k, j, i) == radiation::FailFlags::fail) {
+            v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
+            v(b, irfail, k, j, i) = radiation::FailFlags::fail;
+          }
+        }
+
+        // Need to account for not stenciling outside of ghost zones
+        // bool is_outer_ghost_layer =
+        //    (i == ib.s || i == ib.e || j == jb.s || j == jb.e || k == kb.s || k ==
+        //    kb.e);
+
         auto fixup0 = [&](const int iv) {
           v(b, iv, k, j, i) = v0(b, iv, k, j, i - 1) + v0(b, iv, k, j, i + 1);
           if (ndim > 1) {
@@ -204,18 +218,55 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
           }
           return v(b, iv, k, j, i) / (2 * ndim);
         };
+        auto fail = [&](const int k, const int j, const int i) {
+          if (c2p_failure_force_fixup_both) {
+            return v(b, ifail, k, j, i) * v(b, irfail, k, j, i);
+          } else {
+            return v(b, ifail, k, j, i);
+          }
+        };
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
-          v(b, iv, k, j, i) = v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
-                              v(b, ifail, k, j, i + 1) * v(b, iv, k, j, i + 1);
+          v(b, iv, k, j, i) = fail(k, j, i - 1) * v(b, iv, k, j, i - 1) +
+                              fail(k, j, i + 1) * v(b, iv, k, j, i + 1);
           if (ndim > 1) {
-            v(b, iv, k, j, i) += v(b, ifail, k, j - 1, i) * v(b, iv, k, j - 1, i) +
-                                 v(b, ifail, k, j + 1, i) * v(b, iv, k, j + 1, i);
+            v(b, iv, k, j, i) += fail(k, j - 1, i) * v(b, iv, k, j - 1, i) +
+                                 fail(k, j + 1, i) * v(b, iv, k, j + 1, i);
             if (ndim == 3) {
-              v(b, iv, k, j, i) += v(b, ifail, k - 1, j, i) * v(b, iv, k - 1, j, i) +
-                                   v(b, ifail, k + 1, j, i) * v(b, iv, k + 1, j, i);
+              v(b, iv, k, j, i) += fail(k - 1, j, i) * v(b, iv, k - 1, j, i) +
+                                   fail(k + 1, j, i) * v(b, iv, k + 1, j, i);
             }
           }
           return inv_mask_sum * v(b, iv, k, j, i);
+        };
+        auto get_minimum = [&](const int iv) {
+          fail(k, j, i - 1) > 0.5
+              ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                             std::fabs(v(b, iv, k, j, i - 1)))
+              : v(b, iv, k, j, i);
+          fail(k, j, i + 1) > 0.5
+              ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                             std::fabs(v(b, iv, k, j, i + 1)))
+              : v(b, iv, k, j, i);
+          if (ndim > 1) {
+            fail(k, j - 1, i) > 0.5
+                ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                               std::fabs(v(b, iv, k, j - 1, i)))
+                : v(b, iv, k, j, i);
+            fail(k, j + 1, i) > 0.5
+                ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                               std::fabs(v(b, iv, k, j + 1, i)))
+                : v(b, iv, k, j, i);
+            if (ndim > 2) {
+              fail(k - 1, j, i) > 0.5
+                  ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                                 std::fabs(v(b, iv, k - 1, j, i)))
+                  : v(b, iv, k, j, i);
+              fail(k + 1, j, i) > 0.5
+                  ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
+                                                 std::fabs(v(b, iv, k + 1, j, i)))
+                  : v(b, iv, k, j, i);
+            }
+          }
         };
         if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
           Real num_valid = 0;
@@ -242,12 +293,18 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
               v(b, peng, k, j, i) = fixup(peng, norm);
 
               if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
+            } else if (num_valid > 0.5 &&
+                       fluid_c2p_failure_strategy == FAILURE_STRATEGY::neighbor_minimum) {
+              get_minimum(prho);
+              SPACELOOP(ii) { get_minimum(pvel_lo + ii); }
+              get_minimum(peng);
+              if (pye > 0) get_minimum(pye);
             } else {
               // No valid neighbors; set fluid mass/energy to near-zero and set primitive
               // velocities to zero
 
-              v(b, prho, k, j, i) = robust::SMALL();
-              v(b, peng, k, j, i) = robust::SMALL();
+              v(b, prho, k, j, i) = 100. * robust::SMALL();
+              v(b, peng, k, j, i) = 100. * robust::SMALL();
 
               // Safe value for ye
               if (pye > 0) {

@@ -51,17 +51,16 @@ class Residual {
   Residual(const Real D, const Real q, const Real bsq, const Real bsq_rpsq,
            const Real rsq, const Real rbsq, const Real v0sq, const Real Ye,
            const singularity::EOS &eos, const fixup::Bounds &bnds, const Real x1,
-           const Real x2, const Real x3)
+           const Real x2, const Real x3, const Real floor_scale_fac)
       : D_(D), q_(q), bsq_(bsq), bsq_rpsq_(bsq_rpsq), rsq_(rsq), rbsq_(rbsq), v0sq_(v0sq),
-        eos_(eos), bounds_(bnds), x1_(x1), x2_(x2), x3_(x3) {
+        eos_(eos), bounds_(bnds), x1_(x1), x2_(x2), x3_(x3),
+        floor_scale_fac_(floor_scale_fac) {
     lambda_[0] = Ye;
     Real garbage = 0.0;
     bounds_.GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
     bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
 
-#if !USE_C2P_ROBUST_FLOORS
-    rho_floor_ = 1.e-100;
-#endif
+    rho_floor_ *= floor_scale_fac_;
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
@@ -104,9 +103,7 @@ class Residual {
                const Real What) {
     Real rho = rhohat_mu(1.0 / What);
     bounds_.GetFloors(x1_, x2_, x3_, rho, e_floor_);
-#if !USE_C2P_ROBUST_FLOORS
-    e_floor_ = 1.e-100;
-#endif
+    e_floor_ *= floor_scale_fac_;
     const Real ehat_trial =
         What * (qbar - mu * rbarsq) + vhatsq * What * What / (1.0 + What);
     used_energy_floor_ = false;
@@ -171,6 +168,7 @@ class Residual {
   const singularity::EOS &eos_;
   const fixup::Bounds &bounds_;
   const Real x1_, x2_, x3_;
+  const Real floor_scale_fac_;
   Real lambda_[2];
   Real rho_floor_, e_floor_, gam_max_, e_max_;
   bool used_density_floor_, used_energy_floor_, used_energy_max_, used_gamma_max_;
@@ -228,7 +226,9 @@ struct CellGeom {
 template <typename Data_t, typename T>
 class ConToPrim {
  public:
-  ConToPrim(Data_t *rc, fixup::Bounds bnds, const Real tol, const int max_iterations)
+  ConToPrim(Data_t *rc, fixup::Bounds bnds, const Real tol, const int max_iterations,
+            const Real floor_scale_fac, const bool fail_on_floors,
+            const bool fail_on_ceilings)
       : bounds(bnds), var(rc->PackVariables(Vars(), imap)),
         prho(imap[fluid_prim::density].first), crho(imap[fluid_cons::density].first),
         pvel_lo(imap[fluid_prim::velocity].first),
@@ -244,7 +244,8 @@ class ConToPrim {
         sig_hi(imap[internal_variables::cell_signal_speed].second),
         gm1(imap[fluid_prim::gamma1].first),
         c2p_mu(imap[internal_variables::c2p_mu].first), rel_tolerance(tol),
-        max_iter(max_iterations), h0sq_(1.0) {}
+        max_iter(max_iterations), h0sq_(1.0), floor_scale_fac_(floor_scale_fac),
+        fail_on_floors_(fail_on_floors), fail_on_ceilings_(fail_on_ceilings) {}
 
   std::vector<std::string> Vars() {
     return std::vector<std::string>(
@@ -285,6 +286,9 @@ class ConToPrim {
   const Real rel_tolerance;
   const int max_iter;
   const Real h0sq_;
+  const Real floor_scale_fac_;
+  const bool fail_on_floors_;
+  const bool fail_on_ceilings_;
 
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g,
@@ -297,10 +301,8 @@ class ConToPrim {
     Real rhoflr = 0.0;
     Real epsflr;
     bounds.GetFloors(x1, x2, x3, rhoflr, epsflr);
-#if !USE_C2P_ROBUST_FLOORS
-    rhoflr = 1.e-100;
-    epsflr = 1.e-100;
-#endif
+    rhoflr *= floor_scale_fac_;
+    epsflr *= floor_scale_fac_;
     Real gam_max, eps_max;
     bounds.GetCeilings(x1, x2, x3, gam_max, eps_max);
 
@@ -355,7 +357,8 @@ class ConToPrim {
     const Real zsq = rsq / h0sq_;
     Real v0sq = std::min(zsq / (1.0 + zsq), 1.0 - 1.0 / (gam_max * gam_max));
 
-    Residual res(D, q, bsq, bsq_rpsq, rsq, rbsq, v0sq, ye_local, eos, bounds, x1, x2, x3);
+    Residual res(D, q, bsq, bsq_rpsq, rsq, rbsq, v0sq, ye_local, eos, bounds, x1, x2, x3,
+                 floor_scale_fac_);
 
     // find the upper bound
     // TODO(JCD): revisit this.  is it worth it to find the upper bound?
@@ -431,8 +434,13 @@ class ConToPrim {
 
     num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
 
-    // if (num_nans > 0 || res.used_gamma_max()) {
-    if (num_nans > 0 || res.used_density_floor() || res.used_energy_floor()) {
+    if (num_nans > 0) {
+      return ConToPrimStatus::failure;
+    }
+    if (fail_on_floors_ && (res.used_density_floor() || res.used_energy_floor())) {
+      return ConToPrimStatus::failure;
+    }
+    if (fail_on_ceilings_ == true && res.used_gamma_max()) {
       return ConToPrimStatus::failure;
     }
     return ConToPrimStatus::success;
@@ -443,8 +451,12 @@ using C2P_Block_t = ConToPrim<MeshBlockData<Real>, VariablePack<Real>>;
 using C2P_Mesh_t = ConToPrim<MeshData<Real>, MeshBlockPack<Real>>;
 
 inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, fixup::Bounds bounds,
-                                  const Real tol, const int max_iter) {
-  return C2P_Block_t(rc, bounds, tol, max_iter);
+                                  const Real tol, const int max_iter,
+                                  const Real c2p_floor_scale_fac,
+                                  const bool fail_on_floors,
+                                  const bool fail_on_ceilings) {
+  return C2P_Block_t(rc, bounds, tol, max_iter, c2p_floor_scale_fac, fail_on_floors,
+                     fail_on_ceilings);
 }
 /*inline C2P_Mesh_t ConToPrimSetup(MeshData<Real> *rc) {
   return C2P_Mesh_t(rc);

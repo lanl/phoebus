@@ -76,6 +76,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     int c2p_max_iter = pin->GetOrAddInteger("fluid", "c2p_max_iter", 20);
     params.Add("c2p_max_iter", c2p_max_iter);
 
+    // The factor by which the floors in c2p are reduced from the floors used in
+    // ApplyFloors
+    Real c2p_floor_scale_fac = pin->GetOrAddReal("fluid", "c2p_floor_scale_fac", 1.);
+    PARTHENON_REQUIRE(c2p_floor_scale_fac <= 1. && c2p_floor_scale_fac > 0.,
+                      "fluid/c2p_floor_scale_fac must be between 0 and 1!");
+    params.Add("c2p_floor_scale_fac", c2p_floor_scale_fac);
+
+    bool c2p_fail_on_floors = pin->GetOrAddBoolean("fluid", "c2p_fail_on_floors", false);
+    params.Add("c2p_fail_on_floors", c2p_fail_on_floors);
+
+    bool c2p_fail_on_ceilings =
+        pin->GetOrAddBoolean("fluid", "c2p_fail_on_ceilings", false);
+    params.Add("c2p_fail_on_ceilings", c2p_fail_on_ceilings);
+
     std::string recon = pin->GetOrAddString("fluid", "recon", "linear");
     PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;
     if (recon == "weno5" || recon == "weno5z") {
@@ -430,7 +444,12 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
-  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
+  const Real c2p_floor_scale_fac = pkg->Param<Real>("c2p_floor_scale_fac");
+  const bool c2p_fail_on_floors = pkg->Param<bool>("c2p_fail_on_floors");
+  const bool c2p_fail_on_ceilings = pkg->Param<bool>("c2p_fail_on_ceilings");
+  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter,
+                                                c2p_floor_scale_fac, c2p_fail_on_floors,
+                                                c2p_fail_on_ceilings);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
@@ -466,7 +485,6 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
   auto invert = con2prim::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
-  auto invert_robust = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");

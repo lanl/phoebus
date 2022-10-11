@@ -200,6 +200,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     fluid_c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
   } else if (fluid_c2p_failure_strategy_str == "interpolate_previous") {
     fluid_c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
+  } else if (fluid_c2p_failure_strategy_str == "neighbor_minimum") {
+    fluid_c2p_failure_strategy = FAILURE_STRATEGY::neighbor_minimum;
   } else if (fluid_c2p_failure_strategy_str == "floors") {
     fluid_c2p_failure_strategy = FAILURE_STRATEGY::floors;
   }
@@ -212,6 +214,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     rad_c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
   } else if (rad_c2p_failure_strategy_str == "interpolate_previous") {
     rad_c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
+  } else if (rad_c2p_failure_strategy_str == "neighbor_minimum") {
+    rad_c2p_failure_strategy = FAILURE_STRATEGY::neighbor_minimum;
   } else if (rad_c2p_failure_strategy_str == "floors") {
     rad_c2p_failure_strategy = FAILURE_STRATEGY::floors;
   }
@@ -228,6 +232,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     src_failure_strategy = FAILURE_STRATEGY::floors;
   }
   params.Add("src_failure_strategy", src_failure_strategy);
+
+  const bool c2p_failure_force_fixup_both =
+      pin->GetOrAddBoolean("fixup", "c2p_failure_force_fixup_both", true);
+  params.Add("c2p_failure_force_fixup_both", c2p_failure_force_fixup_both);
 
   params.Add("bounds",
              Bounds(params.Get<Floors>("floor"), params.Get<Ceilings>("ceiling"),
@@ -306,7 +314,12 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
   const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
-  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter);
+  const Real c2p_floor_scale_fac = fluid_pkg->Param<Real>("c2p_floor_scale_fac");
+  const bool c2p_fail_on_floors = fluid_pkg->Param<bool>("c2p_fail_on_floors");
+  const bool c2p_fail_on_ceilings = fluid_pkg->Param<bool>("c2p_fail_on_ceilings");
+  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter,
+                                                c2p_floor_scale_fac, c2p_fail_on_floors,
+                                                c2p_fail_on_ceilings);
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
