@@ -46,6 +46,9 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Real alpha = pin->GetOrAddReal("coordinates", "poly_alpha", 14);
   Real x0 = pin->GetReal("parthenon/mesh", "x1min");
   Real smooth = pin->GetOrAddReal("coordinates", "smooth", 0.5);
+  Real a = pin->GetReal("geometry", "a");
+  Real Rh = 1.0 + sqrt(1.0 - a * a);
+  Real xh = log(Rh);
   if (!params.hasKey("dxfd")) {
     params.Add("dxfd", dxfd);
   }
@@ -55,6 +58,8 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   params.Add("alpha", alpha);
   params.Add("x0", x0);
   params.Add("smooth", smooth);
+  params.Add("Rh", Rh);
+  params.Add("xh", xh);
 }
 template <>
 void SetGeometry<FMKSMeshBlock>(MeshBlockData<Real> *rc) {}
