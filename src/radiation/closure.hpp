@@ -76,13 +76,12 @@ class ClosureEdd {
              const singularity::neutrinos::Opacity *opac,
              const singularity::neutrinos::MeanOpacity *mean_opac);
 
- ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
-                            const singularity::neutrinos::Opacity *opac_in,
-                            const singularity::neutrinos::MeanOpacity *mean_opac_in,
-                            const parthenon::VariablePack<Real> *v_in,
-                            const parthenon::vpack_types::FlatIdx *idx_Inu_in,
-                            const int nnu_in, const Real dlnu_in,
-                            const parthenon::ParArray1D<Real> *nusamp_in);
+  ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
+             const singularity::neutrinos::Opacity *opac_in,
+             const singularity::neutrinos::MeanOpacity *mean_opac_in,
+             const parthenon::VariablePack<Real> *v_in,
+             const parthenon::vpack_types::FlatIdx *idx_Inu_in, const int nnu_in,
+             const Real dlnu_in, const parthenon::ParArray1D<Real> *nusamp_in);
 
   //-------------------------------------------------------------------------------------
   /// Calculate the update values dE and cov_dF for a linear, implicit source term update
@@ -140,10 +139,11 @@ class ClosureEdd {
   //-------------------------------------------------------------------------------------
   /// Initialize pointers to angle-averaged spectrum information (for frequency-averaging
   /// opacities).
-//  KOKKOS_FUNCTION void
-//  InitializeSpectrum(parthenon::VariablePack<Real> *v_in, const int nnu_in, const Real dlnu,
-//                     parthenon::ParArray1D<Real> *nusamp_in,
-//                     parthenon::vpack_types::FlatIdx *idx_Inu_in);
+  //  KOKKOS_FUNCTION void
+  //  InitializeSpectrum(parthenon::VariablePack<Real> *v_in, const int nnu_in, const Real
+  //  dlnu,
+  //                     parthenon::ParArray1D<Real> *nusamp_in,
+  //                     parthenon::vpack_types::FlatIdx *idx_Inu_in);
 
   KOKKOS_FUNCTION
   ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_tilH, Tens2 *con_tilPi) {
@@ -188,8 +188,11 @@ class ClosureEdd {
   KOKKOS_FUNCTION void InitializeGeometry_(const Vec con_v_in, LocalGeometryType *g);
 };
 
+// TODO(BRR) Undo this extra function that isn't necessary anymore
 template <class SET>
-KOKKOS_FUNCTION void ClosureEdd<SET>::InitializeGeometry_(const Vec con_v_in, LocalGeometryType *g) {
+KOKKOS_FUNCTION void ClosureEdd<SET>::InitializeGeometry_(const Vec con_v_in,
+                                                          LocalGeometryType *g) {
+  SPACELOOP(i) con_v(i) = con_v_in(i);
   gamma = g;
   gamma->lower3Vector(con_v, &cov_v);
   v2 = 0.0;
@@ -197,23 +200,24 @@ KOKKOS_FUNCTION void ClosureEdd<SET>::InitializeGeometry_(const Vec con_v_in, Lo
   W = 1 / std::sqrt(1 - v2);
   W2 = W * W;
 
-  PARTHENON_DEBUG_REQUIRE(!std::isinf(W), "Infinite Lorentz factor!");
+  PARTHENON_DEBUG_REQUIRE(!std::isinf(W) && !std::isnan(W), "Infinite/NAN Lorentz factor!");
 }
 
 template <class SET>
-KOKKOS_FUNCTION ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g) :
-  opac(nullptr), mean_opac(nullptr), v(nullptr), idx_Inu(nullptr), nnu(0), dlnu(0), nusamp(nullptr) {
-    InitializeGeometry_(con_v_in, g);
-//    : gamma(g), v(nullptr), nnu(0), dlnu(0.), nusamp(nullptr), idx_Inu(nullptr) {
-//  SPACELOOP(i) con_v(i) = con_v_in(i);
-//
-//  gamma->lower3Vector(con_v, &cov_v);
-//  v2 = 0.0;
-//  SPACELOOP(i) v2 += con_v(i) * cov_v(i);
-//  W = 1 / std::sqrt(1 - v2);
-//  W2 = W * W;
-//
-//  PARTHENON_DEBUG_REQUIRE(!std::isinf(W), "Infinite Lorentz factor!");
+KOKKOS_FUNCTION ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g)
+    : opac(nullptr), mean_opac(nullptr), v(nullptr), idx_Inu(nullptr), nnu(0), dlnu(0),
+      nusamp(nullptr) {
+  InitializeGeometry_(con_v_in, g);
+  //    : gamma(g), v(nullptr), nnu(0), dlnu(0.), nusamp(nullptr), idx_Inu(nullptr) {
+  //  SPACELOOP(i) con_v(i) = con_v_in(i);
+  //
+  //  gamma->lower3Vector(con_v, &cov_v);
+  //  v2 = 0.0;
+  //  SPACELOOP(i) v2 += con_v(i) * cov_v(i);
+  //  W = 1 / std::sqrt(1 - v2);
+  //  W2 = W * W;
+  //
+  //  PARTHENON_DEBUG_REQUIRE(!std::isinf(W), "Infinite Lorentz factor!");
 }
 
 template <class SET>
@@ -221,8 +225,9 @@ KOKKOS_FUNCTION
 ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
                             const singularity::neutrinos::Opacity *opac_in,
                             const singularity::neutrinos::MeanOpacity *mean_opac_in)
-    : opac(opac_in), mean_opac(mean_opac_in), v(nullptr), idx_Inu(nullptr), nnu(0), dlnu(0), nusamp(nullptr) {
-      InitializeGeometry_(con_v_in, g);
+    : opac(opac_in), mean_opac(mean_opac_in), v(nullptr), idx_Inu(nullptr), nnu(0),
+      dlnu(0), nusamp(nullptr) {
+  InitializeGeometry_(con_v_in, g);
 }
 
 template <class SET>
@@ -234,8 +239,8 @@ ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
                             const parthenon::vpack_types::FlatIdx *idx_Inu_in,
                             const int nnu_in, const Real dlnu_in,
                             const parthenon::ParArray1D<Real> *nusamp_in)
-    : opac(opac_in), mean_opac(mean_opac_in), v(v_in), idx_Inu(idx_Inu_in), nnu(nnu_in), dlnu(dlnu_in),
-      nusamp(nusamp_in) {
+    : opac(opac_in), mean_opac(mean_opac_in), v(v_in), idx_Inu(idx_Inu_in), nnu(nnu_in),
+      dlnu(dlnu_in), nusamp(nusamp_in) {
   InitializeGeometry_(con_v_in, g);
 }
 
@@ -413,9 +418,9 @@ ClosureEdd<SET>::GetAveragedAbsorptionOpacity(const Real rho, const Real T, cons
   kappaJ = mean_opac->RosselandMeanAbsorptionCoefficient(rho, T, ye, species);
 }
 
-//template <class SET>
-//KOKKOS_FUNCTION void
-//ClosureEdd<SET>::InitializeSpectrum(parthenon::VariablePack<Real> *v_in,
+// template <class SET>
+// KOKKOS_FUNCTION void
+// ClosureEdd<SET>::InitializeSpectrum(parthenon::VariablePack<Real> *v_in,
 //                                    const int nnu_in, const Real dlnu_in,
 //                                    parthenon::ParArray1D<Real> *nusamp_in,
 //                                    parthenon::vpack_types::FlatIdx *idx_Inu_in) {

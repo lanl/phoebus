@@ -17,28 +17,28 @@ template <class CLOSURE>
 class OpacityAverager {
  public:
   OpacityAverager(const CLOSURE &c, const FrequencyInfo &freq,
-                    const singularity::neutrinos::Opacity &opac,
-                    const singularity::neutrinos::MeanOpacity &mean_opac,
-                    const parthenon::VariablePack<Real> &v,
-                    const parthenon::vpack_types::FlatIdx &idx_Inu,
-                    const singularity::RadiationType *species,
-                    const int iblock, const int k, const int j, const int i
-                    )
+                  const singularity::neutrinos::Opacity &opac,
+                  const singularity::neutrinos::MeanOpacity &mean_opac,
+                  const parthenon::VariablePack<Real> &v,
+                  const parthenon::vpack_types::FlatIdx &idx_Inu,
+                  const singularity::RadiationType *species, const int iblock,
+                  const int k, const int j, const int i)
       : c_(c), freq_(freq), opac_(opac), mean_opac_(mean_opac), v_(v), idx_Inu_(idx_Inu),
         b_(iblock), k_(k), j_(j), i_(i) {
-          for (int ispec = 0; ispec < MaxNumRadiationSpecies; ispec++) {
-            species_[ispec] = species[ispec];
-          }
-          }
+    for (int ispec = 0; ispec < MaxNumRadiationSpecies; ispec++) {
+      species_[ispec] = species[ispec];
+    }
+  }
 
   Real GetAveragedAbsorptionOpacity(const Real rho, const Real T, const Real ye,
                                     const int ispec) const {
-    printf("idx_Inu.IsValid(): %i\n", static_cast<int>(idx_Inu_.IsValid()));
+    //printf("idx_Inu.IsValid(): %i\n", static_cast<int>(idx_Inu_.IsValid()));
     if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
 
-      for (int n = 0; n < freq_.GetNumBins(); n++) {
-        printf("[%i] nu: %e Inu: %e\n",n, freq_.GetBinCenterNu(n), v_(b_, idx_Inu_(ispec, n), k_, j_, i_));
-      }
+      //for (int n = 0; n < freq_.GetNumBins(); n++) {
+      //  printf("[%i] nu: %e Inu: %e\n", n, freq_.GetBinCenterNu(n),
+      //         v_(b_, idx_Inu_(ispec, n), k_, j_, i_));
+      //}
 
       Real kappaJ_num = 0.;
       Real kappaJ_denom = 0.;
@@ -47,16 +47,23 @@ class OpacityAverager {
         // Trapezoidal rule
         const Real fac = (n == 0 || n == freq_.GetNumBins() - 1) ? 0.5 : 1.;
         nu = freq_.GetBinCenterNu(n);
-        kappaJ_num += fac*opac_.AngleAveragedAbsorptionCoefficient(rho, T, ye, species_[ispec], nu) * v_(b_, idx_Inu_(ispec, n), k_, j_, i_) * nu;
+        kappaJ_num +=
+            fac *
+            opac_.AngleAveragedAbsorptionCoefficient(rho, T, ye, species_[ispec], nu) *
+            v_(b_, idx_Inu_(ispec, n), k_, j_, i_) * nu;
         kappaJ_denom += fac * v_(b_, idx_Inu_(ispec, n), k_, j_, i_) * nu;
       }
 
-      printf("kappaJ: %e Planck: %e\n", robust::ratio(kappaJ_num, kappaJ_denom),
-        mean_opac_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]));
+      //printf("kappaJ: %e Planck: %e\n", robust::ratio(kappaJ_num, kappaJ_denom),
+      //       mean_opac_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]));
 
-
-      PARTHENON_FAIL("MOCMC!");
-      return robust::ratio(kappaJ_num, kappaJ_denom);
+      //PARTHENON_FAIL("MOCMC!");
+      // Handle case of zero particles in zone i.e. Inu = 0
+      if (kappaJ_num < robust::SMALL()) {
+        return mean_opac_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]);
+      } else {
+        return robust::ratio(kappaJ_num, kappaJ_denom);
+      }
     } else {
       return mean_opac_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]);
     }

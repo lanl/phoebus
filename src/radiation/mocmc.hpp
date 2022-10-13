@@ -33,25 +33,22 @@ class MOCMCInteractions {
       phi_hi_ = swarm->template Get<Real>("phi_hi").Get();
       Inuinv_ = swarm->template Get<Real>("Inuinv").Get();
       swarm_d_ = swarm->GetDeviceContext();
-      printf("got ncov!\n");
+//      printf("got ncov!\n");
     }
   }
 
   KOKKOS_INLINE_FUNCTION
   void CalculateInu0(const int iblock, const int ispec, const int k, const int j,
                      const int i, const Real ucon[4]) const {
-    printf("Here! (mocmc? %i)\n",
-           static_cast<int>(
-               programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value));
     if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-      printf("num bins: %i\n", freq_info_.GetNumBins());
+      //printf("num bins: %i\n", freq_info_.GetNumBins());
       for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
         v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) = 0.;
       }
 
       const int nsamp = swarm_d_.GetParticleCountPerCell(k, j, i);
       const Real nu_fluid0 = freq_info_.GetNuMin();
-      printf("ucon: %e %e %e %e\n", ucon[0], ucon[1], ucon[2], ucon[3]);
+      //printf("ucon: %e %e %e %e\n", ucon[0], ucon[1], ucon[2], ucon[3]);
       for (int n = 0; n < nsamp; n++) {
         const int nswarm = swarm_d_.GetFullIndex(k, j, i, n);
         const Real dOmega = (mu_hi_(nswarm) - mu_lo_(nswarm)) *
@@ -87,9 +84,9 @@ class MOCMCInteractions {
         }
       }
 
-      for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
-        printf("[%i] Inu = %e\n", nbin, v_(iblock, idx_Inu0_(ispec, nbin), k, j, i));
-      }
+    //  for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
+        //printf("[%i] Inu = %e\n", nbin, v_(iblock, idx_Inu0_(ispec, nbin), k, j, i));
+     // }
     }
   }
 

@@ -47,14 +47,15 @@ class ClosureMOCMC : public ClosureEdd<SET> {
   KOKKOS_FUNCTION
   ClosureMOCMC(const Vec con_v_in, LocalGeometryType *g) : ClosureEdd<SET>(con_v_in, g) {}
 
-KOKKOS_FUNCTION ClosureMOCMC(const Vec con_v_in, LocalGeometryType *g,
-                            const singularity::neutrinos::Opacity *opac_in,
-                            const singularity::neutrinos::MeanOpacity *mean_opac_in,
-                            const parthenon::VariablePack<Real> *v_in,
-                            const parthenon::vpack_types::FlatIdx *idx_Inu_in,
-                            const int nnu_in, const Real dlnu_in, const parthenon::ParArray1D<Real> *nusamp_in) :
-                            ClosureEdd<SET>(con_v_in, g, opac_in, mean_opac_in, v_in,
-                            idx_Inu_in, nnu_in, dlnu_in, nusamp_in) {}
+  KOKKOS_FUNCTION ClosureMOCMC(const Vec con_v_in, LocalGeometryType *g,
+                               const singularity::neutrinos::Opacity *opac_in,
+                               const singularity::neutrinos::MeanOpacity *mean_opac_in,
+                               const parthenon::VariablePack<Real> *v_in,
+                               const parthenon::vpack_types::FlatIdx *idx_Inu_in,
+                               const int nnu_in, const Real dlnu_in,
+                               const parthenon::ParArray1D<Real> *nusamp_in)
+      : ClosureEdd<SET>(con_v_in, g, opac_in, mean_opac_in, v_in, idx_Inu_in, nnu_in,
+                        dlnu_in, nusamp_in) {}
 
   KOKKOS_FUNCTION
   ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
@@ -75,10 +76,10 @@ KOKKOS_FUNCTION ClosureMOCMC(const Vec con_v_in, LocalGeometryType *g,
 
   KOKKOS_FUNCTION void
   GetAveragedAbsorptionOpacity(const Real rho, const Real T, const Real ye,
-                                              const singularity::RadiationType species,
-                                              Real &kappaJ) const {
-  printf("nu0: %e\n", (*(this->nusamp))(0));
-  kappaJ = this->mean_opac->RosselandMeanAbsorptionCoefficient(rho, T, ye, species);
+                               const singularity::RadiationType species,
+                               Real &kappaJ) const {
+    printf("nu0: %e\n", (*(this->nusamp))(0));
+    kappaJ = this->mean_opac->RosselandMeanAbsorptionCoefficient(rho, T, ye, species);
   }
 };
 } // namespace radiation

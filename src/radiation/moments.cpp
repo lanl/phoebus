@@ -61,6 +61,7 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -112,6 +113,11 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         Vec con_v{{v(b, pv(0), k, j, i) / W, v(b, pv(1), k, j, i) / W,
                    v(b, pv(2), k, j, i) / W}};
 
+                   if (j == 0 && i == 0) {
+                     printf("W: %e\n", W);
+                   }
+
+        printf("%i %i %i W = %e v = %e %e %e\n", k,j,i,W,con_v(0),con_v(1),con_v(2));
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
         CLOSURE c(con_v, &g);
 
@@ -141,6 +147,14 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
+        #ifndef NDEBUG
+        if (std::isnan(J)) {
+          printf("[%i %i %i] E: %e F: %e %e %e\n", k, j, i, E, covF(0), covF(1), covF(2));
+          SPACELOOP2(ii,jj) {printf("pi(%i %i) = %e\n", ii, jj, conTilPi(ii,jj));}
+        }
+        #endif
+
+        PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "J is nan!");
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -181,6 +195,7 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -246,8 +261,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
 
         PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "NAN J in rad P2C!");
 
-        printf("[%i %i %i]\n", k, j, i);
-
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
         v(b, cE(ispec), k, j, i) = sdetgam * E;
@@ -283,6 +296,7 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   using namespace PhoebusReconstruction;
 
   auto *pmb = rc->GetParentPointer().get();
@@ -484,6 +498,7 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
+  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
@@ -679,9 +694,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
             if (i == 16 && j == 16) {
               SPACELOOP(ii) {
-                SPACELOOP(jj) {
-                  printf("%e ", con_tilPil(ii, jj));
-                }
+                SPACELOOP(jj) { printf("%e ", con_tilPil(ii, jj)); }
                 printf("\n");
               }
             }
@@ -727,11 +740,15 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + sigspeed * (El - Er));
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i)),
+                "NAN flux!");
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(v.flux(idir_in, idx_Ff(ispec, ii), k, j, i)),
+                "NAN flux!");
           }
 
           if (sdetgam < robust::SMALL()) {
