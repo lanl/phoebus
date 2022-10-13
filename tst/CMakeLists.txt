@@ -19,6 +19,7 @@ target_link_libraries(phoebus_unit_tests
     Catch2::Catch2
     Kokkos::kokkos
     singularity-eos::singularity-eos
+    singularity-opac::singularity-opac
     )
 if (PHOEBUS_ENABLE_MPI)
   target_compile_definitions(phoebus_unit_tests
@@ -32,7 +33,7 @@ catch_discover_tests(phoebus_unit_tests
   TEST_SPEC "[MonopoleGR]" TEST_PREFIX "MonopoleGR:")
 catch_discover_tests(phoebus_unit_tests
   TEST_SPEC "[relativity_utils]" TEST_PREFIX "relativity_utils:")
-catch_discover_tests(phoebus_unit_tests 
+catch_discover_tests(phoebus_unit_tests
   TEST_SPEC "[radiation]" TEST_PREFIX "radiation:")
 
 if(PHOEBUS_ENABLE_UNIT_TESTS)
@@ -40,8 +41,8 @@ if(PHOEBUS_ENABLE_UNIT_TESTS)
   add_subdirectory(unit)
 endif()
 
-# Currently integration and regression tests 
-# are not integrated into the cmake build system 
+# Currently integration and regression tests
+# are not integrated into the cmake build system
 #if(PHOEBUS_ENABLE_INTEGRATION_TESTS)
 #  message("Building integration tests.")
 #  add_subdirectory(integration)

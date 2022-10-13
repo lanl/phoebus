@@ -14,6 +14,9 @@
 #ifndef CLOSURE_HPP_
 #define CLOSURE_HPP_
 
+#include <interface/variable_pack.hpp>
+#include <kokkos_abstraction.hpp>
+
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/robust.hpp"
@@ -21,6 +24,10 @@
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
+
+#include <singularity-opac/base/radiation_types.hpp>
+#include <singularity-opac/neutrinos/mean_opacity_neutrinos.hpp>
+#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
 #include <cmath>
 #include <iostream>
@@ -60,6 +67,22 @@ class ClosureEdd {
   /// Lorentz factor for the given background state.
   KOKKOS_FUNCTION
   ClosureEdd(const Vec con_v_in, LocalGeometryType *g);
+
+  //-------------------------------------------------------------------------------------
+  /// Constructor specific to radiation sources also sets pointers to opac and mean_opac
+  /// objects on device.
+  KOKKOS_FUNCTION
+  ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
+             const singularity::neutrinos::Opacity *opac,
+             const singularity::neutrinos::MeanOpacity *mean_opac);
+
+ ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
+                            const singularity::neutrinos::Opacity *opac_in,
+                            const singularity::neutrinos::MeanOpacity *mean_opac_in,
+                            const parthenon::VariablePack<Real> *v_in,
+                            const parthenon::vpack_types::FlatIdx *idx_Inu_in,
+                            const int nnu_in, const Real dlnu_in,
+                            const parthenon::ParArray1D<Real> *nusamp_in);
 
   //-------------------------------------------------------------------------------------
   /// Calculate the update values dE and cov_dF for a linear, implicit source term update
@@ -105,6 +128,23 @@ class ClosureEdd {
   ClosureStatus Con2Prim(Real E, const Vec cov_F, const Tens2 con_tilPi, Real *J,
                          Vec *cov_H);
 
+  //-------------------------------------------------------------------------------------
+  /// Calculate frequency-averaged opacities. Analytic closures return Rosseland mean
+  /// opacities, MOCMC averages opacities over an angle-averaged spectrum in the fluid
+  /// frame.
+  KOKKOS_FUNCTION
+  void GetAveragedAbsorptionOpacity(const Real rho, const Real T, const Real ye,
+                                    const singularity::RadiationType species,
+                                    Real &kappaJ) const;
+
+  //-------------------------------------------------------------------------------------
+  /// Initialize pointers to angle-averaged spectrum information (for frequency-averaging
+  /// opacities).
+//  KOKKOS_FUNCTION void
+//  InitializeSpectrum(parthenon::VariablePack<Real> *v_in, const int nnu_in, const Real dlnu,
+//                     parthenon::ParArray1D<Real> *nusamp_in,
+//                     parthenon::vpack_types::FlatIdx *idx_Inu_in);
+
   KOKKOS_FUNCTION
   ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_tilH, Tens2 *con_tilPi) {
     SPACELOOP2(i, j) (*con_tilPi)(i, j) = 0.0;
@@ -123,7 +163,14 @@ class ClosureEdd {
   Real v2, W, W2;
   Vec cov_v;
   Vec con_v;
+  const singularity::neutrinos::Opacity *opac;
+  const singularity::neutrinos::MeanOpacity *mean_opac;
   LocalGeometryType *gamma;
+  const parthenon::VariablePack<Real> *v;
+  const parthenon::vpack_types::FlatIdx *idx_Inu;
+  const int nnu;
+  const Real dlnu;
+  const parthenon::ParArray1D<Real> *nusamp;
 
  protected:
   KOKKOS_FORCEINLINE_FUNCTION
@@ -137,29 +184,59 @@ class ClosureEdd {
     }
     gamma->lower3Vector(con_vTilPi, cov_vTilPi);
   }
+
+  KOKKOS_FUNCTION void InitializeGeometry_(const Vec con_v_in, LocalGeometryType *g);
 };
 
 template <class SET>
-KOKKOS_FUNCTION ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g)
-    : gamma(g) {
-  SPACELOOP(i) con_v(i) = con_v_in(i);
-
+KOKKOS_FUNCTION void ClosureEdd<SET>::InitializeGeometry_(const Vec con_v_in, LocalGeometryType *g) {
+  gamma = g;
   gamma->lower3Vector(con_v, &cov_v);
   v2 = 0.0;
   SPACELOOP(i) v2 += con_v(i) * cov_v(i);
-  // TODO(BRR) use gamma max ceiling (may mess with rootfind)
-  // v2 = std::min<Real>(v2, 0.9999);
   W = 1 / std::sqrt(1 - v2);
-  if (std::isinf(W)) {
-    printf("Nonsense W! vin = %e %e %e\n", con_v_in(0), con_v_in(1), con_v_in(2));
-    printf("v = %e %e %e\n", con_v(0), con_v(1), con_v(2));
-    printf("cov_v: %e %e %e\n", cov_v(0), cov_v(1), cov_v(2));
-    printf("v2 = %e\n", v2);
-    printf("W = %e\n", W);
-  }
   W2 = W * W;
 
   PARTHENON_DEBUG_REQUIRE(!std::isinf(W), "Infinite Lorentz factor!");
+}
+
+template <class SET>
+KOKKOS_FUNCTION ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g) :
+  opac(nullptr), mean_opac(nullptr), v(nullptr), idx_Inu(nullptr), nnu(0), dlnu(0), nusamp(nullptr) {
+    InitializeGeometry_(con_v_in, g);
+//    : gamma(g), v(nullptr), nnu(0), dlnu(0.), nusamp(nullptr), idx_Inu(nullptr) {
+//  SPACELOOP(i) con_v(i) = con_v_in(i);
+//
+//  gamma->lower3Vector(con_v, &cov_v);
+//  v2 = 0.0;
+//  SPACELOOP(i) v2 += con_v(i) * cov_v(i);
+//  W = 1 / std::sqrt(1 - v2);
+//  W2 = W * W;
+//
+//  PARTHENON_DEBUG_REQUIRE(!std::isinf(W), "Infinite Lorentz factor!");
+}
+
+template <class SET>
+KOKKOS_FUNCTION
+ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
+                            const singularity::neutrinos::Opacity *opac_in,
+                            const singularity::neutrinos::MeanOpacity *mean_opac_in)
+    : opac(opac_in), mean_opac(mean_opac_in), v(nullptr), idx_Inu(nullptr), nnu(0), dlnu(0), nusamp(nullptr) {
+      InitializeGeometry_(con_v_in, g);
+}
+
+template <class SET>
+KOKKOS_FUNCTION
+ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
+                            const singularity::neutrinos::Opacity *opac_in,
+                            const singularity::neutrinos::MeanOpacity *mean_opac_in,
+                            const parthenon::VariablePack<Real> *v_in,
+                            const parthenon::vpack_types::FlatIdx *idx_Inu_in,
+                            const int nnu_in, const Real dlnu_in,
+                            const parthenon::ParArray1D<Real> *nusamp_in)
+    : opac(opac_in), mean_opac(mean_opac_in), v(v_in), idx_Inu(idx_Inu_in), nnu(nnu_in), dlnu(dlnu_in),
+      nusamp(nusamp_in) {
+  InitializeGeometry_(con_v_in, g);
 }
 
 template <class SET>
@@ -327,6 +404,27 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<SET>::Con2Prim(Real E, const Vec cov_F,
 
   return ClosureStatus::success;
 }
+
+template <class SET>
+KOKKOS_FUNCTION void
+ClosureEdd<SET>::GetAveragedAbsorptionOpacity(const Real rho, const Real T, const Real ye,
+                                              const singularity::RadiationType species,
+                                              Real &kappaJ) const {
+  kappaJ = mean_opac->RosselandMeanAbsorptionCoefficient(rho, T, ye, species);
+}
+
+//template <class SET>
+//KOKKOS_FUNCTION void
+//ClosureEdd<SET>::InitializeSpectrum(parthenon::VariablePack<Real> *v_in,
+//                                    const int nnu_in, const Real dlnu_in,
+//                                    parthenon::ParArray1D<Real> *nusamp_in,
+//                                    parthenon::vpack_types::FlatIdx *idx_Inu_in) {
+//  v = v_in;
+//  nnu = nnu_in;
+//  dlnu = dlnu_in;
+//  nusamp = nusamp_in;
+//  idx_Inu = idx_Inu_in;
+//}
 
 } // namespace radiation
 

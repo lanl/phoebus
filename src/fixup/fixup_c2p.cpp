@@ -128,10 +128,13 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
 
   bool report_c2p_fails = fix_pkg->Param<bool>("report_c2p_fails");
   if (report_c2p_fails) {
+    IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
+    IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
+    IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
     int nfail_total;
     parthenon::par_reduce(
         parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup failures",
-        DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        DevExecSpace(), 0, v.GetDim(5) - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
           if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
             nf++;

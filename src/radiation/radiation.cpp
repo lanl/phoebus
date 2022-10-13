@@ -17,6 +17,7 @@
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "radiation/local_three_geometry.hpp"
+#include "radiation/frequency_info.hpp"
 #include "reconstruction.hpp"
 
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
@@ -90,15 +91,24 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (is_frequency_dependent) {
     nu_min = pin->GetReal("radiation", "nu_min") / unit_conv.GetTimeCGSToCode();
     ;
-    params.Add("nu_min", nu_min);
     nu_max = pin->GetReal("radiation", "nu_max") / unit_conv.GetTimeCGSToCode();
     ;
-    params.Add("nu_max", nu_max);
     nu_bins = pin->GetInteger("radiation", "nu_bins");
-    params.Add("nu_bins", nu_bins);
     dlnu = (log(nu_max) - log(nu_min)) / nu_bins;
-    params.Add("dlnu", dlnu);
+    FrequencyInfo freq_info(nu_min, dlnu, nu_bins);
+    params.Add("freq_info", freq_info);
+  } else {
+    nu_min = 0.;
+    nu_max = 0.;
+    nu_bins = 0.;
+    dlnu = 0.;
+    FrequencyInfo freq_info;
+    params.Add("freq_info", freq_info);
   }
+  params.Add("nu_min", nu_min);
+  params.Add("nu_max", nu_max);
+  params.Add("nu_bins", nu_bins);
+  params.Add("dlnu", dlnu);
 
   std::vector<RadiationType> species;
   if (do_nu_electron) {

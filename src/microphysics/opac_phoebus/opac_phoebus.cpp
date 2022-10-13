@@ -44,10 +44,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   const std::string radiation_method = pin->GetString("radiation", "method");
   std::set<std::string> gray_methods = {"moment_eddington", "moment_m1"};
-  bool do_mean_opacity = false;
-  if (gray_methods.count(radiation_method)) {
-    do_mean_opacity = true;
-  }
+  //bool do_mean_opacity = false;
+  //if (gray_methods.count(radiation_method)) {
+  //  do_mean_opacity = true;
+  //}
 
   const std::string block_name = "opacity";
 
@@ -120,7 +120,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 #endif
   }
 
-  if (do_mean_opacity) {
+  //if (do_mean_opacity) {
     auto opacity_host = params.Get<singularity::neutrinos::Opacity>("h.opacity");
     const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
     const Real YeMax = pin->GetOrAddReal("mean_opacity", "yemax", 0.5);
@@ -151,7 +151,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       params.Add("h.mean_opacity", mean_opac_host);
       params.Add("d.mean_opacity", mean_opac_device);
     }
-  }
+  //}
 
   return pkg;
 }

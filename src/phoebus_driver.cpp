@@ -555,17 +555,19 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     TaskID fill_derived(0);
 
-    if (rad_mocmc_active) {
-      auto impl_update =
-          tl.AddTask(fill_derived, radiation::MOCMCFluidSource<MeshBlockData<Real>>,
-                     sc1.get(), beta * dt, fluid_active);
-      auto impl_edd = tl.AddTask(
-          impl_update, radiation::MOCMCEddington<MeshBlockData<Real>>, sc1.get());
-    } else if (rad_moments_active) {
+    //if (rad_mocmc_active) {
+   //   auto impl_update =
+   //       tl.AddTask(fill_derived, radiation::MOCMCFluidSource<MeshBlockData<Real>>,
+   //                  sc1.get(), beta * dt, fluid_active);
+
+   //TODO(BRR) update iTilPi during source update
+   //   auto impl_edd = tl.AddTask(
+   //       impl_update, radiation::MOCMCEddington<MeshBlockData<Real>>, sc1.get());
+    //} else if (rad_moments_active) {
       auto impl_update =
           tl.AddTask(fill_derived, radiation::MomentFluidSource<MeshBlockData<Real>>,
                      sc1.get(), beta * dt, fluid_active);
-    }
+    //}
   }
 
   // Communicate (before applying stencil-based fixup)

@@ -21,6 +21,7 @@ target_link_libraries(radiation_unit_tests
   PRIVATE
   parthenon
   singularity-eos::singularity-eos
+  singularity-opac::singularity-opac
   Catch2::Catch2
   Kokkos::kokkos)
 
