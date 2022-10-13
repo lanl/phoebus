@@ -31,7 +31,7 @@ class FrequencyInfo {
 
   KOKKOS_INLINE_FUNCTION Real GetNuMax() const { return std::exp(lnumin_ + num_bins_ * dlnu_); }
 
-  KOKKOS_INLINE_FUNCTION Real GetNumBins() const { return num_bins_; }
+  KOKKOS_INLINE_FUNCTION int GetNumBins() const { return num_bins_; }
 
   KOKKOS_INLINE_FUNCTION Real GetDLogNu() const { return dlnu_; }
 

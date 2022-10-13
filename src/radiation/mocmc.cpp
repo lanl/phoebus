@@ -230,6 +230,7 @@ void MOCMCInitSamples(T *rc) {
   // Initialize eddington tensor and opacities for first step
   MOCMCReconstruction(rc);
   MOCMCEddington(rc);
+  PARTHENON_WARN("Using deprecated function to initialize opacities!");
   MOCMCFluidSource(rc, 0., false); // Update opacities for asymptotic fluxes
 }
 

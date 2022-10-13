@@ -246,6 +246,8 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
 
         PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "NAN J in rad P2C!");
 
+        printf("[%i %i %i]\n", k, j, i);
+
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
         v(b, cE(ispec), k, j, i) = sdetgam * E;
@@ -673,6 +675,15 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             SPACELOOP2(ii, jj) {
               con_tilPil(ii, jj) = v(idx_ql(ispec, 4 + ii + 3 * jj, idir), k, j, i);
               con_tilPir(ii, jj) = v(idx_qr(ispec, 4 + ii + 3 * jj, idir), k, j, i);
+            }
+
+            if (i == 16 && j == 16) {
+              SPACELOOP(ii) {
+                SPACELOOP(jj) {
+                  printf("%e ", con_tilPil(ii, jj));
+                }
+                printf("\n");
+              }
             }
           } else {
             cl.GetConTilPiFromPrim(Jl, HasymL, &con_tilPil);

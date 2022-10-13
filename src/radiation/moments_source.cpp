@@ -24,8 +24,9 @@
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/frequency_info.hpp"
-#include "radiation/opacity_averager.hpp"
 #include "radiation/local_three_geometry.hpp"
+#include "radiation/mocmc.hpp"
+#include "radiation/opacity_averager.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
@@ -37,6 +38,7 @@ namespace radiation {
 
 using namespace singularity::neutrinos;
 using fixup::Bounds;
+using parthenon::vpack_types::FlatIdx;
 using singularity::EOS;
 
 template <typename CLOSURE>
@@ -62,9 +64,11 @@ class SourceResidual4 {
 
   KOKKOS_INLINE_FUNCTION
   void CalculateMHDConserved(Real P_mhd[4], Real U_mhd[4]) {
-    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, robust::ratio(P_mhd[0], rho_), lambda_);
-    Real gam1 =
-        robust::ratio(eos_.BulkModulusFromDensityInternalEnergy(rho_, robust::ratio(P_mhd[0], rho_), lambda_), Pg);
+    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, robust::ratio(P_mhd[0], rho_),
+                                                     lambda_);
+    Real gam1 = robust::ratio(eos_.BulkModulusFromDensityInternalEnergy(
+                                  rho_, robust::ratio(P_mhd[0], rho_), lambda_),
+                              Pg);
     Real D;
     Real bcons[3];
     Real ye_cons;
@@ -117,12 +121,12 @@ class SourceResidual4 {
     Real kappaH =
         mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
 
-    //Real kappaH, kappaJ;
-    //c.GetAverageOpacities(rho_, Tg, lambda_[0], species_, kappaJ, kappaH);
+    // Real kappaH, kappaJ;
+    // c.GetAverageOpacities(rho_, Tg, lambda_[0], species_, kappaJ, kappaH);
     // TODO(BRR) remove this when removing scattering_fraction
-    //kappaH = kappaJ;
+    // kappaH = kappaJ;
 
-    //Real kappaH = c.mean_opac.RosselandMeanAbsorption
+    // Real kappaH = c.mean_opac.RosselandMeanAbsorption
 
     // TODO(BRR) this is arguably cheating, arguably not. Should include dt though
     // kappaH * dt < 1 / eps
@@ -169,21 +173,23 @@ class SourceResidual4 {
   const int &k_, &j_, &i_;
 };
 
-//template <typename T>
+// template <typename T>
 class VarAccessor2D {
-  public:
-  VarAccessor2D(const VariablePack<Real> &v, const int &b, const FlatIdx &idx, const int &k, const int &j, const int &i) :
-    v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {
-      PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Creating VarAccessor2D with invalid FlatIdx!");
-      }
+ public:
+  VarAccessor2D(const VariablePack<Real> &v, const int &b, const FlatIdx &idx,
+                const int &k, const int &j, const int &i)
+      : v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {
+    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(),
+                            "Creating VarAccessor2D with invalid FlatIdx!");
+  }
 
   KOKKOS_FORCEINLINE_FUNCTION
-    Real &operator()(const int &ii, const int &jj) {
-      PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Accessing invalid index!");
-      return v_(b_, idx_(ii, jj), k_, j_, i_);
-    }
+  Real &operator()(const int &ii, const int &jj) const {
+    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Accessing invalid index!");
+    return v_(b_, idx_(ii, jj), k_, j_, i_);
+  }
 
-  private:
+ private:
   const VariablePack<Real> &v_;
   const int &b_;
   const FlatIdx &idx_;
@@ -192,17 +198,24 @@ class VarAccessor2D {
   const int &i_;
 };
 
-template <typename CLOSURE>
+template <typename MBD, typename VP, typename CLOSURE>
 class InteractionTResidual {
  public:
   KOKKOS_FUNCTION
-  InteractionTResidual(const EOS &eos, const CLOSURE closure, const OpacityAverager &opac_avgr, const Opacity &opacity,
+  InteractionTResidual(const EOS &eos, const CLOSURE closure,
+                       const OpacityAverager<CLOSURE> &opac_avgr,
+                       const MOCMCInteractions<MBD, VP, CLOSURE> &mocmc_int,
+                       const FrequencyInfo &freq_info, const Opacity &opacity,
                        const MeanOpacity &mean_opacity, const Real &rho, const Real &ug0,
                        const Real &Ye, const Real J0[3], const int &nspec,
                        const RadiationType species[3], const Real &scattering_fraction,
-                       const Real &dtau, const VarAccessor2D &Inu0, const VarAccessor2D &Inu1)
-      : eos_(eos), closure_(closure), opacity_(opacity), mean_opacity_(mean_opacity), rho_(rho), ug0_(ug0),
-        Ye_(Ye), nspec_(nspec), scattering_fraction_(scattering_fraction), dtau_(dtau), Inu0_(Inu0), Inu1_(Inu1) {
+                       const Real &dtau, const VarAccessor2D &Inu0,
+                       const VarAccessor2D &Inu1, const int &iblock, const int &k,
+                       const int &j, const int &i)
+      : eos_(eos), closure_(closure), opac_avgr_(opac_avgr), mocmc_int_(mocmc_int),
+        freq_info_(freq_info), opacity_(opacity), mean_opacity_(mean_opacity), rho_(rho),
+        ug0_(ug0), Ye_(Ye), nspec_(nspec), scattering_fraction_(scattering_fraction),
+        dtau_(dtau), Inu0_(Inu0), Inu1_(Inu1), iblock_(iblock), k_(k), j_(j), i_(i) {
     for (int ispec = 0; ispec < nspec; ++ispec) {
       J0_[ispec] = J0[ispec];
       species_[ispec] = species[ispec];
@@ -219,17 +232,30 @@ class InteractionTResidual {
     for (int ispec = 0; ispec < nspec_; ++ispec) {
       J0_tot += J0_[ispec];
 
-      // Update n+1 to get
+      // Update Inu to n+1 if using MOCMC
+      if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
+        printf("%s:%i\n", __FILE__, __LINE__);
+        for (int n = 0; n < freq_info_.GetNumBins(); n++) {
+          const Real nu = freq_info_.GetBinCenterNu(n);
+          const Real Jnu =
+              opacity_.EmissivityPerNu(rho_, T, Ye_, species_[ispec], nu) / (4. * M_PI);
+          const Real kappaJ = opacity_.AngleAveragedAbsorptionCoefficient(
+              rho_, T, Ye_, species_[ispec], nu);
+          Inu1_(ispec, n) = (nu * Jnu + robust::ratio(Inu0_(ispec, n), dtau_)) /
+                            (nu * kappaJ + robust::ratio(1., dtau_));
+          printf("Inu0: %e Inu1: %e\n", Inu0_(ispec, n), Inu1_(ispec, n));
+        }
+      }
 
       // Get Inu^n+1 from Inu0
-      //const Real kappa =
+      // const Real kappa =
       //    (1. - scattering_fraction_) *
-      //    mean_opacity_.RosselandMeanAbsorptionCoefficient(rho_, T, Ye_, species_[ispec]);
-      Real kappaJ = opac_avgr.GetAveragedAbsorptionOpacity(rho_, T, Ye_, ispec);
-      //closure_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, species_[ispec], kappaJ);
+      //    mean_opacity_.RosselandMeanAbsorptionCoefficient(rho_, T, Ye_,
+      //    species_[ispec]);
+      Real kappaJ = opac_avgr_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, ispec);
+      // closure_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, species_[ispec], kappaJ);
       kappaJ = (1. - scattering_fraction_) * kappaJ;
       // TODO(BRR) remove scattering_fraction
-
 
       const Real JBB = opacity_.EnergyDensityFromTemperature(T, species_[ispec]);
 
@@ -244,7 +270,9 @@ class InteractionTResidual {
  private:
   const EOS &eos_;
   const CLOSURE &closure_;
-  const OpacityAverager &opac_avgr_;
+  const OpacityAverager<CLOSURE> &opac_avgr_;
+  const MOCMCInteractions<MBD, VP, CLOSURE> &mocmc_int_;
+  const FrequencyInfo &freq_info_;
   const Opacity &opacity_;
   const MeanOpacity &mean_opacity_;
   const Real &rho_;
@@ -257,6 +285,10 @@ class InteractionTResidual {
   const VarAccessor2D &Inu0_;
   const VarAccessor2D &Inu1_;
   RadiationType species_[MaxNumRadiationSpecies];
+  const int &iblock_;
+  const int &k_;
+  const int &j_;
+  const int &i_;
 };
 
 template <class T, class CLOSURE>
@@ -273,13 +305,14 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
+  namespace mi = mocmc_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{c::energy, c::momentum, c::ye,       cr::E,
-                                cr::F,     c::bfield,   p::density,  p::temperature,
-                                p::energy, p::ye,       p::velocity, p::bfield,
-                                pr::J,     pr::H,       ir::kappaJ,  ir::kappaH,
-                                ir::JBB,   ir::tilPi,   ir::srcfail, mocmc_internal::Inu0};
+  std::vector<std::string> vars{
+      c::energy,   c::momentum,    c::ye,      cr::E,      cr::F,       c::bfield,
+      p::density,  p::temperature, p::energy,  p::ye,      p::velocity, p::bfield,
+      pr::J,       pr::H,          ir::kappaJ, ir::kappaH, ir::JBB,     ir::tilPi,
+      ir::srcfail, mi::Inu0,       mi::Inu1};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -288,7 +321,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_H = imap.GetFlatIdx(pr::H);
 
-  auto idx_Inu = imap.GetFlatIdx(mocmc_internal::Inu0);
+  auto idx_Inu0 = imap.GetFlatIdx(mi::Inu0);
+  auto idx_Inu1 = imap.GetFlatIdx(mi::Inu1);
 
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
@@ -346,6 +380,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   const auto src_rootfind_maxiter = rad->Param<int>("src_rootfind_maxiter");
   const auto oned_fixup_strategy = rad->Param<OneDFixupStrategy>("oned_fixup_strategy");
 
+  // TODO(BRR) will cpp17 mean we dont need to be explicit about these template params?
+  MOCMCInteractions<T, VariablePack<Real>, CLOSURE> mocmc_int(rc, v, idx_Inu0, idx_Inu1,
+                                                              freq_info);
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
@@ -370,6 +408,23 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real xi_max;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                     coords.x3v(k, j, i), xi_max);
+
+        // Initial four-velocity
+        const Real vpcon[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i), v(iblock, pv(2), k, j, i)};
+        Real ucon[4];
+        Real W = 0.;
+        SPACELOOP2(ii, jj) {
+          W += cov_gamma(ii,jj) * vpcon[ii] * vpcon[jj];
+        }
+        W = std::sqrt(1. + W);
+        ucon[0] = robust::ratio(W, std::abs(alpha));
+        SPACELOOP(ii) {
+          ucon[ii + 1] = vpcon[ii] - ucon[0] * beta[ii];
+        }
+
+        // Comoving frame angle-averaged intensities
+        VarAccessor2D Inu0(v, iblock, idx_Inu0, k, j, i);
+        VarAccessor2D Inu1(v, iblock, idx_Inu1, k, j, i);
 
         Real rho = v(iblock, prho, k, j, i);
         Real ug = v(iblock, peng, k, j, i);
@@ -403,23 +458,35 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
             const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
 
+            printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+            mocmc_int.CalculateInu0(iblock, ispec, k, j, i, ucon);
+
             // Rootfind over fluid temperature in fluid rest frame
             root_find::RootFind root_find(src_rootfind_maxiter);
-            // TODO(BRR) Pass Residual another class that holds Inu(nu) and can average opacities
-            // Can closure provide this?
-            // Note that con_v doesn't change during temperature update
-            CLOSURE c(con_v, &g, &d_opacity, &d_mean_opacity, &v, &idx_Inu, nu_bins, dlnu, &nusamp);
-            OpacityAverager<CLOSURE> opac_avgr(c, freq_info, d_opacity, d_mean_opacity, v, idx_Inu, species_d, iblock, k, j, i);
-            Real mykappaJ =
-            opac_avgr.GetAveragedAbsorptionOpacity(rho, v(iblock, pT, k, j, i), Ye, ispec);
-            PARTHENON_FAIL("sotp here");
-            //c.InitializeSpectrum(&v, nu_bins, dlnu, &nusamp, &idx_Inu);
-            InteractionTResidual<CLOSURE> res(eos, c, opac_avgr, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
-                                     num_species, species_d, scattering_fraction, dtau);
+            // TODO(BRR) Pass Residual another class that holds Inu(nu) and can average
+            // opacities Can closure provide this? Note that con_v doesn't change during
+            // temperature update
+            CLOSURE c(con_v, &g);
+            printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+            //, &d_opacity, &d_mean_opacity, &v, &idx_Inu, nu_bins, dlnu,
+            //          &nusamp);
+            OpacityAverager<CLOSURE> opac_avgr(c, freq_info, d_opacity, d_mean_opacity, v,
+                                               idx_Inu1, species_d, iblock, k, j, i);
+            printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+            // Real mykappaJ = opac_avgr.GetAveragedAbsorptionOpacity(
+            //    rho, v(iblock, pT, k, j, i), Ye, ispec);
+            printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+            // c.InitializeSpectrum(&v, nu_bins, dlnu, &nusamp, &idx_Inu);
+
+            InteractionTResidual<T, VariablePack<Real>, CLOSURE> res(
+                eos, c, opac_avgr, mocmc_int, freq_info, d_opacity, d_mean_opacity, rho,
+                ug, Ye, J0, num_species, species_d, scattering_fraction, dtau, Inu0, Inu1,
+                iblock, k, j, i);
             root_find::RootFindStatus status;
             const Real T1 = root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
                                              1.e-8 * v(iblock, pT, k, j, i),
                                              v(iblock, pT, k, j, i), &status);
+            PARTHENON_FAIL("sotp here");
             if (status == root_find::RootFindStatus::failure) {
               success = false;
               // break;
@@ -439,7 +506,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             }};
             Tens2 con_tilPi;
 
-            // TODO(BRR) Using updated T, update sample intensities and re-evaluate idx_tilPi()
+            // TODO(BRR) Using updated T, update sample intensities and re-evaluate
+            // idx_tilPi()
 
             if (idx_tilPi.IsValid()) {
               SPACELOOP2(ii, jj) {
@@ -449,8 +517,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               c.GetConTilPiFromPrim(J, cov_H, &con_tilPi);
             }
 
-            // TODO(BRR) Evaluate kappa with updated intensities (or just get it from rootfind
-            // output that produced T1)
+            // TODO(BRR) Evaluate kappa with updated intensities (or just get it from
+            // rootfind output that produced T1)
 
             Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
             Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
