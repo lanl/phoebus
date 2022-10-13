@@ -326,7 +326,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       sndrcv_flux_depend = sndrcv_flux_depend | fix_flux;
     }
 
-    if (rad_mocmc_active) {
+    if (rad_mocmc_active && stage == 1) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       // TODO(BRR) stage_name[stage - 1]?
       auto &sd0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
@@ -564,10 +564,35 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     //   auto impl_edd = tl.AddTask(
     //       impl_update, radiation::MOCMCEddington<MeshBlockData<Real>>, sc1.get());
     //} else if (rad_moments_active) {
+      if (rad_moments_active) {
     auto impl_update =
         tl.AddTask(fill_derived, radiation::MomentFluidSource<MeshBlockData<Real>>,
                    sc1.get(), beta * dt, fluid_active);
+      }
     //}
+
+  // TODO(BRR) true?
+//    // Push and communicate samples after source update, and only on first stage. This is
+//    // for consistency with RK2.
+//    if (rad_mocmc_active) {
+//      using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+//      // TODO(BRR) stage_name[stage - 1]?
+//      auto &sd0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+//      auto samples_transport =
+//          tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get(), dt);
+//      auto send = tl.AddTask(samples_transport, &SwarmContainer::Send, sd0.get(),
+//                             BoundaryCommSubset::all);
+//      auto receive =
+//          tl.AddTask(send, &SwarmContainer::Receive, sd0.get(), BoundaryCommSubset::all);
+//      auto sample_bounds =
+//          tl.AddTask(receive, radiation::MOCMCSampleBoundaries<MDT>, sc0.get());
+//      auto sample_recon =
+//          tl.AddTask(sample_bounds, radiation::MOCMCReconstruction<MDT>, sc0.get());
+//      auto eddington =
+//          tl.AddTask(sample_recon, radiation::MOCMCEddington<MDT>, sc0.get());
+//
+//      geom_src = geom_src | eddington;
+//    }
   }
 
   // Communicate (before applying stencil-based fixup)

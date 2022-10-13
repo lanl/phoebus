@@ -266,13 +266,13 @@ class InteractionTResidual {
     }
 
     const Real ug1 = rho_ * eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda);
-    printf("[%i %i %i] T: %e resid: %e\n", k_, j_, i_, T, ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot));
-    printf("ug1: %e ug0: %e dJ: %e J0: %e\n",
-    ug1, ug0_, dJ_tot, J0_tot);
+    //printf("[%i %i %i] T: %e resid: %e\n", k_, j_, i_, T, ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot));
+    //printf("ug1: %e ug0: %e dJ: %e J0: %e\n",
+    //ug1, ug0_, dJ_tot, J0_tot);
     for (int ispec = 0; ispec < nspec_; ++ispec) {
-        for (int n = 0; n < freq_info_.GetNumBins(); n++) {
-          printf("Inu_1(%i) = %e\n", n, Inu1_(ispec, n));
-        }
+      //  for (int n = 0; n < freq_info_.GetNumBins(); n++) {
+      //    printf("Inu_1(%i) = %e\n", n, Inu1_(ispec, n));
+      //  }
     }
 
     const Real residual = ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot);

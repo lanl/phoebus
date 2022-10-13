@@ -113,11 +113,6 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         Vec con_v{{v(b, pv(0), k, j, i) / W, v(b, pv(1), k, j, i) / W,
                    v(b, pv(2), k, j, i) / W}};
 
-                   if (j == 0 && i == 0) {
-                     printf("W: %e\n", W);
-                   }
-
-        printf("%i %i %i W = %e v = %e %e %e\n", k,j,i,W,con_v(0),con_v(1),con_v(2));
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
         CLOSURE c(con_v, &g);
 
