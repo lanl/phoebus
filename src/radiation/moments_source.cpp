@@ -219,7 +219,7 @@ class InteractionTResidual {
     for (int ispec = 0; ispec < nspec; ++ispec) {
       J0_[ispec] = J0[ispec];
       PARTHENON_DEBUG_REQUIRE(!std::isnan(J0_[ispec]) && J0_[ispec] > robust::SMALL(),
-        "Invalid value of J0!");
+                              "Invalid value of J0!");
       species_[ispec] = species[ispec];
     }
   }
@@ -244,7 +244,7 @@ class InteractionTResidual {
               rho_, T, Ye_, species_[ispec], nu);
           Inu1_(ispec, n) = (nu * Jnu + robust::ratio(Inu0_(ispec, n), dtau_)) /
                             (nu * kappaJ + robust::ratio(1., dtau_));
-          //printf("Inu0: %e Inu1: %e\n", Inu0_(ispec, n), Inu1_(ispec, n));
+          // printf("Inu0: %e Inu1: %e\n", Inu0_(ispec, n), Inu1_(ispec, n));
         }
       }
 
@@ -257,8 +257,7 @@ class InteractionTResidual {
       // closure_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, species_[ispec], kappaJ);
       kappaJ = (1. - scattering_fraction_) * kappaJ;
       // TODO(BRR) remove scattering_fraction
-      if (i_ == 16 && j_ == 16)
-      printf("dtau: %e\n", dtau_);
+      if (i_ == 16 && j_ == 16) printf("dtau: %e\n", dtau_);
 
       const Real JBB = opacity_.EnergyDensityFromTemperature(T, species_[ispec]);
 
@@ -266,9 +265,9 @@ class InteractionTResidual {
     }
 
     const Real ug1 = rho_ * eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda);
-    //printf("[%i %i %i] T: %e resid: %e\n", k_, j_, i_, T, ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot));
-    //printf("ug1: %e ug0: %e dJ: %e J0: %e\n",
-    //ug1, ug0_, dJ_tot, J0_tot);
+    // printf("[%i %i %i] T: %e resid: %e\n", k_, j_, i_, T, ((ug1 - ug0_) + (dJ_tot)) /
+    // (ug0_ + J0_tot)); printf("ug1: %e ug0: %e dJ: %e J0: %e\n", ug1, ug0_, dJ_tot,
+    // J0_tot);
     for (int ispec = 0; ispec < nspec_; ++ispec) {
       //  for (int n = 0; n < freq_info_.GetNumBins(); n++) {
       //    printf("Inu_1(%i) = %e\n", n, Inu1_(ispec, n));
@@ -470,7 +469,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
             const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
 
-            //printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+            // printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
             mocmc_int.CalculateInu0(iblock, ispec, k, j, i, ucon);
 
             // Rootfind over fluid temperature in fluid rest frame
@@ -479,15 +478,15 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             // opacities Can closure provide this? Note that con_v doesn't change during
             // temperature update
             CLOSURE c(con_v, &g);
-            //printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+            // printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
             //, &d_opacity, &d_mean_opacity, &v, &idx_Inu, nu_bins, dlnu,
             //          &nusamp);
             OpacityAverager<CLOSURE> opac_avgr(c, freq_info, d_opacity, d_mean_opacity, v,
                                                idx_Inu1, species_d, iblock, k, j, i);
-            //printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+            // printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
             // Real mykappaJ = opac_avgr.GetAveragedAbsorptionOpacity(
             //    rho, v(iblock, pT, k, j, i), Ye, ispec);
-            //printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+            // printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
             // c.InitializeSpectrum(&v, nu_bins, dlnu, &nusamp, &idx_Inu);
 
             InteractionTResidual<T, VariablePack<Real>, CLOSURE> res(
@@ -543,20 +542,20 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                                    &(dE[ispec]), &(cov_dF[ispec]));
 
               if (std::isnan(dE[ispec])) {
-                printf("E: %e F: %e %e %e\n", Estar, cov_Fstar(0), cov_Fstar(1), cov_Fstar(2));
-                SPACELOOP2(ii,jj) {
-                  printf("pi[%i %i] = %e\n", ii, jj, con_tilPi(ii,jj));
-                  printf("T1: %e JBB: %e tauJ: %e tauH: %e\n",
-                  T1, JBB, tauJ, tauH);
+                printf("E: %e F: %e %e %e\n", Estar, cov_Fstar(0), cov_Fstar(1),
+                       cov_Fstar(2));
+                SPACELOOP2(ii, jj) {
+                  printf("pi[%i %i] = %e\n", ii, jj, con_tilPi(ii, jj));
+                  printf("T1: %e JBB: %e tauJ: %e tauH: %e\n", T1, JBB, tauJ, tauH);
                 }
               }
               PARTHENON_DEBUG_REQUIRE(!std::isnan(dE[ispec]), "Nan dE!\n");
 
               if (i == 16 && j == 16) {
-                printf("e: %e f: %e %e %e\n",
-                Estar, cov_Fstar(0), cov_Fstar(1), cov_Fstar(2));
+                printf("e: %e f: %e %e %e\n", Estar, cov_Fstar(0), cov_Fstar(1),
+                       cov_Fstar(2));
                 printf("dE: %e dF: %e %e %e\n", dE[ispec], cov_dF[ispec](0),
-                  cov_dF[ispec](1), cov_dF[ispec](2));
+                       cov_dF[ispec](1), cov_dF[ispec](2));
               }
               Estar += dE[ispec];
               SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);

@@ -19,8 +19,10 @@ class MOCMCInteractions {
   /// do anything. Also assume that a VariablePack with Inu0 and Inu1 already exists --
   /// just pass those in directly
   MOCMCInteractions(const MBD *rc, VP &v, const FlatIdx &idx_Inu0,
-                    const FlatIdx &idx_Inu1, const FrequencyInfo &freq_info)
-      : rc_(rc), v_(v), idx_Inu0_(idx_Inu0), idx_Inu1_(idx_Inu1), freq_info_(freq_info) {
+                    const FlatIdx &idx_Inu1, const FrequencyInfo &freq_info,
+                    const int &num_species)
+      : rc_(rc), v_(v), idx_Inu0_(idx_Inu0), idx_Inu1_(idx_Inu1), freq_info_(freq_info),
+        num_species_(num_species) {
 
     if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
       auto *pmb = rc->GetParentPointer().get();
@@ -33,7 +35,10 @@ class MOCMCInteractions {
       phi_hi_ = swarm->template Get<Real>("phi_hi").Get();
       Inuinv_ = swarm->template Get<Real>("Inuinv").Get();
       swarm_d_ = swarm->GetDeviceContext();
-//      printf("got ncov!\n");
+
+      for (int ispec = 0; ispec < num_species_; ispec++) {
+        species_[ispec] = species[ispec];
+      }
     }
   }
 
@@ -41,37 +46,34 @@ class MOCMCInteractions {
   void CalculateInu0(const int iblock, const int ispec, const int k, const int j,
                      const int i, const Real ucon[4]) const {
     if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-      //printf("num bins: %i\n", freq_info_.GetNumBins());
       for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
         v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) = 0.;
       }
 
       const int nsamp = swarm_d_.GetParticleCountPerCell(k, j, i);
       const Real nu_fluid0 = freq_info_.GetNuMin();
-      //printf("ucon: %e %e %e %e\n", ucon[0], ucon[1], ucon[2], ucon[3]);
+      // printf("ucon: %e %e %e %e\n", ucon[0], ucon[1], ucon[2], ucon[3]);
       for (int n = 0; n < nsamp; n++) {
         const int nswarm = swarm_d_.GetFullIndex(k, j, i, n);
         const Real dOmega = (mu_hi_(nswarm) - mu_lo_(nswarm)) *
                             (phi_hi_(nswarm) - phi_lo_(nswarm)) / (4. * M_PI);
 
-        Real nu_lab0 = 0.;
-        SPACETIMELOOP(nu) {
-          nu_lab0 -= ncov_(nu, nswarm) * ucon[nu];
-        }
-        nu_lab0 *= nu_fluid0;
+        //  Real nu_lab0 = 0.;
+        //  SPACETIMELOOP(nu) { nu_lab0 -= ncov_(nu, nswarm) * ucon[nu]; }
+        //  nu_lab0 *= nu_fluid0;
+        Real nu_lab0 = freq_info_.GetNuMin();
+        Real nu_fluid0 = 0.;
+        SPACETIMELOOP(nu) { nu_fluid0 -= ncov_(nu, nswarm) * ucon[nu]; }
+        nu_fluid0 *= nu_lab0;
 
-        const Real shift = (std::log(nu_fluid0) - std::log(nu_lab0)) / freq_info_.GetDLogNu();
-        interpolation::PiecewiseConstant interp(freq_info_.GetNumBins(), freq_info_.GetDLogNu(), shift);
+        const Real shift =
+            (std::log(nu_fluid0) - std::log(nu_lab0)) / freq_info_.GetDLogNu();
+        interpolation::PiecewiseConstant interp(freq_info_.GetNumBins(),
+                                                freq_info_.GetDLogNu(), shift);
         int nubin_shift[interp.maxStencilSize];
         Real nubin_wgt[interp.maxStencilSize];
 
-//        printf("nu_lab0: %e nu_fluid0: %e\n", nu_lab0, nu_fluid0);
-//        printf("[%i] ncov = %e %e %e %e shift = %e\n",
-//          n, ncov_(0, nswarm), ncov_(1, nswarm), ncov_(2, nswarm), ncov_(3, nswarm),
-//          shift);
-
-
-        // TODO(BRR) interpolate onto correct frequency grid!
+        // TODO(BRR) linear interp?
         for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
           v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) +=
               Inuinv_(nbin, ispec, nswarm) * pow(freq_info_.GetBinCenterNu(nbin), 3) *
@@ -79,14 +81,62 @@ class MOCMCInteractions {
           interp.GetIndicesAndWeights(nbin, nubin_shift, nubin_wgt);
           for (int isup = 0; isup < interp.StencilSize(); isup++) {
             v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) +=
-              nubin_wgt[isup] * Inuinv_(nubin_shift[isup], ispec, nswarm);
+                nubin_wgt[isup] * Inuinv_(nubin_shift[isup], ispec, nswarm);
           }
         }
       }
+    }
+  }
 
-    //  for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
-        //printf("[%i] Inu = %e\n", nbin, v_(iblock, idx_Inu0_(ispec, nbin), k, j, i));
-     // }
+  KOKKOS_INLINE_FUNCTION
+  void UpdateSampleIntensities(const rho, const T, const Ye, const Real ucon[4],
+                               const int iblock, const int k, const int j, const int i,
+                               Opacity &opac) {
+    if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
+      const int nsamp = swarm_d_.GetParticleCountPerCell(k, j, i);
+      for (int n = 0; n < nsamp; n++) {
+        const int nswarm = swarm_d_.GetFullInex(k, j, i, n);
+
+        Real nu_lab0 = freq_info_.GetNuMin();
+        Real nu_fluid0 = 0.;
+        SPACETIMELOOP(nu) { nu_fluid0 -= ncov_(nu, nswarm) * ucon[nu]; }
+        nu_fluid0 *= nu_lab0;
+
+        // TODO(BRR) check sign of shift
+        const Real shift =
+            (std::log(nu_fluid0) - std::log(nu_lab0)) / freq_info_.GetDLogNu();
+        interpolation::PiecewiseConstant interp(freq_info_.GetNumBins(),
+                                                freq_info_.GetDLogNu(), -shift);
+        int nubin_shift[interp.maxStencilSize];
+        Real nubin_wgt[interp.maxStencilSize];
+
+        for (int ispec = 0; ispec < num_species_; ispec++) {
+          for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
+            const Real nu_lab = freq_info_.GetBinCenterNu(nbin);
+            const Real nu_fluid =
+                std::exp(std::log(nu_fluid) - freq_info_.GetDLogNu() * shift);
+            const Real ds = dt / ucon[0] / nu_fluid;
+            // TODO(BRR) scattering fraction
+            Real scattering_fraction = 0.5;
+            // TODO(BRR) is nu_fluid correct here? We want the nu of the sample bin
+            // (n.u) * nufluid(n) in the fluid frame
+            const Real alphainv_a = nu_fluid * (1. - scattering_fraction) *
+                                    opac.AngleAveragedAbsorptionCoefficient(
+                                        rho, T, Ye, species_d_[ispec], nu_fluid);
+            const Real jinv_a =
+                opac.ThermalDistributionOfTNu(T, species_d_[ispec], nu_fluid) /
+                (nu_fluid * nu_fluid * nu_fluid) * alphainv_a;
+
+            // TODO(BRR) actually include at least elastic scattering
+            const Real alphainv_s = 0.;
+            const Real jinv_s = 0.;
+
+            Inuinv_(nbin, ispec, nswarm) =
+                (Inuinv(nbin, ispec, nswarm) + ds * (jinv_a + jinv_s)) /
+                (1. + ds * (alphainv_a + alphainv_s));
+          }
+        }
+      }
     }
   }
 
@@ -96,6 +146,8 @@ class MOCMCInteractions {
   const FlatIdx &idx_Inu0_;
   const FlatIdx &idx_Inu1_;
   const FrequencyInfo &freq_info_;
+  const int num_species_;
+  RadiationType species_[MaxNumRadiationTypes];
   // TODO(BRR) replace with a pack
   ParArrayND<Real> ncov_;
   ParArrayND<Real> mu_lo_;

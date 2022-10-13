@@ -200,7 +200,8 @@ KOKKOS_FUNCTION void ClosureEdd<SET>::InitializeGeometry_(const Vec con_v_in,
   W = 1 / std::sqrt(1 - v2);
   W2 = W * W;
 
-  PARTHENON_DEBUG_REQUIRE(!std::isinf(W) && !std::isnan(W), "Infinite/NAN Lorentz factor!");
+  PARTHENON_DEBUG_REQUIRE(!std::isinf(W) && !std::isnan(W),
+                          "Infinite/NAN Lorentz factor!");
 }
 
 template <class SET>

@@ -142,12 +142,12 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
-        #ifndef NDEBUG
+#ifndef NDEBUG
         if (std::isnan(J)) {
           printf("[%i %i %i] E: %e F: %e %e %e\n", k, j, i, E, covF(0), covF(1), covF(2));
-          SPACELOOP2(ii,jj) {printf("pi(%i %i) = %e\n", ii, jj, conTilPi(ii,jj));}
+          SPACELOOP2(ii, jj) { printf("pi(%i %i) = %e\n", ii, jj, conTilPi(ii, jj)); }
         }
-        #endif
+#endif
 
         PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "J is nan!");
 
@@ -735,15 +735,15 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + sigspeed * (El - Er));
-              PARTHENON_DEBUG_REQUIRE(!std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i)),
-                "NAN flux!");
+          PARTHENON_DEBUG_REQUIRE(!std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i)),
+                                  "NAN flux!");
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
-              PARTHENON_DEBUG_REQUIRE(!std::isnan(v.flux(idir_in, idx_Ff(ispec, ii), k, j, i)),
-                "NAN flux!");
+            PARTHENON_DEBUG_REQUIRE(
+                !std::isnan(v.flux(idir_in, idx_Ff(ispec, ii), k, j, i)), "NAN flux!");
           }
 
           if (sdetgam < robust::SMALL()) {
