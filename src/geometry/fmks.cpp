@@ -49,8 +49,7 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Real a = pin->GetReal("geometry", "a");
   Real Rh = 1.0 + sqrt(1.0 - a * a);
   Real xh = log(Rh);
-  Real Z1 = 1.0 + std::cbrt(1.0 - a * a) 
-            * (std::cbrt(1.0 + a) + std::cbrt(1.0 - a));
+  Real Z1 = 1.0 + std::cbrt(1.0 - a * a) * (std::cbrt(1.0 + a) + std::cbrt(1.0 - a));
   Real Z2 = sqrt(3.0 * a * a + Z1);
   Real r_isco_p = 3.0 + Z2 - sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2)); // prograde
   Real r_isco_r = 3.0 + Z2 + sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2)); // retrograde
