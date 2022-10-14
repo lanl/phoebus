@@ -31,10 +31,8 @@ from phoebus_constants import cgs, scalefree
 import phoebus_utils
 from phoedf import phoedf
 
-def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian'):
+def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian', draw_bh=True):
   print(fname)
-
-  xlim = 0
 
   cmap_uniform = 'viridis'
   cmap_diverging = 'RdYlBu'
@@ -45,11 +43,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
 
   a = dfile.Params['geometry/a']
   hslope = dfile.Params['geometry/h']
-
-  if rad_active:
-    fig, axes = plt.subplots(2, 4, figsize=(8,6))
-  else:
-    fig, axes = plt.subplots(2, 2, figsize=(4,6))
+  reh = 1. + np.sqrt(1. - a**2)
 
   if geomfile is None:
     geomfile = dfile
@@ -58,36 +52,72 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
   nx = geomfile.MeshBlockSize[0]
   ny = geomfile.MeshBlockSize[1]
   nz = geomfile.MeshBlockSize[2]
+  ndim = int(nx > 1) + int(ny > 1) + int(nz > 1)
+  if ndim == 2:
+    xlim = 0
+  else:
+    xlim = -rlim
 
   time = dfile.Time
 
   # Get pcolormesh grid for each block
-  x1block = np.zeros([nblocks, nx+1, ny+1])
-  x2block = np.zeros([nblocks, nx+1, ny+1])
+  ke = nz + 1 if nz > 1 else 1
+  x1block = np.zeros([nblocks, nx+1, ny+1, ke])
+  x2block = np.zeros([nblocks, nx+1, ny+1, ke])
+  x3block = np.zeros([nblocks, nx+1, ny+1, ke])
   for b in range(nblocks):
+    dx1 = (geomfile.BlockBounds[b][1] - geomfile.BlockBounds[b][0])/nx
+    dx2 = (geomfile.BlockBounds[b][3] - geomfile.BlockBounds[b][2])/ny
+    dx3 = (geomfile.BlockBounds[b][5] - geomfile.BlockBounds[b][4])/nz
     for i in range(nx+1):
       for j in range(ny+1):
-        dx1 = (geomfile.BlockBounds[b][1] - geomfile.BlockBounds[b][0])/nx
-        dx2 = (geomfile.BlockBounds[b][3] - geomfile.BlockBounds[b][2])/ny
-        x1block[b,i,j] = geomfile.BlockBounds[b][0] + i*dx1
-        x2block[b,i,j] = geomfile.BlockBounds[b][2] + j*dx2
+        for k in range(ke):
+          x1block[b,i,j,k] = geomfile.BlockBounds[b][0] + i*dx1
+          x2block[b,i,j,k] = geomfile.BlockBounds[b][2] + j*dx2
+          x3block[b,i,j,k] = geomfile.BlockBounds[b][4] + k*dx3
   rblock = np.exp(x1block)
   thblock = np.pi*x2block + ((1. - hslope)/2.)*np.sin(2.*np.pi*x2block)
-  xblock = rblock*np.sin(thblock)
-  yblock = rblock*np.cos(thblock)
+  phiblock = x3block
+
+  if ndim == 2:
+    xblock = rblock*np.sin(thblock)
+    yblock = rblock*np.cos(thblock)
+  elif ndim == 3:
+    xblock = rblock*np.sin(thblock)*np.cos(phiblock)
+    yblock = rblock*np.cos(thblock)
+    zblock = rblock*np.cos(phiblock) # Fake cylindrical for midplane plots
 
   if coords == "cartesian":
     xplot = xblock
     yplot = yblock
+    zplot = zblock
   elif coords == "mks":
     xplot = x1block
     yplot = x2block
+    zplot = x3block
+
+  if rad_active:
+    fig, axes = plt.subplots(2, 4, figsize=(8,6))
+  else:
+    if ndim == 2:
+      fig, axes = plt.subplots(2, 2, figsize=(4,6))
+    elif ndim == 3:
+      fig, axes = plt.subplots(2, 2, figsize=(6,6))
 
   ax = axes[0,0]
   ldensity = np.log10(np.clip(dfile.Get("p.density", flatten=False), 1.e-20, None))
+
+  if ndim == 2:
+    k = 0
+  else:
+    k = 0
+
   for b in range(nblocks):
-    im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], ldensity[b,0,:,:].transpose(), vmin=-5, vmax=0,
+    im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], ldensity[b,k,:,:].transpose(), vmin=-5, vmax=0,
     cmap=cmap_uniform)
+    if ndim == 3:
+      im = ax.pcolormesh(xplot[b,:,:,k+nz//2], yplot[b,:,:,k+nz//2], ldensity[b,k+nz//2,:,:].transpose(), vmin=-5, vmax=0,
+      cmap=cmap_uniform)
   div = make_axes_locatable(ax)
   cax = div.append_axes('right', size="5%", pad = 0.05)
   fig.colorbar(im, cax=cax, orientation='vertical')
@@ -96,8 +126,12 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
   ax = axes[0,1]
   Gamma = dfile.GetGamma()
   for b in range(nblocks):
-    im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], Gamma[b,0,:,:].transpose(), vmin=1, vmax=5,
+    im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], Gamma[b,k,:,:].transpose(), vmin=1, vmax=5,
     cmap=cmap_uniform)
+    if ndim == 3:
+      im = ax.pcolormesh(xplot[b,:,:,k+nz//2], yplot[b,:,:,k+nz//2], Gamma[b,k+nz//2,:,:].transpose(), vmin=1, vmax=5,
+      cmap=cmap_uniform)
+
   div = make_axes_locatable(ax)
   cax = div.append_axes('right', size="5%", pad = 0.05)
   fig.colorbar(im, cax=cax, orientation='vertical')
@@ -110,7 +144,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
     lbeta = np.log10(Pg/Pm)
     for b in range(nblocks):
-      im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lbeta[b,0,:,:].transpose(), vmin=-2, vmax=2,
+      im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lbeta[b,k,:,:].transpose(), vmin=-2, vmax=2,
         cmap=cmap_diverging)
     div = make_axes_locatable(ax)
     cax = div.append_axes('right', size="5%", pad = 0.05)
@@ -120,7 +154,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     ax = axes[0,3]
     lTg = np.log10(dfile.GetTg())
     for b in range(nblocks):
-      im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lTg[b,0,:,:].transpose(), vmin=5, vmax=10,
+      im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lTg[b,k,:,:].transpose(), vmin=5, vmax=10,
         cmap=cmap_diverging)
     div = make_axes_locatable(ax)
     cax = div.append_axes('right', size="5%", pad = 0.05)
@@ -130,7 +164,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     ax = axes[1,0]
     lJ = np.log10(np.clip(dfile.Get("r.p.J", flatten=False), 1.e-20, None))
     for b in range(nblocks):
-      im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lJ[b,0,:,:].transpose(), vmin=-5, vmax=0,
+      im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lJ[b,k,:,:].transpose(), vmin=-5, vmax=0,
       cmap=cmap_uniform)
     div = make_axes_locatable(ax)
     cax = div.append_axes('right', size="5%", pad = 0.05)
@@ -140,7 +174,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     ax = axes[1,1]
     lxi = np.log10(dfile.GetXi())
     for b in range(nblocks):
-      im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lxi[b,0,:,:].transpose(), vmin=-3, vmax=0,
+      im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lxi[b,k,:,:].transpose(), vmin=-3, vmax=0,
       cmap=cmap_uniform)
     div = make_axes_locatable(ax)
     cax = div.append_axes('right', size="5%", pad = 0.05)
@@ -152,7 +186,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     Pr = dfile.GetPr()
     lbetar = np.log10(Pg/Pr)
     for b in range(nblocks):
-      im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lbetar[b,0,:,:].transpose(), vmin=-2, vmax=2,
+      im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lbetar[b,k,:,:].transpose(), vmin=-2, vmax=2,
       cmap=cmap_diverging)
     div = make_axes_locatable(ax)
     cax = div.append_axes('right', size="5%", pad = 0.05)
@@ -162,7 +196,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     ax = axes[1,3]
     ltau = np.log10(dfile.GetTau())
     for b in range(nblocks):
-      im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], ltau[b,0,:,:].transpose(), vmin=-3, vmax=3,
+      im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], ltau[b,k,:,:].transpose(), vmin=-3, vmax=3,
       cmap=cmap_diverging)
     div = make_axes_locatable(ax)
     cax = div.append_axes('right', size="5%", pad = 0.05)
@@ -173,8 +207,11 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     ax = axes[1,0]
     lenergy = np.log10(np.clip(dfile.Get("p.energy", flatten=False), 1.e-20, None))
     for b in range(nblocks):
-      im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lenergy[b,0,:,:].transpose(), vmin=-5, vmax=0,
+      im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lenergy[b,k,:,:].transpose(), vmin=-5, vmax=0,
       cmap=cmap_uniform)
+      if ndim == 3:
+        im = ax.pcolormesh(xplot[b,:,:,k+nz//2], yplot[b,:,:,k+nz//2], lenergy[b,k+nz//2,:,:].transpose(), vmin=-5, vmax=0,
+        cmap=cmap_uniform)
     div = make_axes_locatable(ax)
     cax = div.append_axes('right', size="5%", pad = 0.05)
     fig.colorbar(im, cax=cax, orientation='vertical')
@@ -185,8 +222,11 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
     lbeta = np.log10(Pg/Pm)
     for b in range(nblocks):
-      im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lbeta[b,0,:,:].transpose(), vmin=-2, vmax=2,
+      im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lbeta[b,k,:,:].transpose(), vmin=-2, vmax=2,
         cmap=cmap_diverging)
+      if ndim == 3:
+        im = ax.pcolormesh(xplot[b,:,:,k+nz//2], yplot[b,:,:,k+nz//2], lbeta[b,k+nz//2,:,:].transpose(), vmin=-2, vmax=2,
+          cmap=cmap_diverging)
     div = make_axes_locatable(ax)
     cax = div.append_axes('right', size="5%", pad = 0.05)
     fig.colorbar(im, cax=cax, orientation='vertical')
@@ -200,6 +240,9 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
         ax.set_aspect('equal')
       if ncol > 0:
         ax.yaxis.set_ticklabels([])
+      if draw_bh:
+        bh = plt.Circle((0, 0), reh, color='k')
+        ax.add_patch(bh)
 
 
   plt.suptitle("Time = %g M" % dfile.Time)
