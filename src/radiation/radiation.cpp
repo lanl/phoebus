@@ -491,8 +491,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                                Metadata::Derived, Metadata::OneCopy},
                               std::vector<int>{num_species, 4});
     physics->AddField(diagnostic_variables::r_src_terms, mdiag);
-    printf("name: %s\n", diagnostic_variables::r_src_terms);
-    printf("Added fields!\n");
 #endif
 
     // Use PostFillDerivedBlock to guarantee that fluid, if active, was already inverted

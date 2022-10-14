@@ -405,7 +405,6 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
       auto &face = inner_outer[outer];
       const std::string name = face + "x" + std::to_string(d) + "_bc";
       const std::string parth_bc = pman.pinput->GetString("parthenon/mesh", name);
-      printf("[%i][%i] bc: %s\n", d, outer, parth_bc.c_str());
       PARTHENON_REQUIRE(parth_bc == "user" || parth_bc == "periodic",
                         "Only \"user\" and \"periodic\" allowed for parthenon/mesh/" +
                             name);

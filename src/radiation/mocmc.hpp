@@ -1,9 +1,24 @@
+// © 2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
+// 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
+// is operated by Triad National Security, LLC for the U.S.
+// Department of Energy/National Nuclear Security Administration. All
+// rights in the program are reserved by Triad National Security, LLC,
+// and the U.S. Department of Energy/National Nuclear Security
+// Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works,
+// distribute copies to the public, perform publicly and display
+// publicly, and to permit others to do so.
+
 #include "phoebus_utils/programming_utils.hpp"
 #include "radiation/closure.hpp"
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/frequency_info.hpp"
 #include "radiation/radiation.hpp"
+
+#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
 #ifndef RADIATION_MOCMC_HPP_
 #define RADIATION_MOCMC_HPP_
@@ -13,6 +28,8 @@ namespace radiation {
 template <typename MBD, typename VP, typename CLOSURE>
 class MOCMCInteractions {
   using FlatIdx = parthenon::vpack_types::FlatIdx;
+  using Opacity = singularity::neutrinos::Opacity;
+  using RadiationType = singularity::RadiationType;
 
  public:
   /// Load MOCMC swarm and relevant swarm data if MOCMC is being used. Otherwise don't
@@ -20,7 +37,8 @@ class MOCMCInteractions {
   /// just pass those in directly
   MOCMCInteractions(const MBD *rc, VP &v, const FlatIdx &idx_Inu0,
                     const FlatIdx &idx_Inu1, const FrequencyInfo &freq_info,
-                    const int &num_species)
+                    const int &num_species,
+                    const RadiationType species[MaxNumRadiationSpecies])
       : rc_(rc), v_(v), idx_Inu0_(idx_Inu0), idx_Inu1_(idx_Inu1), freq_info_(freq_info),
         num_species_(num_species) {
 
@@ -89,13 +107,14 @@ class MOCMCInteractions {
   }
 
   KOKKOS_INLINE_FUNCTION
-  void UpdateSampleIntensities(const rho, const T, const Ye, const Real ucon[4],
-                               const int iblock, const int k, const int j, const int i,
-                               Opacity &opac) {
+  void UpdateSampleIntensities(const Real &rho, const Real &T, const Real &Ye,
+                               const Real ucon[4], const int &iblock, const int &k,
+                               const int &j, const int &i, Opacity &opac,
+                               const Real &dt) {
     if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
       const int nsamp = swarm_d_.GetParticleCountPerCell(k, j, i);
       for (int n = 0; n < nsamp; n++) {
-        const int nswarm = swarm_d_.GetFullInex(k, j, i, n);
+        const int nswarm = swarm_d_.GetFullIndex(k, j, i, n);
 
         Real nu_lab0 = freq_info_.GetNuMin();
         Real nu_fluid0 = 0.;
@@ -122,9 +141,9 @@ class MOCMCInteractions {
             // (n.u) * nufluid(n) in the fluid frame
             const Real alphainv_a = nu_fluid * (1. - scattering_fraction) *
                                     opac.AngleAveragedAbsorptionCoefficient(
-                                        rho, T, Ye, species_d_[ispec], nu_fluid);
+                                        rho, T, Ye, species_[ispec], nu_fluid);
             const Real jinv_a =
-                opac.ThermalDistributionOfTNu(T, species_d_[ispec], nu_fluid) /
+                opac.ThermalDistributionOfTNu(T, species_[ispec], nu_fluid) /
                 (nu_fluid * nu_fluid * nu_fluid) * alphainv_a;
 
             // TODO(BRR) actually include at least elastic scattering
@@ -132,7 +151,7 @@ class MOCMCInteractions {
             const Real jinv_s = 0.;
 
             Inuinv_(nbin, ispec, nswarm) =
-                (Inuinv(nbin, ispec, nswarm) + ds * (jinv_a + jinv_s)) /
+                (Inuinv_(nbin, ispec, nswarm) + ds * (jinv_a + jinv_s)) /
                 (1. + ds * (alphainv_a + alphainv_s));
           }
         }
@@ -147,7 +166,7 @@ class MOCMCInteractions {
   const FlatIdx &idx_Inu1_;
   const FrequencyInfo &freq_info_;
   const int num_species_;
-  RadiationType species_[MaxNumRadiationTypes];
+  RadiationType species_[MaxNumRadiationSpecies];
   // TODO(BRR) replace with a pack
   ParArrayND<Real> ncov_;
   ParArrayND<Real> mu_lo_;

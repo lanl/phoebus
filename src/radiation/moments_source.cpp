@@ -30,6 +30,9 @@
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
+#include "radiation/source_residual_1.hpp"
+#include "radiation/source_residual_4.hpp"
+
 //#include "fluid/con2prim_robust.hpp"
 #include "fixup/fixup.hpp"
 #include "fluid/prim2con.hpp"
@@ -41,273 +44,9 @@ using fixup::Bounds;
 using parthenon::vpack_types::FlatIdx;
 using singularity::EOS;
 
-template <typename CLOSURE>
-class SourceResidual4 {
- public:
-  KOKKOS_FUNCTION
-  SourceResidual4(const EOS &eos, const Opacity &opac, const MeanOpacity &mopac,
-                  const Real rho, const Real Ye, const Real bprim[3],
-                  const RadiationType species, /*const*/ Tens2 &conTilPi,
-                  const Real (&gcov)[4][4], const Real (&gammacon)[3][3],
-                  const Real alpha, const Real beta[3], const Real sdetgam,
-                  const Real scattering_fraction, typename CLOSURE::LocalGeometryType &g,
-                  Real (&U_mhd_0)[4], Real (&U_rad_0)[4], const int &k, const int &j,
-                  const int &i)
-      : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), bprim_(&(bprim[0])),
-        species_(species), conTilPi_(conTilPi), gcov_(&gcov), gammacon_(&gammacon),
-        alpha_(alpha), beta_(&(beta[0])), sdetgam_(sdetgam),
-        scattering_fraction_(scattering_fraction), g_(g), U_mhd_0_(&U_mhd_0),
-        U_rad_0_(&U_rad_0), k_(k), j_(j), i_(i) {
-    lambda_[0] = Ye;
-    lambda_[1] = 0.;
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void CalculateMHDConserved(Real P_mhd[4], Real U_mhd[4]) {
-    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, robust::ratio(P_mhd[0], rho_),
-                                                     lambda_);
-    Real gam1 = robust::ratio(eos_.BulkModulusFromDensityInternalEnergy(
-                                  rho_, robust::ratio(P_mhd[0], rho_), lambda_),
-                              Pg);
-    Real D;
-    Real bcons[3];
-    Real ye_cons;
-    prim2con::p2c(rho_, &(P_mhd[1]), bprim_, P_mhd[0], lambda_[0], Pg, gam1, *gcov_,
-                  *gammacon_, beta_, alpha_, sdetgam_, D, &(U_mhd[1]), bcons, U_mhd[0],
-                  ye_cons);
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void CalculateRadConserved(Real U_mhd[4], Real U_rad[4]) {
-    for (int n = 0; n < 4; n++) {
-      U_rad[n] = (*U_rad_0_)[n] - (U_mhd[n] - (*U_mhd_0_)[n]);
-    }
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void CalculateRadConservedFromRadPrim(Real P_rad[4], Real U_rad[4]) {
-    PARTHENON_FAIL("Not implemented!");
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  ClosureStatus CalculateRadPrimitive(Real P_mhd[4], Real U_rad[4], Real P_rad[4]) {
-    const Real E = U_rad[0] / sdetgam_;
-    Vec cov_F{U_rad[1] / sdetgam_, U_rad[2] / sdetgam_, U_rad[3] / sdetgam_};
-    Vec cov_H;
-    Real W = 0.;
-    SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
-    W = std::sqrt(1. + W);
-    Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
-    // Use gamma_max from code?
-    if (W > 100) {
-      printf("W = %e! [%i %i %i]\n", W, k_, j_, i_);
-      return ClosureStatus::failure;
-    }
-    CLOSURE c(con_v, &g_);
-    // TODO(BRR) Accept separately calculated con_tilPi as an option
-    // TODO(BRR) Store xi, phi guesses
-    Real xi;
-    Real phi;
-    c.GetConTilPiFromCon(E, cov_F, xi, phi, &conTilPi_);
-    auto status = c.Con2Prim(E, cov_F, conTilPi_, &(P_rad[0]), &cov_H);
-    SPACELOOP(ii) { P_rad[ii + 1] = cov_H(ii); }
-    return status;
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  void CalculateSource(Real P_mhd[4], Real P_rad[4], Real S[4]) {
-    Real Tg = eos_.TemperatureFromDensityInternalEnergy(rho_, P_mhd[0] / rho_, lambda_);
-    Real JBB = opac_.EnergyDensityFromTemperature(Tg, species_);
-    Real kappaH =
-        mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
-
-    // Real kappaH, kappaJ;
-    // c.GetAverageOpacities(rho_, Tg, lambda_[0], species_, kappaJ, kappaH);
-    // TODO(BRR) remove this when removing scattering_fraction
-    // kappaH = kappaJ;
-
-    // Real kappaH = c.mean_opac.RosselandMeanAbsorption
-
-    // TODO(BRR) this is arguably cheating, arguably not. Should include dt though
-    // kappaH * dt < 1 / eps
-    kappaH = std::min<Real>(kappaH, 1.e5);
-    // TODO(BRR) remove scattering_fraction
-    Real kappaJ = (1. - scattering_fraction_) * kappaH;
-    Real W = 0.;
-    SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
-    W = std::sqrt(1. + W);
-    Real cov_v[3] = {0};
-    SPACELOOP2(ii, jj) { cov_v[ii] += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] / W; }
-    Real vdH = 0.;
-    SPACELOOP(ii) { vdH += P_mhd[ii + 1] / W * P_rad[ii + 1]; }
-
-    S[0] = alpha_ * sdetgam_ * (kappaJ * W * (JBB - P_rad[0]) - kappaH * vdH);
-    SPACELOOP(ii) {
-      S[ii + 1] = alpha_ * sdetgam_ *
-                  (kappaJ * W * cov_v[ii] * (JBB - P_rad[0]) - kappaH * P_rad[1 + ii]);
-    }
-  }
-
- private:
-  const EOS &eos_;
-  const Opacity &opac_;
-  const MeanOpacity &mopac_;
-  const Real rho_;
-  const Real *bprim_;
-  const RadiationType species_;
-  Real lambda_[2];
-  Tens2 &conTilPi_;
-
-  const Real (*gcov_)[4][4];
-  const Real (*gammacon_)[3][3];
-  const Real alpha_;
-  const Real *beta_;
-  const Real sdetgam_;
-  const Real scattering_fraction_;
-
-  typename CLOSURE::LocalGeometryType &g_;
-
-  const Real (*U_mhd_0_)[4];
-  const Real (*U_rad_0_)[4];
-
-  const int &k_, &j_, &i_;
-};
-
-// template <typename T>
-class VarAccessor2D {
- public:
-  VarAccessor2D(const VariablePack<Real> &v, const int &b, const FlatIdx &idx,
-                const int &k, const int &j, const int &i)
-      : v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {
-    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(),
-                            "Creating VarAccessor2D with invalid FlatIdx!");
-  }
-
-  KOKKOS_FORCEINLINE_FUNCTION
-  Real &operator()(const int &ii, const int &jj) const {
-    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Accessing invalid index!");
-    return v_(b_, idx_(ii, jj), k_, j_, i_);
-  }
-
- private:
-  const VariablePack<Real> &v_;
-  const int &b_;
-  const FlatIdx &idx_;
-  const int &k_;
-  const int &j_;
-  const int &i_;
-};
-
-template <typename MBD, typename VP, typename CLOSURE>
-class InteractionTResidual {
- public:
-  KOKKOS_FUNCTION
-  InteractionTResidual(const EOS &eos, const CLOSURE closure,
-                       const OpacityAverager<CLOSURE> &opac_avgr,
-                       const MOCMCInteractions<MBD, VP, CLOSURE> &mocmc_int,
-                       const FrequencyInfo &freq_info, const Opacity &opacity,
-                       const MeanOpacity &mean_opacity, const Real &rho, const Real &ug0,
-                       const Real &Ye, const Real J0[3], const int &nspec,
-                       const RadiationType species[3], const Real &scattering_fraction,
-                       const Real &dtau, const VarAccessor2D &Inu0,
-                       const VarAccessor2D &Inu1, const int &iblock, const int &k,
-                       const int &j, const int &i)
-      : eos_(eos), closure_(closure), opac_avgr_(opac_avgr), mocmc_int_(mocmc_int),
-        freq_info_(freq_info), opacity_(opacity), mean_opacity_(mean_opacity), rho_(rho),
-        ug0_(ug0), Ye_(Ye), nspec_(nspec), scattering_fraction_(scattering_fraction),
-        dtau_(dtau), Inu0_(Inu0), Inu1_(Inu1), iblock_(iblock), k_(k), j_(j), i_(i) {
-    for (int ispec = 0; ispec < nspec; ++ispec) {
-      J0_[ispec] = J0[ispec];
-      PARTHENON_DEBUG_REQUIRE(!std::isnan(J0_[ispec]) && J0_[ispec] > robust::SMALL(),
-                              "Invalid value of J0!");
-      species_[ispec] = species[ispec];
-    }
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  Real operator()(const Real T) {
-    Real lambda[2] = {Ye_, 0.0};
-
-    Real J0_tot = 0.;
-    Real dJ_tot = 0.;
-
-    for (int ispec = 0; ispec < nspec_; ++ispec) {
-      J0_tot += J0_[ispec];
-
-      // Update Inu to n+1 if using MOCMC
-      if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-        for (int n = 0; n < freq_info_.GetNumBins(); n++) {
-          const Real nu = freq_info_.GetBinCenterNu(n);
-          const Real Jnu =
-              opacity_.EmissivityPerNu(rho_, T, Ye_, species_[ispec], nu) / (4. * M_PI);
-          const Real kappaJ = opacity_.AngleAveragedAbsorptionCoefficient(
-              rho_, T, Ye_, species_[ispec], nu);
-          Inu1_(ispec, n) = (nu * Jnu + robust::ratio(Inu0_(ispec, n), dtau_)) /
-                            (nu * kappaJ + robust::ratio(1., dtau_));
-          // printf("Inu0: %e Inu1: %e\n", Inu0_(ispec, n), Inu1_(ispec, n));
-        }
-      }
-
-      // Get Inu^n+1 from Inu0
-      // const Real kappa =
-      //    (1. - scattering_fraction_) *
-      //    mean_opacity_.RosselandMeanAbsorptionCoefficient(rho_, T, Ye_,
-      //    species_[ispec]);
-      Real kappaJ = opac_avgr_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, ispec);
-      // closure_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, species_[ispec], kappaJ);
-      kappaJ = (1. - scattering_fraction_) * kappaJ;
-      // TODO(BRR) remove scattering_fraction
-      if (i_ == 16 && j_ == 16) printf("dtau: %e\n", dtau_);
-
-      const Real JBB = opacity_.EnergyDensityFromTemperature(T, species_[ispec]);
-
-      dJ_tot += (J0_[ispec] + dtau_ * kappaJ * JBB) / (1. + dtau_ * kappaJ) - J0_[ispec];
-    }
-
-    const Real ug1 = rho_ * eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda);
-    // printf("[%i %i %i] T: %e resid: %e\n", k_, j_, i_, T, ((ug1 - ug0_) + (dJ_tot)) /
-    // (ug0_ + J0_tot)); printf("ug1: %e ug0: %e dJ: %e J0: %e\n", ug1, ug0_, dJ_tot,
-    // J0_tot);
-    for (int ispec = 0; ispec < nspec_; ++ispec) {
-      //  for (int n = 0; n < freq_info_.GetNumBins(); n++) {
-      //    printf("Inu_1(%i) = %e\n", n, Inu1_(ispec, n));
-      //  }
-    }
-
-    const Real residual = ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot);
-    PARTHENON_DEBUG_REQUIRE(!std::isnan(residual), "NAN residual!");
-
-    return residual;
-  }
-
- private:
-  const EOS &eos_;
-  const CLOSURE &closure_;
-  const OpacityAverager<CLOSURE> &opac_avgr_;
-  const MOCMCInteractions<MBD, VP, CLOSURE> &mocmc_int_;
-  const FrequencyInfo &freq_info_;
-  const Opacity &opacity_;
-  const MeanOpacity &mean_opacity_;
-  const Real &rho_;
-  const Real &ug0_;
-  const Real &Ye_;
-  Real J0_[MaxNumRadiationSpecies];
-  const int &nspec_;
-  const Real &scattering_fraction_;
-  const Real &dtau_; // Proper time
-  const VarAccessor2D &Inu0_;
-  const VarAccessor2D &Inu1_;
-  RadiationType species_[MaxNumRadiationSpecies];
-  const int &iblock_;
-  const int &k_;
-  const int &j_;
-  const int &i_;
-};
-
 template <class T, class CLOSURE>
 TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   PARTHENON_REQUIRE(USE_VALENCIA, "Covariant MHD formulation not supported!");
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
 
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
@@ -395,8 +134,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   const auto oned_fixup_strategy = rad->Param<OneDFixupStrategy>("oned_fixup_strategy");
 
   // TODO(BRR) will cpp17 mean we dont need to be explicit about these template params?
-  MOCMCInteractions<T, VariablePack<Real>, CLOSURE> mocmc_int(rc, v, idx_Inu0, idx_Inu1,
-                                                              freq_info);
+  MOCMCInteractions<T, VariablePack<Real>, CLOSURE> mocmc_int(
+      rc, v, idx_Inu0, idx_Inu1, freq_info, num_species, species_d);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -489,7 +228,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             // printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
             // c.InitializeSpectrum(&v, nu_bins, dlnu, &nusamp, &idx_Inu);
 
-            InteractionTResidual<T, VariablePack<Real>, CLOSURE> res(
+            SourceResidual1<T, VariablePack<Real>, CLOSURE> res(
                 eos, c, opac_avgr, mocmc_int, freq_info, d_opacity, d_mean_opacity, rho,
                 ug, Ye, J0, num_species, species_d, scattering_fraction, dtau, Inu0, Inu1,
                 iblock, k, j, i);
@@ -551,12 +290,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
               PARTHENON_DEBUG_REQUIRE(!std::isnan(dE[ispec]), "Nan dE!\n");
 
-              if (i == 16 && j == 16) {
-                printf("e: %e f: %e %e %e\n", Estar, cov_Fstar(0), cov_Fstar(1),
-                       cov_Fstar(2));
-                printf("dE: %e dF: %e %e %e\n", dE[ispec], cov_dF[ispec](0),
-                       cov_dF[ispec](1), cov_dF[ispec](2));
-              }
               Estar += dE[ispec];
               SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
 

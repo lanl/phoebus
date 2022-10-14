@@ -131,6 +131,8 @@ add_executable(phoebus
   radiation/moments_source.cpp
   radiation/monte_carlo.cpp
   radiation/opacity_averager.hpp
+  radiation/source_residual_1.hpp
+  radiation/source_residual_4.hpp
 
   reconstruction.hpp
 

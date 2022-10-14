@@ -61,7 +61,6 @@ class ReconstructionIndexer {
 
 template <class T, class CLOSURE, bool STORE_GUESS>
 TaskStatus MomentCon2PrimImpl(T *rc) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -142,12 +141,6 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
-#ifndef NDEBUG
-        if (std::isnan(J)) {
-          printf("[%i %i %i] E: %e F: %e %e %e\n", k, j, i, E, covF(0), covF(1), covF(2));
-          SPACELOOP2(ii, jj) { printf("pi(%i %i) = %e\n", ii, jj, conTilPi(ii, jj)); }
-        }
-#endif
 
         PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "J is nan!");
 
@@ -190,7 +183,6 @@ template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -291,7 +283,6 @@ template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
 
 template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   using namespace PhoebusReconstruction;
 
   auto *pmb = rc->GetParentPointer().get();
@@ -493,7 +484,6 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
@@ -685,13 +675,6 @@ TaskStatus CalculateFluxesImpl(T *rc) {
             SPACELOOP2(ii, jj) {
               con_tilPil(ii, jj) = v(idx_ql(ispec, 4 + ii + 3 * jj, idir), k, j, i);
               con_tilPir(ii, jj) = v(idx_qr(ispec, 4 + ii + 3 * jj, idir), k, j, i);
-            }
-
-            if (i == 16 && j == 16) {
-              SPACELOOP(ii) {
-                SPACELOOP(jj) { printf("%e ", con_tilPil(ii, jj)); }
-                printf("\n");
-              }
             }
           } else {
             cl.GetConTilPiFromPrim(Jl, HasymL, &con_tilPil);
