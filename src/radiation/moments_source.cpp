@@ -36,6 +36,7 @@ namespace radiation {
 using namespace singularity::neutrinos;
 using fixup::Bounds;
 using singularity::EOS;
+using Microphysics::Opacities;
 
 template <typename CLOSURE>
 class SourceResidual4 {
@@ -279,11 +280,13 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   auto coords = pmb->coords;
 
-  const auto &d_opacity = opac->Param<Opacity>("d.opacity");
-  const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
+  //const auto &d_opacity = opac->Param<Opacity>("d.opacity");
+  //const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
   // Mainly for testing purposes, probably should be able to do this with the opacity code
   // itself
-  const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
+  //const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
+
+  const auto &opacities = opac->Param<Opacities>("opacities");
 
   const auto src_solver = rad->Param<SourceSolver>("src_solver");
   const auto src_use_oned_backup = rad->Param<bool>("src_use_oned_backup");
@@ -386,11 +389,17 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               c.GetConTilPiFromPrim(J, cov_H, &con_tilPi);
             }
 
-            Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
-            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+            //Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
+            Real JBB = opacities.EnergyDensityFromTemperature(T1, species_d[ispec]);
+            //Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+            Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(
                 rho, T1, Ye, species_d[ispec]);
-            Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-            Real tauH = alpha * dt * kappa;
+            Real kappaH = opacities.RosselandMeanScatteringCoefficient(
+                rho, T1, Ye, species_d[ispec]) + kappaJ;
+            //Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
+            //Real tauH = alpha * dt * kappa;
+            Real tauJ = alpha * dt * kappaJ;
+            Real tauH = alpha * dt * kappaH;
 
             if (status == root_find::RootFindStatus::success) {
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
@@ -418,11 +427,17 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 cov_Fstar(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
               }
 
-              JBB = v(iblock, idx_J(ispec), k, j, i);
-              kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-                  rho, v(iblock, pT, k, j, i), Ye, species_d[ispec]);
-              tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-              tauH = alpha * dt * kappa;
+              //JBB = v(iblock, idx_J(ispec), k, j, i);
+              Real JBB = opacities.EnergyDensityFromTemperature(v(iblock, pT, k, j, i), species_d[ispec]);
+            //Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+              Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(
+                  rho, T1, Ye, species_d[ispec]);
+              Real kappaH = opacities.RosselandMeanScatteringCoefficient(
+                  rho, T1, Ye, species_d[ispec]) + kappaJ;
+              //Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+              //    rho, v(iblock, pT, k, j, i), Ye, species_d[ispec]);
+              tauJ = alpha * dt * kappaJ;
+              tauH = alpha * dt * kappaH;
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
 
