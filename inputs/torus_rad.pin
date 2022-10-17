@@ -7,8 +7,8 @@ ix2_bc = reflect
 ox2_bc = reflect
 
 <phoebus/mesh>
-bc_vars = primitive
-#bc_vars = conserved
+#bc_vars = primitive
+bc_vars = conserved
 
 <parthenon/job>
 problem_id  = torus       # problem ID: basename of output filenames
@@ -19,33 +19,33 @@ dt = 200.0
 
 <parthenon/output1>
 variables = p.density,       &
-            c.density,       &
+#            c.density,       &
             p.velocity,      &
-            c.momentum,      &
+#            c.momentum,      &
             p.energy,        &
-            c.energy,        &
-            pressure,      	 &
+#            c.energy,        &
+#            pressure,      	 &
             r.p.J,           &
             r.p.H,           &
-            r.c.E,           &
-            r.c.F,           &
+#            r.c.E,           &
+#            r.c.F,           &
             g.c.coord,       &
             g.n.coord,       &
             g.c.detgam,      &
-            g.c.bcon,        &
+#            g.c.bcon,        &
             g.c.alpha,       &
             g.c.gcov,        &
-            src_terms,       &
-            flux_divergence, &
+#            src_terms,       &
+#            flux_divergence, &
             r.i.kappaH,      &
             p.bfield
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1.0       # time increment between outputs
+dt          = 5.0       # time increment between outputs
 
 <parthenon/time>
 nlim        = -1 # cycle limit
-tlim        = 500.       # time limit
+tlim        = 2000.       # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -55,19 +55,22 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 128           # Number of zones in X1-direction
+nx1         = 256           # Number of zones in X1-direction
+#nx1 = 128
 x1min       = 0.59          # minimum value of X1; overwritten for the torus problem
 x1max       = 3.69          # maximum value of X1; set by <coordinates>/r_outer for the torus problem
 ix1_bc      = user          # Inner-X1 boundary condition flag
 ox1_bc      = user          # Outer-X1 boundary condition flag
 
-nx2         = 128           # Number of zones in X2-direction
+nx2         = 256           # Number of zones in X2-direction
+#nx2 = 128
 x2min       = 0             # minimum value of X2
 x2max       = 1             # maximum value of X2. X2 = 1 -> theta = pi
 ix2_bc      = user          # Inner-X2 boundary condition flag
 ox2_bc      = user          # Outer-X2 boundary condition flag
 
 nx3         = 1             # Number of zones in X3-direction
+#nx3 = 64
 x3min       = 0             # minimum value of X3
 x3max       = 6.28318530718 # maximum value of X3. 2*pi
 ix3_bc      = periodic      # Inner-X3 boundary condition flag
@@ -103,6 +106,8 @@ recon = weno5
 c2p_max_iter = 100
 c2p_tol = 1.e-8
 c2p_floor_scale_fac = 1.e-10
+c2p_fail_on_floors = false
+c2p_fail_on_ceilings = false
 c2p_method = robust
 Ye = false
 mhd = true
@@ -151,8 +156,8 @@ enable_rad_ceilings = true
 enable_flux_fixup = false # true
 enable_c2p_fixup = true
 enable_source_fixup = true
-report_c2p_fails = true
-report_source_fails = true
+report_c2p_fails = false
+report_source_fails = false
 
 fluid_c2p_failure_strategy = interpolate
 rad_c2p_failure_strategy = interpolate
