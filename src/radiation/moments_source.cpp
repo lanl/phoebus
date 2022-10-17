@@ -92,11 +92,6 @@ class SourceResidual4 {
     SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
     Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
-    // Use gamma_max from code?
-    if (W > 100) {
-      printf("W = %e! [%i %i %i]\n", W, k_, j_, i_);
-      return ClosureStatus::failure;
-    }
     CLOSURE c(con_v, &g_);
     // TODO(BRR) Accept separately calculated con_tilPi as an option
     // TODO(BRR) Store xi, phi guesses

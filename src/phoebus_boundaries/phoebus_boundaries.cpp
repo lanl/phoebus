@@ -139,63 +139,6 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
         });
-
-    // TODO(BRR) Is this always unnecessary if BC inside BH?
-    // pmb->par_for_bndry(
-    //    "OutflowInnerX1PrimFixup", nb1, domain, coarse,
-    //    KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
-    //      // Enforce u^1 <= 0
-    //      Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
-    //                      q(pv_lo + 2, k, j, i)};
-    //      Real gammacov[3][3];
-    //      geom.Metric(CellLocation::Cent, k, j, i, gammacov);
-    //      Real W = phoebus::GetLorentzFactor(vcon, gammacov);
-    //      const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-    //      Real beta[3];
-    //      geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-
-    //      Real ucon1 = vcon[0] - W * beta[0] / alpha;
-
-    //      if (ucon1 > 0) {
-    //        SPACELOOP(ii) { vcon[ii] /= W; }
-    //        vcon[0] = beta[0] / alpha;
-    //        Real vsq = 0.;
-    //        SPACELOOP2(ii, jj) { vsq += gammacov[ii][jj] * vcon[ii] * vcon[jj]; }
-    //        W = 1. / sqrt(1. - vsq);
-
-    //        SPACELOOP(ii) { q(pv_lo + ii, k, j, i) = W * vcon[ii]; }
-    //      }
-
-    //      // No flux of radiation into the simulation
-    //      if (idx_H.IsValid()) {
-    //        Real gammacon[3][3];
-    //        geom.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
-    //        for (int ispec = 0; ispec < num_species; ispec++) {
-    //          Real Hcon[3] = {0};
-    //          SPACELOOP2(ii, jj) {
-    //            Hcon[ii] += gammacon[ii][jj] * q(idx_H(ispec, jj), k, j, i);
-    //          }
-    //          if (Hcon[0] > 0.) {
-    //            Hcon[0] = 0.;
-
-    //            // Check xi
-    //            Real xi = 0.;
-    //            SPACELOOP2(ii, jj) { xi += gammacov[ii][jj] * Hcon[ii] * Hcon[jj]; }
-    //            xi = std::sqrt(xi);
-    //            if (xi > 0.99) {
-    //              SPACELOOP(ii) { Hcon[ii] *= 0.99 / xi; }
-    //            }
-
-    //            SPACELOOP(ii) {
-    //              q(idx_H(ispec, ii), k, j, i) = 0.;
-    //              SPACELOOP(jj) {
-    //                q(idx_H(ispec, ii), k, j, i) += gammacov[ii][jj] * Hcon[jj];
-    //              }
-    //            }
-    //          }
-    //        }
-    //      }
-    //    });
   }
 }
 

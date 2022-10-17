@@ -414,6 +414,9 @@ void ProblemModifier(ParameterInput *pin) {
       const Real Gamma = pin->GetReal("eos", "Gamma");
       const Real cv = (Gamma - 1.) * pc::kb / pc::mp;
       pin->SetReal("eos", "Cv", cv);
+    } else {
+      PARTHENON_FAIL(
+          "eos_type not supported for initializing radiation torus currently!");
     }
   }
 }

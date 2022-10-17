@@ -65,9 +65,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("report_c2p_fails", report_c2p_fails);
   bool report_source_fails = pin->GetOrAddBoolean("fixup", "report_source_fails", false);
   params.Add("report_source_fails", report_source_fails);
-  bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", enable_mhd ? true : false);
-  bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", enable_rad ? true : false);
-  bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", enable_rad ? true : false);
+  bool enable_mhd_floors =
+      pin->GetOrAddBoolean("fixup", "enable_mhd_floors", enable_mhd ? true : false);
+  bool enable_rad_floors =
+      pin->GetOrAddBoolean("fixup", "enable_rad_floors", enable_rad ? true : false);
+  bool enable_rad_ceilings =
+      pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", enable_rad ? true : false);
 
   if (enable_mhd_floors && !enable_mhd) {
     enable_mhd_floors = false;
@@ -203,12 +206,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pin->GetOrAddString("fixup", "fluid_c2p_failure_strategy", "interpolate");
   if (fluid_c2p_failure_strategy_str == "interpolate") {
     fluid_c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
-  } else if (fluid_c2p_failure_strategy_str == "interpolate_previous") {
-    fluid_c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
-  } else if (fluid_c2p_failure_strategy_str == "neighbor_minimum") {
-    fluid_c2p_failure_strategy = FAILURE_STRATEGY::neighbor_minimum;
   } else if (fluid_c2p_failure_strategy_str == "floors") {
     fluid_c2p_failure_strategy = FAILURE_STRATEGY::floors;
+  } else {
+    PARTHENON_FAIL("fixup/fluid_c2p_failure_strategy not supported!");
   }
   params.Add("fluid_c2p_failure_strategy", fluid_c2p_failure_strategy);
 
@@ -217,12 +218,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pin->GetOrAddString("fixup", "rad_c2p_failure_strategy", "interpolate");
   if (rad_c2p_failure_strategy_str == "interpolate") {
     rad_c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
-  } else if (rad_c2p_failure_strategy_str == "interpolate_previous") {
-    rad_c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
-  } else if (rad_c2p_failure_strategy_str == "neighbor_minimum") {
-    rad_c2p_failure_strategy = FAILURE_STRATEGY::neighbor_minimum;
   } else if (rad_c2p_failure_strategy_str == "floors") {
     rad_c2p_failure_strategy = FAILURE_STRATEGY::floors;
+  } else {
+    PARTHENON_FAIL("fixup/rad_c2p_failure_strategy not supported!");
   }
   params.Add("rad_c2p_failure_strategy", rad_c2p_failure_strategy);
 
@@ -231,10 +230,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pin->GetOrAddString("fixup", "src_failure_strategy", "interpolate");
   if (src_failure_strategy_str == "interpolate") {
     src_failure_strategy = FAILURE_STRATEGY::interpolate;
-  } else if (src_failure_strategy_str == "interpolate_previous") {
-    src_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
   } else if (src_failure_strategy_str == "floors") {
     src_failure_strategy = FAILURE_STRATEGY::floors;
+  } else {
+    PARTHENON_FAIL("fixup/src_c2p_failure_strategy not supported!");
   }
   params.Add("src_failure_strategy", src_failure_strategy);
 
