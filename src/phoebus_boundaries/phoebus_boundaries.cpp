@@ -181,63 +181,6 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
         });
-
-    // TODO(BRR) Make this part of the same kernel? Don't have nb be a kernel index?
-    pmb->par_for_bndry(
-        "OutflowOuterX1PrimFixup", nb1, domain, coarse,
-        KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
-          // Enforce u^1 >= 0
-          Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
-                          q(pv_lo + 2, k, j, i)};
-          Real gammacov[3][3];
-          geom.Metric(CellLocation::Cent, k, j, i, gammacov);
-          Real W = phoebus::GetLorentzFactor(vcon, gammacov);
-          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
-          Real beta[3];
-          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-
-          Real ucon1 = vcon[0] - W * beta[0] / alpha;
-
-          if (ucon1 < 0) {
-            SPACELOOP(ii) { vcon[ii] /= W; }
-            vcon[0] = beta[0] / alpha;
-            Real vsq = 0.;
-            SPACELOOP2(ii, jj) { vsq += gammacov[ii][jj] * vcon[ii] * vcon[jj]; }
-            W = 1. / sqrt(1. - vsq);
-
-            SPACELOOP(ii) { q(pv_lo + ii, k, j, i) = W * vcon[ii]; }
-          }
-
-          // No flux of radiation into the simulation
-          if (idx_H.IsValid()) {
-            Real gammacon[3][3];
-            geom.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
-            for (int ispec = 0; ispec < num_species; ispec++) {
-              Real Hcon[3] = {0};
-              SPACELOOP2(ii, jj) {
-                Hcon[ii] += gammacon[ii][jj] * q(idx_H(ispec, jj), k, j, i);
-              }
-              if (Hcon[0] < 0.) {
-                Hcon[0] = 0.;
-
-                // Check xi
-                Real xi = 0.;
-                SPACELOOP2(ii, jj) { xi += gammacov[ii][jj] * Hcon[ii] * Hcon[jj]; }
-                xi = std::sqrt(xi);
-                if (xi > 0.99) {
-                  SPACELOOP(ii) { Hcon[ii] *= 0.99 / xi; }
-                }
-
-                SPACELOOP(ii) {
-                  q(idx_H(ispec, ii), k, j, i) = 0.;
-                  SPACELOOP(jj) {
-                    q(idx_H(ispec, ii), k, j, i) += gammacov[ii][jj] * Hcon[jj];
-                  }
-                }
-              }
-            }
-          }
-        });
   }
 }
 
@@ -296,8 +239,106 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
   }
 
   auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
+  auto &pkg_rad = rc->GetParentPointer()->packages.Get("radiation");
+  auto &pkg_fix = rc->GetParentPointer()->packages.Get("fixup");
+  std::string bc_vars = pkg->Param<std::string>("bc_vars");
+
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
+                    "Problem \"torus\" requires FMKS geometry!");
+
+  // Apply inflow check to ox1 for BH problem
+  const bool enable_ox1_fmks_inflow_check =
+      pkg_fix->Param<bool>("enable_ox1_fmks_inflow_check");
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS) &&
+      enable_ox1_fmks_inflow_check) {
+
+    const IndexDomain domain = IndexDomain::outer_x1;
+    IndexRange ib = rc->GetBoundsI(domain);
+    IndexRange jb = rc->GetBoundsJ(domain);
+    IndexRange kb = rc->GetBoundsK(domain);
+
+    if (bc_vars == "conserved") {
+      // Just call C2P everywhere instead of 6 different kernels
+      fluid::ConservedToPrimitiveRegion(rc.get(), ib, jb, kb);
+    }
+
+    // Inflow check and then p2c
+    std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
+    auto geom = Geometry::GetCoordinateSystem(rc.get());
+
+    // TODO(BRR) Is this always true?
+    const bool coarse = false;
+
+    PackIndexMap imap;
+    std::vector<std::string> vars{fluid_prim::velocity, radmoment_prim::H};
+    auto q = rc->PackVariables(vars, imap, coarse);
+    auto nb1 = IndexRange{0, 0};
+
+    const int pv_lo = imap[fluid_prim::velocity].first;
+    auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
+
+    const int num_species =
+        pkg_rad->Param<bool>("active") ? pkg_rad->Param<int>("num_species") : 0;
+    pmb->par_for_bndry(
+        "OutflowOuterX1PrimFixup", nb1, domain, coarse,
+        KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
+          // Enforce u^1 >= 0
+          Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
+                          q(pv_lo + 2, k, j, i)};
+          Real gammacov[3][3];
+          geom.Metric(CellLocation::Cent, k, j, i, gammacov);
+          Real W = phoebus::GetLorentzFactor(vcon, gammacov);
+          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real beta[3];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+
+          Real ucon1 = vcon[0] - W * beta[0] / alpha;
+
+          if (ucon1 < 0) {
+            SPACELOOP(ii) { vcon[ii] /= W; }
+            vcon[0] = beta[0] / alpha;
+            Real vsq = 0.;
+            SPACELOOP2(ii, jj) { vsq += gammacov[ii][jj] * vcon[ii] * vcon[jj]; }
+            W = 1. / sqrt(1. - vsq);
+
+            SPACELOOP(ii) { q(pv_lo + ii, k, j, i) = W * vcon[ii]; }
+          }
+
+          // No flux of radiation into the simulation
+          if (idx_H.IsValid()) {
+            Real gammacon[3][3];
+            geom.MetricInverse(CellLocation::Cent, k, j, i, gammacon);
+            for (int ispec = 0; ispec < num_species; ispec++) {
+              Real Hcon[3] = {0};
+              SPACELOOP2(ii, jj) {
+                Hcon[ii] += gammacon[ii][jj] * q(idx_H(ispec, jj), k, j, i);
+              }
+              if (Hcon[0] < 0.) {
+                Hcon[0] = 0.;
+
+                // Check xi
+                Real xi = 0.;
+                SPACELOOP2(ii, jj) { xi += gammacov[ii][jj] * Hcon[ii] * Hcon[jj]; }
+                xi = std::sqrt(xi);
+                if (xi > 0.99) {
+                  SPACELOOP(ii) { Hcon[ii] *= 0.99 / xi; }
+                }
+
+                SPACELOOP(ii) {
+                  q(idx_H(ispec, ii), k, j, i) = 0.;
+                  SPACELOOP(jj) {
+                    q(idx_H(ispec, ii), k, j, i) += gammacov[ii][jj] * Hcon[jj];
+                  }
+                }
+              }
+            }
+          }
+        });
+
+    fluid::PrimitiveToConservedRegion(rc.get(), ib, jb, kb);
+  }
+
   if (pkg->Param<bool>("active")) {
-    std::string bc_vars = pkg->Param<std::string>("bc_vars");
     if (bc_vars == "primitive") {
       // auto c2p = pkg->Param<fluid::c2p_meshblock_type>("c2p_func");
       for (auto &domain : domains) {
@@ -309,9 +350,9 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     }
   }
 
-  auto &pkg_rad = rc->GetParentPointer()->packages.Get("radiation");
   if (pkg_rad->Param<bool>("active")) {
-    std::string bc_vars = pkg_rad->Param<std::string>("bc_vars");
+    // Fluid and rad always have same value
+    // std::string bc_vars = pkg_rad->Param<std::string>("bc_vars");
     if (bc_vars == "primitive") {
       for (auto &domain : domains) {
         // TODO(BRR) Make this per-region!
