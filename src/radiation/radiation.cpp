@@ -382,11 +382,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     params.Add("oned_fixup_strategy", oned_fixup_strategy);
 
-    int ndim = 1;
-    if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
-      ndim = 3;
-    else if (pin->GetInteger("parthenon/mesh", "nx2") > 1)
-      ndim = 2;
+    // Required to be 3D in dJ calculation in radiation::ReconstructEdgeStates
+    const int ndim = 3;
 
     Metadata mspecies_three_vector =
         Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
