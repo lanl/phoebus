@@ -47,6 +47,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto fix = std::make_shared<StateDescriptor>("fixup");
   Params &params = fix->AllParams();
 
+  const bool enable_mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
+  const bool enable_rad = pin->GetOrAddBoolean("physics", "rad", false);
+
   bool enable_flux_fixup = pin->GetOrAddBoolean("fixup", "enable_flux_fixup", false);
   params.Add("enable_flux_fixup", enable_flux_fixup);
   bool enable_fixup = pin->GetOrAddBoolean("fixup", "enable_fixup", false);
@@ -58,17 +61,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("enable_source_fixup", enable_source_fixup);
   bool enable_ceilings = pin->GetOrAddBoolean("fixup", "enable_ceilings", false);
   params.Add("enable_ceilings", enable_ceilings);
-  bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", false);
-  params.Add("enable_rad_ceilings", enable_rad_ceilings);
   bool report_c2p_fails = pin->GetOrAddBoolean("fixup", "report_c2p_fails", false);
   params.Add("report_c2p_fails", report_c2p_fails);
   bool report_source_fails = pin->GetOrAddBoolean("fixup", "report_source_fails", false);
   params.Add("report_source_fails", report_source_fails);
-  bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
-  bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", false);
-
-  const bool enable_mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
-  const bool enable_rad = pin->GetOrAddBoolean("physics", "rad", false);
+  bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", enable_mhd ? true : false);
+  bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", enable_rad ? true : false);
+  bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", enable_rad ? true : false);
 
   if (enable_mhd_floors && !enable_mhd) {
     enable_mhd_floors = false;
@@ -81,6 +80,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_WARN("WARNING Disabling radiation floors because radiation is disabled!");
   }
   params.Add("enable_rad_floors", enable_rad_floors);
+
+  if (enable_rad_ceilings && !enable_rad) {
+    enable_rad_ceilings = false;
+    PARTHENON_WARN("WARNING Disabling radiation ceilings because radiation is disabled!");
+  }
+  params.Add("enable_rad_ceilings", enable_rad_ceilings);
 
   if (enable_c2p_fixup && !enable_floors) {
     enable_floors = true;
