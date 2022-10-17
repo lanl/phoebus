@@ -340,17 +340,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     params.Add("recon_fixup_strategy", recon_fixup_strategy);
 
-    //    std::string solver = pin->GetOrAddString("radiation", "riemann", "hll");
-    //    riemann::solver rs = riemann::solver::HLL;
-    //    if (solver == "llf") {
-    //      rs = riemann::solver::LLF;
-    //    } else if (solver == "hll") {
-    //      rs = riemann::solver::HLL;
-    //    } else {
-    //      PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
-    //    }
-    //    params.Add("RiemannSolver", rs);
-
     const std::string src_solver_name =
         pin->GetOrAddString("radiation", "src_solver", "oned");
     SourceSolver src_solver;
@@ -393,9 +382,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     params.Add("oned_fixup_strategy", oned_fixup_strategy);
 
-    int ndim = 3;
-    // if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
-    // else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
+    int ndim = 1;
+    if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
+      ndim = 3;
+    else if (pin->GetInteger("parthenon/mesh", "nx2") > 1)
+      ndim = 2;
 
     Metadata mspecies_three_vector =
         Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,

@@ -48,7 +48,7 @@ namespace fixup {
 // good neighbors, set everything to the floors. Then call p2c on both fluid and
 // radiation.
 template <typename T, class CLOSURE>
-TaskStatus SourceFixupImpl(T *rc, T *rc0) {
+TaskStatus SourceFixupImpl(T *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -83,8 +83,6 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  PackIndexMap imap0;
-  auto v0 = rc0->PackVariables(vars, imap0);
 
   const int prho = imap[p::density].first;
   const int crho = imap[c::density].first;
@@ -158,21 +156,10 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                     coords.x3v(k, j, i), xi_max);
 
-        double eos_lambda[2]; // used for stellarcollapse eos and
-                              // other EOS's that require root
-                              // finding.
+        double eos_lambda[2]; // used for stellarcollapse eos and other EOS's that require
+                              // root finding.
         eos_lambda[1] = std::log10(v(b, tmp, k, j, i)); // use last temp as initial guess
 
-        auto fixup0 = [&](const int iv) {
-          v(b, iv, k, j, i) = v0(b, iv, k, j, i - 1) + v0(b, iv, k, j, i + 1);
-          if (ndim > 1) {
-            v(b, iv, k, j, i) += v0(b, iv, k, j - 1, i) + v0(b, iv, k, j + 1, i);
-            if (ndim == 3) {
-              v(b, iv, k, j, i) += v0(b, iv, k - 1, j, i) + v0(b, iv, k + 1, j, i);
-            }
-          }
-          return v(b, iv, k, j, i) / (2 * ndim);
-        };
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
           v(b, iv, k, j, i) = v(b, ifail, k, j, i - 1) * v(b, iv, k, j, i - 1) +
                               v(b, ifail, k, j, i + 1) * v(b, iv, k, j, i + 1);
@@ -188,12 +175,18 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
         };
 
         if (v(b, ifail, k, j, i) == radiation::FailFlags::fail) {
-          if (src_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
-            v(b, prho, k, j, i) = fixup0(prho);
-            v(b, peng, k, j, i) = fixup0(peng);
-            SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = fixup0(idx_pvel(ii)); }
+          Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
+          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
+          if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+
+          if (num_valid > 0.5 && src_failure_strategy == FAILURE_STRATEGY::interpolate) {
+            const Real norm = 1.0 / num_valid;
+
+            v(b, prho, k, j, i) = fixup(prho, norm);
+            v(b, peng, k, j, i) = fixup(peng, norm);
+            SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = fixup(idx_pvel(ii), norm); }
             if (pye > 0) {
-              v(b, pye, k, j, i) = fixup0(pye);
+              v(b, pye, k, j, i) = fixup(pye, norm);
             }
             if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
             v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
@@ -207,76 +200,40 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
                       v(b, prs, k, j, i));
 
             for (int ispec = 0; ispec < num_species; ispec++) {
-              v(b, idx_J(ispec), k, j, i) = fixup0(idx_J(ispec));
+              v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
               SPACELOOP(ii) {
-                v(b, idx_H(ispec, ii), k, j, i) = fixup0(idx_H(ispec, ii));
+                v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
               }
             }
           } else {
+            // No valid neighbors; set to floors with zero spatial velocity
 
-            Real num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
-            if (ndim > 1)
-              num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
-            if (ndim == 3)
-              num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+            v(b, prho, k, j, i) = 1.e-100;
+            v(b, peng, k, j, i) = 1.e-100;
 
-            if (num_valid > 0.5 &&
-                src_failure_strategy == FAILURE_STRATEGY::interpolate) {
-              const Real norm = 1.0 / num_valid;
+            // Zero primitive velocities
+            SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
 
-              v(b, prho, k, j, i) = fixup(prho, norm);
-              v(b, peng, k, j, i) = fixup(peng, norm);
-              SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = fixup(idx_pvel(ii), norm); }
-              if (pye > 0) {
-                v(b, pye, k, j, i) = fixup(pye, norm);
-              }
-              if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-              v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                  v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-                  eos_lambda);
-              v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-                  v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-              v(b, gm1, k, j, i) =
-                  ratio(eos.BulkModulusFromDensityTemperature(
-                            v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
-                        v(b, prs, k, j, i));
+            // Auxiliary primitives
+            // Safe value for ye
+            if (pye > 0) {
+              v(b, pye, k, j, i) = 0.5;
+            }
+            if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
+            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+                v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+                eos_lambda);
+            v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
+                v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
+            v(b, gm1, k, j, i) =
+                ratio(eos.BulkModulusFromDensityTemperature(
+                          v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
+                      v(b, prs, k, j, i));
 
-              for (int ispec = 0; ispec < num_species; ispec++) {
-                v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
-                SPACELOOP(ii) {
-                  v(b, idx_H(ispec, ii), k, j, i) = fixup(idx_H(ispec, ii), norm);
-                }
-              }
-            } else {
-              // No valid neighbors; set to floors with zero spatial velocity
+            for (int ispec = 0; ispec < num_species; ispec++) {
+              v(b, idx_J(ispec), k, j, i) = 1.e-100;
 
-              v(b, prho, k, j, i) = 1.e-100;
-              v(b, peng, k, j, i) = 1.e-100;
-
-              // Zero primitive velocities
-              SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
-
-              // Auxiliary primitives
-              // Safe value for ye
-              if (pye > 0) {
-                v(b, pye, k, j, i) = 0.5;
-              }
-              if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-              v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                  v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
-                  eos_lambda);
-              v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-                  v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-              v(b, gm1, k, j, i) =
-                  ratio(eos.BulkModulusFromDensityTemperature(
-                            v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda),
-                        v(b, prs, k, j, i));
-
-              for (int ispec = 0; ispec < num_species; ispec++) {
-                v(b, idx_J(ispec), k, j, i) = 1.e-100;
-
-                SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
-              }
+              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
             }
           }
 
@@ -311,7 +268,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
                           std::pow(g.contractConCov3Vectors(con_v, cov_H), 2));
           }
 
-          //          // Update MHD conserved variables
+          // Update MHD conserved variables
           Real S[3];
           Real bcons[3];
           Real bp[3] = {0.0, 0.0, 0.0};
@@ -366,7 +323,7 @@ TaskStatus SourceFixupImpl(T *rc, T *rc0) {
 }
 
 template <typename T>
-TaskStatus SourceFixup(T *rc, T *rc0) {
+TaskStatus SourceFixup(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
@@ -382,16 +339,15 @@ TaskStatus SourceFixup(T *rc, T *rc0) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return SourceFixupImpl<T, radiation::ClosureM1<settings>>(rc, rc0);
+    return SourceFixupImpl<T, radiation::ClosureM1<settings>>(rc);
   } else if (method == "moment_eddington") {
-    return SourceFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0);
+    return SourceFixupImpl<T, radiation::ClosureEdd<settings>>(rc);
   } else if (method == "mocmc") {
-    return SourceFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc, rc0);
+    return SourceFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc);
   }
   return TaskStatus::fail;
 }
 
-template TaskStatus SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
-                                                     MeshBlockData<Real> *rc0);
+template TaskStatus SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 } // namespace fixup
