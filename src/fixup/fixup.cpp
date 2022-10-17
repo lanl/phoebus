@@ -52,6 +52,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   bool enable_flux_fixup = pin->GetOrAddBoolean("fixup", "enable_flux_fixup", false);
   params.Add("enable_flux_fixup", enable_flux_fixup);
+  bool enable_ox1_fmks_inflow_check =
+      pin->GetOrAddBoolean("fixup", "enable_ox1_fmks_inflow_check", true);
+  params.Add("enable_ox1_fmks_inflow_check", enable_ox1_fmks_inflow_check);
   bool enable_fixup = pin->GetOrAddBoolean("fixup", "enable_fixup", false);
   params.Add("enable_fixup", enable_fixup);
   bool enable_floors = pin->GetOrAddBoolean("fixup", "enable_floors", false);
