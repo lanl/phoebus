@@ -352,7 +352,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     //    params.Add("RiemannSolver", rs);
 
     const std::string src_solver_name =
-        pin->GetOrAddString("radiation", "src_solver", "fourd");
+        pin->GetOrAddString("radiation", "src_solver", "oned");
     SourceSolver src_solver;
     if (src_solver_name == "zerod") {
       src_solver = SourceSolver::zerod;
