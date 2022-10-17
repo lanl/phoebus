@@ -246,11 +246,12 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
                     "Problem \"torus\" requires FMKS geometry!");
 
-  // Apply inflow check to ox1 for BH problem
+  // Apply inflow check to ox1 for BH problem at simulation BC only
   const bool enable_ox1_fmks_inflow_check =
       pkg_fix->Param<bool>("enable_ox1_fmks_inflow_check");
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS) &&
-      enable_ox1_fmks_inflow_check) {
+      enable_ox1_fmks_inflow_check &&
+      pmb->boundary_flag[1] != parthenon::BoundaryFlag::block) {
 
     const IndexDomain domain = IndexDomain::outer_x1;
     IndexRange ib = rc->GetBoundsI(domain);
@@ -341,11 +342,14 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
   if (pkg->Param<bool>("active")) {
     if (bc_vars == "primitive") {
       // auto c2p = pkg->Param<fluid::c2p_meshblock_type>("c2p_func");
-      for (auto &domain : domains) {
-        IndexRange ib = rc->GetBoundsI(domain);
-        IndexRange jb = rc->GetBoundsJ(domain);
-        IndexRange kb = rc->GetBoundsK(domain);
-        fluid::PrimitiveToConservedRegion(rc.get(), ib, jb, kb);
+      for (int n = 0; n < domains.size(); n++) {
+        if (pmb->boundary_flag[n] != parthenon::BoundaryFlag::block) {
+          const auto &domain = domains[n];
+          IndexRange ib = rc->GetBoundsI(domain);
+          IndexRange jb = rc->GetBoundsJ(domain);
+          IndexRange kb = rc->GetBoundsK(domain);
+          fluid::PrimitiveToConservedRegion(rc.get(), ib, jb, kb);
+        }
       }
     }
   }
@@ -354,9 +358,11 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     // Fluid and rad always have same value
     // std::string bc_vars = pkg_rad->Param<std::string>("bc_vars");
     if (bc_vars == "primitive") {
-      for (auto &domain : domains) {
-        // TODO(BRR) Make this per-region!
-        radiation::MomentPrim2Con(rc.get(), domain);
+      for (int n = 0; n < domains.size(); n++) {
+        if (pmb->boundary_flag[n] != parthenon::BoundaryFlag::block) {
+          const auto &domain = domains[n];
+          radiation::MomentPrim2Con(rc.get(), domain);
+        }
       }
     }
   }
