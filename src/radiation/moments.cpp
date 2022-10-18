@@ -66,6 +66,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   namespace ir = radmoment_internal;
 
   auto *pm = rc->GetParentPointer().get();
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
 
   IndexRange ib = pm->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -94,6 +95,9 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
   const Real pi = acos(-1);
 
+  auto closure_runtime_params =
+      rad->Param<ClosureRuntimeSettings>("closure_runtime_params");
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 0,
       v.GetDim(5) - 1,  // Loop over meshblocks
@@ -113,7 +117,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
                    v(b, pv(2), k, j, i) / W}};
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
-        CLOSURE c(con_v, &g);
+        CLOSURE c(con_v, &g, closure_runtime_params);
 
         Real J;
         Vec covH;
@@ -141,6 +145,13 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
+
+        if (status == ClosureStatus::modified) {
+          c.Prim2Con(J, covH, conTilPi, &E, &covF);
+          v(b, cE(ispec), k, j, i) = E / isdetgam;
+          SPACELOOP(ii) { v(b, cF(ispec, ii), k, j, i) = covF(ii) / isdetgam; }
+          status = ClosureStatus::success;
+        }
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
