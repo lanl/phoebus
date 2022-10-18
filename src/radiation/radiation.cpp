@@ -19,6 +19,8 @@
 #include "radiation/local_three_geometry.hpp"
 #include "reconstruction.hpp"
 
+#include "closure.hpp"
+
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
 namespace radiation {
@@ -304,6 +306,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     namespace p = radmoment_prim;
     namespace c = radmoment_cons;
     namespace i = radmoment_internal;
+
+    std::string closure_strategy_str =
+        pin->GetOrAddString("radiation", "closure_c2p_strategy", "robust");
+    ClosureCon2PrimStrategy closure_strategy;
+    if (closure_strategy_str == "robust") {
+      closure_strategy = ClosureCon2PrimStrategy::robust;
+    } else if (closure_strategy_str == "frail") {
+      closure_strategy = ClosureCon2PrimStrategy::frail;
+    }
+
+    ClosureRuntimeSettings closure_runtime_params{closure_strategy};
+    params.Add("closure_runtime_params", closure_runtime_params);
 
     std::string recon = pin->GetOrAddString("radiation", "recon", "linear");
     PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;

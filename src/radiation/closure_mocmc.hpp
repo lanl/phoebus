@@ -45,7 +45,9 @@ class ClosureMOCMC : public ClosureEdd<SET> {
   /// Constructor just calculates the inverse 3-metric, covariant three-velocity, and the
   /// Lorentz factor for the given background state.
   KOKKOS_FUNCTION
-  ClosureMOCMC(const Vec con_v_in, LocalGeometryType *g) : ClosureEdd<SET>(con_v_in, g) {}
+  ClosureMOCMC(const Vec con_v_in, LocalGeometryType *g,
+               ClosureRuntimeSettings r = {ClosureCon2PrimStrategy::robust})
+      : ClosureEdd<SET>(con_v_in, g, r) {}
 
   KOKKOS_FUNCTION
   ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
