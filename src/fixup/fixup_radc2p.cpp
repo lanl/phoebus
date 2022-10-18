@@ -177,7 +177,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
             }
           } else {
             for (int ispec = 0; ispec < nspec; ispec++) {
-              v(b, idx_J(ispec), k, j, i) = 10.*robust::SMALL();
+              v(b, idx_J(ispec), k, j, i) = 10. * robust::SMALL();
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
             }
           }
