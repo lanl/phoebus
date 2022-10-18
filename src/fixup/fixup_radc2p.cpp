@@ -165,9 +165,11 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
           if (ndim == 3)
             num_valid += v(b, iradfail, k - 1, j, i) + v(b, iradfail, k + 1, j, i);
           // Can't stencil outside of memory of this meshblock
+          //if (num_valid > 0.5 &&
+          //    rad_c2p_failure_strategy == FAILURE_STRATEGY::interpolate && i > ib.s &&
+          //    i < ib.e - 1 && j > jb.s && j < jb.e - 1 && k > kb.s && k < kb.e - 1) {
           if (num_valid > 0.5 &&
-              rad_c2p_failure_strategy == FAILURE_STRATEGY::interpolate && i > ib.s &&
-              i < ib.e - 1 && j > jb.s && j < jb.e - 1 && k > kb.s && k < kb.e - 1) {
+              rad_c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
             const Real norm = 1.0 / num_valid;
             for (int ispec = 0; ispec < nspec; ispec++) {
               v(b, idx_J(ispec), k, j, i) = fixup(idx_J(ispec), norm);
