@@ -219,8 +219,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
 
           if (num_valid > 0.5 &&
-              fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate
-              && i > ib.s && i < ib.e - 1 && j > jb.s && j < jb.e - 1 && k > kb.s && k < kb.e - 1) {
+              fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate && i > ib.s &&
+              i < ib.e - 1 && j > jb.s && j < jb.e - 1 && k > kb.s && k < kb.e - 1) {
             const Real norm = 1.0 / num_valid;
             v(b, prho, k, j, i) = fixup(prho, norm);
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
