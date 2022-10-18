@@ -314,6 +314,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       closure_strategy = ClosureCon2PrimStrategy::robust;
     } else if (closure_strategy_str == "frail") {
       closure_strategy = ClosureCon2PrimStrategy::frail;
+    } else {
+      PARTHENON_THROW("Invalid closure_c2p_strategy option. Choose from [robust,frail]");
     }
 
     ClosureRuntimeSettings closure_runtime_params{closure_strategy};
