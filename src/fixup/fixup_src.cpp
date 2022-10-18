@@ -208,8 +208,8 @@ TaskStatus SourceFixupImpl(T *rc) {
           } else {
             // No valid neighbors; set to floors with zero spatial velocity
 
-            v(b, prho, k, j, i) = 10.*robust::SMALL();
-            v(b, peng, k, j, i) = 10.*robust::SMALL();
+            v(b, prho, k, j, i) = 10. * robust::SMALL();
+            v(b, peng, k, j, i) = 10. * robust::SMALL();
 
             // Zero primitive velocities
             SPACELOOP(ii) { v(b, idx_pvel(ii), k, j, i) = 0.; }
@@ -231,7 +231,7 @@ TaskStatus SourceFixupImpl(T *rc) {
                       v(b, prs, k, j, i));
 
             for (int ispec = 0; ispec < num_species; ispec++) {
-              v(b, idx_J(ispec), k, j, i) = 10.*robust::SMALL();
+              v(b, idx_J(ispec), k, j, i) = 10. * robust::SMALL();
 
               SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = 0.; }
             }
