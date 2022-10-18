@@ -329,6 +329,10 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<SET>::Con2Prim(Real E, const Vec cov_F,
                 std::pow(gamma->contractConCov3Vectors(con_v, *cov_tilH), 2)) /
       (*J);
 
+  if (std::isnan(xi) || std::isnan(*J)) {
+    return ClosureStatus::failure;
+  }
+
   if (*J < 0. || xi >= 1.0) {
     if (rset_.con2prim_strategy == ClosureCon2PrimStrategy::robust) {
       if (*J < 0.) {

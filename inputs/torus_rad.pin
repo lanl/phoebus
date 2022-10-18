@@ -134,6 +134,7 @@ src_rootfind_tol = 1.e-8
 src_rootfind_maxiter = 100
 oned_fixup_strategy = ignore_dJ
 recon_fixup_strategy = bounds
+closure_c2p_strategy = frail # robust
 
 #scattering_fraction = 1.0
 scattering_fraction = 0.5
@@ -156,8 +157,8 @@ enable_rad_ceilings = true
 enable_flux_fixup = false # true
 enable_c2p_fixup = true
 enable_source_fixup = true
-report_c2p_fails = false
-report_source_fails = false
+report_c2p_fails = true # false
+report_source_fails = true # false
 
 fluid_c2p_failure_strategy = interpolate
 rad_c2p_failure_strategy = interpolate
