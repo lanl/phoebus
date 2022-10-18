@@ -212,15 +212,15 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         };
         // When using IndexDomain::entire, can't stencil from e.g. i = 0 because 0 - 1 =
         // -1 is a segfault
-        if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail && i > ib.s &&
-            i < ib.e - 1 && j > jb.s && j < jb.e - 1 && k > kb.s && k < kb.e - 1) {
+        if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
           Real num_valid = 0;
           num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
 
           if (num_valid > 0.5 &&
-              fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
+              fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate
+              && i > ib.s && i < ib.e - 1 && j > jb.s && j < jb.e - 1 && k > kb.s && k < kb.e - 1) {
             const Real norm = 1.0 / num_valid;
             v(b, prho, k, j, i) = fixup(prho, norm);
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
