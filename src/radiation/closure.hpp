@@ -33,7 +33,11 @@ using namespace LinearAlgebra;
 using namespace robust;
 
 /// Status of closure calculation
-enum class ClosureStatus { success = 0, failure = 1 };
+enum class ClosureStatus {
+  success = 0, // C2P inversion completed successfully
+  failure = 1, // C2P inversion failed; must be fixed up
+  modified = 2 // C2P inversion recovered but cons vars must be updated
+};
 
 enum class ClosureType { Eddington, M1, MOCMC };
 
@@ -48,6 +52,14 @@ struct ClosureSettings {
   static const ClosureVerbosity verbosity = VB;
 };
 
+enum class ClosureCon2PrimStrategy {
+  frail, // Mark cell as failed if inversion produces unphysical state
+  robust // Attempt to repair unphysical states
+};
+struct ClosureRuntimeSettings {
+  ClosureCon2PrimStrategy con2prim_strategy;
+};
+
 /// Holds methods for closing the radiation moment equations as well as calculating
 /// radiation moment source terms.
 template <class SET = ClosureSettings<>>
@@ -59,7 +71,8 @@ class ClosureEdd {
   /// Constructor just calculates the inverse 3-metric, covariant three-velocity, and the
   /// Lorentz factor for the given background state.
   KOKKOS_FUNCTION
-  ClosureEdd(const Vec con_v_in, LocalGeometryType *g);
+  ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
+             ClosureRuntimeSettings rset = {ClosureCon2PrimStrategy::robust});
 
   //-------------------------------------------------------------------------------------
   /// Calculate the update values dE and cov_dF for a linear, implicit source term update
@@ -124,6 +137,7 @@ class ClosureEdd {
   Vec cov_v;
   Vec con_v;
   LocalGeometryType *gamma;
+  ClosureRuntimeSettings rset_;
 
  protected:
   KOKKOS_FORCEINLINE_FUNCTION
@@ -140,8 +154,9 @@ class ClosureEdd {
 };
 
 template <class SET>
-KOKKOS_FUNCTION ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g)
-    : gamma(g) {
+KOKKOS_FUNCTION ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryType *g,
+                                            ClosureRuntimeSettings rset)
+    : gamma(g), rset_(rset) {
   SPACELOOP(i) con_v(i) = con_v_in(i);
 
   gamma->lower3Vector(con_v, &cov_v);
@@ -315,7 +330,17 @@ KOKKOS_FUNCTION ClosureStatus ClosureEdd<SET>::Con2Prim(Real E, const Vec cov_F,
       (*J);
 
   if (*J < 0. || xi >= 1.0) {
-    return ClosureStatus::failure;
+    if (rset_.con2prim_strategy == ClosureCon2PrimStrategy::robust) {
+      if (*J < 0.) {
+        *J = std::min(*J, 10. * robust::SMALL());
+      }
+      if (xi >= 1.0) {
+        SPACELOOP(ii) { (*cov_tilH)(ii) *= 0.999 / xi; }
+      }
+      return ClosureStatus::modified;
+    } else {
+      return ClosureStatus::failure;
+    }
   }
 
   return ClosureStatus::success;
