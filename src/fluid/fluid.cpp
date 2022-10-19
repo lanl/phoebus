@@ -395,6 +395,13 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         }
 
         Real sig[3];
+        if (v(b, prho, k, j, i) <= robust::SMALL()) {
+          printf("[%i %i %i] rho = %e vel = %e %e %e eng = %e P = %e gm1 = %e\n",
+          k,j,i,v(b,prho,k,j,i), vel[0],vel[1],vel[2],v(b,peng,k,j,i), v(b,prs,k,j,i),
+          v(b,gm1,k,j,i));
+          PARTHENON_FAIL("bad prho");
+          }
+
         prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
                       v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov4, gcon, shift, lapse,
                       gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,

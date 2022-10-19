@@ -165,6 +165,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   const auto c2p_failure_force_fixup_both =
       fix_pkg->Param<bool>("c2p_failure_force_fixup_both");
 
+  PARTHENON_REQUIRE(!c2p_failure_force_fixup_both, "As currently implemented this is a race condition!");
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -231,6 +233,9 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
             v(b, peng, k, j, i) = fixup(peng, norm);
 
             if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
+
+            v(b, prho, k, j, i) = std::max<Real>(v(b, prho, k, j, i), 100. * robust::SMALL());
+            v(b, peng, k, j, i) = std::max<Real>(v(b, peng, k, j, i), 100.*robust::SMALL());
           } else {
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
             // velocities to zero

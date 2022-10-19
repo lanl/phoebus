@@ -433,11 +433,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                   std::sqrt(g.contractCov3Vectors(cov_H, cov_H) -
                             std::pow(g.contractConCov3Vectors(con_v, cov_H), 2)) /
                   J;
-              if (c2p_status == ClosureStatus::failure) {
+              if (c2p_status == ClosureStatus::success) {
+                success = true;
+              } else {
                 success = false;
                 break;
-              } else {
-                success = true;
               }
             } else if (!success && oned_fixup_strategy == OneDFixupStrategy::ignore_all) {
               dE[ispec] = 0.;
