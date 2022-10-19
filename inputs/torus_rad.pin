@@ -7,8 +7,7 @@ ix2_bc = reflect
 ox2_bc = reflect
 
 <phoebus/mesh>
-#bc_vars = primitive
-bc_vars = conserved
+bc_vars = primitive
 
 <parthenon/job>
 problem_id  = torus       # problem ID: basename of output filenames
@@ -134,7 +133,7 @@ src_rootfind_tol = 1.e-8
 src_rootfind_maxiter = 100
 oned_fixup_strategy = ignore_dJ
 recon_fixup_strategy = bounds
-closure_c2p_strategy = frail # robust
+closure_c2p_strategy = robust
 
 #scattering_fraction = 1.0
 scattering_fraction = 0.5
@@ -157,8 +156,9 @@ enable_rad_ceilings = true
 enable_flux_fixup = false # true
 enable_c2p_fixup = true
 enable_source_fixup = true
-report_c2p_fails = true # false
-report_source_fails = true # false
+report_c2p_fails = false
+report_source_fails = false
+c2p_failure_force_fixup_both = false
 
 fluid_c2p_failure_strategy = interpolate
 rad_c2p_failure_strategy = interpolate
