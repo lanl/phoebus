@@ -165,7 +165,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   const auto c2p_failure_force_fixup_both =
       fix_pkg->Param<bool>("c2p_failure_force_fixup_both");
 
-  PARTHENON_REQUIRE(!c2p_failure_force_fixup_both, "As currently implemented this is a race condition!");
+  PARTHENON_REQUIRE(!c2p_failure_force_fixup_both,
+                    "As currently implemented this is a race condition!");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
@@ -220,7 +221,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
 
-          //if (num_valid > 0.5 &&
+          // if (num_valid > 0.5 &&
           //    fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate && i > ib.s &&
           //    i < ib.e - 1 && j > jb.s && j < jb.e - 1 && k > kb.s && k < kb.e - 1) {
           if (num_valid > 0.5 &&
@@ -234,8 +235,10 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
             if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
 
-            v(b, prho, k, j, i) = std::max<Real>(v(b, prho, k, j, i), 100. * robust::SMALL());
-            v(b, peng, k, j, i) = std::max<Real>(v(b, peng, k, j, i), 100.*robust::SMALL());
+            v(b, prho, k, j, i) =
+                std::max<Real>(v(b, prho, k, j, i), 100. * robust::SMALL());
+            v(b, peng, k, j, i) =
+                std::max<Real>(v(b, peng, k, j, i), 100. * robust::SMALL());
           } else {
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
             // velocities to zero
