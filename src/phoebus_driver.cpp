@@ -347,13 +347,13 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
   }
 
-  TaskRegion &sync_region_6 = tc.AddRegion(num_partitions);
+  TaskRegion &sync_region_2 = tc.AddRegion(num_partitions);
   for (int ib = 0; ib < num_partitions; ib++) {
     auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
     auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
     auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
     auto &dudt = pmesh->mesh_data.GetOrAdd("dUdt", ib);
-    auto &tl = sync_region_6[ib];
+    auto &tl = sync_region_2[ib];
     auto &gsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", ib);
     int reg_dep_id = 0;
 
@@ -367,17 +367,15 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (monopole_gr_active) {
       auto interp_to_monopole =
           tl.AddTask(none, MonopoleGR::InterpolateMatterTo1D<MDT>, sc0.get());
-      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, interp_to_monopole);
-    }
+      sync_region_2.AddRegionalDependencies(reg_dep_id++, ib, interp_to_monopole);
 
-    // TODO(JMM): Is this the right place for this?
-    // TODO(JMM): Should this stuff be in the synchronous region?
-    if (monopole_gr_active) {
+      // TODO(JMM): Is this the right place for this?
+      // TODO(JMM): Should this stuff be in the synchronous region?
       auto matter_to_host =
           (ib == 0 ? tl.AddTask(interp_to_monopole, MonopoleGR::MatterToHost,
                                 monopole.get(), true)
                    : none);
-      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, matter_to_host);
+      sync_region_2.AddRegionalDependencies(reg_dep_id++, ib, matter_to_host);
       auto start_reduce_matter =
           (ib == 0 ? tl.AddTask(matter_to_host, &MonoMatRed_t::StartReduce, pmono_mat_red,
                                 MPI_SUM)
@@ -388,10 +386,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                    : none);
       auto finish_reduce_matter =
           tl.AddTask(start_reduce_matter, &MonoMatRed_t::CheckReduce, pmono_mat_red);
-      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_matter);
+      sync_region_2.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_matter);
       auto finish_reduce_vols =
           tl.AddTask(start_reduce_vols, &MonoVolRed_t::CheckReduce, pmono_vol_red);
-      sync_region_6.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_vols);
+      sync_region_2.AddRegionalDependencies(reg_dep_id++, ib, finish_reduce_vols);
       auto finish_mono_reds = finish_reduce_matter | finish_reduce_vols;
       auto divide_vols =
           (ib == 0 ? tl.AddTask(finish_mono_reds, MonopoleGR::DivideVols, monopole.get())
@@ -417,9 +415,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
   // Communicate flux corrections and update independent data with fluxes and geometric
   // sources
-  TaskRegion &sync_region_2 = tc.AddRegion(num_partitions);
+  TaskRegion &sync_region_3 = tc.AddRegion(num_partitions);
   for (int i = 0; i < num_partitions; i++) {
-    auto &tl = sync_region_2[i];
+    auto &tl = sync_region_3[i];
     auto &mbase = pmesh->mesh_data.GetOrAdd("base", i);
     auto &mc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], i);
     auto &mc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
@@ -477,92 +475,43 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto floors =
         tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
-  }
 
-  // TODO(BRR) skip this communication and source update if no radiation
-
-  // Communicate
-  TaskRegion &sync_region_3 = tc.AddRegion(num_partitions);
-  for (int ip = 0; ip < num_partitions; ip++) {
-    auto &tl = sync_region_3[ip];
-    auto &mc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ip);
-
-    auto send_local =
-        tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundBufs<local>, mc1);
-    auto send_nonlocal =
-        tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, mc1);
-
-    auto recv_local =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, mc1);
-    auto recv_nonlocal =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, mc1);
-
-    auto set_local =
-        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, mc1);
-    auto set_nonlocal = tl.AddTask(
-        recv_nonlocal, parthenon::cell_centered_bvars::SetBounds<nonlocal>, mc1);
-
-    if (pmesh->multilevel) {
-      tl.AddTask(set_nonlocal | set_local,
-                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, mc1.get());
-    }
-  }
-
-  // TODO(BRR) loop this in thoughtfully!
-  TaskRegion &async_region_temp1 = tc.AddRegion(blocks.size());
-  for (int i = 0; i < blocks.size(); i++) {
-    auto &pmb = blocks[i];
-    auto &tl = async_region_temp1[i];
-    auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
-
-    auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
-
-    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
-
-    auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
-
-    auto fill_derived = tl.AddTask(
-        convert_bc, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc.get());
-
-    auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
-
-    auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
-
-    auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
-  }
-
-  // Radiation/fluid interaction terms
-  TaskRegion &async_region_3 = tc.AddRegion(num_independent_task_lists);
-  for (int ib = 0; ib < num_independent_task_lists; ib++) {
-    auto pmb = blocks[ib].get();
-    auto &tl = async_region_3[ib];
-
-    // first make other useful containers
-    auto &base = pmb->meshblock_data.Get();
-
-    // pull out the container we'll use to get fluxes and/or compute RHSs
-    auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
-    auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
-    using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-
-    TaskID fill_derived(0);
-
+    TaskID gas_rad_int(0);
     if (rad_mocmc_active) {
       auto impl_update =
-          tl.AddTask(fill_derived, radiation::MOCMCFluidSource<MeshBlockData<Real>>,
-                     sc1.get(), beta * dt, fluid_active);
+          tl.AddTask(floors, radiation::MOCMCFluidSource<MeshBlockData<Real>>, sc1.get(),
+                     beta * dt, fluid_active);
       auto impl_edd = tl.AddTask(
           impl_update, radiation::MOCMCEddington<MeshBlockData<Real>>, sc1.get());
+      gas_rad_int = gas_rad_int | impl_edd;
     } else if (rad_moments_active) {
       auto impl_update =
-          tl.AddTask(fill_derived, radiation::MomentFluidSource<MeshBlockData<Real>>,
-                     sc1.get(), beta * dt, fluid_active);
+          tl.AddTask(floors, radiation::MomentFluidSource<MeshBlockData<Real>>, sc1.get(),
+                     beta * dt, fluid_active);
+      gas_rad_int = gas_rad_int | impl_update;
+    }
+
+    if (rad_moments_active) {
+      // Fixup for interaction failures
+      auto src_fixup =
+          tl.AddTask(gas_rad_int, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get());
+
+      // fill in derived fields after source update
+      auto fill_derived = tl.AddTask(
+          src_fixup, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+
+      auto fixup = tl.AddTask(
+          fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+
+      auto radfixup = tl.AddTask(
+          fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+
+      auto floors =
+          tl.AddTask(src_fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
     }
   }
 
-  // Communicate (before applying stencil-based fixup)
+  // Communicate (after applying stencil-based fixup)
   TaskRegion &sync_region_4 = tc.AddRegion(num_partitions);
   for (int ip = 0; ip < num_partitions; ip++) {
     auto &tl = sync_region_4[ip];
@@ -588,68 +537,11 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                  parthenon::cell_centered_refinement::RestrictPhysicalBounds, mc1.get());
     }
   }
-
-  // Fix up interaction failures
-  TaskRegion &async_region_4 = tc.AddRegion(num_independent_task_lists);
-  for (int ib = 0; ib < num_independent_task_lists; ib++) {
-    auto pmb = blocks[ib].get();
-    auto &tl = async_region_4[ib];
-
-    // first make other useful containers
-    auto &base = pmb->meshblock_data.Get();
-
-    // pull out the container we'll use to get fluxes and/or compute RHSs
-    auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
-    using MDT = std::remove_pointer<decltype(sc1.get())>::type;
-
-    // Fixup for interaction failures
-    auto src_fixup = tl.AddTask(none, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get());
-
-    // fill in derived fields after source update
-    auto fill_derived = tl.AddTask(
-        src_fixup, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
-
-    auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
-
-    auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
-
-    auto floors =
-        tl.AddTask(src_fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
-  }
-
-  // Communicate (after applying stencil-based fixup)
-  TaskRegion &sync_region_5 = tc.AddRegion(num_partitions);
-  for (int ip = 0; ip < num_partitions; ip++) {
-    auto &tl = sync_region_5[ip];
-    auto &mc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ip);
-
-    auto send_local =
-        tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundBufs<local>, mc1);
-    auto send_nonlocal =
-        tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, mc1);
-
-    auto recv_local =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, mc1);
-    auto recv_nonlocal =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, mc1);
-
-    auto set_local =
-        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, mc1);
-    auto set_nonlocal = tl.AddTask(
-        recv_nonlocal, parthenon::cell_centered_bvars::SetBounds<nonlocal>, mc1);
-
-    if (pmesh->multilevel) {
-      tl.AddTask(set_nonlocal | set_local,
-                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, mc1.get());
-    }
-  }
   // TODO(BRR) loop this in thoughtfully!
-  TaskRegion &async_region_temp2 = tc.AddRegion(blocks.size());
+  TaskRegion &async_region_3 = tc.AddRegion(num_independent_task_lists);
   for (int i = 0; i < blocks.size(); i++) {
     auto &pmb = blocks[i];
-    auto &tl = async_region_temp2[i];
+    auto &tl = async_region_3[i];
     auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
 
     auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
@@ -668,23 +560,19 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc.get());
 
     auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
-  }
 
-  // Evaluate and report particle statistics
-  if (rad_mocmc_active && stage == integrator->nstages) {
-    TaskRegion &tuning_region = tc.AddRegion(num_independent_task_lists);
-    {
+    if (rad_mocmc_active && stage == integrator->nstages) {
       particle_resolution.val.resize(1); // total
-      for (int i = 0; i < particle_resolution.val.size(); i++) {
-        particle_resolution.val[i] = 0.;
-      }
+      // for (int i = 0; i < particle_resolution.val.size(); i++) {
+      particle_resolution.val[i] = 0.;
+      //}
       int reg_dep_id = 0;
-      auto &tl = tuning_region[0];
+      // auto &tl = async_region_3[0];
 
       auto update_count = tl.AddTask(none, radiation::MOCMCUpdateParticleCount, pmesh,
                                      &particle_resolution.val);
 
-      tuning_region.AddRegionalDependencies(reg_dep_id, 0, update_count);
+      async_region_3.AddRegionalDependencies(reg_dep_id, 0, update_count);
       reg_dep_id++;
 
       auto start_count_reduce =
@@ -694,7 +582,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto finish_count_reduce =
           tl.AddTask(start_count_reduce, &AllReduce<std::vector<Real>>::CheckReduce,
                      &particle_resolution);
-      tuning_region.AddRegionalDependencies(reg_dep_id, 0, finish_count_reduce);
+      async_region_3.AddRegionalDependencies(reg_dep_id, 0, finish_count_reduce);
       reg_dep_id++;
 
       // Report particle count
@@ -710,36 +598,26 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                        &particle_resolution.val)
                                  : none);
     }
-  }
 
-  TaskRegion &async_region_6 = tc.AddRegion(num_independent_task_lists);
-  for (int ib = 0; ib < num_independent_task_lists; ib++) {
-    auto pmb = blocks[ib].get();
-    auto &tl = async_region_6[ib];
-    auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
-
-    // TODO(JMM): Should this be at the beginning of a cycle? The end?
-    // After the monopole solver is done?
-    // Update cached metric if needed
     if (time_dependent_geom) {
       auto update_geom =
-          tl.AddTask(none, Geometry::UpdateGeometry<MeshBlockData<Real>>, sc1.get());
+          tl.AddTask(floors, Geometry::UpdateGeometry<MeshBlockData<Real>>, sc.get());
     }
 
     // estimate next time step
     if (stage == integrator->nstages) {
       auto new_dt = tl.AddTask(
-          none, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc1.get());
+          floors, parthenon::Update::EstimateTimestep<MeshBlockData<Real>>, sc.get());
 
       if (fluid_active) {
-        auto divb = tl.AddTask(none, fluid::CalculateDivB, sc1.get());
+        auto divb = tl.AddTask(floors, fluid::CalculateDivB, sc.get());
       }
 
       // Update refinement
       if (pmesh->adaptive) {
         // using tag_type = TaskStatus(std::shared_ptr<MeshBlockData<Real>> &);
         auto tag_refine =
-            tl.AddTask(none, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc1.get());
+            tl.AddTask(floors, parthenon::Refinement::Tag<MeshBlockData<Real>>, sc.get());
       }
     }
   }
