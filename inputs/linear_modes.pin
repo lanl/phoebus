@@ -112,7 +112,6 @@ riemann = hll
 c2p_max_iter = 100
 recon = linear
 c2p_tol = 1.e-12
-#c2p_method = classic
 c2p_method = robust
 
 <hydro_modes>
