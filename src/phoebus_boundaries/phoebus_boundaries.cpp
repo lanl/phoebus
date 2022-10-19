@@ -243,9 +243,6 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
   auto &pkg_fix = rc->GetParentPointer()->packages.Get("fixup");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
 
-  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
-                    "Problem \"torus\" requires FMKS geometry!");
-
   // Apply inflow check to ox1 for BH problem at simulation BC only
   const bool enable_ox1_fmks_inflow_check =
       pkg_fix->Param<bool>("enable_ox1_fmks_inflow_check");

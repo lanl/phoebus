@@ -53,7 +53,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool enable_flux_fixup = pin->GetOrAddBoolean("fixup", "enable_flux_fixup", false);
   params.Add("enable_flux_fixup", enable_flux_fixup);
   bool enable_ox1_fmks_inflow_check =
-      pin->GetOrAddBoolean("fixup", "enable_ox1_fmks_inflow_check", true);
+      pin->GetOrAddBoolean("fixup", "enable_ox1_fmks_inflow_check", false);
   params.Add("enable_ox1_fmks_inflow_check", enable_ox1_fmks_inflow_check);
   bool enable_fixup = pin->GetOrAddBoolean("fixup", "enable_fixup", false);
   params.Add("enable_fixup", enable_fixup);
@@ -68,12 +68,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("report_c2p_fails", report_c2p_fails);
   bool report_source_fails = pin->GetOrAddBoolean("fixup", "report_source_fails", false);
   params.Add("report_source_fails", report_source_fails);
-  bool enable_mhd_floors =
-      pin->GetOrAddBoolean("fixup", "enable_mhd_floors", enable_mhd ? true : false);
-  bool enable_rad_floors =
-      pin->GetOrAddBoolean("fixup", "enable_rad_floors", enable_rad ? true : false);
-  bool enable_rad_ceilings =
-      pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", enable_rad ? true : false);
+  bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
+  bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", false);
+  bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", false);
 
   if (enable_mhd_floors && !enable_mhd) {
     enable_mhd_floors = false;
