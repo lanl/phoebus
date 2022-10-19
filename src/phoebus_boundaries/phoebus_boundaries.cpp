@@ -115,14 +115,8 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   // auto nb1 = IndexRange{0, 0};
   auto domain = IndexDomain::inner_x1;
 
-  const int pv_lo = imap[fluid_prim::velocity].first;
-  auto idx_J = imap.GetFlatIdx(radmoment_prim::J, false);
-  auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
-
   auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
-  auto &rad = rc->GetParentPointer()->packages.Get("radiation");
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
-  const int num_species = rad->Param<bool>("active") ? rad->Param<int>("num_species") : 0;
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
@@ -158,8 +152,6 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   const int pv_lo = imap[fluid_prim::velocity].first;
   auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
-  // TODO(BRR): debug
-  auto idx_J = imap.GetFlatIdx(radmoment_prim::J, false);
 
   auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
   auto &rad = rc->GetParentPointer()->packages.Get("radiation");
@@ -242,9 +234,6 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
   auto &pkg_rad = rc->GetParentPointer()->packages.Get("radiation");
   auto &pkg_fix = rc->GetParentPointer()->packages.Get("fixup");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
-
-  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
-                    "Problem \"torus\" requires FMKS geometry!");
 
   // Apply inflow check to ox1 for BH problem at simulation BC only
   const bool enable_ox1_fmks_inflow_check =
