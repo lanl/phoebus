@@ -56,6 +56,8 @@ constexpr char kappaH[] = "r.i.kappaH";
 constexpr char JBB[] = "r.i.JBB";
 constexpr char tilPi[] = "r.i.tilPi";
 constexpr char kappaH_mean[] = "r.i.kappaH_mean";
+constexpr char c2pfail[] = "r.i.c2p_fail";
+constexpr char srcfail[] = "r.i.src_fail";
 } // namespace radmoment_internal
 
 namespace mocmc_internal {
@@ -87,6 +89,8 @@ namespace diagnostic_variables {
 constexpr char divb[] = "divb";
 constexpr char divf[] = "flux_divergence";
 constexpr char src_terms[] = "src_terms";
+constexpr char r_divf[] = "r.flux_divergence";
+constexpr char r_src_terms[] = "r.src_terms";
 } // namespace diagnostic_variables
 
 #endif // PHOEBUS_UTILS_VARIABLES_HPP_

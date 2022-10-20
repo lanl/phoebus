@@ -45,6 +45,7 @@ def plot_dump(filename, varname,
               log=True):
     data = phdf(filename)
     print(data)
+    time = data.Time
 
     q = data.Get(varname, False)
     NB = q.shape[0]
@@ -86,7 +87,12 @@ def plot_dump(filename, varname,
     fig = plt.figure()
     p = fig.add_subplot(111, aspect=1)
     for i in range(NB):
-        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], q[i,0,:,:], shading='gouraud',
+        val = q[i,0,:,:]
+        if len(val.shape) > 2:
+          print("WARNING plotting the 0th index of multidimensional variable!")
+          val = val[:,:,0]
+
+        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:], shading='gouraud',
                             vmin=qmin, vmax=qmax, cmap=colormap)
 
     plt.xlim(x1bounds[0], x1bounds[1])
@@ -95,6 +101,8 @@ def plot_dump(filename, varname,
     plt.xlabel(r'$x$')
     plt.ylabel(r'$y$')
     plt.colorbar(mesh, label=cbar_label)
+
+    plt.title("t = %g" % time)
 
     plt.savefig(savename, dpi=300, bbox_inches='tight')
     plt.clf()

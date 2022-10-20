@@ -32,7 +32,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables(
-      {p::density, p::velocity, p::energy, p::ye, p::pressure, p::temperature}, imap);
+      {p::density, p::velocity, p::energy, p::ye, p::pressure, p::temperature, p::gamma1},
+      imap);
 
   const int irho = imap[p::density].first;
   const int ivlo = imap[p::velocity].first;
@@ -41,6 +42,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iye = imap[p::ye].second;
   const int iprs = imap[p::pressure].first;
   const int itmp = imap[p::temperature].first;
+  const int igm1 = imap[p::gamma1].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -77,6 +79,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(itmp, k, j, i) =
             eos.TemperatureFromDensityInternalEnergy(rho0, u0 / rho0, lambda);
         v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho0, u0 / rho0, lambda);
+        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(irho, k, j, i), v(itmp, k, j, i), lambda) /
+                           v(iprs, k, j, i);
         v(iye, k, j, i) = 0.5; // TODO(BRR) change depending on species
 
         for (int d = 0; d < 3; d++)

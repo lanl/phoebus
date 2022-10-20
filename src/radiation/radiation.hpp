@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -43,12 +43,25 @@ enum class MOCMCRecon { kdgrid };
 
 enum class MOCMCBoundaries { outflow, fixed_temp, periodic };
 
+enum class SourceSolver { zerod, oned, fourd };
+
+enum class OneDFixupStrategy {
+  none,      // Do not attempt to repair failed 1D rootfind
+  ignore_dJ, // If 1D rootfind fails, ignore update to radiation temperature
+  ignore_all // If 1D rootfind fails, do not apply radiation source
+};
+
+enum class ReconFixupStrategy {
+  none,  // Do not apply fixups to reconstructed quantities
+  bounds // Apply floors and ceilings to reconstructed quantities
+};
+
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
 
-constexpr RadiationType species[3] = {
+constexpr int MaxNumRadiationSpecies = 3;
+constexpr RadiationType species[MaxNumRadiationSpecies] = {
     RadiationType::NU_ELECTRON, RadiationType::NU_ELECTRON_ANTI, RadiationType::NU_HEAVY};
-constexpr int NumRadiationTypes = 3;
 
 KOKKOS_INLINE_FUNCTION
 Real LogLinearInterp(Real x, int sidx, int k, int j, int i, ParArrayND<Real> table,
@@ -59,6 +72,12 @@ Real LogLinearInterp(Real x, int sidx, int k, int j, int i, ParArrayND<Real> tab
   dn = dn - n;
   return (1. - dn) * table(n, sidx, k, j, i) + dn * table(n + 1, sidx, k, j, i);
 }
+
+enum class SourceStatus { success, failure };
+struct FailFlags {
+  static constexpr Real success = 1.0;
+  static constexpr Real fail = 0.0;
+};
 
 // Choice of RNG
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;

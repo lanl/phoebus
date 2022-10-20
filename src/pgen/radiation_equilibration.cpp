@@ -31,11 +31,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(
-      {radmoment_prim::J, radmoment_prim::H, radmoment_internal::xi,
-       radmoment_internal::phi, fluid_prim::density, fluid_prim::temperature,
-       fluid_prim::pressure, fluid_prim::energy, fluid_prim::ye, fluid_prim::velocity},
-      imap);
+  auto v = rc->PackVariables({radmoment_prim::J, radmoment_prim::H,
+                              radmoment_internal::xi, radmoment_internal::phi,
+                              fluid_prim::density, fluid_prim::temperature,
+                              fluid_prim::pressure, fluid_prim::gamma1,
+                              fluid_prim::energy, fluid_prim::ye, fluid_prim::velocity},
+                             imap);
 
   auto idJ = imap.GetFlatIdx(radmoment_prim::J);
   auto idH = imap.GetFlatIdx(radmoment_prim::H);
@@ -45,6 +46,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iRho = imap[fluid_prim::density].first;
   const int iT = imap[fluid_prim::temperature].first;
   const int iP = imap[fluid_prim::pressure].first;
+  const int igm1 = imap[fluid_prim::gamma1].first;
   const int ieng = imap[fluid_prim::energy].first;
   const int pye = imap[fluid_prim::ye].first;
   auto idv = imap.GetFlatIdx(fluid_prim::velocity);
@@ -86,11 +88,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(iT, k, j, i) = Tg0;
         v(iP, k, j, i) = P;
         v(ieng, k, j, i) = v(iRho, k, j, i) * eps;
+        v(igm1, k, j, i) =
+            eos.BulkModulusFromDensityTemperature(v(iRho, k, j, i), v(iT, k, j, i)) /
+            v(iP, k, j, i);
         v(pye, k, j, i) = Ye0;
         SPACELOOP(ii) v(idv(ii), k, j, i) = 0.0;
 
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
-          SPACELOOP(ii) v(idH(ii, ispec), k, j, i) = 0.0;
+          SPACELOOP(ii) v(idH(ispec, ii), k, j, i) = 0.0;
           v(idJ(ispec), k, j, i) =
               opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
         }
@@ -104,8 +109,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     }
   }
 
-  radiation::MomentPrim2Con(rc.get(), IndexDomain::entire);
   fluid::PrimitiveToConserved(rc.get());
+  radiation::MomentPrim2Con(rc.get(), IndexDomain::entire);
 }
 
 } // namespace radiation_equilibration

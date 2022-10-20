@@ -64,7 +64,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             Vec con_v = {vmag * cos(phiv), vmag * sin(phiv), 0.0};
             Tens2 cov_gamma = {{{1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 0.0, 1.0}}};
             LocalThreeGeometry g(cov_gamma);
-            ClosureM1<Vec, Tens2> cl(con_v, &g);
+            ClosureM1<> cl(con_v, &g);
 
             // Assume a fluid frame state
             Real J = 1.0;
@@ -75,7 +75,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
             // Calculate comoving frame state
             Real E;
             Vec F;
-            cl.GetCovTilPiFromPrim(J, cov_tilH, &con_tilPi);
+            cl.GetConTilPiFromPrim(J, cov_tilH, &con_tilPi);
             cl.Prim2Con(J, cov_tilH, con_tilPi, &E, &F);
 
             // re-Calculate rest frame quantities using closure
@@ -85,7 +85,7 @@ TEST_CASE("M1 Closure", "[radiation][closure]") {
 
             Real xig, phig;
             cl.GetM1GuessesFromEddington(E, F, &xig, &phig);
-            cl.GetCovTilPiFromCon(E, F, xig, phig, &con_tilPi);
+            cl.GetConTilPiFromCon(E, F, xig, phig, &con_tilPi);
             cl.Con2Prim(E, F, con_tilPi, &J_out, &H_out);
 
             // if (result.status == radiation::Status::failure) throw 2;

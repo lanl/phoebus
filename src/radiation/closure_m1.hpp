@@ -44,8 +44,8 @@ struct M1Result {
 
 /// Holds methods for closing the radiation moment equations as well as calculating
 /// radiation moment source terms.
-template <class Vec, class Tens2, class SET = ClosureSettings<>>
-class ClosureM1 : public ClosureEdd<Vec, Tens2, SET> {
+template <class SET = ClosureSettings<>>
+class ClosureM1 : public ClosureEdd<SET> {
  protected:
   KOKKOS_FORCEINLINE_FUNCTION
   Real closure(Real xi) {
@@ -55,24 +55,25 @@ class ClosureM1 : public ClosureEdd<Vec, Tens2, SET> {
   }
 
  public:
-  using typename ClosureEdd<Vec, Tens2, SET>::LocalGeometryType;
+  using typename ClosureEdd<SET>::LocalGeometryType;
 
   //-------------------------------------------------------------------------------------
   /// Constructor just calculates the inverse 3-metric, covariant three-velocity, and the
   /// Lorentz factor for the given background state.
   KOKKOS_FUNCTION
-  ClosureM1(const Vec con_v_in, LocalGeometryType *g)
-      : ClosureEdd<Vec, Tens2, SET>(con_v_in, g) {}
+  ClosureM1(const Vec con_v_in, LocalGeometryType *g,
+            ClosureRuntimeSettings r = {ClosureCon2PrimStrategy::robust})
+      : ClosureEdd<SET>(con_v_in, g, r) {}
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
+  ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_H, Tens2 *con_tilPi) {
     Vec con_tilf;
     M1FluidPressureTensor(J, cov_H, con_tilPi, &con_tilf);
     return ClosureStatus::success;
   }
 
   KOKKOS_FUNCTION
-  ClosureStatus GetCovTilPiFromCon(Real E, const Vec cov_F, Real &xi, Real &phi,
+  ClosureStatus GetConTilPiFromCon(Real E, const Vec cov_F, Real &xi, Real &phi,
                                    Tens2 *con_tilPi) {
 
     if (SET::eqn_type == ClosureEquation::number_conserve) {
@@ -91,14 +92,14 @@ class ClosureM1 : public ClosureEdd<Vec, Tens2, SET> {
   void GetM1GuessesFromEddington(const Real E, const Vec cov_F, Real *xi, Real *phi);
 
   // Make base template class variables dependent names (pretty ugly, I know)
-  using ClosureEdd<Vec, Tens2, SET>::Con2Prim;
-  using ClosureEdd<Vec, Tens2, SET>::Prim2Con;
-  using ClosureEdd<Vec, Tens2, SET>::v2;
-  using ClosureEdd<Vec, Tens2, SET>::W;
-  using ClosureEdd<Vec, Tens2, SET>::W2;
-  using ClosureEdd<Vec, Tens2, SET>::cov_v;
-  using ClosureEdd<Vec, Tens2, SET>::con_v;
-  using ClosureEdd<Vec, Tens2, SET>::gamma;
+  using ClosureEdd<SET>::Con2Prim;
+  using ClosureEdd<SET>::Prim2Con;
+  using ClosureEdd<SET>::v2;
+  using ClosureEdd<SET>::W;
+  using ClosureEdd<SET>::W2;
+  using ClosureEdd<SET>::cov_v;
+  using ClosureEdd<SET>::con_v;
+  using ClosureEdd<SET>::gamma;
 
  protected:
   // All internal methods are written in terms of E = n^\mu n^\nu M_{\mu \nu}
@@ -151,10 +152,10 @@ class ClosureM1 : public ClosureEdd<Vec, Tens2, SET> {
 
 //---- Method templates instantiated below
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION void
-ClosureM1<Vec, Tens2, SET>::GetM1GuessesFromEddington(const Real E, const Vec cov_F,
-                                                      Real *xi, Real *phi) {
+template <class SET>
+KOKKOS_FUNCTION void ClosureM1<SET>::GetM1GuessesFromEddington(const Real E,
+                                                               const Vec cov_F, Real *xi,
+                                                               Real *phi) {
   // Get the basis vectors for the search
   Vec con_tilg, con_tild;
   GetBasisVectors(cov_F, &con_tilg, &con_tild);
@@ -170,6 +171,7 @@ ClosureM1<Vec, Tens2, SET>::GetM1GuessesFromEddington(const Real E, const Vec co
   Real vHEdd = gamma->contractConCov3Vectors(con_v, cov_HEdd);
   Real HEdd = sqrt(gamma->contractCov3Vectors(cov_HEdd, cov_HEdd) - vHEdd * vHEdd);
 
+  // TODO(BRR) Use radiation ceilings value here?
   *xi = std::min(ratio(HEdd, JEdd), 0.99);
   *phi = 1.000001 * acos(-1);
 }
@@ -177,12 +179,10 @@ ClosureM1<Vec, Tens2, SET>::GetM1GuessesFromEddington(const Real E, const Vec co
 //----------------
 // Protected functions below
 //----------------
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION M1Result ClosureM1<Vec, Tens2, SET>::SolveClosure(Real E, Vec cov_F,
-                                                                  Real *xi_out,
-                                                                  Real *phi_out,
-                                                                  const Real xi_guess,
-                                                                  const Real phi_guess) {
+template <class SET>
+KOKKOS_FUNCTION M1Result ClosureM1<SET>::SolveClosure(Real E, Vec cov_F, Real *xi_out,
+                                                      Real *phi_out, const Real xi_guess,
+                                                      const Real phi_guess) {
   const int max_iter = 30;
   const Real tol = 1.e6 * std::numeric_limits<Real>::epsilon();
   const Real eps = std::sqrt(10 * std::numeric_limits<Real>::epsilon());
@@ -266,10 +266,12 @@ KOKKOS_FUNCTION M1Result ClosureM1<Vec, Tens2, SET>::SolveClosure(Real E, Vec co
   return result;
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION ClosureStatus ClosureM1<Vec, Tens2, SET>::M1Residuals(
-    const Real E, const Vec cov_F, const Real xi, const Real phi, const Vec con_tilg,
-    const Vec con_tild, Real *fXi, Real *fPhi) {
+template <class SET>
+KOKKOS_FUNCTION ClosureStatus ClosureM1<SET>::M1Residuals(const Real E, const Vec cov_F,
+                                                          const Real xi, const Real phi,
+                                                          const Vec con_tilg,
+                                                          const Vec con_tild, Real *fXi,
+                                                          Real *fPhi) {
   // Calculate rest frame fluid variables
   Tens2 con_tilPi;
   Vec con_tilf;
@@ -292,9 +294,11 @@ KOKKOS_FUNCTION ClosureStatus ClosureM1<Vec, Tens2, SET>::M1Residuals(
   return ClosureStatus::success;
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION ClosureStatus ClosureM1<Vec, Tens2, SET>::M1FluidPressureTensor(
-    const Real J, const Vec cov_tilH, Tens2 *con_tilPi, Vec *con_tilf) {
+template <class SET>
+KOKKOS_FUNCTION ClosureStatus ClosureM1<SET>::M1FluidPressureTensor(const Real J,
+                                                                    const Vec cov_tilH,
+                                                                    Tens2 *con_tilPi,
+                                                                    Vec *con_tilf) {
   Vec con_tilH;
   gamma->raise3Vector(cov_tilH, &con_tilH);
   Real H(0.0), vH(0.0);
@@ -314,8 +318,8 @@ KOKKOS_FUNCTION ClosureStatus ClosureM1<Vec, Tens2, SET>::M1FluidPressureTensor(
   return ClosureStatus::success;
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION ClosureStatus ClosureM1<Vec, Tens2, SET>::M1FluidPressureTensor(
+template <class SET>
+KOKKOS_FUNCTION ClosureStatus ClosureM1<SET>::M1FluidPressureTensor(
     const Vec /*cov_F*/, const Real xi, const Real phi, const Vec con_tilg,
     const Vec con_tild, Tens2 *con_tilPi, Vec *con_tilf) {
 
@@ -337,10 +341,10 @@ KOKKOS_FUNCTION ClosureStatus ClosureM1<Vec, Tens2, SET>::M1FluidPressureTensor(
   return ClosureStatus::success;
 }
 
-template <class Vec, class Tens2, class SET>
-KOKKOS_FUNCTION ClosureStatus ClosureM1<Vec, Tens2, SET>::GetBasisVectors(const Vec cov_F,
-                                                                          Vec *con_tilg,
-                                                                          Vec *con_tild) {
+template <class SET>
+KOKKOS_FUNCTION ClosureStatus ClosureM1<SET>::GetBasisVectors(const Vec cov_F,
+                                                              Vec *con_tilg,
+                                                              Vec *con_tild) {
   // Build projected basis vectors for flux direction
   // These vectors are actually fixed, so there is no need to recalculate
   // them every step in the root find

@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -93,6 +93,57 @@ KOKKOS_INLINE_FUNCTION void SolveAxb2x2(T A[2][2], T b[2], T x[2]) {
   const auto invDet = 1.0 / DifferenceOfProducts(A[0][0], A[1][1], A[0][1], A[1][0]);
   x[0] = invDet * DifferenceOfProducts(A[1][1], b[0], A[0][1], b[1]);
   x[1] = invDet * DifferenceOfProducts(A[0][0], b[1], A[1][0], b[0]);
+}
+
+KOKKOS_INLINE_FUNCTION
+Real MINOR(Real m[16], int r0, int r1, int r2, int c0, int c1, int c2) {
+  return m[4 * r0 + c0] *
+             (m[4 * r1 + c1] * m[4 * r2 + c2] - m[4 * r2 + c1] * m[4 * r1 + c2]) -
+         m[4 * r0 + c1] *
+             (m[4 * r1 + c0] * m[4 * r2 + c2] - m[4 * r2 + c0] * m[4 * r1 + c2]) +
+         m[4 * r0 + c2] *
+             (m[4 * r1 + c0] * m[4 * r2 + c1] - m[4 * r2 + c0] * m[4 * r1 + c1]);
+}
+
+KOKKOS_INLINE_FUNCTION
+void adjoint(Real m[16], Real adjOut[16]) {
+  adjOut[0] = MINOR(m, 1, 2, 3, 1, 2, 3);
+  adjOut[1] = -MINOR(m, 0, 2, 3, 1, 2, 3);
+  adjOut[2] = MINOR(m, 0, 1, 3, 1, 2, 3);
+  adjOut[3] = -MINOR(m, 0, 1, 2, 1, 2, 3);
+
+  adjOut[4] = -MINOR(m, 1, 2, 3, 0, 2, 3);
+  adjOut[5] = MINOR(m, 0, 2, 3, 0, 2, 3);
+  adjOut[6] = -MINOR(m, 0, 1, 3, 0, 2, 3);
+  adjOut[7] = MINOR(m, 0, 1, 2, 0, 2, 3);
+
+  adjOut[8] = MINOR(m, 1, 2, 3, 0, 1, 3);
+  adjOut[9] = -MINOR(m, 0, 2, 3, 0, 1, 3);
+  adjOut[10] = MINOR(m, 0, 1, 3, 0, 1, 3);
+  adjOut[11] = -MINOR(m, 0, 1, 2, 0, 1, 3);
+
+  adjOut[12] = -MINOR(m, 1, 2, 3, 0, 1, 2);
+  adjOut[13] = MINOR(m, 0, 2, 3, 0, 1, 2);
+  adjOut[14] = -MINOR(m, 0, 1, 3, 0, 1, 2);
+  adjOut[15] = MINOR(m, 0, 1, 2, 0, 1, 2);
+}
+
+KOKKOS_INLINE_FUNCTION
+Real determinant(Real m[16]) {
+  return m[0] * MINOR(m, 1, 2, 3, 1, 2, 3) - m[1] * MINOR(m, 1, 2, 3, 0, 2, 3) +
+         m[2] * MINOR(m, 1, 2, 3, 0, 1, 3) - m[3] * MINOR(m, 1, 2, 3, 0, 1, 2);
+}
+
+KOKKOS_INLINE_FUNCTION
+void matrixInverse4x4(Real mat[4][4], Real matinv[4][4]) {
+  adjoint(&(mat[0][0]), &(matinv[0][0]));
+
+  Real det = determinant(&(mat[0][0]));
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 4; j++) {
+      matinv[i][j] /= det;
+    }
+  }
 }
 
 } // namespace LinearAlgebra

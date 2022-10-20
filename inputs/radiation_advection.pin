@@ -105,6 +105,7 @@ absorption = true
 do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
+src_solver = oned
 
 scattering_fraction = 1.0
 
