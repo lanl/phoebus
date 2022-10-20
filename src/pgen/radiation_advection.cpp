@@ -111,7 +111,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(prho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
                                    v(prho, k, j, i), v(pT, k, j, i), lambda);
 
-        v(idv(0), k, j, i) = vx;
+        v(idv(0), k, j, i) = W * vx;
         v(idv(1), k, j, i) = 0.0;
         v(idv(2), k, j, i) = 0.0;
 
@@ -132,10 +132,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                 J0 * std::max(exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10);
           }
 
-          printf("ispec: %i\n", ispec);
-          v(idH(0, ispec), k, j, i) = Hx;
-          v(idH(1, ispec), k, j, i) = Hy;
-          v(idH(2, ispec), k, j, i) = Hz;
+          v(idH(ispec, 0), k, j, i) = Hx;
+          v(idH(ispec, 1), k, j, i) = Hy;
+          v(idH(ispec, 2), k, j, i) = Hz;
         }
       });
 

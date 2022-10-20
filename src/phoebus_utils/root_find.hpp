@@ -58,7 +58,7 @@ struct RootFind {
 
   template <typename F>
   KOKKOS_INLINE_FUNCTION Real secant(F &func, Real a, Real b, const Real tol,
-                                     const Real guess) {
+                                     const Real guess, RootFindStatus *status = nullptr) {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
     Real x1, x2, y1, y2;
@@ -82,9 +82,11 @@ struct RootFind {
       // guard against roundoff because ya or yb is sufficiently close to zero
       if (x0 == x1) {
         x2 = x1;
+        iteration_count++;
         continue;
       } else if (x0 == x2) {
         x1 = x2;
+        iteration_count++;
         continue;
       }
       Real y0 = sign * func(x0);
@@ -92,7 +94,14 @@ struct RootFind {
       y2 = y1;
       x1 = x0;
       y1 = y0;
+      iteration_count++;
     }
+
+    if (status != nullptr) {
+      *status =
+          iteration_count == max_iter ? RootFindStatus::failure : RootFindStatus::success;
+    }
+
     return 0.5 * (x1 + x2);
   }
 
@@ -115,9 +124,11 @@ struct RootFind {
       // guard against roundoff because ya or yb is sufficiently close to zero
       if (c == a) {
         b = a;
+        iteration_count++;
         continue;
       } else if (c == b) {
         a = b;
+        iteration_count++;
         continue;
       }
       Real yc = sign * func(c);

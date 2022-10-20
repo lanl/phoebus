@@ -15,7 +15,11 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
+#include <singularity-eos/eos/eos.hpp>
+
+#include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/programming_utils.hpp"
+#include "phoebus_utils/root_find.hpp"
 #include "radiation/closure.hpp"
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
@@ -23,7 +27,14 @@
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
+#include "fluid/con2prim_robust.hpp"
+#include "fluid/prim2con.hpp"
+
 namespace radiation {
+
+using namespace singularity::neutrinos;
+using fixup::Bounds;
+using singularity::EOS;
 
 template <class T>
 class ReconstructionIndexer {
@@ -55,16 +66,15 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   namespace ir = radmoment_internal;
 
   auto *pm = rc->GetParentPointer().get();
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
 
   IndexRange ib = pm->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  std::vector<std::string> variables{cr::E,  cr::F,  pr::J, pr::H, fluid_prim::velocity,
-                                     ir::xi, ir::phi};
-  if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    variables.push_back(ir::tilPi);
-  }
+  std::vector<std::string> variables{
+      cr::E,  cr::F,   pr::J,       pr::H,    fluid_prim::velocity,
+      ir::xi, ir::phi, ir::c2pfail, ir::tilPi};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -73,19 +83,20 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   auto cF = imap.GetFlatIdx(cr::F);
   auto pH = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  // TODO(BRR) Should be able to just get an invalid iTilPi back from imap when MOCMC off
-  vpack_types::FlatIdx iTilPi({-1}, -1);
-  if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    iTilPi = imap.GetFlatIdx(ir::tilPi);
-  }
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
   auto specB = cE.GetBounds(1);
-  auto dirB = pH.GetBounds(1);
+  auto dirB = pH.GetBounds(2);
 
   auto iXi = imap.GetFlatIdx(ir::xi);
   auto iPhi = imap.GetFlatIdx(ir::phi);
 
+  auto ifail = imap[ir::c2pfail].first;
+
   auto geom = Geometry::GetCoordinateSystem(rc);
   const Real pi = acos(-1);
+
+  auto closure_runtime_params =
+      rad->Param<ClosureRuntimeSettings>("closure_runtime_params");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 0,
@@ -95,13 +106,18 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
       jb.s, jb.e,       // y-loop
       ib.s, ib.e,       // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
-        Vec con_v{{v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)}};
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real isdetgam = 1.0 / geom.DetGamma(CellLocation::Cent, b, k, j, i);
 
+        const Real vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i),
+                            v(b, pv(2), k, j, i)};
+        const Real W = phoebus::GetLorentzFactor(vp, cov_gamma.data);
+        Vec con_v{{v(b, pv(0), k, j, i) / W, v(b, pv(1), k, j, i) / W,
+                   v(b, pv(2), k, j, i) / W}};
+
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
-        CLOSURE c(con_v, &g);
+        CLOSURE c(con_v, &g, closure_runtime_params);
 
         Real J;
         Vec covH;
@@ -111,39 +127,48 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
                      v(b, cF(ispec, 1), k, j, i) * isdetgam,
                      v(b, cF(ispec, 2), k, j, i) * isdetgam}};
 
-        if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
+        if (iTilPi.IsValid()) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
         } else {
           Real xi = 0.0;
           Real phi = pi;
+          // TODO(BRR) Remove STORE_GUESS parameter and instead check if closure type is
+          // M1?
           if (STORE_GUESS) {
             xi = v(b, iXi(ispec), k, j, i);
             phi = 1.0001 * v(b, iPhi(ispec), k, j, i);
           }
-          c.GetCovTilPiFromCon(E, covF, xi, phi, &conTilPi);
+          c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
           if (STORE_GUESS) {
             v(b, iXi(ispec), k, j, i) = xi;
             v(b, iPhi(ispec), k, j, i) = phi;
           }
         }
-        c.Con2Prim(E, covF, conTilPi, &J, &covH);
-        if (std::isnan(J) || std::isnan(covH(0)) || std::isnan(covH(1)) ||
-            std::isnan(covH(2))) {
-          PARTHENON_FAIL("Radiation Con2Prim NaN.");
+        auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
+
+        if (status == ClosureStatus::modified) {
+          c.Prim2Con(J, covH, conTilPi, &E, &covF);
+          v(b, cE(ispec), k, j, i) = E / isdetgam;
+          SPACELOOP(ii) { v(b, cF(ispec, ii), k, j, i) = covF(ii) / isdetgam; }
+          status = ClosureStatus::success;
         }
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
-          v(b, pH(ispec, idir), k, j, i) =
-              covH(idir) /
-              J; // Used the scaled value of the rest frame flux for reconstruction
+          // Use the scaled value of the rest frame flux for reconstruction
+          v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
         }
+
+        v(b, ifail, k, j, i) =
+            (status == ClosureStatus::success ? FailFlags::success : FailFlags::fail);
       });
 
   return TaskStatus::complete;
 }
 
 template <class T>
+// TODO(BRR) add domain so we can do this only over interior if we are using prims as
+// boundary data?
 TaskStatus MomentCon2Prim(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
@@ -152,11 +177,11 @@ TaskStatus MomentCon2Prim(T *rc) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentCon2PrimImpl<T, ClosureM1<Vec, Tens2, settings>, true>(rc);
+    return MomentCon2PrimImpl<T, ClosureM1<settings>, true>(rc);
   } else if (method == "moment_eddington") {
-    return MomentCon2PrimImpl<T, ClosureEdd<Vec, Tens2, settings>, false>(rc);
+    return MomentCon2PrimImpl<T, ClosureEdd<settings>, false>(rc);
   } else if (method == "mocmc") {
-    return MomentCon2PrimImpl<T, ClosureMOCMC<Vec, Tens2, settings>, false>(rc);
+    return MomentCon2PrimImpl<T, ClosureMOCMC<settings>, false>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown");
   }
@@ -189,13 +214,10 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   auto cF = imap.GetFlatIdx(cr::F);
   auto pH = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  vpack_types::FlatIdx iTilPi({-1}, -1);
-  if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    iTilPi = imap.GetFlatIdx(ir::tilPi);
-  }
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
 
   auto specB = cE.GetBounds(1);
-  auto dirB = pH.GetBounds(1);
+  auto dirB = pH.GetBounds(2);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -208,12 +230,16 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
       ib.s, ib.e,       // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
         // Set up the background
-        Vec con_v{{v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)}};
+        const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
-        const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+        typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 
-        typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, 0, b, j, i);
+        const Real con_vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i),
+                                v(b, pv(2), k, j, i)};
+        const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+        Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+
         CLOSURE c(con_v, &g);
 
         Real E;
@@ -223,11 +249,13 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         Vec covH = {{v(b, pH(ispec, 0), k, j, i) * J, v(b, pH(ispec, 1), k, j, i) * J,
                      v(b, pH(ispec, 2), k, j, i) * J}};
 
-        if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
+        if (iTilPi.IsValid()) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
         } else {
-          c.GetCovTilPiFromPrim(J, covH, &conTilPi);
+          c.GetConTilPiFromPrim(J, covH, &conTilPi);
         }
+
+        PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "NAN J in rad P2C!");
 
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
@@ -248,11 +276,11 @@ TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentPrim2ConImpl<T, ClosureM1<Vec, Tens2, settings>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureM1<settings>>(rc, domain);
   } else if (method == "moment_eddington") {
-    return MomentPrim2ConImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureEdd<settings>>(rc, domain);
   } else if (method == "mocmc") {
-    return MomentPrim2ConImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureMOCMC<settings>>(rc, domain);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -267,15 +295,10 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   using namespace PhoebusReconstruction;
 
   auto *pmb = rc->GetParentPointer().get();
-  StateDescriptor *rad = pmb->packages.Get("radiation").get();
-  auto method = rad->Param<std::string>("method");
-  bool eddington_known = false;
-  if (method == "mocmc") {
-    eddington_known = true;
-  }
+  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
+  auto rt = rad_pkg->Param<ReconType>("Recon");
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  const int di = (pmb->pmy_mesh->ndim > 0 ? 1 : 0);
 
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const int dj = (pmb->pmy_mesh->ndim > 1 ? 1 : 0);
@@ -292,18 +315,12 @@ TaskStatus ReconstructEdgeStates(T *rc) {
       rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
   VariablePack<Real> qr_base =
       rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
-  std::vector<std::string> variables = {pr::J, pr::H};
-  if (eddington_known) {
-    variables.push_back(ir::tilPi);
-  }
+  std::vector<std::string> variables = {pr::J, pr::H, ir::tilPi};
   variables.push_back(ir::dJ);
   VariablePack<Real> v = rc->PackVariables(variables, imap);
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_dJ = imap.GetFlatIdx(ir::dJ);
-  vpack_types::FlatIdx iTilPi({-1}, -1);
-  if (eddington_known) {
-    iTilPi = imap.GetFlatIdx(ir::tilPi);
-  }
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
 
   ParArrayND<Real> ql_v = rc->Get(ir::ql_v).data;
   ParArrayND<Real> qr_v = rc->Get(ir::qr_v).data;
@@ -313,7 +330,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
 
   const int nspec = qIdx.DimSize(1);
   int nrecon = 4 * nspec;
-  if (eddington_known) {
+  if (iTilPi.IsValid()) {
     nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
   }
 
@@ -335,12 +352,18 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         const VariablePack<Real> &var = (n < nrecon ? v : v_vel);
         const int var_id = n % nrecon;
         Real *pv = &var(b, var_id, k, j, 0);
+        Real *pvim2 = pv - 2;
         Real *pvim1 = pv - 1;
         Real *pvip1 = pv + 1;
+        Real *pvip2 = pv + 2;
+        Real *pvjm2 = &var(b, var_id, k, j - 2 * dj, 0);
         Real *pvjm1 = &var(b, var_id, k, j - dj, 0);
         Real *pvjp1 = &var(b, var_id, k, j + dj, 0);
+        Real *pvjp2 = &var(b, var_id, k, j + 2 * dj, 0);
+        Real *pvkm2 = &var(b, var_id, k - 2 * dk, j, 0);
         Real *pvkm1 = &var(b, var_id, k - dk, j, 0);
         Real *pvkp1 = &var(b, var_id, k + dk, j, 0);
+        Real *pvkp2 = &var(b, var_id, k + 2 * dk, j, 0);
         Real *vi_l, *vi_r, *vj_l, *vj_r, *vk_l, *vk_r;
         if (n < nrecon) {
           vi_l = &ql(0, n, k, j, 1);
@@ -349,6 +372,8 @@ TaskStatus ReconstructEdgeStates(T *rc) {
           vj_r = &qr(1 % ndim, n, k, j, 0);
           vk_l = &ql(2 % ndim, n, k + dk, j, 0);
           vk_r = &qr(2 % ndim, n, k, j, 0);
+          if (n == 0) {
+          }
         } else {
           vi_l = &ql_v(0, var_id, k, j, 1);
           vi_r = &qr_v(0, var_id, k, j, 0);
@@ -358,16 +383,43 @@ TaskStatus ReconstructEdgeStates(T *rc) {
           vk_r = &qr_v(2 % ndim, var_id, k, j, 0);
         }
 
-        // TODO(JCD): do we want to enable other recon methods like weno5?
-        // x-direction
-        ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
-                                   vi_r);
-        // y-direction
-        if (ndim > 1)
-          ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
-        // z-direction
-        if (ndim > 2)
-          ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
+        switch (rt) {
+        case ReconType::weno5z:
+          ReconLoop<WENO5Z>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2,
+                            vi_l, vi_r);
+          if (ndim > 1)
+            ReconLoop<WENO5Z>(member, ib.s, ib.e, pvjm2, pvjm1, pv, pvjp1, pvjp2, vj_l,
+                              vj_r);
+          if (ndim > 2)
+            ReconLoop<WENO5Z>(member, ib.s, ib.e, pvkm2, pvkm1, pv, pvkp1, pvkp2, vk_l,
+                              vk_r);
+          break;
+        case ReconType::mp5:
+          ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2, vi_l,
+                         vi_r);
+          if (ndim > 1)
+            ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvjm2, pvjm1, pv, pvjp1, pvjp2,
+                           vj_l, vj_r);
+          if (ndim > 2)
+            ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvkm2, pvkm1, pv, pvkp1, pvkp2,
+                           vk_l, vk_r);
+          break;
+        case ReconType::linear:
+          ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
+                                     vi_r);
+          if (ndim > 1)
+            ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvjm1, pv, pvjp1, vj_l, vj_r);
+          if (ndim > 2)
+            ReconLoop<PiecewiseLinear>(member, ib.s, ib.e, pvkm1, pv, pvkp1, vk_l, vk_r);
+          break;
+        case ReconType::constant:
+          ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vi_l, vi_r);
+          if (ndim > 1) ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vj_l, vj_r);
+          if (ndim > 2) ReconLoop<PiecewiseConstant>(member, ib.s, ib.e, pv, vk_l, vk_r);
+          break;
+        default:
+          PARTHENON_FAIL("Invalid recon option.");
+        }
 
         // Calculate spatial derivatives of J at zone faces for diffusion limit
         //    x-->
@@ -442,7 +494,8 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
   auto *pmb = rc->GetParentPointer().get();
-  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const int di = (pmb->pmy_mesh->ndim > 0 ? 1 : 0);
@@ -473,20 +526,20 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   auto idx_Ff = imap.GetFlatIdx(cr::F);
   auto idx_Ef = imap.GetFlatIdx(cr::E);
 
-  auto species = rad->Param<std::vector<RadiationType>>("species");
-  auto num_species = rad->Param<int>("num_species");
-  RadiationType species_d[3] = {};
-  for (int s = 0; s < num_species; s++) {
-    species_d[s] = species[s];
-  }
+  auto num_species = rad_pkg->Param<int>("num_species");
 
   // const int nblock = 1; //v.GetDim(5);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
+  auto bounds = fix_pkg->Param<Bounds>("bounds");
+
+  // TODO(BRR) add to radiation floors
   const Real kappaH_min = 1.e-20;
 
   auto &coords = pmb->coords;
+
+  auto recon_fixup_strategy = rad_pkg->Param<ReconFixupStrategy>("recon_fixup_strategy");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Fluxes", DevExecSpace(), X1DIR,
@@ -514,31 +567,92 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           face = CellLocation::Face3;
           break;
         }
+        Real X[4];
+        X[1] = (face == CellLocation::Face1 ? coords.x1f(k, j, i) : coords.x1v(k, j, i));
+        X[2] = (face == CellLocation::Face2 ? coords.x2f(k, j, i) : coords.x2v(k, j, i));
+        X[3] = (face == CellLocation::Face3 ? coords.x3f(k, j, i) : coords.x3v(k, j, i));
+
+        Real W_ceiling, garbage;
+        bounds.GetCeilings(X[1], X[2], X[3], W_ceiling, garbage);
+
+        Real J_floor;
+        bounds.GetRadiationFloors(X[1], X[2], X[3], J_floor);
+
+        Real xi_ceiling;
+        bounds.GetRadiationCeilings(X[1], X[2], X[3], xi_ceiling);
 
         Vec con_beta;
         Tens2 cov_gamma;
         geom.Metric(face, k, j, i, cov_gamma.data);
         geom.ContravariantShift(face, k, j, i, con_beta.data);
         const Real sdetgam = geom.DetGamma(face, k, j, i);
+        Tens2 con_gamma;
+        geom.MetricInverse(face, k, j, i, con_gamma.data);
+        const Real alpha = geom.Lapse(face, k, j, i);
         typename CLOSURE::LocalGeometryType g(geom, face, 0, k, j, i);
 
         const Real dx = coords.Dx(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
 
+        Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i), v(idx_qlv(1, idir), k, j, i),
+                           v(idx_qlv(2, idir), k, j, i)};
+        Real con_vpr[3] = {v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
+                           v(idx_qrv(2, idir), k, j, i)};
+        Real Wl = phoebus::GetLorentzFactor(con_vpl, cov_gamma.data);
+        Real Wr = phoebus::GetLorentzFactor(con_vpr, cov_gamma.data);
+
+        if (recon_fixup_strategy == ReconFixupStrategy::bounds) {
+          if (Wl > W_ceiling) {
+            const Real rescale = std::sqrt(W_ceiling * W_ceiling - 1.) / (Wl * Wl - 1.);
+            SPACELOOP(ii) { con_vpl[ii] *= rescale; }
+            Wl = W_ceiling;
+          }
+          if (Wr > W_ceiling) {
+            const Real rescale = std::sqrt(W_ceiling * W_ceiling - 1.) / (Wr * Wr - 1.);
+            SPACELOOP(ii) { con_vpr[ii] *= rescale; }
+            Wr = W_ceiling;
+          }
+        }
+
+        Vec con_vl{{con_vpl[0] / Wl, con_vpl[1] / Wl, con_vpl[2] / Wl}};
+        Vec con_vr{{con_vpr[0] / Wr, con_vpr[1] / Wr, con_vpr[2] / Wr}};
+
+        // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt. depth)
+        // cs_rad = 1)
+        const Real sigp = alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
+        const Real sigm = -alpha * std::sqrt(con_gamma(idir, idir)) - con_beta(idir);
+        const Real asym_sigl = alpha * con_vl(idir) - con_beta(idir);
+        const Real asym_sigr = alpha * con_vr(idir) - con_beta(idir);
+
         for (int ispec = 0; ispec < num_species; ++ispec) {
-
-          const Real &Jl = v(idx_ql(ispec, 0, idir), k, j, i);
-          const Real &Jr = v(idx_qr(ispec, 0, idir), k, j, i);
-          const Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
-                          Jl * v(idx_ql(ispec, 2, idir), k, j, i),
-                          Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
-          const Vec Hr = {Jr * v(idx_qr(ispec, 1, idir), k, j, i),
-                          Jr * v(idx_qr(ispec, 2, idir), k, j, i),
-                          Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
-
-          Vec con_vl{{v(idx_qlv(0, idir), k, j, i), v(idx_qlv(1, idir), k, j, i),
-                      v(idx_qlv(2, idir), k, j, i)}};
-          Vec con_vr{{v(idx_qrv(0, idir), k, j, i), v(idx_qrv(1, idir), k, j, i),
-                      v(idx_qrv(2, idir), k, j, i)}};
+          // TODO(BRR) Use floors
+          Real Jl = v(idx_ql(ispec, 0, idir), k, j, i);
+          Real Jr = v(idx_qr(ispec, 0, idir), k, j, i);
+          if (recon_fixup_strategy == ReconFixupStrategy::bounds) {
+            Jl = std::max<Real>(Jl, J_floor);
+            Jr = std::max<Real>(Jr, J_floor);
+          }
+          Vec Hl = {Jl * v(idx_ql(ispec, 1, idir), k, j, i),
+                    Jl * v(idx_ql(ispec, 2, idir), k, j, i),
+                    Jl * v(idx_ql(ispec, 3, idir), k, j, i)};
+          Vec Hr = {Jr * v(idx_qr(ispec, 1, idir), k, j, i),
+                    Jr * v(idx_qr(ispec, 2, idir), k, j, i),
+                    Jr * v(idx_qr(ispec, 3, idir), k, j, i)};
+          if (recon_fixup_strategy == ReconFixupStrategy::bounds) {
+            const Real xil =
+                std::sqrt(g.contractCov3Vectors(Hl, Hl) -
+                          std::pow(g.contractConCov3Vectors(con_vl, Hl), 2)) /
+                Jl;
+            const Real xir =
+                std::sqrt(g.contractCov3Vectors(Hr, Hr) -
+                          std::pow(g.contractConCov3Vectors(con_vr, Hr), 2)) /
+                Jr;
+            if (xil > xi_ceiling) {
+              SPACELOOP(ii) { Hl(ii) *= xi_ceiling / xil; }
+            }
+            if (xir > xi_ceiling) {
+              SPACELOOP(ii) { Hr(ii) *= xi_ceiling / xir; }
+            }
+          }
 
           Vec cov_dJ{{v(idx_dJ(ispec, 0, idir), k, j, i),
                       v(idx_dJ(ispec, 1, idir), k, j, i),
@@ -572,8 +686,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
               con_tilPir(ii, jj) = v(idx_qr(ispec, 4 + ii + 3 * jj, idir), k, j, i);
             }
           } else {
-            cl.GetCovTilPiFromPrim(Jl, HasymL, &con_tilPil);
-            cr.GetCovTilPiFromPrim(Jr, HasymR, &con_tilPir);
+            cl.GetConTilPiFromPrim(Jl, HasymL, &con_tilPil);
+            cr.GetConTilPiFromPrim(Jr, HasymR, &con_tilPir);
           }
           cl.getFluxesFromPrim(Jl, HasymL, con_tilPil, &conFl_asym, &Pl_asym);
           cr.getFluxesFromPrim(Jr, HasymR, con_tilPir, &conFr_asym, &Pr_asym);
@@ -581,8 +695,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Regular fluxes
           if (!programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
             // Recalculate Eddington if using J, H
-            cl.GetCovTilPiFromPrim(Jl, Hl, &con_tilPil);
-            cr.GetCovTilPiFromPrim(Jr, Hr, &con_tilPir);
+            cl.GetConTilPiFromPrim(Jl, Hl, &con_tilPil);
+            cr.GetConTilPiFromPrim(Jr, Hr, &con_tilPir);
           }
           cl.getFluxesFromPrim(Jl, Hl, con_tilPil, &conFl, &Pl);
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
@@ -591,11 +705,15 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
-          const Real speed = a * 1.0 + (1 - a) * std::max(sqrt(cl.v2), sqrt(cr.v2));
           conFl = a * conFl + (1 - a) * conFl_asym;
           conFr = a * conFr + (1 - a) * conFr_asym;
           Pl = a * Pl + (1 - a) * Pl_asym;
           Pr = a * Pr + (1 - a) * Pr_asym;
+
+          const Real rad_sigspeed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
+          const Real asym_sigspeed =
+              std::max<Real>(std::fabs(asym_sigl), std::fabs(asym_sigr));
+          const Real sigspeed = a * rad_sigspeed + (1. - a) * asym_sigspeed;
 
           // Correct the fluxes with the shift terms
           conFl(idir) -= con_beta(idir) * El;
@@ -608,14 +726,15 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
-              0.5 * sdetgam * (conFl(idir) + conFr(idir) + speed * (El - Er));
+              0.5 * sdetgam * (conFl(idir) + conFr(idir) + sigspeed * (El - Er));
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
                 0.5 * sdetgam *
-                (Pl(idir, ii) + Pr(idir, ii) + speed * (covFl(ii) - covFr(ii)));
+                (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
           }
-          if (sdetgam < std::numeric_limits<Real>::min() * 10) {
+
+          if (sdetgam < robust::SMALL()) {
             v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
             SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
@@ -633,11 +752,11 @@ TaskStatus CalculateFluxes(T *rc) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateFluxesImpl<T, ClosureM1<Vec, Tens2, settings>>(rc);
+    return CalculateFluxesImpl<T, ClosureM1<settings>>(rc);
   } else if (method == "moment_eddington") {
-    return CalculateFluxesImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc);
+    return CalculateFluxesImpl<T, ClosureEdd<settings>>(rc);
   } else if (method == "mocmc") {
-    return CalculateFluxesImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc);
+    return CalculateFluxesImpl<T, ClosureMOCMC<settings>>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -648,7 +767,6 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   constexpr int ND = Geometry::NDFULL;
-  // constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
 
   namespace cr = radmoment_cons;
@@ -656,20 +774,19 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   namespace ir = radmoment_internal;
   namespace p = fluid_prim;
   PackIndexMap imap;
-  std::vector<std::string> vars{cr::E, cr::F, pr::J, pr::H, p::velocity};
-  if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    vars.push_back(ir::tilPi);
-  }
+  std::vector<std::string> vars{cr::E, cr::F, pr::J, pr::H, p::velocity, ir::tilPi};
+  vars.push_back(diagnostic_variables::r_src_terms);
+#if SET_FLUX_SRC_DIAGS
+  vars.push_back(diagnostic_variables::r_src_terms);
+#endif
   auto v = rc->PackVariables(vars, imap);
   auto idx_E = imap.GetFlatIdx(cr::E);
   auto idx_F = imap.GetFlatIdx(cr::F);
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_H = imap.GetFlatIdx(pr::H);
   auto pv = imap.GetFlatIdx(p::velocity);
-  vpack_types::FlatIdx iTilPi({-1}, -1);
-  if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    iTilPi = imap.GetFlatIdx(ir::tilPi);
-  }
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_diag = imap.GetFlatIdx(diagnostic_variables::r_src_terms, false);
 
   PackIndexMap imap_src;
   std::vector<std::string> vars_src{cr::E, cr::F};
@@ -695,10 +812,12 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
       ib.s, ib.e, // x-loop
       KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
         // Set up the background state
-        Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                   v(iblock, pv(2), k, j, i)}};
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
+        const Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                                v(iblock, pv(2), k, j, i)};
+        const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+        Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
         CLOSURE c(con_v, &g);
@@ -707,25 +826,16 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
         Vec con_beta;
         geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
-        Real beta2 = 0.0;
-        SPACELOOP2(ii, jj) beta2 += con_beta(ii) * con_beta(jj) * cov_gamma(ii, jj);
-
+        Real con_g[4][4] = {0};
+        geom.SpacetimeMetricInverse(CellLocation::Cent, iblock, k, j, i, con_g);
         Real dlnalp[ND];
         Real Gamma[ND][ND][ND];
         geom.GradLnAlpha(CellLocation::Cent, iblock, k, j, i, dlnalp);
         geom.ConnectionCoefficient(CellLocation::Cent, iblock, k, j, i, Gamma);
 
-        // Get the gradient of the shift from the Christoffel symbols of the first kind
-        // Get the extrinsic curvature from the Christoffel symbols of the first kind
-        // All indices are covariant
-        Tens2 dbeta, K;
-        const Real iFac = 1.0 / (alp + beta2 / alp);
-        SPACELOOP2(ii, jj) {
-          dbeta(ii, jj) = Gamma[ii + 1][jj + 1][0] + Gamma[ii + 1][0][jj + 1];
-          K(ii, jj) = Gamma[ii + 1][0][jj + 1];
-          SPACELOOP(kk) K(ii, jj) -= Gamma[ii + 1][kk + 1][jj + 1] * con_beta(kk);
-          K(ii, jj) *= iFac;
-        }
+        Real con_u[4];
+        con_u[0] = W / alp;
+        SPACELOOP(ii) { con_u[ii + 1] = W * con_v(ii) - con_beta(ii) / alp; }
 
         for (int ispec = 0; ispec < nspec; ++ispec) {
           Real E = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
@@ -736,37 +846,71 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Vec covH{{J * v(iblock, idx_H(ispec, 0), k, j, i),
                     J * v(iblock, idx_H(ispec, 1), k, j, i),
                     J * v(iblock, idx_H(ispec, 2), k, j, i)}};
+
           Vec conF;
           g.raise3Vector(covF, &conF);
-          Tens2 conP, con_tilPi;
 
-          if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
+          Real con_H4[4] = {0};
+          SPACELOOP2(ii, jj) { con_H4[ii + 1] += g.con_gamma(ii, jj) * covH(jj); }
+
+          Real conTilPi[4][4] = {0};
+          if (iTilPi.IsValid()) {
             SPACELOOP2(ii, jj) {
-              con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+              conTilPi[ii + 1][jj + 1] = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
             }
           } else {
-            c.GetCovTilPiFromPrim(J, covH, &con_tilPi);
+            Tens2 con_tilPi{0};
+            c.GetConTilPiFromPrim(J, covH, &con_tilPi);
+            SPACELOOP2(ii, jj) { conTilPi[ii + 1][jj + 1] = con_tilPi(ii, jj); }
           }
-          c.getConPFromPrim(J, covH, con_tilPi, &conP);
+
+          Real con_T[4][4];
+          SPACETIMELOOP2(mu, nu) {
+            Real conh_munu = con_g[mu][nu] + con_u[mu] * con_u[nu];
+            con_T[mu][nu] = (con_u[mu] * con_u[nu] + conh_munu / 3.) * J;
+            con_T[mu][nu] += con_u[mu] * con_H4[nu] + con_u[nu] * con_H4[mu];
+            con_T[mu][nu] += J * conTilPi[mu][nu];
+          }
+
+          // TODO(BRR) add Pij contribution
 
           Real srcE = 0.0;
-          SPACELOOP2(ii, jj) srcE += K(ii, jj) * conP(ii, jj);
-          SPACELOOP(ii) srcE -= dlnalp[ii + 1] * conF(ii);
-          srcE *= alp;
+          SPACETIMELOOP(mu) {
+            srcE += con_T[mu][0] * dlnalp[mu];
+            SPACETIMELOOP(nu) {
+              Real Gamma_udd = 0.;
+              SPACETIMELOOP(lam) { Gamma_udd += con_g[0][lam] * Gamma[lam][nu][mu]; }
+              srcE -= con_T[mu][nu] * Gamma_udd;
+            }
+          }
+          srcE *= alp * alp;
 
           Vec srcF{0, 0, 0};
           SPACELOOP(ii) {
-            SPACELOOP(jj) srcF(ii) += covF(jj) * dbeta(ii, jj);
-            srcF(ii) -= alp * E * dlnalp[ii + 1];
-            SPACELOOP2(jj, kk)
-            srcF(ii) += alp * conP(jj, kk) * Gamma[jj + 1][kk + 1][ii + 1];
+            SPACETIMELOOP2(mu, nu) { srcF(ii) += con_T[mu][nu] * Gamma[mu][nu][ii + 1]; }
+            srcF(ii) *= alp;
           }
+
           v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
-          SPACELOOP(ii) v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
+          SPACELOOP(ii) {
+            v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
+          }
+
+#if SET_FLUX_SRC_DIAGS
+          v(iblock, idx_diag(ispec, 0), k, j, i) =
+              v_src(iblock, idx_E_src(ispec), k, j, i);
+          v(iblock, idx_diag(ispec, 1), k, j, i) =
+              v_src(iblock, idx_F_src(ispec, 0), k, j, i);
+          v(iblock, idx_diag(ispec, 2), k, j, i) =
+              v_src(iblock, idx_F_src(ispec, 1), k, j, i);
+          v(iblock, idx_diag(ispec, 3), k, j, i) =
+              v_src(iblock, idx_F_src(ispec, 2), k, j, i);
+#endif
         }
       });
   return TaskStatus::complete;
 }
+
 template <class T>
 TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
   auto *pm = rc->GetParentPointer().get();
@@ -775,12 +919,11 @@ TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return CalculateGeometricSourceImpl<T, ClosureM1<Vec, Tens2, settings>>(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureM1<settings>>(rc, rc_src);
   } else if (method == "moment_eddington") {
-    return CalculateGeometricSourceImpl<T, ClosureEdd<Vec, Tens2, settings>>(rc, rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureEdd<settings>>(rc, rc_src);
   } else if (method == "mocmc") {
-    return CalculateGeometricSourceImpl<T, ClosureMOCMC<Vec, Tens2, settings>>(rc,
-                                                                               rc_src);
+    return CalculateGeometricSourceImpl<T, ClosureMOCMC<settings>>(rc, rc_src);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -788,144 +931,6 @@ TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
 }
 template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<Real> *,
                                                                   MeshBlockData<Real> *);
-
-// TODO(BRR) Unsure how else to get radiation parameters from MeshData
-template <>
-TaskStatus MomentFluidSource(MeshData<Real> *rc, Real dt, bool update_fluid) {
-  for (int n = 0; n < rc->NumBlocks(); n++) {
-    MomentFluidSource(rc->GetBlockData(n).get(), dt, update_fluid);
-  }
-  return TaskStatus::complete;
-}
-
-template <class T>
-TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
-  auto *pmb = rc->GetParentPointer().get();
-  StateDescriptor *rad = pmb->packages.Get("radiation").get();
-  namespace cr = radmoment_cons;
-  namespace pr = radmoment_prim;
-  namespace ir = radmoment_internal;
-  namespace c = fluid_cons;
-  namespace p = fluid_prim;
-  std::vector<std::string> vars{cr::E,      cr::F,       p::density, p::temperature,
-                                p::ye,      p::velocity, pr::J,      pr::H,
-                                ir::kappaJ, ir::kappaH,  ir::JBB};
-  if (update_fluid) {
-    vars.push_back(c::energy);
-    vars.push_back(c::momentum);
-    vars.push_back(c::ye);
-  }
-
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-  auto idx_E = imap.GetFlatIdx(cr::E);
-  auto idx_F = imap.GetFlatIdx(cr::F);
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_H = imap.GetFlatIdx(pr::H);
-
-  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
-  auto idx_JBB = imap.GetFlatIdx(ir::JBB);
-  auto pv = imap.GetFlatIdx(p::velocity);
-
-  int prho = imap[p::density].first;
-  int pT = imap[p::temperature].first;
-  int pYe = imap[p::ye].first;
-
-  int ceng(-1), cmom_lo(-1), cye(-1);
-  if (update_fluid) {
-    ceng = imap[c::energy].first;
-    cmom_lo = imap[c::momentum].first;
-    cye = imap[c::ye].first;
-  }
-
-  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
-
-  // Get the background geometry
-  auto geom = Geometry::GetCoordinateSystem(rc);
-
-  int nblock = v.GetDim(5);
-  // TODO(BRR) This updates all neutrino species (including contributions to fluid)
-  // regardless of whether they are active
-  // int nspec = idx_E.DimSize(1);
-
-  auto species = rad->Param<std::vector<RadiationType>>("species");
-  auto num_species = rad->Param<int>("num_species");
-  RadiationType species_d[3] = {};
-  for (int s = 0; s < num_species; s++) {
-    species_d[s] = species[s];
-  }
-
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
-      nblock - 1, // Loop over blocks
-      kb.s, kb.e, // z-loop
-      jb.s, jb.e, // y-loop
-      ib.s, ib.e, // x-loop
-      KOKKOS_LAMBDA(const int iblock, const int k, const int j, const int i) {
-        for (int ispec = 0; ispec < num_species; ++ispec) {
-
-          // Set up the background state
-          Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                     v(iblock, pv(2), k, j, i)}};
-          Tens2 cov_gamma;
-          geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
-          Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
-          Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-          LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
-
-          /// TODO: (LFR) Move beyond Eddington for this update
-          ClosureEdd<Vec, Tens2> c(con_v, &g);
-
-          Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
-          Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
-                        v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
-                        v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
-
-          Real dE;
-          Vec cov_dF;
-
-          // Treat the Eddington tensor explicitly for now
-          Real &J = v(iblock, idx_J(ispec), k, j, i);
-          Vec cov_H{{
-              J * v(iblock, idx_H(ispec, 0), k, j, i),
-              J * v(iblock, idx_H(ispec, 1), k, j, i),
-              J * v(iblock, idx_H(ispec, 2), k, j, i),
-          }};
-          Tens2 con_tilPi;
-
-          c.GetCovTilPiFromPrim(J, cov_H, &con_tilPi);
-
-          Real B = v(iblock, idx_JBB(ispec), k, j, i);
-          Real tauJ = alpha * dt * v(iblock, idx_kappaJ(ispec), k, j, i);
-          Real tauH = alpha * dt * v(iblock, idx_kappaH(ispec), k, j, i);
-          Real kappaH = v(iblock, idx_kappaH(ispec), k, j, i);
-          c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, B, tauJ, tauH, &dE, &cov_dF);
-
-          // Add source corrections to conserved iration variables
-          v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
-          for (int idir = 0; idir < 3; ++idir) {
-            v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
-          }
-
-          // Add source corrections to conserved fluid variables
-          if (update_fluid) {
-            v(iblock, cye, k, j, i) -= sdetgam * 0.0;
-            v(iblock, ceng, k, j, i) -= sdetgam * dE;
-            v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
-            v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
-            v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
-          }
-        }
-      });
-
-  return TaskStatus::complete;
-}
-// template TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *, Real, bool);
-template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real,
-                                                           bool);
 
 template <class T>
 TaskStatus MomentCalculateOpacities(T *rc) {
@@ -964,12 +969,11 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  // Mainly for testing purposes, probably should be able to do this with the opacity code
-  // itself
+  // Mainly for testing purposes, probably should be able to do this with the opacity
+  // code itself
   const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
   // Get the device opacity object
-  using namespace singularity::neutrinos;
   const auto &d_opacity = opac->Param<Opacity>("d.opacity");
   const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
 
@@ -983,7 +987,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   RadiationType dev_species[3] = {species[0], species[1], species[2]};
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
+      DEFAULT_LOOP_PATTERN, "RadMoments::CalculateOpacities", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
       kb.s, kb.e, // z-loop
       jb.s, jb.e, // y-loop
@@ -992,7 +996,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
         for (int ispec = 0; ispec < nspec; ++ispec) {
           const Real rho = v(iblock, prho, k, j, i);
           const Real Temp = v(iblock, pT, k, j, i);
-          const Real Ye = v(iblock, pYe, k, j, i);
+          const Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
 
           Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
               rho, Temp, Ye, dev_species[ispec]);
