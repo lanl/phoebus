@@ -129,6 +129,9 @@ add_executable(phoebus
 
   tov/tov.hpp
   tov/tov.cpp
+
+  tracers/tracers.hpp
+  tracers/tracers.cpp
 )
 
 set(MAX_NUMBER_CONSERVED_VARS 9 CACHE INTEGER "Maximum number of conserved variables")
