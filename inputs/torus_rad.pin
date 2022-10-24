@@ -135,7 +135,11 @@ scattering_fraction = 0.5
 
 <opacity>
 type = gray
-gray_kappa = 1.e-10 # midplane tau/zone >1e3
+gray_kappa = 5.e-11 # midplane tau/zone >1e3
+
+<s_opacity>
+type = gray
+gray_kappa = 5.e-11
 
 <units>
 scale_free = false

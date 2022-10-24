@@ -38,6 +38,7 @@ namespace pr = radmoment_prim;
 namespace ir = radmoment_internal;
 namespace im = mocmc_internal;
 using namespace singularity::neutrinos;
+using Microphysics::Opacities;
 using singularity::EOS;
 using singularity::RadiationType;
 using vpack_types::FlatIdx;
@@ -517,12 +518,9 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
   // Microphysics
   auto opac = pmb->packages.Get("opacity");
-  const auto opac_d = opac->template Param<Opacity>("d.opacity");
+  const auto opac_d = opac->template Param<Opacities>("opacities");
   StateDescriptor *eos = pmb->packages.Get("eos").get();
   const auto eos_d = eos->template Param<EOS>("d.EOS");
-
-  // TODO(BRR) Add singularity-scat
-  const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
 
   std::vector<std::string> variables{
       cr::E,      cr::F,        pr::J,           pr::H,    pf::density,
@@ -644,6 +642,10 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                             v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                             v(iblock, pye, k, j, i), species_d[ispec], nusamp(bin)) *
                         v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
+              kappaH += opac_d.TotalScatteringCoefficient(
+                            v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                            v(iblock, pye, k, j, i), species_d[ispec], nusamp(bin)) *
+                        v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
               Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
             }
 
@@ -659,13 +661,22 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                     v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                     v(iblock, pye, k, j, i), species_d[ispec], nusamp(nu_bins - 1)) *
                 v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
+            kappaH -= 0.5 *
+                      opac_d.TotalScatteringCoefficient(
+                          v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                          v(iblock, pye, k, j, i), species_d[ispec], nusamp(0)) *
+                      v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0);
+            kappaH -=
+                0.5 *
+                opac_d.TotalScatteringCoefficient(
+                    v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                    v(iblock, pye, k, j, i), species_d[ispec], nusamp(nu_bins - 1)) *
+                v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
             Itot -= 0.5 *
                     (v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0) +
                      v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1));
             kappaJ = robust::ratio(kappaJ, Itot);
-            kappaH = kappaJ;
-            // TODO(BRR) Replace scattering_fraction with physical scattering opacity
-            kappaJ *= (1. - scattering_fraction);
+            kappaH = robust::ratio(kappaH, Itot) + kappaJ;
 
             Real tauJ = alpha * dt * kappaJ;
             Real tauH = alpha * dt * kappaH;
@@ -710,10 +721,9 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
               for (int bin = 0; bin < nu_bins; bin++) {
                 const Real nu_fluid = nusamp(bin);
                 const Real alphainv_s =
-                    nu_fluid * scattering_fraction *
-                    opac_d.AngleAveragedAbsorptionCoefficient(
-                        v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                        v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
+                    nu_fluid * opac_d.TotalScatteringCoefficient(
+                                   v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                                   v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
                 v(iblock, ijinvs(ispec, bin), k, j, i) =
                     v(iblock, Inu0(ispec, bin), k, j, i) /
                     (nu_fluid * nu_fluid * nu_fluid) * alphainv_s;
@@ -724,15 +734,13 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                 const Real nu_lab = std::exp(std::log(nu_fluid) - dlnu * shift);
                 const Real ds = dt / ucon[0] / nu_fluid;
                 const Real alphainv_a =
-                    nu_fluid * (1. - scattering_fraction) *
-                    opac_d.AngleAveragedAbsorptionCoefficient(
-                        v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                        v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
+                    nu_fluid * opac_d.TotalScatteringCoefficient(
+                                   v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                                   v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
                 const Real alphainv_s =
-                    nu_fluid * scattering_fraction *
-                    opac_d.AngleAveragedAbsorptionCoefficient(
-                        v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                        v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
+                    nu_fluid * opac_d.TotalScatteringCoefficient(
+                                   v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
+                                   v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
                 const Real jinv_a =
                     opac_d.ThermalDistributionOfTNu(v(iblock, pT, k, j, i),
                                                     species_d[ispec], nu_fluid) /
