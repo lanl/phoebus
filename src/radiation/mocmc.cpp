@@ -277,6 +277,8 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
 
   auto swarm_d = swarm->GetDeviceContext();
 
+  // TODO(BRR) provide *all* MOCMC boundaries
+
   auto ix1_bc = rad->Param<MOCMCBoundaries>("ix1_bc");
   // auto ox1_bc = rad->Param<MOCMCBoundaries>("ox1_bc");
 

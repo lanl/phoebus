@@ -24,10 +24,8 @@ using namespace parthenon::package::prelude;
 namespace fixup {
 
 enum class FAILURE_STRATEGY {
-  interpolate,
-  interpolate_previous,
-  neighbor_minimum,
-  floors
+  interpolate, // Average involved primitive variables over good neighbors
+  floors       // Set involved primitive variables to floors
 };
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
@@ -35,11 +33,11 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc);
 template <typename T>
 TaskStatus ApplyFloors(T *rc);
 template <typename T>
-TaskStatus RadConservedToPrimitiveFixup(T *rc, T *rc0);
+TaskStatus RadConservedToPrimitiveFixup(T *rc);
 template <typename T>
-TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0);
+TaskStatus ConservedToPrimitiveFixup(T *rc);
 template <typename T>
-TaskStatus SourceFixup(T *rc, T *rc0);
+TaskStatus SourceFixup(T *rc);
 
 static struct ConstantRhoSieFloor {
 } constant_rho_sie_floor_tag;

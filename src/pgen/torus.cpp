@@ -302,19 +302,22 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                 GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i),
                                               d_opacity, eos, species_d[ispec], Ye);
                 v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
-              } else {
-                PARTHENON_FAIL("Only thermal initial radiation supported currently!");
               }
 
               // Set fluid u/P/T and radiation J using equilibrium temperature
-              v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
-                  v(itmp, k, j, i), species_d[ispec]);
               Real lambda[2] = {Ye, 0.0};
               v(ieng, k, j, i) =
                   v(irho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
                                          v(irho, k, j, i), v(itmp, k, j, i), lambda);
               v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
                   v(irho, k, j, i), v(itmp, k, j, i), lambda);
+
+              if (init_rad == InitialRadiation::thermal) {
+                v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
+                    v(itmp, k, j, i), species_d[ispec]);
+              } else {
+                v(iJ(ispec), k, j, i) = 1.e-5 * v(ieng, k, j, i);
+              }
 
               // Zero comoving frame fluxes
               SPACELOOP(ii) { v(iH(ispec, 0), k, j, i) = 0.; }
@@ -414,6 +417,9 @@ void ProblemModifier(ParameterInput *pin) {
       const Real Gamma = pin->GetReal("eos", "Gamma");
       const Real cv = (Gamma - 1.) * pc::kb / pc::mp;
       pin->SetReal("eos", "Cv", cv);
+    } else {
+      PARTHENON_FAIL(
+          "eos_type not supported for initializing radiation torus currently!");
     }
   }
 }

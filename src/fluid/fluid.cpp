@@ -423,14 +423,21 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 }
 
 template <typename T>
+TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRange &ib, const IndexRange &jb,
+                                      const IndexRange &kb) {
+  auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
+  return c2p(rc, ib, jb, kb);
+}
+
+template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
-  auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
-  return c2p(rc, ib, jb, kb);
+  return ConservedToPrimitiveRegion(rc, ib, jb, kb);
 }
 
 template <typename T>

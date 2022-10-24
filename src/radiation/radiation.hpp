@@ -47,9 +47,16 @@ enum class MOCMCBoundaries { outflow, fixed_temp, periodic };
 
 enum class SourceSolver { zerod, oned, fourd };
 
-enum class OneDFixupStrategy { none, ignore_dJ, ignore_all };
+enum class OneDFixupStrategy {
+  none,      // Do not attempt to repair failed 1D rootfind
+  ignore_dJ, // If 1D rootfind fails, ignore update to radiation temperature
+  ignore_all // If 1D rootfind fails, do not apply radiation source
+};
 
-enum class ReconFixupStrategy { none, bounds };
+enum class ReconFixupStrategy {
+  none,  // Do not apply fixups to reconstructed quantities
+  bounds // Apply floors and ceilings to reconstructed quantities
+};
 
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;
