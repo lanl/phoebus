@@ -17,17 +17,22 @@
 #include <vector>
 
 // parthenon includes
+#include "utils/constants.hpp"
 #include <parthenon/package.hpp>
 
 // singularity includes
 #include <singularity-opac/neutrinos/mean_opacity_neutrinos.hpp>
+#include <singularity-opac/neutrinos/mean_s_opacity_neutrinos.hpp>
 #include <singularity-opac/neutrinos/opac_neutrinos.hpp>
+#include <singularity-opac/neutrinos/s_opac_neutrinos.hpp>
 
 // phoebus includes
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
 
 #include "opac_phoebus.hpp"
+
+using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
 namespace Microphysics {
 namespace Opacity {
@@ -70,8 +75,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("type", opacity_type);
 
   if (opacity_type == "none") {
-    // Just return 0 for everything. Still have units vs scale-free because we use the distribution
-    // function provided by this class for example if we have a definite scattering opacity.
+    // Just return 0 for everything. Still have units vs scale-free because we use the
+    // distribution function provided by this class for example if we have a definite
+    // scattering opacity.
     const Real kappa = 0.;
     if (scale_free) {
       singularity::neutrinos::Opacity opacity_host = ScaleFree(kappa);
@@ -134,7 +140,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 #endif
   }
 
-  //if (do_mean_opacity) {
+  // if (do_mean_opacity) {
   {
     auto opacity_host = params.Get<singularity::neutrinos::Opacity>("h.opacity");
     const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
@@ -168,7 +174,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
   }
 
-
   const std::string s_block_name = "s_opacity";
   std::string s_opacity_type = pin->GetOrAddString(s_block_name, "type", "none");
   std::set<std::string> known_s_opacity_types = {"none", "gray"};
@@ -182,41 +187,45 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       !(s_opacity_type == "scalefree" && !unit_conv.IsScaleFree()),
       "Scale free opacity only supported for scale-free phoebus simulations!");
 
-  params.Add("type", opacity_type);
+  params.Add("s_type", s_opacity_type);
 
-  if (opacity_type == "none") {
+  const Real avg_particle_mass = pc::mp;
+
+  if (s_opacity_type == "none") {
     const Real kappa = 0.;
     if (scale_free) {
-      singularity::neutrinos::SOpacity opacity_host = ScaleFreeS(kappa);
+      singularity::neutrinos::SOpacity opacity_host = ScaleFreeS(kappa, 1.);
       auto opacity_device = opacity_host.GetOnDevice();
       params.Add("h.s_opacity", opacity_host);
       params.Add("d.s_opacity", opacity_device);
     } else {
       singularity::neutrinos::SOpacity opacity_host =
-          NonCGSUnitsS<GrayS>(GrayS(kappa), time_unit, mass_unit, length_unit, temp_unit);
+          NonCGSUnitsS<GrayS>(GrayS(kappa / avg_particle_mass, avg_particle_mass),
+                              time_unit, mass_unit, length_unit, temp_unit);
       auto opacity_device = opacity_host.GetOnDevice();
       params.Add("h.s_opacity", opacity_host);
       params.Add("d.s_opacity", opacity_device);
     }
-  } else if (opacity_type == "gray") {
+  } else if (s_opacity_type == "gray") {
     const Real kappa = pin->GetReal(s_block_name, "gray_kappa");
-    params.Add("gray_kappa", kappa);
+    params.Add("s_gray_kappa", kappa);
 
     if (scale_free) {
-      singularity::neutrinos::SOpacity opacity_host = ScaleFreeS(kappa);
+      singularity::neutrinos::SOpacity opacity_host = ScaleFreeS(kappa, 1.);
       auto opacity_device = opacity_host.GetOnDevice();
       params.Add("h.s_opacity", opacity_host);
       params.Add("d.s_opacity", opacity_device);
     } else {
       singularity::neutrinos::SOpacity opacity_host =
-          NonCGSUnitsS<GrayS>(GrayS(kappa), time_unit, mass_unit, length_unit, temp_unit);
+          NonCGSUnitsS<GrayS>(GrayS(kappa / avg_particle_mass, avg_particle_mass),
+                              time_unit, mass_unit, length_unit, temp_unit);
       auto opacity_device = opacity_host.GetOnDevice();
       params.Add("h.s_opacity", opacity_host);
       params.Add("d.s_opacity", opacity_device);
     }
   }
 
-   {
+  {
     auto opacity_host = params.Get<singularity::neutrinos::SOpacity>("h.s_opacity");
     const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
     const Real YeMax = pin->GetOrAddReal("mean_opacity", "yemax", 0.5);
@@ -242,18 +251,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(1.e12));
       const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
       MeanSOpacity mean_opac_host = MeanSOpacityCGS(opacity_host, lRhoMin, lRhoMax, NRho,
-                                                  lTMin, lTMax, NT, YeMin, YeMax, NYe);
+                                                    lTMin, lTMax, NT, YeMin, YeMax, NYe);
       auto mean_opac_device = mean_opac_host.GetOnDevice();
       params.Add("h.mean_s_opacity", mean_opac_host);
       params.Add("d.mean_s_opacity", mean_opac_device);
     }
-   }
+  }
 
   auto &opacity_device = params.Get<singularity::neutrinos::Opacity>("d.opacity");
   auto &mean_opac_device = params.Get<MeanOpacity>("d.mean_opacity");
   auto &s_opacity_device = params.Get<SOpacity>("d.s_opacity");
   auto &mean_s_opac_device = params.Get<MeanSOpacity>("d.mean_s_opacity");
-  Opacities opacities(opacity_device, mean_opac_device, s_opacity_device, mean_s_opac_device);
+  Opacities opacities(opacity_device, mean_opac_device, s_opacity_device,
+                      mean_s_opac_device);
   params.Add("opacities", opacities);
 
   return pkg;

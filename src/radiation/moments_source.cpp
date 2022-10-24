@@ -35,25 +35,23 @@ namespace radiation {
 
 using namespace singularity::neutrinos;
 using fixup::Bounds;
-using singularity::EOS;
 using Microphysics::Opacities;
+using singularity::EOS;
 
 template <typename CLOSURE>
 class SourceResidual4 {
  public:
   KOKKOS_FUNCTION
-  SourceResidual4(const EOS &eos, const Opacity &opac, const MeanOpacity &mopac,
-                  const Real rho, const Real Ye, const Real bprim[3],
-                  const RadiationType species, /*const*/ Tens2 &conTilPi,
-                  const Real (&gcov)[4][4], const Real (&gammacon)[3][3],
-                  const Real alpha, const Real beta[3], const Real sdetgam,
-                  const Real scattering_fraction, typename CLOSURE::LocalGeometryType &g,
+  SourceResidual4(const EOS &eos, const Opacities &opacities, const Real rho,
+                  const Real Ye, const Real bprim[3], const RadiationType species,
+                  /*const*/ Tens2 &conTilPi, const Real (&gcov)[4][4],
+                  const Real (&gammacon)[3][3], const Real alpha, const Real beta[3],
+                  const Real sdetgam, typename CLOSURE::LocalGeometryType &g,
                   Real (&U_mhd_0)[4], Real (&U_rad_0)[4], const int &k, const int &j,
                   const int &i)
-      : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), bprim_(&(bprim[0])),
+      : eos_(eos), opacities_(opacities), rho_(rho), bprim_(&(bprim[0])),
         species_(species), conTilPi_(conTilPi), gcov_(&gcov), gammacon_(&gammacon),
-        alpha_(alpha), beta_(&(beta[0])), sdetgam_(sdetgam),
-        scattering_fraction_(scattering_fraction), g_(g), U_mhd_0_(&U_mhd_0),
+        alpha_(alpha), beta_(&(beta[0])), sdetgam_(sdetgam), g_(g), U_mhd_0_(&U_mhd_0),
         U_rad_0_(&U_rad_0), k_(k), j_(j), i_(i) {
     lambda_[0] = Ye;
     lambda_[1] = 0.;
@@ -112,13 +110,15 @@ class SourceResidual4 {
   KOKKOS_INLINE_FUNCTION
   void CalculateSource(Real P_mhd[4], Real P_rad[4], Real S[4]) {
     Real Tg = eos_.TemperatureFromDensityInternalEnergy(rho_, P_mhd[0] / rho_, lambda_);
-    Real JBB = opac_.EnergyDensityFromTemperature(Tg, species_);
-    Real kappaH =
-        mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
+    Real JBB = opacities_.EnergyDensityFromTemperature(Tg, species_);
+    Real kappaJ =
+        opacities_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
+    Real kappaH = kappaJ + opacities_.RosselandMeanAbsorptionCoefficient(
+                               rho_, Tg, lambda_[0], species_);
     // TODO(BRR) this is arguably cheating, arguably not. Should include dt though
     // kappaH * dt < 1 / eps
     kappaH = std::min<Real>(kappaH, 1.e5);
-    Real kappaJ = (1. - scattering_fraction_) * kappaH;
+    kappaJ = std::min<Real>(kappaJ, 1.e5);
     Real W = 0.;
     SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
@@ -136,8 +136,7 @@ class SourceResidual4 {
 
  private:
   const EOS &eos_;
-  const Opacity &opac_;
-  const MeanOpacity &mopac_;
+  const Opacities &opacities_;
   const Real rho_;
   const Real *bprim_;
   const RadiationType species_;
@@ -149,7 +148,6 @@ class SourceResidual4 {
   const Real alpha_;
   const Real *beta_;
   const Real sdetgam_;
-  const Real scattering_fraction_;
 
   typename CLOSURE::LocalGeometryType &g_;
 
@@ -162,13 +160,11 @@ class SourceResidual4 {
 class InteractionTResidual {
  public:
   KOKKOS_FUNCTION
-  InteractionTResidual(const EOS &eos, const Opacity &opacity,
-                       const MeanOpacity &mean_opacity, const Real &rho, const Real &ug0,
-                       const Real &Ye, const Real J0[3], const int &nspec,
-                       const RadiationType species[3], const Real &scattering_fraction,
-                       const Real &dtau)
-      : eos_(eos), opacity_(opacity), mean_opacity_(mean_opacity), rho_(rho), ug0_(ug0),
-        Ye_(Ye), nspec_(nspec), scattering_fraction_(scattering_fraction), dtau_(dtau) {
+  InteractionTResidual(const EOS &eos, const Opacities &opacities, const Real &rho,
+                       const Real &ug0, const Real &Ye, const Real J0[3],
+                       const int &nspec, const RadiationType species[3], const Real &dtau)
+      : eos_(eos), opacities_(opacities), rho_(rho), ug0_(ug0), Ye_(Ye), nspec_(nspec),
+        dtau_(dtau) {
     for (int ispec = 0; ispec < nspec; ++ispec) {
       J0_[ispec] = J0[ispec];
       species_[ispec] = species[ispec];
@@ -185,10 +181,9 @@ class InteractionTResidual {
     for (int ispec = 0; ispec < nspec_; ++ispec) {
       J0_tot += J0_[ispec];
       const Real kappa =
-          (1. - scattering_fraction_) *
-          mean_opacity_.RosselandMeanAbsorptionCoefficient(rho_, T, Ye_, species_[ispec]);
+          opacities_.RosselandMeanAbsorptionCoefficient(rho_, T, Ye_, species_[ispec]);
 
-      const Real JBB = opacity_.EnergyDensityFromTemperature(T, species_[ispec]);
+      const Real JBB = opacities_.EnergyDensityFromTemperature(T, species_[ispec]);
 
       dJ_tot += (J0_[ispec] + dtau_ * kappa * JBB) / (1. + dtau_ * kappa) - J0_[ispec];
     }
@@ -200,14 +195,12 @@ class InteractionTResidual {
 
  private:
   const EOS &eos_;
-  const Opacity &opacity_;
-  const MeanOpacity &mean_opacity_;
+  const Opacities &opacities_;
   const Real &rho_;
   const Real &ug0_;
   const Real &Ye_;
   Real J0_[MaxNumRadiationSpecies];
   const int &nspec_;
-  const Real &scattering_fraction_;
   const Real &dtau_; // Proper time
   RadiationType species_[MaxNumRadiationSpecies];
 };
@@ -280,12 +273,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   auto coords = pmb->coords;
 
-  //const auto &d_opacity = opac->Param<Opacity>("d.opacity");
-  //const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
-  // Mainly for testing purposes, probably should be able to do this with the opacity code
-  // itself
-  //const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
-
   const auto &opacities = opac->Param<Opacities>("opacities");
 
   const auto src_solver = rad->Param<SourceSolver>("src_solver");
@@ -354,8 +341,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
             // Rootfind over fluid temperature in fluid rest frame
             root_find::RootFind root_find(src_rootfind_maxiter);
-            InteractionTResidual res(eos, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
-                                     num_species, species_d, scattering_fraction, dtau);
+            InteractionTResidual res(eos, opacities, rho, ug, Ye, J0, num_species,
+                                     species_d, dtau);
             root_find::RootFindStatus status;
             const Real T1 = root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
                                              1.e-8 * v(iblock, pT, k, j, i),
@@ -389,15 +376,14 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               c.GetConTilPiFromPrim(J, cov_H, &con_tilPi);
             }
 
-            //Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
+            // Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
             Real JBB = opacities.EnergyDensityFromTemperature(T1, species_d[ispec]);
-            //Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-            Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(
-                rho, T1, Ye, species_d[ispec]);
-            Real kappaH = opacities.RosselandMeanScatteringCoefficient(
-                rho, T1, Ye, species_d[ispec]) + kappaJ;
-            //Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-            //Real tauH = alpha * dt * kappa;
+            // Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+            Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(rho, T1, Ye,
+                                                                       species_d[ispec]);
+            Real kappaH = opacities.RosselandMeanScatteringCoefficient(rho, T1, Ye,
+                                                                       species_d[ispec]) +
+                          kappaJ;
             Real tauJ = alpha * dt * kappaJ;
             Real tauH = alpha * dt * kappaH;
 
@@ -427,14 +413,16 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 cov_Fstar(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
               }
 
-              //JBB = v(iblock, idx_J(ispec), k, j, i);
-              Real JBB = opacities.EnergyDensityFromTemperature(v(iblock, pT, k, j, i), species_d[ispec]);
-            //Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+              // JBB = v(iblock, idx_J(ispec), k, j, i);
+              Real JBB = opacities.EnergyDensityFromTemperature(v(iblock, pT, k, j, i),
+                                                                species_d[ispec]);
+              // Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
               Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(
                   rho, T1, Ye, species_d[ispec]);
               Real kappaH = opacities.RosselandMeanScatteringCoefficient(
-                  rho, T1, Ye, species_d[ispec]) + kappaJ;
-              //Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+                                rho, T1, Ye, species_d[ispec]) +
+                            kappaJ;
+              // Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
               //    rho, v(iblock, pT, k, j, i), Ye, species_d[ispec]);
               tauJ = alpha * dt * kappaJ;
               tauH = alpha * dt * kappaH;
@@ -507,10 +495,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                       v(iblock, idx_F(ispec, 2), k, j, i)}};
             c.GetConTilPiFromPrim(J, covH, &con_tilPi);
           }
-          SourceResidual4<CLOSURE> srm(eos, d_opacity, d_mean_opacity, rho, Ye, bprim,
-                                       species_d[ispec], con_tilPi, cov_g, con_gamma.data,
-                                       alpha, beta, sdetgam, scattering_fraction, g,
-                                       U_mhd_0, U_rad_0, k, j, i);
+          SourceResidual4<CLOSURE> srm(eos, opacities, rho, Ye, bprim, species_d[ispec],
+                                       con_tilPi, cov_g, con_gamma.data, alpha, beta,
+                                       sdetgam, g, U_mhd_0, U_rad_0, k, j, i);
 
           // Memory for evaluating Jacobian via finite differences
           Real P_rad_m[4];
