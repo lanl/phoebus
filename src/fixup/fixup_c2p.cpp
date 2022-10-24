@@ -44,8 +44,7 @@ using singularity::neutrinos::Opacity;
 namespace fixup {
 
 template <typename T, class CLOSURE>
-TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
-                                         IndexDomain domain = IndexDomain::interior) {
+TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
@@ -53,9 +52,9 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
   auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
@@ -87,8 +86,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  PackIndexMap imap0;
-  auto v0 = rc0->PackVariables(vars, imap0);
 
   const int prho = imap[p::density].first;
   const int crho = imap[c::density].first;
@@ -163,25 +160,13 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
 
   Coordinates_t coords = rc->GetParentPointer().get()->coords;
 
-  // TODO(BRR) make this less ugly (or do this at all?)
-  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "C2P fail initialization", DevExecSpace(), 0, v.GetDim(5) - 1,
-      kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        if (i < ib.s || i > ib.e || j < jb.s || j > jb.e || k < kb.s || k > kb.e) {
-          // Do not use ghost zones as data for averaging
-          // TODO(BRR) need to allow ghost zones from neighboring blocks
-          v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
-        }
-      });
-
   auto fluid_c2p_failure_strategy =
       fix_pkg->Param<FAILURE_STRATEGY>("fluid_c2p_failure_strategy");
   const auto c2p_failure_force_fixup_both =
       fix_pkg->Param<bool>("c2p_failure_force_fixup_both");
+
+  PARTHENON_REQUIRE(!c2p_failure_force_fixup_both,
+                    "As currently implemented this is a race condition!");
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
@@ -208,16 +193,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
         //    (i == ib.s || i == ib.e || j == jb.s || j == jb.e || k == kb.s || k ==
         //    kb.e);
 
-        auto fixup0 = [&](const int iv) {
-          v(b, iv, k, j, i) = v0(b, iv, k, j, i - 1) + v0(b, iv, k, j, i + 1);
-          if (ndim > 1) {
-            v(b, iv, k, j, i) += v0(b, iv, k, j - 1, i) + v0(b, iv, k, j + 1, i);
-            if (ndim == 3) {
-              v(b, iv, k, j, i) += v0(b, iv, k - 1, j, i) + v0(b, iv, k + 1, j, i);
-            }
-          }
-          return v(b, iv, k, j, i) / (2 * ndim);
-        };
         auto fail = [&](const int k, const int j, const int i) {
           if (c2p_failure_force_fixup_both) {
             return v(b, ifail, k, j, i) * v(b, irfail, k, j, i);
@@ -238,82 +213,46 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
           }
           return inv_mask_sum * v(b, iv, k, j, i);
         };
-        auto get_minimum = [&](const int iv) {
-          fail(k, j, i - 1) > 0.5
-              ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
-                                             std::fabs(v(b, iv, k, j, i - 1)))
-              : v(b, iv, k, j, i);
-          fail(k, j, i + 1) > 0.5
-              ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
-                                             std::fabs(v(b, iv, k, j, i + 1)))
-              : v(b, iv, k, j, i);
-          if (ndim > 1) {
-            fail(k, j - 1, i) > 0.5
-                ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
-                                               std::fabs(v(b, iv, k, j - 1, i)))
-                : v(b, iv, k, j, i);
-            fail(k, j + 1, i) > 0.5
-                ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
-                                               std::fabs(v(b, iv, k, j + 1, i)))
-                : v(b, iv, k, j, i);
-            if (ndim > 2) {
-              fail(k - 1, j, i) > 0.5
-                  ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
-                                                 std::fabs(v(b, iv, k - 1, j, i)))
-                  : v(b, iv, k, j, i);
-              fail(k + 1, j, i) > 0.5
-                  ? v(b, iv, k, j, i) = std::min(std::fabs(v(b, iv, k, j, i)),
-                                                 std::fabs(v(b, iv, k + 1, j, i)))
-                  : v(b, iv, k, j, i);
-            }
-          }
-        };
+        // When using IndexDomain::entire, can't stencil from e.g. i = 0 because 0 - 1 =
+        // -1 is a segfault
         if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
           Real num_valid = 0;
           num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
           if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
           if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
 
-          if (fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate_previous) {
-            v(b, prho, k, j, i) = fixup0(prho);
+          // if (num_valid > 0.5 &&
+          //    fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate && i > ib.s &&
+          //    i < ib.e - 1 && j > jb.s && j < jb.e - 1 && k > kb.s && k < kb.e - 1) {
+          if (num_valid > 0.5 &&
+              fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
+            const Real norm = 1.0 / num_valid;
+            v(b, prho, k, j, i) = fixup(prho, norm);
             for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
-              v(b, pv, k, j, i) = fixup0(pv);
+              v(b, pv, k, j, i) = fixup(pv, norm);
             }
-            v(b, peng, k, j, i) = fixup0(peng);
+            v(b, peng, k, j, i) = fixup(peng, norm);
 
-            if (pye > 0) v(b, pye, k, j, i) = fixup0(pye);
+            if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
+
+            v(b, prho, k, j, i) =
+                std::max<Real>(v(b, prho, k, j, i), 100. * robust::SMALL());
+            v(b, peng, k, j, i) =
+                std::max<Real>(v(b, peng, k, j, i), 100. * robust::SMALL());
           } else {
-            if (num_valid > 0.5 &&
-                fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
-              const Real norm = 1.0 / num_valid;
-              v(b, prho, k, j, i) = fixup(prho, norm);
-              for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
-                v(b, pv, k, j, i) = fixup(pv, norm);
-              }
-              v(b, peng, k, j, i) = fixup(peng, norm);
+            // No valid neighbors; set fluid mass/energy to near-zero and set primitive
+            // velocities to zero
 
-              if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
-            } else if (num_valid > 0.5 &&
-                       fluid_c2p_failure_strategy == FAILURE_STRATEGY::neighbor_minimum) {
-              get_minimum(prho);
-              SPACELOOP(ii) { get_minimum(pvel_lo + ii); }
-              get_minimum(peng);
-              if (pye > 0) get_minimum(pye);
-            } else {
-              // No valid neighbors; set fluid mass/energy to near-zero and set primitive
-              // velocities to zero
+            v(b, prho, k, j, i) = 100. * robust::SMALL();
+            v(b, peng, k, j, i) = 100. * robust::SMALL();
 
-              v(b, prho, k, j, i) = 100. * robust::SMALL();
-              v(b, peng, k, j, i) = 100. * robust::SMALL();
-
-              // Safe value for ye
-              if (pye > 0) {
-                v(b, pye, k, j, i) = 0.5;
-              }
-
-              // Zero primitive velocities
-              SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = 0.; }
+            // Safe value for ye
+            if (pye > 0) {
+              v(b, pye, k, j, i) = 0.5;
             }
+
+            // Zero primitive velocities
+            SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = 0.; }
           }
 
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -418,7 +357,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc, T *rc0,
 }
 
 template <typename T>
-TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
+TaskStatus ConservedToPrimitiveFixup(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
@@ -428,29 +367,22 @@ TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0) {
     method = rad_pkg->Param<std::string>("method");
   }
 
-  IndexDomain domain = IndexDomain::interior;
-
   // TODO(BRR) share these settings somewhere else. Set at configure time?
   using settings =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureM1<settings>>(rc, rc0,
-                                                                            domain);
+    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureM1<settings>>(rc);
   } else if (method == "moment_eddington") {
-    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0,
-                                                                             domain);
+    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<settings>>(rc);
   } else if (method == "mocmc") {
-    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc, rc0,
-                                                                               domain);
+    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc);
   } else {
-    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<settings>>(rc, rc0,
-                                                                             domain);
+    return ConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<settings>>(rc);
   }
   return TaskStatus::fail;
 }
 
 template TaskStatus
-ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
-                                               MeshBlockData<Real> *rc0);
+ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 
 } // namespace fixup

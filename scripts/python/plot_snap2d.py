@@ -61,15 +61,6 @@ def plot_dump(filename, varname,
     y = coord[...,2]
     x = coord[...,1]
 
-    # Plot some conserved quantities
-    cdens = data.Get("c.density", False)
-    mass = np.sum(cdens)
-    cener = data.Get("c.energy", False)
-    sumEner = np.sum(cener)
-    cE = data.Get("r.c.E", False)
-    if (cE is not None):
-      sumE = np.sum(cE)
-
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)
         x = rho
@@ -93,23 +84,13 @@ def plot_dump(filename, varname,
         if log:
             cbar_label = r'$\log_{10}$' + cbar_label
 
-    flux_diag = data.Get("flux_divergence", False)
-    src_diag = data.Get("src_terms", False)
-
     fig = plt.figure()
     p = fig.add_subplot(111, aspect=1)
     for i in range(NB):
         val = q[i,0,:,:]
         if len(val.shape) > 2:
           print("WARNING plotting the 0th index of multidimensional variable!")
-          val = val[:,:,1]
-
-        #idx = 5
-        #val = np.log10(np.fabs(flux_diag[i,0,:,:,idx]) + src_diag[i,0,:,:,idx])
-        #val = np.log10(np.fabs(flux_diag[i,0,:,:,idx]))# + src_diag[i,0,:,:,idx]))
-        #val = np.log10(np.fabs(src_diag[i,0,:,:,idx]))
-        #print((10.**val).max())
-        #print((10.**val).min())
+          val = val[:,:,0]
 
         mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:], shading='gouraud',
                             vmin=qmin, vmax=qmax, cmap=colormap)

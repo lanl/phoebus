@@ -46,6 +46,13 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Real alpha = pin->GetOrAddReal("coordinates", "poly_alpha", 14);
   Real x0 = pin->GetReal("parthenon/mesh", "x1min");
   Real smooth = pin->GetOrAddReal("coordinates", "smooth", 0.5);
+  Real a = pin->GetReal("geometry", "a");
+  Real Rh = 1.0 + sqrt(1.0 - a * a);
+  Real xh = log(Rh);
+  Real Z1 = 1.0 + std::cbrt(1.0 - a * a) * (std::cbrt(1.0 + a) + std::cbrt(1.0 - a));
+  Real Z2 = sqrt(3.0 * a * a + Z1);
+  Real r_isco_p = 3.0 + Z2 - sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2)); // prograde
+  Real r_isco_r = 3.0 + Z2 + sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2)); // retrograde
   if (!params.hasKey("dxfd")) {
     params.Add("dxfd", dxfd);
   }
@@ -55,6 +62,10 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   params.Add("alpha", alpha);
   params.Add("x0", x0);
   params.Add("smooth", smooth);
+  params.Add("Rh", Rh);
+  params.Add("xh", xh);
+  params.Add("r_isco_p", r_isco_p);
+  params.Add("r_isco_r", r_isco_r);
 }
 template <>
 void SetGeometry<FMKSMeshBlock>(MeshBlockData<Real> *rc) {}
