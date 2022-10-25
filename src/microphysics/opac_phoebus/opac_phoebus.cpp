@@ -133,34 +133,36 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 #endif
   }
 
-  auto opacity_host = params.Get<singularity::neutrinos::Opacity>("h.opacity");
-  const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
-  const Real YeMax = pin->GetOrAddReal("mean_opacity", "yemax", 0.5);
-  const int NYe = pin->GetOrAddInteger("mean_opacity", "nye", 10);
-  if (scale_free) {
-    const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(0.1));
-    const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(10.));
-    const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
-    const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(0.1));
-    const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(10.));
-    const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
-    MeanOpacity mean_opac_host = MeanOpacityScaleFree(
-        opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin, YeMax, NYe);
-    auto mean_opac_device = mean_opac_host.GetOnDevice();
-    params.Add("h.mean_opacity", mean_opac_host);
-    params.Add("d.mean_opacity", mean_opac_device);
-  } else {
-    const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(1.e5));
-    const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(1.e14));
-    const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
-    const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(1.e5));
-    const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(1.e12));
-    const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
-    MeanOpacity mean_opac_host = MeanOpacityCGS(opacity_host, lRhoMin, lRhoMax, NRho,
-                                                lTMin, lTMax, NT, YeMin, YeMax, NYe);
-    auto mean_opac_device = mean_opac_host.GetOnDevice();
-    params.Add("h.mean_opacity", mean_opac_host);
-    params.Add("d.mean_opacity", mean_opac_device);
+  {
+    auto opacity_host = params.Get<singularity::neutrinos::Opacity>("h.opacity");
+    const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
+    const Real YeMax = pin->GetOrAddReal("mean_opacity", "yemax", 0.5);
+    const int NYe = pin->GetOrAddInteger("mean_opacity", "nye", 10);
+    if (scale_free) {
+      const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(0.1));
+      const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(10.));
+      const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
+      const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(0.1));
+      const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(10.));
+      const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
+      MeanOpacity mean_opac_host = MeanOpacityScaleFree(
+          opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin, YeMax, NYe);
+      auto mean_opac_device = mean_opac_host.GetOnDevice();
+      params.Add("h.mean_opacity", mean_opac_host);
+      params.Add("d.mean_opacity", mean_opac_device);
+    } else {
+      const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(1.e5));
+      const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(1.e14));
+      const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
+      const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(1.e5));
+      const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(1.e12));
+      const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
+      MeanOpacity mean_opac_host = MeanOpacityCGS(opacity_host, lRhoMin, lRhoMax, NRho,
+                                                  lTMin, lTMax, NT, YeMin, YeMax, NYe);
+      auto mean_opac_device = mean_opac_host.GetOnDevice();
+      params.Add("h.mean_opacity", mean_opac_host);
+      params.Add("d.mean_opacity", mean_opac_device);
+    }
   }
 
   const std::string s_block_name = "s_opacity";
@@ -214,34 +216,36 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
   }
 
-  auto opacity_host = params.Get<singularity::neutrinos::SOpacity>("h.s_opacity");
-  const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
-  const Real YeMax = pin->GetOrAddReal("mean_opacity", "yemax", 0.5);
-  const int NYe = pin->GetOrAddInteger("mean_opacity", "nye", 10);
-  if (scale_free) {
-    const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(0.1));
-    const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(10.));
-    const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
-    const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(0.1));
-    const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(10.));
-    const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
-    MeanSOpacity mean_opac_host = MeanSOpacityScaleFree(
-        opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin, YeMax, NYe);
-    auto mean_opac_device = mean_opac_host.GetOnDevice();
-    params.Add("h.mean_s_opacity", mean_opac_host);
-    params.Add("d.mean_s_opacity", mean_opac_device);
-  } else {
-    const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(1.e5));
-    const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(1.e14));
-    const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
-    const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(1.e5));
-    const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(1.e12));
-    const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
-    MeanSOpacity mean_opac_host = MeanSOpacityCGS(opacity_host, lRhoMin, lRhoMax, NRho,
-                                                  lTMin, lTMax, NT, YeMin, YeMax, NYe);
-    auto mean_opac_device = mean_opac_host.GetOnDevice();
-    params.Add("h.mean_s_opacity", mean_opac_host);
-    params.Add("d.mean_s_opacity", mean_opac_device);
+  {
+    auto opacity_host = params.Get<singularity::neutrinos::SOpacity>("h.s_opacity");
+    const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
+    const Real YeMax = pin->GetOrAddReal("mean_opacity", "yemax", 0.5);
+    const int NYe = pin->GetOrAddInteger("mean_opacity", "nye", 10);
+    if (scale_free) {
+      const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(0.1));
+      const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(10.));
+      const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
+      const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(0.1));
+      const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(10.));
+      const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
+      MeanSOpacity mean_opac_host = MeanSOpacityScaleFree(
+          opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin, YeMax, NYe);
+      auto mean_opac_device = mean_opac_host.GetOnDevice();
+      params.Add("h.mean_s_opacity", mean_opac_host);
+      params.Add("d.mean_s_opacity", mean_opac_device);
+    } else {
+      const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(1.e5));
+      const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(1.e14));
+      const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
+      const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(1.e5));
+      const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(1.e12));
+      const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
+      MeanSOpacity mean_opac_host = MeanSOpacityCGS(opacity_host, lRhoMin, lRhoMax, NRho,
+                                                    lTMin, lTMax, NT, YeMin, YeMax, NYe);
+      auto mean_opac_device = mean_opac_host.GetOnDevice();
+      params.Add("h.mean_s_opacity", mean_opac_host);
+      params.Add("d.mean_s_opacity", mean_opac_device);
+    }
   }
 
   auto &opacity_device = params.Get<singularity::neutrinos::Opacity>("d.opacity");
