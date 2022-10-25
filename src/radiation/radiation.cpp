@@ -21,8 +21,6 @@
 
 #include "closure.hpp"
 
-#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
-
 namespace radiation {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {

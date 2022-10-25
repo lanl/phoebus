@@ -33,7 +33,6 @@
 
 namespace radiation {
 
-using namespace singularity::neutrinos;
 using fixup::Bounds;
 using Microphysics::Opacities;
 using singularity::EOS;

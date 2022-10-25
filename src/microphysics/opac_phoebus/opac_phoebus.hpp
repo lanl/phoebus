@@ -52,12 +52,29 @@ class Opacities {
   }
 
   KOKKOS_INLINE_FUNCTION
+  Real TemperatureFromEnergyDensity(const Real &E, const RadiationType &type) const {
+    return opac_.TemperatureFromEnergyDensity(E, type);
+  }
+
+  KOKKOS_INLINE_FUNCTION
   Real ThermalDistributionOfTNu(const Real &T, const RadiationType &type,
                                 const Real &nu) const {
     return opac_.ThermalDistributionOfTNu(T, type, nu);
   }
 
   /// Absoprtion/emission quantities
+  KOKKOS_INLINE_FUNCTION
+  Real Emissivity(const Real &rho, const Real &T, const Real &Ye,
+                  const RadiationType &type, Real *lambda = nullptr) const {
+    return opac_.Emissivity(rho, T, Ye, type, lambda);
+  }
+
+  KOKKOS_INLINE_FUNCTION
+  Real NumberEmissivity(const Real &rho, const Real &T, const Real &Ye,
+                        const RadiationType &type, Real *lambda = nullptr) const {
+    return opac_.NumberEmissivity(rho, T, Ye, type, lambda);
+  }
+
   KOKKOS_INLINE_FUNCTION
   Real EmissivityPerNu(const Real &rho, const Real &T, const Real &Ye,
                        const RadiationType &type, const Real nu,

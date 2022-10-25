@@ -39,7 +39,6 @@ using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
 using singularity::RadiationType;
-using singularity::neutrinos::Opacity;
 
 namespace fixup {
 
