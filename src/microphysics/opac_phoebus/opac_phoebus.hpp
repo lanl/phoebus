@@ -32,8 +32,6 @@ using RadiationType = singularity::RadiationType;
 
 /// One class to contain all opacity objects and wrap the subset of calls we use in
 /// phoebus for convenience.
-// TODO(BRR) template on opacity/scattering opacity being gray, and if they are constexpr
-// if-away the table lookups for mean opacities
 class Opacities {
   using Opacity = singularity::neutrinos::Opacity;
   using MeanOpacity = singularity::neutrinos::MeanOpacity;
