@@ -152,7 +152,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       params.Add("d.mean_opacity", mean_opac_device);
     } else {
       const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(1.e5));
-      const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(1.e14));
+      const Real lRhoMax =
+          pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(1.e14));
       const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
       const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(1.e5));
       const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(1.e12));
@@ -235,7 +236,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       params.Add("d.mean_s_opacity", mean_opac_device);
     } else {
       const Real lRhoMin = pin->GetOrAddReal("mean_opacity", "lrhomin", std::log10(1.e5));
-      const Real lRhoMax = pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(1.e14));
+      const Real lRhoMax =
+          pin->GetOrAddReal("mean_opacity", "lrhomax", std::log10(1.e14));
       const int NRho = pin->GetOrAddInteger("mean_opacity", "nrho", 10);
       const Real lTMin = pin->GetOrAddReal("mean_opacity", "ltmin", std::log10(1.e5));
       const Real lTMax = pin->GetOrAddReal("mean_opacity", "ltmax", std::log10(1.e12));
