@@ -77,11 +77,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.8);
   params.Add("cfl", cfl);
 
-  // Get fake scattering value for testing in anticipation of scattering in
-  // singularity-opac
-  Real scattering_fraction = pin->GetOrAddReal("radiation", "scattering_fraction", 0.0);
-  params.Add("scattering_fraction", scattering_fraction);
-
   // Initialize frequency discretization
   Real nu_min;
   Real nu_max;

@@ -135,9 +135,6 @@ oned_fixup_strategy = ignore_dJ
 recon_fixup_strategy = bounds
 closure_c2p_strategy = robust
 
-#scattering_fraction = 1.0
-scattering_fraction = 0.5
-
 <opacity>
 type = gray
 gray_kappa = 5.e-11 # midplane tau/zone >1e3
