@@ -40,12 +40,12 @@ using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
 using namespace radiation;
 using singularity::EOS;
-using namespace singularity::neutrinos;
+using Microphysics::Opacities;
 
 class GasRadTemperatureResidual {
  public:
   KOKKOS_FUNCTION
-  GasRadTemperatureResidual(const Real Ptot, const Real rho, const Opacity &opac,
+  GasRadTemperatureResidual(const Real Ptot, const Real rho, const Opacities &opac,
                             const EOS &eos, RadiationType type, const Real Ye)
       : Ptot_(Ptot), rho_(rho), opac_(opac), eos_(eos), type_(type), Ye_(Ye) {}
 
@@ -59,7 +59,7 @@ class GasRadTemperatureResidual {
  private:
   const Real Ptot_;
   const Real rho_;
-  const Opacity &opac_;
+  const Opacities &opac_;
   const EOS &eos_;
   const RadiationType type_;
   const Real Ye_;
@@ -149,12 +149,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   InitialRadiation init_rad = InitialRadiation::thermal;
 
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
-  Opacity d_opacity;
+  auto opacities = opac->Param<Opacities>("opacities");
   std::vector<RadiationType> species;
   int num_species = 0;
   RadiationType species_d[MaxNumRadiationSpecies] = {};
   if (do_rad) {
-    d_opacity = opac->Param<Opacity>("d.opacity");
     const std::string init_rad_str =
         pin->GetOrAddString("torus", "initial_radiation", "None");
     if (init_rad_str == "None") {
@@ -300,7 +299,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               if (init_rad == InitialRadiation::thermal) {
                 root_find::RootFind root_find;
                 GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i),
-                                              d_opacity, eos, species_d[ispec], Ye);
+                                              opacities, eos, species_d[ispec], Ye);
                 v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
               }
 
@@ -313,7 +312,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                   v(irho, k, j, i), v(itmp, k, j, i), lambda);
 
               if (init_rad == InitialRadiation::thermal) {
-                v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
+                v(iJ(ispec), k, j, i) = opacities.EnergyDensityFromTemperature(
                     v(itmp, k, j, i), species_d[ispec]);
               } else {
                 v(iJ(ispec), k, j, i) = 1.e-5 * v(ieng, k, j, i);
