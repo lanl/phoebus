@@ -17,7 +17,6 @@
 
 // singularity
 #include <singularity-eos/eos/eos.hpp>
-#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
 #include "closure.hpp"
 #include "closure_mocmc.hpp"
@@ -37,7 +36,6 @@ namespace cr = radmoment_cons;
 namespace pr = radmoment_prim;
 namespace ir = radmoment_internal;
 namespace im = mocmc_internal;
-using namespace singularity::neutrinos;
 using Microphysics::Opacities;
 using singularity::EOS;
 using singularity::RadiationType;
@@ -80,8 +78,8 @@ void MOCMCInitSamples(T *rc) {
   const Real &minx_k = pmb->coords.x3f(kb.s);
 
   // Microphysics
-  auto opac = pmb->packages.Get("opacity");
-  const auto d_opac = opac->template Param<Opacity>("d.opacity");
+  auto opac_pkg = pmb->packages.Get("opacity");
+  const auto opac = opac_pkg->template Param<Opacities>("opacities");
   StateDescriptor *eos = pmb->packages.Get("eos").get();
 
   std::vector<std::string> variables{pr::J,           pr::H,  pf::density, pf::velocity,
@@ -213,13 +211,13 @@ void MOCMCInitSamples(T *rc) {
           for (int s = 0; s < num_species; s++) {
             // Get radiation temperature
             const RadiationType type = species_d[s];
-            const Real Tr = d_opac.TemperatureFromEnergyDensity(v(pJ(s), k, j, i), type);
+            const Real Tr = opac.TemperatureFromEnergyDensity(v(pJ(s), k, j, i), type);
             for (int nubin = 0; nubin < nu_bins; nubin++) {
               const Real nu = nusamp(nubin) * ndu;
 
               Inuinv(nubin, s, n) = std::max<Real>(
                   robust::SMALL(),
-                  d_opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3));
+                  opac.ThermalDistributionOfTNu(Temp, type, nu) / pow(nu, 3));
             }
           }
         }
@@ -250,8 +248,8 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   auto v = rc->PackVariables(variables, imap);
 
   // Microphysics
-  auto opac = pmb->packages.Get("opacity");
-  const auto opac_d = opac->template Param<Opacity>("d.opacity");
+  auto opac_pkg = pmb->packages.Get("opacity");
+  const auto opac = opac_pkg->template Param<Opacities>("opacities");
 
   const auto &x = swarm->template Get<Real>("x").Get();
   const auto &y = swarm->template Get<Real>("y").Get();
@@ -310,8 +308,7 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
               Real temp = 0.;
               if (ix1_bc == MOCMCBoundaries::outflow) {
                 // Temperature from J in ghost zone
-                temp =
-                    opac_d.TemperatureFromEnergyDensity(v(iJ(s), k, j, i), species_d[s]);
+                temp = opac.TemperatureFromEnergyDensity(v(iJ(s), k, j, i), species_d[s]);
               } else {
                 // Fixed temperature
                 temp = ix1_temp;
@@ -321,7 +318,7 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
               for (int nubin = 0; nubin < nu_bins; nubin++) {
                 const Real nu = nusamp(nubin);
                 Inuinv(nubin, s, n) =
-                    std::max<Real>(robust::SMALL(), opac_d.ThermalDistributionOfTNu(
+                    std::max<Real>(robust::SMALL(), opac.ThermalDistributionOfTNu(
                                                         temp, species_d[s], nu)) /
                     std::pow(nu, 3);
               }

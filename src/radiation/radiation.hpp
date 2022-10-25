@@ -22,9 +22,6 @@ using namespace parthenon::driver::prelude;
 using namespace parthenon::package::prelude;
 using namespace parthenon;
 
-#include <singularity-opac/neutrinos/mean_opacity_neutrinos.hpp>
-#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
-
 #include "compile_constants.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
 #include "utils/constants.hpp"

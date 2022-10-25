@@ -39,8 +39,8 @@ namespace torus {
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
 using namespace radiation;
-using singularity::EOS;
 using Microphysics::Opacities;
+using singularity::EOS;
 
 class GasRadTemperatureResidual {
  public:
