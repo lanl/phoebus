@@ -33,22 +33,22 @@ jobs:
             mkdir build_minkowski_release
             cd build_minkowski_release
             cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
-            cmake --build . --parallel 4
+            cmake --build . --parallel 8
             cd ..
             mkdir build_fmks_release
             cd build_fmks_release
             cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=FMKS -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
-            cmake --build . --parallel 4
+            cmake --build . --parallel 8
             cd ..
             mkdir build_minkowski_debug
             cd build_minkowski_debug
             cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
-            cmake --build . --parallel 4
+            cmake --build . --parallel 8
             cd ..
             mkdir build_fmks_debug
             cd build_fmks_debug
             cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=FMKS -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
-            cmake --build . --parallel 4
+            cmake --build . --parallel 8
             cd ..
             # TODO(BRR) add --use_gpu flag here if running on GPU
             # Release suite
