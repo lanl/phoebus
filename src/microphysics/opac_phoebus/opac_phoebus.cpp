@@ -148,8 +148,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       const Real lNuMin = std::log10(pin->GetOrAddReal("mean_opacity", "numin", 0.1));
       const Real lNuMax = std::log10(pin->GetOrAddReal("mean_opacity", "numax", 10.));
       const int NNu = pin->GetOrAddInteger("mean_opacity", "nnu", 100);
-      MeanOpacity mean_opac_host = MeanOpacityScaleFree(
-          opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin, YeMax, NYe, lNuMin, lNuMax, NNu);
+      MeanOpacity mean_opac_host =
+          MeanOpacityScaleFree(opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT,
+                               YeMin, YeMax, NYe, lNuMin, lNuMax, NNu);
       auto mean_opac_device = mean_opac_host.GetOnDevice();
       params.Add("h.mean_opacity", mean_opac_host);
       params.Add("d.mean_opacity", mean_opac_device);
@@ -164,8 +165,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       const Real lNuMin = std::log10(pin->GetOrAddReal("mean_opacity", "numin", 1.e10));
       const Real lNuMax = std::log10(pin->GetOrAddReal("mean_opacity", "numax", 1.e24));
       const int NNu = pin->GetOrAddInteger("mean_opacity", "nnu", 100);
-      MeanOpacity mean_opac_host = MeanOpacityCGS(
-          opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin, YeMax, NYe, lNuMin, lNuMax, NNu);
+      MeanOpacity mean_opac_host =
+          MeanOpacityCGS(opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin,
+                         YeMax, NYe, lNuMin, lNuMax, NNu);
       auto mean_opac_device = mean_opac_host.GetOnDevice();
       params.Add("h.mean_opacity", mean_opac_host);
       params.Add("d.mean_opacity", mean_opac_device);
