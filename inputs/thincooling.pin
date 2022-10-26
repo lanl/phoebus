@@ -97,6 +97,11 @@ tophat_C = 1.e0
 tophat_numin = 1.e15
 tophat_numax = 1.e17
 
+<mean_opacity>
+numin = 1.e15
+numax = 1.e17
+nnu = 10
+
 <monte_carlo>
 remove_emitted_particles = true
 
