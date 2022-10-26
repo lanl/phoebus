@@ -11,7 +11,11 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
-from parthenon_tools import phdf
+import sys
+sys.path.append('/users/brryan/github/phoebus/external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/')
+
+import phdf
+#from parthenon_tools import phdf
 
 from phoebus_constants import *
 from phoebus_eos import *

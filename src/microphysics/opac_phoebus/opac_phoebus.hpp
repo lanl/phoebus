@@ -117,10 +117,10 @@ class Opacities {
   }
 
  private:
-  const Opacity &opac_;
-  const MeanOpacity &m_opac_;
-  const SOpacity &s_opac_;
-  const MeanSOpacity &m_s_opac_;
+  Opacity opac_;
+  MeanOpacity m_opac_;
+  SOpacity s_opac_;
+  MeanSOpacity m_s_opac_;
 };
 
 namespace Opacity {
