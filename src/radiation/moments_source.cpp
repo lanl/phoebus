@@ -378,6 +378,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             Real kappaH = opacities.RosselandMeanScatteringCoefficient(rho, T1, Ye,
                                                                        species_d[ispec]) +
                           kappaJ;
+                          if (i == 32 && j == 32) {
+                            printf("[%i %i] JBB: %e kappaJ: %e kappaH: %e T0: %e T1: %e\n", i,j,JBB, kappaJ,kappaH, v(iblock, pT, k, j, i), T1);
+                          }
             Real tauJ = alpha * dt * kappaJ;
             Real tauH = alpha * dt * kappaH;
 

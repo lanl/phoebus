@@ -200,7 +200,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       params.Add("d.s_opacity", opacity_device);
     } else {
       singularity::neutrinos::SOpacity opacity_host =
-          NonCGSUnitsS<GrayS>(GrayS(kappa / avg_particle_mass, avg_particle_mass),
+          NonCGSUnitsS<GrayS>(GrayS(kappa * avg_particle_mass, avg_particle_mass),
                               time_unit, mass_unit, length_unit, temp_unit);
       auto opacity_device = opacity_host.GetOnDevice();
       params.Add("h.s_opacity", opacity_host);
@@ -217,7 +217,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       params.Add("d.s_opacity", opacity_device);
     } else {
       singularity::neutrinos::SOpacity opacity_host =
-          NonCGSUnitsS<GrayS>(GrayS(kappa / avg_particle_mass, avg_particle_mass),
+          NonCGSUnitsS<GrayS>(GrayS(kappa * avg_particle_mass, avg_particle_mass),
                               time_unit, mass_unit, length_unit, temp_unit);
       auto opacity_device = opacity_host.GetOnDevice();
       params.Add("h.s_opacity", opacity_host);

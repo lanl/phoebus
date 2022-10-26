@@ -11,11 +11,11 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
-import sys
-sys.path.append('/users/brryan/github/phoebus/external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/')
+#import sys
+#sys.path.append('/users/brryan/github/phoebus/external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/')
 
-import phdf
-#from parthenon_tools import phdf
+#import phdf
+from parthenon_tools import phdf
 
 from phoebus_constants import *
 from phoebus_eos import *
@@ -221,10 +221,10 @@ class phoedf(phdf.phdf):
     for ii in range(3):
       vdH += vcon[:,:,:,:,ii]*Hcov[:,:,:,:,ii]
       for jj in range(3):
-        self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj] 
+        self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj]
     self.xi[:,:,:,:] -= vdH*vdH
     self.xi = np.sqrt(self.xi)
-    
+
     print(f"xi max: {self.xi.max()}")
 
     self.xi = np.clip(self.xi, 1.e-10, 1.)
