@@ -172,7 +172,12 @@ struct RootFind {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
     if (!check_bracket(a, b, ya, yb)) {
-      PARTHENON_FAIL("Aborting with unbracketed root.");
+      if (status == nullptr) {
+        PARTHENON_FAIL("Aborting with unbracketed root.");
+      } else {
+        *status = RootFindStatus::failure;
+        return guess;
+      }
     }
     Real sign = (ya < 0 ? 1.0 : -1.0);
     ya *= sign;

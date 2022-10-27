@@ -27,7 +27,7 @@
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
-//#include "fluid/con2prim_robust.hpp"
+#include "fluid/con2prim_robust.hpp"
 #include "fixup/fixup.hpp"
 #include "fluid/prim2con.hpp"
 
@@ -275,6 +275,15 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   const auto src_rootfind_tol = rad->Param<Real>("src_rootfind_tol");
   const auto src_rootfind_maxiter = rad->Param<int>("src_rootfind_maxiter");
   const auto oned_fixup_strategy = rad->Param<OneDFixupStrategy>("oned_fixup_strategy");
+  
+  const Real c2p_tol = pkg->Param<Real>("c2p_tol");
+  const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
+  const Real c2p_floor_scale_fac = pkg->Param<Real>("c2p_floor_scale_fac");
+  const bool c2p_fail_on_floors = pkg->Param<bool>("c2p_fail_on_floors");
+  const bool c2p_fail_on_ceilings = pkg->Param<bool>("c2p_fail_on_ceilings");
+  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter,
+                                                c2p_floor_scale_fac, c2p_fail_on_floors,
+                                                c2p_fail_on_ceilings);
 
   constexpr int izone = 4;
   constexpr int jzone = 4;
@@ -788,6 +797,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               printf("[%i %i %i] dE = %e E = %e ceng = %e\n", k, j, i,
                      dE[ispec] * sdetgam, v(iblock, idx_E(ispec), k, j, i),
                      v(iblock, ceng, k, j, i));
+              v(iblock, ifail, k, j, i) = FailFlags::fail;
+              dE[ispec] = 0.;
+              SPACELOOP(ii) { 
+                cov_dF[ispec](ii) = 0.;
+              }
               // exit(-1);
             }
 
@@ -795,6 +809,36 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             SPACELOOP(ii) {
               v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF[ispec](ii);
             }
+
+            // Update pij here!
+            Tens2 conTilPi = {0};
+            Real E = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+            Vec covF;
+            Real J;
+            Real covH;
+            SPACELOOP(ii) {
+              covF(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
+            }
+            if (iTilPi.IsValid()) {
+              SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
+            } else {
+              Real xi = 0.0;
+              Real phi = pi;
+              // TODO(BRR) Remove STORE_GUESS parameter and instead check if closure type is
+              // M1?
+              if (STORE_GUESS) {
+                xi = v(b, iXi(ispec), k, j, i);
+                phi = 1.0001 * v(b, iPhi(ispec), k, j, i);
+              }
+              c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
+              if (STORE_GUESS) {
+                v(b, iXi(ispec), k, j, i) = xi;
+                v(b, iPhi(ispec), k, j, i) = phi;
+              }
+            }
+
+            bool successful_prim_recovery = false;
+
             if (update_fluid) {
               if (cye > 0) {
                 v(iblock, cye, k, j, i) -= sdetgam * 0.0;
@@ -803,7 +847,77 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               SPACELOOP(ii) {
                 v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF[ispec](ii);
               }
+
+              // Do GRMHD inversion and check that it works
+              auto mhd_c2p_status = invert(geom, eos, coords, k, j, i);
+              if (mhd_c2p_status == con2prim_robust::ConToPrimStatus::failure) {
+                successful_prim_recovery = false;
+              } else {
+                // Set con_v
+                Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i), v(iblock, pv(2), k, j, i)}};
+                const Real W = phoebus::GetLorentzFactor(con_v, cov_gamma.data);
+                SPACELOOP(ii) {
+                  con_v(ii) /= W;
+                }
+                
+                // Do rad inversion and check that it works
+                CLOSURE c(con_v, &g, {ClosureCon2PrimStrategy::frail});
+                auto rad_c2p_status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
+                
+                if (rad_c2p_status == ClosureStatus::success) {
+                  successful_prim_recovery = true;
+                  // Store rad prims
+                  v(iblock, idx_J(ispec), k, j, i) = J;
+                  SPACELOOP(ii) {
+                    v(iblock, idx_H(ispec, ii), k, j, i) = covH(ii) / J;
+                  }
+                } else {
+                  successful_prim_recovery = false;
+                }
+              }
+
+            } else {
+              // No fluid update; just do rad inversion and check that it works
+              
+              const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+              Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+              CLOSURE c(con_v, &g, {ClosureCon2PrimStrategy::frail});
+              auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
+              if (status == ClosureStatus::success) {
+                // If it worked, set prims
+                v(iblock, idx_J(ispec), k, j, i) = J;
+                SPACELOOP(ii) {
+                  v(iblock, idx_H(ispec, ii), k, j, i) = covH(ii) / J;
+                }
+              } else {
+                successful_prim_recovery = false;
+              }
             }
+
+            if (!successful_prim_recovery) {
+              // Source update failed. Try again with smaller kappas? Set to floors? Zero source update?
+
+              if (update_fluid) {
+                // Also set con_v for the closure
+              }
+                
+              CLOSURE c(con_v, &g, {ClosureCon2PrimStrategy::frail});
+
+              v(iblock, idx_J(ispec), k, j, i) = robust::SMALL();
+              J = v(iblock, idx_J(ispec), k, j, i)
+              SPACELOOP(ii) {
+                v(iblock, idx_H(ispec), k, j, i) = 0.;
+                covH(ii) = v(iblock, idx_H(ispec), k, j, i) * J;
+              }
+              c.Prim2Con(J, covH, conTilPi, E, covF);
+              v(iblock, idx_E(ispec), k, j, i) = E*sdetgam;
+              SPACELOOP(ii) {
+                v(iblock, idx_F(ispec), k, j, i) = covF(ii) * sdetgam;
+              }
+
+            
+            }
+
           }
         } else {
           v(iblock, ifail, k, j, i) = FailFlags::fail;
