@@ -428,7 +428,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               if (c2p_status == ClosureStatus::success) {
                 success = true;
               } else {
-                printf("[%i %i %i] orig closure fail!\n", k, j, i);
+                //printf("[%i %i %i] orig closure fail!\n", k, j, i);
                 success = false;
               }
             } else {
