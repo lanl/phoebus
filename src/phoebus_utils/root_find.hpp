@@ -107,7 +107,7 @@ struct RootFind {
 
   template <typename F>
   KOKKOS_INLINE_FUNCTION Real regula_falsi(F &func, Real a, Real b, const Real tol,
-                                           const Real guess) {
+                                           const Real guess, RootFindStatus *status = nullptr) {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
     if (!check_bracket(a, b, ya, yb)) {
@@ -150,11 +150,12 @@ struct RootFind {
       }
       iteration_count++;
     }
-    if (iteration_count == max_iter) {
-      PARTHENON_WARN(
-          "root finding reached the maximum number of iterations.  likely not converged");
-      // PARTHENON_FAIL("Aborting after root find failed to converge");
+
+    if (status != nullptr) {
+      *status =
+          iteration_count == max_iter ? RootFindStatus::failure : RootFindStatus::success;
     }
+
     return 0.5 * (a + b);
   }
 
@@ -198,12 +199,12 @@ struct RootFind {
       }
       iteration_count++;
     }
+
     if (status != nullptr) {
-      *status = RootFindStatus::success;
+      *status =
+          iteration_count == max_iter ? RootFindStatus::failure : RootFindStatus::success;
     }
-    if (iteration_count == max_iter)
-      PARTHENON_WARN(
-          "root finding reached the maximum number of iterations.  likely not converged");
+
     return 0.5 * (a + b);
   }
 
