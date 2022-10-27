@@ -279,9 +279,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   const auto src_rootfind_maxiter = rad->Param<int>("src_rootfind_maxiter");
   const auto oned_fixup_strategy = rad->Param<OneDFixupStrategy>("oned_fixup_strategy");
 
-  const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
-  const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
-  const Real c2p_floor_scale_fac = fluid_pkg->Param<Real>("c2p_floor_scale_fac");
+  const Real c2p_tol = update_fluid ? fluid_pkg->Param<Real>("c2p_tol") : 0.;
+  const int c2p_max_iter = update_fluid ? fluid_pkg->Param<int>("c2p_max_iter") : 0;
+  const Real c2p_floor_scale_fac =
+      update_fluid ? fluid_pkg->Param<Real>("c2p_floor_scale_fac") : 0.;
   const bool c2p_fail_on_floors = true;
   const bool c2p_fail_on_ceilings = true;
   auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter,
@@ -429,9 +430,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 success = true;
               } else {
                 // printf("[%i %i %i] orig closure fail!\n", k, j, i);
+                PARTHENON_DEBUG_WARN("closure failure!");
                 success = false;
               }
             } else {
+              PARTHENON_DEBUG_WARN("success is false!");
               success = false;
             }
 
@@ -936,6 +939,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               // If it worked, set prims
               v(iblock, idx_J(ispec), k, j, i) = J;
               SPACELOOP(ii) { v(iblock, idx_H(ispec, ii), k, j, i) = covH(ii) / J; }
+              successful_prim_recovery = true;
             } else {
               successful_prim_recovery = false;
             }
