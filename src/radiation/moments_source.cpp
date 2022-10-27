@@ -215,9 +215,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{c::energy, c::momentum, c::ye,       cr::E,
+  std::vector<std::string> vars{c::density, c::energy, c::momentum, c::ye,       cr::E,
                                 cr::F,     c::bfield,   p::density,  p::temperature,
-                                p::energy, p::ye,       p::velocity, p::bfield,
+                                p::energy, p::ye,       p::velocity, p::pressure, p::gamma1, p::bfield,
                                 pr::J,     pr::H,       ir::kappaJ,  ir::kappaH,
                                 ir::JBB,   ir::tilPi,   ir::srcfail};
 
@@ -238,10 +238,13 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   int prho = imap[p::density].first;
   int peng = imap[p::energy].first;
   int pT = imap[p::temperature].first;
+  int pprs = imap[p::pressure].first;
+  int pgm1 = imap[p::gamma1].first;
   int pYe = imap[p::ye].first;
   int pb_lo = imap[p::bfield].first;
   int cb_lo = imap[c::bfield].first;
 
+  int crho = imap[c::density].first;
   int ceng = imap[c::energy].first;
   int cmom_lo = imap[c::momentum].first;
   int cmom_hi = imap[c::momentum].second;
@@ -276,11 +279,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   const auto src_rootfind_maxiter = rad->Param<int>("src_rootfind_maxiter");
   const auto oned_fixup_strategy = rad->Param<OneDFixupStrategy>("oned_fixup_strategy");
   
-  const Real c2p_tol = pkg->Param<Real>("c2p_tol");
-  const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
-  const Real c2p_floor_scale_fac = pkg->Param<Real>("c2p_floor_scale_fac");
-  const bool c2p_fail_on_floors = pkg->Param<bool>("c2p_fail_on_floors");
-  const bool c2p_fail_on_ceilings = pkg->Param<bool>("c2p_fail_on_ceilings");
+  const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
+  const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
+  const Real c2p_floor_scale_fac = fluid_pkg->Param<Real>("c2p_floor_scale_fac");
+  const bool c2p_fail_on_floors = true; 
+  const bool c2p_fail_on_ceilings = true; 
   auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter,
                                                 c2p_floor_scale_fac, c2p_fail_on_floors,
                                                 c2p_fail_on_ceilings);
@@ -788,54 +791,56 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
           }
         } // SourceSolver
 
-        if (success == true) {
+//        if (success == true) {
           for (int ispec = 0; ispec < num_species; ispec++) {
             v(iblock, ifail, k, j, i) = FailFlags::success;
 
-            if (dE[ispec] * sdetgam + v(iblock, idx_E(ispec), k, j, i) < 0 ||
-                (-dE[ispec] * sdetgam + v(iblock, ceng, k, j, i) < 0)) {
-              printf("[%i %i %i] dE = %e E = %e ceng = %e\n", k, j, i,
-                     dE[ispec] * sdetgam, v(iblock, idx_E(ispec), k, j, i),
-                     v(iblock, ceng, k, j, i));
-              v(iblock, ifail, k, j, i) = FailFlags::fail;
-              dE[ispec] = 0.;
-              SPACELOOP(ii) { 
-                cov_dF[ispec](ii) = 0.;
+            //if (dE[ispec] * sdetgam + v(iblock, idx_E(ispec), k, j, i) < 0 ||
+            //    (-dE[ispec] * sdetgam + v(iblock, ceng, k, j, i) < 0)) {
+            //  printf("[%i %i %i] dE = %e E = %e ceng = %e\n", k, j, i,
+            //         dE[ispec] * sdetgam, v(iblock, idx_E(ispec), k, j, i),
+            //         v(iblock, ceng, k, j, i));
+            //  v(iblock, ifail, k, j, i) = FailFlags::fail;
+            //  dE[ispec] = 0.;
+            //  SPACELOOP(ii) { 
+            //    cov_dF[ispec](ii) = 0.;
+            //  }
+            //  // exit(-1);
+            //}
+
+            if (success == true) {
+              v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE[ispec];
+              SPACELOOP(ii) {
+                v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF[ispec](ii);
               }
-              // exit(-1);
             }
 
-            v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE[ispec];
-            SPACELOOP(ii) {
-              v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF[ispec](ii);
-            }
-
-            // Update pij here!
+//            // Update pij here!
             Tens2 conTilPi = {0};
             Real E = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
             Vec covF;
             Real J;
-            Real covH;
-            SPACELOOP(ii) {
-              covF(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
-            }
-            if (iTilPi.IsValid()) {
-              SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
-            } else {
-              Real xi = 0.0;
-              Real phi = pi;
-              // TODO(BRR) Remove STORE_GUESS parameter and instead check if closure type is
-              // M1?
-              if (STORE_GUESS) {
-                xi = v(b, iXi(ispec), k, j, i);
-                phi = 1.0001 * v(b, iPhi(ispec), k, j, i);
-              }
-              c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
-              if (STORE_GUESS) {
-                v(b, iXi(ispec), k, j, i) = xi;
-                v(b, iPhi(ispec), k, j, i) = phi;
-              }
-            }
+            Vec covH;
+//            SPACELOOP(ii) {
+//              covF(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
+//            }
+//            if (idx_tilPi.IsValid()) {
+//              SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i); }
+//            } else {
+//              Real xi = 0.0;
+//              Real phi = M_PI;
+//              // TODO(BRR) Remove STORE_GUESS parameter and instead check if closure type is
+//              // M1?
+//              //if (STORE_GUESS) {
+//              //  xi = v(iblock, iXi(ispec), k, j, i);
+//              //  phi = 1.0001 * v(iblock, iPhi(ispec), k, j, i);
+//             // }
+//              c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
+//              //if (STORE_GUESS) {
+//              //  v(iblock, iXi(ispec), k, j, i) = xi;
+//              //  v(iblock, iPhi(ispec), k, j, i) = phi;
+//              //}
+//            }
 
             bool successful_prim_recovery = false;
 
@@ -855,13 +860,36 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               } else {
                 // Set con_v
                 Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i), v(iblock, pv(2), k, j, i)}};
-                const Real W = phoebus::GetLorentzFactor(con_v, cov_gamma.data);
+                const Real W = phoebus::GetLorentzFactor(con_v.data, cov_gamma.data);
                 SPACELOOP(ii) {
                   con_v(ii) /= W;
                 }
                 
                 // Do rad inversion and check that it works
                 CLOSURE c(con_v, &g, {ClosureCon2PrimStrategy::frail});
+                
+                // Update pi
+                SPACELOOP(ii) {
+                  covF(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
+                }
+                if (idx_tilPi.IsValid()) {
+                  SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i); }
+                } else {
+                  Real xi = 0.0;
+                  Real phi = M_PI;
+                  // TODO(BRR) Remove STORE_GUESS parameter and instead check if closure type is
+                  // M1?
+                  //if (STORE_GUESS) {
+                  //  xi = v(iblock, iXi(ispec), k, j, i);
+                  //  phi = 1.0001 * v(iblock, iPhi(ispec), k, j, i);
+                 // }
+                  c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
+                  //if (STORE_GUESS) {
+                  //  v(iblock, iXi(ispec), k, j, i) = xi;
+                  //  v(iblock, iPhi(ispec), k, j, i) = phi;
+                  //}
+                }
+
                 auto rad_c2p_status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
                 
                 if (rad_c2p_status == ClosureStatus::success) {
@@ -882,6 +910,28 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
               Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
               CLOSURE c(con_v, &g, {ClosureCon2PrimStrategy::frail});
+              // Update pi
+              SPACELOOP(ii) {
+                covF(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
+              }
+              if (idx_tilPi.IsValid()) {
+                SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i); }
+              } else {
+                Real xi = 0.0;
+                Real phi = M_PI;
+                // TODO(BRR) Remove STORE_GUESS parameter and instead check if closure type is
+                // M1?
+                //if (STORE_GUESS) {
+                //  xi = v(iblock, iXi(ispec), k, j, i);
+                //  phi = 1.0001 * v(iblock, iPhi(ispec), k, j, i);
+               // }
+                c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
+                //if (STORE_GUESS) {
+                //  v(iblock, iXi(ispec), k, j, i) = xi;
+                //  v(iblock, iPhi(ispec), k, j, i) = phi;
+                //}
+              }
+
               auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
               if (status == ClosureStatus::success) {
                 // If it worked, set prims
@@ -899,29 +949,64 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
               if (update_fluid) {
                 // Also set con_v for the closure
+                v(iblock, prho, k, j, i) = 10.*robust::SMALL();
+                v(iblock, peng, k, j, i) = 10.*robust::SMALL();
+                SPACELOOP(ii) {
+                  v(iblock, pv(ii), k, j, i) = 0.;
+                }
+                // TODO(BRR) use Ye here!
+                Real eos_lambda[2] = {0.5, 0};
+                v(iblock, pprs, k, j, i) = eos.PressureFromDensityInternalEnergy(v(iblock, prho, k, j, i),
+                robust::ratio(v(iblock, peng, k, j, i), v(iblock, prho, k, j, i)), eos_lambda);
+                v(iblock, pT, k, j, i) = eos.TemperatureFromDensityInternalEnergy(v(iblock, prho, k, j, i),
+                 robust::ratio(v(iblock, peng, k, j, i),v(iblock, prho, k, j, i)), eos_lambda);
+                v(iblock, pgm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+                  v(iblock, prho, k, j, i), v(iblock, pT, k, j, i), eos_lambda);
+                Real vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i), 
+                  v(iblock, pv(2), k, j, i)};
+                  Real bp[3];
+                  SPACELOOP(ii) {
+                    SPACELOOP(ii) { bp[ii] = v(iblock, pb_lo + ii, k, j, i); }
+                  }
+                Real S[3];
+                Real Bcons[3];
+                Real yecons;
+                prim2con::p2c(v(iblock, prho, k, j, i), vp, bp, v(iblock, peng, k, j, i), eos_lambda[0], 
+                  v(iblock, pprs, k, j, i), v(iblock, pgm1, k, j, i), cov_g,
+                  con_gamma.data, beta, alpha, sdetgam, v(iblock, crho, k, j, i), S, Bcons, v(iblock, ceng, k, j, i), yecons);
+                // TODO(BRR) set cons ye!
+                SPACELOOP(ii) {
+                  v(iblock, cmom_lo + ii, k, j, i) = S[ii];
+                }
+              }
+                
+              Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i), v(iblock, pv(2), k, j, i)}};
+              const Real W = phoebus::GetLorentzFactor(con_v.data, cov_gamma.data);
+              SPACELOOP(ii) {
+                con_v(ii) /= W;
               }
                 
               CLOSURE c(con_v, &g, {ClosureCon2PrimStrategy::frail});
 
               v(iblock, idx_J(ispec), k, j, i) = robust::SMALL();
-              J = v(iblock, idx_J(ispec), k, j, i)
+              J = v(iblock, idx_J(ispec), k, j, i);
               SPACELOOP(ii) {
-                v(iblock, idx_H(ispec), k, j, i) = 0.;
-                covH(ii) = v(iblock, idx_H(ispec), k, j, i) * J;
+                v(iblock, idx_H(ispec, ii), k, j, i) = 0.;
+                covH(ii) = v(iblock, idx_H(ispec, ii), k, j, i) * J;
               }
-              c.Prim2Con(J, covH, conTilPi, E, covF);
+              c.Prim2Con(J, covH, conTilPi, &E, &covF);
               v(iblock, idx_E(ispec), k, j, i) = E*sdetgam;
               SPACELOOP(ii) {
-                v(iblock, idx_F(ispec), k, j, i) = covF(ii) * sdetgam;
+                v(iblock, idx_F(ispec, ii), k, j, i) = covF(ii) * sdetgam;
               }
 
             
             }
 
           }
-        } else {
-          v(iblock, ifail, k, j, i) = FailFlags::fail;
-        }
+//        } else {
+//          v(iblock, ifail, k, j, i) = FailFlags::fail;
+//        }
       });
   return TaskStatus::complete;
 }
