@@ -351,6 +351,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
             if (status == root_find::RootFindStatus::failure) {
               // printf("FAILURE! %i %i %i\n", k, j, i);
+              PARTHENON_DEBUG_WARN("1D source rootfind failure!");
               success = false;
               // break;
 
@@ -472,7 +473,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               }
             } else if (!success && oned_fixup_strategy == OneDFixupStrategy::ignore_all) {
               dE[ispec] = 0.;
-              SPACELOOP(ii) { cov_Fstar(ii) = 0.; }
+              SPACELOOP(ii) { cov_dF[ispec](ii) = 0.; }
               success = true;
             } else {
               break; // Don't bother with other species if this failed
