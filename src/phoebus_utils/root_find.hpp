@@ -107,7 +107,8 @@ struct RootFind {
 
   template <typename F>
   KOKKOS_INLINE_FUNCTION Real regula_falsi(F &func, Real a, Real b, const Real tol,
-                                           const Real guess, RootFindStatus *status = nullptr) {
+                                           const Real guess,
+                                           RootFindStatus *status = nullptr) {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
     if (!check_bracket(a, b, ya, yb)) {

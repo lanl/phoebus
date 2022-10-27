@@ -178,13 +178,11 @@ class InteractionTResidual {
           opacities_.RosselandMeanAbsorptionCoefficient(rho_, T, Ye_, species_[ispec]);
 
       const Real JBB = opacities_.EnergyDensityFromTemperature(T, species_[ispec]);
-      printf("kappa: %e JBB: %e\n", kappa, JBB);
 
       dJ_tot += (J0_[ispec] + dtau_ * kappa * JBB) / (1. + dtau_ * kappa) - J0_[ispec];
     }
 
     const Real ug1 = rho_ * eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda);
-     printf("T = %e resid = %e ug1 = %e ug0_ = %e dJ = %e J0_tot = %e\n", T, ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot), ug1, ug0_, dJ_tot, J0_tot);
 
     return ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot);
   }
@@ -343,29 +341,21 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             InteractionTResidual res(eos, opacities, rho, ug, Ye, J0, num_species,
                                      species_d, dtau);
             root_find::RootFindStatus status;
-            //Real T1 = root_find.secant(res, 1.e-3*v(iblock, pT, k, j, i), 1.e3 * v(iblock, pT, k, j, i),
+            // Real T1 = root_find.secant(res, 1.e-3*v(iblock, pT, k, j, i), 1.e3 *
+            // v(iblock, pT, k, j, i),
             //                                 1.e-8 * v(iblock, pT, k, j, i),
             //                                 v(iblock, pT, k, j, i), &status);
-            Real T1 = root_find.itp(res, 1.e-5*v(iblock, pT, k, j, i), 1.e5 * v(iblock, pT, k, j, i),
-                                             1.e-8 * v(iblock, pT, k, j, i),
-                                             v(iblock, pT, k, j, i), &status);
-            if (i == izone && j == jzone) {
-              printf("[%i %i] T1 = %e T0 = %e success = %i\n", i, j, T1,
-                v(iblock, pT, k, j, i), static_cast<int>(status == root_find::RootFindStatus::success));
-              exit(-1);
-            }
+            Real T1 = root_find.itp(
+                res, 1.e-5 * v(iblock, pT, k, j, i), 1.e5 * v(iblock, pT, k, j, i),
+                1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i), &status);
+
             if (status == root_find::RootFindStatus::failure) {
-              //printf("FAILURE! %i %i %i\n", k, j, i);
-              //success = false;
+              // printf("FAILURE! %i %i %i\n", k, j, i);
+              success = false;
               // break;
 
-              status = root_find::RootFindStatus::success;
-              T1 = v(iblock, pT, k, j, i);
-            }
-
-            if (rho > 1.e-2 && std::fabs(T1 - v(iblock, pT, k, j, i))/v(iblock, pT, k, j, i) > 0.05) {
-              printf("BIG T CHANGE! %i %i %i rho = %e T1 = %e T0 = %e\n",
-                k,j,i,rho, T1, v(iblock, pT, k, j, i));
+              // status = root_find::RootFindStatus::success;
+              // T1 = v(iblock, pT, k, j, i);
             }
 
             CLOSURE c(con_v, &g);
@@ -406,12 +396,15 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             if (status == root_find::RootFindStatus::success) {
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
-                          if (i == izone && j == jzone) {
-                            printf("[%i %i] JBB: %e kappaJ: %e kappaH: %e T0: %e T1: %e\n", i,j,JBB, kappaJ,kappaH, v(iblock, pT, k, j, i), T1);
-                            printf("tauJ: %e tauH: %e\n", tauJ, tauH);
-                            printf("dE: %e cov_dF: %e %e %e\n", dE[ispec], cov_dF[ispec](0),
-                              cov_dF[ispec](1), cov_dF[ispec](2));
-                          }
+              //                          if (i == izone && j == jzone) {
+              //                            printf("[%i %i] JBB: %e kappaJ: %e kappaH: %e
+              //                            T0: %e T1: %e\n", i,j,JBB, kappaJ,kappaH,
+              //                            v(iblock, pT, k, j, i), T1); printf("tauJ: %e
+              //                            tauH: %e\n", tauJ, tauH); printf("dE: %e
+              //                            cov_dF: %e %e %e\n", dE[ispec],
+              //                            cov_dF[ispec](0),
+              //                              cov_dF[ispec](1), cov_dF[ispec](2));
+              //                          }
 
               Estar += dE[ispec];
               SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
@@ -422,7 +415,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               if (c2p_status == ClosureStatus::success) {
                 success = true;
               } else {
-                printf("[%i %i %i] orig closure fail!\n",k,j,i);
+                printf("[%i %i %i] orig closure fail!\n", k, j, i);
                 success = false;
               }
             } else {
@@ -451,10 +444,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               tauH = alpha * dt * kappaH;
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
-              printf("[%i %i %i] ignoredJ dE: %e dF: %e %e %e JBB: %e kappaJ: %e kappaH: %e\n", k,j,i, dE[ispec], cov_dF[ispec](0),
-                cov_dF[ispec](1), cov_dF[ispec](2), JBB, kappaH, kappaJ);
-              if (rho > 1.e-2)
-              exit(-1);
+              // printf("[%i %i %i] ignoredJ dE: %e dF: %e %e %e JBB: %e kappaJ: %e
+              // kappaH: %e\n", k,j,i, dE[ispec], cov_dF[ispec](0),
+              //  cov_dF[ispec](1), cov_dF[ispec](2), JBB, kappaH, kappaJ);
+              // if (rho > 1.e-2)
+              // exit(-1);
 
               // Check xi
               Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam + dE[ispec];
@@ -788,10 +782,12 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
           for (int ispec = 0; ispec < num_species; ispec++) {
             v(iblock, ifail, k, j, i) = FailFlags::success;
 
-            if (dE[ispec]*sdetgam + v(iblock, idx_E(ispec), k, j, i) < 0 || (-dE[ispec]*sdetgam + v(iblock, ceng, k, j, i) < 0 )) {
-              printf("[%i %i %i] dE = %e E = %e ceng = %e\n", k, j, i, dE[ispec]*sdetgam,
-                v(iblock, idx_E(ispec), k, j, i), v(iblock, ceng, k, j, i));
-              exit(-1);
+            if (dE[ispec] * sdetgam + v(iblock, idx_E(ispec), k, j, i) < 0 ||
+                (-dE[ispec] * sdetgam + v(iblock, ceng, k, j, i) < 0)) {
+              printf("[%i %i %i] dE = %e E = %e ceng = %e\n", k, j, i,
+                     dE[ispec] * sdetgam, v(iblock, idx_E(ispec), k, j, i),
+                     v(iblock, ceng, k, j, i));
+              // exit(-1);
             }
 
             v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE[ispec];
