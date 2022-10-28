@@ -29,7 +29,6 @@ args = parser.parse_args()
 
 modified_inputs = {}
 modified_inputs['radiation/method'] = 'moment_eddington'
-modified_inputs['radiation/scattering_fraction'] = 0.0
 modified_inputs['opacity/gray_kappa'] = 0.1
 modified_inputs['radiation_equilibration/J'] = 0.2
 

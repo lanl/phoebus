@@ -14,7 +14,7 @@
 # publicly, and to permit others to do so.
 
 import argparse
-import os 
+import os
 import sys
 import regression_test as rt
 
@@ -28,7 +28,6 @@ parser.add_argument('--build_type', type=str, default='Release', choices=['Debug
 args = parser.parse_args()
 
 modified_inputs = {}
-modified_inputs['radiation/scattering_fraction'] = 0.0
 modified_inputs['radiation/B_fake'] = 1.0
 modified_inputs['opacity/gray_kappa'] = 1.e1
 modified_inputs['radiation_advection/J'] = 0.1
@@ -46,7 +45,7 @@ code = rt.gold_comparison(variables=['r.p.J', 'r.p.H'],
                           geometry='SphericalMinkowski',
                           use_gpu=args.use_gpu,
                           use_mpiexec=args.use_mpiexec,
-                          build_type=args.build_type, 
+                          build_type=args.build_type,
                           upgold=args.upgold,
                           compression_factor=10)
 
