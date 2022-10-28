@@ -14,6 +14,7 @@
 #ifndef GEOMETRY_COORDINATE_SYSTEMS_HPP_
 #define GEOMETRY_COORDINATE_SYSTEMS_HPP_
 
+
 #include <array>
 #include <cmath>
 #include <limits>
@@ -24,13 +25,13 @@
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
-using namespace parthenon::package::prelude;
 
 // phoebus includes
 #include "compile_constants.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/linear_algebra.hpp"
+#include "phoebus_utils/preprocessor_utils.hpp"
 
 // coordinate system includes
 #include "geometry/analytic_system.hpp"
@@ -53,6 +54,7 @@ namespace Geometry {
 // Coordinate system choices
 using CoordSysMeshBlock = GEOMETRY_MESH_BLOCK;
 using CoordSysMesh = GEOMETRY_MESH;
+constexpr char GEOMETRY_NAME[] = TOKEN2STRING(PHOEBUS_GEOMETRY);
 
 } // namespace Geometry
 
