@@ -20,8 +20,7 @@ using Geometry::NDFULL;
 
 namespace radiation {
 
-using namespace singularity::neutrinos;
-using singularity::RadiationType;
+using Microphysics::Opacities;
 
 KOKKOS_INLINE_FUNCTION
 Real GetWeight(const Real wgtC, const Real nu) { return wgtC / nu; }
@@ -46,7 +45,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_particles = rad->Param<int>("num_particles");
   const auto remove_emitted_particles = rad->Param<bool>("remove_emitted_particles");
 
-  const auto d_opacity = opac->Param<Opacity>("d.opacity");
+  const auto &opacities = opac->Param<Opacities>("opacities");
 
   auto species = rad->Param<std::vector<RadiationType>>("species");
   auto num_species = rad->Param<int>("num_species");
@@ -124,7 +123,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real nu = nusamp(n);
             Real ener = h_code * nu;
             Real wgt = GetWeight(wgtC, nu);
-            Real Jnu = d_opacity.EmissivityPerNu(dens, temp, ye, s, nu);
+            Real Jnu = opacities.EmissivityPerNu(dens, temp, ye, s, nu);
 
             dN += Jnu / (ener * wgt) * (nu * dlnu);
 
@@ -144,9 +143,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           // Trapezoidal rule
           Real nu0 = nusamp[0];
           Real nu1 = nusamp[nu_bins];
-          dN -= 0.5 * d_opacity.EmissivityPerNu(dens, temp, ye, s, nu0) /
+          dN -= 0.5 * opacities.EmissivityPerNu(dens, temp, ye, s, nu0) /
                 (h_code * GetWeight(wgtC, nu0)) * dlnu;
-          dN -= 0.5 * d_opacity.EmissivityPerNu(dens, temp, ye, s, nu1) /
+          dN -= 0.5 * opacities.EmissivityPerNu(dens, temp, ye, s, nu1) /
                 (h_code * GetWeight(wgtC, nu1)) * dlnu;
           dN *= d3x * detG * dt;
 
@@ -348,7 +347,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_particles = rad->Param<int>("num_particles");
   const auto absorption = rad->Param<bool>("absorption");
 
-  const auto d_opacity = opac->Param<Opacity>("d.opacity");
+  const auto &opacities = opac->Param<Opacities>("opacities");
 
   // Meshblock geometry
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -411,7 +410,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
 
           Real alphanu = 4. * M_PI *
-                         d_opacity.AbsorptionCoefficient(
+                         opacities.AbsorptionCoefficient(
                              v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units

@@ -32,8 +32,8 @@
 
 namespace radiation {
 
-using namespace singularity::neutrinos;
 using fixup::Bounds;
+using Microphysics::Opacities;
 using singularity::EOS;
 
 template <class T>
@@ -969,13 +969,8 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  // Mainly for testing purposes, probably should be able to do this with the opacity
-  // code itself
-  const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
-
   // Get the device opacity object
-  const auto &d_opacity = opac->Param<Opacity>("d.opacity");
-  const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
+  const auto &opacities = opac->Param<Opacities>("opacities");
 
   // Get the background geometry
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -998,13 +993,15 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           const Real Temp = v(iblock, pT, k, j, i);
           const Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
 
-          Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-              rho, Temp, Ye, dev_species[ispec]);
-          Real JBB = d_opacity.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
+          Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(rho, Temp, Ye,
+                                                                     dev_species[ispec]);
+          Real kappaH = kappaJ + opacities.RosselandMeanScatteringCoefficient(
+                                     rho, Temp, Ye, dev_species[ispec]);
+          Real JBB = opacities.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
 
           v(iblock, idx_JBB(ispec), k, j, i) = JBB;
-          v(iblock, idx_kappaJ(ispec), k, j, i) = kappa * (1.0 - scattering_fraction);
-          v(iblock, idx_kappaH(ispec), k, j, i) = kappa;
+          v(iblock, idx_kappaJ(ispec), k, j, i) = kappaJ;
+          v(iblock, idx_kappaH(ispec), k, j, i) = kappaH;
         }
       });
 
