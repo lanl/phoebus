@@ -905,7 +905,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               Real vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                             v(iblock, pv(2), k, j, i)};
               Real bp[3];
-              SPACELOOP(ii) {
+              if (pb_lo >= 0) {
                 SPACELOOP(ii) { bp[ii] = v(iblock, pb_lo + ii, k, j, i); }
               }
               Real S[3];
