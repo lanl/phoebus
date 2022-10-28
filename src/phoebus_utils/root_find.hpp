@@ -112,7 +112,12 @@ struct RootFind {
     Real ya, yb;
     refine_bracket(func, guess, a, b, ya, yb);
     if (!check_bracket(a, b, ya, yb)) {
-      PARTHENON_FAIL("Aborting with unbracketed root.");
+      if (status == nullptr) {
+        PARTHENON_FAIL("Aborting with unbracketed root.");
+      } else {
+        *status = RootFindStatus::failure;
+        return guess;
+      }
     }
     Real sign = (ya < 0 ? 1.0 : -1.0);
     ya *= sign;
@@ -215,12 +220,17 @@ struct RootFind {
   }
 
   template <typename F>
-  KOKKOS_INLINE_FUNCTION Real bisect(F func, Real a, Real b, const Real tol) {
+  KOKKOS_INLINE_FUNCTION Real bisect(F func, Real a, Real b, const Real tol, RootFindStatus *status = nullptr) {
 
     Real ya = func(a);
     Real yb = func(b);
     if (!check_bracket(a, b, ya, yb)) {
-      PARTHENON_FAIL("Aborting with unbracketed root.");
+      if (status == nullptr) {
+        PARTHENON_FAIL("Aborting with unbracketed root.");
+      } else {
+        *status = RootFindStatus::failure;
+        return guess;
+      }
     }
     Real sign = (ya < 0 ? 1.0 : -1.0);
     ya *= sign;
@@ -241,9 +251,12 @@ struct RootFind {
       }
       iteration_count++;
     }
-    if (iteration_count == max_iter)
-      PARTHENON_WARN(
-          "root finding reached the maximum number of iterations.  likely not converged");
+
+    if (status != nullptr) {
+      *status =
+          iteration_count == max_iter ? RootFindStatus::failure : RootFindStatus::success;
+    }
+
     return 0.5 * (a + b);
   }
 
