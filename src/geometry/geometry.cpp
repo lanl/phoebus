@@ -39,6 +39,37 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto geometry = std::make_shared<StateDescriptor>("geometry");
   Initialize<CoordSysMeshBlock>(pin, geometry.get());
 
+  Params &params = geometry->AllParams();
+
+  // Store name of geometry in parameters
+  std::string geometry_name;
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski)) {
+    geometry_name = "Minkowski";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski)) {
+    geometry_name = "BoostedMinkowski";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::SphericalMinkowski)) {
+    geometry_name = "SphericalMinkowski";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoyerLindquist)) {
+    geometry_name = "BoyerLindquist";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::SphericalKerrSchild)) {
+    geometry_name = "SphericalKerrSchild";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FLRW)) {
+    geometry_name = "FLRW";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS)) {
+    geometry_name = "FMKS";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake)) {
+    geometry_name = "Snake";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Inchworm)) {
+    geometry_name = "Inchworm";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph)) {
+    geometry_name = "MonopoleSph";
+  } else if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart)) {
+    geometry_name = "MonopoleCart";
+  } else {
+    PARTHENON_THROW("PHOEBUS_GEOMETRY not recognized!");
+  }
+  params.Add("geometry_name", geometry_name);
+
   // Always add coodinates fields
   Utils::MeshBlockShape dims(pin);
   std::vector<int> cell_shape = {4};
