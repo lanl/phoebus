@@ -14,7 +14,6 @@
 #ifndef GEOMETRY_COORDINATE_SYSTEMS_HPP_
 #define GEOMETRY_COORDINATE_SYSTEMS_HPP_
 
-
 #include <array>
 #include <cmath>
 #include <limits>
