@@ -220,7 +220,8 @@ struct RootFind {
   }
 
   template <typename F>
-  KOKKOS_INLINE_FUNCTION Real bisect(F func, Real a, Real b, const Real tol, RootFindStatus *status = nullptr) {
+  KOKKOS_INLINE_FUNCTION Real bisect(F func, Real a, Real b, const Real tol,
+                                     RootFindStatus *status = nullptr) {
 
     Real ya = func(a);
     Real yb = func(b);
