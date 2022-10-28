@@ -216,10 +216,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace c = fluid_cons;
   namespace p = fluid_prim;
   std::vector<std::string> vars{
-      c::density,  c::energy,  c::momentum,    c::ye,      cr::E, cr::F,
-      c::bfield,   p::density, p::temperature, p::energy,  p::ye, p::velocity,
-      p::pressure, p::gamma1,  p::bfield,      pr::J,      pr::H, ir::kappaJ,
-      ir::kappaH,  ir::JBB,    ir::tilPi,      ir::srcfail};
+      c::density,  c::energy,  c::momentum,    c::ye,     cr::E, cr::F,
+      c::bfield,   p::density, p::temperature, p::energy, p::ye, p::velocity,
+      p::pressure, p::gamma1,  p::bfield,      pr::J,     pr::H, ir::kappaJ,
+      ir::kappaH,  ir::JBB,    ir::tilPi};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -232,7 +232,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
   auto idx_tilPi = imap.GetFlatIdx(ir::tilPi, false);
-  auto ifail = imap[ir::srcfail].first;
   auto pv = imap.GetFlatIdx(p::velocity);
 
   int prho = imap[p::density].first;
@@ -354,22 +353,14 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             InteractionTResidual res(eos, opacities, rho, ug, Ye, J0, num_species,
                                      species_d, dtau);
             root_find::RootFindStatus status;
-            // Real T1 = root_find.secant(res, 1.e-3*v(iblock, pT, k, j, i), 1.e3 *
-            // v(iblock, pT, k, j, i),
-            //                                 1.e-8 * v(iblock, pT, k, j, i),
-            //                                 v(iblock, pT, k, j, i), &status);
-            Real T1 = root_find.itp(
-                res, 1.e-5 * v(iblock, pT, k, j, i), 1.e5 * v(iblock, pT, k, j, i),
-                1.e-8 * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i), &status);
+            Real T1 = root_find.itp(res, 1.e-5 * v(iblock, pT, k, j, i),
+                                    1.e5 * v(iblock, pT, k, j, i),
+                                    src_rootfind_tol * v(iblock, pT, k, j, i),
+                                    v(iblock, pT, k, j, i), &status);
 
             if (status == root_find::RootFindStatus::failure) {
-              // printf("FAILURE! %i %i %i\n", k, j, i);
               PARTHENON_DEBUG_WARN("1D source rootfind failure!");
               success = false;
-              // break;
-
-              // status = root_find::RootFindStatus::success;
-              // T1 = v(iblock, pT, k, j, i);
             }
 
             CLOSURE c(con_v, &g);
@@ -410,15 +401,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             if (status == root_find::RootFindStatus::success) {
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
-              //                          if (i == izone && j == jzone) {
-              //                            printf("[%i %i] JBB: %e kappaJ: %e kappaH: %e
-              //                            T0: %e T1: %e\n", i,j,JBB, kappaJ,kappaH,
-              //                            v(iblock, pT, k, j, i), T1); printf("tauJ: %e
-              //                            tauH: %e\n", tauJ, tauH); printf("dE: %e
-              //                            cov_dF: %e %e %e\n", dE[ispec],
-              //                            cov_dF[ispec](0),
-              //                              cov_dF[ispec](1), cov_dF[ispec](2));
-              //                          }
 
               Estar += dE[ispec];
               SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);
@@ -429,7 +411,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               if (c2p_status == ClosureStatus::success) {
                 success = true;
               } else {
-                // printf("[%i %i %i] orig closure fail!\n", k, j, i);
                 PARTHENON_DEBUG_WARN("closure failure!");
                 success = false;
               }
@@ -445,7 +426,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 cov_Fstar(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
               }
 
-              // JBB = v(iblock, idx_J(ispec), k, j, i);
               Real JBB = opacities.EnergyDensityFromTemperature(v(iblock, pT, k, j, i),
                                                                 species_d[ispec]);
               // Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
@@ -454,17 +434,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               Real kappaH = opacities.RosselandMeanScatteringCoefficient(
                                 rho, T1, Ye, species_d[ispec]) +
                             kappaJ;
-              // Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-              //    rho, v(iblock, pT, k, j, i), Ye, species_d[ispec]);
               tauJ = alpha * dt * kappaJ;
               tauH = alpha * dt * kappaH;
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
-              // printf("[%i %i %i] ignoredJ dE: %e dF: %e %e %e JBB: %e kappaJ: %e
-              // kappaH: %e\n", k,j,i, dE[ispec], cov_dF[ispec](0),
-              //  cov_dF[ispec](1), cov_dF[ispec](2), JBB, kappaH, kappaJ);
-              // if (rho > 1.e-2)
-              // exit(-1);
 
               // Check xi
               Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam + dE[ispec];
@@ -794,22 +767,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
           }
         } // SourceSolver
 
-        //        if (success == true) {
+        // TODO(BRR) Check this logic for multiple species
         for (int ispec = 0; ispec < num_species; ispec++) {
-          v(iblock, ifail, k, j, i) = FailFlags::success;
-
-          // if (dE[ispec] * sdetgam + v(iblock, idx_E(ispec), k, j, i) < 0 ||
-          //    (-dE[ispec] * sdetgam + v(iblock, ceng, k, j, i) < 0)) {
-          //  printf("[%i %i %i] dE = %e E = %e ceng = %e\n", k, j, i,
-          //         dE[ispec] * sdetgam, v(iblock, idx_E(ispec), k, j, i),
-          //         v(iblock, ceng, k, j, i));
-          //  v(iblock, ifail, k, j, i) = FailFlags::fail;
-          //  dE[ispec] = 0.;
-          //  SPACELOOP(ii) {
-          //    cov_dF[ispec](ii) = 0.;
-          //  }
-          //  // exit(-1);
-          //}
 
           if (success == true) {
             v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE[ispec];
@@ -818,34 +777,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             }
           }
 
-          //            // Update pij here!
           Tens2 conTilPi = {0};
           Real E = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
           Vec covF;
           Real J;
           Vec covH;
-          //            SPACELOOP(ii) {
-          //              covF(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
-          //            }
-          //            if (idx_tilPi.IsValid()) {
-          //              SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(iblock,
-          //              idx_tilPi(ispec, ii, jj), k, j, i); }
-          //            } else {
-          //              Real xi = 0.0;
-          //              Real phi = M_PI;
-          //              // TODO(BRR) Remove STORE_GUESS parameter and instead check if
-          //              closure type is
-          //              // M1?
-          //              //if (STORE_GUESS) {
-          //              //  xi = v(iblock, iXi(ispec), k, j, i);
-          //              //  phi = 1.0001 * v(iblock, iPhi(ispec), k, j, i);
-          //             // }
-          //              c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
-          //              //if (STORE_GUESS) {
-          //              //  v(iblock, iXi(ispec), k, j, i) = xi;
-          //              //  v(iblock, iPhi(ispec), k, j, i) = phi;
-          //              //}
-          //            }
 
           bool successful_prim_recovery = false;
 
@@ -1002,9 +938,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) = covF(ii) * sdetgam; }
           }
         }
-        //        } else {
-        //          v(iblock, ifail, k, j, i) = FailFlags::fail;
-        //        }
       });
   return TaskStatus::complete;
 }
