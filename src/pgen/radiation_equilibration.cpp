@@ -59,9 +59,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
-  const auto opac_d =
-      pmb->packages.Get("opacity")->template Param<singularity::neutrinos::Opacity>(
-          "d.opacity");
+  const auto opac =
+      pmb->packages.Get("opacity")->template Param<Microphysics::Opacities>("opacities");
 
   const Real rho0 = pin->GetOrAddReal("radiation_equilibration", "rho0", 1.);
   const Real Tg0 = pin->GetOrAddReal("radiation_equilibration", "Tg0", 1.);
@@ -97,7 +96,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
           SPACELOOP(ii) v(idH(ispec, ii), k, j, i) = 0.0;
           v(idJ(ispec), k, j, i) =
-              opac_d.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
+              opac.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
         }
       });
 

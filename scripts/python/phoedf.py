@@ -217,10 +217,10 @@ class phoedf(phdf.phdf):
     for ii in range(3):
       vdH += vcon[:,:,:,:,ii]*Hcov[:,:,:,:,ii]
       for jj in range(3):
-        self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj] 
+        self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj]
     self.xi[:,:,:,:] -= vdH*vdH
     self.xi = np.sqrt(self.xi)
-    
+
     print(f"xi max: {self.xi.max()}")
 
     self.xi = np.clip(self.xi, 1.e-10, 1.)
