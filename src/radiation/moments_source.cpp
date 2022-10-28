@@ -891,7 +891,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               v(iblock, peng, k, j, i) = 10. * robust::SMALL();
               SPACELOOP(ii) { v(iblock, pv(ii), k, j, i) = 0.; }
               // TODO(BRR) use Ye here!
-              Real eos_lambda[2] = {0.5, 0};
+              Real ye = 0.5;
+              if (pYe >= 0) {
+                ye = v(iblock, pYe, k, j, i);
+              }
+              Real eos_lambda[2] = {ye, 0};
               v(iblock, pprs, k, j, i) = eos.PressureFromDensityInternalEnergy(
                   v(iblock, prho, k, j, i),
                   robust::ratio(v(iblock, peng, k, j, i), v(iblock, prho, k, j, i)),
@@ -917,6 +921,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                             sdetgam, v(iblock, crho, k, j, i), S, Bcons,
                             v(iblock, ceng, k, j, i), yecons);
               // TODO(BRR) set cons ye!
+              if (cye >= 0) {
+                v(iblock, cye, k, j, i) = yecons;
+              }
               SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) = S[ii]; }
             }
 
