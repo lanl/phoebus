@@ -230,7 +230,7 @@ struct RootFind {
         PARTHENON_FAIL("Aborting with unbracketed root.");
       } else {
         *status = RootFindStatus::failure;
-        return guess;
+        return (a + b) / 2.;
       }
     }
     Real sign = (ya < 0 ? 1.0 : -1.0);
