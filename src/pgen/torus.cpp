@@ -414,7 +414,8 @@ void ProblemModifier(ParameterInput *pin) {
     const std::string eos_type = pin->GetString("eos", "type");
     if (eos_type == "IdealGas") {
       const Real Gamma = pin->GetReal("eos", "Gamma");
-      const Real cv = (Gamma - 1.) * pc::kb / pc::mp;
+      // TODO(BRR) mp is not exactly some average of mp and mn
+      const Real cv = pc::kb / ((Gamma - 1.) * pc::mp);
       pin->SetReal("eos", "Cv", cv);
     } else {
       PARTHENON_FAIL(
