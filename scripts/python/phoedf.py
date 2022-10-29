@@ -54,6 +54,13 @@ class phoedf(phdf.phdf):
     def flatten_indices(mu, nu):
       ind = [[0,1,3,6],[1,2,4,7],[3,4,5,8],[6,7,8,9]]
       return ind[mu][nu]
+    if self.flatgcov is None:
+      if self.Params['geometry/geometry_name'] == "Minkowski":
+        self.flatgcov = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 10])
+        self.flatgcov[:,:,:,:,flatten_indices(0, 0)] = -1.
+        self.flatgcov[:,:,:,:,flatten_indices(1, 1)] = 1.
+        self.flatgcov[:,:,:,:,flatten_indices(2, 2)] = 1.
+        self.flatgcov[:,:,:,:,flatten_indices(3, 3)] = 1.
     self.gcov = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 4, 4])
     print(self.flatgcov.shape)
     for mu in range(4):
