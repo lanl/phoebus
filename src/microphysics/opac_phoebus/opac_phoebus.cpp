@@ -44,6 +44,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   bool do_rad = pin->GetBoolean("physics", "rad");
   if (!do_rad) {
+    params.Add("opacities", Opacities());
     return pkg;
   }
 
