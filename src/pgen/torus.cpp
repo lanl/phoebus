@@ -145,7 +145,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-
   // set up transformation stuff
   auto gpkg = pmb->packages.Get("geometry");
   bool derefine_poles = gpkg->Param<bool>("derefine_poles");
@@ -262,13 +261,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // TODO(BRR) Make this an input parameter
           InitialRadiation init_rad;
           if (init_rad_str == "None") {
-            //InitialRadiation init_rad = InitialRadiation::none;
             init_rad = InitialRadiation::none;
           } else if (init_rad_str == "thermal") {
-            //InitialRadiation init_rad = InitialRadiation::thermal;
             init_rad = InitialRadiation::thermal;
           } else {
-           PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
+            PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
           }
 
           species = rad_pkg->Param<std::vector<RadiationType>>("species");
