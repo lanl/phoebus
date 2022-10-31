@@ -145,31 +145,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  // TODO(BRR) Make this an input parameter
-  InitialRadiation init_rad = InitialRadiation::thermal;
-
-  StateDescriptor *opac = pmb->packages.Get("opacity").get();
-  auto opacities = opac->Param<Opacities>("opacities");
-  std::vector<RadiationType> species;
-  int num_species = 0;
-  RadiationType species_d[MaxNumRadiationSpecies] = {};
-  if (do_rad) {
-    const std::string init_rad_str =
-        pin->GetOrAddString("torus", "initial_radiation", "None");
-    if (init_rad_str == "None") {
-      init_rad = InitialRadiation::none;
-    } else if (init_rad_str == "thermal") {
-      init_rad = InitialRadiation::thermal;
-    } else {
-      PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
-    }
-
-    species = rad_pkg->Param<std::vector<RadiationType>>("species");
-    num_species = rad_pkg->Param<int>("num_species");
-    for (int s = 0; s < num_species; s++) {
-      species_d[s] = species[s];
-    }
-  }
 
   // set up transformation stuff
   auto gpkg = pmb->packages.Get("geometry");
@@ -277,6 +252,30 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
         // Radiation
         if (do_rad) {
+          StateDescriptor *opac = pmb->packages.Get("opacity").get();
+          auto opacities = opac->Param<Opacities>("opacities");
+          std::vector<RadiationType> species;
+          int num_species = 0;
+          RadiationType species_d[MaxNumRadiationSpecies] = {};
+          const std::string init_rad_str =
+              pin->GetOrAddString("torus", "initial_radiation", "None");
+          // TODO(BRR) Make this an input parameter
+          InitialRadiation init_rad;
+          if (init_rad_str == "None") {
+            //InitialRadiation init_rad = InitialRadiation::none;
+            init_rad = InitialRadiation::none;
+          } else if (init_rad_str == "thermal") {
+            //InitialRadiation init_rad = InitialRadiation::thermal;
+            init_rad = InitialRadiation::thermal;
+          } else {
+           PARTHENON_FAIL("\"torus/initial_radiation\" not recognized!");
+          }
+
+          species = rad_pkg->Param<std::vector<RadiationType>>("species");
+          num_species = rad_pkg->Param<int>("num_species");
+          for (int s = 0; s < num_species; s++) {
+            species_d[s] = species[s];
+          }
 
           Real r = tr.bl_radius(x1v);
           Real th = tr.bl_theta(x1v, x2v);
