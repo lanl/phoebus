@@ -126,6 +126,7 @@ ceiling_type = ConstantGamSie
 sie0_ceiling = 1.0
 gam0_ceiling = 10.0
 enable_ox1_fmks_inflow_check = true
+c2p_failure_force_fixup_both = false
 
 <torus>
 target_beta = 100.
