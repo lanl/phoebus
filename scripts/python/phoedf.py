@@ -62,7 +62,6 @@ class phoedf(phdf.phdf):
         self.flatgcov[:,:,:,:,flatten_indices(2, 2)] = 1.
         self.flatgcov[:,:,:,:,flatten_indices(3, 3)] = 1.
     self.gcov = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 4, 4])
-    print(self.flatgcov.shape)
     for mu in range(4):
       for nu in range(4):
         self.gcov[:,:,:,:,mu,nu] = self.flatgcov[:,:,:,:,flatten_indices(mu,nu)]
