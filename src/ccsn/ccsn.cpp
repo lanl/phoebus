@@ -177,8 +177,8 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
     Real x = radius.x(i);
     int jlo = // call to some routine to get int if needed
 
-    // add if then for if jlo = 0 or num_zones?
-    for (int j = 1; j < num_vars; j++) {
+        // add if then for if jlo = 0 or num_zones?
+        for (int j = 1; j < num_vars; j++) {
 
       // xx[jlo::jlo+mm]
       auto xa = ccsn_state_raw_d.Slice(CCSN::R, std::make_pair(jlo, jlo + 3));
@@ -186,9 +186,9 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
       // yy[jlo::jlo+mm]
       auto ya = ccsn_state_raw_d.Slice(j, std::make_pair(jlo, jlo + 3));
 
-      Real yint = //  call to some interp routine  
+      Real yint = //  call to some interp routine
 
-      ccsn_state_interp_d(j, i) = yint;
+          ccsn_state_interp_d(j, i) = yint;
     }
   }
 
