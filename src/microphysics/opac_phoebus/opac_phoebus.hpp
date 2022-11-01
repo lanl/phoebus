@@ -39,6 +39,8 @@ class Opacities {
   using MeanSOpacity = singularity::neutrinos::MeanSOpacity;
 
  public:
+  Opacities() = default;
+  KOKKOS_FUNCTION
   Opacities(const Opacity &opac, const MeanOpacity &m_opac, const SOpacity &s_opac,
             const MeanSOpacity &m_s_opac)
       : opac_(opac), m_opac_(m_opac), s_opac_(s_opac), m_s_opac_(m_s_opac) {}
