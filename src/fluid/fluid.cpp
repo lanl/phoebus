@@ -13,6 +13,7 @@
 
 #include "fluid.hpp"
 
+#include "analysis/history.hpp"
 #include "con2prim.hpp"
 #include "con2prim_robust.hpp"
 #include "fixup/fixup.hpp"
@@ -24,7 +25,6 @@
 #include "prim2con.hpp"
 #include "reconstruction.hpp"
 #include "riemann.hpp"
-#include "analysis/history.hpp"
 #include "tmunu.hpp"
 
 #include <singularity-eos/eos/eos.hpp>

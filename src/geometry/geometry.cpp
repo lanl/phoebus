@@ -22,12 +22,12 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
+#include "analysis/history.hpp"
 #include "geometry/coordinate_systems.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/variables.hpp"
-#include "analysis/history.hpp"
 
 using namespace parthenon::package::prelude;
 using parthenon::Coordinates_t;
@@ -63,8 +63,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       return ReduceMassAccretionRate<Kokkos::Sum<Real>>(md);
     };
 
-    hst_vars.emplace_back(
-        HistoryOutputVar(HstSum, ReduceAccretionRate, "mdot"));
+    hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceAccretionRate, "mdot"));
     params.Add(parthenon::hist_param_key, hst_vars);
   }
 
