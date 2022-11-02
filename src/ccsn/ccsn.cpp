@@ -173,22 +173,17 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   //// fill interpolated data onto device array
   for (int i = 0; i < npoints; i++) {
 
-    // some of the vars below will be changed to EOS calls
-    Real x = radius.x(i);
-    int jlo = // call to some routine to get int if needed
+      for (int j = 1; j < num_vars; j++) {
 
-        // add if then for if jlo = 0 or num_zones?
-        for (int j = 1; j < num_vars; j++) {
+      // r(i) from ccsn raw data -- assumes uniform spacing for input file?
+      auto xa = ccsn_state_raw_d.Slice(CCSN::R, i);
 
-      // xx[jlo::jlo+mm]
-      auto xa = ccsn_state_raw_d.Slice(CCSN::R, std::make_pair(jlo, jlo + 3));
+      // ya(i) from ccsn raw data
+      auto ya = ccsn_state_raw_d.Slice(j, i);
 
-      // yy[jlo::jlo+mm]
-      auto ya = ccsn_state_raw_d.Slice(j, std::make_pair(jlo, jlo + 3));
+      Real yint = MonopoleGR::Interpolate(xa, ccsn_state_raw_d, radius, j);  //  call to some interp routine
 
-      Real yint = //  call to some interp routine
-
-          ccsn_state_interp_d(j, i) = yint;
+      ccsn_state_interp_d(j, i) = yint;
     }
   }
 
