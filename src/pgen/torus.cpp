@@ -415,7 +415,9 @@ void ProblemModifier(ParameterInput *pin) {
     if (eos_type == "IdealGas") {
       const Real Gamma = pin->GetReal("eos", "Gamma");
       PARTHENON_WARN("Resetting Cv assuming Ye = 0.5!");
-      const Real mu = (pc::mp + pc::mn + pc::me) / (3. * pc::mp);
+      PARTHENON_WARN("Don't currently have neutron mass!");
+      const Real mn = pc::mp + pc::me; // Oops no binding energy
+      const Real mu = (pc::mp + mn + pc::me) / (3. * pc::mp);
       const Real cv = pc::kb / ((Gamma - 1.) * mu * pc::mp);
       pin->SetReal("eos", "Cv", cv);
     } else {
