@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -12,11 +12,14 @@
 // publicly, and to permit others to do so.
 
 #include "radiation.hpp"
+#include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/variables.hpp"
+#include "radiation/local_three_geometry.hpp"
+#include "reconstruction.hpp"
 
-#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
+#include "closure.hpp"
 
 namespace radiation {
 
@@ -74,11 +77,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.8);
   params.Add("cfl", cfl);
 
-  // Get fake scattering value for testing in anticipation of scattering in
-  // singularity-opac
-  Real scattering_fraction = pin->GetOrAddReal("radiation", "scattering_fraction", 0.0);
-  params.Add("scattering_fraction", scattering_fraction);
-
   // Initialize frequency discretization
   Real nu_min;
   Real nu_max;
@@ -97,8 +95,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("dlnu", dlnu);
   }
 
-  int num_species = pin->GetOrAddInteger("radiation", "num_species", 1);
-  params.Add("num_species", num_species);
   std::vector<RadiationType> species;
   if (do_nu_electron) {
     species.push_back(RadiationType::NU_ELECTRON);
@@ -109,9 +105,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (do_nu_heavy) {
     species.push_back(RadiationType::NU_HEAVY);
   }
+  const int num_species = species.size();
+  params.Add("num_species", num_species);
   params.Add("species", species);
-  PARTHENON_REQUIRE(num_species == species.size(),
-                    "Number of species does not match requested species!");
 
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
@@ -129,7 +125,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata fourv_swarmvalue_metadata({Metadata::Real}, std::vector<int>{4});
     physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
     Metadata Inu_swarmvalue_metadata({Metadata::Real},
-                                     std::vector<int>{NumRadiationTypes, nu_bins});
+                                     std::vector<int>{num_species, nu_bins});
     physics->AddSwarmValue("Inuinv", swarm_name, Inu_swarmvalue_metadata);
 
     // Boundary temperatures for outflow sample boundary conditions
@@ -185,7 +181,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     params.Add("mocmc_recon", mocmc_recon);
 
-    std::vector<int> Inu_size{NumRadiationTypes, nu_bins};
+    std::vector<int> Inu_size{num_species, nu_bins};
     Metadata mInu = Metadata({Metadata::Cell, Metadata::OneCopy}, Inu_size);
     physics->AddField(mocmc_internal::Inu0, mInu);
     physics->AddField(mocmc_internal::Inu1, mInu);
@@ -210,13 +206,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata int_swarmvalue_metadata({Metadata::Integer});
     physics->AddSwarmValue("species", swarm_name, int_swarmvalue_metadata);
 
-    Metadata mspecies_scalar = Metadata({Metadata::Cell, Metadata::OneCopy},
-                                        std::vector<int>(1, NumRadiationTypes));
+    Metadata mspecies_scalar =
+        Metadata({Metadata::Cell, Metadata::OneCopy}, std::vector<int>{num_species});
     physics->AddField("dNdlnu_max", mspecies_scalar);
     physics->AddField("dN", mspecies_scalar);
     physics->AddField("Ns", mspecies_scalar);
 
-    std::vector<int> dNdlnu_size{NumRadiationTypes, nu_bins + 1};
+    std::vector<int> dNdlnu_size{num_species, params.Get<int>("nu_bins") + 1};
     Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
     physics->AddField("dNdlnu", mdNdlnu);
 
@@ -304,27 +300,117 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     namespace c = radmoment_cons;
     namespace i = radmoment_internal;
 
-    int ndim = 3;
-    // if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
-    // else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
+    std::string closure_strategy_str =
+        pin->GetOrAddString("radiation", "closure_c2p_strategy", "robust");
+    ClosureCon2PrimStrategy closure_strategy;
+    if (closure_strategy_str == "robust") {
+      closure_strategy = ClosureCon2PrimStrategy::robust;
+    } else if (closure_strategy_str == "frail") {
+      closure_strategy = ClosureCon2PrimStrategy::frail;
+    } else {
+      PARTHENON_THROW("Invalid closure_c2p_strategy option. Choose from [robust,frail]");
+    }
+
+    ClosureRuntimeSettings closure_runtime_params{closure_strategy};
+    params.Add("closure_runtime_params", closure_runtime_params);
+
+    std::string recon = pin->GetOrAddString("radiation", "recon", "linear");
+    PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;
+    if (recon == "weno5" || recon == "weno5z") {
+      PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                               "weno5 requires 4+ ghost cells");
+      rt = PhoebusReconstruction::ReconType::weno5z;
+    } else if (recon == "mp5") {
+      PARTHENON_REQUIRE_THROWS(parthenon::Globals::nghost >= 4,
+                               "mp5 requires 4+ ghost cells");
+      if (cfl > 0.4) {
+        PARTHENON_WARN("mp5 often requires smaller cfl numbers for stability");
+      }
+      rt = PhoebusReconstruction::ReconType::mp5;
+    } else if (recon == "linear") {
+      rt = PhoebusReconstruction::ReconType::linear;
+    } else if (recon == "constant") {
+      rt = PhoebusReconstruction::ReconType::constant;
+    } else {
+      PARTHENON_THROW("Invalid Reconstruction option.  Choose from "
+                      "[constant,linear,mp5,weno5,weno5z]");
+    }
+    params.Add("Recon", rt);
+
+    const std::string recon_fixup_strategy_str =
+        pin->GetOrAddString("radiation", "recon_fixup_strategy", "bounds");
+    ReconFixupStrategy recon_fixup_strategy;
+    if (recon_fixup_strategy_str == "none") {
+      recon_fixup_strategy = ReconFixupStrategy::none;
+    } else if (recon_fixup_strategy_str == "bounds") {
+      recon_fixup_strategy = ReconFixupStrategy::bounds;
+    } else {
+      PARTHENON_FAIL("\"radiation/recon_fixup_strategy\" option unrecognized!");
+    }
+    params.Add("recon_fixup_strategy", recon_fixup_strategy);
+
+    const std::string src_solver_name =
+        pin->GetOrAddString("radiation", "src_solver", "oned");
+    SourceSolver src_solver;
+    if (src_solver_name == "zerod") {
+      src_solver = SourceSolver::zerod;
+    } else if (src_solver_name == "oned") {
+      src_solver = SourceSolver::oned;
+    } else if (src_solver_name == "fourd") {
+      src_solver = SourceSolver::fourd;
+    } else {
+      PARTHENON_FAIL("\"radiation/src_solver\" option unrecognized!");
+    }
+    params.Add("src_solver", src_solver);
+
+    const bool src_use_oned_backup =
+        pin->GetOrAddBoolean("radiation", "src_use_oned_backup", false);
+    params.Add("src_use_oned_backup", src_use_oned_backup);
+
+    Real src_rootfind_eps = pin->GetOrAddReal("radiation", "src_rootfind_eps", 1.e-8);
+    params.Add("src_rootfind_eps", src_rootfind_eps);
+
+    Real src_rootfind_tol = pin->GetOrAddReal("radiation", "src_rootfind_tol", 1.e-12);
+    params.Add("src_rootfind_tol", src_rootfind_tol);
+
+    int src_rootfind_maxiter =
+        pin->GetOrAddInteger("radiation", "src_rootfind_maxiter", 100);
+    params.Add("src_rootfind_maxiter", src_rootfind_maxiter);
+
+    std::string oned_fixup_strategy_str =
+        pin->GetOrAddString("radiation", "oned_fixup_strategy", "none");
+    OneDFixupStrategy oned_fixup_strategy;
+    if (oned_fixup_strategy_str == "none") {
+      oned_fixup_strategy = OneDFixupStrategy::none;
+    } else if (oned_fixup_strategy_str == "ignore_dJ") {
+      oned_fixup_strategy = OneDFixupStrategy::ignore_dJ;
+    } else if (oned_fixup_strategy_str == "ignore_all") {
+      oned_fixup_strategy = OneDFixupStrategy::ignore_all;
+    } else {
+      PARTHENON_FAIL("radiation/oned_fixup_strategy has an invalid entry!");
+    }
+    params.Add("oned_fixup_strategy", oned_fixup_strategy);
+
+    // Required to be 3D in dJ calculation in radiation::ReconstructEdgeStates
+    const int ndim = 3;
 
     Metadata mspecies_three_vector =
         Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
                   Metadata::Intensive, Metadata::FillGhost, Metadata::Vector},
-                 std::vector<int>{NumRadiationTypes, 3});
+                 std::vector<int>{num_species, 3});
     Metadata mspecies_scalar =
         Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
                   Metadata::Intensive, Metadata::FillGhost},
-                 std::vector<int>{NumRadiationTypes});
+                 std::vector<int>{num_species});
 
     Metadata mspecies_three_vector_cons = Metadata(
         {Metadata::Cell, Metadata::Independent, Metadata::Conserved, Metadata::Intensive,
          Metadata::WithFluxes, Metadata::FillGhost, Metadata::Vector},
-        std::vector<int>{NumRadiationTypes, 3});
+        std::vector<int>{num_species, 3});
     Metadata mspecies_scalar_cons =
         Metadata({Metadata::Cell, Metadata::Independent, Metadata::Conserved,
                   Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost},
-                 std::vector<int>{NumRadiationTypes});
+                 std::vector<int>{num_species});
 
     physics->AddField(c::E, mspecies_scalar_cons);
     physics->AddField(c::F, mspecies_three_vector_cons);
@@ -344,7 +430,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       nrecon += 9; // Reconstruct conTilPi // TODO(BRR) Use 6 elements by symmetry
     }
     Metadata mrecon = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-                               std::vector<int>{NumRadiationTypes, nrecon, ndim});
+                               std::vector<int>{num_species, nrecon, ndim});
     Metadata mrecon_v = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                  std::vector<int>{3, ndim});
     physics->AddField(i::ql, mrecon);
@@ -354,39 +440,63 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     // Add variable for calculating gradients of rest frame energy density
     Metadata mdJ = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-                            std::vector<int>{NumRadiationTypes, ndim, ndim});
+                            std::vector<int>{num_species, ndim, ndim});
     physics->AddField(i::dJ, mdJ);
 
     // Add variables for source functions
     Metadata mSourceVar = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
-                                   std::vector<int>{NumRadiationTypes});
+                                   std::vector<int>{num_species});
     physics->AddField(i::kappaJ, mSourceVar);
     physics->AddField(i::kappaH, mSourceVar);
     physics->AddField(i::JBB, mSourceVar);
+
+    // this fail flag should really be an enum or something
+    // but parthenon doesn't yet support that kind of thing
+    Metadata m_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
+                                  Metadata::Intensive, Metadata::FillGhost});
+    physics->AddField(i::c2pfail, m_scalar);
+    physics->AddField(i::srcfail, m_scalar);
 
     // Make Eddington tensor an independent quantity for MOCMC to supply
     if (method == "mocmc") {
       Metadata mspecies_three_tensor = Metadata(
           {Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
-          std::vector<int>{NumRadiationTypes, 3, 3});
+          std::vector<int>{num_species, 3, 3});
 
       physics->AddField(i::tilPi, mspecies_three_tensor);
       physics->AddField(mocmc_internal::dnsamp, mscalar);
     }
 
-    physics->FillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
+#if SET_FLUX_SRC_DIAGS
+    // DIAGNOSTIC STUFF FOR DEBUGGING
+    std::vector<int> spec_four_vec{num_species, 4};
+    Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
+                              Metadata::Derived, Metadata::OneCopy},
+                             std::vector<int>{num_species, 4});
+    physics->AddField(diagnostic_variables::r_divf, mdiv);
+    Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
+                               Metadata::Derived, Metadata::OneCopy},
+                              std::vector<int>{num_species, 4});
+    physics->AddField(diagnostic_variables::r_src_terms, mdiag);
+    printf("name: %s\n", diagnostic_variables::r_src_terms);
+    printf("Added fields!\n");
+#endif
+
+    // Use PostFillDerivedBlock to guarantee that fluid, if active, was already inverted
+    // (we need updated fluid primitive velocities to calculate radiation primitives)
+    physics->PostFillDerivedBlock = MomentCon2Prim<MeshBlockData<Real>>;
   }
 
   params.Add("moments_active", moments_active);
 
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
-  printf("Done initializing\n");
-
   return physics;
 }
 
 TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
+  PARTHENON_REQUIRE(USE_VALENCIA, "Covariant GRMHD formulation not supported!");
+
   namespace c = fluid_cons;
   namespace iv = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
@@ -409,7 +519,7 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        v(ceng, k, j, i) += v(Gcov_lo, k, j, i) * dt;
+        v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
@@ -420,6 +530,9 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
 }
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
+  namespace ir = radmoment_internal;
+  namespace p = fluid_prim;
+
   // Note that this is still used for the cooling function even though that option
   // contains no transport. This is useful for consistency between methods.
   auto pmb = rc->GetBlockPointer();
@@ -427,19 +540,53 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
+  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+
   auto &coords = pmb->coords;
   const int ndim = pmb->pmy_mesh->ndim;
 
-  // TODO(BRR) Can't just use dx^i/dx^0 = 1 for speed of light
-  // TODO(BRR) add a cfl-like fudge factor to radiation
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
+  PackIndexMap imap;
+  std::vector<std::string> vars{ir::kappaH, p::velocity};
+  auto v = rc->PackVariables(vars, imap);
+  auto idx_v = imap.GetFlatIdx(p::velocity);
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH, false);
+
+  auto num_species = rad->Param<int>("num_species");
+
   auto &pars = pmb->packages.Get("radiation")->AllParams();
   Real min_dt;
   pmb->par_reduce(
       "Radiation::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
-        Real csig = 1.0;
-        for (int d = 0; d < ndim; d++) {
-          lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
+        Vec con_beta;
+        geom.ContravariantShift(CellLocation::Cent, k, j, i, con_beta.data);
+        Tens2 cov_gamma;
+        geom.Metric(CellLocation::Cent, k, j, i, cov_gamma.data);
+        Tens2 con_gamma;
+        geom.MetricInverse(CellLocation::Cent, k, j, i, con_gamma.data);
+        const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+
+        for (int ispec = 0; ispec < num_species; ispec++) {
+
+          const Real kappaH = idx_kappaH.IsValid() ? v(idx_kappaH(ispec), k, j, i) : 0.;
+
+          for (int d = 0; d < ndim; d++) {
+            // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt.
+            // depth) cs_rad = 1)
+            const Real sigp = alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
+            const Real sigm = -alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
+            const Real asym_sigl = alpha * v(idx_v(d), k, j, i) - con_beta(d);
+            const Real rad_speed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
+            const Real asym_speed = std::fabs(asym_sigl);
+
+            const Real dx = coords.Dx(X1DIR + d, k, j, i) * sqrt(cov_gamma(d, d));
+            const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
+            const Real csig = a * rad_speed + (1. - a) * asym_speed;
+
+            lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
+          }
         }
       },
       Kokkos::Min<Real>(min_dt));

@@ -105,13 +105,12 @@ absorption = true
 do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
-
-scattering_fraction = 1.0
+src_solver = oned
 
 <radiation/mocmc>
 nsamp_per_zone = 32
 
-<opacity>
+<s_opacity>
 type = gray
 gray_kappa = 1.e3
 

@@ -1,20 +1,23 @@
-//========================================================================================
-// (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
-//
-// This program was produced under U.S. Government contract 89233218CNA000001 for Los
-// Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
-// for the U.S. Department of Energy/National Nuclear Security Administration. All rights
-// in the program are reserved by Triad National Security, LLC, and the U.S. Department
-// of Energy/National Nuclear Security Administration. The Government is granted for
-// itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
-// license in this material to reproduce, prepare derivative works, distribute copies to
-// the public, perform publicly and display publicly, and to permit others to do so.
-//========================================================================================
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
+// 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
+// is operated by Triad National Security, LLC for the U.S.
+// Department of Energy/National Nuclear Security Administration. All
+// rights in the program are reserved by Triad National Security, LLC,
+// and the U.S. Department of Energy/National Nuclear Security
+// Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works,
+// distribute copies to the public, perform publicly and display
+// publicly, and to permit others to do so.
 
 #ifndef FLUID_PRIM2CON_HPP_
 #define FLUID_PRIM2CON_HPP_
 
+#include <utils/error_checking.hpp>
+
 #include "phoebus_utils/relativity_utils.hpp"
+#include "phoebus_utils/robust.hpp"
 
 namespace prim2con {
 
@@ -25,6 +28,10 @@ void signal_speeds(const Real &rho, const Real &u, const Real &p, const Real &bs
   const Real rho_rel = rho + u + p;
   const Real vasq = bsq / (rho_rel + bsq);
   Real cssq = gam1 * p / rho_rel;
+  PARTHENON_DEBUG_REQUIRE(rho > robust::SMALL(), "rho is unacceptably small!");
+  PARTHENON_DEBUG_REQUIRE(u > robust::SMALL(), "u is unacceptably small!");
+  PARTHENON_DEBUG_REQUIRE(p > robust::SMALL(), "p is unacceptably small!");
+  PARTHENON_DEBUG_REQUIRE(gam1 > robust::SMALL(), "gam1 is unacceptably small!");
   cssq += vasq - cssq * vasq;
   const Real vcoff = alpha / (1.0 - vsq * cssq);
   SPACELOOP(m) {

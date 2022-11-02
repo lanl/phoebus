@@ -7,6 +7,10 @@
 namespace robust {
 
 template <typename T = Real>
+KOKKOS_FORCEINLINE_FUNCTION constexpr auto LARGE() {
+  return 0.1 * std::numeric_limits<T>::max();
+}
+template <typename T = Real>
 KOKKOS_FORCEINLINE_FUNCTION constexpr auto SMALL() {
   return 10 * std::numeric_limits<T>::min();
 }

@@ -26,6 +26,9 @@ class BaseEOS:
   def u_from_rho_T_Ye(self, rho, T, Ye):
     raise NotImplementedError()
 
+  def P_from_rho_u_Ye(self, rho, u, Ye):
+    raise NotImplementedError()
+
 # -- Ideal gas EOS
 class IdealEOS(BaseEOS):
   def __init__(self, params):
@@ -39,6 +42,9 @@ class IdealEOS(BaseEOS):
 
   def u_from_rho_T_Ye(self, rho, T, Ye):
     return rho * self.Cv * T
+
+  def P_from_rho_u_Ye(self, rho, u, Ye):
+    return self.gm1 * u
 
 # ---------------------------------------------------------------------------- #
 # -- Dictionary of EOS types

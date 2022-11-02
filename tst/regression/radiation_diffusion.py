@@ -21,16 +21,16 @@ import regression_test as rt
 parser = argparse.ArgumentParser(description='Run a finite velocity radiation diffusion test')
 parser.add_argument('--upgold', dest='upgold', action='store_true')
 parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
+parser.add_argument('--use_mpiexec', dest='use_mpiexec', action='store_true')
 parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../inputs/radiation_advection.pin'))
 parser.add_argument('--executable', type=str, default=None)
 parser.add_argument('--build_type', type=str, default='Release', choices=['Debug, Release'])
 args = parser.parse_args()
 
 modified_inputs = {}
-modified_inputs['radiation/scattering_fraction'] = 1.0
 modified_inputs['radiation/B_fake'] = 0.5
 modified_inputs['radiation/method'] = 'moment_m1'
-modified_inputs['opacity/gray_kappa'] = 1.e3
+modified_inputs['s_opacity/gray_kappa'] = 1.e3
 modified_inputs['radiation_advection/J'] = 1.0
 modified_inputs['radiation_advection/Hx'] = 0.0
 modified_inputs['radiation_advection/Hy'] = 0.0
@@ -45,6 +45,7 @@ code = rt.gold_comparison(variables=['r.p.J', 'r.p.H'],
                           executable=args.executable,
                           geometry='Minkowski',
                           use_gpu=args.use_gpu,
+                          use_mpiexec=args.use_mpiexec,
                           build_type=args.build_type,
                           upgold=args.upgold,
                           compression_factor=10)

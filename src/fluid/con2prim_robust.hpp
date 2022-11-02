@@ -1,15 +1,15 @@
-//========================================================================================
-// (C) (or copyright) 2020. Triad National Security, LLC. All rights reserved.
-//
-// This program was produced under U.S. Government contract 89233218CNA000001 for Los
-// Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
-// for the U.S. Department of Energy/National Nuclear Security Administration. All rights
-// in the program are reserved by Triad National Security, LLC, and the U.S. Department
-// of Energy/National Nuclear Security Administration. The Government is granted for
-// itself and others acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
-// license in this material to reproduce, prepare derivative works, distribute copies to
-// the public, perform publicly and display publicly, and to permit others to do so.
-//========================================================================================
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
+// 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
+// is operated by Triad National Security, LLC for the U.S.
+// Department of Energy/National Nuclear Security Administration. All
+// rights in the program are reserved by Triad National Security, LLC,
+// and the U.S. Department of Energy/National Nuclear Security
+// Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works,
+// distribute copies to the public, perform publicly and display
+// publicly, and to permit others to do so.
 
 #ifndef CON2PRIM_ROBUST_HPP_
 #define CON2PRIM_ROBUST_HPP_
@@ -35,8 +35,6 @@ using namespace parthenon::package::prelude;
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
 
-#define CON2PRIM_ROBUST_PRINT_FAILURES 0
-
 namespace con2prim_robust {
 
 using namespace robust;
@@ -53,17 +51,16 @@ class Residual {
   Residual(const Real D, const Real q, const Real bsq, const Real bsq_rpsq,
            const Real rsq, const Real rbsq, const Real v0sq, const Real Ye,
            const singularity::EOS &eos, const fixup::Bounds &bnds, const Real x1,
-           const Real x2, const Real x3)
+           const Real x2, const Real x3, const Real floor_scale_fac)
       : D_(D), q_(q), bsq_(bsq), bsq_rpsq_(bsq_rpsq), rsq_(rsq), rbsq_(rbsq), v0sq_(v0sq),
-        eos_(eos), bounds_(bnds), x1_(x1), x2_(x2), x3_(x3) {
+        eos_(eos), bounds_(bnds), x1_(x1), x2_(x2), x3_(x3),
+        floor_scale_fac_(floor_scale_fac) {
     lambda_[0] = Ye;
     Real garbage = 0.0;
     bounds_.GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
     bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
 
-#if !USE_C2P_ROBUST_FLOORS
-    rho_floor_ = 1.e-20;
-#endif
+    rho_floor_ *= floor_scale_fac_;
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
@@ -106,6 +103,7 @@ class Residual {
                const Real What) {
     Real rho = rhohat_mu(1.0 / What);
     bounds_.GetFloors(x1_, x2_, x3_, rho, e_floor_);
+    e_floor_ *= floor_scale_fac_;
     const Real ehat_trial =
         What * (qbar - mu * rbarsq) + vhatsq * What * What / (1.0 + What);
     used_energy_floor_ = false;
@@ -170,6 +168,7 @@ class Residual {
   const singularity::EOS &eos_;
   const fixup::Bounds &bounds_;
   const Real x1_, x2_, x3_;
+  const Real floor_scale_fac_;
   Real lambda_[2];
   Real rho_floor_, e_floor_, gam_max_, e_max_;
   bool used_density_floor_, used_energy_floor_, used_energy_max_, used_gamma_max_;
@@ -205,7 +204,6 @@ struct CellGeom {
       : gdet(geom.DetGamma(CellLocation::Cent, k, j, i)),
         lapse(geom.Lapse(CellLocation::Cent, k, j, i)) {
     geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
-    SPACELOOP2(m, n) { gcov[m][n] = gcov4[m + 1][n + 1]; }
     geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
     geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
   }
@@ -215,11 +213,9 @@ struct CellGeom {
       : gdet(geom.DetGamma(CellLocation::Cent, b, k, j, i)),
         lapse(geom.Lapse(CellLocation::Cent, b, k, j, i)) {
     geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, gcov4);
-    SPACELOOP2(m, n) { gcov[m][n] = gcov4[m + 1][n + 1]; }
     geom.MetricInverse(CellLocation::Cent, b, k, j, i, gcon);
     geom.ContravariantShift(CellLocation::Cent, b, k, j, i, beta);
   }
-  Real gcov[3][3];
   Real gcov4[4][4];
   Real gcon[3][3];
   Real beta[3];
@@ -230,7 +226,9 @@ struct CellGeom {
 template <typename Data_t, typename T>
 class ConToPrim {
  public:
-  ConToPrim(Data_t *rc, fixup::Bounds bnds, const Real tol, const int max_iterations)
+  ConToPrim(Data_t *rc, fixup::Bounds bnds, const Real tol, const int max_iterations,
+            const Real floor_scale_fac, const bool fail_on_floors,
+            const bool fail_on_ceilings)
       : bounds(bnds), var(rc->PackVariables(Vars(), imap)),
         prho(imap[fluid_prim::density].first), crho(imap[fluid_cons::density].first),
         pvel_lo(imap[fluid_prim::velocity].first),
@@ -246,7 +244,8 @@ class ConToPrim {
         sig_hi(imap[internal_variables::cell_signal_speed].second),
         gm1(imap[fluid_prim::gamma1].first),
         c2p_mu(imap[internal_variables::c2p_mu].first), rel_tolerance(tol),
-        max_iter(max_iterations), h0sq_(1.0) {}
+        max_iter(max_iterations), h0sq_(1.0), floor_scale_fac_(floor_scale_fac),
+        fail_on_floors_(fail_on_floors), fail_on_ceilings_(fail_on_ceilings) {}
 
   std::vector<std::string> Vars() {
     return std::vector<std::string>(
@@ -287,6 +286,9 @@ class ConToPrim {
   const Real rel_tolerance;
   const int max_iter;
   const Real h0sq_;
+  const Real floor_scale_fac_;
+  const bool fail_on_floors_;
+  const bool fail_on_ceilings_;
 
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g,
@@ -299,6 +301,8 @@ class ConToPrim {
     Real rhoflr = 0.0;
     Real epsflr;
     bounds.GetFloors(x1, x2, x3, rhoflr, epsflr);
+    rhoflr *= floor_scale_fac_;
+    epsflr *= floor_scale_fac_;
     Real gam_max, eps_max;
     bounds.GetCeilings(x1, x2, x3, gam_max, eps_max);
 
@@ -344,7 +348,7 @@ class ConToPrim {
         bu[i] = v(pb_lo + i) * sD;
         bdotr += bu[i] * rcov[i];
       }
-      SPACELOOP2(i, j) bsq += g.gcov[i][j] * bu[i] * bu[j];
+      SPACELOOP2(i, j) bsq += g.gcov4[i + 1][j + 1] * bu[i] * bu[j];
       bsq = std::max(0.0, bsq);
 
       rbsq = bdotr * bdotr;
@@ -353,7 +357,8 @@ class ConToPrim {
     const Real zsq = rsq / h0sq_;
     Real v0sq = std::min(zsq / (1.0 + zsq), 1.0 - 1.0 / (gam_max * gam_max));
 
-    Residual res(D, q, bsq, bsq_rpsq, rsq, rbsq, v0sq, ye_local, eos, bounds, x1, x2, x3);
+    Residual res(D, q, bsq, bsq_rpsq, rsq, rbsq, v0sq, ye_local, eos, bounds, x1, x2, x3,
+                 floor_scale_fac_);
 
     // find the upper bound
     // TODO(JCD): revisit this.  is it worth it to find the upper bound?
@@ -429,7 +434,13 @@ class ConToPrim {
 
     num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
 
-    if (num_nans > 0 || res.used_gamma_max()) {
+    if (num_nans > 0) {
+      return ConToPrimStatus::failure;
+    }
+    if (fail_on_floors_ && (res.used_density_floor() || res.used_energy_floor())) {
+      return ConToPrimStatus::failure;
+    }
+    if (fail_on_ceilings_ == true && res.used_gamma_max()) {
       return ConToPrimStatus::failure;
     }
     return ConToPrimStatus::success;
@@ -440,8 +451,12 @@ using C2P_Block_t = ConToPrim<MeshBlockData<Real>, VariablePack<Real>>;
 using C2P_Mesh_t = ConToPrim<MeshData<Real>, MeshBlockPack<Real>>;
 
 inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, fixup::Bounds bounds,
-                                  const Real tol, const int max_iter) {
-  return C2P_Block_t(rc, bounds, tol, max_iter);
+                                  const Real tol, const int max_iter,
+                                  const Real c2p_floor_scale_fac,
+                                  const bool fail_on_floors,
+                                  const bool fail_on_ceilings) {
+  return C2P_Block_t(rc, bounds, tol, max_iter, c2p_floor_scale_fac, fail_on_floors,
+                     fail_on_ceilings);
 }
 /*inline C2P_Mesh_t ConToPrimSetup(MeshData<Real> *rc) {
   return C2P_Mesh_t(rc);
