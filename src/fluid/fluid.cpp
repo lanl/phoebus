@@ -24,7 +24,7 @@
 #include "prim2con.hpp"
 #include "reconstruction.hpp"
 #include "riemann.hpp"
-#include "tally/history.hpp"
+#include "analysis/history.hpp"
 #include "tmunu.hpp"
 
 #include <singularity-eos/eos/eos.hpp>

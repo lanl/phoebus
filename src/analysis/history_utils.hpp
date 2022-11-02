@@ -11,8 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef TALLY_HISTORY_UTILS_HPP_
-#define TALLY_HISTORY_UTILS_HPP_
+#ifndef ANALYSIS_HISTORY_UTILS_HPP_
+#define ANALYSIS_HISTORY_UTILS_HPP_
 
 #include <string>
 #include <vector>
@@ -29,14 +29,11 @@ using namespace parthenon::package::prelude;
 
 namespace History {
 
-// TODO(BLB). move this. a "tally_quantities.hpp" etc?
-// TODO(BLB) generalize this
-// TODO Kokkos decorator
-// Pass it a pack ? DOn't reconstruct so many times...
 template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real CalcMassFlux(Pack &pack, Geometry &geom, const int prho,
-                                        const int pvel_lo, const int pvel_hi, const int b,
-                                        const int k, const int j, const int i) {
+                                         const int pvel_lo, const int pvel_hi,
+                                         const int b, const int k, const int j,
+                                         const int i) {
 
   Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
   Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
@@ -56,4 +53,4 @@ KOKKOS_INLINE_FUNCTION Real CalcMassFlux(Pack &pack, Geometry &geom, const int p
 
 } // namespace History
 
-#endif // TALLY_HISTORY_UTILS_HPP_
+#endif // ANALYSIS_HISTORY_UTILS_HPP_
