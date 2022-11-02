@@ -46,9 +46,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Params &phoebus_params = pmb->packages.Get("phoebus")->AllParams();
 
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
-  const auto opac_d =
-      pmb->packages.Get("opacity")->template Param<singularity::neutrinos::Opacity>(
-          "d.opacity");
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   const Real MASS = unit_conv.GetMassCGSToCode();
@@ -67,7 +64,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real vx = pin->GetOrAddReal("radiation_advection", "vx", 0.0);
   PARTHENON_REQUIRE(std::fabs(vx) < 1., "Subluminal velocity required!");
   const Real width = pin->GetOrAddReal("radiation_advection", "width", sqrt(2.0));
-  const Real kappa = pin->GetReal("opacity", "gray_kappa") * LENGTH * LENGTH / MASS;
+  const Real kappa = pin->GetReal("s_opacity", "gray_kappa") * LENGTH * LENGTH / MASS;
   const bool boost = pin->GetOrAddBoolean("radiation_advection", "boost_profile", false);
   const int shapedim = pin->GetOrAddInteger("radiation_advection", "shapedim", 1);
 
@@ -111,7 +108,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(prho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
                                    v(prho, k, j, i), v(pT, k, j, i), lambda);
 
-        v(idv(0), k, j, i) = vx;
+        v(idv(0), k, j, i) = W * vx;
         v(idv(1), k, j, i) = 0.0;
         v(idv(2), k, j, i) = 0.0;
 
@@ -132,10 +129,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                 J0 * std::max(exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10);
           }
 
-          printf("ispec: %i\n", ispec);
-          v(idH(0, ispec), k, j, i) = Hx;
-          v(idH(1, ispec), k, j, i) = Hy;
-          v(idH(2, ispec), k, j, i) = Hz;
+          v(idH(ispec, 0), k, j, i) = Hx;
+          v(idH(ispec, 1), k, j, i) = Hy;
+          v(idH(ispec, 2), k, j, i) = Hz;
         }
       });
 
@@ -163,7 +159,7 @@ void ProblemModifier(ParameterInput *pin) {
 
   const Real kappa = tau / (rho0 * dx1);
 
-  pin->SetReal("opacity", "gray_kappa", kappa);
+  pin->SetReal("s_opacity", "gray_kappa", kappa);
 }
 
 } // namespace radiation_advection

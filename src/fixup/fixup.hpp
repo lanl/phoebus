@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -23,12 +23,21 @@ using namespace parthenon::package::prelude;
 
 namespace fixup {
 
+enum class FAILURE_STRATEGY {
+  interpolate, // Average involved primitive variables over good neighbors
+  floors       // Set involved primitive variables to floors
+};
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus FixFluxes(MeshBlockData<Real> *rc);
 template <typename T>
 TaskStatus ApplyFloors(T *rc);
 template <typename T>
+TaskStatus RadConservedToPrimitiveFixup(T *rc);
+template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc);
+template <typename T>
+TaskStatus SourceFixup(T *rc);
 
 static struct ConstantRhoSieFloor {
 } constant_rho_sie_floor_tag;
@@ -98,6 +107,41 @@ class Floors {
   const FloorFlag floor_flag_;
 };
 
+static struct ConstantJFloor {
+} constant_j_floor_tag;
+static struct ExpX1JFloor {
+} exp_x1_j_floor_tag;
+
+enum class RadiationFloorFlag { ConstantJ, ExpX1J };
+
+class RadiationFloors {
+ public:
+  RadiationFloors()
+      : RadiationFloors(constant_j_floor_tag, -std::numeric_limits<Real>::max()) {}
+  RadiationFloors(ConstantJFloor, const Real J0)
+      : J0_(J0), floor_flag_(RadiationFloorFlag::ConstantJ) {}
+  RadiationFloors(ExpX1JFloor, const Real J0, const Real Jp)
+      : J0_(J0), Jalpha_(Jp), floor_flag_(RadiationFloorFlag::ExpX1J) {}
+
+  KOKKOS_INLINE_FUNCTION
+  void GetRadiationFloors(const Real x1, const Real x2, const Real x3, Real &Jflr) const {
+    switch (floor_flag_) {
+    case RadiationFloorFlag::ConstantJ:
+      Jflr = J0_;
+      break;
+    case RadiationFloorFlag::ExpX1J:
+      Jflr = J0_ * std::exp(Jalpha_ * x1);
+      break;
+    default:
+      PARTHENON_FAIL("No valid radiation floor set.");
+    }
+  }
+
+ private:
+  Real J0_, Jalpha_;
+  const RadiationFloorFlag floor_flag_;
+};
+
 static struct ConstantGamSieCeiling {
 } constant_gam_sie_ceiling_tag;
 
@@ -127,12 +171,78 @@ class Ceilings {
   const int ceiling_flag_;
 };
 
+static struct ConstantBsqRatCeiling {
+} constant_bsq_rat_ceiling_tag;
+
+class MHDCeilings {
+ public:
+  MHDCeilings()
+      : MHDCeilings(constant_bsq_rat_ceiling_tag, std::numeric_limits<Real>::max(),
+                    std::numeric_limits<Real>::max()) {}
+  MHDCeilings(ConstantBsqRatCeiling, const Real bsqorho0, const Real bsqou0)
+      : bsqorho0_(bsqorho0), bsqou0_(bsqou0), mhd_ceiling_flag_(1) {}
+
+  KOKKOS_INLINE_FUNCTION
+  void GetMHDCeilings(const Real x1, const Real x2, const Real x3, Real &bsqorho,
+                      Real &bsqou) const {
+    switch (mhd_ceiling_flag_) {
+    case 1:
+      bsqorho = bsqorho0_;
+      bsqou = bsqou0_;
+      break;
+    default:
+      PARTHENON_FAIL("No valid MHD ceiling set.");
+    }
+  }
+
+ private:
+  Real bsqorho0_, bsqou0_;
+  const int mhd_ceiling_flag_;
+};
+
+static struct ConstantXi0RadiationCeiling {
+} constant_xi0_radiation_ceiling_tag;
+
+class RadiationCeilings {
+ public:
+  RadiationCeilings()
+      : RadiationCeilings(constant_xi0_radiation_ceiling_tag,
+                          std::numeric_limits<Real>::max()) {}
+  RadiationCeilings(ConstantXi0RadiationCeiling, const Real xi0)
+      : xi0_(xi0), radiation_ceiling_flag_(1) {}
+
+  KOKKOS_INLINE_FUNCTION
+  void GetRadiationCeilings(const Real x1, const Real x2, const Real x3,
+                            Real &ximax) const {
+    switch (radiation_ceiling_flag_) {
+    case 1:
+      ximax = xi0_;
+      break;
+    default:
+      PARTHENON_FAIL("No valid radiation ceiling set.");
+    }
+  }
+
+ private:
+  Real xi0_;
+  const int radiation_ceiling_flag_;
+};
+
 class Bounds {
  public:
-  Bounds() : floors_(Floors()), ceilings_(Ceilings()) {}
-  Bounds(const Floors &fl, const Ceilings &cl) : floors_(fl), ceilings_(cl) {}
-  explicit Bounds(const Floors &fl) : floors_(fl), ceilings_(Ceilings()) {}
-  explicit Bounds(const Ceilings &cl) : floors_(Floors()), ceilings_(cl) {}
+  Bounds()
+      : floors_(Floors()), ceilings_(Ceilings()), mhd_ceilings_(MHDCeilings()),
+        radiation_floors_(RadiationFloors()), radiation_ceilings_(RadiationCeilings()) {}
+  Bounds(const Floors &fl, const Ceilings &cl, const MHDCeilings &mcl,
+         const RadiationFloors &rfl, const RadiationCeilings &rcl)
+      : floors_(fl), ceilings_(cl), mhd_ceilings_(mcl), radiation_floors_(rfl),
+        radiation_ceilings_(rcl) {}
+  explicit Bounds(const Floors &fl)
+      : floors_(fl), ceilings_(Ceilings()), mhd_ceilings_(MHDCeilings()),
+        radiation_floors_(RadiationFloors()), radiation_ceilings_(RadiationCeilings()) {}
+  explicit Bounds(const Ceilings &cl)
+      : floors_(Floors()), ceilings_(cl), mhd_ceilings_(MHDCeilings()),
+        radiation_floors_(RadiationFloors()), radiation_ceilings_(RadiationCeilings()) {}
 
   template <class... Args>
   KOKKOS_INLINE_FUNCTION void GetFloors(Args &&...args) const {
@@ -144,9 +254,27 @@ class Bounds {
     ceilings_.GetCeilings(std::forward<Args>(args)...);
   }
 
+  template <class... Args>
+  KOKKOS_INLINE_FUNCTION void GetMHDCeilings(Args &&...args) const {
+    mhd_ceilings_.GetMHDCeilings(std::forward<Args>(args)...);
+  }
+
+  template <class... Args>
+  KOKKOS_INLINE_FUNCTION void GetRadiationFloors(Args &&...args) const {
+    radiation_floors_.GetRadiationFloors(std::forward<Args>(args)...);
+  }
+
+  template <class... Args>
+  KOKKOS_INLINE_FUNCTION void GetRadiationCeilings(Args &&...args) const {
+    radiation_ceilings_.GetRadiationCeilings(std::forward<Args>(args)...);
+  }
+
  private:
   const Floors floors_;
   const Ceilings ceilings_;
+  const MHDCeilings mhd_ceilings_;
+  const RadiationFloors radiation_floors_;
+  const RadiationCeilings radiation_ceilings_;
 };
 
 } // namespace fixup

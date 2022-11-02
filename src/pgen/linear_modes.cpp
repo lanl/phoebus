@@ -43,9 +43,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ndim = pmb->pmy_mesh->ndim;
 
   PackIndexMap imap;
-  std::vector<std::string> vars(
-      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
-       fluid_prim::pressure, fluid_prim::temperature, fluid_prim::ye});
+  std::vector<std::string> vars({fluid_prim::density, fluid_prim::velocity,
+                                 fluid_prim::energy, fluid_prim::bfield,
+                                 fluid_prim::pressure, fluid_prim::temperature,
+                                 fluid_prim::gamma1, fluid_prim::ye});
   auto v = rc->PackVariables(vars, imap);
 
   const int irho = imap[fluid_prim::density].first;
@@ -56,6 +57,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ib_hi = imap[fluid_prim::bfield].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
+  const int igm1 = imap[fluid_prim::gamma1].first;
   const int iye = imap[fluid_prim::ye].second;
   const int nv = ivhi - ivlo + 1;
 
@@ -222,6 +224,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // k, j, i)/rho);
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
             rho, v(ieng, k, j, i) / rho, eos_lambda);
+        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
+                           v(iprs, k, j, i);
         if (ivhi > 0) {
           v(ivlo, k, j, i) = u10 + (du1 * mode).real();
         }

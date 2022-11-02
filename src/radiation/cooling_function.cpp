@@ -17,7 +17,7 @@
 
 namespace radiation {
 
-using namespace singularity::neutrinos;
+using Microphysics::Opacities;
 using singularity::RadiationType;
 
 TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt) {
@@ -53,7 +53,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
   const Real mp_code = code_constants.mp;
 
-  const auto d_opacity = opac->Param<Opacity>("d.opacity");
+  const auto d_opacity = opac->Param<Opacities>("opacities");
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -99,7 +99,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             Real detG = geom.DetG(CellLocation::Cent, k, j, i);
 
             for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-              Kokkos::atomic_add(&(v(mu, k, j, i)), detG * Gcov_coord[mu - Gcov_lo]);
+              Kokkos::atomic_add(&(v(mu, k, j, i)), -detG * Gcov_coord[mu - Gcov_lo]);
             }
             Kokkos::atomic_add(&(v(Gye, k, j, i)), -detG * Jye);
           });

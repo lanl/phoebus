@@ -15,8 +15,11 @@ add_executable(phoebus
   main.cpp # first
 
   # alphabetical
-  fixup/fixup.cpp
   fixup/fixup.hpp
+  fixup/fixup.cpp
+  fixup/fixup_c2p.cpp
+  fixup/fixup_radc2p.cpp
+  fixup/fixup_src.cpp
 
   fluid/con2prim.hpp
   fluid/con2prim_robust.hpp
@@ -111,6 +114,7 @@ add_executable(phoebus
   phoebus_utils/history.hpp
   phoebus_utils/linear_algebra.hpp
   phoebus_utils/phoebus_interpolation.hpp
+  phoebus_utils/preprocessor_utils.hpp
   phoebus_utils/reduction.hpp
   phoebus_utils/relativity_utils.hpp
   phoebus_utils/robust.hpp
@@ -122,6 +126,7 @@ add_executable(phoebus
   radiation/cooling_function.cpp
   radiation/mocmc.cpp
   radiation/moments.cpp
+  radiation/moments_source.cpp
   radiation/monte_carlo.cpp
   radiation/geodesics.hpp
 
