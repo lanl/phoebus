@@ -135,7 +135,8 @@ class phoedf(phdf.phdf):
     rho = self.GetRho()
     u = self.Get("p.energy", flatten=False)
     Ye = np.zeros(self.ScalarField)
-    self.Pg[:,:,:,:] = eos.P_from_rho_u_Ye(rho[:,:,:,:], u[:,:,:,:], Ye[:,:,:,:])
+    self.Pg[:,:,:,:] = eos.P_from_rho_u_Ye(rho[:,:,:,:]*self.MassDensityCodeToCGS,
+      u[:,:,:,:]*self.EnergyDensityCodeToCGS, Ye[:,:,:,:]) / self.EnergyDensityCodeToCGS
 
     self.Pg = np.clip(self.Pg, 1.e-20, 1.e20)
 
@@ -151,8 +152,8 @@ class phoedf(phdf.phdf):
     rho = self.GetRho()
     u = self.Get("p.energy", flatten=False)
     Ye = np.zeros(self.ScalarField)
-    self.Tg[:,:,:,:] = eos.T_from_rho_u_Ye(rho[:,:,:,:], u[:,:,:,:], Ye[:,:,:,:])
-    self.Tg *= self.TemperatureCodeToCGS
+    self.Tg[:,:,:,:] = eos.T_from_rho_u_Ye(rho[:,:,:,:]*self.MassDensityCodeToCGS,
+      u[:,:,:,:]*self.EnergyDensityCodeToCGS, Ye[:,:,:,:]) / self.TemperatureCodeToCGS
 
     self.Tg = np.clip(self.Tg, 1., 1.e20)
 
