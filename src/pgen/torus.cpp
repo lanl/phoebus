@@ -300,7 +300,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                 root_find::RootFind root_find;
                 GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i),
                                               opacities, eos, species_d[ispec], Ye);
-                v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
+                v(itmp, k, j, i) = root_find.itp(res, 0, T, 1.e-6 * T, T);
               }
 
               // Set fluid u/P/T and radiation J using equilibrium temperature
@@ -414,8 +414,9 @@ void ProblemModifier(ParameterInput *pin) {
     const std::string eos_type = pin->GetString("eos", "type");
     if (eos_type == "IdealGas") {
       const Real Gamma = pin->GetReal("eos", "Gamma");
-      // TODO(BRR) mp is not exactly some average of mp and mn
-      const Real cv = pc::kb / ((Gamma - 1.) * pc::mp);
+      PARTHENON_WARN("Resetting Cv assuming Ye = 0.5!");
+      const Real mu = (pc::mp + pc::mn + pc::me) / (3. * pc::mp);
+      const Real cv = pc::kb / ((Gamma - 1.) * mu * pc::mp);
       pin->SetReal("eos", "Cv", cv);
     } else {
       PARTHENON_FAIL(
