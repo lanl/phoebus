@@ -121,14 +121,14 @@ class phoedf(phdf.phdf):
       dX2 = (self.BlockBounds[b][3] - self.BlockBounds[b][2])/self.Nx2
       dX3 = (self.BlockBounds[b][5] - self.BlockBounds[b][4])/self.Nx3
       if self.Nx3 > 1:
-        dX = np.sqrt((dX1*self.gcov[b,:,:,:,1,1])**2 +
-                     (dX2*self.gcov[b,:,:,:,2,2])**2 +
-                     (dX3*self.gcov[b,:,:,:,3,3])**2)
+        dX = np.sqrt((dX1*np.sqrt(self.gcov[b,:,:,:,1,1]))**2 +
+                     (dX2*np.sqrt(self.gcov[b,:,:,:,2,2]))**2 +
+                     (dX3*np.sqrt(self.gcov[b,:,:,:,3,3]))**2)
       elif self.Nx2 > 1:
-        dX = np.sqrt((dX1*self.gcov[b,:,:,:,1,1])**2 +
-                     (dX2*self.gcov[b,:,:,:,2,2])**2)
+        dX = np.sqrt((dX1*np.sqrt(self.gcov[b,:,:,:,1,1]))**2 +
+                     (dX2*np.sqrt(self.gcov[b,:,:,:,2,2]))**2)
       else:
-        dX = dX1*self.gcov[b,:,:,:,1,1]
+        dX = dX1*np.sqrt(self.gcov[b,:,:,:,1,1])
 
       self.tau[b,:,:,:] = kappaH[b,:,:,:,]*dX
 
