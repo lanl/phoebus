@@ -132,7 +132,7 @@ class phoedf(phdf.phdf):
 
       self.tau[b,:,:,:] = kappaH[b,:,:,:,]*dX
 
-    self.tau = np.clip(self.tau, 1.e-20, 1.e20)
+    self.tau = np.clip(self.tau, 1.e-100, 1.e100)
 
     return self.tau
 
@@ -149,7 +149,7 @@ class phoedf(phdf.phdf):
     self.Pg[:,:,:,:] = eos.P_from_rho_u_Ye(rho[:,:,:,:]*self.MassDensityCodeToCGS,
       u[:,:,:,:]*self.EnergyDensityCodeToCGS, Ye[:,:,:,:]) / self.EnergyDensityCodeToCGS
 
-    self.Pg = np.clip(self.Pg, 1.e-20, 1.e20)
+    self.Pg = np.clip(self.Pg, 1.e-100, 1.e100)
 
     return self.Pg
 
@@ -166,7 +166,7 @@ class phoedf(phdf.phdf):
     self.Tg[:,:,:,:] = eos.T_from_rho_u_Ye(rho[:,:,:,:]*self.MassDensityCodeToCGS,
       u[:,:,:,:]*self.EnergyDensityCodeToCGS, Ye[:,:,:,:]) / self.TemperatureCodeToCGS
 
-    self.Tg = np.clip(self.Tg, 1., 1.e20)
+    self.Tg = np.clip(self.Tg, 1.e-100, 1.e100)
 
     return self.Tg
 
@@ -191,7 +191,7 @@ class phoedf(phdf.phdf):
     bsq[:,:,:,:] = (Bsq[:,:,:,:] + (self.alpha[:,:,:,:]*bcon0[:,:,:,:])**2)/(Gamma[:,:,:,:]**2)
 
     self.Pm = bsq / 2.
-    self.Pm = np.clip(self.Pm, 1.e-20, 1.e20)
+    self.Pm = np.clip(self.Pm, 1.e-100, 1.e100)
 
     return self.Pm
 
@@ -204,7 +204,7 @@ class phoedf(phdf.phdf):
     J = self.Get("r.p.J", flatten=False)
     self.Pr[:,:,:,:] = 1./3.*J[:,:,:,:]
 
-    self.Pr = np.clip(self.Pr, 1.e-20, 1.e20)
+    self.Pr = np.clip(self.Pr, 1.e-100, 1.e100)
 
     return self.Pr
 
@@ -239,7 +239,7 @@ class phoedf(phdf.phdf):
     self.xi[:,:,:,:] -= vdH*vdH
     self.xi = np.sqrt(self.xi)
 
-    self.xi = np.clip(self.xi, 1.e-10, 1.)
+    self.xi = np.clip(self.xi, 1.e-100, 1.)
 
     return self.xi
 
