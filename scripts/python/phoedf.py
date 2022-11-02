@@ -118,8 +118,19 @@ class phoedf(phdf.phdf):
 
     for b in range(self.NumBlocks):
       dX1 = (self.BlockBounds[b][1] - self.BlockBounds[b][0])/self.Nx1
-      dX2 = (self.BlockBounds[b][3] - self.BlockBounds[b][2])/self.Nx1
-      self.tau[b,:,:,:] = kappaH[b,:,:,:,]*np.sqrt((dX1*self.gcov[b,:,:,:,1,1])**2 + (dX2*self.gcov[b,:,:,:,2,2])**2)
+      dX2 = (self.BlockBounds[b][3] - self.BlockBounds[b][2])/self.Nx2
+      dX3 = (self.BlockBounds[b][5] - self.BlockBounds[b][4])/self.Nx3
+      if self.Nx3 > 1:
+        dX = np.sqrt((dX1*self.gcov[b,:,:,:,1,1])**2 +
+                     (dX2*self.gcov[b,:,:,:,2,2])**2 +
+                     (dX3*self.gcov[b,:,:,:,3,3])**2)
+      elif self.Nx2 > 1:
+        dX = np.sqrt((dX1*self.gcov[b,:,:,:,1,1])**2 +
+                     (dX2*self.gcov[b,:,:,:,2,2])**2)
+      else:
+        dX = dX1*self.gcov[b,:,:,:,1,1]
+
+      self.tau[b,:,:,:] = kappaH[b,:,:,:,]*dX
 
     self.tau = np.clip(self.tau, 1.e-20, 1.e20)
 
@@ -227,8 +238,6 @@ class phoedf(phdf.phdf):
         self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj]
     self.xi[:,:,:,:] -= vdH*vdH
     self.xi = np.sqrt(self.xi)
-
-    print(f"xi max: {self.xi.max()}")
 
     self.xi = np.clip(self.xi, 1.e-10, 1.)
 
