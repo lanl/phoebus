@@ -86,7 +86,8 @@ FOREACH_MODIFIER
 // declare all the initial condition modifiers
 #define POSTINIT_MODIFIER(name)                                                          \
   namespace name {                                                                       \
-  void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh);                     \
+  void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh,                      \
+                                  const bool is_restart);                                \
   }
 FOREACH_POSTINIT_MODIFIER
 #undef POSTINIT_MODIFIER
@@ -107,7 +108,8 @@ static std::map<std::string, std::function<void(ParameterInput *pin)>> pmod_dict
 #undef MODIFIER
 });
 
-static std::map<std::string, std::function<void(ParameterInput *pin, Mesh *pmesh)>>
+static std::map<std::string, std::function<void(ParameterInput *pin, Mesh *pmesh,
+                                                const bool is_restart)>>
     pinitmod_dict({
 #define POSTINIT_MODIFIER(name) {#name, name::PostInitializationModifier},
         FOREACH_POSTINIT_MODIFIER

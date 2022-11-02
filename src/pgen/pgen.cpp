@@ -44,14 +44,14 @@ void ProblemModifier(ParameterInput *pin) {
   f(pin);
 }
 
-void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh, const bool is_restart) {
   std::string name = pin->GetString("phoebus", "problem");
   if (name == "phoebus" || pinitmod_dict.count(name) == 0) {
     return;
   }
 
   auto f = pinitmod_dict[name];
-  f(pin, pmesh);
+  f(pin, pmesh, is_restart);
 }
 
 class PressResidual {

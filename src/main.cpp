@@ -60,11 +60,12 @@ int main(int argc, char *argv[]) {
   pman.ParthenonInitPackagesAndMesh();
 
   // call post-initialization
-  phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get());
+  phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get(),
+                                      pman.IsRestart());
 
   // Initialize the driver
-  phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(),
-                                pman.pmesh.get());
+  phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(), pman.pmesh.get(),
+                                pman.IsRestart());
 
   // Communicate ghost buffers before executing
   driver.PostInitializationCommunication();
