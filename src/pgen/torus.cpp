@@ -427,7 +427,10 @@ void ProblemModifier(ParameterInput *pin) {
   }
 }
 
-void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh, const bool is_restart) {
+  if (is_restart) {
+    return;
+  }
   const bool magnetized = pin->GetOrAddBoolean("torus", "magnetized", true);
   const Real beta_target = pin->GetOrAddReal("torus", "target_beta", 100.);
   const bool harm_style_beta =
