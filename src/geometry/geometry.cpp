@@ -27,7 +27,7 @@
 #include "geometry/geometry_defaults.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/variables.hpp"
-#include "tally/history.hpp"
+#include "analysis/history.hpp"
 
 using namespace parthenon::package::prelude;
 using parthenon::Coordinates_t;

@@ -131,8 +131,8 @@ add_executable(phoebus
 
   reconstruction.hpp
 
-  tally/history.hpp
-  tally/history_utils.hpp
+  analysis/history.hpp
+  analysis/history_utils.hpp
 
   tov/tov.hpp
   tov/tov.cpp
