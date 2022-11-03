@@ -60,7 +60,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     parthenon::HstVar_list hst_vars = {};
 
     auto ReduceAccretionRate = [](MeshData<Real> *md) {
-      return ReduceMassAccretionRate<Kokkos::Sum<Real>>(md);
+      return ReduceMassAccretionRate(md);
     };
 
     hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceAccretionRate, "mdot"));

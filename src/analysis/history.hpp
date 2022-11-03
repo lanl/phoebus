@@ -76,8 +76,7 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
   return result;
 }
 
-template <typename Reducer_t>
-Real ReduceMassAccretionRate(MeshData<Real> *md) {
+KOKKOS_INLINE_FUNCTION Real ReduceMassAccretionRate(MeshData<Real> *md) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -99,7 +98,6 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
   auto geom = Geometry::GetCoordinateSystem(md);
 
   Real result = 0.0;
-  Reducer_t reducer(result);
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Phoebus History for Mass Accretion Rate",
       DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -120,12 +118,12 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
                        (xh - coords.x1v(i)) * m) *
                       dx2 * dx3;
 
-          reducer.join(lresult, -flux);
+          lresult += - flux;
         } else {
-          reducer.join(lresult, 0.0);
+          lresult += 0.0;
         }
       },
-      reducer);
+      result);
   return result;
 } // mass accretion
 
