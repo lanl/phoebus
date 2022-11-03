@@ -53,7 +53,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Reductions
   Params &params = geometry->AllParams();
-  if (params.hasKey("xh")) {
+  const bool do_hydro = pin->GetBoolean("physics", "hydro");
+  if (params.hasKey("xh") && do_hydro) {
     auto HstSum = parthenon::UserHistoryOperation::sum;
     using History::ReduceMassAccretionRate;
     using parthenon::HistoryOutputVar;
