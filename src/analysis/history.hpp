@@ -21,10 +21,6 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
-#include "geometry/geometry.hpp"
-#include "geometry/geometry_utils.hpp"
-#include "history_utils.hpp"
-#include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 
 using namespace parthenon::package::prelude;

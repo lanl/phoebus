@@ -12,6 +12,10 @@
 // publicly, and to permit others to do so.
 
 #include "history.hpp"
+#include "geometry/geometry.hpp"
+#include "geometry/geometry_utils.hpp"
+#include "history_utils.hpp"
+#include "phoebus_utils/relativity_utils.hpp"
 
 namespace History {
 
