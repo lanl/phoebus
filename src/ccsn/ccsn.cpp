@@ -173,7 +173,7 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   //// fill interpolated data onto device array
   for (int i = 0; i < npoints; i++) {
 
-      for (int j = 1; j < num_vars; j++) {
+    for (int j = 1; j < num_vars; j++) {
 
       // r(i) from ccsn raw data -- assumes uniform spacing for input file?
       auto xa = ccsn_state_raw_d.Slice(CCSN::R, i);
@@ -181,7 +181,8 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
       // ya(i) from ccsn raw data
       auto ya = ccsn_state_raw_d.Slice(j, i);
 
-      Real yint = MonopoleGR::Interpolate(xa, ccsn_state_raw_d, radius, j);  //  call to some interp routine
+      Real yint = MonopoleGR::Interpolate(xa, ccsn_state_raw_d, radius,
+                                          j); //  call to some interp routine
 
       ccsn_state_interp_d(j, i) = yint;
     }
