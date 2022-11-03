@@ -14,6 +14,8 @@ add_library(geometry_unit_tests OBJECT
   test_geometry.cpp
   test_tetrads.cpp
 
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/analysis/history.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/analysis/history.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/analytic_system.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/boyer_lindquist.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/boyer_lindquist.cpp
@@ -38,6 +40,10 @@ add_library(geometry_unit_tests OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/phoebus_utils/phoebus_interpolation.hpp
 
 )
+
+# Super annoying but it had to be done.
+set(MAX_NUMBER_CONSERVED_VARS 9 CACHE STRING "Maximum number of conserved variables")
+configure_file(../../../src/compile_constants.hpp.in generated/compile_constants.hpp @ONLY)
 
 target_link_libraries(geometry_unit_tests
   PRIVATE
