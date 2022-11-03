@@ -69,7 +69,7 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
                        (xh - coords.x1v(i)) * m) *
                       dx2 * dx3;
 
-          lresult += - flux;
+          lresult += -flux;
         } else {
           lresult += 0.0;
         }
@@ -78,4 +78,4 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
   return result;
 } // mass accretion
 
-} // namespace history
+} // namespace History
