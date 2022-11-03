@@ -11,19 +11,7 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#include <string>
-#include <vector>
-
-#include <kokkos_abstraction.hpp>
-#include <parthenon/package.hpp>
-#include <utils/error_checking.hpp>
-
-#include "geometry/geometry.hpp"
-#include "geometry/geometry_utils.hpp"
 #include "history.hpp"
-#include "history_utils.hpp"
-#include "phoebus_utils/relativity_utils.hpp"
-#include "phoebus_utils/variables.hpp"
 
 namespace History {
 
