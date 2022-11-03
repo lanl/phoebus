@@ -42,7 +42,7 @@ using namespace parthenon::package::prelude;
 namespace History {
 
 Real ReduceMassAccretionRate(MeshData<Real> *md);
-  
+
 template <typename Reducer_t>
 Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
@@ -78,7 +78,6 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
       reducer);
   return result;
 }
-
 
 } // namespace History
 
