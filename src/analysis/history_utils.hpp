@@ -48,7 +48,7 @@ KOKKOS_INLINE_FUNCTION Real CalcMassFlux(Pack &pack, Geometry &geom, const int p
   const Real W = phoebus::GetLorentzFactor(vel, gcov4);
   const Real ucon = vel[0] - shift[0] * W / lapse;
 
-  return gdet * pack(b, prho, k, j, i) * ucon;
+  return lapse * gdet * pack(b, prho, k, j, i) * ucon;
 }
 
 } // namespace History
