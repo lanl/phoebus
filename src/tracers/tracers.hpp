@@ -34,9 +34,8 @@ using namespace parthenon;
 namespace tracers {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-// perhaps some task status? Update? Advect? etc?
-Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
+TaskStatus AdvectTracers(MeshBlockData<Real> *rc);
 } // namespace tracers
 
 
