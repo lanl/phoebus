@@ -28,12 +28,12 @@ using namespace parthenon::package::prelude;
 #include <singularity-eos/eos/eos.hpp>
 
 // Phoebus
+#include "analysis/history.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "monopole_gr/monopole_gr_base.hpp"
 #include "monopole_gr/monopole_gr_interface.hpp"
 #include "monopole_gr/monopole_gr_utils.hpp"
-#include "phoebus_utils/history.hpp"
 #include "phoebus_utils/variables.hpp"
 
 #include "tov.hpp"

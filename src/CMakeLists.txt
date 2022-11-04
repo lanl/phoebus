@@ -111,7 +111,6 @@ add_executable(phoebus
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
-  phoebus_utils/history.hpp
   phoebus_utils/linear_algebra.hpp
   phoebus_utils/phoebus_interpolation.hpp
   phoebus_utils/preprocessor_utils.hpp
@@ -131,6 +130,10 @@ add_executable(phoebus
   radiation/geodesics.hpp
 
   reconstruction.hpp
+
+  analysis/history.hpp
+  analysis/history_utils.hpp
+  analysis/history.cpp
 
   tov/tov.hpp
   tov/tov.cpp
