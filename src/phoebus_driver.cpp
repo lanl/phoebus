@@ -39,6 +39,7 @@
 #include "phoebus_utils/robust.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
+#include "tracers/tracers.hpp"
 
 using namespace parthenon::driver::prelude;
 using parthenon::AllReduce;
@@ -181,10 +182,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
   auto rad = pmesh->packages.Get("radiation");
   auto fluid = pmesh->packages.Get("fluid");
+  auto tracers = pmesh->packages.Get("tracers");
   auto monopole = pmesh->packages.Get("monopole_gr");
   const auto rad_active = rad->Param<bool>("active");
   const auto rad_moments_active = rad->Param<bool>("moments_active");
   const auto fluid_active = fluid->Param<bool>("active");
+  const auto tracers_active = tracers->Param<bool>("active");
   bool rad_mocmc_active = false;
   if (rad_active) {
     rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
@@ -665,6 +668,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(fixup::Initialize(pin.get()));
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
   packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
+  packages.Add(tracers::Initialize(pin.get()));
 
   // TODO(JMM): I need to do this before problem generators get
   // called. For now I'm hacking this in here. But in the long term,
