@@ -22,6 +22,7 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
+#include "analysis/history.hpp"
 #include "geometry/coordinate_systems.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_defaults.hpp"
@@ -39,14 +40,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto geometry = std::make_shared<StateDescriptor>("geometry");
   Initialize<CoordSysMeshBlock>(pin, geometry.get());
 
-  Params &params = geometry->AllParams();
-
-  // Store name of geometry in parameters
-  const std::string gname = GEOMETRY_NAME;
-  const std::string geometry_name = gname.substr(gname.find("::") + 2);
-  PARTHENON_REQUIRE_THROWS(geometry_name.size() > 0, "Invalid geometry name!");
-  params.Add("geometry_name", geometry_name);
-
   // Always add coodinates fields
   Utils::MeshBlockShape dims(pin);
   std::vector<int> cell_shape = {4};
@@ -57,6 +50,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata gcoord_node = Metadata({Metadata::Derived, Metadata::OneCopy}, node_shape);
   geometry->AddField(geometric_variables::cell_coords, gcoord_cell);
   geometry->AddField(geometric_variables::node_coords, gcoord_node);
+
+  // Reductions
+  Params &params = geometry->AllParams();
+  const bool do_hydro = pin->GetBoolean("physics", "hydro");
+  if (params.hasKey("xh") && do_hydro) {
+    auto HstSum = parthenon::UserHistoryOperation::sum;
+    using History::ReduceMassAccretionRate;
+    using parthenon::HistoryOutputVar;
+    parthenon::HstVar_list hst_vars = {};
+
+    auto ReduceAccretionRate = [](MeshData<Real> *md) {
+      return ReduceMassAccretionRate(md);
+    };
+
+    hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceAccretionRate, "mdot"));
+    params.Add(parthenon::hist_param_key, hst_vars);
+  }
 
   return geometry;
 }
