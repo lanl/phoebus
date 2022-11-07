@@ -178,8 +178,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         pin->GetOrAddString("fixup", "radiation_ceiling_type", "ConstantXi0");
     if (radiation_ceiling_type == "ConstantXi0") {
       Real xi0 = pin->GetOrAddReal("fixup", "xi0_ceiling", 0.99);
+      Real tau0 = pin->GetOrAddReal("fixup", "tau0_ceiling", 1.e5);
       params.Add("rad_ceiling",
-                 RadiationCeilings(constant_xi0_radiation_ceiling_tag, xi0));
+                 RadiationCeilings(constant_xi0_radiation_ceiling_tag, xi0, tau0));
     }
   } else {
     params.Add("rad_ceiling", RadiationCeilings());
@@ -348,8 +349,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         bounds.GetRadiationFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                   coords.x3v(k, j, i), J_floor);
         Real xi_max;
+        Real garbage;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max);
+                                    coords.x3v(k, j, i), xi_max, garbage);
 
         Real rho_floor_max = rho_floor;
         Real u_floor_max = rho_floor * sie_floor;
