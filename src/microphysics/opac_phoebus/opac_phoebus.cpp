@@ -176,12 +176,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       const Real lNuMin = std::log10(pin->GetOrAddReal("mean_opacity", "numin", 1.e10));
       const Real lNuMax = std::log10(pin->GetOrAddReal("mean_opacity", "numax", 1.e24));
       const int NNu = pin->GetOrAddInteger("mean_opacity", "nnu", 100);
-      auto cgs_mean_opacity =
+      MeanOpacityCGS cgs_mean_opacity =
           MeanOpacityCGS(opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin,
                          YeMax, NYe, lNuMin, lNuMax, NNu);
-      auto mean_opac_host =
-          MeanNonCGSUnits<MeanOpacity>(std::forward<MeanOpacity>(cgs_mean_opacity),
-                                       time_unit, mass_unit, length_unit, temp_unit);
+      MeanOpacity mean_opac_host =
+          MeanNonCGSUnits<MeanOpacityCGS>(std::forward<MeanOpacityCGS>(cgs_mean_opacity),
+                                          time_unit, mass_unit, length_unit, temp_unit);
       auto mean_opac_device = mean_opac_host.GetOnDevice();
       params.Add("h.mean_opacity", mean_opac_host);
       params.Add("d.mean_opacity", mean_opac_device);
@@ -275,9 +275,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       const int NT = pin->GetOrAddInteger("mean_opacity", "nt", 10);
       auto cgs_mean_opacity = MeanSOpacityCGS(opacity_host, lRhoMin, lRhoMax, NRho, lTMin,
                                               lTMax, NT, YeMin, YeMax, NYe);
-      auto mean_opac_host =
-          MeanNonCGSUnitsS<MeanSOpacity>(std::forward<MeanSOpacity>(cgs_mean_opacity),
-                                         time_unit, mass_unit, length_unit, temp_unit);
+      MeanSOpacity mean_opac_host = MeanNonCGSUnitsS<MeanSOpacityCGS>(
+          std::forward<MeanSOpacityCGS>(cgs_mean_opacity), time_unit, mass_unit,
+          length_unit, temp_unit);
       auto mean_opac_device = mean_opac_host.GetOnDevice();
       params.Add("h.mean_s_opacity", mean_opac_host);
       params.Add("d.mean_s_opacity", mean_opac_device);
@@ -285,10 +285,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   auto opacity_device = params.Get<singularity::neutrinos::Opacity>("d.opacity");
-  auto &mean_opac_device = params.Get<MeanNonCGSUnits<MeanOpacity>>("d.mean_opacity");
+  auto &mean_opac_device = params.Get<MeanOpacity>("d.mean_opacity");
   auto &s_opacity_device = params.Get<SOpacity>("d.s_opacity");
-  auto &mean_s_opac_device =
-      params.Get<MeanNonCGSUnitsS<MeanSOpacity>>("d.mean_s_opacity");
+  auto &mean_s_opac_device = params.Get<MeanSOpacity>("d.mean_s_opacity");
   Opacities opacities(opacity_device, mean_opac_device, s_opacity_device,
                       mean_s_opac_device);
   params.Add("opacities", opacities);
