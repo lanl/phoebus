@@ -47,6 +47,10 @@ class phoedf(phdf.phdf):
 
     self.ScalarField = [self.NumBlocks, self.Nx3, self.Nx2, self.Nx1]
 
+    self.RadiationActive = self.Params['radiation/active']
+    if (self.RadiationActive):
+      self.NumSpecies = self.Params['radiation/num_species']
+
 # TODO(BRR) store output data only once with get/load functions
 
     if geomfile is None:
@@ -57,29 +61,29 @@ class phoedf(phdf.phdf):
     if self.flatgcov is None:
       if self.Params['geometry/geometry_name'] == "Minkowski":
         self.flatgcov = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 10])
-        self.flatgcov[:,:,:,:,flatten_indices(0, 0)] = -1.
-        self.flatgcov[:,:,:,:,flatten_indices(1, 1)] = 1.
-        self.flatgcov[:,:,:,:,flatten_indices(2, 2)] = 1.
-        self.flatgcov[:,:,:,:,flatten_indices(3, 3)] = 1.
-    self.gcov = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 4, 4])
+        self.flatgcov[:,flatten_indices(0, 0),:,:,:] = -1.
+        self.flatgcov[:,flatten_indices(1, 1),:,:,:] = 1.
+        self.flatgcov[:,flatten_indices(2, 2),:,:,:] = 1.
+        self.flatgcov[:,flatten_indices(3, 3),:,:,:] = 1.
+    self.gcov = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
     for mu in range(4):
       for nu in range(4):
-        self.gcov[:,:,:,:,mu,nu] = self.flatgcov[:,:,:,:,flatten_indices(mu,nu)]
+        self.gcov[:,mu,nu,:,:,:] = self.flatgcov[:,flatten_indices(mu,nu),:,:,:]
     del(self.flatgcov)
-    self.gcon = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 4, 4])
+    self.gcon = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
     for b in range(self.NumBlocks):
       for k in range(self.Nx3):
         for j in range(self.Nx2):
           for i in range(self.Nx1):
-            self.gcon[b,k,j,i,:,:] = np.linalg.inv(self.gcov[b,k,j,i,:,:])
+            self.gcon[b,:,:,k,j,i] = np.linalg.inv(self.gcov[b,:,:,k,j,i])
     self.alpha = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1])
-    self.alpha[:,:,:,:] = np.sqrt(-1./self.gcon[:,:,:,:,0,0])
-    self.betacon = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 3])
-    self.betacon[:,:,:,:,:] = self.gcon[:,:,:,:,1:,0]*(self.alpha[:,:,:,:,np.newaxis]**2)
-    self.gammacon = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 3, 3])
+    self.alpha[:,:,:,:] = np.sqrt(-1./self.gcon[:,0,0,:,:,:])
+    self.betacon = np.zeros([self.NumBlocks, 3, self.Nx3, self.Nx2, self.Nx1])
+    self.betacon[:,:,:,:,:] = self.gcon[:,1:,0,:,:,:]*(self.alpha[:,np.newaxis,:,:,:]**2)
+    self.gammacon = np.zeros([self.NumBlocks, 3, 3, self.Nx3, self.Nx2, self.Nx1])
     for ii in range(3):
       for jj in range(3):
-        self.gammacon[:,:,:,:,ii,jj] = self.gcon[:,:,:,:,ii+1,jj+1] + self.betacon[:,:,:,:,ii]*self.betacon[:,:,:,:,jj]/(self.alpha[:,:,:,:]**2)
+        self.gammacon[:,ii,jj,:,:,:] = self.gcon[:,ii+1,jj+1,:,:,:] + self.betacon[:,ii,:,:,:]*self.betacon[:,jj,:,:,:]/(self.alpha[:,:,:,:]**2)
 
     # Output quantities loaded upon request
     self.rho = None
@@ -92,6 +96,9 @@ class phoedf(phdf.phdf):
     self.Pr = None
     self.tau = None
     self.Tg = None
+    self.vpcon = None
+    self.J = None
+    self.Hcov = None
 
   def GetRho(self):
     if self.rho is not None:
@@ -121,14 +128,14 @@ class phoedf(phdf.phdf):
       dX2 = (self.BlockBounds[b][3] - self.BlockBounds[b][2])/self.Nx2
       dX3 = (self.BlockBounds[b][5] - self.BlockBounds[b][4])/self.Nx3
       if self.Nx3 > 1:
-        dX = np.sqrt((dX1*np.sqrt(self.gcov[b,:,:,:,1,1]))**2 +
-                     (dX2*np.sqrt(self.gcov[b,:,:,:,2,2]))**2 +
-                     (dX3*np.sqrt(self.gcov[b,:,:,:,3,3]))**2)
+        dX = np.sqrt((dX1*np.sqrt(self.gcov[b,1,1,:,:,:]))**2 +
+                     (dX2*np.sqrt(self.gcov[b,2,2,:,:,:]))**2 +
+                     (dX3*np.sqrt(self.gcov[b,3,3,:,:,:]))**2)
       elif self.Nx2 > 1:
-        dX = np.sqrt((dX1*np.sqrt(self.gcov[b,:,:,:,1,1]))**2 +
-                     (dX2*np.sqrt(self.gcov[b,:,:,:,2,2]))**2)
+        dX = np.sqrt((dX1*np.sqrt(self.gcov[b,1,1,:,:,:]))**2 +
+                     (dX2*np.sqrt(self.gcov[b,2,2,:,:,:]))**2)
       else:
-        dX = dX1*np.sqrt(self.gcov[b,:,:,:,1,1])
+        dX = dX1*np.sqrt(self.gcov[b,1,1,:,:,:])
 
       self.tau[b,:,:,:] = kappaH[b,:,:,:,]*dX
 
@@ -186,8 +193,8 @@ class phoedf(phdf.phdf):
     vpcon = self.Get("p.velocity", flatten=False)
     for ii in range(3):
       for jj in range(3):
-        bcon0[:,:,:,:] += self.gcov[:,:,:,:,ii+1,jj+1]*Bcon[:,:,:,:,ii]*vpcon[:,:,:,:,jj]
-        Bsq[:,:,:,:] += self.gcov[:,:,:,:,ii+1,jj+1]*Bcon[:,:,:,:,ii]*Bcon[:,:,:,:,jj]
+        bcon0[:,:,:,:] += self.gcov[:,ii+1,jj+1,:,:,:]*Bcon[:,ii,:,:,:]*vpcon[:,jj,:,:,:]
+        Bsq[:,:,:,:] += self.gcov[:,ii+1,jj+1,:,:,:]*Bcon[:,ii,:,:,:]*Bcon[:,jj,:,:,:]
     bsq[:,:,:,:] = (Bsq[:,:,:,:] + (self.alpha[:,:,:,:]*bcon0[:,:,:,:])**2)/(Gamma[:,:,:,:]**2)
 
     self.Pm = bsq / 2.
@@ -201,8 +208,9 @@ class phoedf(phdf.phdf):
 
     self.Pr = np.zeros(self.ScalarField)
 
-    J = self.Get("r.p.J", flatten=False)
-    self.Pr[:,:,:,:] = 1./3.*J[:,:,:,:]
+    J = self.GetJ()
+    for ispec in range(self.NumSpecies):
+      self.Pr[:,:,:,:] += 1./3.*J[:,ispec,:,:,:]
 
     self.Pr = np.clip(self.Pr, 1.e-100, 1.e100)
 
@@ -217,26 +225,45 @@ class phoedf(phdf.phdf):
     vpcon = self.Get("p.velocity", flatten=False)
     for ii in range(3):
       for jj in range(3):
-        self.Gamma[:,:,:,:] += self.gcov[:,:,:,:,ii+1,jj+1] * vpcon[:,:,:,:,ii] * vpcon[:,:,:,:,jj]
+        self.Gamma[:,:,:,:] += self.gcov[:,ii+1,jj+1,:,:,:] * vpcon[:,ii,:,:,:] * vpcon[:,jj,:,:,:]
     self.Gamma = np.sqrt(1. + self.Gamma)
 
     return self.Gamma
+
+  def GetVpCon(self):
+    if self.vpcon is None:
+      self.vpcon = np.clip(self.Get("p.velocity", flatten=False), -1.e100, 1.e100)
+
+    return self.vpcon
+
+  def GetJ(self):
+    assert self.RadiationActive
+    if self.J is None:
+      self.J = self.Get("r.p.J", flatten=False)
+
+    return self.J
+
+  def GetHcov(self):
+    if self.Hcov is None:
+      self.Hcov = self.Get("r.p.H", flatten=False) * self.GetJ()[:,:,np.newaxis,:,:,:]
+
+    return self.Hcov
 
   def GetXi(self):
     if self.xi is not None:
       return self.xi
 
-    self.xi = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1])
-    Hcov = self.Get("r.p.H", flatten=False)
-    vcon = self.Get("p.velocity", flatten=False)
+    self.xi = np.zeros([self.NumBlocks, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1])
+    Hcov = self.GetHcov() / self.GetJ()[:,np.newaxis,:,:,:]
     Gamma = self.GetGamma()
-    vcon[:,:,:,:,:] /= Gamma[:,:,:,:,np.newaxis]
-    vdH = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1])
-    for ii in range(3):
-      vdH += vcon[:,:,:,:,ii]*Hcov[:,:,:,:,ii]
-      for jj in range(3):
-        self.xi[:,:,:,:] += self.gammacon[:,:,:,:,ii,jj]*Hcov[:,:,:,:,ii]*Hcov[:,:,:,:,jj]
-    self.xi[:,:,:,:] -= vdH*vdH
+    vcon = self.GetVpCon() / Gamma[:,np.newaxis,:,:,:]
+    for ispec in range(self.NumSpecies):
+      vdH = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1])
+      for ii in range(3):
+        vdH += vcon[:,ii,:,:,:]*Hcov[:,ii,ispec,:,:,:]
+        for jj in range(3):
+          self.xi[:,ispec,:,:,:] += self.gammacon[:,ii,jj,:,:,:]*Hcov[:,ii,ispec,:,:,:]*Hcov[:,jj,ispec,:,:,:]
+      self.xi[:,ispec,:,:,:] -= vdH*vdH
     self.xi = np.sqrt(self.xi)
 
     self.xi = np.clip(self.xi, 1.e-100, 1.)
