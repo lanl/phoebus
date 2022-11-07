@@ -43,8 +43,8 @@ class Opacities {
  public:
   Opacities() = default;
   KOKKOS_FUNCTION
-  Opacities(const Opacity &opac, const MeanNonCGSUnits &m_opac, const SOpacity &s_opac,
-            const MeanNonCGSUnitsS &m_s_opac)
+  Opacities(const Opacity &opac, const MeanOpacity &m_opac, const SOpacity &s_opac,
+            const MeanSOpacity &m_s_opac)
       : opac_(opac), m_opac_(m_opac), s_opac_(s_opac), m_s_opac_(m_s_opac) {}
 
   /// Radiation equation of state calls
@@ -122,9 +122,9 @@ class Opacities {
 
  private:
   Opacity opac_;
-  MeanNonCGSUnits m_opac_;
+  MeanOpacity m_opac_;
   SOpacity s_opac_;
-  MeanNonCGSUnitsS m_s_opac_;
+  MeanSOpacity m_s_opac_;
 };
 
 namespace Opacity {
