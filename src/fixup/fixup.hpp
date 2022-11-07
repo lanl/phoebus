@@ -207,13 +207,14 @@ class RadiationCeilings {
  public:
   RadiationCeilings()
       : RadiationCeilings(constant_xi0_radiation_ceiling_tag,
-                          std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max()) {}
+                          std::numeric_limits<Real>::max(),
+                          std::numeric_limits<Real>::max()) {}
   RadiationCeilings(ConstantXi0RadiationCeiling, const Real xi0, const Real tau0)
       : xi0_(xi0), tau0_(tau0), radiation_ceiling_flag_(1) {}
 
   KOKKOS_INLINE_FUNCTION
-  void GetRadiationCeilings(const Real x1, const Real x2, const Real x3,
-                            Real &ximax, Real &taumax) const {
+  void GetRadiationCeilings(const Real x1, const Real x2, const Real x3, Real &ximax,
+                            Real &taumax) const {
     switch (radiation_ceiling_flag_) {
     case 1:
       ximax = xi0_;
