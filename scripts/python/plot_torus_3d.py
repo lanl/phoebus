@@ -109,7 +109,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
       fig, axes = plt.subplots(2, 2, figsize=(6,6))
 
   ax = axes[0,0]
-  ldensity = np.log10(np.clip(dfile.Get("p.density", flatten=False), 1.e-20, None))
+  ldensity = np.log10(dfile.GetRho())
 
   density = dfile.Get("p.density", flatten=False)
   J = dfile.Get("r.p.J", flatten=False)
@@ -165,7 +165,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     ax.set_title(r'$\log_{10}~\beta_{\rm M}$')
 
     ax = axes[0,3]
-    lTg = np.log10(dfile.GetTg())
+    lTg = np.log10(dfile.GetTg() * dfile.TemperatureCodeToCGS)
     for b in range(nblocks):
       im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lTg[b,k,:,:].transpose(), vmin=5, vmax=10,
         cmap=cmap_diverging)
@@ -178,7 +178,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     ax.set_title(r'$\log_{10}~T_{\rm g}~({\rm K})$')
 
     ax = axes[1,0]
-    lJ = np.log10(np.clip(dfile.Get("r.p.J", flatten=False), 1.e-20, None))
+    lJ = np.log10(np.clip(dfile.Get("r.p.J", flatten=False), 1.e-20, None))[:,0,:,:,:]
     for b in range(nblocks):
       im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lJ[b,k,:,:].transpose(), vmin=-5, vmax=0,
       cmap=cmap_uniform)
@@ -191,7 +191,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
     ax.set_title(r'$\log_{10}~J$')
 
     ax = axes[1,1]
-    lxi = np.log10(dfile.GetXi())
+    lxi = np.log10(dfile.GetXi())[:,0,:,:,:]
     for b in range(nblocks):
       im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lxi[b,k,:,:].transpose(), vmin=-3, vmax=0,
       cmap=cmap_uniform)
