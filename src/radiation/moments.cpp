@@ -579,7 +579,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         bounds.GetRadiationFloors(X[1], X[2], X[3], J_floor);
 
         Real xi_ceiling;
-        bounds.GetRadiationCeilings(X[1], X[2], X[3], xi_ceiling);
+        bounds.GetRadiationCeilings(X[1], X[2], X[3], xi_ceiling, garbage);
 
         Vec con_beta;
         Tens2 cov_gamma;
