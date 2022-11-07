@@ -291,9 +291,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                                                 c2p_floor_scale_fac, c2p_fail_on_floors,
                                                 c2p_fail_on_ceilings);
 
-  constexpr int izone = 4;
-  constexpr int jzone = 4;
-
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
