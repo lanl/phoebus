@@ -197,7 +197,7 @@ class InteractionTResidual {
   const Real &Ye_;
   Real J0_[MaxNumRadiationSpecies];
   const int &nspec_;
-  const Real &dtau_; // Proper time
+  const Real &dtau_;      // Proper time
   const Real &alpha_max_; // Maximum optical depth per timestep
   RadiationType species_[MaxNumRadiationSpecies];
 };
@@ -392,22 +392,16 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               c.GetConTilPiFromPrim(J, cov_H, &con_tilPi);
             }
 
-            // Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
             Real JBB = opacities.EnergyDensityFromTemperature(T1, species_d[ispec]);
-            // Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
             Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(rho, T1, Ye,
                                                                        species_d[ispec]);
             kappaJ = std::min<Real>(kappaJ, alpha_max);
             Real kappaH = opacities.RosselandMeanScatteringCoefficient(rho, T1, Ye,
                                                                        species_d[ispec]);
-            //+              kappaJ;
             kappaH = std::min<Real>(kappaH, alpha_max);
             kappaH += kappaJ;
             Real tauJ = alpha * dt * kappaJ;
             Real tauH = alpha * dt * kappaH;
-            if (i == 36 && j == 22) {
-            printf("tauJ: %e tauH: %e\n", tauJ, tauH);
-            }
 
             if (status == root_find::RootFindStatus::success) {
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
