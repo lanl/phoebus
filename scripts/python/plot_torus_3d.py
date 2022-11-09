@@ -37,6 +37,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
   cmap_uniform = 'viridis'
   cmap_diverging = 'RdYlBu'
 
+  shading = 'gouraud'
+
   dfile = phoedf(fname)
 
   rad_active = dfile.Params['radiation/active']
@@ -124,7 +126,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
 
   for b in range(nblocks):
     im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], ldensity[b,k,:,:].transpose(), vmin=-5, vmax=0,
-    cmap=cmap_uniform)
+    cmap=cmap_uniform, shading=shading)
     if ndim == 3:
       im = ax.pcolormesh(xplot[b,:,:,k+nz//2], yplot[b,:,:,k+nz//2], ldensity[b,k+nz//2,:,:].transpose(), vmin=-5, vmax=0,
       cmap=cmap_uniform)
