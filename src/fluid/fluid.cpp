@@ -582,22 +582,15 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
           Real gcon0[4] = {-inv_alpha2, inv_alpha2 * shift[0], inv_alpha2 * shift[1],
                            inv_alpha2 * shift[2]};
-          for (int m = 0; m < ND; m++) {
-            for (int n = 0; n < ND; n++) {
-              Real gam0 = 0;
-              for (int r = 0; r < ND; r++) {
-                gam0 += gcon0[r] * gam[r][m][n];
-              }
-              TGam += Tmunu[m][n] * gam0;
-            }
+          SPACETIMELOOP2(m, n) {
+            Real gam0 = 0;
+            SPACETIMELOOP(r) { gam0 += gcon0[r] * gam[r][m][n]; }
+            TGam += Tmunu[m][n] * gam0;
           }
           Real Ta = 0.0;
           Real da[ND];
-          // Real *da = &gam[1][0][0];
           geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
-          for (int m = 0; m < ND; m++) {
-            Ta += Tmunu[m][0] * da[m];
-          }
+          SPACETIMELOOP(m) { Ta += Tmunu[m][0] * da[m]; }
           src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
 #else
                          SPACETIMELOOP2(mu, nu) {
