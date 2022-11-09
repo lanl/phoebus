@@ -83,7 +83,7 @@ if __name__ == "__main__":
   for n, ax in enumerate(axes):
     ax.set_yscale('log')
     ax.set_xlim([0, None])
-    ax.set_ylim([1.e-5, 1.e0])
+    ax.set_ylim([1.e-4, 1.e1])
     if n < len(axes) - 1:
       ax.set_xticklabels([])
     else:
