@@ -838,6 +838,10 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Real con_n[4] = {1. / alp, -con_beta(0) / alp, -con_beta(1) / alp,
                          -con_beta(2) / alp};
 
+        Real con_u[4] = {0};
+        con_u[0] = W / alp;
+        SPACELOOP(ii) { con_u[ii + 1] = W * con_v(ii) - con_beta(ii) / alp; }
+
         for (int ispec = 0; ispec < nspec; ++ispec) {
           Real E = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
           Real J = v(iblock, idx_J(ispec), k, j, i);
@@ -848,12 +852,15 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
                     J * v(iblock, idx_H(ispec, 1), k, j, i),
                     J * v(iblock, idx_H(ispec, 2), k, j, i)}};
           Tens2 conTilPi;
+          Real conTilPi_other[4][4] = {0};
           if (iTilPi.IsValid()) {
             SPACELOOP2(ii, jj) {
               conTilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+              conTilPi_other[ii + 1][jj + 1] = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
             }
           } else {
             c.GetConTilPiFromPrim(J, covH, &conTilPi);
+            SPACELOOP2(ii, jj) { conTilPi_other[ii + 1][jj + 1] = conTilPi(ii, jj); }
           }
           Tens2 conP;
           c.getConPFromPrim(J, covH, conTilPi, &conP);
@@ -861,16 +868,29 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Vec conF;
           g.raise3Vector(covF, &conF);
 
+Real con_H4[4] = {0};
+ SPACELOOP2(ii, jj) { con_H4[ii + 1] += g.con_gamma(ii, jj) * covH(jj); }
+
           Real con_T[4][4] = {0};
           SPACETIMELOOP2(mu, nu) {
-            con_T[mu][nu] = con_n[mu] * con_n[nu] * E;
-            con_T[mu][nu] += conP(mu, nu);
+            con_T[mu][nu] += con_n[mu] * con_n[nu] * E;
           }
           SPACETIMELOOP(mu) {
             SPACELOOP(ii) {
-              con_T[mu][ii] += con_n[mu] * conF(ii);
-              con_T[ii][mu] += con_n[mu] * conF(ii);
+              con_T[mu][ii+1] += con_n[mu] * conF(ii);
+              con_T[ii+1][mu] += con_n[mu] * conF(ii);
             }
+          }
+          SPACELOOP2(ii, jj) {
+            con_T[ii+1][jj+1] += conP(ii, jj);
+          }
+
+          Real con_T_other[4][4] = {0};
+          SPACETIMELOOP2(mu, nu) {
+            Real conh_munu = con_g[mu][nu] + con_u[mu] * con_u[nu];
+            con_T_other[mu][nu] = (con_u[mu] * con_u[nu] + conh_munu / 3.) * J;
+            con_T_other[mu][nu] += con_u[mu] * con_H4[nu] + con_u[nu] * con_H4[mu];
+            con_T_other[mu][nu] += J * conTilPi_other[mu][nu];
           }
 
           Real TGam = 0.0;
@@ -881,14 +901,48 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           }
           Real Ta = 0.0;
           SPACETIMELOOP(m) { Ta += con_T[m][0] * dlnalp[m]; }
-          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * alp * (Ta - TGam);
+          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * alp * alp * (Ta - TGam);
 
           SPACELOOP(l) {
             Real src_mom = 0.0;
             SPACETIMELOOP2(m, n) {
               src_mom += con_T[m][n] * (dg[n][l + 1][m] - Gamma[l + 1][n][m]);
+              if (i == 40 && j == 32) {
+              printf("[%i][%i %i] dsrcmom = %e\n", l, m, n, con_T[m][n] * (dg[n][l + 1][m] - Gamma[l + 1][n][m]));
+              }
             }
-            v_src(iblock, idx_F_src(ispec, l), k, j, i) = sdetgam * src_mom;
+            v_src(iblock, idx_F_src(ispec, l), k, j, i) = alp * sdetgam * src_mom;
+          }
+
+          Real srcE_old = 0.;
+          SPACETIMELOOP(mu) {
+            srcE_old += con_T[mu][0] * dlnalp[mu];
+            SPACETIMELOOP(nu) {
+              Real Gamma_udd = 0.;
+              SPACETIMELOOP(lam) { Gamma_udd += con_g[0][lam] * Gamma[lam][nu][mu]; }
+              srcE_old -= con_T[mu][nu] * Gamma_udd;
+            }
+          }
+          srcE_old *= sdetgam * alp * alp;
+
+          Vec srcF_old{0, 0, 0};
+          SPACELOOP(ii) {
+            SPACETIMELOOP2(mu, nu) { srcF_old(ii) += con_T[mu][nu] * Gamma[mu][nu][ii + 1]; }
+            srcF_old(ii) *= sdetgam * alp;
+          }
+
+          if (i == 40 && j == 32) {
+            SPACETIMELOOP2(mu, nu) {
+              printf("%i %i: %e %e\n", mu,nu,con_T[mu][nu], con_T_other[mu][nu]);
+            }
+
+            printf("srcs: %e %e %e %e\n", v_src(iblock, idx_E_src(ispec), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 0), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 1), k, j, i),
+              v_src(iblock, idx_F_src(ispec, 2), k, j, i));
+            printf("old srcs: %e %e %e %e\n", srcE_old,
+              srcF_old(0), srcF_old(1), srcF_old(2));
+            exit(-1);
           }
 
 #if SET_FLUX_SRC_DIAGS

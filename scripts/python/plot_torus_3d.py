@@ -82,6 +82,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
   if ndim == 2:
     xblock = rblock*np.sin(thblock)
     yblock = rblock*np.cos(thblock)
+    zblock = None
   elif ndim == 3:
     xblock = rblock*np.sin(thblock)*np.cos(phiblock)
     yblock = rblock*np.cos(thblock)
@@ -113,7 +114,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
   density = dfile.Get("p.density", flatten=False)
   J = dfile.Get("r.p.J", flatten=False)
   print(f'density min: {density.min()} max: {density.max()}')
-  print(f'J min:       {J.min()} max: {J.max()}')
+  #print(f'J min:       {J.min()} max: {J.max()}')
 
   if ndim == 2:
     k = 0
@@ -149,7 +150,11 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
 
     ax = axes[0,2]
     Pg = dfile.GetPg()
-    Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
+    print(dfile.Params['fluid/mhd'])
+    if dfile.Params['fluid/mhd']:
+      Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
+    else:
+      Pm = 1.e-100
     lbeta = np.log10(Pg/Pm)
     for b in range(nblocks):
       im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lbeta[b,k,:,:].transpose(), vmin=-2, vmax=2,
@@ -245,7 +250,11 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
 
     ax = axes[1,1]
     Pg = dfile.GetPg()
-    Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
+    print(dfile.Params['fluid/mhd'])
+    if dfile.Params['fluid/mhd']:
+      Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
+    else:
+      Pm = 1.e-100
     lbeta = np.log10(Pg/Pm)
     for b in range(nblocks):
       im = ax.pcolormesh(xplot[b,:,:,k], yplot[b,:,:,k], lbeta[b,k,:,:].transpose(), vmin=-2, vmax=2,
