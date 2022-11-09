@@ -916,18 +916,18 @@ Real con_H4[4] = {0};
 
           Real srcE_old = 0.;
           SPACETIMELOOP(mu) {
-            srcE_old += con_T[mu][0] * dlnalp[mu];
+            srcE_old += con_T_other[mu][0] * dlnalp[mu];
             SPACETIMELOOP(nu) {
               Real Gamma_udd = 0.;
               SPACETIMELOOP(lam) { Gamma_udd += con_g[0][lam] * Gamma[lam][nu][mu]; }
-              srcE_old -= con_T[mu][nu] * Gamma_udd;
+              srcE_old -= con_T_other[mu][nu] * Gamma_udd;
             }
           }
           srcE_old *= sdetgam * alp * alp;
 
           Vec srcF_old{0, 0, 0};
           SPACELOOP(ii) {
-            SPACETIMELOOP2(mu, nu) { srcF_old(ii) += con_T[mu][nu] * Gamma[mu][nu][ii + 1]; }
+            SPACETIMELOOP2(mu, nu) { srcF_old(ii) += con_T_other[mu][nu] * Gamma[mu][nu][ii + 1]; }
             srcF_old(ii) *= sdetgam * alp;
           }
 
