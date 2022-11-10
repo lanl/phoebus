@@ -135,8 +135,11 @@ class phoedf(phdf.phdf):
 
   def GetBcon(self):
     if self.Bcon is None:
-      self.Bcon = self.Get("p.bfield", flatten=False)
-      assert self.Bcon is not None
+      if self.Params['fluid/mhd']:
+        self.Bcon = self.Get("p.bfield", flatten=False)
+        assert self.Bcon is not None
+      else:
+        self.Bcon = np.zeros(self.ThreeVectorField)
 
     return self.Bcon
 
@@ -237,6 +240,8 @@ class phoedf(phdf.phdf):
       Ye = np.zeros(self.ScalarField)
       self.Tg[:,:,:,:] = eos.T_from_rho_u_Ye(rho[:,:,:,:]*self.MassDensityCodeToCGS,
         u[:,:,:,:]*self.EnergyDensityCodeToCGS, Ye[:,:,:,:]) / self.TemperatureCodeToCGS
+
+      print('%e' % np.max(self.Tg*self.TemperatureCodeToCGS))
 
       self.Tg = np.clip(self.Tg, 1.e-100, 1.e100)
 
