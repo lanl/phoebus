@@ -355,10 +355,23 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             InteractionTResidual res(eos, opacities, rho, ug, Ye, J0, num_species,
                                      species_d, dtau, alpha_max);
             root_find::RootFindStatus status;
-            Real T1 = root_find.itp(res, 1.e-5 * v(iblock, pT, k, j, i),
-                                    1.e5 * v(iblock, pT, k, j, i),
+            Real T1 = root_find.itp(res, 1.e-1 * v(iblock, pT, k, j, i),
+                                    1.e1 * v(iblock, pT, k, j, i),
                                     src_rootfind_tol * v(iblock, pT, k, j, i),
                                     v(iblock, pT, k, j, i), &status);
+            Real rebracketing_fac = 10.;
+            int n_rebracketing_tries = 0;
+            constexpr int MAX_REBRACKETING_TRIES = 5;
+            while (status == root_find::RootFindStatus::failure &&
+                   n_rebracketing_tries < MAX_REBRACKETING_TRIES) {
+              T1 = root_find.itp(res, 1.e-1 / rebracketing_fac * v(iblock, pT, k, j, i),
+                                 1.e1 * rebracketing_fac * v(iblock, pT, k, j, i),
+                                 src_rootfind_tol * v(iblock, pT, k, j, i),
+                                 v(iblock, pT, k, j, i), &status);
+
+              n_rebracketing_tries++;
+              rebracketing_fac *= 10.;
+            }
 
             if (status == root_find::RootFindStatus::failure) {
               PARTHENON_DEBUG_WARN("1D source rootfind failure!");
