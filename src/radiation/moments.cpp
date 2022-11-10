@@ -942,8 +942,14 @@ Real con_H4[4] = {0};
               v_src(iblock, idx_F_src(ispec, 2), k, j, i));
             printf("old srcs: %e %e %e %e\n", srcE_old,
               srcF_old(0), srcF_old(1), srcF_old(2));
-            exit(-1);
+         //   exit(-1);
           }
+
+          //v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE_old;
+          SPACELOOP(ii) {
+           // v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF_old(ii);
+          }
+
 
 #if SET_FLUX_SRC_DIAGS
           v(iblock, idx_diag(ispec, 0), k, j, i) =
