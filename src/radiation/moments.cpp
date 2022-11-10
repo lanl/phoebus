@@ -831,15 +831,9 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Real dlnalp[ND];
         Real Gamma[ND][ND][ND];
         geom.GradLnAlpha(CellLocation::Cent, iblock, k, j, i, dlnalp);
-        // geom.ConnectionCoefficient(CellLocation::Cent, iblock, k, j, i, Gamma);
         Real dg[ND][ND][ND];
-        //Real gam[4][4][4] = {0};
         geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
         Geometry::Utils::SetConnectionCoeffFromMetricDerivs(dg, Gamma);
-
-        // Real con_u[4];
-        // con_u[0] = W / alp;
-        // SPACELOOP(ii) { con_u[ii + 1] = W * con_v(ii) - con_beta(ii) / alp; }
 
         Real con_n[4] = {1. / alp, -con_beta(0) / alp, -con_beta(1) / alp,
                          -con_beta(2) / alp};
@@ -867,8 +861,6 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Vec conF;
           g.raise3Vector(covF, &conF);
 
-          // Real con_H4[4] = {0};
-          // SPACELOOP2(ii, jj) { con_H4[ii + 1] += g.con_gamma(ii, jj) * covH(jj); }
           Real con_T[4][4] = {0};
           SPACETIMELOOP2(mu, nu) { con_T[mu][nu] += con_n[mu] * con_n[nu] * E; }
           SPACETIMELOOP(mu) {
@@ -896,85 +888,6 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             }
             v_src(iblock, idx_F_src(ispec, l), k, j, i) = alp * sdetgam * src_mom;
           }
-
-//          if (i == 32 && j == 32) {
-//            printf("news: %e %e %e %e\n", v_src(iblock, idx_E_src(ispec), k, j, i),
-//                   v_src(iblock, idx_F_src(ispec, 0), k, j, i),
-//                   v_src(iblock, idx_F_src(ispec, 1), k, j, i),
-//                   v_src(iblock, idx_F_src(ispec, 2), k, j, i));
-//          }
-
-//          {
-//            Real srcE = 0.0;
-//            SPACETIMELOOP(mu) {
-//              srcE += con_T[mu][0] * dlnalp[mu];
-//              SPACETIMELOOP(nu) {
-//                Real Gamma_udd = 0.;
-//                SPACETIMELOOP(lam) { Gamma_udd += con_g[0][lam] * Gamma[lam][nu][mu]; }
-//                srcE -= con_T[mu][nu] * Gamma_udd;
-//              }
-//            }
-//            srcE *= alp * alp;
-//
-//            Vec srcF{0, 0, 0};
-//            SPACELOOP(ii) {
-//              SPACETIMELOOP2(mu, nu) {
-//                srcF(ii) += con_T[mu][nu] * Gamma[mu][nu][ii + 1];
-//              }
-//              srcF(ii) *= alp;
-//            }
-//            if (i == 32 && j == 32) {
-//              printf("olds: %e %e %e %e\n", sdetgam * srcE, sdetgam * srcF(0),
-//                     sdetgam * srcF(1), sdetgam * srcF(2));
-//              exit(-1);
-//            }
-//          }
-
-      // Real con_H4[4] = {0};
-      // SPACELOOP2(ii, jj) { con_H4[ii + 1] += g.con_gamma(ii, jj) * covH(jj); }
-      //          Real conTilPi[4][4] = {0};
-      //          if (iTilPi.IsValid()) {
-      //            SPACELOOP2(ii, jj) {
-      //              conTilPi[ii + 1][jj + 1] = v(iblock, iTilPi(ispec, ii, jj), k, j,
-      //              i);
-      //            }
-      //          } else {
-      //            Tens2 con_tilPi{0};
-      //            c.GetConTilPiFromPrim(J, covH, &con_tilPi);
-      //            SPACELOOP2(ii, jj) { conTilPi[ii + 1][jj + 1] = con_tilPi(ii, jj); }
-      //          }
-      //
-      //          Real con_T[4][4];
-      //          SPACETIMELOOP2(mu, nu) {
-      //            Real conh_munu = con_g[mu][nu] + con_u[mu] * con_u[nu];
-      //            con_T[mu][nu] = (con_u[mu] * con_u[nu] + conh_munu / 3.) * J;
-      //            con_T[mu][nu] += con_u[mu] * con_H4[nu] + con_u[nu] * con_H4[mu];
-      //            con_T[mu][nu] += J * conTilPi[mu][nu];
-      //          }
-      //
-      //          // TODO(BRR) add Pij contribution
-      //
-      //          Real srcE = 0.0;
-      //          SPACETIMELOOP(mu) {
-      //            srcE += con_T[mu][0] * dlnalp[mu];
-      //            SPACETIMELOOP(nu) {
-      //              Real Gamma_udd = 0.;
-      //              SPACETIMELOOP(lam) { Gamma_udd += con_g[0][lam] *
-      //              Gamma[lam][nu][mu]; } srcE -= con_T[mu][nu] * Gamma_udd;
-      //            }
-      //          }
-      //          srcE *= alp * alp;
-      //
-      //          Vec srcF{0, 0, 0};
-      //          SPACELOOP(ii) {
-      //            SPACETIMELOOP2(mu, nu) { srcF(ii) += con_T[mu][nu] * Gamma[mu][nu][ii
-      //            + 1]; } srcF(ii) *= alp;
-      //          }
-      //
-      //          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
-      //          SPACELOOP(ii) {
-      //            v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
-      //          }
 
 #if SET_FLUX_SRC_DIAGS
           v(iblock, idx_diag(ispec, 0), k, j, i) =
