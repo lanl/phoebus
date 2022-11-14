@@ -119,7 +119,8 @@ KOKKOS_INLINE_FUNCTION void DumpToTxtInterpModel1D(const std::string model_filen
   std::string out = model_filename;
   out.std::string::append("_interp");
   pf = fopen(out.c_str(), "w");
-  fprintf(pf, "# r \t rho \t temp \t ye \t eint \t vel_rad \t pres \t rho_adm \t j_adm \t S_adm \t Srr_adm \n");
+  fprintf(pf, "# r \t rho \t temp \t ye \t eint \t vel_rad \t pres \t rho_adm \t j_adm "
+              "\t S_adm \t Srr_adm \n");
   for (int i = 0; i < npoints; ++i) {
     Real r = ccsn_state_interp_h(CCSN::R, i);
     fprintf(pf, "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e\n", r,
@@ -127,7 +128,7 @@ KOKKOS_INLINE_FUNCTION void DumpToTxtInterpModel1D(const std::string model_filen
             ccsn_state_interp_h(CCSN::YE, i), ccsn_state_interp_h(CCSN::EPS, i),
             ccsn_state_interp_h(CCSN::VEL_RAD, i), ccsn_state_interp_h(CCSN::PRES, i),
             ccsn_state_interp_h(CCSN::RHO_ADM, i), ccsn_state_interp_h(CCSN::J_ADM, i),
-	    ccsn_state_interp_h(CCSN::S_ADM, i), ccsn_state_interp_h(CCSN::Srr_ADM, i));
+            ccsn_state_interp_h(CCSN::S_ADM, i), ccsn_state_interp_h(CCSN::Srr_ADM, i));
   }
   fclose(pf);
 }
