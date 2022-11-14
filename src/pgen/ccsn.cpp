@@ -93,7 +93,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // interp per mesh block here? or pull data from model_1d
         Real rho = std::max(rhomin, MonopoleGR::Interpolate(r, base, rgrid, CCSN::RHO));
         Real eps = std::max(epsmin, MonopoleGR::Interpolate(r, base, rgrid, CCSN::EPS));
-        Real P = std::max(pmin, MonopoleGR::Interpolate(r, base, rgrid, CCSN::P));
+        Real P = std::max(pmin, MonopoleGR::Interpolate(r, base, rgrid, CCSN::PRES));
 
         // TODO(JMM): Add lambdas, Ye, etc
         v(irho, k, j, i) = rho;
