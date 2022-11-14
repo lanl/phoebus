@@ -88,7 +88,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::pair<int, int> p = Get1DProfileNumZones(model_filename);
   const int num_zones = p.first - 1;
   const int num_comments = p.second;
-  const int num_vars = 9;
+  const int num_vars = 11;
 
   params.Add("num_zones", num_zones);
   params.Add("num_comments", num_comments);
@@ -181,8 +181,7 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
       // ya(i) from ccsn raw data
       auto ya = ccsn_state_raw_d.Slice(j, i);
 
-      Real yint = MonopoleGR::Interpolate(xa, ccsn_state_raw_d, radius,
-                                          j); //  call to some interp routine
+      Real yint = MonopoleGR::Interpolate(xa, ccsn_state_raw_d, radius,j); //  call to some interp routine
 
       ccsn_state_interp_d(j, i) = yint;
     }
@@ -196,7 +195,7 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
       ccsn_state_interp_d(CCSN::YE, 0));
   printf("MESA model interpolated to monopoleGR rgrid. Central pressure = %.14e "
          "(dyn/cm**2)\n",
-         ccsn_state_interp_d(CCSN::P, 0));
+         ccsn_state_interp_d(CCSN::PRES, 0));
   printf(
       "MESA model interpolated to monopoleGR rgrid. Central temperature = %.14e (GK)\n",
       ccsn_state_interp_d(CCSN::TEMP, 0));
@@ -209,9 +208,10 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
 
   // second loop, to set density, specific energy, and matter state
   for (int i = 0; i < npoints; ++i) {
-    Real rho = ccsn_state_interp_h(CCSN::RHO, i);
-    Real press = ccsn_state_interp_h(CCSN::P, i);
-    Real eps = ccsn_state_interp_h(CCSN::EPS, i);
+    Real rho_adm = ccsn_state_interp_h(CCSN::RHO_ADM, i);
+    Real J_adm = ccsn_state_interp_h(CCSN::J_ADM, i);
+    Real trcS = ccsn_state_interp_h(CCSN::S_ADM, i);
+    Real Srr_adm = ccsn_state_interp_h(CCSN::Srr_ADM, i);
 
     // no floor for now, and using input thermo
     if (press <= 1.1 * Pmin) {
@@ -220,10 +220,10 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
       // PolytropeThermoFromP(press, K, Gamma, rho, eps);
     }
     // these eqns will change?
-    matter_h(MonopoleGR::Matter::RHO, i) = rho * (1 + eps); // ADM mass
-    matter_h(MonopoleGR::Matter::J_R, i) = 0;               // momentum
-    matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
-    matter_h(MonopoleGR::Matter::Srr, i) = press;
+    matter_h(MonopoleGR::Matter::RHO, i) = rho_adm; // ADM mass
+    matter_h(MonopoleGR::Matter::J_R, i) = J_adm;               // momentum
+    matter_h(MonopoleGR::Matter::trcS, i) = trcS;      // in rest frame of fluid
+    matter_h(MonopoleGR::Matter::Srr, i) = Srr_adm;
   }
 
   // create matter array on device
