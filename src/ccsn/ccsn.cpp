@@ -154,6 +154,8 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   Get1DProfileData(model_filename, num_zones, num_comments, num_vars, ccsn_state_raw_d);
 
   /////
+  
+  auto state_raw = params.Get<CCSN::State_t>("ccsn_state_raw_d");
 
   Real input_radius[num_zones];
 
@@ -176,12 +178,12 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
     for (int j = 1; j < num_vars; j++) {
 
       // r(i) from ccsn raw data -- assumes uniform spacing for input file?
-      auto xa = ccsn_state_raw_d.Slice(CCSN::R, i);
+      auto xa = radius.x(i);//ccsn_state_raw_d.Slice(CCSN::R, i);
 
       // ya(i) from ccsn raw data
       auto ya = ccsn_state_raw_d.Slice(j, i);
 
-      Real yint = MonopoleGR::Interpolate(xa, ccsn_state_raw_d, radius,j); //  call to some interp routine
+      Real yint = MonopoleGR::Interpolate(xa, state_raw, radius,j); //  call to some interp routine
 
       ccsn_state_interp_d(j, i) = yint;
     }
