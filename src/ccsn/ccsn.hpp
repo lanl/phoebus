@@ -22,7 +22,7 @@
 using namespace parthenon::package::prelude;
 
 namespace CCSN {
-constexpr int NCCSN = 9;
+constexpr int NCCSN = 11;
 
 // NVAR:NUM_ZONES
 using parthenon::Real;
@@ -31,13 +31,15 @@ using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 
 constexpr int R = 0;
 constexpr int RHO = 1;
-constexpr int V = 2;
-constexpr int EPS = 3;
-constexpr int YE = 4;
-constexpr int P = 5;
-constexpr int TEMP = 6;
-constexpr int grav = 7;
-constexpr int entr = 8;
+constexpr int TEMP = 2;
+constexpr int YE = 3;
+constexpr int EPS = 4;
+constexpr int VEL_RAD = 5;
+constexpr int PRES = 6;
+constexpr int RHO_ADM = 7;
+constexpr int J_ADM = 8;
+constexpr int S_ADM = 9;
+constexpr int Srr_ADM = 10;
 
 KOKKOS_INLINE_FUNCTION
 std::pair<int, int> Get1DProfileNumZones(const std::string model_filename) {
