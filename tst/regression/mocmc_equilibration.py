@@ -28,7 +28,6 @@ parser.add_argument('--build_type', type=str, default='Release', choices=['Debug
 args = parser.parse_args()
 
 modified_inputs = {}
-modified_inputs['radiation/scattering_fraction'] = 0.0
 modified_inputs['opacity/gray_kappa'] = 0.1
 modified_inputs['radiation/method'] = 'mocmc'
 modified_inputs['radiation/nu_min'] = 1.e-2

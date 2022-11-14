@@ -26,6 +26,11 @@ if (PHOEBUS_ENABLE_MPI)
     MPI_PARALLEL)
 endif()
 
+if(PHOEBUS_ENABLE_UNIT_TESTS)
+  message("Building unit tests.")
+  add_subdirectory(unit)
+endif()
+
 catch_discover_tests(phoebus_unit_tests
   TEST_SPEC "[geometry]" TEST_PREFIX "geometry:")
 catch_discover_tests(phoebus_unit_tests
@@ -34,11 +39,6 @@ catch_discover_tests(phoebus_unit_tests
   TEST_SPEC "[relativity_utils]" TEST_PREFIX "relativity_utils:")
 catch_discover_tests(phoebus_unit_tests 
   TEST_SPEC "[radiation]" TEST_PREFIX "radiation:")
-
-if(PHOEBUS_ENABLE_UNIT_TESTS)
-  message("Building unit tests.")
-  add_subdirectory(unit)
-endif()
 
 # Currently integration and regression tests 
 # are not integrated into the cmake build system 

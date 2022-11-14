@@ -493,22 +493,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
 
     if (rad_moments_active) {
-      // Fixup for interaction failures
-      auto src_fixup =
-          tl.AddTask(gas_rad_int, fixup::SourceFixup<MeshBlockData<Real>>, sc1.get());
-
-      // fill in derived fields after source update
-      auto fill_derived = tl.AddTask(
-          src_fixup, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
-
-      auto fixup = tl.AddTask(
-          fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
-
-      auto radfixup = tl.AddTask(
-          fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
-
+      // Only apply floors because MomentFluidSource already ensured that a sensible state
+      // was returned
       auto floors =
-          tl.AddTask(src_fixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+          tl.AddTask(gas_rad_int, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
     }
   }
 

@@ -39,7 +39,6 @@ using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
 using singularity::RadiationType;
-using singularity::neutrinos::Opacity;
 
 namespace fixup {
 
@@ -238,7 +237,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("src_failure_strategy", src_failure_strategy);
 
   const bool c2p_failure_force_fixup_both =
-      pin->GetOrAddBoolean("fixup", "c2p_failure_force_fixup_both", true);
+      pin->GetOrAddBoolean("fixup", "c2p_failure_force_fixup_both", false);
   params.Add("c2p_failure_force_fixup_both", c2p_failure_force_fixup_both);
 
   params.Add("bounds",

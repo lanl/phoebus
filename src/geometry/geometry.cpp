@@ -22,6 +22,7 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
+#include "analysis/history.hpp"
 #include "geometry/coordinate_systems.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_defaults.hpp"
@@ -49,6 +50,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata gcoord_node = Metadata({Metadata::Derived, Metadata::OneCopy}, node_shape);
   geometry->AddField(geometric_variables::cell_coords, gcoord_cell);
   geometry->AddField(geometric_variables::node_coords, gcoord_node);
+
+  // Reductions
+  Params &params = geometry->AllParams();
+  const bool do_hydro = pin->GetBoolean("physics", "hydro");
+  if (params.hasKey("xh") && do_hydro) {
+    auto HstSum = parthenon::UserHistoryOperation::sum;
+    using History::ReduceMassAccretionRate;
+    using parthenon::HistoryOutputVar;
+    parthenon::HstVar_list hst_vars = {};
+
+    auto ReduceAccretionRate = [](MeshData<Real> *md) {
+      return ReduceMassAccretionRate(md);
+    };
+
+    hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceAccretionRate, "mdot"));
+    params.Add(parthenon::hist_param_key, hst_vars);
+  }
 
   return geometry;
 }

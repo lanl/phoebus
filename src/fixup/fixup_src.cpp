@@ -39,7 +39,6 @@ using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
 using singularity::RadiationType;
-using singularity::neutrinos::Opacity;
 
 namespace fixup {
 
@@ -72,8 +71,6 @@ TaskStatus SourceFixupImpl(T *rc) {
   }
 
   auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
-  StateDescriptor *opac = pmb->packages.Get("opacity").get();
-  const auto &d_opacity = opac->Param<Opacity>("d.opacity");
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   const std::vector<std::string> vars(
