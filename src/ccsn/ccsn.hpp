@@ -71,7 +71,7 @@ std::pair<int, int> Get1DProfileNumZones(const std::string model_filename) {
     }
 
     // skip c++ comments
-    if (line.find("//") == first_nonws) {
+    if (line.find("#") == first_nonws) {
       nc++;
       continue;
     }
@@ -119,14 +119,15 @@ KOKKOS_INLINE_FUNCTION void DumpToTxtInterpModel1D(const std::string model_filen
   std::string out = model_filename;
   out.std::string::append("_interp");
   pf = fopen(out.c_str(), "w");
-  fprintf(pf, "# r \t rho \t vel_rad \t eint \t ye \t pres \t temp \t grav \t entr \n");
+  fprintf(pf, "# r \t rho \t temp \t ye \t eint \t vel_rad \t pres \t rho_adm \t j_adm \t S_adm \t Srr_adm \n");
   for (int i = 0; i < npoints; ++i) {
     Real r = ccsn_state_interp_h(CCSN::R, i);
-    fprintf(pf, "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e\n", r,
-            ccsn_state_interp_h(CCSN::RHO, i), ccsn_state_interp_h(CCSN::V, i),
-            ccsn_state_interp_h(CCSN::EPS, i), ccsn_state_interp_h(CCSN::YE, i),
-            ccsn_state_interp_h(CCSN::P, i), ccsn_state_interp_h(CCSN::TEMP, i),
-            ccsn_state_interp_h(CCSN::grav, i), ccsn_state_interp_h(CCSN::entr, i));
+    fprintf(pf, "%.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e %.14e\n", r,
+            ccsn_state_interp_h(CCSN::RHO, i), ccsn_state_interp_h(CCSN::TEMP, i),
+            ccsn_state_interp_h(CCSN::YE, i), ccsn_state_interp_h(CCSN::EPS, i),
+            ccsn_state_interp_h(CCSN::VEL_RAD, i), ccsn_state_interp_h(CCSN::PRES, i),
+            ccsn_state_interp_h(CCSN::RHO_ADM, i), ccsn_state_interp_h(CCSN::J_ADM, i),
+	    ccsn_state_interp_h(CCSN::S_ADM, i), ccsn_state_interp_h(CCSN::Srr_ADM, i));
   }
   fclose(pf);
 }
