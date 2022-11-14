@@ -208,22 +208,28 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
 
   // second loop, to set density, specific energy, and matter state
   for (int i = 0; i < npoints; ++i) {
+
+    Real pres = ccsn_state_interp_h(CCSN::PRES, i); // pressure
+    Real rho = ccsn_state_interp_h(CCSN::RHO, i);   // mass density
+    Real eps = ccsn_state_interp_h(CCSN::EPS, i);   // specific internal energy - need to multiply by mass?
+
+    // adm quantities
     Real rho_adm = ccsn_state_interp_h(CCSN::RHO_ADM, i);
     Real J_adm = ccsn_state_interp_h(CCSN::J_ADM, i);
     Real trcS = ccsn_state_interp_h(CCSN::S_ADM, i);
     Real Srr_adm = ccsn_state_interp_h(CCSN::Srr_ADM, i);
 
-    // no floor for now, and using input thermo
-    if (press <= 1.1 * Pmin) {
-      press = rho = eps = 0;
+    // floor based on pressure 
+    if (pres <= 1.1 * Pmin) {
+      pres = rho = eps = 0;
     } else {
       // PolytropeThermoFromP(press, K, Gamma, rho, eps);
     }
-    // these eqns will change?
-    matter_h(MonopoleGR::Matter::RHO, i) = rho_adm; // ADM mass
-    matter_h(MonopoleGR::Matter::J_R, i) = J_adm;               // momentum
-    matter_h(MonopoleGR::Matter::trcS, i) = trcS;      // in rest frame of fluid
-    matter_h(MonopoleGR::Matter::Srr, i) = Srr_adm;
+    // fill matter array for monopole solver
+    matter_h(MonopoleGR::Matter::RHO, i) = rho_adm;              // ADM mass density
+    matter_h(MonopoleGR::Matter::J_R, i) = J_adm;                // ADM momentum 
+    matter_h(MonopoleGR::Matter::trcS, i) = trcS;                // in rest frame of fluid
+    matter_h(MonopoleGR::Matter::Srr, i) = Srr_adm;              
   }
 
   // create matter array on device
