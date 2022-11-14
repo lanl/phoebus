@@ -149,4 +149,4 @@ Pmin = 1e-12
 rhomin = 1e-12
 epsmin = 1e-12
 # read in 1D initial model for initial conditions
-model_filename = 20m.txt
+model_filename = 20m.txt #ADM_stellartable.dat
