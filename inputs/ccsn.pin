@@ -15,8 +15,10 @@
 <phoebus>
 problem = ccsn
 bc_ix1 = reflect
-bc_ox1 = reflect  # reflecting outer boundary a bit better behaved
-#bc_ox1 = outflow # but outflow and reflecting both work fine
+bc_ox1 = outflow
+ix2_bc = reflect
+ox2_bc = reflect
+
 
 <parthenon/job>
 problem_id  = ccsn # problem ID: basename of output filenames
@@ -43,6 +45,10 @@ variables = p.density,  &
 
 file_type   = hdf5      # Tabular data dump
 dt          = 5.e-4     # time increment between outputs - half a ms
+
+<parthenon/output2>
+file_type = hst
+dt = 1.e-3
 
 <parthenon/time>
 nlim        = 1000      # cycle limit
@@ -112,11 +118,11 @@ Ye = false
 <fixup>
 enable_floors = true
 enable_ceilings = true
-enable_flux_fixup = false
+enable_flux_fixup = true
 enable_c2p_fixup = true
-floor_type = ConstantRhoSie
+floor_type = X1RhoSie
 rho0_floor = 1.0e-9
-sie0_floor = 1.0e-9
+sie0_floor = 1.0e-3
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
