@@ -68,8 +68,6 @@ def get_torus_fluxes(dfile):
   for b in range(dfile.NumBlocks):
     print(f'{b}\n\n')
     blockBounds = dfile.BlockBounds[b]
-    print(dfile.BlockBounds[b])
-    dfile.GetCartesianBlockBounds(b)
 
     dx2 = (blockBounds[3] - blockBounds[2]) / dfile.MeshBlockSize[1]
     dx3 = (blockBounds[5] - blockBounds[4]) / dfile.MeshBlockSize[2]
