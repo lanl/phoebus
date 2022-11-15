@@ -138,13 +138,24 @@ if __name__ == "__main__":
                         help='Files to take a snapshot of')
   args = parser.parse_args()
 
-  for fname in args.files:
+  logfile = open("fluxes_logfile.txt", "a")
+
+  for n, fname in enumerate(args.files):
     print(f'Opening file {fname}... ', end='')
     dfile = phoedf(fname)
     print('done')
 
+
     fluxes = get_torus_fluxes(dfile)
+    if n == 0:
+      for flux in fluxes.keys():
+        logfile.write(f'{flux} ')
+      logfile.write('\n')
     print('Fluxes:')
     for flux in fluxes.keys():
       print(f'  {flux}: {fluxes[flux]}')
+      logfile.write(f'{fluxes[flux]} ')
+    logfile.write('\n')
+
+  logfile.close()
 
