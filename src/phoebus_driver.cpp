@@ -666,6 +666,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(fixup::Initialize(pin.get()));
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
   packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
+  packages.Add(CCSN::Initialize(pin.get()));       // Does nothing if not enabled.
 
   // TODO(JMM): I need to do this before problem generators get
   // called. For now I'm hacking this in here. But in the long term,
