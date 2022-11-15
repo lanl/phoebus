@@ -87,7 +87,9 @@ class phoedf(phdf.phdf):
     self.gammacon = np.zeros(self.ThreeTensorField)
     for ii in range(3):
       for jj in range(3):
-        self.gammacon[:,ii,jj,:,:,:] = self.gcon[:,ii+1,jj+1,:,:,:] + self.betacon[:,ii,:,:,:]*self.betacon[:,jj,:,:,:]/(self.alpha[:,:,:,:]**2)
+        self.gammacon[:,ii,jj,:,:,:] = self.gcon[:,ii+1,jj+1,:,:,:] + \
+                                       self.betacon[:,ii,:,:,:] * self.betacon[:,jj,:,:,:] / \
+                                       (self.alpha[:,:,:,:]**2)
     self.gdet = np.zeros(self.ScalarField)
     for b in range(self.NumBlocks):
       for k in range(self.Nx3):
@@ -120,20 +122,41 @@ class phoedf(phdf.phdf):
   def GetRho(self):
     if self.rho is None:
       self.rho = self.Get("p.density", flatten=False)
+      assert self.rho is not None
 
     return self.rho
 
   def GetUg(self):
     if self.ug is None:
       self.ug = self.Get("p.energy", flatten=False)
+      assert self.ug is not None
 
     return self.ug
 
   def GetBcon(self):
     if self.Bcon is None:
-      self.Bcon = self.Get("p.bfield", flatten=False)
+      if self.Params['fluid/mhd']:
+        self.Bcon = self.Get("p.bfield", flatten=False)
+        assert self.Bcon is not None
+      else:
+        self.Bcon = np.zeros(self.ThreeVectorField)
 
     return self.Bcon
+
+  def GetJ(self):
+    assert self.RadiationActive
+    if self.J is None:
+      self.J = self.Get("r.p.J", flatten=False)
+      assert self.J is not None
+
+    return self.J
+
+  def GetHcov(self):
+    if self.Hcov is None:
+      self.Hcov = self.Get("r.p.H", flatten=False) * self.GetJ()[:,:,np.newaxis,:,:,:]
+      assert self.Hcov is not None
+
+    return self.Hcov
 
   def Getbcon(self):
     if self.bcon is None:
@@ -148,10 +171,12 @@ class phoedf(phdf.phdf):
 
       for ii in range(3):
         for jj in range(3):
-          self.bcon[:,0,:,:,:] += Gamma * (Bcon[:,ii,:,:,:] * gcov[:,ii+1,jj+1,:,:,:] * vcon[:,jj,:,:,:]) / alpha
+          self.bcon[:,0,:,:,:] += Gamma * (Bcon[:,ii,:,:,:] * gcov[:,ii+1,jj+1,:,:,:] * \
+                                           vcon[:,jj,:,:,:]) / alpha
 
       for ii in range(3):
-        self.bcon[:,ii+1,:,:,:] = (Bcon[:,ii,:,:,:] + alpha * self.bcon[:,0,:,:,:] * ucon[:,ii,:,:,:]) / Gamma
+        self.bcon[:,ii+1,:,:,:] = (Bcon[:,ii,:,:,:] + alpha * self.bcon[:,0,:,:,:] * \
+                                   ucon[:,ii+1,:,:,:]) / Gamma
 
     return self.bcon
 
@@ -167,6 +192,7 @@ class phoedf(phdf.phdf):
       self.tau = np.zeros(self.ScalarField)
 
       kappaH = self.Get("r.i.kappaH", flatten=False)
+      assert kappaH is not None
 
       for b in range(self.NumBlocks):
         dX1 = (self.BlockBounds[b][1] - self.BlockBounds[b][0])/self.Nx1
@@ -209,32 +235,30 @@ class phoedf(phdf.phdf):
 
       eos = self.GetEOS()
       rho = self.GetRho()
-      u = self.Get("p.energy", flatten=False)
+      u = self.GetUg()
+      # TODO(BRR) actually get Ye
       Ye = np.zeros(self.ScalarField)
       self.Tg[:,:,:,:] = eos.T_from_rho_u_Ye(rho[:,:,:,:]*self.MassDensityCodeToCGS,
         u[:,:,:,:]*self.EnergyDensityCodeToCGS, Ye[:,:,:,:]) / self.TemperatureCodeToCGS
 
+      print('%e' % np.max(self.Tg*self.TemperatureCodeToCGS))
+
       self.Tg = np.clip(self.Tg, 1.e-100, 1.e100)
 
     return self.Tg
-
 
   def GetPm(self):
     if self.Pm is None:
       self.Pm = np.zeros(self.ScalarField)
 
       Gamma = self.GetGamma()
+      bcon = self.Getbcon()
+      gcov = self.gcov
 
-      bcon0 = np.zeros(self.ScalarField)
-      Bsq = np.zeros(self.ScalarField)
       bsq = np.zeros(self.ScalarField)
-      Bcon = self.Get("p.bfield", flatten=False)
-      vpcon = self.Get("p.velocity", flatten=False)
-      for ii in range(3):
-        for jj in range(3):
-          bcon0[:,:,:,:] += self.gcov[:,ii+1,jj+1,:,:,:]*Bcon[:,ii,:,:,:]*vpcon[:,jj,:,:,:]
-          Bsq[:,:,:,:] += self.gcov[:,ii+1,jj+1,:,:,:]*Bcon[:,ii,:,:,:]*Bcon[:,jj,:,:,:]
-      bsq[:,:,:,:] = (Bsq[:,:,:,:] + (self.alpha[:,:,:,:]*bcon0[:,:,:,:])**2)/(Gamma[:,:,:,:]**2)
+      for mu in range(4):
+        for nu in range(4):
+          bsq[:,:,:,:] += gcov[:,mu,nu,:,:,:]*bcon[:,mu,:,:,:]*bcon[:,nu,:,:,:]
 
       self.Pm = bsq / 2.
       self.Pm = np.clip(self.Pm, 1.e-100, 1.e100)
@@ -247,7 +271,7 @@ class phoedf(phdf.phdf):
 
       J = self.GetJ()
       for ispec in range(self.NumSpecies):
-        self.Pr[:,:,:,:] += 1./3.*J[:,ispec,:,:,:]
+        self.Pr[:,:,:,:] += 1. / 3. * J[:,ispec,:,:,:]
 
       self.Pr = np.clip(self.Pr, 1.e-100, 1.e100)
 
@@ -255,9 +279,9 @@ class phoedf(phdf.phdf):
 
   def GetGamma(self):
     if self.Gamma is None:
-      self.Gamma = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1])
+      self.Gamma = np.zeros(self.ScalarField)
 
-      vpcon = self.Get("p.velocity", flatten=False)
+      vpcon = self.GetVpCon()
       for ii in range(3):
         for jj in range(3):
           self.Gamma[:,:,:,:] += self.gcov[:,ii+1,jj+1,:,:,:] * vpcon[:,ii,:,:,:] * vpcon[:,jj,:,:,:]
@@ -268,6 +292,7 @@ class phoedf(phdf.phdf):
   def GetVpCon(self):
     if self.vpcon is None:
       self.vpcon = np.clip(self.Get("p.velocity", flatten=False), -1.e100, 1.e100)
+      assert self.vpcon is not None
 
     return self.vpcon
 
@@ -280,35 +305,25 @@ class phoedf(phdf.phdf):
 
       self.ucon[:,0,:,:,:] = Gamma[:,:,:,:] / self.alpha[:,:,:,:]
       for ii in range(3):
-        self.ucon[:,ii + 1,:,:,:] = vpcon[:,ii,:,:,:] - Gamma[:,:,:,:] * self.betacon[:,ii,:,:,:] / self.alpha[:,:,:,:]
+        self.ucon[:,ii + 1,:,:,:] = vpcon[:,ii,:,:,:] - Gamma[:,:,:,:] * \
+                                    self.betacon[:,ii,:,:,:] / self.alpha[:,:,:,:]
 
     return self.ucon
-
-  def GetJ(self):
-    assert self.RadiationActive
-    if self.J is None:
-      self.J = self.Get("r.p.J", flatten=False)
-
-    return self.J
-
-  def GetHcov(self):
-    if self.Hcov is None:
-      self.Hcov = self.Get("r.p.H", flatten=False) * self.GetJ()[:,:,np.newaxis,:,:,:]
-
-    return self.Hcov
 
   def GetXi(self):
     if self.xi is None:
       self.xi = np.zeros([self.NumBlocks, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1])
+
       Hcov = self.GetHcov() / self.GetJ()[:,np.newaxis,:,:,:]
       Gamma = self.GetGamma()
       vcon = self.GetVpCon() / Gamma[:,np.newaxis,:,:,:]
       for ispec in range(self.NumSpecies):
-        vdH = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1])
+        vdH = np.zeros(self.ScalarField)
         for ii in range(3):
-          vdH += vcon[:,ii,:,:,:]*Hcov[:,ii,ispec,:,:,:]
+          vdH += vcon[:,ii,:,:,:] * Hcov[:,ii,ispec,:,:,:]
           for jj in range(3):
-            self.xi[:,ispec,:,:,:] += self.gammacon[:,ii,jj,:,:,:]*Hcov[:,ii,ispec,:,:,:]*Hcov[:,jj,ispec,:,:,:]
+            self.xi[:,ispec,:,:,:] += self.gammacon[:,ii,jj,:,:,:] * Hcov[:,ii,ispec,:,:,:] \
+                                      * Hcov[:,jj,ispec,:,:,:]
         self.xi[:,ispec,:,:,:] -= vdH*vdH
       self.xi = np.sqrt(self.xi)
 
@@ -325,10 +340,11 @@ class phoedf(phdf.phdf):
       J = self.GetJ()
       Hcov = self.GetHcov()
 
-      self.E[:,:,:,:,:] = (4. * Gamma[:,np.newaxis,:,:,:] / 3. - 1. / 3.)*J[:,:,:,:,:]
-      print(np.einsum('abkji,abskji->askji', vcon, Hcov).shape)
+      self.E[:,:,:,:,:] = (4. * Gamma[:,np.newaxis,:,:,:]**2 / 3. - 1. / 3.)*J[:,:,:,:,:]
 
-      self.E[:,:,:,:,:] += 2. * Gamma[:,np.newaxis,:,:,:] * np.einsum('bdkji,bdskji->bskji', vcon, Hcov)
+      for ii in range(3):
+        self.E[:,:,:,:,:] += 2. * Gamma[:,np.newaxis,:,:,:] * vcon[:,ii,np.newaxis,:,:,:] * \
+                             Hcov[:,ii,:,k,j,i]
 
       # TODO(BRR) tilPi component
 
@@ -336,7 +352,7 @@ class phoedf(phdf.phdf):
 
   def GetF(self):
     if self.F is None:
-      self.F = np.zeros([self.NumBlocks, 3, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1])
+      self.F = np.zeros([self.NumBlocks, self.NumSpecies, 3, self.Nx3, self.Nx2, self.Nx1])
 
       Gamma = self.GetGamma()
       vcon = self.GetVpCon() / Gamma[:,np.newaxis,:,:,:]
@@ -344,9 +360,17 @@ class phoedf(phdf.phdf):
       Hcov = self.GetHcov()
       gammacon = self.gammacon
 
-      self.F[:,:,:,:,:,:] = 4. * Gamma[:,np.newaxis,np.newaxis,:,:,:] / 3. * vcon[:,:,np.newaxis,:,:,:] * J[:,np.newaxis,:,:,:,:]
-      self.F[:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,:,:,:] * vcon[:,:,np.newaxis,:,:,:] * np.einsum('bdkji,bdskji->bskji', vcon, Hcov)[:,np.newaxis,:,:,:,:]
-      self.F[:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,:,:,:] * np.einsum('bdekji,bdskji->beskji', gammacon, Hcov)
+      self.F[:,:,:,:,:,:] = 4. * Gamma[:,np.newaxis,np.newaxis,:,:,:]**2 / 3. * \
+                            vcon[:,:,np.newaxis,:,:,:] * J[:,np.newaxis,:,:,:,:]
+      for ii in range(3):
+        self.F[:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,:,:,:] * vcon[:,:,np.newaxis,:,:,:] * \
+                               vcon[:,ii,np.newaxis,:,:,:]*Hcov[:,ii,:,:,:,:]
+
+      for ii in range(3):
+        self.F[:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,:,:,:] * \
+                               gammacon[:,:,ii,np.newaxis,:,:,:] * Hcov[:,ii,:,:,:,:]
+
+      # TODO(BRR) tilPi component
 
     return self.F
 
@@ -360,9 +384,23 @@ class phoedf(phdf.phdf):
       Hcov = self.GetHcov()
       gammacon = self.gammacon
 
-      self.P[:,:,:,:,:,:,:] = (4./3. * Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:]**2*vcon[:,:,np.newaxis,np.newaxis,:,:,:]*vcon[:,np.newaxis,:,np.newaxis,:,:,:] + 1./3.*gammacon[:,:,:,np.newaxis,:,:,:])*J[:,np.newaxis,np.newaxis,:,:,:,:]
-      self.P[:,:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:]*vcon[:,:,np.newaxis,np.newaxis,:,:,:]*np.einsum('bdekji,bdskji->beskji', gammacon, Hcov)[:,np.newaxis,:,:,:,:,:]
-      self.P[:,:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:]*vcon[:,np.newaxis,:,np.newaxis,:,:,:]*np.einsum('bdekji,bdskji->beskji', gammacon, Hcov)[:,:,np.newaxis,:,:,:,:]
+      self.P[:,:,:,:,:,:,:] = (4. / 3. * Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:]**2 * \
+                               vcon[:,:,np.newaxis,np.newaxis,:,:,:] * \
+                               vcon[:,np.newaxis,:,np.newaxis,:,:,:] + \
+                               1. / 3. * gammacon[:,:,:,np.newaxis,:,:,:]) * \
+                              J[:,np.newaxis,np.newaxis,:,:,:,:]
+      for ii in range(3):
+        self.P[:,:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:] * \
+                                 vcon[:,:,np.newaxis,np.newaxis,:,:,:] * \
+                                 gammacon[:,:,ii,np.newaxis,:,:,:] * \
+                                 Hcov[:,np.newaxis,ii,:,:,:,:]
+      for ii in range(3):
+        self.P[:,:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:] * \
+                                 vcon[:,np.newaxis,:,np.newaxis,:,:,:] * \
+                                 gammacon[:,:,ii,np.newaxis,:,:,:] * \
+                                 Hcov[:,ii,np.newaxis,:,:,:,:]
+
+      # TODO(BRR) tilPi component
 
     return self.P
 
@@ -381,7 +419,7 @@ class phoedf(phdf.phdf):
     bsq = 0.
     for mu in range(4):
       for nu in range(4):
-        bsq +=  gcov[mu,nu] * bcon[mu] * bcon[nu]
+        bsq += gcov[mu,nu] * bcon[mu] * bcon[nu]
 
     Ptot = ug + bsq / 2.
 
@@ -418,39 +456,28 @@ class phoedf(phdf.phdf):
     F = self.GetF()
     P = self.GetP()
 
-    Rmunu[:,:,:] = E[b,np.newaxis,np.newaxis,:,k,j,i]*ncon[:,np.newaxis,np.newaxis]*ncon[np.newaxis,:,np.newaxis]
+    Rmunu[:,:,:] = E[b,np.newaxis,np.newaxis,:,k,j,i] * ncon[:,np.newaxis,np.newaxis] * \
+                   ncon[np.newaxis,:,np.newaxis]
     Rmunu[:,1:,:] += ncon[:,np.newaxis,np.newaxis] * F[b,np.newaxis,:,:,k,j,i]
     Rmunu[1:,:,:] += ncon[np.newaxis,:,np.newaxis] * F[b,:,np.newaxis,:,k,j,i]
     Rmunu[1:,1:,:] += P[b,:,:,:,k,j,i]
-
 
     return Rmunu
 
   def GetRmunu_concov(self, b, k, j, i):
     Rmunu_concon = self.GetRmunu_concon(b, k, j, i)
 
-    gcov = self.gcov
+    gcov = self.gcov[b,:,:,k,j,i]
 
-    Rmunu_concov = np.einsum('mn,lns->lms', gcov[b,:,:,k,j,i], Rmunu_concon)
+    Rmunu_concov = np.zeros([4, 4, self.NumSpecies])
+    for mu in range(4):
+      for nu in range(4):
+        for lam in range(4):
+          Rmunu_concov[mu, nu, :] += Rmunu_concon[mu, lam, :] * gcov[lam, nu, np.newaxis]
 
     return Rmunu_concov
 
-  def GetCartesianBlockBounds(self, b):
-    # Only for FMKS
-
-    a = self.Params['geometry/a']
-    xh = self.Params['geometry/xh']
-    print(xh)
-
-    derefine_poles = self.Params['geometry/derefine_poles']
-
-    if derefine_poles:
-      assert False
-
   def GetMdotEddington(self, eff = 0.1):
     Mbh = self.LengthCodeToCGS * cgs['CL']**2 / cgs['GNEWT']
-    print(Mbh)
-    print((Mbh / cgs['MSOLAR']))
     return 1.4e18 * Mbh / cgs['MSOLAR'] # Nominal eff = 0.1
-
 
