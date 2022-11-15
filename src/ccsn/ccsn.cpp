@@ -29,15 +29,19 @@
 #include <parthenon_array_generic.hpp>
 #include <utils/error_checking.hpp>
 
+using namespace parthenon::package::prelude;
+
 // Singularity
 #include <singularity-eos/eos/eos.hpp>
 
 // Phoebus
+#include "analysis/history.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "monopole_gr/monopole_gr_base.hpp"
 #include "monopole_gr/monopole_gr_interface.hpp"
 #include "monopole_gr/monopole_gr_utils.hpp"
+#include "phoebus_utils/variables.hpp"
 
 #include "ccsn.hpp"
 
