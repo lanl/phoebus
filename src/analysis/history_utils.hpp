@@ -68,6 +68,46 @@ KOKKOS_INLINE_FUNCTION Real CalcMagnetization(Pack &pack, Geometry &geom, const 
   return Bsq / rho;
 }
 
+template <typename Pack, typename Geometry>
+KOKKOS_INLINE_FUNCTION Real CalcEMFlux(Pack &pack, Geometry &geom, const int pvel_lo,
+                                       const int pvel_hi, const int pb_lo,
+                                       const int pb_hi, const int b, const int k,
+                                       const int j, const int i) {
+  Real gam[3][3];
+  geom.Metric(CellLocation::Cent, k, j, i, gam);
+  Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+  Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+
+  const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
+                       pack(b, pvel_hi, k, j, i)};
+  const Real Bp[] = {pack(b, pb_lo, k, j, i), pack(b, pb_lo + 1, k, j, i),
+                     pack(b, pb_hi, k, j, i)};
+  const Real W = phoebus::GetLorentzFactor(vcon, gam);
+
+  Real Bsq = 0.0;
+  Real Bdotv = 0.0;
+  Real vcov[3] = {0};
+  Real Bcov[3] = {0};
+  SPACELOOP2(m, n) {
+    Bsq += gam[m][n] * Bp[m] * Bp[n];
+    vcov[m] += gam[m][n] * vcon[n];
+    Bcov[m] += gam[m][n] * Bp[n];
+    Bdotv += gam[m][n] * Bp[m] * vcon[n];
+  }
+
+  const Real b0 = Bdotv * W / lapse;
+  const Real ucon0 = W / lapse;
+  const Real ucov1 = vcov[1];
+  const Real bcov1 = (Bcov[1] + lapse * b0 * ucov1) / W;
+
+  const Real bsq = phoebus::GetMagneticFieldSquared(gam, vcon, Bp, W);
+
+  // time-radius part of EM stress energy tensor
+  const Real T_EM_01 = bsq * ucon0 * ucov1 - b0 * bcov1;
+
+  return T_EM_01 * lapse * gdet;
+}
+
 } // namespace History
 
 #endif // ANALYSIS_HISTORY_UTILS_HPP_
