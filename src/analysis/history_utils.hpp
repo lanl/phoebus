@@ -51,6 +51,23 @@ KOKKOS_INLINE_FUNCTION Real CalcMassFlux(Pack &pack, Geometry &geom, const int p
   return lapse * gdet * pack(b, prho, k, j, i) * ucon;
 }
 
+template <typename Pack, typename Geometry>
+KOKKOS_INLINE_FUNCTION Real CalcMagnetization(Pack &pack, Geometry &geom, const int pb_lo,
+                                              const int pb_hi, const int prho,
+                                              const int b, const int k, const int j,
+                                              const int i) {
+  Real gcov[4][4];
+  geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+  const Real Bp[] = {pack(b, pb_lo, k, j, i), pack(b, pb_lo + 1, k, j, i),
+                     pack(b, pb_hi, k, j, i)};
+  const Real rho = pack(b, prho, k, j, i);
+
+  Real Bsq = 0;
+  SPACELOOP2(m, n) { Bsq += gcov[m][n] * Bp[m] * Bp[n]; }
+
+  return Bsq / rho;
+}
+
 } // namespace History
 
 #endif // ANALYSIS_HISTORY_UTILS_HPP_
