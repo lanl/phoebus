@@ -19,6 +19,9 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
+// Spiner
+#include <spiner/interpolation.hpp>
+
 using namespace parthenon::package::prelude;
 
 namespace CCSN {
@@ -41,6 +44,8 @@ constexpr int J_ADM = 8;
 constexpr int S_ADM = 9;
 constexpr int Srr_ADM = 10;
 
+using Radius = Spiner::RegularGrid1D;
+
 KOKKOS_INLINE_FUNCTION
 std::pair<int, int> Get1DProfileNumZones(const std::string model_filename) {
 
@@ -57,6 +62,8 @@ std::pair<int, int> Get1DProfileNumZones(const std::string model_filename) {
   int nz = 0;
   int nc = 0;
   std::string line;
+  std::string comment1("#");
+  std::string comment2("//");
 
   // get number of zones from 1d file
   while (!inputfile.eof()) {
@@ -70,8 +77,8 @@ std::pair<int, int> Get1DProfileNumZones(const std::string model_filename) {
       continue;
     }
 
-    // skip c++ comments
-    if (line.find("#") == first_nonws) {
+    // skip comments
+    if (line.find(comment1) == first_nonws || line.find(comment2) == first_nonws) {
       nc++;
       continue;
     }
@@ -81,7 +88,7 @@ std::pair<int, int> Get1DProfileNumZones(const std::string model_filename) {
 
   inputfile.close();
 
-  return std::make_pair(nz, nc);
+  return std::make_pair(nz+1, nc);
 }
 
 template <typename ParArray2D>
@@ -96,7 +103,7 @@ KOKKOS_INLINE_FUNCTION void Get1DProfileData(const std::string model_filename,
   std::string line;
 
   // read file into model_1d
-  for (int i = 0; i < num_zones + num_comments; i++) // number of zones
+  for (int i = num_comments; i < num_zones + num_comments; i++) // number of zones
   {
     for (int j = 0; j < num_vars; j++) //  number of vars
     {

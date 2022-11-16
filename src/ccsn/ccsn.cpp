@@ -161,14 +161,6 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
 
   auto state_raw = params.Get<CCSN::State_t>("ccsn_state_raw_d");
 
-  Real input_radius[num_zones];
-
-  // make array for MESA radius
-  for (int i = 0; i < num_zones; ++i) {
-    Real r = ccsn_state_raw_d(CCSN::R, i);
-    input_radius[i] = r;
-  }
-
   // set interp radial grid to monopole grid  - THIS should be a one liner??
   for (int i = 0; i < npoints; i++) {
     Real r = radius.x(i);
@@ -176,19 +168,26 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
     ccsn_state_interp_h(CCSN::R, i) = r;
   }
 
+  Real rin = ccsn_state_raw_d(CCSN::R, 0);
+  Real rout = ccsn_state_raw_d(CCSN::R, num_zones-1);
+
+  printf("rin  = %.14e (cm)\n",rin);
+  printf("rout  = %.14e (cm)\n",rout);
+
+  Radius raw_radius(rin, rout, num_zones);
+  //params.Add("raw_radius", raw_radius);
+
+  //auto raw_radius = ccsnpkg->Param<CCSN::Radius>("raw_radius");
+
   //// fill interpolated data onto device array
   for (int i = 0; i < npoints; i++) {
 
     for (int j = 1; j < num_vars; j++) {
 
       // r(i) from ccsn raw data -- assumes uniform spacing for input file?
-      auto xa = radius.x(i); // ccsn_state_raw_d.Slice(CCSN::R, i);
+      auto xa = radius.x(i); //ccsn_state_raw_d.Slice(CCSN::R, i);
 
-      // ya(i) from ccsn raw data
-      auto ya = ccsn_state_raw_d.Slice(j, i);
-
-      Real yint = MonopoleGR::Interpolate(xa, state_raw, radius,
-                                          j); //  call to some interp routine
+      Real yint = MonopoleGR::Interpolate(xa, state_raw, radius,j); //  call to some interp routine
 
       ccsn_state_interp_d(j, i) = yint;
     }
