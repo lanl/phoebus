@@ -17,7 +17,7 @@ import numpy as np
 from subprocess import call
 import shutil
 import glob
-sys.path.append("../../external/parthenon/scripts/python/packages/parthenon_tools")
+sys.path.insert(0,"../../external/parthenon/scripts/python/packages/parthenon_tools")
 from parthenon_tools import phdf
 import __main__
 
