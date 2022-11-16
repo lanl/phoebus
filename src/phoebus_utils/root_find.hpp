@@ -29,9 +29,10 @@ struct RootFind {
     if (ya * yb > 0.0) {
       if (status != nullptr) {
         *status = RootFindStatus::failure;
+      } else {
+        printf("Root not bracketed in find_root. a, b, ya, yb = %g %g %g %g\n", a, b, ya,
+               yb);
       }
-      printf("Root not bracketed in find_root. a, b, ya, yb = %g %g %g %g\n", a, b, ya,
-             yb);
       return false;
     }
     return true;
