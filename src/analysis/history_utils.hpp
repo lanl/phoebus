@@ -26,6 +26,7 @@
 #include <utils/error_checking.hpp>
 
 using namespace parthenon::package::prelude;
+using namespace Geometry;
 
 namespace History {
 
@@ -63,7 +64,10 @@ KOKKOS_INLINE_FUNCTION Real CalcMagnetization(Pack &pack, Geometry &geom, const 
   const Real rho = pack(b, prho, k, j, i);
 
   Real Bsq = 0;
-  SPACELOOP2(m, n) { Bsq += gcov[m][n] * Bp[m] * Bp[n]; }
+  for (int m = 0; m < 3; m++)
+    for (int n = 0; n < 3; n++) {
+      Bsq += gcov[m][n] * Bp[m] * Bp[n];
+    }
 
   return Bsq / rho;
 }
@@ -88,12 +92,13 @@ KOKKOS_INLINE_FUNCTION Real CalcEMFlux(Pack &pack, Geometry &geom, const int pve
   Real Bdotv = 0.0;
   Real vcov[3] = {0};
   Real Bcov[3] = {0};
-  SPACELOOP2(m, n) {
-    Bsq += gam[m][n] * Bp[m] * Bp[n];
-    vcov[m] += gam[m][n] * vcon[n];
-    Bcov[m] += gam[m][n] * Bp[n];
-    Bdotv += gam[m][n] * Bp[m] * vcon[n];
-  }
+  for (int m = 0; m < 3; m++)
+    for (int n = 0; n < 3; n++) {
+      Bsq += gam[m][n] * Bp[m] * Bp[n];
+      vcov[m] += gam[m][n] * vcon[n];
+      Bcov[m] += gam[m][n] * Bp[n];
+      Bdotv += gam[m][n] * Bp[m] * vcon[n];
+    }
 
   const Real b0 = Bdotv * W / lapse;
   const Real ucon0 = W / lapse;
