@@ -47,8 +47,6 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         const auto &coords = pack.GetCoords(b);
         if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1)) {
-          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-
           const Real dx1 = coords.Dx(X1DIR, k, j, i);
           const Real dx2 = coords.Dx(X2DIR, k, j, i);
           const Real dx3 = coords.Dx(X3DIR, k, j, i);
@@ -61,7 +59,7 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
                        (xh - coords.x1v(i)) * m) *
                       dx2 * dx3;
 
-          lresult += -flux;
+          lresult += flux;
         } else {
           lresult += 0.0;
         }
