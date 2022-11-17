@@ -121,11 +121,18 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   const std::string model_filename = params.Get<std::string>("model_filename");
   auto npoints = params.Get<int>("npoints");
   auto radius = monopolepkg->Param<MonopoleGR::Radius>("radius");
-  const Real dr = radius.dx();
 
   auto num_zones = params.Get<int>("num_zones");
   auto num_comments = params.Get<int>("num_comments");
   auto num_vars = params.Get<int>("num_vars");
+
+  if (num_zones > 0 && npoints != num_zones) {
+    std::stringstream msg;
+    msg << "When using a stellar input profile Monopole GR npoints must equal the number "
+           "of zones in input file:"
+        << num_zones << std::endl;
+    PARTHENON_THROW(msg);
+  }
 
   auto Pmin = params.Get<Real>("pmin");
 
@@ -175,9 +182,7 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   printf("rout  = %.14e (cm)\n", rout);
 
   Radius raw_radius(rin, rout, num_zones);
-  // params.Add("raw_radius", raw_radius);
-
-  // auto raw_radius = ccsnpkg->Param<CCSN::Radius>("raw_radius");
+  const Real dr = raw_radius.dx();
 
   //// fill interpolated data onto device array
   for (int i = 0; i < npoints; i++) {

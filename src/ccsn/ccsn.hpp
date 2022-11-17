@@ -101,14 +101,21 @@ KOKKOS_INLINE_FUNCTION void Get1DProfileData(const std::string model_filename,
 
   Real val = 0;
   std::string line;
+  int line_num = 0;
+
+  // skip comment lines
+  while (line_num < num_comments) {
+    getline(inputfile, line);
+    line_num++;
+  }
 
   // read file into model_1d
-  for (int i = num_comments; i < num_zones + num_comments; i++) // number of zones
+  for (int i = 0; i < num_zones; i++) // number of zones
   {
     for (int j = 0; j < num_vars; j++) //  number of vars
     {
       inputfile >> val;
-      ccsn_state_raw_h(j, i - num_comments) = val;
+      ccsn_state_raw_h(j, i) = val;
     }
   }
 
