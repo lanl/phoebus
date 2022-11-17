@@ -74,10 +74,11 @@ KOKKOS_INLINE_FUNCTION Real CalcMagnetization(Pack &pack, Geometry &geom, const 
 }
 
 template <typename Pack, typename Geometry>
-KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom, const int pvel_lo,
-                                         const int pvel_hi, const int pb_lo,
-                                         const int pb_hi, const int b, const int k,
-                                         const int j, const int i) {
+KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom,
+                                             const int pvel_lo, const int pvel_hi,
+                                             const int pb_lo, const int pb_hi,
+                                             const int b, const int k, const int j,
+                                             const int i) {
   Real gam[3][3];
   geom.Metric(CellLocation::Cent, k, j, i, gam);
   Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -111,14 +112,15 @@ KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom, const i
   // energy flux of EM stress energy tensor
   const Real T_EM_01 = bsq * ucon0 * ucov1 - b0 * bcov1;
 
-  return + T_EM_01 * lapse * gdet;
+  return +T_EM_01 * lapse * gdet;
 } // energy flux
 
 template <typename Pack, typename Geometry>
-KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom, const int pvel_lo,
-                                         const int pvel_hi, const int pb_lo,
-                                         const int pb_hi, const int b, const int k,
-                                         const int j, const int i) {
+KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
+                                               const int pvel_lo, const int pvel_hi,
+                                               const int pb_lo, const int pb_hi,
+                                               const int b, const int k, const int j,
+                                               const int i) {
   Real gam[3][3];
   geom.Metric(CellLocation::Cent, k, j, i, gam);
   Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -155,8 +157,8 @@ KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom, const
   // momentum flux part of EM stress energy tensor
   const Real T_EM_11 = bsq * ucon1 * ucov1 - bcon1 * bcov1 + 0.5 * bsq;
 
-  return - T_EM_11 * lapse * gdet;
-} //momentum flux
+  return -T_EM_11 * lapse * gdet;
+} // momentum flux
 
 } // namespace History
 

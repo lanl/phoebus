@@ -95,8 +95,8 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
 
   Real result = 0.0;
   parthenon::par_reduce(
-      parthenon::LoopPatternMDRange(), "Phoebus History for Jet Energy Flux", DevExecSpace(), 0,
-      pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      parthenon::LoopPatternMDRange(), "Phoebus History for Jet Energy Flux",
+      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         const auto &coords = pack.GetCoords(b);
         const Real sigma = CalcMagnetization(pack, geom, pb_lo, pb_hi, prho, b, k, j, i);
@@ -106,10 +106,11 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
           const Real dx3 = coords.Dx(X3DIR, k, j, i);
 
           // interp to make sure we're getting the horizon correct
-          auto m =
-              (CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i + 1) -
-               CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i - 1)) /
-              (2.0 * dx1);
+          auto m = (CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j,
+                                     i + 1) -
+                    CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j,
+                                     i - 1)) /
+                   (2.0 * dx1);
           auto flux =
               (CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i) +
                (xh - coords.x1v(i)) * m) *
@@ -150,8 +151,8 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
 
   Real result = 0.0;
   parthenon::par_reduce(
-      parthenon::LoopPatternMDRange(), "Phoebus History for Jet Momentum Flux", DevExecSpace(), 0,
-      pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      parthenon::LoopPatternMDRange(), "Phoebus History for Jet Momentum Flux",
+      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         const auto &coords = pack.GetCoords(b);
         const Real sigma = CalcMagnetization(pack, geom, pb_lo, pb_hi, prho, b, k, j, i);
@@ -161,14 +162,15 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
           const Real dx3 = coords.Dx(X3DIR, k, j, i);
 
           // interp to make sure we're getting the horizon correct
-          auto m =
-              (CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i + 1) -
-               CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i - 1)) /
-              (2.0 * dx1);
-          auto flux =
-              (CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i) +
-               (xh - coords.x1v(i)) * m) *
-              dx2 * dx3;
+          auto m = (CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k,
+                                       j, i + 1) -
+                    CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k,
+                                       j, i - 1)) /
+                   (2.0 * dx1);
+          auto flux = (CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b,
+                                          k, j, i) +
+                       (xh - coords.x1v(i)) * m) *
+                      dx2 * dx3;
 
           lresult += flux;
         } else {

@@ -56,9 +56,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const bool do_hydro = pin->GetBoolean("physics", "hydro");
   if (params.hasKey("xh") && do_hydro) {
     auto HstSum = parthenon::UserHistoryOperation::sum;
-    using History::ReduceMassAccretionRate;
     using History::ReduceJetEnergyFlux;
     using History::ReduceJetMomentumFlux;
+    using History::ReduceMassAccretionRate;
     using parthenon::HistoryOutputVar;
     parthenon::HstVar_list hst_vars = {};
 
@@ -75,8 +75,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     };
 
     hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceAccretionRate, "mdot"));
-    hst_vars.emplace_back(HistoryOutputVar(HstSum, ComputeJetEnergyFlux, "jet_energy_flux"));
-    hst_vars.emplace_back(HistoryOutputVar(HstSum, ComputeJetMomentumFlux, "jet_momentum_flux"));
+    hst_vars.emplace_back(
+        HistoryOutputVar(HstSum, ComputeJetEnergyFlux, "jet_energy_flux"));
+    hst_vars.emplace_back(
+        HistoryOutputVar(HstSum, ComputeJetMomentumFlux, "jet_momentum_flux"));
     params.Add(parthenon::hist_param_key, hst_vars);
   }
 
