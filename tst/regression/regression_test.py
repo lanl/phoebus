@@ -228,9 +228,9 @@ def gold_comparison(variables, input_file, modified_inputs={},
   for variable_name in variables:
     variable = dump.Get(variable_name)
     if len(variable.shape) > 1:
-      dim = variable.shape[1]
+      dim = variable.shape[0]
       for d in range(dim):
-        variables_data = np.concatenate((variables_data, variable[:,d]))
+        variables_data = np.concatenate((variables_data, variable[d,:]))
     else:
       variables_data = np.concatenate((variables_data, variable))
 
