@@ -38,6 +38,7 @@ using namespace parthenon::package::prelude;
 namespace History {
 
 Real ReduceMassAccretionRate(MeshData<Real> *md);
+Real ReduceJetPower(MeshData<Real> *md);
 
 template <typename Reducer_t>
 Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {

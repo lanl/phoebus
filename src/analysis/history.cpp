@@ -70,4 +70,59 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
   return result;
 } // mass accretion
 
+Real ReduceJetPower(MeshData<Real> *md) {
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+  auto pmb = md->GetParentPointer();
+  auto &pars = pmb->packages.Get("geometry")->AllParams();
+  const Real xh = pars.Get<Real>("xh");
+
+  namespace p = fluid_prim;
+  const std::vector<std::string> vars({p::density, p::bfield, p::velocity});
+
+  PackIndexMap imap;
+  auto pack = md->PackVariables(vars, imap);
+
+  const int prho = imap[p::density].first;
+  const int pvel_lo = imap[p::velocity].first;
+  const int pvel_hi = imap[p::velocity].second;
+  const int pb_lo = imap[p::bfield].first;
+  const int pb_hi = imap[p::bfield].second;
+
+  auto geom = Geometry::GetCoordinateSystem(md);
+
+  Real result = 0.0;
+  parthenon::par_reduce(
+      parthenon::LoopPatternMDRange(), "Phoebus History for Jet Power", DevExecSpace(), 0,
+      pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
+        const auto &coords = pack.GetCoords(b);
+        const auto sigma = CalcMagnetization(pack, geom, pb_lo, pb_hi, prho, b, k, j, i);
+        if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1) && sigma > 1.0) {
+          const Real dx1 = coords.Dx(X1DIR, k, j, i);
+          const Real dx2 = coords.Dx(X2DIR, k, j, i);
+          const Real dx3 = coords.Dx(X3DIR, k, j, i);
+
+          // interp to make sure we're getting the horizon correct
+          auto m =
+              (CalcEMFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i + 1) -
+               CalcEMFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i - 1)) /
+              (2.0 * dx1);
+          auto flux =
+              (CalcEMFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i) +
+               (xh - coords.x1v(i)) * m) *
+              dx2 * dx3;
+
+          lresult += flux;
+        } else {
+          lresult += 0.0;
+        }
+      },
+      result);
+  return result;
+
+} // JetPower
+
 } // namespace History
