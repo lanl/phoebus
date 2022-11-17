@@ -169,15 +169,15 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   }
 
   Real rin = ccsn_state_raw_d(CCSN::R, 0);
-  Real rout = ccsn_state_raw_d(CCSN::R, num_zones-1);
+  Real rout = ccsn_state_raw_d(CCSN::R, num_zones - 1);
 
-  printf("rin  = %.14e (cm)\n",rin);
-  printf("rout  = %.14e (cm)\n",rout);
+  printf("rin  = %.14e (cm)\n", rin);
+  printf("rout  = %.14e (cm)\n", rout);
 
   Radius raw_radius(rin, rout, num_zones);
-  //params.Add("raw_radius", raw_radius);
+  // params.Add("raw_radius", raw_radius);
 
-  //auto raw_radius = ccsnpkg->Param<CCSN::Radius>("raw_radius");
+  // auto raw_radius = ccsnpkg->Param<CCSN::Radius>("raw_radius");
 
   //// fill interpolated data onto device array
   for (int i = 0; i < npoints; i++) {
@@ -185,9 +185,10 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
     for (int j = 1; j < num_vars; j++) {
 
       // r(i) from ccsn raw data -- assumes uniform spacing for input file?
-      auto xa = radius.x(i); //ccsn_state_raw_d.Slice(CCSN::R, i);
+      auto xa = radius.x(i); // ccsn_state_raw_d.Slice(CCSN::R, i);
 
-      Real yint = MonopoleGR::Interpolate(xa, state_raw, radius,j); //  call to some interp routine
+      Real yint = MonopoleGR::Interpolate(xa, state_raw, radius,
+                                          j); //  call to some interp routine
 
       ccsn_state_interp_d(j, i) = yint;
     }

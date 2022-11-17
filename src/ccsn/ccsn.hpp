@@ -88,7 +88,7 @@ std::pair<int, int> Get1DProfileNumZones(const std::string model_filename) {
 
   inputfile.close();
 
-  return std::make_pair(nz+1, nc);
+  return std::make_pair(nz + 1, nc);
 }
 
 template <typename ParArray2D>
