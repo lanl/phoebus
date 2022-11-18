@@ -27,7 +27,6 @@ using namespace parthenon::package::prelude;
 namespace CCSN {
 constexpr int NCCSN = 11;
 
-// NVAR:NUM_ZONES
 using parthenon::Real;
 using State_t = parthenon::ParArray2D<Real>;
 using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;

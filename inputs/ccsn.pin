@@ -62,9 +62,9 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 512         # Number of zones in X1-direction
+nx1         = 1024         # Number of zones in X1-direction
 x1min       = 0           # minimum value of X1
-x1max       = 4e8         # maximum value of X1
+x1max       = 2e8         # maximum value of X1
 ix1_bc      = user        # Inner-X1 boundary condition flag
 ox1_bc      = user        # Outer-X1 boundary condition flag
 
@@ -131,8 +131,8 @@ gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
-npoints = 4096
-rout = 4e8
+npoints = 2000
+rout = 2e8
 # Disables time derivatives. Runs only at initialization
 force_static = false
 # Runs the first n subcycles. Then freezes. Source terms are not disabled.

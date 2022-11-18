@@ -41,6 +41,7 @@ using namespace parthenon::package::prelude;
 #include "monopole_gr/monopole_gr_base.hpp"
 #include "monopole_gr/monopole_gr_interface.hpp"
 #include "monopole_gr/monopole_gr_utils.hpp"
+#include "phoebus_utils/unit_conversions.hpp"
 #include "phoebus_utils/variables.hpp"
 
 #include "ccsn.hpp"
@@ -100,6 +101,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   printf("1D model read in with %d number of zones. \n", num_zones);
   printf("1D model read in with %d number of comments. \n", num_comments);
+
+  auto unit_conv = phoebus::UnitConversions(pin);
+  params.Add("unit_conv", unit_conv);
 
   return ccsn;
 }
@@ -218,19 +222,47 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   // save interpolated output for analysis
   DumpToTxtInterpModel1D(model_filename, ccsn_state_interp_h, npoints);
 
+  // create 1d array for converted interp data
+  CCSN::State_t ccsn_state_conv_interp_d("CCSN state interp converted", CCSN::NCCSN,
+                                         npoints);
+
+  CCSN::State_host_t ccsn_state_conv_interp_h =
+      Kokkos::create_mirror_view(ccsn_state_conv_interp_d);
+
+  params.Add("ccsn_state_conv_interp_d", ccsn_state_conv_interp_d);
+  params.Add("ccsn_state_conv_interp_h", ccsn_state_conv_interp_h);
+
+  // Convert1DProfileData(npoints, ccsn_state_interp_h, ccsn_state_conv_interp_h);
+
+  auto unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
+
+  for (int i = 0; i < npoints; ++i) {
+    ccsn_state_conv_interp_h(CCSN::R, i) =
+        ccsn_state_interp_h(CCSN::R, i) * unit_conv.GetLengthCGSToCode();
+    ccsn_state_conv_interp_h(CCSN::RHO, i) =
+        ccsn_state_interp_h(CCSN::RHO, i) * unit_conv.GetMassDensityCGSToCode();
+    ccsn_state_conv_interp_h(CCSN::TEMP, i) =
+        ccsn_state_interp_h(CCSN::TEMP, i) * unit_conv.GetTemperatureCGSToCode();
+  }
+
+  printf("Converted central density = %.14e (code units)\n",
+         ccsn_state_conv_interp_h(CCSN::RHO, 0));
+  printf("Converted central temperature = %.14e (code units)\n",
+         ccsn_state_conv_interp_h(CCSN::TEMP, 0));
+
   // second loop, to set density, specific energy, and matter state
   for (int i = 0; i < npoints; ++i) {
 
-    Real pres = ccsn_state_interp_h(CCSN::PRES, i); // pressure
-    Real rho = ccsn_state_interp_h(CCSN::RHO, i);   // mass density
-    Real eps = ccsn_state_interp_h(
+    Real pres = ccsn_state_conv_interp_h(CCSN::PRES, i); // pressure
+    Real rho = ccsn_state_conv_interp_h(CCSN::RHO, i);   // mass density
+    Real eps = ccsn_state_conv_interp_h(
         CCSN::EPS, i); // specific internal energy - need to multiply by mass?
 
     // adm quantities
-    Real rho_adm = ccsn_state_interp_h(CCSN::RHO_ADM, i);
-    Real J_adm = ccsn_state_interp_h(CCSN::J_ADM, i);
-    Real trcS = ccsn_state_interp_h(CCSN::S_ADM, i);
-    Real Srr_adm = ccsn_state_interp_h(CCSN::Srr_ADM, i);
+    Real rho_adm = ccsn_state_conv_interp_h(CCSN::RHO_ADM, i);
+    Real J_adm = ccsn_state_conv_interp_h(CCSN::J_ADM, i);
+    Real trcS = ccsn_state_conv_interp_h(CCSN::S_ADM, i);
+    Real Srr_adm = ccsn_state_conv_interp_h(CCSN::Srr_ADM, i);
 
     // floor based on pressure
     if (pres <= 1.1 * Pmin) {
@@ -249,7 +281,7 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   auto matter_d = monopolepkg->Param<MonopoleGR::Matter_t>("matter");
 
   // copy ccsn state to device
-  auto state_d = params.Get<CCSN::State_t>("ccsn_state_interp_d");
+  auto state_d = params.Get<CCSN::State_t>("ccsn_state_conv_interp_d");
 
   // copy filled arrays to device
   Kokkos::deep_copy(matter_d, matter_h);
