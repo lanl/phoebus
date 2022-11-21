@@ -147,6 +147,11 @@ dtfac = 0.9
 warn_on_dt = false
 dtwarn_eps = 1e-5
 
+<units>
+scale_free = false
+fluid_mass_g = 2e33
+geom_length_cm = 5e7
+
 <ccsn>
 enabled = true
 # pressure below which we terminate the TOV solver and transition to atmosphere
