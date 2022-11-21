@@ -130,6 +130,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
   params.Add("mhd", mhd);
 
+  Real sigma_cutoff = pin->GetOrAddReal("fluid", "sigma_cutoff", 1.0);
+  params.Add("sigma_cutoff", sigma_cutoff);
+
   Metadata m;
   std::vector<int> three_vec(1, 3);
 
