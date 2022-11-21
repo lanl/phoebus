@@ -97,7 +97,8 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
       DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         const auto &coords = pack.GetCoords(b);
-        const Real sigma = CalcMagnetization(pack, geom, pb_lo, pb_hi, prho, b, k, j, i);
+        const Real sigma = CalcMagnetization(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi,
+                                             prho, b, k, j, i);
         if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1) && sigma > 1.0) {
           const Real dx1 = coords.Dx(X1DIR, k, j, i);
           const Real dx2 = coords.Dx(X2DIR, k, j, i);
@@ -153,7 +154,8 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
       DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         const auto &coords = pack.GetCoords(b);
-        const Real sigma = CalcMagnetization(pack, geom, pb_lo, pb_hi, prho, b, k, j, i);
+        const Real sigma = CalcMagnetization(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi,
+                                             prho, b, k, j, i);
         if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1) && sigma > 1.0) {
           const Real dx1 = coords.Dx(X1DIR, k, j, i);
           const Real dx2 = coords.Dx(X2DIR, k, j, i);

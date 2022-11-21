@@ -54,23 +54,23 @@ KOKKOS_INLINE_FUNCTION Real CalcMassFlux(Pack &pack, Geometry &geom, const int p
 }
 
 template <typename Pack, typename Geometry>
-KOKKOS_INLINE_FUNCTION Real CalcMagnetization(Pack &pack, Geometry &geom, const int pb_lo,
-                                              const int pb_hi, const int prho,
-                                              const int b, const int k, const int j,
-                                              const int i) {
+KOKKOS_INLINE_FUNCTION Real CalcMagnetization(Pack &pack, Geometry &geom,
+                                              const int pvel_lo, const int pvel_hi,
+                                              const int pb_lo, const int pb_hi,
+                                              const int prho, const int b, const int k,
+                                              const int j, const int i) {
   Real gam[3][3];
   geom.Metric(CellLocation::Cent, k, j, i, gam);
   const Real Bp[] = {pack(b, pb_lo, k, j, i), pack(b, pb_lo + 1, k, j, i),
                      pack(b, pb_hi, k, j, i)};
+  const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
+                       pack(b, pvel_hi, k, j, i)};
   const Real rho = pack(b, prho, k, j, i);
+  const Real W = phoebus::GetLorentzFactor(vcon, gam);
 
-  Real Bsq = 0;
-  for (int m = 0; m < 3; m++)
-    for (int n = 0; n < 3; n++) {
-      Bsq += gam[m][n] * Bp[m] * Bp[n];
-    }
+  const Real bsq = phoebus::GetMagneticFieldSquared(gam, vcon, Bp, W);
 
-  return Bsq / rho;
+  return bsq / rho;
 }
 
 template <typename Pack, typename Geometry>
