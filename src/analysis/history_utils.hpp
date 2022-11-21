@@ -83,6 +83,8 @@ KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom,
   geom.Metric(CellLocation::Cent, k, j, i, gam);
   Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
   Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+  Real shift[3];
+  geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
 
   const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
                        pack(b, pvel_hi, k, j, i)};
@@ -103,16 +105,16 @@ KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom,
     }
 
   const Real b0 = Bdotv * W / lapse;
-  const Real ucon0 = W / lapse;
-  const Real ucov1 = vcov[0];
-  const Real bcov1 = robust::ratio((Bcov[0] + lapse * b0 * ucov1), W);
+  const Real ucov0 = -W * lapse;
+  const Real ucon1 = vcon[0] - shift[0] * W / lapse;
+  const Real bcon1 = robust::ratio((Bp[0] + lapse * b0 * ucon1), W);
 
   const Real bsq = phoebus::GetMagneticFieldSquared(gam, vcon, Bp, W);
 
-  // energy flux of EM stress energy tensor
-  const Real T_EM_01 = bsq * ucon0 * ucov1 - b0 * bcov1;
+  // energy flux of EM stress energy tensor T_{EM}^1_0
+  const Real T_EM_10 = bsq * ucon1 * ucov0 - bcon1 * b0;
 
-  return +T_EM_01 * lapse * gdet;
+  return +T_EM_10 * lapse * gdet;
 } // energy flux
 
 template <typename Pack, typename Geometry>
