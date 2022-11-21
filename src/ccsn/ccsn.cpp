@@ -130,6 +130,8 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
   auto num_comments = params.Get<int>("num_comments");
   auto num_vars = params.Get<int>("num_vars");
 
+  const Real pi = acos(-1);
+
   if (num_zones > 0 && npoints != num_zones) {
     std::stringstream msg;
     msg << "When using a stellar input profile Monopole GR npoints must equal the number "
@@ -243,6 +245,35 @@ TaskStatus InitializeCCSN(StateDescriptor *ccsnpkg, StateDescriptor *monopolepkg
         ccsn_state_interp_h(CCSN::RHO, i) * unit_conv.GetMassDensityCGSToCode();
     ccsn_state_conv_interp_h(CCSN::TEMP, i) =
         ccsn_state_interp_h(CCSN::TEMP, i) * unit_conv.GetTemperatureCGSToCode();
+    ccsn_state_conv_interp_h(CCSN::YE, i) = ccsn_state_interp_h(CCSN::YE, i);
+
+    // convert from specific eint then to code units
+    Real mass = ccsn_state_interp_h(CCSN::RHO, i) * (4. / 3.) *
+                (pi)*std::pow(ccsn_state_interp_h(CCSN::R, i), 3.);
+
+    ccsn_state_conv_interp_h(CCSN::EPS, i) =
+        ccsn_state_interp_h(CCSN::EPS, i) * mass * unit_conv.GetEnergyCGSToCode();
+
+    ccsn_state_conv_interp_h(CCSN::VEL_RAD, i) =
+        ccsn_state_interp_h(CCSN::VEL_RAD, i) *
+        (unit_conv.GetLengthCGSToCode() / unit_conv.GetTimeCGSToCode());
+    ccsn_state_conv_interp_h(CCSN::PRES, i) =
+        ccsn_state_interp_h(CCSN::PRES, i) *
+        (unit_conv.GetEnergyCGSToCode() * unit_conv.GetNumberDensityCGSToCode());
+    ccsn_state_conv_interp_h(CCSN::RHO_ADM, i) =
+        ccsn_state_interp_h(CCSN::RHO_ADM, i) * unit_conv.GetMassDensityCGSToCode();
+
+    ccsn_state_conv_interp_h(CCSN::J_ADM, i) =
+        ccsn_state_interp_h(CCSN::J_ADM, i) *
+        ((unit_conv.GetMassDensityCGSToCode()) *
+         (unit_conv.GetLengthCGSToCode() / unit_conv.GetTimeCGSToCode()));
+
+    ccsn_state_conv_interp_h(CCSN::S_ADM, i) =
+        ccsn_state_interp_h(CCSN::S_ADM, i) *
+        (unit_conv.GetEnergyCGSToCode() * unit_conv.GetNumberDensityCGSToCode());
+    ccsn_state_conv_interp_h(CCSN::Srr_ADM, i) =
+        ccsn_state_interp_h(CCSN::Srr_ADM, i) *
+        (unit_conv.GetEnergyCGSToCode() * unit_conv.GetNumberDensityCGSToCode());
   }
 
   printf("Converted central density = %.14e (code units)\n",
