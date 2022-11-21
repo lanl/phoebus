@@ -91,6 +91,8 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
+  const Real sigma_cutoff = pmb->packages.Get("fluid")->Param<Real>("sigma_cutoff");
+
   Real result = 0.0;
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Phoebus History for Jet Energy Flux",
@@ -99,7 +101,7 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
         const auto &coords = pack.GetCoords(b);
         const Real sigma = CalcMagnetization(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi,
                                              prho, b, k, j, i);
-        if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1) && sigma > 1.0) {
+        if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1) && sigma > sigma_cutoff) {
           const Real dx1 = coords.Dx(X1DIR, k, j, i);
           const Real dx2 = coords.Dx(X2DIR, k, j, i);
           const Real dx3 = coords.Dx(X3DIR, k, j, i);
@@ -148,6 +150,9 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
+  const Real sigma_cutoff = pmb->packages.Get("fluid")->Param<Real>("sigma_cutoff");
+  std::printf("\n\n\n%f\n\n\n", sigma_cutoff);
+
   Real result = 0.0;
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Phoebus History for Jet Momentum Flux",
@@ -156,7 +161,7 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
         const auto &coords = pack.GetCoords(b);
         const Real sigma = CalcMagnetization(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi,
                                              prho, b, k, j, i);
-        if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1) && sigma > 1.0) {
+        if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1) && sigma > sigma_cutoff) {
           const Real dx1 = coords.Dx(X1DIR, k, j, i);
           const Real dx2 = coords.Dx(X2DIR, k, j, i);
           const Real dx3 = coords.Dx(X3DIR, k, j, i);
