@@ -60,8 +60,9 @@ int main(int argc, char *argv[]) {
   pman.ParthenonInitPackagesAndMesh();
 
   // call post-initialization
-  phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get(),
-                                      pman.IsRestart());
+  if (pman.IsRestart()) {
+    phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get());
+  }
 
   // Initialize the driver
   phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(), pman.pmesh.get(),
