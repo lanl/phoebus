@@ -151,7 +151,6 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
   auto geom = Geometry::GetCoordinateSystem(md);
 
   const Real sigma_cutoff = pmb->packages.Get("fluid")->Param<Real>("sigma_cutoff");
-  std::printf("\n\n\n%f\n\n\n", sigma_cutoff);
 
   Real result = 0.0;
   parthenon::par_reduce(
