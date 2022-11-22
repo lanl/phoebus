@@ -92,15 +92,9 @@ KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom,
                      pack(b, pb_hi, k, j, i)};
   const Real W = phoebus::GetLorentzFactor(vcon, gam);
 
-  Real Bsq = 0.0;
   Real Bdotv = 0.0;
-  Real vcov[3] = {0};
-  Real Bcov[3] = {0};
   for (int m = 0; m < 3; m++)
     for (int n = 0; n < 3; n++) {
-      Bsq += gam[m][n] * Bp[m] * Bp[n];
-      vcov[m] += gam[m][n] * vcon[n];
-      Bcov[m] += gam[m][n] * Bp[n];
       Bdotv += gam[m][n] * Bp[m] * robust::ratio(vcon[n], W);
     }
 
@@ -136,13 +130,11 @@ KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
                      pack(b, pb_hi, k, j, i)};
   const Real W = phoebus::GetLorentzFactor(vcon, gam);
 
-  Real Bsq = 0.0;
   Real Bdotv = 0.0;
   Real vcov[3] = {0};
   Real Bcov[3] = {0};
   for (int m = 0; m < 3; m++)
     for (int n = 0; n < 3; n++) {
-      Bsq += gam[m][n] * Bp[m] * Bp[n];
       vcov[m] += gam[m][n] * vcon[n];
       Bcov[m] += gam[m][n] * Bp[n];
       Bdotv += gam[m][n] * Bp[m] * robust::ratio(vcon[n], W);
