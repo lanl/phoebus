@@ -300,7 +300,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                 root_find::RootFind root_find;
                 GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i),
                                               opacities, eos, species_d[ispec], Ye);
-                v(itmp, k, j, i) = root_find.itp(res, 0, T, 1.e-6 * T, T);
+                v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
               }
 
               // Set fluid u/P/T and radiation J using equilibrium temperature
