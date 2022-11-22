@@ -46,7 +46,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   auto rgrid = monopole_pkg->Param<MonopoleGR::Radius>("radius");
-  auto base = ccsn_pkg->Param<CCSN::State_t>("ccsn_state_interp_d");
+  auto base = ccsn_pkg->Param<CCSN::State_t>("ccsn_state_conv_interp_d");
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
 
