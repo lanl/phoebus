@@ -11,14 +11,13 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+#include "microphysics/opac_phoebus/opac_phoebus.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "radiation/closure.hpp"
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/frequency_info.hpp"
 #include "radiation/radiation.hpp"
-
-#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
 
 #ifndef RADIATION_MOCMC_HPP_
 #define RADIATION_MOCMC_HPP_
@@ -28,7 +27,7 @@ namespace radiation {
 template <typename MBD, typename VP, typename CLOSURE>
 class MOCMCInteractions {
   using FlatIdx = parthenon::vpack_types::FlatIdx;
-  using Opacity = singularity::neutrinos::Opacity;
+  using Opacities = Microphysics::Opacities;
   using RadiationType = singularity::RadiationType;
 
  public:
@@ -63,7 +62,7 @@ class MOCMCInteractions {
   KOKKOS_INLINE_FUNCTION
   void CalculateInu0(const int iblock, const int ispec, const int k, const int j,
                      const int i, const Real ucon[4]) const {
-    if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
+    if constexpr (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
       for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
         v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) = 0.;
       }
@@ -109,8 +108,8 @@ class MOCMCInteractions {
   KOKKOS_INLINE_FUNCTION
   void UpdateSampleIntensities(const Real &rho, const Real &T, const Real &Ye,
                                const Real ucon[4], const int &iblock, const int &k,
-                               const int &j, const int &i, Opacity &opac,
-                               const Real &dt) {
+                               const int &j, const int &i, const Opacities &opacities,
+                               const Real &dt) const {
     if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
       const int nsamp = swarm_d_.GetParticleCountPerCell(k, j, i);
       for (int n = 0; n < nsamp; n++) {
@@ -140,10 +139,10 @@ class MOCMCInteractions {
             // TODO(BRR) is nu_fluid correct here? We want the nu of the sample bin
             // (n.u) * nufluid(n) in the fluid frame
             const Real alphainv_a = nu_fluid * (1. - scattering_fraction) *
-                                    opac.AngleAveragedAbsorptionCoefficient(
+                                    opacities.AngleAveragedAbsorptionCoefficient(
                                         rho, T, Ye, species_[ispec], nu_fluid);
             const Real jinv_a =
-                opac.ThermalDistributionOfTNu(T, species_[ispec], nu_fluid) /
+                opacities.ThermalDistributionOfTNu(T, species_[ispec], nu_fluid) /
                 (nu_fluid * nu_fluid * nu_fluid) * alphainv_a;
 
             // TODO(BRR) actually include at least elastic scattering

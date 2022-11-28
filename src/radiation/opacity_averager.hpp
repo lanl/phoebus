@@ -41,9 +41,7 @@ class OpacityAverager {
 
   Real GetAveragedAbsorptionOpacity(const Real rho, const Real T, const Real ye,
                                     const int ispec) const {
-    printf("idx_Inu.IsValid(): %i\n", static_cast<int>(idx_Inu_.IsValid()));
     if constexpr (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-
       for (int n = 0; n < freq_.GetNumBins(); n++) {
         printf("[%i] nu: %e Inu: %e\n", n, freq_.GetBinCenterNu(n),
                v_(b_, idx_Inu_(ispec, n), k_, j_, i_));
@@ -66,10 +64,9 @@ class OpacityAverager {
       printf("kappaJ: %e Planck: %e\n", robust::ratio(kappaJ_num, kappaJ_denom),
              opacities_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]));
 
-      // PARTHENON_FAIL("MOCMC!");
       // Handle case of zero particles in zone i.e. Inu = 0
       if (kappaJ_num < robust::SMALL()) {
-        return mean_opac_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]);
+        return opacities_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]);
       } else {
         return robust::ratio(kappaJ_num, kappaJ_denom);
       }

@@ -36,16 +36,14 @@ class SourceResidual1 {
   SourceResidual1(const EOS &eos, const CLOSURE closure,
                   const OpacityAverager<CLOSURE> &opac_avgr,
                   const MOCMCInteractions<MBD, VP, CLOSURE> &mocmc_int,
-                  const FrequencyInfo &freq_info, const Opacity &opacity,
-                  const MeanOpacity &mean_opacity, const Real &rho, const Real &ug0,
+                  const FrequencyInfo &freq_info, const Real &rho, const Real &ug0,
                   const Real &Ye, const Real J0[3], const int &nspec,
-                  const RadiationType species[3], const Real &scattering_fraction,
-                  const Real &dtau, const VarAccessor2D &Inu0, const VarAccessor2D &Inu1,
-                  const int &iblock, const int &k, const int &j, const int &i)
+                  const RadiationType species[3], const Real &dtau,
+                  const VarAccessor2D &Inu0, const VarAccessor2D &Inu1,
+                  const Real &alpha_max)
       : eos_(eos), closure_(closure), opac_avgr_(opac_avgr), mocmc_int_(mocmc_int),
-        freq_info_(freq_info), opacity_(opacity), mean_opacity_(mean_opacity), rho_(rho),
-        ug0_(ug0), Ye_(Ye), nspec_(nspec), scattering_fraction_(scattering_fraction),
-        dtau_(dtau), Inu0_(Inu0), Inu1_(Inu1), iblock_(iblock), k_(k), j_(j), i_(i) {
+        freq_info_(freq_info), rho_(rho), ug0_(ug0), Ye_(Ye), nspec_(nspec), dtau_(dtau),
+        Inu0_(Inu0), Inu1_(Inu1), alpha_max_(alpha_max) {
     for (int ispec = 0; ispec < nspec; ++ispec) {
       J0_[ispec] = J0[ispec];
       PARTHENON_DEBUG_REQUIRE(!std::isnan(J0_[ispec]) && J0_[ispec] > robust::SMALL(),
@@ -69,8 +67,9 @@ class SourceResidual1 {
         for (int n = 0; n < freq_info_.GetNumBins(); n++) {
           const Real nu = freq_info_.GetBinCenterNu(n);
           const Real Jnu =
-              opacity_.EmissivityPerNu(rho_, T, Ye_, species_[ispec], nu) / (4. * M_PI);
-          const Real kappaJ = opacity_.AngleAveragedAbsorptionCoefficient(
+              opac_avgr_.opacities_.EmissivityPerNu(rho_, T, Ye_, species_[ispec], nu) /
+              (4. * M_PI);
+          const Real kappaJ = opac_avgr_.opacities_.AngleAveragedAbsorptionCoefficient(
               rho_, T, Ye_, species_[ispec], nu);
           Inu1_(ispec, n) = (nu * Jnu + robust::ratio(Inu0_(ispec, n), dtau_)) /
                             (nu * kappaJ + robust::ratio(1., dtau_));
@@ -78,17 +77,17 @@ class SourceResidual1 {
       }
 
       Real kappaJ = opac_avgr_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, ispec);
-      kappaJ = (1. - scattering_fraction_) * kappaJ;
-      // TODO(BRR) remove scattering_fraction
+      kappaJ = std::min<Real>(kappaJ, alpha_max_);
 
-      const Real JBB = opacity_.EnergyDensityFromTemperature(T, species_[ispec]);
+      const Real JBB =
+          opac_avgr_.opacities_.EnergyDensityFromTemperature(T, species_[ispec]);
 
       dJ_tot += (J0_[ispec] + dtau_ * kappaJ * JBB) / (1. + dtau_ * kappaJ) - J0_[ispec];
     }
 
     const Real ug1 = rho_ * eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda);
 
-    const Real residual = ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot);
+    const Real residual = robust::ratio((ug1 - ug0_) + (dJ_tot), ug0_ + J0_tot);
     PARTHENON_DEBUG_REQUIRE(!std::isnan(residual), "NAN residual!");
 
     return residual;
@@ -100,22 +99,16 @@ class SourceResidual1 {
   const OpacityAverager<CLOSURE> &opac_avgr_;
   const MOCMCInteractions<MBD, VP, CLOSURE> &mocmc_int_;
   const FrequencyInfo &freq_info_;
-  const Opacity &opacity_;
-  const MeanOpacity &mean_opacity_;
   const Real &rho_;
   const Real &ug0_;
   const Real &Ye_;
   Real J0_[MaxNumRadiationSpecies];
   const int &nspec_;
-  const Real &scattering_fraction_;
   const Real &dtau_; // Proper time
   const VarAccessor2D &Inu0_;
   const VarAccessor2D &Inu1_;
+  const Real &alpha_max_;
   RadiationType species_[MaxNumRadiationSpecies];
-  const int &iblock_;
-  const int &k_;
-  const int &j_;
-  const int &i_;
 };
 
 } // namespace radiation

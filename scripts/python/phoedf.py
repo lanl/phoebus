@@ -21,6 +21,13 @@ from phoebus_opacities import *
 # Phoebus-specific derived class from Parthenon's phdf datafile reader
 class phoedf(phdf.phdf):
 
+  def DecodedParam(self, name):
+    try:
+      return self.Params[name].decode()
+    except (UnicodeDecodeError, AttributeError):
+      return self.Params[name]
+
+
   def __init__(self, filename, geomfile=None):
     super().__init__(filename)
 
@@ -30,7 +37,7 @@ class phoedf(phdf.phdf):
       self.eos_type = self.Params['eos/type']
 
     if 'opacity/type' in self.Params:
-      self.opacity_model = self.Params['opacity/type']
+      self.opacity_model = self.DecodedParam('opacity/type')
 
     self.LengthCodeToCGS = self.Params['phoebus/LengthCodeToCGS']
     self.TimeCodeToCGS = self.Params['phoebus/TimeCodeToCGS']
@@ -63,16 +70,18 @@ class phoedf(phdf.phdf):
       ind = [[0,1,3,6],[1,2,4,7],[3,4,5,8],[6,7,8,9]]
       return ind[mu][nu]
     if self.flatgcov is None:
-      if self.Params['geometry/geometry_name'] == "Minkowski":
-        self.flatgcov = np.zeros([self.NumBlocks, self.Nx3, self.Nx2, self.Nx1, 10])
+      if self.DecodedParam('geometry/geometry_name') == "Minkowski":
+        self.flatgcov = np.zeros([self.NumBlocks, 10, self.Nx3+2*self.NGhost, self.Nx2+2*self.NGhost, self.Nx1+2*self.NGhost])
         self.flatgcov[:,flatten_indices(0, 0),:,:,:] = -1.
         self.flatgcov[:,flatten_indices(1, 1),:,:,:] = 1.
         self.flatgcov[:,flatten_indices(2, 2),:,:,:] = 1.
         self.flatgcov[:,flatten_indices(3, 3),:,:,:] = 1.
+      else:
+        assert False
     self.gcov = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
     for mu in range(4):
       for nu in range(4):
-        self.gcov[:,mu,nu,:,:,:] = self.flatgcov[:,flatten_indices(mu,nu),:,self.NGhost:-self.NGhost,self.NGhost:-self.NGhost]
+        self.gcov[:,mu,nu,:,:,:] = self.flatgcov[:,flatten_indices(mu,nu),self.NGhost:-self.NGhost,self.NGhost:-self.NGhost,self.NGhost:-self.NGhost]
     del(self.flatgcov)
     self.gcon = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
     for b in range(self.NumBlocks):

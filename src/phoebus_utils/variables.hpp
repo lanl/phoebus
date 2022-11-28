@@ -15,6 +15,7 @@
 #define PHOEBUS_UTILS_VARIABLES_HPP_
 
 #include <interface/variable_pack.hpp>
+#include <parthenon/package.hpp>
 
 namespace fluid_prim {
 constexpr char density[] = "p.density";
@@ -100,14 +101,12 @@ constexpr char r_src_terms[] = "r.src_terms";
 /// classes and functions inside compute kernels.
 class VarAccessor2D {
   using FlatIdx = parthenon::vpack_types::FlatIdx;
+  using Real = parthenon::package::prelude::Real;
 
  public:
-  VarAccessor2D(const VariablePack<Real> &v, const int &b, const FlatIdx &idx,
+  VarAccessor2D(const parthenon::VariablePack<Real> &v, const int &b, const FlatIdx &idx,
                 const int &k, const int &j, const int &i)
-      : v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {
-    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(),
-                            "Creating VarAccessor2D with invalid FlatIdx!");
-  }
+      : v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {}
 
   KOKKOS_FORCEINLINE_FUNCTION
   Real &operator()(const int &ii, const int &jj) const {
@@ -116,7 +115,7 @@ class VarAccessor2D {
   }
 
  private:
-  const VariablePack<Real> &v_;
+  const parthenon::VariablePack<Real> &v_;
   const int &b_;
   const FlatIdx &idx_;
   const int &k_;

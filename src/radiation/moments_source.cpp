@@ -30,7 +30,7 @@
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
-//#include "radiation/source_residual_1.hpp"
+#include "radiation/source_residual_1.hpp"
 //#include "radiation/source_residual_4.hpp"
 
 #include "fixup/fixup.hpp"
@@ -161,87 +161,89 @@ class SourceResidual4 {
 };
 
 // template <typename T>
-class VarAccessor2D {
- public:
-  VarAccessor2D(const VariablePack<Real> &v, const int &b, const FlatIdx &idx,
-                const int &k, const int &j, const int &i)
-      : v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {
-    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(),
-                            "Creating VarAccessor2D with invalid FlatIdx!");
-  }
+// class VarAccessor2D {
+// public:
+//  VarAccessor2D(const VariablePack<Real> &v, const int &b, const FlatIdx &idx,
+//                const int &k, const int &j, const int &i)
+//      : v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {
+//    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(),
+//                            "Creating VarAccessor2D with invalid FlatIdx!");
+//  }
+//
+//  KOKKOS_FORCEINLINE_FUNCTION
+//  Real &operator()(const int &ii, const int &jj) {
+//    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Accessing invalid index!");
+//    return v_(b_, idx_(ii, jj), k_, j_, i_);
+//  }
+//
+// private:
+//  const VariablePack<Real> &v_;
+//  const int &b_;
+//  const FlatIdx &idx_;
+//  const int &k_;
+//  const int &j_;
+//  const int &i_;
+//};
 
-  KOKKOS_FORCEINLINE_FUNCTION
-  Real &operator()(const int &ii, const int &jj) {
-    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Accessing invalid index!");
-    return v_(b_, idx_(ii, jj), k_, j_, i_);
-  }
-
- private:
-  const VariablePack<Real> &v_;
-  const int &b_;
-  const FlatIdx &idx_;
-  const int &k_;
-  const int &j_;
-  const int &i_;
-};
-
-template <typename CLOSURE>
-class InteractionTResidual {
- public:
-  KOKKOS_FUNCTION
-  InteractionTResidual(const EOS &eos, const CLOSURE closure,
-                       const OpacityAverager<CLOSURE> &opac_avgr, const Real &rho,
-                       const Real &ug0, const Real &Ye, const Real J0[3],
-                       const int &nspec, const RadiationType species[3], const Real &dtau,
-                       VarAccessor2D &Inu0, VarAccessor2D &Inu1, const Real &alpha_max)
-      : eos_(eos), closure_(closure), opac_avgr_(opac_avgr), rho_(rho), ug0_(ug0),
-        Ye_(Ye), nspec_(nspec), dtau_(dtau), Inu0_(Inu0), Inu1_(Inu1),
-        alpha_max_(alpha_max) {
-    for (int ispec = 0; ispec < nspec; ++ispec) {
-      J0_[ispec] = J0[ispec];
-      species_[ispec] = species[ispec];
-    }
-  }
-
-  KOKKOS_INLINE_FUNCTION
-  Real operator()(const Real T) {
-    Real lambda[2] = {Ye_, 0.0};
-
-    Real J0_tot = 0.;
-    Real dJ_tot = 0.;
-
-    for (int ispec = 0; ispec < nspec_; ++ispec) {
-      J0_tot += J0_[ispec];
-
-      Real kappaJ = opac_avgr_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, ispec);
-      kappaJ = std::min<Real>(kappaJ, alpha_max_);
-
-      const Real JBB =
-          opac_avgr_.opacities_.EnergyDensityFromTemperature(T, species_[ispec]);
-
-      dJ_tot += (J0_[ispec] + dtau_ * kappaJ * JBB) / (1. + dtau_ * kappaJ) - J0_[ispec];
-    }
-
-    const Real ug1 = rho_ * eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda);
-
-    return ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot);
-  }
-
- private:
-  const EOS &eos_;
-  const CLOSURE &closure_;
-  const OpacityAverager<CLOSURE> &opac_avgr_;
-  const Real &rho_;
-  const Real &ug0_;
-  const Real &Ye_;
-  Real J0_[MaxNumRadiationSpecies];
-  const int &nspec_;
-  const Real &dtau_; // Proper time
-  const VarAccessor2D &Inu0_;
-  const VarAccessor2D &Inu1_;
-  const Real &alpha_max_; // Maximum optical depth per timestep
-  RadiationType species_[MaxNumRadiationSpecies];
-};
+// template <typename CLOSURE>
+// class InteractionTResidual {
+// public:
+//  KOKKOS_FUNCTION
+//  InteractionTResidual(const EOS &eos, const CLOSURE closure,
+//                       const OpacityAverager<CLOSURE> &opac_avgr, const Real &rho,
+//                       const Real &ug0, const Real &Ye, const Real J0[3],
+//                       const int &nspec, const RadiationType species[3], const Real
+//                       &dtau, VarAccessor2D &Inu0, VarAccessor2D &Inu1, const Real
+//                       &alpha_max)
+//      : eos_(eos), closure_(closure), opac_avgr_(opac_avgr), rho_(rho), ug0_(ug0),
+//        Ye_(Ye), nspec_(nspec), dtau_(dtau), Inu0_(Inu0), Inu1_(Inu1),
+//        alpha_max_(alpha_max) {
+//    for (int ispec = 0; ispec < nspec; ++ispec) {
+//      J0_[ispec] = J0[ispec];
+//      species_[ispec] = species[ispec];
+//    }
+//  }
+//
+//  KOKKOS_INLINE_FUNCTION
+//  Real operator()(const Real T) {
+//    Real lambda[2] = {Ye_, 0.0};
+//
+//    Real J0_tot = 0.;
+//    Real dJ_tot = 0.;
+//
+//    for (int ispec = 0; ispec < nspec_; ++ispec) {
+//      J0_tot += J0_[ispec];
+//
+//      Real kappaJ = opac_avgr_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, ispec);
+//      kappaJ = std::min<Real>(kappaJ, alpha_max_);
+//
+//      const Real JBB =
+//          opac_avgr_.opacities_.EnergyDensityFromTemperature(T, species_[ispec]);
+//
+//      dJ_tot += (J0_[ispec] + dtau_ * kappaJ * JBB) / (1. + dtau_ * kappaJ) -
+//      J0_[ispec];
+//    }
+//
+//    const Real ug1 = rho_ * eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda);
+//
+//    return ((ug1 - ug0_) + (dJ_tot)) / (ug0_ + J0_tot);
+//  }
+//
+// private:
+//  const EOS &eos_;
+//  const CLOSURE &closure_;
+//  const OpacityAverager<CLOSURE> &opac_avgr_;
+//  const Real &rho_;
+//  const Real &ug0_;
+//  const Real &Ye_;
+//  Real J0_[MaxNumRadiationSpecies];
+//  const int &nspec_;
+//  const Real &dtau_; // Proper time
+//  const VarAccessor2D &Inu0_;
+//  const VarAccessor2D &Inu1_;
+//  const Real &alpha_max_; // Maximum optical depth per timestep
+//  RadiationType species_[MaxNumRadiationSpecies];
+//};
 
 template <class T, class CLOSURE>
 TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
@@ -260,29 +262,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace mi = mocmc_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{c::density,
-                                c::energy,
-                                c::momentum,
-                                c::ye,
-                                cr::E,
-                                cr::F,
-                                c::bfield,
-                                p::density,
-                                p::temperature,
-                                p::energy,
-                                p::ye,
-                                p::velocity,
-                                p::pressure,
-                                p::gamma1,
-                                p::bfield,
-                                pr::J,
-                                pr::H,
-                                ir::kappaJ,
-                                ir::kappaH,
-                                ir::JBB,
-                                ir::tilPi,
-                                mi::Inu0,
-                                mi::Inu1};
+  std::vector<std::string> vars{
+      c::density,  c::energy,  c::momentum,    c::ye,     cr::E,   cr::F,
+      c::bfield,   p::density, p::temperature, p::energy, p::ye,   p::velocity,
+      p::pressure, p::gamma1,  p::bfield,      pr::J,     pr::H,   ir::kappaJ,
+      ir::kappaH,  ir::JBB,    ir::tilPi,      mi::Inu0,  mi::Inu1};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -291,8 +275,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_H = imap.GetFlatIdx(pr::H);
 
-  auto idx_Inu0 = imap.GetFlatIdx(mi::Inu0);
-  auto idx_Inu1 = imap.GetFlatIdx(mi::Inu1);
+  auto idx_Inu0 = imap.GetFlatIdx(mi::Inu0, false);
+  auto idx_Inu1 = imap.GetFlatIdx(mi::Inu1, false);
 
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
@@ -324,9 +308,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   int nblock = v.GetDim(5);
 
-  auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
-  const int nu_bins = rad->Param<int>("nu_bins");
-  const Real dlnu = rad->Param<Real>("dlnu");
   const auto freq_info = rad->Param<FrequencyInfo>("freq_info");
   auto species = rad->Param<std::vector<RadiationType>>("species");
   auto num_species = rad->Param<int>("num_species");
@@ -415,19 +396,15 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
 
-        VarAccessor2D Inu0(v, iblock, idx_Inu0, k, j, i);
-        VarAccessor2D Inu1(v, iblock, idx_Inu1, k, j, i);
-
         Real dE[MaxNumRadiationSpecies];
         Vec cov_dF[MaxNumRadiationSpecies];
 
         // If MOCMC, get angle-averaged intensity from samples
-        PARTHENON_FAIL("Set Inu0");
-        for (int ispec = 0; ispec < num_species; ispec++) {
-          for (int idx_nu = 0; idx_nu < freq_info.GetNumBins(); idx_nu++) {
-            Inu1(ispec, idx_nu) = Inu0(ispec, idx_nu);
-          }
-        }
+        // for (int ispec = 0; ispec < num_species; ispec++) {
+        //  for (int idx_nu = 0; idx_nu < freq_info.GetNumBins(); idx_nu++) {
+        //    Inu1(ispec, idx_nu) = Inu0(ispec, idx_nu);
+        //  }
+        //}
 
         bool success = false;
         if (src_solver == SourceSolver::zerod) {
@@ -457,16 +434,16 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
             OpacityAverager<CLOSURE> opac_avgr(c, freq_info, opacities, v, idx_Inu1,
                                                species_d, iblock, k, j, i);
-            //Real mykappaJ = opac_avgr.GetAveragedAbsorptionOpacity(
+            // Real mykappaJ = opac_avgr.GetAveragedAbsorptionOpacity(
             //    rho, v(iblock, pT, k, j, i), Ye, ispec);
-            //PARTHENON_FAIL("sotp here");
-            InteractionTResidual<CLOSURE> res(eos, c, opac_avgr, rho, ug, Ye, J0,
-                                              num_species, species_d, dtau, Inu0, Inu1,
-                                              alpha_max);
-            //SourceResidual1<T, VariablePack<Real>, CLOSURE> res(
-            //    eos, c, opac_avgr, mocmc_int, freq_info, d_opacity, d_mean_opacity, rho,
-            //    ug, Ye, J0, num_species, species_d, scattering_fraction, dtau, Inu0, Inu1,
-            //    iblock, k, j, i);
+            // PARTHENON_FAIL("sotp here");
+            // InteractionTResidual<CLOSURE> res(eos, c, opac_avgr, mocmc_int, freq_info,
+            // rho, ug, Ye, J0,
+            //                                  num_species, species_d, dtau, Inu0, Inu1,
+            //                                  alpha_max);
+            SourceResidual1<T, VariablePack<Real>, CLOSURE> res(
+                eos, c, opac_avgr, mocmc_int, freq_info, rho, ug, Ye, J0, num_species,
+                species_d, dtau, Inu0, Inu1, alpha_max);
             root_find::RootFindStatus status;
             Real T1 = root_find.regula_falsi(res, 1.e-2 * v(iblock, pT, k, j, i),
                                              1.e2 * v(iblock, pT, k, j, i),
@@ -1087,8 +1064,20 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
           }
         }
 
-        PARTHENON_FAIL("Update sample intensities");
-        // TODO(BRR) if MOCMC, update sample intensities
+        // Update MOCMC sample intensities
+        if constexpr (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
+          const Real vpcon[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                                 v(iblock, pv(2), k, j, i)};
+          Real ucon[4];
+          Real W = 0.;
+          SPACELOOP2(ii, jj) { W += cov_gamma(ii, jj) * vpcon[ii] * vpcon[jj]; }
+          W = std::sqrt(1. + W);
+          ucon[0] = robust::ratio(W, std::abs(alpha));
+          SPACELOOP(ii) { ucon[ii + 1] = vpcon[ii] - ucon[0] * beta[ii]; }
+          mocmc_int.UpdateSampleIntensities(
+              v(iblock, prho, k, j, i), v(iblock, pT, k, j, i), v(iblock, pYe, k, j, i),
+              ucon, iblock, k, j, i, opacities, dt);
+        }
       });
   return TaskStatus::complete;
 }
