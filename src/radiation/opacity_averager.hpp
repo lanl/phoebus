@@ -24,20 +24,20 @@ namespace radiation {
 
 template <class CLOSURE>
 class OpacityAverager {
+  using Opacities = Microphysics::Opacities;
+
  public:
-  OpacityAverager(const CLOSURE &c, const FrequencyInfo &freq,
-  const Opacities &opacities,
-                    const parthenon::VariablePack<Real> &v,
-                    const parthenon::vpack_types::FlatIdx &idx_Inu,
-                    const singularity::RadiationType *species,
-                    const int iblock, const int k, const int j, const int i
-                    )
-      : c_(c), freq_(freq), opacities_(opacities), v_(v), idx_Inu_(idx_Inu),
-        b_(iblock), k_(k), j_(j), i_(i) {
-          for (int ispec = 0; ispec < MaxNumRadiationSpecies; ispec++) {
-            species_[ispec] = species[ispec];
-          }
-          }
+  OpacityAverager(const CLOSURE &c, const FrequencyInfo &freq, const Opacities &opacities,
+                  const parthenon::VariablePack<Real> &v,
+                  const parthenon::vpack_types::FlatIdx &idx_Inu,
+                  const singularity::RadiationType *species, const int iblock,
+                  const int k, const int j, const int i)
+      : c_(c), freq_(freq), opacities_(opacities), v_(v), idx_Inu_(idx_Inu), b_(iblock),
+        k_(k), j_(j), i_(i) {
+    for (int ispec = 0; ispec < MaxNumRadiationSpecies; ispec++) {
+      species_[ispec] = species[ispec];
+    }
+  }
 
   Real GetAveragedAbsorptionOpacity(const Real rho, const Real T, const Real ye,
                                     const int ispec) const {
@@ -45,7 +45,8 @@ class OpacityAverager {
     if constexpr (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
 
       for (int n = 0; n < freq_.GetNumBins(); n++) {
-        printf("[%i] nu: %e Inu: %e\n",n, freq_.GetBinCenterNu(n), v_(b_, idx_Inu_(ispec, n), k_, j_, i_));
+        printf("[%i] nu: %e Inu: %e\n", n, freq_.GetBinCenterNu(n),
+               v_(b_, idx_Inu_(ispec, n), k_, j_, i_));
       }
 
       Real kappaJ_num = 0.;
@@ -55,13 +56,15 @@ class OpacityAverager {
         // Trapezoidal rule
         const Real fac = (n == 0 || n == freq_.GetNumBins() - 1) ? 0.5 : 1.;
         nu = freq_.GetBinCenterNu(n);
-        kappaJ_num += fac*opacities_.AngleAveragedAbsorptionCoefficient(rho, T, ye, species_[ispec], nu) * v_(b_, idx_Inu_(ispec, n), k_, j_, i_) * nu;
+        kappaJ_num += fac *
+                      opacities_.AngleAveragedAbsorptionCoefficient(rho, T, ye,
+                                                                    species_[ispec], nu) *
+                      v_(b_, idx_Inu_(ispec, n), k_, j_, i_) * nu;
         kappaJ_denom += fac * v_(b_, idx_Inu_(ispec, n), k_, j_, i_) * nu;
       }
 
       printf("kappaJ: %e Planck: %e\n", robust::ratio(kappaJ_num, kappaJ_denom),
-        opacities_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]));
-
+             opacities_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]));
 
       PARTHENON_FAIL("MOCMC!");
       return robust::ratio(kappaJ_num, kappaJ_denom);
@@ -69,14 +72,15 @@ class OpacityAverager {
       return opacities_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]);
     }
   }
+
  private:
   const CLOSURE &c_;
   const FrequencyInfo &freq_;
 
-public:
+ public:
   const Opacities &opacities_;
 
-private:
+ private:
   const parthenon::VariablePack<Real> &v_;
   const parthenon::vpack_types::FlatIdx &idx_Inu_;
   const int b_;

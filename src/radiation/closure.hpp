@@ -137,10 +137,11 @@ class ClosureEdd {
   //-------------------------------------------------------------------------------------
   /// Initialize pointers to angle-averaged spectrum information (for frequency-averaging
   /// opacities).
-//  KOKKOS_FUNCTION void
-//  InitializeSpectrum(parthenon::VariablePack<Real> *v_in, const int nnu_in, const Real dlnu,
-//                     parthenon::ParArray1D<Real> *nusamp_in,
-//                     parthenon::vpack_types::FlatIdx *idx_Inu_in);
+  //  KOKKOS_FUNCTION void
+  //  InitializeSpectrum(parthenon::VariablePack<Real> *v_in, const int nnu_in, const Real
+  //  dlnu,
+  //                     parthenon::ParArray1D<Real> *nusamp_in,
+  //                     parthenon::vpack_types::FlatIdx *idx_Inu_in);
 
   KOKKOS_FUNCTION
   ClosureStatus GetConTilPiFromPrim(const Real J, const Vec cov_tilH, Tens2 *con_tilPi) {

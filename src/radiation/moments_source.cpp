@@ -37,6 +37,7 @@ namespace radiation {
 
 using fixup::Bounds;
 using Microphysics::Opacities;
+using parthenon::vpack_types::FlatIdx;
 using singularity::EOS;
 
 template <typename CLOSURE>
@@ -185,11 +186,11 @@ class InteractionTResidual {
  public:
   KOKKOS_FUNCTION
   InteractionTResidual(const EOS &eos, const CLOSURE closure,
-                       const OpacityAverager &opac_avgr, const Real &rho, const Real &ug0,
-                       const Real &Ye, const Real J0[3], const int &nspec,
-                       const RadiationType species[3], const Real &dtau,
+                       const OpacityAverager<CLOSURE> &opac_avgr, const Real &rho,
+                       const Real &ug0, const Real &Ye, const Real J0[3],
+                       const int &nspec, const RadiationType species[3], const Real &dtau,
                        VarAccessor2D &Inu0, VarAccessor2D &Inu1, const Real &alpha_max)
-      : eos_(eos), closure_(closure), opacities_(opacities), rho_(rho), ug0_(ug0),
+      : eos_(eos), closure_(closure), opac_avgr_(opac_avgr), rho_(rho), ug0_(ug0),
         Ye_(Ye), nspec_(nspec), dtau_(dtau), Inu0_(Inu0), Inu1_(Inu1),
         alpha_max_(alpha_max) {
     for (int ispec = 0; ispec < nspec; ++ispec) {
@@ -225,7 +226,7 @@ class InteractionTResidual {
  private:
   const EOS &eos_;
   const CLOSURE &closure_;
-  const OpacityAverager &opac_avgr_;
+  const OpacityAverager<CLOSURE> &opac_avgr_;
   const Real &rho_;
   const Real &ug0_;
   const Real &Ye_;
@@ -285,7 +286,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_H = imap.GetFlatIdx(pr::H);
 
-  auto idx_Inu = imap.GetFlatIdx(mocmc_internal::Inu0);
+  auto idx_Inu0 = imap.GetFlatIdx(mocmc_internal::Inu0);
+  auto idx_Inu1 = imap.GetFlatIdx(mocmc_internal::Inu1);
 
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
@@ -391,8 +393,19 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         Real con_vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
                           v(iblock, pv(2), k, j, i)};
 
+        VarAccessor2D Inu0(v, iblock, idx_Inu0, k, j, i);
+        VarAccessor2D Inu1(v, iblock, idx_Inu1, k, j, i);
+
         Real dE[MaxNumRadiationSpecies];
         Vec cov_dF[MaxNumRadiationSpecies];
+
+        // If MOCMC, get angle-averaged intensity from samples
+        PARTHENON_FAIL("Set Inu0");
+        for (int ispec = 0; ispec < num_species; ispec++) {
+          for (int idx_nu = 0; idx_nu < freq_info.GetNumBins(); idx_nu++) {
+            Inu1(ispec, idx_nu) = Inu0(ispec, idx_nu);
+          }
+        }
 
         bool success = false;
         if (src_solver == SourceSolver::zerod) {
@@ -415,15 +428,16 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             // TODO(BRR) Pass Residual another class that holds Inu(nu) and can average
             // opacities Can closure provide this? Note that con_v doesn't change during
             // temperature update
-            CLOSURE c(con_v, &g, &d_opacity, &d_mean_opacity, &v, &idx_Inu, nu_bins, dlnu,
-                      &nusamp);
-            OpacityAverager<CLOSURE> opac_avgr(c, freq_info, opacities, v, idx_Inu,
+            CLOSURE c(con_v, &g);
+
+            OpacityAverager<CLOSURE> opac_avgr(c, freq_info, opacities, v, idx_Inu1,
                                                species_d, iblock, k, j, i);
             Real mykappaJ = opac_avgr.GetAveragedAbsorptionOpacity(
                 rho, v(iblock, pT, k, j, i), Ye, ispec);
             PARTHENON_FAIL("sotp here");
             InteractionTResidual<CLOSURE> res(eos, c, opac_avgr, rho, ug, Ye, J0,
-                                              num_species, species_d, dtau, alpha_max);
+                                              num_species, species_d, dtau, Inu0, Inu1,
+                                              alpha_max);
             root_find::RootFindStatus status;
             Real T1 = root_find.regula_falsi(res, 1.e-2 * v(iblock, pT, k, j, i),
                                              1.e2 * v(iblock, pT, k, j, i),
@@ -1009,7 +1023,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                             v(iblock, pgm1, k, j, i), cov_g, con_gamma.data, beta, alpha,
                             sdetgam, v(iblock, crho, k, j, i), S, Bcons,
                             v(iblock, ceng, k, j, i), yecons);
-              // TODO(BRR) set cons ye!
               if (cye >= 0) {
                 v(iblock, cye, k, j, i) = yecons;
               }
@@ -1034,6 +1047,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) = covF(ii) * sdetgam; }
           }
         }
+
+        PARTHENON_FAIL("Update sample intensities");
+        // TODO(BRR) if MOCMC, update sample intensities
       });
   return TaskStatus::complete;
 }

@@ -16,8 +16,8 @@
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/variables.hpp"
-#include "radiation/local_three_geometry.hpp"
 #include "radiation/frequency_info.hpp"
+#include "radiation/local_three_geometry.hpp"
 #include "reconstruction.hpp"
 
 #include "closure.hpp"
