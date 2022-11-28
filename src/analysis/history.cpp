@@ -47,8 +47,6 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         const auto &coords = pack.GetCoords(b);
         if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1)) {
-          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-
           const Real dx1 = coords.Dx(X1DIR, k, j, i);
           const Real dx2 = coords.Dx(X2DIR, k, j, i);
           const Real dx3 = coords.Dx(X3DIR, k, j, i);
@@ -61,7 +59,7 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
                        (xh - coords.x1v(i)) * m) *
                       dx2 * dx3;
 
-          lresult += -flux;
+          lresult += flux;
         } else {
           lresult += 0.0;
         }
@@ -69,5 +67,123 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
       result);
   return result;
 } // mass accretion
+
+Real ReduceJetEnergyFlux(MeshData<Real> *md) {
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+  auto pmb = md->GetParentPointer();
+  auto &pars = pmb->packages.Get("geometry")->AllParams();
+  const Real xh = pars.Get<Real>("xh");
+
+  namespace p = fluid_prim;
+  const std::vector<std::string> vars({p::density, p::bfield, p::velocity});
+
+  PackIndexMap imap;
+  auto pack = md->PackVariables(vars, imap);
+
+  const int prho = imap[p::density].first;
+  const int pvel_lo = imap[p::velocity].first;
+  const int pvel_hi = imap[p::velocity].second;
+  const int pb_lo = imap[p::bfield].first;
+  const int pb_hi = imap[p::bfield].second;
+
+  auto geom = Geometry::GetCoordinateSystem(md);
+
+  const Real sigma_cutoff = pmb->packages.Get("fluid")->Param<Real>("sigma_cutoff");
+
+  Real result = 0.0;
+  parthenon::par_reduce(
+      parthenon::LoopPatternMDRange(), "Phoebus History for Jet Energy Flux",
+      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
+        const auto &coords = pack.GetCoords(b);
+        const Real sigma = CalcMagnetization(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi,
+                                             prho, b, k, j, i);
+        if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1) && sigma > sigma_cutoff) {
+          const Real dx1 = coords.Dx(X1DIR, k, j, i);
+          const Real dx2 = coords.Dx(X2DIR, k, j, i);
+          const Real dx3 = coords.Dx(X3DIR, k, j, i);
+
+          // interp to make sure we're getting the horizon correct
+          auto m = (CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j,
+                                     i + 1) -
+                    CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j,
+                                     i - 1)) /
+                   (2.0 * dx1);
+          auto flux =
+              (CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i) +
+               (xh - coords.x1v(i)) * m) *
+              dx2 * dx3;
+
+          lresult += flux;
+        } else {
+          lresult += 0.0;
+        }
+      },
+      result);
+  return result;
+
+} // JetEnergyFlux
+
+Real ReduceJetMomentumFlux(MeshData<Real> *md) {
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+  auto pmb = md->GetParentPointer();
+  auto &pars = pmb->packages.Get("geometry")->AllParams();
+  const Real xh = pars.Get<Real>("xh");
+
+  namespace p = fluid_prim;
+  const std::vector<std::string> vars({p::density, p::bfield, p::velocity});
+
+  PackIndexMap imap;
+  auto pack = md->PackVariables(vars, imap);
+
+  const int prho = imap[p::density].first;
+  const int pvel_lo = imap[p::velocity].first;
+  const int pvel_hi = imap[p::velocity].second;
+  const int pb_lo = imap[p::bfield].first;
+  const int pb_hi = imap[p::bfield].second;
+
+  auto geom = Geometry::GetCoordinateSystem(md);
+
+  const Real sigma_cutoff = pmb->packages.Get("fluid")->Param<Real>("sigma_cutoff");
+
+  Real result = 0.0;
+  parthenon::par_reduce(
+      parthenon::LoopPatternMDRange(), "Phoebus History for Jet Momentum Flux",
+      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
+        const auto &coords = pack.GetCoords(b);
+        const Real sigma = CalcMagnetization(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi,
+                                             prho, b, k, j, i);
+        if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1) && sigma > sigma_cutoff) {
+          const Real dx1 = coords.Dx(X1DIR, k, j, i);
+          const Real dx2 = coords.Dx(X2DIR, k, j, i);
+          const Real dx3 = coords.Dx(X3DIR, k, j, i);
+
+          // interp to make sure we're getting the horizon correct
+          auto m = (CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k,
+                                       j, i + 1) -
+                    CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k,
+                                       j, i - 1)) /
+                   (2.0 * dx1);
+          auto flux = (CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b,
+                                          k, j, i) +
+                       (xh - coords.x1v(i)) * m) *
+                      dx2 * dx3;
+
+          lresult += flux;
+        } else {
+          lresult += 0.0;
+        }
+      },
+      result);
+  return result;
+
+} // ReduceJetMomentumFlux
 
 } // namespace History
