@@ -40,6 +40,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto geometry = std::make_shared<StateDescriptor>("geometry");
   Initialize<CoordSysMeshBlock>(pin, geometry.get());
 
+  Params &params = geometry->AllParams();
+
   // Store name of geometry in parameters
   const std::string gname = GEOMETRY_NAME;
   const std::string geometry_name = gname.substr(gname.find("::") + 2);
@@ -58,7 +60,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   geometry->AddField(geometric_variables::node_coords, gcoord_node);
 
   // Reductions
-  Params &params = geometry->AllParams();
   const bool do_hydro = pin->GetBoolean("physics", "hydro");
   if (params.hasKey("xh") && do_hydro) {
     auto HstSum = parthenon::UserHistoryOperation::sum;
