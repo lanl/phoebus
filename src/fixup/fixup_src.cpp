@@ -150,8 +150,9 @@ TaskStatus SourceFixupImpl(T *rc) {
         bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
                            gamma_max, e_max);
         Real xi_max;
+        Real garbage;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max);
+                                    coords.x3v(k, j, i), xi_max, garbage);
 
         double eos_lambda[2]; // used for stellarcollapse eos and other EOS's that require
                               // root finding.

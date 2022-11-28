@@ -156,9 +156,10 @@ class InteractionTResidual {
   KOKKOS_FUNCTION
   InteractionTResidual(const EOS &eos, const Opacities &opacities, const Real &rho,
                        const Real &ug0, const Real &Ye, const Real J0[3],
-                       const int &nspec, const RadiationType species[3], const Real &dtau)
+                       const int &nspec, const RadiationType species[3], const Real &dtau,
+                       const Real &alpha_max)
       : eos_(eos), opacities_(opacities), rho_(rho), ug0_(ug0), Ye_(Ye), nspec_(nspec),
-        dtau_(dtau) {
+        dtau_(dtau), alpha_max_(alpha_max) {
     for (int ispec = 0; ispec < nspec; ++ispec) {
       J0_[ispec] = J0[ispec];
       species_[ispec] = species[ispec];
@@ -174,8 +175,9 @@ class InteractionTResidual {
 
     for (int ispec = 0; ispec < nspec_; ++ispec) {
       J0_tot += J0_[ispec];
-      const Real kappa =
+      Real kappa =
           opacities_.RosselandMeanAbsorptionCoefficient(rho_, T, Ye_, species_[ispec]);
+      kappa = std::min<Real>(kappa, alpha_max_);
 
       const Real JBB = opacities_.EnergyDensityFromTemperature(T, species_[ispec]);
 
@@ -195,7 +197,8 @@ class InteractionTResidual {
   const Real &Ye_;
   Real J0_[MaxNumRadiationSpecies];
   const int &nspec_;
-  const Real &dtau_; // Proper time
+  const Real &dtau_;      // Proper time
+  const Real &alpha_max_; // Maximum optical depth per timestep
   RadiationType species_[MaxNumRadiationSpecies];
 };
 
@@ -288,9 +291,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                                                 c2p_floor_scale_fac, c2p_fail_on_floors,
                                                 c2p_fail_on_ceilings);
 
-  constexpr int izone = 4;
-  constexpr int jzone = 4;
-
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
       nblock - 1, // Loop over blocks
@@ -313,8 +313,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
         // Bounds
         Real xi_max;
+        Real tau_max;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max);
+                                    coords.x3v(k, j, i), xi_max, tau_max);
+        const Real alpha_max = tau_max / (alpha * dt);
 
         Real rho = v(iblock, prho, k, j, i);
         Real ug = v(iblock, peng, k, j, i);
@@ -351,12 +353,26 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             // Rootfind over fluid temperature in fluid rest frame
             root_find::RootFind root_find(src_rootfind_maxiter);
             InteractionTResidual res(eos, opacities, rho, ug, Ye, J0, num_species,
-                                     species_d, dtau);
+                                     species_d, dtau, alpha_max);
             root_find::RootFindStatus status;
-            Real T1 = root_find.itp(res, 1.e-5 * v(iblock, pT, k, j, i),
-                                    1.e5 * v(iblock, pT, k, j, i),
-                                    src_rootfind_tol * v(iblock, pT, k, j, i),
-                                    v(iblock, pT, k, j, i), &status);
+            Real T1 = root_find.regula_falsi(res, 1.e-2 * v(iblock, pT, k, j, i),
+                                             1.e2 * v(iblock, pT, k, j, i),
+                                             src_rootfind_tol * v(iblock, pT, k, j, i),
+                                             v(iblock, pT, k, j, i), &status);
+            Real rebracketing_fac = 10.;
+            int n_rebracketing_tries = 0;
+            constexpr int MAX_REBRACKETING_TRIES = 4;
+            while (status == root_find::RootFindStatus::failure &&
+                   n_rebracketing_tries < MAX_REBRACKETING_TRIES) {
+              T1 = root_find.regula_falsi(
+                  res, 1.e-1 / rebracketing_fac * v(iblock, pT, k, j, i),
+                  1.e1 * rebracketing_fac * v(iblock, pT, k, j, i),
+                  src_rootfind_tol * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i),
+                  &status);
+
+              n_rebracketing_tries++;
+              rebracketing_fac *= 10.;
+            }
 
             if (status == root_find::RootFindStatus::failure) {
               PARTHENON_DEBUG_WARN("1D source rootfind failure!");
@@ -387,14 +403,14 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               c.GetConTilPiFromPrim(J, cov_H, &con_tilPi);
             }
 
-            // Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
             Real JBB = opacities.EnergyDensityFromTemperature(T1, species_d[ispec]);
-            // Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
             Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(rho, T1, Ye,
                                                                        species_d[ispec]);
+            kappaJ = std::min<Real>(kappaJ, alpha_max);
             Real kappaH = opacities.RosselandMeanScatteringCoefficient(rho, T1, Ye,
-                                                                       species_d[ispec]) +
-                          kappaJ;
+                                                                       species_d[ispec]);
+            kappaH = std::min<Real>(kappaH, alpha_max);
+            kappaH += kappaJ;
             Real tauJ = alpha * dt * kappaJ;
             Real tauH = alpha * dt * kappaH;
 
