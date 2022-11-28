@@ -30,6 +30,9 @@ TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
 TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange &ib,
                                       const IndexRange &jb, const IndexRange &kb);
 template <typename T>
+TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRange &ib, const IndexRange &jb,
+                                      const IndexRange &kb);
+template <typename T>
 TaskStatus ConservedToPrimitive(T *rc);
 template <typename T>
 TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRange &jb,

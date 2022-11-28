@@ -20,7 +20,7 @@
 #include "radiation/frequency_info.hpp"
 #include "reconstruction.hpp"
 
-#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
+#include "closure.hpp"
 
 namespace radiation {
 
@@ -77,11 +77,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Set radiation cfl factor
   Real cfl = pin->GetOrAddReal("radiation", "cfl", 0.8);
   params.Add("cfl", cfl);
-
-  // Get fake scattering value for testing in anticipation of scattering in
-  // singularity-opac
-  Real scattering_fraction = pin->GetOrAddReal("radiation", "scattering_fraction", 0.0);
-  params.Add("scattering_fraction", scattering_fraction);
 
   // Initialize frequency discretization
   Real nu_min;
@@ -315,6 +310,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     namespace c = radmoment_cons;
     namespace i = radmoment_internal;
 
+    std::string closure_strategy_str =
+        pin->GetOrAddString("radiation", "closure_c2p_strategy", "robust");
+    ClosureCon2PrimStrategy closure_strategy;
+    if (closure_strategy_str == "robust") {
+      closure_strategy = ClosureCon2PrimStrategy::robust;
+    } else if (closure_strategy_str == "frail") {
+      closure_strategy = ClosureCon2PrimStrategy::frail;
+    } else {
+      PARTHENON_THROW("Invalid closure_c2p_strategy option. Choose from [robust,frail]");
+    }
+
+    ClosureRuntimeSettings closure_runtime_params{closure_strategy};
+    params.Add("closure_runtime_params", closure_runtime_params);
+
     std::string recon = pin->GetOrAddString("radiation", "recon", "linear");
     PhoebusReconstruction::ReconType rt = PhoebusReconstruction::ReconType::linear;
     if (recon == "weno5" || recon == "weno5z") {
@@ -350,19 +359,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     params.Add("recon_fixup_strategy", recon_fixup_strategy);
 
-    //    std::string solver = pin->GetOrAddString("radiation", "riemann", "hll");
-    //    riemann::solver rs = riemann::solver::HLL;
-    //    if (solver == "llf") {
-    //      rs = riemann::solver::LLF;
-    //    } else if (solver == "hll") {
-    //      rs = riemann::solver::HLL;
-    //    } else {
-    //      PARTHENON_THROW("Invalid Riemann Solver option. Choose from [llf, hll]");
-    //    }
-    //    params.Add("RiemannSolver", rs);
-
     const std::string src_solver_name =
-        pin->GetOrAddString("radiation", "src_solver", "fourd");
+        pin->GetOrAddString("radiation", "src_solver", "oned");
     SourceSolver src_solver;
     if (src_solver_name == "zerod") {
       src_solver = SourceSolver::zerod;
@@ -403,9 +401,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     params.Add("oned_fixup_strategy", oned_fixup_strategy);
 
-    int ndim = 3;
-    // if (pin->GetInteger("parthenon/mesh", "nx3") > 1) ndim = 3;
-    // else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) ndim = 2;
+    // Required to be 3D in dJ calculation in radiation::ReconstructEdgeStates
+    const int ndim = 3;
 
     Metadata mspecies_three_vector =
         Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,

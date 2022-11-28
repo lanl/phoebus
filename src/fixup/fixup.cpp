@@ -39,7 +39,6 @@ using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
 using singularity::RadiationType;
-using singularity::neutrinos::Opacity;
 
 namespace fixup {
 
@@ -47,8 +46,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto fix = std::make_shared<StateDescriptor>("fixup");
   Params &params = fix->AllParams();
 
+  const bool enable_mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
+  const bool enable_rad = pin->GetOrAddBoolean("physics", "rad", false);
+
   bool enable_flux_fixup = pin->GetOrAddBoolean("fixup", "enable_flux_fixup", false);
   params.Add("enable_flux_fixup", enable_flux_fixup);
+  bool enable_ox1_fmks_inflow_check =
+      pin->GetOrAddBoolean("fixup", "enable_ox1_fmks_inflow_check", false);
+  params.Add("enable_ox1_fmks_inflow_check", enable_ox1_fmks_inflow_check);
   bool enable_fixup = pin->GetOrAddBoolean("fixup", "enable_fixup", false);
   params.Add("enable_fixup", enable_fixup);
   bool enable_floors = pin->GetOrAddBoolean("fixup", "enable_floors", false);
@@ -58,17 +63,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("enable_source_fixup", enable_source_fixup);
   bool enable_ceilings = pin->GetOrAddBoolean("fixup", "enable_ceilings", false);
   params.Add("enable_ceilings", enable_ceilings);
-  bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", false);
-  params.Add("enable_rad_ceilings", enable_rad_ceilings);
   bool report_c2p_fails = pin->GetOrAddBoolean("fixup", "report_c2p_fails", false);
   params.Add("report_c2p_fails", report_c2p_fails);
   bool report_source_fails = pin->GetOrAddBoolean("fixup", "report_source_fails", false);
   params.Add("report_source_fails", report_source_fails);
   bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
   bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", false);
-
-  const bool enable_mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
-  const bool enable_rad = pin->GetOrAddBoolean("physics", "rad", false);
+  bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", false);
 
   if (enable_mhd_floors && !enable_mhd) {
     enable_mhd_floors = false;
@@ -81,6 +82,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     PARTHENON_WARN("WARNING Disabling radiation floors because radiation is disabled!");
   }
   params.Add("enable_rad_floors", enable_rad_floors);
+
+  if (enable_rad_ceilings && !enable_rad) {
+    enable_rad_ceilings = false;
+    PARTHENON_WARN("WARNING Disabling radiation ceilings because radiation is disabled!");
+  }
+  params.Add("enable_rad_ceilings", enable_rad_ceilings);
 
   if (enable_c2p_fixup && !enable_floors) {
     enable_floors = true;
@@ -171,8 +178,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         pin->GetOrAddString("fixup", "radiation_ceiling_type", "ConstantXi0");
     if (radiation_ceiling_type == "ConstantXi0") {
       Real xi0 = pin->GetOrAddReal("fixup", "xi0_ceiling", 0.99);
+      Real tau0 = pin->GetOrAddReal("fixup", "tau0_ceiling", 1.e5);
       params.Add("rad_ceiling",
-                 RadiationCeilings(constant_xi0_radiation_ceiling_tag, xi0));
+                 RadiationCeilings(constant_xi0_radiation_ceiling_tag, xi0, tau0));
     }
   } else {
     params.Add("rad_ceiling", RadiationCeilings());
@@ -198,12 +206,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pin->GetOrAddString("fixup", "fluid_c2p_failure_strategy", "interpolate");
   if (fluid_c2p_failure_strategy_str == "interpolate") {
     fluid_c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
-  } else if (fluid_c2p_failure_strategy_str == "interpolate_previous") {
-    fluid_c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
-  } else if (fluid_c2p_failure_strategy_str == "neighbor_minimum") {
-    fluid_c2p_failure_strategy = FAILURE_STRATEGY::neighbor_minimum;
   } else if (fluid_c2p_failure_strategy_str == "floors") {
     fluid_c2p_failure_strategy = FAILURE_STRATEGY::floors;
+  } else {
+    PARTHENON_FAIL("fixup/fluid_c2p_failure_strategy not supported!");
   }
   params.Add("fluid_c2p_failure_strategy", fluid_c2p_failure_strategy);
 
@@ -212,12 +218,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pin->GetOrAddString("fixup", "rad_c2p_failure_strategy", "interpolate");
   if (rad_c2p_failure_strategy_str == "interpolate") {
     rad_c2p_failure_strategy = FAILURE_STRATEGY::interpolate;
-  } else if (rad_c2p_failure_strategy_str == "interpolate_previous") {
-    rad_c2p_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
-  } else if (rad_c2p_failure_strategy_str == "neighbor_minimum") {
-    rad_c2p_failure_strategy = FAILURE_STRATEGY::neighbor_minimum;
   } else if (rad_c2p_failure_strategy_str == "floors") {
     rad_c2p_failure_strategy = FAILURE_STRATEGY::floors;
+  } else {
+    PARTHENON_FAIL("fixup/rad_c2p_failure_strategy not supported!");
   }
   params.Add("rad_c2p_failure_strategy", rad_c2p_failure_strategy);
 
@@ -226,15 +230,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       pin->GetOrAddString("fixup", "src_failure_strategy", "interpolate");
   if (src_failure_strategy_str == "interpolate") {
     src_failure_strategy = FAILURE_STRATEGY::interpolate;
-  } else if (src_failure_strategy_str == "interpolate_previous") {
-    src_failure_strategy = FAILURE_STRATEGY::interpolate_previous;
   } else if (src_failure_strategy_str == "floors") {
     src_failure_strategy = FAILURE_STRATEGY::floors;
+  } else {
+    PARTHENON_FAIL("fixup/src_c2p_failure_strategy not supported!");
   }
   params.Add("src_failure_strategy", src_failure_strategy);
 
   const bool c2p_failure_force_fixup_both =
-      pin->GetOrAddBoolean("fixup", "c2p_failure_force_fixup_both", true);
+      pin->GetOrAddBoolean("fixup", "c2p_failure_force_fixup_both", false);
   params.Add("c2p_failure_force_fixup_both", c2p_failure_force_fixup_both);
 
   params.Add("bounds",
@@ -345,8 +349,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         bounds.GetRadiationFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                   coords.x3v(k, j, i), J_floor);
         Real xi_max;
+        Real garbage;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max);
+                                    coords.x3v(k, j, i), xi_max, garbage);
 
         Real rho_floor_max = rho_floor;
         Real u_floor_max = rho_floor * sie_floor;

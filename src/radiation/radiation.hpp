@@ -22,9 +22,6 @@ using namespace parthenon::driver::prelude;
 using namespace parthenon::package::prelude;
 using namespace parthenon;
 
-#include <singularity-opac/neutrinos/mean_opacity_neutrinos.hpp>
-#include <singularity-opac/neutrinos/opac_neutrinos.hpp>
-
 #include "compile_constants.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
 #include "utils/constants.hpp"
@@ -32,6 +29,8 @@ using namespace parthenon;
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/variables.hpp"
+
+#include "microphysics/opac_phoebus/opac_phoebus.hpp"
 
 using namespace phoebus;
 
@@ -45,9 +44,16 @@ enum class MOCMCBoundaries { outflow, fixed_temp, periodic };
 
 enum class SourceSolver { zerod, oned, fourd };
 
-enum class OneDFixupStrategy { none, ignore_dJ, ignore_all };
+enum class OneDFixupStrategy {
+  none,      // Do not attempt to repair failed 1D rootfind
+  ignore_dJ, // If 1D rootfind fails, ignore update to radiation temperature
+  ignore_all // If 1D rootfind fails, do not apply radiation source
+};
 
-enum class ReconFixupStrategy { none, bounds };
+enum class ReconFixupStrategy {
+  none,  // Do not apply fixups to reconstructed quantities
+  bounds // Apply floors and ceilings to reconstructed quantities
+};
 
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 using singularity::RadiationType;

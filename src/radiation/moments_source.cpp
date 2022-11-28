@@ -24,37 +24,35 @@
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/frequency_info.hpp"
-#include "radiation/opacity_averager.hpp"
 #include "radiation/local_three_geometry.hpp"
+#include "radiation/opacity_averager.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
 
-//#include "fluid/con2prim_robust.hpp"
 #include "fixup/fixup.hpp"
+#include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
 
 namespace radiation {
 
-using namespace singularity::neutrinos;
 using fixup::Bounds;
+using Microphysics::Opacities;
 using singularity::EOS;
 
 template <typename CLOSURE>
 class SourceResidual4 {
  public:
   KOKKOS_FUNCTION
-  SourceResidual4(const EOS &eos, const Opacity &opac, const MeanOpacity &mopac,
-                  const Real rho, const Real Ye, const Real bprim[3],
-                  const RadiationType species, /*const*/ Tens2 &conTilPi,
-                  const Real (&gcov)[4][4], const Real (&gammacon)[3][3],
-                  const Real alpha, const Real beta[3], const Real sdetgam,
-                  const Real scattering_fraction, typename CLOSURE::LocalGeometryType &g,
+  SourceResidual4(const EOS &eos, const Opacities &opacities, const Real rho,
+                  const Real Ye, const Real bprim[3], const RadiationType species,
+                  /*const*/ Tens2 &conTilPi, const Real (&gcov)[4][4],
+                  const Real (&gammacon)[3][3], const Real alpha, const Real beta[3],
+                  const Real sdetgam, typename CLOSURE::LocalGeometryType &g,
                   Real (&U_mhd_0)[4], Real (&U_rad_0)[4], const int &k, const int &j,
                   const int &i)
-      : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), bprim_(&(bprim[0])),
+      : eos_(eos), opacities_(opacities), rho_(rho), bprim_(&(bprim[0])),
         species_(species), conTilPi_(conTilPi), gcov_(&gcov), gammacon_(&gammacon),
-        alpha_(alpha), beta_(&(beta[0])), sdetgam_(sdetgam),
-        scattering_fraction_(scattering_fraction), g_(g), U_mhd_0_(&U_mhd_0),
+        alpha_(alpha), beta_(&(beta[0])), sdetgam_(sdetgam), g_(g), U_mhd_0_(&U_mhd_0),
         U_rad_0_(&U_rad_0), k_(k), j_(j), i_(i) {
     lambda_[0] = Ye;
     lambda_[1] = 0.;
@@ -62,9 +60,11 @@ class SourceResidual4 {
 
   KOKKOS_INLINE_FUNCTION
   void CalculateMHDConserved(Real P_mhd[4], Real U_mhd[4]) {
-    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, robust::ratio(P_mhd[0], rho_), lambda_);
-    Real gam1 =
-        robust::ratio(eos_.BulkModulusFromDensityInternalEnergy(rho_, robust::ratio(P_mhd[0], rho_), lambda_), Pg);
+    Real Pg = eos_.PressureFromDensityInternalEnergy(rho_, robust::ratio(P_mhd[0], rho_),
+                                                     lambda_);
+    Real gam1 = robust::ratio(eos_.BulkModulusFromDensityInternalEnergy(
+                                  rho_, robust::ratio(P_mhd[0], rho_), lambda_),
+                              Pg);
     Real D;
     Real bcons[3];
     Real ye_cons;
@@ -94,11 +94,6 @@ class SourceResidual4 {
     SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
     Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
-    // Use gamma_max from code?
-    if (W > 100) {
-      printf("W = %e! [%i %i %i]\n", W, k_, j_, i_);
-      return ClosureStatus::failure;
-    }
     CLOSURE c(con_v, &g_);
     // TODO(BRR) Accept separately calculated con_tilPi as an option
     // TODO(BRR) Store xi, phi guesses
@@ -113,22 +108,15 @@ class SourceResidual4 {
   KOKKOS_INLINE_FUNCTION
   void CalculateSource(Real P_mhd[4], Real P_rad[4], Real S[4]) {
     Real Tg = eos_.TemperatureFromDensityInternalEnergy(rho_, P_mhd[0] / rho_, lambda_);
-    Real JBB = opac_.EnergyDensityFromTemperature(Tg, species_);
-    Real kappaH =
-        mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
-
-    //Real kappaH, kappaJ;
-    //c.GetAverageOpacities(rho_, Tg, lambda_[0], species_, kappaJ, kappaH);
-    // TODO(BRR) remove this when removing scattering_fraction
-    //kappaH = kappaJ;
-
-    //Real kappaH = c.mean_opac.RosselandMeanAbsorption
-
+    Real JBB = opacities_.EnergyDensityFromTemperature(Tg, species_);
+    Real kappaJ =
+        opacities_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
+    Real kappaH = kappaJ + opacities_.RosselandMeanAbsorptionCoefficient(
+                               rho_, Tg, lambda_[0], species_);
     // TODO(BRR) this is arguably cheating, arguably not. Should include dt though
     // kappaH * dt < 1 / eps
     kappaH = std::min<Real>(kappaH, 1.e5);
-    // TODO(BRR) remove scattering_fraction
-    Real kappaJ = (1. - scattering_fraction_) * kappaH;
+    kappaJ = std::min<Real>(kappaJ, 1.e5);
     Real W = 0.;
     SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
@@ -146,8 +134,7 @@ class SourceResidual4 {
 
  private:
   const EOS &eos_;
-  const Opacity &opac_;
-  const MeanOpacity &mopac_;
+  const Opacities &opacities_;
   const Real rho_;
   const Real *bprim_;
   const RadiationType species_;
@@ -159,7 +146,6 @@ class SourceResidual4 {
   const Real alpha_;
   const Real *beta_;
   const Real sdetgam_;
-  const Real scattering_fraction_;
 
   typename CLOSURE::LocalGeometryType &g_;
 
@@ -169,21 +155,23 @@ class SourceResidual4 {
   const int &k_, &j_, &i_;
 };
 
-//template <typename T>
+// template <typename T>
 class VarAccessor2D {
-  public:
-  VarAccessor2D(const VariablePack<Real> &v, const int &b, const FlatIdx &idx, const int &k, const int &j, const int &i) :
-    v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {
-      PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Creating VarAccessor2D with invalid FlatIdx!");
-      }
+ public:
+  VarAccessor2D(const VariablePack<Real> &v, const int &b, const FlatIdx &idx,
+                const int &k, const int &j, const int &i)
+      : v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {
+    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(),
+                            "Creating VarAccessor2D with invalid FlatIdx!");
+  }
 
   KOKKOS_FORCEINLINE_FUNCTION
-    Real &operator()(const int &ii, const int &jj) {
-      PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Accessing invalid index!");
-      return v_(b_, idx_(ii, jj), k_, j_, i_);
-    }
+  Real &operator()(const int &ii, const int &jj) {
+    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Accessing invalid index!");
+    return v_(b_, idx_(ii, jj), k_, j_, i_);
+  }
 
-  private:
+ private:
   const VariablePack<Real> &v_;
   const int &b_;
   const FlatIdx &idx_;
@@ -196,13 +184,14 @@ template <typename CLOSURE>
 class InteractionTResidual {
  public:
   KOKKOS_FUNCTION
-  InteractionTResidual(const EOS &eos, const CLOSURE closure, const OpacityAverager &opac_avgr, const Opacity &opacity,
-                       const MeanOpacity &mean_opacity, const Real &rho, const Real &ug0,
+  InteractionTResidual(const EOS &eos, const CLOSURE closure,
+                       const OpacityAverager &opac_avgr, const Real &rho, const Real &ug0,
                        const Real &Ye, const Real J0[3], const int &nspec,
-                       const RadiationType species[3], const Real &scattering_fraction,
-                       const Real &dtau, const VarAccessor2D &Inu0, const VarAccessor2D &Inu1)
-      : eos_(eos), closure_(closure), opacity_(opacity), mean_opacity_(mean_opacity), rho_(rho), ug0_(ug0),
-        Ye_(Ye), nspec_(nspec), scattering_fraction_(scattering_fraction), dtau_(dtau), Inu0_(Inu0), Inu1_(Inu1) {
+                       const RadiationType species[3], const Real &dtau,
+                       VarAccessor2D &Inu0, VarAccessor2D &Inu1, const Real &alpha_max)
+      : eos_(eos), closure_(closure), opacities_(opacities), rho_(rho), ug0_(ug0),
+        Ye_(Ye), nspec_(nspec), dtau_(dtau), Inu0_(Inu0), Inu1_(Inu1),
+        alpha_max_(alpha_max) {
     for (int ispec = 0; ispec < nspec; ++ispec) {
       J0_[ispec] = J0[ispec];
       species_[ispec] = species[ispec];
@@ -219,19 +208,11 @@ class InteractionTResidual {
     for (int ispec = 0; ispec < nspec_; ++ispec) {
       J0_tot += J0_[ispec];
 
-      // Update n+1 to get
+      Real kappaJ = opac_avgr_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, ispec);
+      kappaJ = std::min<Real>(kappaJ, alpha_max_);
 
-      // Get Inu^n+1 from Inu0
-      //const Real kappa =
-      //    (1. - scattering_fraction_) *
-      //    mean_opacity_.RosselandMeanAbsorptionCoefficient(rho_, T, Ye_, species_[ispec]);
-      Real kappaJ = opac_avgr.GetAveragedAbsorptionOpacity(rho_, T, Ye_, ispec);
-      //closure_.GetAveragedAbsorptionOpacity(rho_, T, Ye_, species_[ispec], kappaJ);
-      kappaJ = (1. - scattering_fraction_) * kappaJ;
-      // TODO(BRR) remove scattering_fraction
-
-
-      const Real JBB = opacity_.EnergyDensityFromTemperature(T, species_[ispec]);
+      const Real JBB =
+          opac_avgr_.opacities_.EnergyDensityFromTemperature(T, species_[ispec]);
 
       dJ_tot += (J0_[ispec] + dtau_ * kappaJ * JBB) / (1. + dtau_ * kappaJ) - J0_[ispec];
     }
@@ -245,17 +226,15 @@ class InteractionTResidual {
   const EOS &eos_;
   const CLOSURE &closure_;
   const OpacityAverager &opac_avgr_;
-  const Opacity &opacity_;
-  const MeanOpacity &mean_opacity_;
   const Real &rho_;
   const Real &ug0_;
   const Real &Ye_;
   Real J0_[MaxNumRadiationSpecies];
   const int &nspec_;
-  const Real &scattering_fraction_;
   const Real &dtau_; // Proper time
   const VarAccessor2D &Inu0_;
   const VarAccessor2D &Inu1_;
+  const Real &alpha_max_; // Maximum optical depth per timestep
   RadiationType species_[MaxNumRadiationSpecies];
 };
 
@@ -275,11 +254,29 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{c::energy, c::momentum, c::ye,       cr::E,
-                                cr::F,     c::bfield,   p::density,  p::temperature,
-                                p::energy, p::ye,       p::velocity, p::bfield,
-                                pr::J,     pr::H,       ir::kappaJ,  ir::kappaH,
-                                ir::JBB,   ir::tilPi,   ir::srcfail, mocmc_internal::Inu0};
+  std::vector<std::string> vars{c::density,
+                                c::energy,
+                                c::momentum,
+                                c::ye,
+                                cr::E,
+                                cr::F,
+                                c::bfield,
+                                p::density,
+                                p::temperature,
+                                p::energy,
+                                p::ye,
+                                p::velocity,
+                                p::pressure,
+                                p::gamma1,
+                                p::bfield,
+                                pr::J,
+                                pr::H,
+                                ir::kappaJ,
+                                ir::kappaH,
+                                ir::JBB,
+                                ir::tilPi,
+                                mocmc_internal::Inu0,
+                                mocmc_internal::Inu1};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -294,16 +291,18 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
   auto idx_tilPi = imap.GetFlatIdx(ir::tilPi, false);
-  auto ifail = imap[ir::srcfail].first;
   auto pv = imap.GetFlatIdx(p::velocity);
 
   int prho = imap[p::density].first;
   int peng = imap[p::energy].first;
   int pT = imap[p::temperature].first;
+  int pprs = imap[p::pressure].first;
+  int pgm1 = imap[p::gamma1].first;
   int pYe = imap[p::ye].first;
   int pb_lo = imap[p::bfield].first;
   int cb_lo = imap[c::bfield].first;
 
+  int crho = imap[c::density].first;
   int ceng = imap[c::energy].first;
   int cmom_lo = imap[c::momentum].first;
   int cmom_hi = imap[c::momentum].second;
@@ -333,11 +332,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   auto coords = pmb->coords;
 
-  const auto &d_opacity = opac->Param<Opacity>("d.opacity");
-  const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
-  // Mainly for testing purposes, probably should be able to do this with the opacity code
-  // itself
-  const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
+  const auto &opacities = opac->Param<Opacities>("opacities");
 
   const auto src_solver = rad->Param<SourceSolver>("src_solver");
   const auto src_use_oned_backup = rad->Param<bool>("src_use_oned_backup");
@@ -345,6 +340,16 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   const auto src_rootfind_tol = rad->Param<Real>("src_rootfind_tol");
   const auto src_rootfind_maxiter = rad->Param<int>("src_rootfind_maxiter");
   const auto oned_fixup_strategy = rad->Param<OneDFixupStrategy>("oned_fixup_strategy");
+
+  const Real c2p_tol = update_fluid ? fluid_pkg->Param<Real>("c2p_tol") : 0.;
+  const int c2p_max_iter = update_fluid ? fluid_pkg->Param<int>("c2p_max_iter") : 0;
+  const Real c2p_floor_scale_fac =
+      update_fluid ? fluid_pkg->Param<Real>("c2p_floor_scale_fac") : 0.;
+  const bool c2p_fail_on_floors = true;
+  const bool c2p_fail_on_ceilings = true;
+  auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter,
+                                                c2p_floor_scale_fac, c2p_fail_on_floors,
+                                                c2p_fail_on_ceilings);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -368,8 +373,10 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
         // Bounds
         Real xi_max;
+        Real tau_max;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max);
+                                    coords.x3v(k, j, i), xi_max, tau_max);
+        const Real alpha_max = tau_max / (alpha * dt);
 
         Real rho = v(iblock, prho, k, j, i);
         Real ug = v(iblock, peng, k, j, i);
@@ -405,24 +412,41 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
             // Rootfind over fluid temperature in fluid rest frame
             root_find::RootFind root_find(src_rootfind_maxiter);
-            // TODO(BRR) Pass Residual another class that holds Inu(nu) and can average opacities
-            // Can closure provide this?
-            // Note that con_v doesn't change during temperature update
-            CLOSURE c(con_v, &g, &d_opacity, &d_mean_opacity, &v, &idx_Inu, nu_bins, dlnu, &nusamp);
-            OpacityAverager<CLOSURE> opac_avgr(c, freq_info, d_opacity, d_mean_opacity, v, idx_Inu, species_d, iblock, k, j, i);
-            Real mykappaJ =
-            opac_avgr.GetAveragedAbsorptionOpacity(rho, v(iblock, pT, k, j, i), Ye, ispec);
+            // TODO(BRR) Pass Residual another class that holds Inu(nu) and can average
+            // opacities Can closure provide this? Note that con_v doesn't change during
+            // temperature update
+            CLOSURE c(con_v, &g, &d_opacity, &d_mean_opacity, &v, &idx_Inu, nu_bins, dlnu,
+                      &nusamp);
+            OpacityAverager<CLOSURE> opac_avgr(c, freq_info, opacities, v, idx_Inu,
+                                               species_d, iblock, k, j, i);
+            Real mykappaJ = opac_avgr.GetAveragedAbsorptionOpacity(
+                rho, v(iblock, pT, k, j, i), Ye, ispec);
             PARTHENON_FAIL("sotp here");
-            //c.InitializeSpectrum(&v, nu_bins, dlnu, &nusamp, &idx_Inu);
-            InteractionTResidual<CLOSURE> res(eos, c, opac_avgr, d_opacity, d_mean_opacity, rho, ug, Ye, J0,
-                                     num_species, species_d, scattering_fraction, dtau);
+            InteractionTResidual<CLOSURE> res(eos, c, opac_avgr, rho, ug, Ye, J0,
+                                              num_species, species_d, dtau, alpha_max);
             root_find::RootFindStatus status;
-            const Real T1 = root_find.secant(res, 0, 1.e3 * v(iblock, pT, k, j, i),
-                                             1.e-8 * v(iblock, pT, k, j, i),
+            Real T1 = root_find.regula_falsi(res, 1.e-2 * v(iblock, pT, k, j, i),
+                                             1.e2 * v(iblock, pT, k, j, i),
+                                             src_rootfind_tol * v(iblock, pT, k, j, i),
                                              v(iblock, pT, k, j, i), &status);
+            Real rebracketing_fac = 10.;
+            int n_rebracketing_tries = 0;
+            constexpr int MAX_REBRACKETING_TRIES = 4;
+            while (status == root_find::RootFindStatus::failure &&
+                   n_rebracketing_tries < MAX_REBRACKETING_TRIES) {
+              T1 = root_find.regula_falsi(
+                  res, 1.e-1 / rebracketing_fac * v(iblock, pT, k, j, i),
+                  1.e1 * rebracketing_fac * v(iblock, pT, k, j, i),
+                  src_rootfind_tol * v(iblock, pT, k, j, i), v(iblock, pT, k, j, i),
+                  &status);
+
+              n_rebracketing_tries++;
+              rebracketing_fac *= 10.;
+            }
+
             if (status == root_find::RootFindStatus::failure) {
+              PARTHENON_DEBUG_WARN("1D source rootfind failure!");
               success = false;
-              // break;
             }
 
             Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
@@ -439,7 +463,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             }};
             Tens2 con_tilPi;
 
-            // TODO(BRR) Using updated T, update sample intensities and re-evaluate idx_tilPi()
+            // TODO(BRR) Using updated T, update sample intensities and re-evaluate
+            // idx_tilPi()
 
             if (idx_tilPi.IsValid()) {
               SPACELOOP2(ii, jj) {
@@ -449,14 +474,18 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               c.GetConTilPiFromPrim(J, cov_H, &con_tilPi);
             }
 
-            // TODO(BRR) Evaluate kappa with updated intensities (or just get it from rootfind
-            // output that produced T1)
-
-            Real JBB = d_opacity.EnergyDensityFromTemperature(T1, species_d[ispec]);
-            Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-                rho, T1, Ye, species_d[ispec]);
-            Real tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-            Real tauH = alpha * dt * kappa;
+            // TODO(BRR) Use opacity averager with updated temperature (and updated
+            // intensities?)
+            Real JBB = opacities.EnergyDensityFromTemperature(T1, species_d[ispec]);
+            Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(rho, T1, Ye,
+                                                                       species_d[ispec]);
+            kappaJ = std::min<Real>(kappaJ, alpha_max);
+            Real kappaH = opacities.RosselandMeanScatteringCoefficient(rho, T1, Ye,
+                                                                       species_d[ispec]);
+            kappaH = std::min<Real>(kappaH, alpha_max);
+            kappaH += kappaJ;
+            Real tauJ = alpha * dt * kappaJ;
+            Real tauH = alpha * dt * kappaH;
 
             if (status == root_find::RootFindStatus::success) {
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
@@ -471,9 +500,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               if (c2p_status == ClosureStatus::success) {
                 success = true;
               } else {
+                PARTHENON_DEBUG_WARN("closure failure!");
                 success = false;
               }
             } else {
+              PARTHENON_DEBUG_WARN("success is false!");
               success = false;
             }
 
@@ -484,11 +515,16 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                 cov_Fstar(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam;
               }
 
-              JBB = v(iblock, idx_J(ispec), k, j, i);
-              kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-                  rho, v(iblock, pT, k, j, i), Ye, species_d[ispec]);
-              tauJ = alpha * dt * (1. - scattering_fraction) * kappa;
-              tauH = alpha * dt * kappa;
+              Real JBB = opacities.EnergyDensityFromTemperature(v(iblock, pT, k, j, i),
+                                                                species_d[ispec]);
+              // Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
+              Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(
+                  rho, T1, Ye, species_d[ispec]);
+              Real kappaH = opacities.RosselandMeanScatteringCoefficient(
+                                rho, T1, Ye, species_d[ispec]) +
+                            kappaJ;
+              tauJ = alpha * dt * kappaJ;
+              tauH = alpha * dt * kappaH;
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
 
@@ -504,15 +540,17 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                   std::sqrt(g.contractCov3Vectors(cov_H, cov_H) -
                             std::pow(g.contractConCov3Vectors(con_v, cov_H), 2)) /
                   J;
-              if (c2p_status == ClosureStatus::failure) {
+              if (c2p_status == ClosureStatus::success) {
+                printf("c2p ignore dJ success!\n");
+                success = true;
+              } else {
+                printf("c2p ignore dJ failure!\n");
                 success = false;
                 break;
-              } else {
-                success = true;
               }
             } else if (!success && oned_fixup_strategy == OneDFixupStrategy::ignore_all) {
               dE[ispec] = 0.;
-              SPACELOOP(ii) { cov_Fstar(ii) = 0.; }
+              SPACELOOP(ii) { cov_dF[ispec](ii) = 0.; }
               success = true;
             } else {
               break; // Don't bother with other species if this failed
@@ -558,10 +596,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                       v(iblock, idx_F(ispec, 2), k, j, i)}};
             c.GetConTilPiFromPrim(J, covH, &con_tilPi);
           }
-          SourceResidual4<CLOSURE> srm(eos, d_opacity, d_mean_opacity, rho, Ye, bprim,
-                                       species_d[ispec], con_tilPi, cov_g, con_gamma.data,
-                                       alpha, beta, sdetgam, scattering_fraction, g,
-                                       U_mhd_0, U_rad_0, k, j, i);
+          SourceResidual4<CLOSURE> srm(eos, opacities, rho, Ye, bprim, species_d[ispec],
+                                       con_tilPi, cov_g, con_gamma.data, alpha, beta,
+                                       sdetgam, g, U_mhd_0, U_rad_0, k, j, i);
 
           // Memory for evaluating Jacobian via finite differences
           Real P_rad_m[4];
@@ -819,26 +856,183 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
           }
         } // SourceSolver
 
-        if (success == true) {
-          for (int ispec = 0; ispec < num_species; ispec++) {
-            v(iblock, ifail, k, j, i) = FailFlags::success;
+        // TODO(BRR) Check this logic for multiple species
+        for (int ispec = 0; ispec < num_species; ispec++) {
 
+          if (success == true) {
             v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE[ispec];
             SPACELOOP(ii) {
               v(iblock, idx_F(ispec, ii), k, j, i) += sdetgam * cov_dF[ispec](ii);
             }
-            if (update_fluid) {
-              if (cye > 0) {
-                v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+          }
+
+          Tens2 conTilPi = {0};
+          Real E = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
+          Vec covF;
+          Real J;
+          Vec covH;
+
+          bool successful_prim_recovery = false;
+
+          if (update_fluid) {
+            if (cye > 0) {
+              v(iblock, cye, k, j, i) -= sdetgam * 0.0;
+            }
+            v(iblock, ceng, k, j, i) -= sdetgam * dE[ispec];
+            SPACELOOP(ii) {
+              v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF[ispec](ii);
+            }
+
+            // Do GRMHD inversion and check that it works
+            auto mhd_c2p_status = invert(geom, eos, coords, k, j, i);
+            if (mhd_c2p_status == con2prim_robust::ConToPrimStatus::failure) {
+              successful_prim_recovery = false;
+            } else {
+              // Set con_v
+              Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                         v(iblock, pv(2), k, j, i)}};
+              const Real W = phoebus::GetLorentzFactor(con_v.data, cov_gamma.data);
+              SPACELOOP(ii) { con_v(ii) /= W; }
+
+              // Do rad inversion and check that it works
+              CLOSURE c(con_v, &g, {ClosureCon2PrimStrategy::frail});
+
+              // Update pi
+              SPACELOOP(ii) { covF(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam; }
+              if (idx_tilPi.IsValid()) {
+                SPACELOOP2(ii, jj) {
+                  conTilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i);
+                }
+              } else {
+                Real xi = 0.0;
+                Real phi = M_PI;
+                // TODO(BRR) Remove STORE_GUESS parameter and instead check if closure
+                // type is M1?
+                // if (STORE_GUESS) {
+                //  xi = v(iblock, iXi(ispec), k, j, i);
+                //  phi = 1.0001 * v(iblock, iPhi(ispec), k, j, i);
+                // }
+                c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
+                // if (STORE_GUESS) {
+                //  v(iblock, iXi(ispec), k, j, i) = xi;
+                //  v(iblock, iPhi(ispec), k, j, i) = phi;
+                //}
               }
-              v(iblock, ceng, k, j, i) -= sdetgam * dE[ispec];
-              SPACELOOP(ii) {
-                v(iblock, cmom_lo + ii, k, j, i) -= sdetgam * cov_dF[ispec](ii);
+
+              auto rad_c2p_status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
+
+              if (rad_c2p_status == ClosureStatus::success) {
+                successful_prim_recovery = true;
+                // Store rad prims
+                v(iblock, idx_J(ispec), k, j, i) = J;
+                SPACELOOP(ii) { v(iblock, idx_H(ispec, ii), k, j, i) = covH(ii) / J; }
+              } else {
+                successful_prim_recovery = false;
               }
             }
+
+          } else {
+            // No fluid update; just do rad inversion and check that it works
+
+            const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
+            Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
+            CLOSURE c(con_v, &g, {ClosureCon2PrimStrategy::frail});
+            // Update pi
+            SPACELOOP(ii) { covF(ii) = v(iblock, idx_F(ispec, ii), k, j, i) / sdetgam; }
+            if (idx_tilPi.IsValid()) {
+              SPACELOOP2(ii, jj) {
+                conTilPi(ii, jj) = v(iblock, idx_tilPi(ispec, ii, jj), k, j, i);
+              }
+            } else {
+              Real xi = 0.0;
+              Real phi = M_PI;
+              // TODO(BRR) Remove STORE_GUESS parameter and instead check if closure type
+              // is M1?
+              // if (STORE_GUESS) {
+              //  xi = v(iblock, iXi(ispec), k, j, i);
+              //  phi = 1.0001 * v(iblock, iPhi(ispec), k, j, i);
+              // }
+              c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
+              // if (STORE_GUESS) {
+              //  v(iblock, iXi(ispec), k, j, i) = xi;
+              //  v(iblock, iPhi(ispec), k, j, i) = phi;
+              //}
+            }
+
+            auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
+            if (status == ClosureStatus::success) {
+              // If it worked, set prims
+              v(iblock, idx_J(ispec), k, j, i) = J;
+              SPACELOOP(ii) { v(iblock, idx_H(ispec, ii), k, j, i) = covH(ii) / J; }
+              successful_prim_recovery = true;
+            } else {
+              successful_prim_recovery = false;
+            }
           }
-        } else {
-          v(iblock, ifail, k, j, i) = FailFlags::fail;
+
+          if (!successful_prim_recovery) {
+            // Source update failed. Try again with smaller kappas? Set to floors? Zero
+            // source update?
+
+            if (update_fluid) {
+              // Also set con_v for the closure
+              v(iblock, prho, k, j, i) = 10. * robust::SMALL();
+              v(iblock, peng, k, j, i) = 10. * robust::SMALL();
+              SPACELOOP(ii) { v(iblock, pv(ii), k, j, i) = 0.; }
+              // TODO(BRR) use Ye here!
+              Real ye = 0.5;
+              if (pYe >= 0) {
+                ye = v(iblock, pYe, k, j, i);
+              }
+              Real eos_lambda[2] = {ye, 0};
+              v(iblock, pprs, k, j, i) = eos.PressureFromDensityInternalEnergy(
+                  v(iblock, prho, k, j, i),
+                  robust::ratio(v(iblock, peng, k, j, i), v(iblock, prho, k, j, i)),
+                  eos_lambda);
+              v(iblock, pT, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+                  v(iblock, prho, k, j, i),
+                  robust::ratio(v(iblock, peng, k, j, i), v(iblock, prho, k, j, i)),
+                  eos_lambda);
+              v(iblock, pgm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+                  v(iblock, prho, k, j, i), v(iblock, pT, k, j, i), eos_lambda);
+              Real vp[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                            v(iblock, pv(2), k, j, i)};
+              Real bp[3];
+              if (pb_lo >= 0) {
+                SPACELOOP(ii) { bp[ii] = v(iblock, pb_lo + ii, k, j, i); }
+              }
+              Real S[3];
+              Real Bcons[3];
+              Real yecons;
+              prim2con::p2c(v(iblock, prho, k, j, i), vp, bp, v(iblock, peng, k, j, i),
+                            eos_lambda[0], v(iblock, pprs, k, j, i),
+                            v(iblock, pgm1, k, j, i), cov_g, con_gamma.data, beta, alpha,
+                            sdetgam, v(iblock, crho, k, j, i), S, Bcons,
+                            v(iblock, ceng, k, j, i), yecons);
+              // TODO(BRR) set cons ye!
+              if (cye >= 0) {
+                v(iblock, cye, k, j, i) = yecons;
+              }
+              SPACELOOP(ii) { v(iblock, cmom_lo + ii, k, j, i) = S[ii]; }
+            }
+
+            Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                       v(iblock, pv(2), k, j, i)}};
+            const Real W = phoebus::GetLorentzFactor(con_v.data, cov_gamma.data);
+            SPACELOOP(ii) { con_v(ii) /= W; }
+
+            CLOSURE c(con_v, &g, {ClosureCon2PrimStrategy::frail});
+
+            v(iblock, idx_J(ispec), k, j, i) = robust::SMALL();
+            J = v(iblock, idx_J(ispec), k, j, i);
+            SPACELOOP(ii) {
+              v(iblock, idx_H(ispec, ii), k, j, i) = 0.;
+              covH(ii) = v(iblock, idx_H(ispec, ii), k, j, i) * J;
+            }
+            c.Prim2Con(J, covH, conTilPi, &E, &covF);
+            v(iblock, idx_E(ispec), k, j, i) = E * sdetgam;
+            SPACELOOP(ii) { v(iblock, idx_F(ispec, ii), k, j, i) = covF(ii) * sdetgam; }
+          }
         }
       });
   return TaskStatus::complete;

@@ -1,5 +1,5 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
-// program was produced under U.S. Government contract
+// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
 // Department of Energy/National Nuclear Security Administration. All
@@ -14,18 +14,16 @@
 #ifndef COMPILE_CONSTANTS_HPP_
 #define COMPILE_CONSTANTS_HPP_
 
-#define NCONS_MAX @MAX_NUMBER_CONSERVED_VARS@
+#define NCONS_MAX (@MAX_NUMBER_CONSERVED_VARS@)
 
 #define PHOEBUS_GEOMETRY Geometry::@PHOEBUS_GEOMETRY@
 #define GEOMETRY_MESH @GEOMETRY_MESH@
 #define GEOMETRY_MESH_BLOCK @GEOMETRY_MESH_BLOCK@
 
-#define USE_VALENCIA @USE_VALENCIA@
+#define USE_VALENCIA (@USE_VALENCIA@)
 
-#define USE_C2P_ROBUST_FLOORS @USE_C2P_ROBUST_FLOORS@
+#define SET_FLUX_SRC_DIAGS (@SET_FLUX_SRC_DIAGS@)
 
-#define SET_FLUX_SRC_DIAGS @SET_FLUX_SRC_DIAGS@
-
-#define CON2PRIM_STATISTICS @CON2PRIM_STATISTICS@
+#define CON2PRIM_STATISTICS (@CON2PRIM_STATISTICS@)
 
 #endif //COMPILE_CONSTANTS_HPP_

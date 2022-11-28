@@ -32,8 +32,8 @@
 
 namespace radiation {
 
-using namespace singularity::neutrinos;
 using fixup::Bounds;
+using Microphysics::Opacities;
 using singularity::EOS;
 
 template <class T>
@@ -66,6 +66,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   namespace ir = radmoment_internal;
 
   auto *pm = rc->GetParentPointer().get();
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
 
   IndexRange ib = pm->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -94,6 +95,9 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
   const Real pi = acos(-1);
 
+  auto closure_runtime_params =
+      rad->Param<ClosureRuntimeSettings>("closure_runtime_params");
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 0,
       v.GetDim(5) - 1,  // Loop over meshblocks
@@ -113,7 +117,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
                    v(b, pv(2), k, j, i) / W}};
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
-        CLOSURE c(con_v, &g);
+        CLOSURE c(con_v, &g, closure_runtime_params);
 
         Real J;
         Vec covH;
@@ -141,6 +145,13 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
           }
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
+
+        if (status == ClosureStatus::modified) {
+          c.Prim2Con(J, covH, conTilPi, &E, &covF);
+          v(b, cE(ispec), k, j, i) = E / isdetgam;
+          SPACELOOP(ii) { v(b, cF(ispec, ii), k, j, i) = covF(ii) / isdetgam; }
+          status = ClosureStatus::success;
+        }
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -568,7 +579,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         bounds.GetRadiationFloors(X[1], X[2], X[3], J_floor);
 
         Real xi_ceiling;
-        bounds.GetRadiationCeilings(X[1], X[2], X[3], xi_ceiling);
+        bounds.GetRadiationCeilings(X[1], X[2], X[3], xi_ceiling, garbage);
 
         Vec con_beta;
         Tens2 cov_gamma;
@@ -820,11 +831,12 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
         Real dlnalp[ND];
         Real Gamma[ND][ND][ND];
         geom.GradLnAlpha(CellLocation::Cent, iblock, k, j, i, dlnalp);
-        geom.ConnectionCoefficient(CellLocation::Cent, iblock, k, j, i, Gamma);
+        Real dg[ND][ND][ND];
+        geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
+        Geometry::Utils::SetConnectionCoeffFromMetricDerivs(dg, Gamma);
 
-        Real con_u[4];
-        con_u[0] = W / alp;
-        SPACELOOP(ii) { con_u[ii + 1] = W * con_v(ii) - con_beta(ii) / alp; }
+        Real con_n[4] = {1. / alp, -con_beta(0) / alp, -con_beta(1) / alp,
+                         -con_beta(2) / alp};
 
         for (int ispec = 0; ispec < nspec; ++ispec) {
           Real E = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
@@ -835,54 +847,46 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
           Vec covH{{J * v(iblock, idx_H(ispec, 0), k, j, i),
                     J * v(iblock, idx_H(ispec, 1), k, j, i),
                     J * v(iblock, idx_H(ispec, 2), k, j, i)}};
+          Tens2 conTilPi;
+          if (iTilPi.IsValid()) {
+            SPACELOOP2(ii, jj) {
+              conTilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+            }
+          } else {
+            c.GetConTilPiFromPrim(J, covH, &conTilPi);
+          }
+          Tens2 conP;
+          c.getConPFromPrim(J, covH, conTilPi, &conP);
 
           Vec conF;
           g.raise3Vector(covF, &conF);
 
-          Real con_H4[4] = {0};
-          SPACELOOP2(ii, jj) { con_H4[ii + 1] += g.con_gamma(ii, jj) * covH(jj); }
-
-          Real conTilPi[4][4] = {0};
-          if (iTilPi.IsValid()) {
-            SPACELOOP2(ii, jj) {
-              conTilPi[ii + 1][jj + 1] = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
-            }
-          } else {
-            Tens2 con_tilPi{0};
-            c.GetConTilPiFromPrim(J, covH, &con_tilPi);
-            SPACELOOP2(ii, jj) { conTilPi[ii + 1][jj + 1] = con_tilPi(ii, jj); }
-          }
-
-          Real con_T[4][4];
-          SPACETIMELOOP2(mu, nu) {
-            Real conh_munu = con_g[mu][nu] + con_u[mu] * con_u[nu];
-            con_T[mu][nu] = (con_u[mu] * con_u[nu] + conh_munu / 3.) * J;
-            con_T[mu][nu] += con_u[mu] * con_H4[nu] + con_u[nu] * con_H4[mu];
-            con_T[mu][nu] += J * conTilPi[mu][nu];
-          }
-
-          // TODO(BRR) add Pij contribution
-
-          Real srcE = 0.0;
+          Real con_T[4][4] = {0};
+          SPACETIMELOOP2(mu, nu) { con_T[mu][nu] += con_n[mu] * con_n[nu] * E; }
           SPACETIMELOOP(mu) {
-            srcE += con_T[mu][0] * dlnalp[mu];
-            SPACETIMELOOP(nu) {
-              Real Gamma_udd = 0.;
-              SPACETIMELOOP(lam) { Gamma_udd += con_g[0][lam] * Gamma[lam][nu][mu]; }
-              srcE -= con_T[mu][nu] * Gamma_udd;
+            SPACELOOP(ii) {
+              con_T[mu][ii + 1] += con_n[mu] * conF(ii);
+              con_T[ii + 1][mu] += con_n[mu] * conF(ii);
             }
           }
-          srcE *= alp * alp;
+          SPACELOOP2(ii, jj) { con_T[ii + 1][jj + 1] += conP(ii, jj); }
 
-          Vec srcF{0, 0, 0};
-          SPACELOOP(ii) {
-            SPACETIMELOOP2(mu, nu) { srcF(ii) += con_T[mu][nu] * Gamma[mu][nu][ii + 1]; }
-            srcF(ii) *= alp;
+          Real TGam = 0.0;
+          SPACETIMELOOP2(m, n) {
+            Real gam0 = 0.;
+            SPACETIMELOOP(r) { gam0 += con_g[0][r] * Gamma[r][m][n]; }
+            TGam += con_T[m][n] * gam0;
           }
+          Real Ta = 0.0;
+          SPACETIMELOOP(m) { Ta += con_T[m][0] * dlnalp[m]; }
+          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * alp * alp * (Ta - TGam);
 
-          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * srcE;
-          SPACELOOP(ii) {
-            v_src(iblock, idx_F_src(ispec, ii), k, j, i) = sdetgam * srcF(ii);
+          SPACELOOP(l) {
+            Real src_mom = 0.0;
+            SPACETIMELOOP2(m, n) {
+              src_mom += con_T[m][n] * (dg[n][l + 1][m] - Gamma[l + 1][n][m]);
+            }
+            v_src(iblock, idx_F_src(ispec, l), k, j, i) = alp * sdetgam * src_mom;
           }
 
 #if SET_FLUX_SRC_DIAGS
@@ -958,13 +962,8 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  // Mainly for testing purposes, probably should be able to do this with the opacity
-  // code itself
-  const auto scattering_fraction = rad->Param<Real>("scattering_fraction");
-
   // Get the device opacity object
-  const auto &d_opacity = opac->Param<Opacity>("d.opacity");
-  const auto &d_mean_opacity = opac->Param<MeanOpacity>("d.mean_opacity");
+  const auto &opacities = opac->Param<Opacities>("opacities");
 
   // Get the background geometry
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -987,13 +986,15 @@ TaskStatus MomentCalculateOpacities(T *rc) {
           const Real Temp = v(iblock, pT, k, j, i);
           const Real Ye = pYe > 0 ? v(iblock, pYe, k, j, i) : 0.5;
 
-          Real kappa = d_mean_opacity.RosselandMeanAbsorptionCoefficient(
-              rho, Temp, Ye, dev_species[ispec]);
-          Real JBB = d_opacity.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
+          Real kappaJ = opacities.RosselandMeanAbsorptionCoefficient(rho, Temp, Ye,
+                                                                     dev_species[ispec]);
+          Real kappaH = kappaJ + opacities.RosselandMeanScatteringCoefficient(
+                                     rho, Temp, Ye, dev_species[ispec]);
+          Real JBB = opacities.EnergyDensityFromTemperature(Temp, dev_species[ispec]);
 
           v(iblock, idx_JBB(ispec), k, j, i) = JBB;
-          v(iblock, idx_kappaJ(ispec), k, j, i) = kappa * (1.0 - scattering_fraction);
-          v(iblock, idx_kappaH(ispec), k, j, i) = kappa;
+          v(iblock, idx_kappaJ(ispec), k, j, i) = kappaJ;
+          v(iblock, idx_kappaH(ispec), k, j, i) = kappaH;
         }
       });
 

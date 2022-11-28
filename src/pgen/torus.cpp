@@ -39,13 +39,13 @@ namespace torus {
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
 using namespace radiation;
+using Microphysics::Opacities;
 using singularity::EOS;
-using namespace singularity::neutrinos;
 
 class GasRadTemperatureResidual {
  public:
   KOKKOS_FUNCTION
-  GasRadTemperatureResidual(const Real Ptot, const Real rho, const Opacity &opac,
+  GasRadTemperatureResidual(const Real Ptot, const Real rho, const Opacities &opac,
                             const EOS &eos, RadiationType type, const Real Ye)
       : Ptot_(Ptot), rho_(rho), opac_(opac), eos_(eos), type_(type), Ye_(Ye) {}
 
@@ -59,7 +59,7 @@ class GasRadTemperatureResidual {
  private:
   const Real Ptot_;
   const Real rho_;
-  const Opacity &opac_;
+  const Opacities &opac_;
   const EOS &eos_;
   const RadiationType type_;
   const Real Ye_;
@@ -149,12 +149,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   InitialRadiation init_rad = InitialRadiation::thermal;
 
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
-  Opacity d_opacity;
+  auto opacities = opac->Param<Opacities>("opacities");
   std::vector<RadiationType> species;
   int num_species = 0;
   RadiationType species_d[MaxNumRadiationSpecies] = {};
   if (do_rad) {
-    d_opacity = opac->Param<Opacity>("d.opacity");
     const std::string init_rad_str =
         pin->GetOrAddString("torus", "initial_radiation", "None");
     if (init_rad_str == "None") {
@@ -300,21 +299,24 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               if (init_rad == InitialRadiation::thermal) {
                 root_find::RootFind root_find;
                 GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i),
-                                              d_opacity, eos, species_d[ispec], Ye);
-                v(itmp, k, j, i) = root_find.secant(res, 0, T, 1.e-6 * T, T);
-              } else {
-                PARTHENON_FAIL("Only thermal initial radiation supported currently!");
+                                              opacities, eos, species_d[ispec], Ye);
+                v(itmp, k, j, i) = root_find.regula_falsi(res, 0, T, 1.e-6 * T, T);
               }
 
               // Set fluid u/P/T and radiation J using equilibrium temperature
-              v(iJ(ispec), k, j, i) = d_opacity.EnergyDensityFromTemperature(
-                  v(itmp, k, j, i), species_d[ispec]);
               Real lambda[2] = {Ye, 0.0};
               v(ieng, k, j, i) =
                   v(irho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
                                          v(irho, k, j, i), v(itmp, k, j, i), lambda);
               v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
                   v(irho, k, j, i), v(itmp, k, j, i), lambda);
+
+              if (init_rad == InitialRadiation::thermal) {
+                v(iJ(ispec), k, j, i) = opacities.EnergyDensityFromTemperature(
+                    v(itmp, k, j, i), species_d[ispec]);
+              } else {
+                v(iJ(ispec), k, j, i) = 1.e-5 * v(ieng, k, j, i);
+              }
 
               // Zero comoving frame fluxes
               SPACELOOP(ii) { v(iH(ispec, 0), k, j, i) = 0.; }
@@ -419,8 +421,15 @@ void ProblemModifier(ParameterInput *pin) {
     const std::string eos_type = pin->GetString("eos", "type");
     if (eos_type == "IdealGas") {
       const Real Gamma = pin->GetReal("eos", "Gamma");
-      const Real cv = (Gamma - 1.) * pc::kb / pc::mp;
+      PARTHENON_WARN("Resetting Cv assuming Ye = 0.5!");
+      PARTHENON_WARN("Don't currently have neutron mass!");
+      const Real mn = pc::mp + pc::me; // Oops no binding energy
+      const Real mu = (pc::mp + mn + pc::me) / (3. * pc::mp);
+      const Real cv = pc::kb / ((Gamma - 1.) * mu * pc::mp);
       pin->SetReal("eos", "Cv", cv);
+    } else {
+      PARTHENON_FAIL(
+          "eos_type not supported for initializing radiation torus currently!");
     }
   }
 }

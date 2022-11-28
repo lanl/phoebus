@@ -13,13 +13,13 @@
 
 #include "fluid.hpp"
 
+#include "analysis/history.hpp"
 #include "con2prim.hpp"
 #include "con2prim_robust.hpp"
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
-#include "phoebus_utils/history.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
@@ -423,14 +423,21 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 }
 
 template <typename T>
+TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRange &ib, const IndexRange &jb,
+                                      const IndexRange &kb) {
+  auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
+  return c2p(rc, ib, jb, kb);
+}
+
+template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
-  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
-  auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
-  return c2p(rc, ib, jb, kb);
+  return ConservedToPrimitiveRegion(rc, ib, jb, kb);
 }
 
 template <typename T>

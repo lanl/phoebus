@@ -24,10 +24,8 @@ using namespace parthenon::package::prelude;
 namespace fixup {
 
 enum class FAILURE_STRATEGY {
-  interpolate,
-  interpolate_previous,
-  neighbor_minimum,
-  floors
+  interpolate, // Average involved primitive variables over good neighbors
+  floors       // Set involved primitive variables to floors
 };
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
@@ -35,11 +33,11 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc);
 template <typename T>
 TaskStatus ApplyFloors(T *rc);
 template <typename T>
-TaskStatus RadConservedToPrimitiveFixup(T *rc, T *rc0);
+TaskStatus RadConservedToPrimitiveFixup(T *rc);
 template <typename T>
-TaskStatus ConservedToPrimitiveFixup(T *rc, T *rc0);
+TaskStatus ConservedToPrimitiveFixup(T *rc);
 template <typename T>
-TaskStatus SourceFixup(T *rc, T *rc0);
+TaskStatus SourceFixup(T *rc);
 
 static struct ConstantRhoSieFloor {
 } constant_rho_sie_floor_tag;
@@ -209,16 +207,18 @@ class RadiationCeilings {
  public:
   RadiationCeilings()
       : RadiationCeilings(constant_xi0_radiation_ceiling_tag,
+                          std::numeric_limits<Real>::max(),
                           std::numeric_limits<Real>::max()) {}
-  RadiationCeilings(ConstantXi0RadiationCeiling, const Real xi0)
-      : xi0_(xi0), radiation_ceiling_flag_(1) {}
+  RadiationCeilings(ConstantXi0RadiationCeiling, const Real xi0, const Real tau0)
+      : xi0_(xi0), tau0_(tau0), radiation_ceiling_flag_(1) {}
 
   KOKKOS_INLINE_FUNCTION
-  void GetRadiationCeilings(const Real x1, const Real x2, const Real x3,
-                            Real &ximax) const {
+  void GetRadiationCeilings(const Real x1, const Real x2, const Real x3, Real &ximax,
+                            Real &taumax) const {
     switch (radiation_ceiling_flag_) {
     case 1:
       ximax = xi0_;
+      taumax = tau0_;
       break;
     default:
       PARTHENON_FAIL("No valid radiation ceiling set.");
@@ -226,7 +226,8 @@ class RadiationCeilings {
   }
 
  private:
-  Real xi0_;
+  const Real xi0_;
+  const Real tau0_;
   const int radiation_ceiling_flag_;
 };
 

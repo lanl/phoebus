@@ -29,7 +29,7 @@ args = parser.parse_args()
 
 modified_inputs = {}
 modified_inputs['radiation/scattering_fraction'] = 1.0
-modified_inputs['opacity/gray_kappa'] = 1.e3
+modified_inputs['s_opacity/gray_kappa'] = 1.e3
 modified_inputs['radiation_advection/J'] = 1.0
 modified_inputs['radiation_advection/Hx'] = 0.0
 modified_inputs['radiation_advection/Hy'] = 0.0
