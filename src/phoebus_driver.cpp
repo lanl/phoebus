@@ -329,7 +329,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       sndrcv_flux_depend = sndrcv_flux_depend | fix_flux;
     }
 
-    if (rad_mocmc_active) {
+    if (rad_mocmc_active && stage == 1) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       // TODO(BRR) stage_name[stage - 1]?
       auto &sd0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);

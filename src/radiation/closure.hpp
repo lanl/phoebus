@@ -1,4 +1,4 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
+// © 2021-2022. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -196,7 +196,8 @@ KOKKOS_FUNCTION ClosureEdd<SET>::ClosureEdd(const Vec con_v_in, LocalGeometryTyp
   W = 1 / std::sqrt(1 - v2);
   W2 = W * W;
 
-  PARTHENON_DEBUG_REQUIRE(!std::isinf(W), "Infinite Lorentz factor!");
+  PARTHENON_DEBUG_REQUIRE(!std::isinf(W) && !std::isnan(W),
+                          "Infinite/NAN Lorentz factor!");
 }
 
 template <class SET>

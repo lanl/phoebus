@@ -229,6 +229,7 @@ void MOCMCInitSamples(T *rc) {
   // Initialize eddington tensor and opacities for first step
   MOCMCReconstruction(rc);
   MOCMCEddington(rc);
+  PARTHENON_WARN("Using deprecated function to initialize opacities!");
   MOCMCFluidSource(rc, 0., false); // Update opacities for asymptotic fluxes
 }
 
@@ -639,42 +640,18 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
             Real Itot = 0.;
             for (int bin = 0; bin < nu_bins; bin++) {
-              kappaJ += opac_d.AngleAveragedAbsorptionCoefficient(
+              const Real fac = (bin == 0 || bin == nu_bins - 1) ? 0.5 : 1.; // Trapezoidal rule
+              kappaJ += fac * opac_d.AngleAveragedAbsorptionCoefficient(
                             v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i), ye,
                             species_d[ispec], nusamp(bin)) *
                         v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
-              kappaH += opac_d.TotalScatteringCoefficient(
+              kappaH += fac * opac_d.TotalScatteringCoefficient(
                             v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
                             v(iblock, pye, k, j, i), species_d[ispec], nusamp(bin)) *
                         v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
-              Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
+              Itot += fac * v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
             }
 
-            // Trapezoidal rule
-            kappaJ -= 0.5 *
-                      opac_d.AngleAveragedAbsorptionCoefficient(
-                          v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i), ye,
-                          species_d[ispec], nusamp(0)) *
-                      v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0);
-            kappaJ -= 0.5 *
-                      opac_d.AngleAveragedAbsorptionCoefficient(
-                          v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i), ye,
-                          species_d[ispec], nusamp(nu_bins - 1)) *
-                      v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
-            kappaH -= 0.5 *
-                      opac_d.TotalScatteringCoefficient(
-                          v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                          v(iblock, pye, k, j, i), species_d[ispec], nusamp(0)) *
-                      v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0);
-            kappaH -=
-                0.5 *
-                opac_d.TotalScatteringCoefficient(
-                    v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                    v(iblock, pye, k, j, i), species_d[ispec], nusamp(nu_bins - 1)) *
-                v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
-            Itot -= 0.5 *
-                    (v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0) +
-                     v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1));
             kappaJ = robust::ratio(kappaJ, Itot);
             kappaH = robust::ratio(kappaH, Itot) + kappaJ;
 

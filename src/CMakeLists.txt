@@ -123,11 +123,16 @@ add_executable(phoebus
   radiation/radiation.hpp
   radiation/radiation.cpp
   radiation/cooling_function.cpp
+  radiation/frequency_info.hpp
+  radiation/geodesics.hpp
   radiation/mocmc.cpp
+  radiation/mocmc.hpp
   radiation/moments.cpp
   radiation/moments_source.cpp
   radiation/monte_carlo.cpp
-  radiation/geodesics.hpp
+  radiation/opacity_averager.hpp
+  radiation/source_residual_1.hpp
+  radiation/source_residual_4.hpp
 
   reconstruction.hpp
 

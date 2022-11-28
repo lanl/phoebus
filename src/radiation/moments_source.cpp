@@ -25,9 +25,13 @@
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/frequency_info.hpp"
 #include "radiation/local_three_geometry.hpp"
+#include "radiation/mocmc.hpp"
 #include "radiation/opacity_averager.hpp"
 #include "radiation/radiation.hpp"
 #include "reconstruction.hpp"
+
+//#include "radiation/source_residual_1.hpp"
+//#include "radiation/source_residual_4.hpp"
 
 #include "fixup/fixup.hpp"
 #include "fluid/con2prim_robust.hpp"
@@ -253,6 +257,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
+  namespace mi = mocmc_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
   std::vector<std::string> vars{c::density,
@@ -276,8 +281,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                                 ir::kappaH,
                                 ir::JBB,
                                 ir::tilPi,
-                                mocmc_internal::Inu0,
-                                mocmc_internal::Inu1};
+                                mi::Inu0,
+                                mi::Inu1};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -286,8 +291,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_H = imap.GetFlatIdx(pr::H);
 
-  auto idx_Inu0 = imap.GetFlatIdx(mocmc_internal::Inu0);
-  auto idx_Inu1 = imap.GetFlatIdx(mocmc_internal::Inu1);
+  auto idx_Inu0 = imap.GetFlatIdx(mi::Inu0);
+  auto idx_Inu1 = imap.GetFlatIdx(mi::Inu1);
 
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
@@ -352,6 +357,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto invert = con2prim_robust::ConToPrimSetup(rc, bounds, c2p_tol, c2p_max_iter,
                                                 c2p_floor_scale_fac, c2p_fail_on_floors,
                                                 c2p_fail_on_ceilings);
+  // TODO(BRR) will cpp17 mean we dont need to be explicit about these template params?
+  MOCMCInteractions<T, VariablePack<Real>, CLOSURE> mocmc_int(
+      rc, v, idx_Inu0, idx_Inu1, freq_info, num_species, species_d);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,
@@ -379,6 +387,20 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
                                     coords.x3v(k, j, i), xi_max, tau_max);
         const Real alpha_max = tau_max / (alpha * dt);
+
+        // Initial four-velocity
+        const Real vpcon[3] = {v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
+                               v(iblock, pv(2), k, j, i)};
+        Real ucon[4];
+        Real W = 0.;
+        SPACELOOP2(ii, jj) { W += cov_gamma(ii, jj) * vpcon[ii] * vpcon[jj]; }
+        W = std::sqrt(1. + W);
+        ucon[0] = robust::ratio(W, std::abs(alpha));
+        SPACELOOP(ii) { ucon[ii + 1] = vpcon[ii] - ucon[0] * beta[ii]; }
+
+        // Comoving frame angle-averaged intensities
+        VarAccessor2D Inu0(v, iblock, idx_Inu0, k, j, i);
+        VarAccessor2D Inu1(v, iblock, idx_Inu1, k, j, i);
 
         Real rho = v(iblock, prho, k, j, i);
         Real ug = v(iblock, peng, k, j, i);
@@ -423,6 +445,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
             const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
 
+            // printf("%s:%i:%s\n", __FILE__, __LINE__, __func__);
+            mocmc_int.CalculateInu0(iblock, ispec, k, j, i, ucon);
+
             // Rootfind over fluid temperature in fluid rest frame
             root_find::RootFind root_find(src_rootfind_maxiter);
             // TODO(BRR) Pass Residual another class that holds Inu(nu) and can average
@@ -432,12 +457,16 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
             OpacityAverager<CLOSURE> opac_avgr(c, freq_info, opacities, v, idx_Inu1,
                                                species_d, iblock, k, j, i);
-            Real mykappaJ = opac_avgr.GetAveragedAbsorptionOpacity(
-                rho, v(iblock, pT, k, j, i), Ye, ispec);
-            PARTHENON_FAIL("sotp here");
+            //Real mykappaJ = opac_avgr.GetAveragedAbsorptionOpacity(
+            //    rho, v(iblock, pT, k, j, i), Ye, ispec);
+            //PARTHENON_FAIL("sotp here");
             InteractionTResidual<CLOSURE> res(eos, c, opac_avgr, rho, ug, Ye, J0,
                                               num_species, species_d, dtau, Inu0, Inu1,
                                               alpha_max);
+            //SourceResidual1<T, VariablePack<Real>, CLOSURE> res(
+            //    eos, c, opac_avgr, mocmc_int, freq_info, d_opacity, d_mean_opacity, rho,
+            //    ug, Ye, J0, num_species, species_d, scattering_fraction, dtau, Inu0, Inu1,
+            //    iblock, k, j, i);
             root_find::RootFindStatus status;
             Real T1 = root_find.regula_falsi(res, 1.e-2 * v(iblock, pT, k, j, i),
                                              1.e2 * v(iblock, pT, k, j, i),
@@ -504,6 +533,16 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             if (status == root_find::RootFindStatus::success) {
               c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ, tauH,
                                    &(dE[ispec]), &(cov_dF[ispec]));
+
+              if (std::isnan(dE[ispec])) {
+                printf("E: %e F: %e %e %e\n", Estar, cov_Fstar(0), cov_Fstar(1),
+                       cov_Fstar(2));
+                SPACELOOP2(ii, jj) {
+                  printf("pi[%i %i] = %e\n", ii, jj, con_tilPi(ii, jj));
+                  printf("T1: %e JBB: %e tauJ: %e tauH: %e\n", T1, JBB, tauJ, tauH);
+                }
+              }
+              PARTHENON_DEBUG_REQUIRE(!std::isnan(dE[ispec]), "Nan dE!\n");
 
               Estar += dE[ispec];
               SPACELOOP(ii) cov_Fstar(ii) += cov_dF[ispec](ii);

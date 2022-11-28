@@ -66,8 +66,13 @@ class OpacityAverager {
       printf("kappaJ: %e Planck: %e\n", robust::ratio(kappaJ_num, kappaJ_denom),
              opacities_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]));
 
-      PARTHENON_FAIL("MOCMC!");
-      return robust::ratio(kappaJ_num, kappaJ_denom);
+      // PARTHENON_FAIL("MOCMC!");
+      // Handle case of zero particles in zone i.e. Inu = 0
+      if (kappaJ_num < robust::SMALL()) {
+        return mean_opac_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]);
+      } else {
+        return robust::ratio(kappaJ_num, kappaJ_denom);
+      }
     } else {
       return opacities_.RosselandMeanAbsorptionCoefficient(rho, T, ye, species_[ispec]);
     }

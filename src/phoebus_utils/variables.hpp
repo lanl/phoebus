@@ -14,6 +14,8 @@
 #ifndef PHOEBUS_UTILS_VARIABLES_HPP_
 #define PHOEBUS_UTILS_VARIABLES_HPP_
 
+#include <interface/variable_pack.hpp>
+
 namespace fluid_prim {
 constexpr char density[] = "p.density";
 constexpr char velocity[] = "p.velocity";
@@ -92,5 +94,34 @@ constexpr char src_terms[] = "src_terms";
 constexpr char r_divf[] = "r.flux_divergence";
 constexpr char r_src_terms[] = "r.src_terms";
 } // namespace diagnostic_variables
+
+// template <typename T>
+/// This class simplifies the process of passing a particular packed variable to other
+/// classes and functions inside compute kernels.
+class VarAccessor2D {
+  using FlatIdx = parthenon::vpack_types::FlatIdx;
+
+ public:
+  VarAccessor2D(const VariablePack<Real> &v, const int &b, const FlatIdx &idx,
+                const int &k, const int &j, const int &i)
+      : v_(v), b_(b), idx_(idx), k_(k), j_(j), i_(i) {
+    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(),
+                            "Creating VarAccessor2D with invalid FlatIdx!");
+  }
+
+  KOKKOS_FORCEINLINE_FUNCTION
+  Real &operator()(const int &ii, const int &jj) const {
+    PARTHENON_DEBUG_REQUIRE(idx_.IsValid(), "Accessing invalid index!");
+    return v_(b_, idx_(ii, jj), k_, j_, i_);
+  }
+
+ private:
+  const VariablePack<Real> &v_;
+  const int &b_;
+  const FlatIdx &idx_;
+  const int &k_;
+  const int &j_;
+  const int &i_;
+};
 
 #endif // PHOEBUS_UTILS_VARIABLES_HPP_

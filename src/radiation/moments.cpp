@@ -146,12 +146,14 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
 
+        // TODO(BRR) does this logic occur in torus calculation
         if (status == ClosureStatus::modified) {
           c.Prim2Con(J, covH, conTilPi, &E, &covF);
           v(b, cE(ispec), k, j, i) = E / isdetgam;
           SPACELOOP(ii) { v(b, cF(ispec, ii), k, j, i) = covF(ii) / isdetgam; }
           status = ClosureStatus::success;
         }
+        PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "J is nan!");
 
         v(b, pJ(ispec), k, j, i) = J;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
@@ -727,11 +729,15 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           // Calculate the numerical flux using LLF
           v.flux(idir_in, idx_Ef(ispec), k, j, i) =
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + sigspeed * (El - Er));
+          PARTHENON_DEBUG_REQUIRE(!std::isnan(v.flux(idir_in, idx_Ef(ispec), k, j, i)),
+                                  "NAN flux!");
 
           SPACELOOP(ii) {
             v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
+            PARTHENON_DEBUG_REQUIRE(
+                !std::isnan(v.flux(idir_in, idx_Ff(ispec, ii), k, j, i)), "NAN flux!");
           }
 
           if (sdetgam < robust::SMALL()) {
