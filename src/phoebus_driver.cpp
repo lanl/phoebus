@@ -50,9 +50,10 @@ namespace phoebus {
 // that mostly means defining the MakeTaskList     *//
 // function.                                       *//
 // *************************************************//
-PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm)
+PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm,
+                             const bool is_restart)
     : EvolutionDriver(pin, app_in, pm),
-      integrator(std::make_unique<StagedIntegrator>(pin)) {
+      integrator(std::make_unique<StagedIntegrator>(pin)), is_restart_(is_restart) {
 
   // fail if these are not specified in the input file
   pin->CheckRequired("parthenon/mesh", "ix1_bc");
@@ -73,8 +74,10 @@ TaskListStatus PhoebusDriver::Step() {
   TaskListStatus status;
   Real dt_trial = tm.dt;
   if (first_call) dt_trial = std::min(dt_trial, dt_init);
-  dt_trial *= dt_init_fact;
-  dt_init_fact = 1.0;
+  if (!is_restart_) {
+    dt_trial *= dt_init_fact;
+    dt_init_fact = 1.0;
+  }
   if (tm.time + dt_trial > tm.tlim) dt_trial = tm.tlim - tm.time;
   tm.dt = dt_trial;
   integrator->dt = dt_trial;

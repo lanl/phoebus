@@ -25,7 +25,8 @@ namespace phoebus {
 // TODO(JMM): What kind of driver should this be?
 class PhoebusDriver : public EvolutionDriver {
  public:
-  PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm);
+  PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm,
+                const bool is_restart);
 
   void PostInitializationCommunication();
 
@@ -38,6 +39,7 @@ class PhoebusDriver : public EvolutionDriver {
 
  private:
   std::unique_ptr<StagedIntegrator> integrator;
+  const bool is_restart_;
   Real dt_init, dt_init_fact;
 
   AllReduce<Real> dNtot;
