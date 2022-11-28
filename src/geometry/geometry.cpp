@@ -40,6 +40,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto geometry = std::make_shared<StateDescriptor>("geometry");
   Initialize<CoordSysMeshBlock>(pin, geometry.get());
 
+  // Store name of geometry in parameters
+  const std::string gname = GEOMETRY_NAME;
+  const std::string geometry_name = gname.substr(gname.find("::") + 2);
+  PARTHENON_REQUIRE_THROWS(geometry_name.size() > 0, "Invalid geometry name!");
+  params.Add("geometry_name", geometry_name);
+
   // Always add coodinates fields
   Utils::MeshBlockShape dims(pin);
   std::vector<int> cell_shape = {4};
