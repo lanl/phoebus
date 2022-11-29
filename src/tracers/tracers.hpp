@@ -31,12 +31,14 @@ using namespace parthenon;
 
 #include "phoebus_utils/variables.hpp"
 
+typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
+
 namespace tracers {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
-TaskStatus AdvectTracers(MeshBlockData<Real> *rc);
-} // namespace tracers
+TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt);
 
+} // namespace tracers
 
 #endif // TRACERS_HPP_
