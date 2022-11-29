@@ -311,8 +311,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (rad_moments_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+      auto sample_bounds =
+          tl.AddTask(none, radiation::MOCMCSampleBoundaries<MDT>, sc0.get());
       auto moment_recon =
-          tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get());
+          tl.AddTask(sample_bounds, radiation::ReconstructEdgeStates<MDT>, sc0.get());
+      //auto moment_recon =
+      //    tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get());
       // TODO(BRR) Remove from task list if not using due to MOCMC
       auto get_opacities =
           tl.AddTask(moment_recon, radiation::MomentCalculateOpacities<MDT>, sc0.get());
@@ -329,7 +333,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       sndrcv_flux_depend = sndrcv_flux_depend | fix_flux;
     }
 
-    if (rad_mocmc_active && stage == 1) {
+    if (rad_mocmc_active) {// && stage == 1) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       // TODO(BRR) stage_name[stage - 1]?
       auto &sd0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);

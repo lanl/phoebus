@@ -351,6 +351,12 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         ReconstructionIndexer<VariablePack<Real>> ql(ql_base, nrecon, offset, b);
         ReconstructionIndexer<VariablePack<Real>> qr(qr_base, nrecon, offset, b);
 
+        if (n == 0) {
+          for (int i = 0; i < 32 + 8; i++) {
+            printf("v(%i %i %i) = %e\n", k,j,i,v(b, n, k, j, i));
+          }
+        }
+
         const VariablePack<Real> &var = (n < nrecon ? v : v_vel);
         const int var_id = n % nrecon;
         Real *pv = &var(b, var_id, k, j, 0);

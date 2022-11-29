@@ -195,6 +195,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata mInu = Metadata({Metadata::Cell, Metadata::OneCopy}, Inu_size);
     physics->AddField(mocmc_internal::Inu0, mInu);
     physics->AddField(mocmc_internal::Inu1, mInu);
+    // TODO(BRR) probably don't need per-species jinvs
     physics->AddField(mocmc_internal::jinvs, mInu);
     physics->AddField(iv::Gye, mscalar);
 

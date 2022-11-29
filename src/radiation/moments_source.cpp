@@ -65,7 +65,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
       c::density,  c::energy,  c::momentum,    c::ye,     cr::E,   cr::F,
       c::bfield,   p::density, p::temperature, p::energy, p::ye,   p::velocity,
       p::pressure, p::gamma1,  p::bfield,      pr::J,     pr::H,   ir::kappaJ,
-      ir::kappaH,  ir::JBB,    ir::tilPi,      mi::Inu0,  mi::Inu1};
+      ir::kappaH,  ir::JBB,    ir::tilPi,      mi::Inu0,  mi::Inu1, mi::jinvs};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -76,6 +76,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   auto idx_Inu0 = imap.GetFlatIdx(mi::Inu0, false);
   auto idx_Inu1 = imap.GetFlatIdx(mi::Inu1, false);
+  auto idx_jinvs = imap.GetFlatIdx(mi::jinvs, false);
 
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
@@ -139,7 +140,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                                                 c2p_fail_on_ceilings);
   // TODO(BRR) will cpp17 mean we dont need to be explicit about these template params?
   MOCMCInteractions<T, VariablePack<Real>, CLOSURE> mocmc_int(
-      rc, v, idx_Inu0, idx_Inu1, freq_info, num_species, species_d);
+      rc, v, idx_Inu0, idx_Inu1, idx_jinvs, freq_info, num_species, species_d);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::FluidSource", DevExecSpace(), 0,

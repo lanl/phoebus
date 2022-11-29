@@ -429,7 +429,7 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
 
       if (bc == "reflect") {
         pman.app_input->boundary_conditions[loc[d - 1][outer]] = reflect[d - 1][outer];
-      } else if (bc == "outflow") {
+      } else if (bc == "outflow" || bc == "fixed_temp") {
         pman.app_input->boundary_conditions[loc[d - 1][outer]] = outflow[d - 1][outer];
         if (d == 1) {
           if (outer == 0) {

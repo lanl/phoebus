@@ -33,7 +33,6 @@ except ModuleNotFoundError:
 
 def plot_dump(filename, varname,
               savename = None,
-              cbar_label = None,
               x1bounds=None,
               lidx=0,
               filename0 = None,
@@ -80,11 +79,6 @@ def plot_dump(filename, varname,
     if x1bounds is None:
         x1bounds = [x.min(), x.max()]
 
-    if cbar_label is None:
-        cbar_label = varname
-        if log:
-            cbar_label = r'$\log_{10}$' + cbar_label
-
     fig = plt.figure()
     p = fig.add_subplot(111)
     for i in range(NB):
@@ -92,7 +86,9 @@ def plot_dump(filename, varname,
           xplt = x[i,0,0,:]
         else:
           xplt = x[i,:]
-        p.plot(xplt, q[i,0,0,:,lidx], color='r')
+        p.plot(xplt, q[i,lidx,0,0,:], color='r')
+        print(xplt)
+        print(q.shape)
         if overlay_initial:
           p.plot(xplt, q0[i,0,0,:,lidx], color='k', linestyle='--')
 
@@ -143,7 +139,6 @@ if __name__ == "__main__":
     if args.initial:
       filename0 = args.files[0]
     plot_dump(args.files[args.nplot], args.varname, savename,
-              cbar_label = args.cbarlabel,
               x1bounds = args.xbounds,
               lidx = args.lidx,
               filename0 = filename0,

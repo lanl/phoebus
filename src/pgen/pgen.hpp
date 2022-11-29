@@ -47,6 +47,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(radiation_equilibration)                                                       \
   PROBLEM(rotor)                                                                         \
   PROBLEM(homogeneous_sphere)                                                            \
+  PROBLEM(hohlraum)                                                                      \
   PROBLEM(torus)                                                                         \
   PROBLEM(p2c2p)                                                                         \
   PROBLEM(tov)

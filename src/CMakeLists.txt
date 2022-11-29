@@ -85,6 +85,7 @@ add_executable(phoebus
   pgen/bondi.cpp
   pgen/check_cached_geom.cpp
   pgen/friedmann.cpp
+  pgen/hohlraum.cpp
   pgen/homogeneous_sphere.cpp
   pgen/kh.cpp
   pgen/leptoneq.cpp

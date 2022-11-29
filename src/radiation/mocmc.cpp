@@ -245,7 +245,7 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> variables{pr::J, pf::velocity, ir::tilPi};
+  std::vector<std::string> variables{pr::J, pr::H, cr::E, cr::F, pf::velocity, ir::tilPi};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -265,6 +265,9 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   auto pv = imap.GetFlatIdx(pf::velocity);
   auto iTilPi = imap.GetFlatIdx(ir::tilPi);
   auto iJ = imap.GetFlatIdx(pr::J);
+  auto iH = imap.GetFlatIdx(pr::H);
+  auto iE = imap.GetFlatIdx(cr::E);
+  auto iF = imap.GetFlatIdx(cr::F);
 
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const int nu_bins = rad->Param<int>("nu_bins");
@@ -282,6 +285,7 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   auto ix1_bc = rad->Param<MOCMCBoundaries>("ix1_bc");
   // auto ox1_bc = rad->Param<MOCMCBoundaries>("ox1_bc");
 
+  // TODO(BRR) allow for fixed-temp moment BCs outside of MOCMC
   Real ix1_temp = 0.;
   // Real ox1_temp = 0.;
   if (ix1_bc == MOCMCBoundaries::fixed_temp) {
@@ -290,6 +294,46 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   // if (ox1_bc == MOCMCBoundaries::fixed_temp) {
   //  ox1_temp = rad->Param<Real>("ox1_temp");
   //}
+
+  // Update radiation moment boundaries if fixed temperature (and physical boundary)
+  printf("EHRHERHE>>>???? %i\n", static_cast<int>(ix1_bc == MOCMCBoundaries::fixed_temp));
+  if (ix1_bc == MOCMCBoundaries::fixed_temp) {
+    auto nb = IndexRange{0, 0};//v.GetDim(4) - 1};
+    auto domain = IndexDomain::inner_x1;
+
+    bool coarse = false;
+    pmb->par_for_bndry(
+        "FixedTempInnerX1", nb, domain, coarse,
+        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+          for (int s = 0; s < num_species; s++) {
+            v(iJ(s), k, j, i) = opac.EnergyDensityFromTemperature(ix1_temp, species_d[s]);
+            SPACELOOP(ii) {
+              v(iH(s, ii), k, j, i) = 0.0;
+            }
+            // Set cons vars
+            const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
+            using settings =
+             ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+             // TODO(BRR) block idx = 0!!
+             const int iblock = 0;
+            typename ClosureMOCMC<settings>::LocalGeometryType g(geom, CellLocation::Cent, iblock, k, j, i);
+            Vec con_v{0};
+            ClosureMOCMC<settings> c(con_v, &g);
+            const Real J = v(iJ(s), k, j, i);
+            const Vec covH{0};
+            const Tens2 conTilPi{0};
+            Real E;
+            Vec covF;
+            c.Prim2Con(J, covH, conTilPi, &E, &covF);
+            v(iE(s), k, j, i) = sdetgam * E;
+            SPACELOOP(ii) {
+              v(iF(s, ii), k, j, i) = sdetgam * covF(ii);
+            }
+            printf("[%i %i %i] E = %e\n", k, j, i, v(iE(s), k, j, i));
+          }
+        });
+
+  }
 
   pmb->par_for(
       "Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
