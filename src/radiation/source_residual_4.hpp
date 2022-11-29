@@ -20,24 +20,21 @@ namespace radiation {
 
 template <typename CLOSURE>
 class SourceResidual4 {
-  using Opacity = singularity::neutrinos::Opacity;
-  using MeanOpacity = singularity::neutrinos::MeanOpacity;
   using EOS = singularity::EOS;
+  using Opacities = Microphysics::Opacities;
 
  public:
   KOKKOS_FUNCTION
-  SourceResidual4(const EOS &eos, const Opacity &opac, const MeanOpacity &mopac,
-                  const Real rho, const Real Ye, const Real bprim[3],
-                  const RadiationType species, /*const*/ Tens2 &conTilPi,
-                  const Real (&gcov)[4][4], const Real (&gammacon)[3][3],
-                  const Real alpha, const Real beta[3], const Real sdetgam,
-                  const Real scattering_fraction, typename CLOSURE::LocalGeometryType &g,
+  SourceResidual4(const EOS &eos, const Opacities &opacities, const Real rho,
+                  const Real Ye, const Real bprim[3], const RadiationType species,
+                  /*const*/ Tens2 &conTilPi, const Real (&gcov)[4][4],
+                  const Real (&gammacon)[3][3], const Real alpha, const Real beta[3],
+                  const Real sdetgam, typename CLOSURE::LocalGeometryType &g,
                   Real (&U_mhd_0)[4], Real (&U_rad_0)[4], const int &k, const int &j,
                   const int &i)
-      : eos_(eos), opac_(opac), mopac_(mopac), rho_(rho), bprim_(&(bprim[0])),
+      : eos_(eos), opacities_(opacities), rho_(rho), bprim_(&(bprim[0])),
         species_(species), conTilPi_(conTilPi), gcov_(&gcov), gammacon_(&gammacon),
-        alpha_(alpha), beta_(&(beta[0])), sdetgam_(sdetgam),
-        scattering_fraction_(scattering_fraction), g_(g), U_mhd_0_(&U_mhd_0),
+        alpha_(alpha), beta_(&(beta[0])), sdetgam_(sdetgam), g_(g), U_mhd_0_(&U_mhd_0),
         U_rad_0_(&U_rad_0), k_(k), j_(j), i_(i) {
     lambda_[0] = Ye;
     lambda_[1] = 0.;
@@ -79,11 +76,6 @@ class SourceResidual4 {
     SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
     Vec con_v{P_mhd[1] / W, P_mhd[2] / W, P_mhd[3] / W};
-    // Use gamma_max from code?
-    if (W > 100) {
-      printf("W = %e! [%i %i %i]\n", W, k_, j_, i_);
-      return ClosureStatus::failure;
-    }
     CLOSURE c(con_v, &g_);
     // TODO(BRR) Accept separately calculated con_tilPi as an option
     // TODO(BRR) Store xi, phi guesses
@@ -98,22 +90,15 @@ class SourceResidual4 {
   KOKKOS_INLINE_FUNCTION
   void CalculateSource(Real P_mhd[4], Real P_rad[4], Real S[4]) {
     Real Tg = eos_.TemperatureFromDensityInternalEnergy(rho_, P_mhd[0] / rho_, lambda_);
-    Real JBB = opac_.EnergyDensityFromTemperature(Tg, species_);
-    Real kappaH =
-        mopac_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
-
-    // Real kappaH, kappaJ;
-    // c.GetAverageOpacities(rho_, Tg, lambda_[0], species_, kappaJ, kappaH);
-    // TODO(BRR) remove this when removing scattering_fraction
-    // kappaH = kappaJ;
-
-    // Real kappaH = c.mean_opac.RosselandMeanAbsorption
-
+    Real JBB = opacities_.EnergyDensityFromTemperature(Tg, species_);
+    Real kappaJ =
+        opacities_.RosselandMeanAbsorptionCoefficient(rho_, Tg, lambda_[0], species_);
+    Real kappaH = kappaJ + opacities_.RosselandMeanAbsorptionCoefficient(
+                               rho_, Tg, lambda_[0], species_);
     // TODO(BRR) this is arguably cheating, arguably not. Should include dt though
     // kappaH * dt < 1 / eps
     kappaH = std::min<Real>(kappaH, 1.e5);
-    // TODO(BRR) remove scattering_fraction
-    Real kappaJ = (1. - scattering_fraction_) * kappaH;
+    kappaJ = std::min<Real>(kappaJ, 1.e5);
     Real W = 0.;
     SPACELOOP2(ii, jj) { W += (*gcov_)[ii + 1][jj + 1] * P_mhd[ii + 1] * P_mhd[jj + 1]; }
     W = std::sqrt(1. + W);
@@ -131,8 +116,7 @@ class SourceResidual4 {
 
  private:
   const EOS &eos_;
-  const Opacity &opac_;
-  const MeanOpacity &mopac_;
+  const Opacities &opacities_;
   const Real rho_;
   const Real *bprim_;
   const RadiationType species_;
@@ -144,7 +128,6 @@ class SourceResidual4 {
   const Real alpha_;
   const Real *beta_;
   const Real sdetgam_;
-  const Real scattering_fraction_;
 
   typename CLOSURE::LocalGeometryType &g_;
 
