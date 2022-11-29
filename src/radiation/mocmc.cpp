@@ -425,11 +425,6 @@ TaskStatus MOCMCReconstruction(T *rc) {
           for (int m = 0; m < n; m++) {
             const int mswarm = swarm_d.GetFullIndex(k, j, i, m);
             printf("    m = %i mswarm = %i\n", m, mswarm);
-            printf("    25: mulohi %e %e philohi %e %e\n",
-              mu_lo(25), mu_hi(25), phi_lo(25), phi_hi(25));
-            if (phi_hi(25) < 0.) {
-              PARTHENON_FAIL("weird");
-            }
             PARTHENON_DEBUG_REQUIRE(mswarm != nswarm, "Comparing the same particle!");
             if (mu > mu_lo(mswarm) && mu < mu_hi(mswarm) && phi > phi_lo(mswarm) &&
                 phi < phi_hi(mswarm)) {
@@ -445,16 +440,10 @@ TaskStatus MOCMCReconstruction(T *rc) {
                   mu_lo(nswarm) = mu_lo(mswarm);
                   mu_hi(nswarm) = mu0;
                   mu_lo(mswarm) = mu0;
-                  if (mswarm == 25) {
-                    printf("    mswarm == 25: mu_lo = %e\n", mu_lo(mswarm));
-                  }
                 } else {
                   mu_lo(nswarm) = mu0;
                   mu_hi(nswarm) = mu_hi(mswarm);
                   mu_hi(mswarm) = mu0;
-                  if (mswarm == 25) {
-                    printf("    mswarm == 25: mu_hi = %e\n", mu_hi(mswarm));
-                  }
                 }
                 phi_lo(nswarm) = phi_lo(mswarm);
                 phi_hi(nswarm) = phi_hi(mswarm);
@@ -466,25 +455,16 @@ TaskStatus MOCMCReconstruction(T *rc) {
                   phi_lo(nswarm) = phi_lo(mswarm);
                   phi_hi(nswarm) = phi0;
                   phi_lo(mswarm) = phi0;
-                  if (mswarm == 25) {
-                    printf("    mswarm == 25: phi_lo = %e\n", phi_lo(mswarm));
-                  }
                 } else {
                   phi_lo(nswarm) = phi0;
                   phi_hi(nswarm) = phi_hi(mswarm);
                   phi_hi(mswarm) = phi0;
-                  if (mswarm == 25) {
-                    printf("    mswarm == 25: phi_hi = %e\n", phi_hi(mswarm));
-                  }
                 }
                 mu_lo(nswarm) = mu_lo(mswarm);
                 mu_hi(nswarm) = mu_hi(mswarm);
               }
               const Real dOmega = (mu_hi(nswarm) - mu_lo(nswarm)) *
                                    (phi_hi(nswarm) - phi_lo(nswarm));
-                                   if (nswarm == 25) {
-                                     printf("25!!!\n\n\n");
-                                   }
               printf("  dO [%i] mu: %e %e phi: %e %e\n", nswarm, mu_lo(nswarm), mu_hi(nswarm),
                 phi_lo(nswarm), phi_hi(nswarm));
               PARTHENON_DEBUG_REQUIRE(dOmega > 0., "Zero or negative solid angle");

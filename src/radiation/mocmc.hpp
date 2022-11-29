@@ -142,7 +142,7 @@ class MOCMCInteractions {
           for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
             const Real nu_lab = freq_info_.GetBinCenterNu(nbin);
             const Real nu_fluid =
-                std::exp(std::log(nu_fluid) - freq_info_.GetDLogNu() * shift);
+                std::exp(std::log(nu_lab) - freq_info_.GetDLogNu() * shift);
             const Real ds = dt / ucon[0] / nu_fluid;
             // TODO(BRR) scattering fraction
             Real scattering_fraction = 0.5;
@@ -162,6 +162,9 @@ class MOCMCInteractions {
             Inuinv_(nbin, ispec, nswarm) =
                 (Inuinv_(nbin, ispec, nswarm) + ds * (jinv_a + jinv_s)) /
                 (1. + ds * (alphainv_a + alphainv_s));
+
+            PARTHENON_DEBUG_REQUIRE(!std::isnan(Inuinv_(nbin, ispec, nswarm)),
+              "NAN intensity!");
           }
         }
       }
