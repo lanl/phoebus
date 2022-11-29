@@ -74,6 +74,10 @@ class MOCMCInteractions {
         const int nswarm = swarm_d_.GetFullIndex(k, j, i, n);
         const Real dOmega = (mu_hi_(nswarm) - mu_lo_(nswarm)) *
                             (phi_hi_(nswarm) - phi_lo_(nswarm)) / (4. * M_PI);
+                            printf("[%i] mu: %e %e phi: %e %e\n", nswarm,
+                            mu_lo_(nswarm), mu_hi_(nswarm),
+                            phi_lo_(nswarm), phi_hi_(nswarm));
+                            PARTHENON_DEBUG_REQUIRE(dOmega > 0., "Absurd dOmega!");
 
         //  Real nu_lab0 = 0.;
         //  SPACETIMELOOP(nu) { nu_lab0 -= ncov_(nu, nswarm) * ucon[nu]; }
@@ -92,14 +96,20 @@ class MOCMCInteractions {
 
         // TODO(BRR) linear interp?
         for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
+          PARTHENON_DEBUG_REQUIRE(!std::isnan(Inuinv_(nbin, ispec, nswarm)), "NAN intensity!");
           v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) +=
               Inuinv_(nbin, ispec, nswarm) * pow(freq_info_.GetBinCenterNu(nbin), 3) *
               dOmega;
-          interp.GetIndicesAndWeights(nbin, nubin_shift, nubin_wgt);
-          for (int isup = 0; isup < interp.StencilSize(); isup++) {
-            v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) +=
-                nubin_wgt[isup] * Inuinv_(nubin_shift[isup], ispec, nswarm);
-          }
+          //printf("[%i] Inu0 = %e (%e %e %e)\n",
+          //  nbin, v_(iblock, idx_Inu0_(ispec, nbin), k, j, i),
+          //  Inuinv_(nbin, ispec, nswarm),
+          //  freq_info_.GetBinCenterNu(nbin),
+          //  dOmega);
+          //interp.GetIndicesAndWeights(nbin, nubin_shift, nubin_wgt);
+          //for (int isup = 0; isup < interp.StencilSize(); isup++) {
+          //  v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) +=
+          //      nubin_wgt[isup] * Inuinv_(nubin_shift[isup], ispec, nswarm);
+          //}
         }
       }
     }
