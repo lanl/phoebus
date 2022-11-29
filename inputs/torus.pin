@@ -70,10 +70,10 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 # Commenting out meshblock sizes makes the simulation 1 meshblock
- <parthenon/meshblock>
- nx1 = 128
- nx2 = 128
- nx3 = 1
+#<parthenon/meshblock>
+#nx1 = 128
+#nx2 = 128
+#nx3 = 1
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
