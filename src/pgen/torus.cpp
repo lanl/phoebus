@@ -90,6 +90,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto rad_pkg = pmb->packages.Get("radiation");
   bool do_rad = rad_pkg->Param<bool>("active");
 
+  auto tracer_pkg = pmb->packages.Get("tracers");
+  bool do_tracers = tracer_pkg->Param<bool>("active");
+  auto &sc = pmb->swarm_data.Get();
+  auto &swarm = pmb->swarm_data.Get()->Get("tracers");
+  auto rng_pool_tr =
+      tracer_pkg->Param<RNGPool>("rng_pool"); // Q: Have 2 pools. combine/share?
+  const auto num_tracers_total = tracer_pkg->Param<Real>("num_tracers");
+
   PackIndexMap imap;
   auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
                               fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
@@ -138,6 +146,24 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
+  const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
+  const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
+  const Real &minx_i = pmb->coords.x1f(ib.s);
+  const Real &minx_j = pmb->coords.x2f(jb.s);
+  const Real &minx_k = pmb->coords.x3f(kb.s);
+
+  const int n_tracers_block = (int)((num_tracers_total) / (nx_i + nx_j + nx_k));
+
+  // Q: Should this be in an if (do_tracers)? Or is defaulting num_tracers to 0
+  // sufficient?
+  ParArrayND<int> new_indices;
+  swarm->AddEmptyParticles(n_tracers_block, new_indices);
+
+  // Q: similar. Can we "Get" these if no tracers?
+  auto &x = swarm->Get<Real>("x").Get();
+  auto &y = swarm->Get<Real>("y").Get();
+  auto &z = swarm->Get<Real>("z").Get();
 
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
@@ -330,7 +356,38 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               SPACELOOP(ii) { v(iH(ispec, 0), k, j, i) = 0.; }
             }
           }
-        }
+        } // do_rad
+
+        if (do_tracers) {
+          Real r = tr.bl_radius(x1v);
+          Real th = tr.bl_theta(x1v, x2v);
+          Real lnh = -1.0;
+          Real uphi;
+          if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
+
+          if (lnh > 0.0) {
+            const Real &x_min = pmb->coords.x1f(i);
+            const Real &y_min = pmb->coords.x2f(j);
+            const Real &z_min = pmb->coords.x3f(k);
+            const Real &x_max = pmb->coords.x1f(i + 1);
+            const Real &y_max = pmb->coords.x2f(j + 1);
+            const Real &z_max = pmb->coords.x3f(k + 1);
+            pmb->par_for(
+                "CreateTracers", 0, n_tracers_block - 1, KOKKOS_LAMBDA(const int n) {
+                  auto rng_gen = rng_pool_tr.get_state();
+
+                  // No rejection sampling at the moment.
+                  // Perhaps this can be improved in the future.
+
+                  x(n) = x_min + rng_gen.drand() * (x_max - x_min);
+                  y(n) = y_min + rng_gen.drand() * (y_max - y_min);
+                  z(n) = z_min + rng_gen.drand() * (z_max - z_min);
+
+                  rng_pool_tr.free_state(rng_gen);
+                }); // Create Tracers
+          }
+
+        } // do_tracers
 
         rng_pool.free_state(rng_gen);
       });

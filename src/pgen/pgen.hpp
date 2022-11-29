@@ -27,6 +27,7 @@ using namespace parthenon::package::prelude;
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "radiation/radiation.hpp"
+#include "tracers/tracers.hpp"
 
 // add the name of a namespace that contains your new ProblemGenerator
 #define FOREACH_PROBLEM                                                                  \

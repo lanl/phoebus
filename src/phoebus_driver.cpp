@@ -348,6 +348,17 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
       geom_src = geom_src | eddington;
     }
+
+    // BLB: is this right?
+    if (tracers_active) {
+      auto &sd0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+      auto advect_tracers = tl.AddTask(none, tracers::AdvectTracers, sc0.get(), dt);
+      // BLB: Just copying above.. needs a good check.
+      auto send = tl.AddTask(advect_tracers, &SwarmContainer::Send, sd0.get(),
+                             BoundaryCommSubset::all);
+      auto receive =
+          tl.AddTask(send, &SwarmContainer::Receive, sd0.get(), BoundaryCommSubset::all);
+    }
   }
 
   TaskRegion &sync_region_2 = tc.AddRegion(num_partitions);
