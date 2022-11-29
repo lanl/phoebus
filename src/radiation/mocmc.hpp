@@ -69,19 +69,12 @@ class MOCMCInteractions {
 
       const int nsamp = swarm_d_.GetParticleCountPerCell(k, j, i);
       const Real nu_fluid0 = freq_info_.GetNuMin();
-      // printf("ucon: %e %e %e %e\n", ucon[0], ucon[1], ucon[2], ucon[3]);
       for (int n = 0; n < nsamp; n++) {
         const int nswarm = swarm_d_.GetFullIndex(k, j, i, n);
         const Real dOmega = (mu_hi_(nswarm) - mu_lo_(nswarm)) *
                             (phi_hi_(nswarm) - phi_lo_(nswarm)) / (4. * M_PI);
-                            printf("[%i] mu: %e %e phi: %e %e\n", nswarm,
-                            mu_lo_(nswarm), mu_hi_(nswarm),
-                            phi_lo_(nswarm), phi_hi_(nswarm));
-                            PARTHENON_DEBUG_REQUIRE(dOmega > 0., "Absurd dOmega!");
+        PARTHENON_DEBUG_REQUIRE(dOmega > 0., "Non-positive dOmega");
 
-        //  Real nu_lab0 = 0.;
-        //  SPACETIMELOOP(nu) { nu_lab0 -= ncov_(nu, nswarm) * ucon[nu]; }
-        //  nu_lab0 *= nu_fluid0;
         Real nu_lab0 = freq_info_.GetNuMin();
         Real nu_fluid0 = 0.;
         SPACETIMELOOP(nu) { nu_fluid0 -= ncov_(nu, nswarm) * ucon[nu]; }
@@ -94,22 +87,16 @@ class MOCMCInteractions {
         int nubin_shift[interp.maxStencilSize];
         Real nubin_wgt[interp.maxStencilSize];
 
-        // TODO(BRR) linear interp?
         for (int nbin = 0; nbin < freq_info_.GetNumBins(); nbin++) {
-          PARTHENON_DEBUG_REQUIRE(!std::isnan(Inuinv_(nbin, ispec, nswarm)), "NAN intensity!");
-          v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) +=
-              Inuinv_(nbin, ispec, nswarm) * pow(freq_info_.GetBinCenterNu(nbin), 3) *
-              dOmega;
-          //printf("[%i] Inu0 = %e (%e %e %e)\n",
-          //  nbin, v_(iblock, idx_Inu0_(ispec, nbin), k, j, i),
-          //  Inuinv_(nbin, ispec, nswarm),
-          //  freq_info_.GetBinCenterNu(nbin),
-          //  dOmega);
-          //interp.GetIndicesAndWeights(nbin, nubin_shift, nubin_wgt);
-          //for (int isup = 0; isup < interp.StencilSize(); isup++) {
-          //  v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) +=
-          //      nubin_wgt[isup] * Inuinv_(nubin_shift[isup], ispec, nswarm);
-          //}
+          interp.GetIndicesAndWeights(nbin, nubin_shift, nubin_wgt);
+          for (int isup = 0; isup < interp.StencilSize(); isup++) {
+            PARTHENON_DEBUG_REQUIRE(
+                !std::isnan(Inuinv_(nubin_shift[isup], ispec, nswarm)), "NAN intensity!");
+            const Real nu = freq_info_.GetBinCenterNu(nubin_shift[isup]);
+            v_(iblock, idx_Inu0_(ispec, nbin), k, j, i) +=
+                nubin_wgt[isup] * Inuinv_(nubin_shift[isup], ispec, nswarm) * pow(nu, 3) *
+                dOmega;
+          }
         }
       }
     }
@@ -144,13 +131,11 @@ class MOCMCInteractions {
             const Real nu_fluid =
                 std::exp(std::log(nu_lab) - freq_info_.GetDLogNu() * shift);
             const Real ds = dt / ucon[0] / nu_fluid;
-            // TODO(BRR) scattering fraction
-            Real scattering_fraction = 0.5;
             // TODO(BRR) is nu_fluid correct here? We want the nu of the sample bin
             // (n.u) * nufluid(n) in the fluid frame
-            const Real alphainv_a = nu_fluid * (1. - scattering_fraction) *
-                                    opacities.AngleAveragedAbsorptionCoefficient(
-                                        rho, T, Ye, species_[ispec], nu_fluid);
+            const Real alphainv_a =
+                nu_fluid * opacities.AngleAveragedAbsorptionCoefficient(
+                               rho, T, Ye, species_[ispec], nu_fluid);
             const Real jinv_a =
                 opacities.ThermalDistributionOfTNu(T, species_[ispec], nu_fluid) /
                 (nu_fluid * nu_fluid * nu_fluid) * alphainv_a;
@@ -164,7 +149,7 @@ class MOCMCInteractions {
                 (1. + ds * (alphainv_a + alphainv_s));
 
             PARTHENON_DEBUG_REQUIRE(!std::isnan(Inuinv_(nbin, ispec, nswarm)),
-              "NAN intensity!");
+                                    "NAN intensity!");
           }
         }
       }

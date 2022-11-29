@@ -192,7 +192,6 @@ void MOCMCInitSamples(T *rc) {
           x(n) = minx_i + (i - ib.s + rng_gen.drand()) * dx_i;
           y(n) = minx_j + (j - jb.s + rng_gen.drand()) * dx_j;
           z(n) = minx_k + (k - kb.s + rng_gen.drand()) * dx_k;
-          printf("[%i] xyz = %e %e %e\n", n, x(n), y(n), z(n));
 
           const Real Temp = v(b, pT, k, j, i);
 
@@ -391,17 +390,13 @@ TaskStatus MOCMCReconstruction(T *rc) {
       DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
       ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
-        printf("kdgrid [%i %i %i] nsamp: %i\n", k,j,i,nsamp);
         for (int n = 0; n < nsamp; n++) {
           const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
-          printf("\n\n  nswarm: %i\n", nswarm);
           if (n == 0) {
             mu_lo(nswarm) = 0.0;
             mu_hi(nswarm) = 2.0;
             phi_lo(nswarm) = 0.0;
             phi_hi(nswarm) = 2.0 * M_PI;
-            printf("  [%i] muhilo = %e %e phihilo = %e %e\n", nswarm, mu_hi(nswarm), mu_lo(nswarm),
-              phi_hi(nswarm), phi_lo(nswarm));
             continue;
           }
 
@@ -420,11 +415,9 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
           const Real mu = 1.0 - ncov_tetrad[1];
           const Real phi = atan2(ncov_tetrad[3], ncov_tetrad[2]) + M_PI;
-          printf("  mu = %e phi = %e\n", mu, phi);
 
           for (int m = 0; m < n; m++) {
             const int mswarm = swarm_d.GetFullIndex(k, j, i, m);
-            printf("    m = %i mswarm = %i\n", m, mswarm);
             PARTHENON_DEBUG_REQUIRE(mswarm != nswarm, "Comparing the same particle!");
             if (mu > mu_lo(mswarm) && mu < mu_hi(mswarm) && phi > phi_lo(mswarm) &&
                 phi < phi_hi(mswarm)) {
@@ -433,7 +426,6 @@ TaskStatus MOCMCReconstruction(T *rc) {
               Real mu0 = mu_hi(mswarm) - mu_lo(mswarm);
               Real phi0 = phi_hi(mswarm) - phi_lo(mswarm);
               if (mu0 > phi0) {
-                printf("    A!\n");
                 const Real mu_m = 1.0 - mcov_tetrad[1];
                 mu0 = 0.5 * (mu + mu_m);
                 if (mu < mu0) {
@@ -448,7 +440,6 @@ TaskStatus MOCMCReconstruction(T *rc) {
                 phi_lo(nswarm) = phi_lo(mswarm);
                 phi_hi(nswarm) = phi_hi(mswarm);
               } else {
-                printf("    B!\n");
                 const Real phi_m = atan2(mcov_tetrad[3], mcov_tetrad[2]) + M_PI;
                 phi0 = 0.5 * (phi + phi_m);
                 if (phi < phi0) {
@@ -463,17 +454,14 @@ TaskStatus MOCMCReconstruction(T *rc) {
                 mu_lo(nswarm) = mu_lo(mswarm);
                 mu_hi(nswarm) = mu_hi(mswarm);
               }
-              const Real dOmega = (mu_hi(nswarm) - mu_lo(nswarm)) *
-                                   (phi_hi(nswarm) - phi_lo(nswarm));
-              printf("  dO [%i] mu: %e %e phi: %e %e\n", nswarm, mu_lo(nswarm), mu_hi(nswarm),
-                phi_lo(nswarm), phi_hi(nswarm));
+              const Real dOmega =
+                  (mu_hi(nswarm) - mu_lo(nswarm)) * (phi_hi(nswarm) - phi_lo(nswarm));
               PARTHENON_DEBUG_REQUIRE(dOmega > 0., "Zero or negative solid angle");
               break;
             } // if inside
           }   // m = 0..n
         }     // n = 0..nsamp
       });
-  printf("Done computing solid angles\n");
 
   return TaskStatus::complete;
 }
@@ -499,7 +487,6 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
           Real z0 = z(n);
           PushParticle(t(n), x(n), y(n), z(n), ncov(0, n), ncov(1, n), ncov(2, n),
                        ncov(3, n), dt, geom);
-          printf("Pushed! [%i] xyz %e %e %e\n", n, x(n), y(n), z(n));
 
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
