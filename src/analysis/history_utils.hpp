@@ -154,6 +154,38 @@ KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
   return -T_EM_11 * lapse * gdet;
 } // momentum flux
 
+template <typename Pack, typename Geometry>
+KOKKOS_INLINE_FUNCTION Real CalcMagneticFluxPhi(Pack &pack, Geometry &geom,
+                                                const int pvel_lo, const int pvel_hi,
+                                                const int pb_lo, const int pb_hi,
+                                                const int b, const int k, const int j,
+                                                const int i) {
+  Real gam[3][3];
+  geom.Metric(CellLocation::Cent, k, j, i, gam);
+  Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+  Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+  Real shift[3];
+  geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+
+  const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
+                       pack(b, pvel_hi, k, j, i)};
+  const Real Bp[] = {pack(b, pb_lo, k, j, i), pack(b, pb_lo + 1, k, j, i),
+                     pack(b, pb_hi, k, j, i)};
+  const Real W = phoebus::GetLorentzFactor(vcon, gam);
+
+  Real Bdotv = 0.0;
+  for (int m = 0; m < 3; m++)
+    for (int n = 0; n < 3; n++) {
+      Bdotv += gam[m][n] * Bp[m] * robust::ratio(vcon[n], W);
+    }
+  const Real ucon0 = W / lapse;
+  const Real ucon1 = vcon[0] - shift[0] * W / lapse;
+  const Real b0 = Bdotv * W / lapse;
+  const Real bcon1 = robust::ratio((Bp[0] + lapse * b0 * ucon1), W);
+
+  return std::abs(bcon1 * ucon0 - b0 * ucon1) * lapse * gdet;
+} // Phi
+
 } // namespace History
 
 #endif // ANALYSIS_HISTORY_UTILS_HPP_
