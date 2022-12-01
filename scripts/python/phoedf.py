@@ -360,15 +360,17 @@ class phoedf(phdf.phdf):
       Hcov = self.GetHcov()
       gammacon = self.gammacon
 
-      self.F[:,:,:,:,:,:] = 4. * Gamma[:,np.newaxis,np.newaxis,:,:,:]**2 / 3. * \
-                            vcon[:,:,np.newaxis,:,:,:] * J[:,np.newaxis,:,:,:,:]
-      for ii in range(3):
-        self.F[:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,:,:,:] * vcon[:,:,np.newaxis,:,:,:] * \
-                               vcon[:,ii,np.newaxis,:,:,:]*Hcov[:,ii,:,:,:,:]
+      for idir in range(3):
+        for ispec in range(self.NumSpecies):
+          self.F[:,idir,ispec,:,:,:] = 4. * Gamma[:,:,:,:]**2 / 3. * \
+                                vcon[:,idir,:,:,:] * J[:,ispec,:,:,:]
+        for ii in range(3):
+          self.F[:,idir,ispec,:,:,:] += Gamma[:,:,:,:] * vcon[:,idir,:,:,:] * \
+                                 vcon[:,ii,:,:,:]*Hcov[:,ii,ispec,:,:,:]
 
-      for ii in range(3):
-        self.F[:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,:,:,:] * \
-                               gammacon[:,:,ii,np.newaxis,:,:,:] * Hcov[:,ii,:,:,:,:]
+        for ii in range(3):
+          self.F[:,idir,ispec,:,:,:] += Gamma[:,:,:,:] * \
+                                 gammacon[:,idir,ii,:,:,:] * Hcov[:,ii,ispec,:,:,:]
 
       # TODO(BRR) tilPi component
 
@@ -384,21 +386,21 @@ class phoedf(phdf.phdf):
       Hcov = self.GetHcov()
       gammacon = self.gammacon
 
-      self.P[:,:,:,:,:,:,:] = (4. / 3. * Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:]**2 * \
-                               vcon[:,:,np.newaxis,np.newaxis,:,:,:] * \
-                               vcon[:,np.newaxis,:,np.newaxis,:,:,:] + \
-                               1. / 3. * gammacon[:,:,:,np.newaxis,:,:,:]) * \
-                              J[:,np.newaxis,np.newaxis,:,:,:,:]
       for ii in range(3):
-        self.P[:,:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:] * \
-                                 vcon[:,:,np.newaxis,np.newaxis,:,:,:] * \
-                                 gammacon[:,:,ii,np.newaxis,:,:,:] * \
-                                 Hcov[:,np.newaxis,ii,:,:,:,:]
-      for ii in range(3):
-        self.P[:,:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:] * \
-                                 vcon[:,np.newaxis,:,np.newaxis,:,:,:] * \
-                                 gammacon[:,:,ii,np.newaxis,:,:,:] * \
-                                 Hcov[:,ii,np.newaxis,:,:,:,:]
+        for jj in range(3):
+          for ispec in range(self.NumSpecies):
+            self.P[:,ii,jj,ispec,:,:,:] = (4. / 3. * Gamma[:,:,:,:]**2 * \
+                                           vcon[:,ii,:,:,:]*vcon[:,jj,:,:,:] + \
+                                           1. / 3. * gammacon[:,ii,jj,:,:,:]) * \
+                                           J[:,ispec,:,:,:]
+
+          for kk in range(3):
+            self.P[:,ii,jj,ispec,:,:,:] += Gamma[:,:,:,:] * vcon[:,ii,:,:,:] * \
+                                           gammacon[:,jj,kk,:,:,:] * Hcov[:,kk,ispec,:,:,:]
+
+          for kk in range(3):
+            self.P[:,ii,jj,ispec,:,:,:] += Gamma[:,:,:,:] * vcon[:,jj,:,:,:] * \
+                                           gammacon[:,ii,kk,:,:,:] * Hcov[:,kk,ispec,:,:,:]
 
       # TODO(BRR) tilPi component
 
