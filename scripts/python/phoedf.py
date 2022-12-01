@@ -72,7 +72,7 @@ class phoedf(phdf.phdf):
     self.gcov = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
     for mu in range(4):
       for nu in range(4):
-        self.gcov[:,mu,nu,:,:,:] = self.flatgcov[:,flatten_indices(mu,nu),:,self.NGhost:-self.NGhost,self.NGhost:-self.NGhost]
+        self.gcov[:,mu,nu,:,:,:] = self.flatgcov[:,flatten_indices(mu,nu),:,:,:]
     del(self.flatgcov)
     self.gcon = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
     for b in range(self.NumBlocks):
