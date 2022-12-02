@@ -31,13 +31,10 @@ from phoebus_constants import cgs, scalefree
 import phoebus_utils
 from phoedf import phoedf
 
-def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian', draw_bh=True):
-  print(fname)
+def plot_frame_from_phoedf(dfile, ifname, savefig, geomfile=None, rlim=40, coords='cartesian', draw_bh=True, custom_name=None):
 
   cmap_uniform = 'viridis'
   cmap_diverging = 'RdYlBu'
-
-  dfile = phoedf(fname)
 
   rad_active = dfile.Params['radiation/active']
 
@@ -113,9 +110,9 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
 
   density = dfile.Get("p.density", flatten=False)
   J = dfile.Get("r.p.J", flatten=False)
-  print(f'density min: {density.min()} max: {density.max()}')
-  if J is not None:
-    print(f'J min:       {J.min()} max: {J.max()}')
+  #print(f'density min: {density.min()} max: {density.max()}')
+  #if J is not None:
+  #  print(f'J min:       {J.min()} max: {J.max()}')
 
   if ndim == 2:
     k = 0
@@ -277,9 +274,19 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
 
   fig.tight_layout()
 
-  savename = str(ifname).rjust(5,"0") + '.png'
+  if custom_name is not None:
+    savename = custom_name
+  else:
+    savename = str(ifname).rjust(5,"0") + '.png'
   plt.savefig(savename, dpi=300, bbox_inches='tight')
   plt.close(fig)
+
+def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian', draw_bh=True, custom_name = None):
+  print(fname)
+
+  dfile = phoedf(fname)
+
+  plot_frame_from_phoedf(dfile, ifname, savefig, geomfile, rlim, coords, draw_bh, custom_name)
 
 if __name__ == "__main__":
 

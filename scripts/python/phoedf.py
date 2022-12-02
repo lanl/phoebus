@@ -344,7 +344,7 @@ class phoedf(phdf.phdf):
 
       for ii in range(3):
         self.E[:,:,:,:,:] += 2. * Gamma[:,np.newaxis,:,:,:] * vcon[:,ii,np.newaxis,:,:,:] * \
-                             Hcov[:,ii,:,k,j,i]
+                             Hcov[:,ii,:,:,:,:]
 
       # TODO(BRR) tilPi component
 
@@ -352,7 +352,7 @@ class phoedf(phdf.phdf):
 
   def GetF(self):
     if self.F is None:
-      self.F = np.zeros([self.NumBlocks, self.NumSpecies, 3, self.Nx3, self.Nx2, self.Nx1])
+      self.F = np.zeros([self.NumBlocks, 3, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1])
 
       Gamma = self.GetGamma()
       vcon = self.GetVpCon() / Gamma[:,np.newaxis,:,:,:]
