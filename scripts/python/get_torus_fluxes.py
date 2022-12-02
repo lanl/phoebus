@@ -51,9 +51,7 @@ def get_torus_fluxes(dfile):
   for b in range(dfile.NumBlocks):
     x1max = max(x1max, dfile.BlockBounds[b][1])
   xh = dfile.Params['geometry/xh']
-  print(f'ximax : {x1max}')
 
-  print(dfile.NumBlocks)
   mdot_in = 0.
   mdot_out = 0.
   Eg_in = 0.
@@ -66,7 +64,6 @@ def get_torus_fluxes(dfile):
   Lr_out = 0.
   phi = 0.
   for b in range(dfile.NumBlocks):
-    print(f'{b}\n\n')
     blockBounds = dfile.BlockBounds[b]
 
     dx2 = (blockBounds[3] - blockBounds[2]) / dfile.MeshBlockSize[1]
