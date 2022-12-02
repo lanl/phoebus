@@ -11,7 +11,10 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
-from parthenon_tools import phdf
+import sys
+sys.path.insert(0, '../../external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/')
+import phdf
+#from parthenon_tools import phdf
 
 from phoebus_constants import *
 from phoebus_eos import *
@@ -153,7 +156,7 @@ class phoedf(phdf.phdf):
 
   def GetHcov(self):
     if self.Hcov is None:
-      self.Hcov = self.Get("r.p.H", flatten=False) * self.GetJ()[:,:,np.newaxis,:,:,:]
+      self.Hcov = self.Get("r.p.H", flatten=False) * self.GetJ()[:,np.newaxis,:,:,:,:]
       assert self.Hcov is not None
 
     return self.Hcov
@@ -240,8 +243,6 @@ class phoedf(phdf.phdf):
       Ye = np.zeros(self.ScalarField)
       self.Tg[:,:,:,:] = eos.T_from_rho_u_Ye(rho[:,:,:,:]*self.MassDensityCodeToCGS,
         u[:,:,:,:]*self.EnergyDensityCodeToCGS, Ye[:,:,:,:]) / self.TemperatureCodeToCGS
-
-      print('%e' % np.max(self.Tg*self.TemperatureCodeToCGS))
 
       self.Tg = np.clip(self.Tg, 1.e-100, 1.e100)
 
