@@ -37,11 +37,19 @@ from plot_torus_3d import plot_frame_from_phoedf
 # Script to perform complete analysis of an output directory
 
 def process_file(in_filename, fig_folder, log_folder, avg_folder):
+  print(f'Processing {in_filename}')
+
+  log_filename = os.path.join(log_folder, in_filename.split(os.sep)[-1]).rstrip('.phdf') + '.log'
+  fig_filename = os.path.join(fig_folder, in_filename.split(os.sep)[-1]).rstrip('.phdf') + '.png'
+
+  # Skip if already done and overwrite not requested
+  if not args.overwrite and os.path.exists(log_filename) and os.path.exists(fig_filename):
+    return
+
   # Load data
   dfile = phoedf(in_filename)
 
   # Create log file
-  log_filename = os.path.join(log_folder, in_filename.split(os.sep)[-1]).rstrip('.phdf') + '.log'
   if not (args.overwrite == False and os.path.exists(log_filename)):
     fluxes = get_torus_fluxes(dfile)
 
@@ -55,8 +63,7 @@ def process_file(in_filename, fig_folder, log_folder, avg_folder):
       log_file.write('\n')
 
   # Create figure
-  fig_filename = os.path.join(fig_folder, in_filename.split(os.sep)[-1]).rstrip('.phdf') + '.png'
-  if not (args.overwrite == False and os.path.exists(log_filename)):
+  if not (args.overwrite == False and os.path.exists(fig_filename)):
     plot_frame_from_phoedf(dfile, 0, True, None, args.rout, coords='cartesian', draw_bh=True, custom_name = fig_filename)
 
 if __name__ == "__main__":
