@@ -18,9 +18,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   Params &params = physics->AllParams();
 
-  // input var???
-  int num_tracers = pin->GetOrAddReal("Tracers", "num_tracers", 100);
-  physics->AddParam<>("num_tracers", num_tracers);
+  int num_tracers = pin->GetOrAddInteger("Tracers", "num_tracers", 100);
+  params.Add("num_tracers", num_tracers);
 
   // Initialize random number generator pool
   int rng_seed = pin->GetOrAddInteger("Tracers", "rng_seed", 1273);
@@ -30,7 +29,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Add swarm of tracers
   std::string swarm_name = "tracers";
-  Metadata swarm_metadata({Metadata::Provides}); //, Metadata::None});
+  Metadata swarm_metadata({Metadata::Provides, Metadata::None});
   physics->AddSwarm(swarm_name, swarm_metadata);
   Metadata real_swarmvalue_metadata({Metadata::Real});
   physics->AddSwarmValue("id", swarm_name, Metadata({Metadata::Integer}));
