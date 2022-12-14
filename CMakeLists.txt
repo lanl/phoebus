@@ -187,6 +187,7 @@ add_subdirectory(src)
 # TODO(JMM): Testing?
 if(PHOEBUS_ENABLE_UNIT_TESTS OR PHOEBUS_ENABLE_INTEGRATION_TESTS OR PHOEBUS_ENABLE_REGRESSION_TESTS)
   message("\nConfiguring tests")
+  enable_testing()
   add_subdirectory(external/catch2 Catch2)
   list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/external/catch2/contrib)
   add_subdirectory(tst)

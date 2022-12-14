@@ -126,8 +126,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
       v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         Real xi_max;
+        Real garbage;
         bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max);
+                                    coords.x3v(k, j, i), xi_max, garbage);
 
         // It is assumed that the fluid is already fixed up
         auto fail = [&](const int k, const int j, const int i) {

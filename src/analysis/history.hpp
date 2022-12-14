@@ -11,8 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef PHOEBUS_UTILS_HISTORY_HPP_
-#define PHOEBUS_UTILS_HISTORY_HPP_
+#ifndef ANALYSIS_HISTORY_HPP_
+#define ANALYSIS_HISTORY_HPP_
 
 #include <string>
 #include <vector>
@@ -20,6 +20,8 @@
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
+
+#include "phoebus_utils/variables.hpp"
 
 using namespace parthenon::package::prelude;
 
@@ -34,6 +36,10 @@ using namespace parthenon::package::prelude;
  */
 
 namespace History {
+
+Real ReduceMassAccretionRate(MeshData<Real> *md);
+Real ReduceJetEnergyFlux(MeshData<Real> *md);
+Real ReduceJetMomentumFlux(MeshData<Real> *md);
 
 template <typename Reducer_t>
 Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
@@ -73,4 +79,4 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
 
 } // namespace History
 
-#endif // PHOEBUS_UTILS_HISTORY_HPP_
+#endif // ANALYSIS_HISTORY_HPP_
