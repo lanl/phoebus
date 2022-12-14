@@ -96,7 +96,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &swarm = pmb->swarm_data.Get()->Get("tracers");
   auto rng_pool_tr =
       tracer_pkg->Param<RNGPool>("rng_pool"); // Q: Have 2 pools. combine/share?
-  const auto num_tracers_total = tracer_pkg->Param<Real>("num_tracers");
+  const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
 
   PackIndexMap imap;
   auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,

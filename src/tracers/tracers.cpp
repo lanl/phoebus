@@ -14,11 +14,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("tracers");
   const bool active = pin->GetBoolean("physics", "tracers");
   physics->AddParam<bool>("active", active);
-  if (!active) return physics;
+  // Better way to do this? I leave the tracer swarm defined even if we are not
+  // doing tracers as it simplifies the pgen initialization.
+  // if (!active) return physics;
 
   Params &params = physics->AllParams();
 
-  int num_tracers = pin->GetOrAddInteger("Tracers", "num_tracers", 100);
+  int num_tracers = pin->GetOrAddInteger("Tracers", "num_tracers", 0);
   params.Add("num_tracers", num_tracers);
 
   // Initialize random number generator pool
@@ -62,6 +64,7 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   // update loop.
+  std::printf("%f\n", x(1));
   const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
       "Advect Tracers", 0, max_active_index, KOKKOS_LAMBDA(const int n) {
