@@ -73,15 +73,14 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
 
           // geom quantities
-          // TODO(BLB): pass these X1, X2... intead of i, k...
           Real gcov4[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
-          Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+          geom.SpacetimeMetric(CellLocation::Cent, z(n), y(n), x(n), gcov4);
+          Real lapse = geom.Lapse(CellLocation::Cent, z(n), y(n), x(n));
           Real shift[3];
-          geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+          geom.ContravariantShift(CellLocation::Cent, z(n), y(n), x(n), shift);
           const Real vel[] = {pack(pvel_lo, k, j, i), pack(pvel_lo + 1, k, j, i),
                               pack(pvel_hi, k, j, i)};
-          const Real W = phoebus::GetLorentzFactor(vel, gcov4);
+          const Real W = phoebus::GetLorentzFactor(vel, gcov4); // Q: Interp this?
 
           // Get shift, W, lapse
           Real vel_X1 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo) / W;
