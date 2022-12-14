@@ -35,8 +35,10 @@ using RadiationType = singularity::RadiationType;
 class Opacities {
   using Opacity = singularity::neutrinos::Opacity;
   using MeanOpacity = singularity::neutrinos::MeanOpacity;
+  using MeanNonCGSUnits = singularity::neutrinos::MeanNonCGSUnits<MeanOpacity>;
   using SOpacity = singularity::neutrinos::SOpacity;
   using MeanSOpacity = singularity::neutrinos::MeanSOpacity;
+  using MeanNonCGSUnitsS = singularity::neutrinos::MeanNonCGSUnitsS<MeanSOpacity>;
 
  public:
   Opacities() = default;

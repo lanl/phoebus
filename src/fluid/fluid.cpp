@@ -13,13 +13,13 @@
 
 #include "fluid.hpp"
 
+#include "analysis/history.hpp"
 #include "con2prim.hpp"
 #include "con2prim_robust.hpp"
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
-#include "phoebus_utils/history.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "prim2con.hpp"
@@ -129,6 +129,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
   params.Add("mhd", mhd);
+
+  Real sigma_cutoff = pin->GetOrAddReal("fluid", "sigma_cutoff", 1.0);
+  params.Add("sigma_cutoff", sigma_cutoff);
 
   Metadata m;
   std::vector<int> three_vec(1, 3);
