@@ -70,6 +70,8 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
 
+pack_size = -1
+
 <phoebus/mesh>
 bc_vars = conserved
 
