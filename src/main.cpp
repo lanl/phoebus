@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
   pman.ParthenonInitPackagesAndMesh();
 
   // call post-initialization
-  if (pman.IsRestart()) {
+  if (!pman.IsRestart()) {
     phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get());
   }
 
