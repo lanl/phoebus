@@ -156,20 +156,12 @@ KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
 
 template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real CalcMagneticFluxPhi(Pack &pack, Geometry &geom,
-                                                const int pvel_lo, const int pvel_hi,
-                                                const int pb_lo, const int pb_hi,
-                                                const int b, const int k, const int j,
-                                                const int i) {
-  Real gam[3][3];
-  geom.Metric(CellLocation::Cent, k, j, i, gam);
-  Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+                                                const int cb_lo, const int b,
+                                                const int k, const int j, const int i) {
   Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
 
-  const Real Bp[] = {pack(b, pb_lo, k, j, i), pack(b, pb_lo + 1, k, j, i),
-                     pack(b, pb_hi, k, j, i)};
-
-  // \int B^r sqrt(-gdet) := B^r / alpha * (alpha * detgamma)
-  return std::abs(Bp[0]) * gdet;
+  // \int B^r sqrt(-gdet) := (detgam B^r) * lapse
+  return std::abs(pack(b, cb_lo, k, j, i)) * lapse;
 } // Phi
 
 } // namespace History
