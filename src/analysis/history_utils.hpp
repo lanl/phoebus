@@ -154,6 +154,16 @@ KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
   return -T_EM_11 * lapse * gdet;
 } // momentum flux
 
+template <typename Pack, typename Geometry>
+KOKKOS_INLINE_FUNCTION Real CalcMagneticFluxPhi(Pack &pack, Geometry &geom,
+                                                const int cb_lo, const int b, const int k,
+                                                const int j, const int i) {
+  Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+
+  // \int B^r sqrt(-gdet) := (detgam B^r) * lapse
+  return std::abs(pack(b, cb_lo, k, j, i)) * lapse;
+} // Phi
+
 } // namespace History
 
 #endif // ANALYSIS_HISTORY_UTILS_HPP_

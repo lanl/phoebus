@@ -186,4 +186,51 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
 
 } // ReduceJetMomentumFlux
 
+Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+  auto pmb = md->GetParentPointer();
+  auto &pars = pmb->packages.Get("geometry")->AllParams();
+  const Real xh = pars.Get<Real>("xh");
+
+  namespace c = fluid_cons;
+  const std::vector<std::string> vars({c::bfield});
+
+  PackIndexMap imap;
+  auto pack = md->PackVariables(vars, imap);
+
+  const int cb_lo = imap[c::bfield].first;
+
+  auto geom = Geometry::GetCoordinateSystem(md);
+
+  Real result = 0.0;
+  parthenon::par_reduce(
+      parthenon::LoopPatternMDRange(), "Phoebus History for Jet Magnetic Flux Phi",
+      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
+        const auto &coords = pack.GetCoords(b);
+        if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1)) {
+          const Real dx1 = coords.Dx(X1DIR, k, j, i + 1);
+          const Real dx2 = coords.Dx(X2DIR, k, j, i + 1);
+          const Real dx3 = coords.Dx(X3DIR, k, j, i + 1);
+
+          // interp to make sure we're getting the horizon correct
+          auto m = (CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i + 1 + 1) -
+                    CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i - 1 + 1)) /
+                   (2.0 * dx1);
+          auto flux = (CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i + 1) +
+                       (xh - coords.x1v(i + 1)) * m) *
+                      dx2 * dx3;
+
+          lresult += flux;
+        } else {
+          lresult += 0.0;
+        }
+      },
+      result);
+  return 0.5 * result; // 0.5 \int detg B^r dx2 dx3
+} // Phi
+
 } // namespace History
