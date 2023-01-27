@@ -156,8 +156,8 @@ KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
 
 template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real CalcMagneticFluxPhi(Pack &pack, Geometry &geom,
-                                                const int cb_lo, const int b,
-                                                const int k, const int j, const int i) {
+                                                const int cb_lo, const int b, const int k,
+                                                const int j, const int i) {
   Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
 
   // \int B^r sqrt(-gdet) := (detgam B^r) * lapse

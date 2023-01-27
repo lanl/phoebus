@@ -212,16 +212,17 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         const auto &coords = pack.GetCoords(b);
         if (coords.x1f(i) <= xh && xh < coords.x1f(i + 1)) {
-          const Real dx1 = coords.Dx(X1DIR, k, j, i+1);
-          const Real dx2 = coords.Dx(X2DIR, k, j, i+1);
-          const Real dx3 = coords.Dx(X3DIR, k, j, i+1);
+          const Real dx1 = coords.Dx(X1DIR, k, j, i + 1);
+          const Real dx2 = coords.Dx(X2DIR, k, j, i + 1);
+          const Real dx3 = coords.Dx(X3DIR, k, j, i + 1);
 
           // interp to make sure we're getting the horizon correct
-          auto m = (CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i + 1 +1) -
-                    CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i - 1 +1)) /
+          auto m = (CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i + 1 + 1) -
+                    CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i - 1 + 1)) /
                    (2.0 * dx1);
-          auto flux = (CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i+1) +
-                       (xh - coords.x1v(i+1)) * m) * dx2 * dx3;
+          auto flux = (CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i + 1) +
+                       (xh - coords.x1v(i + 1)) * m) *
+                      dx2 * dx3;
 
           lresult += flux;
         } else {
