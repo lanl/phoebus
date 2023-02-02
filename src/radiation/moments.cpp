@@ -568,9 +568,12 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           break;
         }
         Real X[4];
-        X[1] = (face == CellLocation::Face1 ? coords.Xf<1>(k, j, i) : coords.Xc<1>(k, j, i));
-        X[2] = (face == CellLocation::Face2 ? coords.Xf<2>(k, j, i) : coords.Xc<2>(k, j, i));
-        X[3] = (face == CellLocation::Face3 ? coords.Xf<3>(k, j, i) : coords.Xc<3>(k, j, i));
+        X[1] =
+            (face == CellLocation::Face1 ? coords.Xf<1>(k, j, i) : coords.Xc<1>(k, j, i));
+        X[2] =
+            (face == CellLocation::Face2 ? coords.Xf<2>(k, j, i) : coords.Xc<2>(k, j, i));
+        X[3] =
+            (face == CellLocation::Face3 ? coords.Xf<3>(k, j, i) : coords.Xc<3>(k, j, i));
 
         Real W_ceiling, garbage;
         bounds.GetCeilings(X[1], X[2], X[3], W_ceiling, garbage);
@@ -591,7 +594,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         const Real alpha = geom.Lapse(face, k, j, i);
         typename CLOSURE::LocalGeometryType g(geom, face, 0, k, j, i);
 
-        const Real dx = coords.CellWidthFA(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
+        const Real dx =
+            coords.CellWidthFA(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
 
         Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i), v(idx_qlv(1, idir), k, j, i),
                            v(idx_qlv(2, idir), k, j, i)};

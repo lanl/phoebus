@@ -147,8 +147,8 @@ TaskStatus SourceFixupImpl(T *rc) {
       kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         double gamma_max, e_max;
-        bounds.GetCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i), coords.Xc<3>(k, j, i),
-                           gamma_max, e_max);
+        bounds.GetCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                           coords.Xc<3>(k, j, i), gamma_max, e_max);
         Real xi_max;
         Real garbage;
         bounds.GetRadiationCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),

@@ -147,8 +147,8 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto set = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBounds<nonlocal>, md);
 
     if (pmesh->multilevel) {
-      tl.AddTask(set | set_local,
-                 parthenon::cell_centered_bvars::RestrictGhostHalos, md, false);
+      tl.AddTask(set | set_local, parthenon::cell_centered_bvars::RestrictGhostHalos, md,
+                 false);
     }
   }
 

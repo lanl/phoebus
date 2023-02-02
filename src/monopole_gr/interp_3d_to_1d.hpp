@@ -256,10 +256,10 @@ GetCoordsAndCellWidthsHelper(const Transform &transform, const Pack &p, const in
                              Real &ph, Real &dr, Real &dth, Real &dph, Real &dv) {
   const parthenon::Coordinates_t &coords = p.GetCoords(b);
   if (IS_CART) {
-    transform.GetCoordsAndDerivatives(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
-                                      coords.Xc<3>(k, j, i), coords.CellWidthFA(1, k, j, i),
-                                      coords.CellWidthFA(2, k, j, i), coords.CellWidthFA(3, k, j, i), r, th,
-                                      ph, dr, dth, dph);
+    transform.GetCoordsAndDerivatives(
+        coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i), coords.Xc<3>(k, j, i),
+        coords.CellWidthFA(1, k, j, i), coords.CellWidthFA(2, k, j, i),
+        coords.CellWidthFA(3, k, j, i), r, th, ph, dr, dth, dph);
     dv = coords.CellVolume(k, j, i);
   } else {
     Interp3DTo1D::GetCoordsAndDerivsSph(k, j, i, coords, r, th, ph, dr, dth, dph, dv);
