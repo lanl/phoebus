@@ -581,11 +581,13 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
             const Real rad_speed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
             const Real asym_speed = std::fabs(asym_sigl);
 
-            const Real dx = coords.CellWidthFA(X1DIR + d, k, j, i) * sqrt(cov_gamma(d, d));
+            const Real dx =
+                coords.CellWidthFA(X1DIR + d, k, j, i) * sqrt(cov_gamma(d, d));
             const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
             const Real csig = a * rad_speed + (1. - a) * asym_speed;
 
-            lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.CellWidthFA(X1DIR + d, k, j, i)));
+            lmin_dt =
+                std::min(lmin_dt, 1.0 / (csig / coords.CellWidthFA(X1DIR + d, k, j, i)));
           }
         }
       },

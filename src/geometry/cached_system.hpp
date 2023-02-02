@@ -701,7 +701,8 @@ void SetCachedCoordinateSystem(Data *rc) {
       system.SpacetimeMetric(floc[d], b, idx_fp[0], idx_fp[1], idx_fp[2], g_fp);
       system.SpacetimeMetric(floc[d], b, k, j, i, g_fm);
       // Recall that we're setting GradLnAlpha, not GradAlpha;
-      const Real da = robust::ratio(alpha_fp - alpha_fm, alpha * coords.CellWidthFA(d + 1));
+      const Real da =
+          robust::ratio(alpha_fp - alpha_fm, alpha * coords.CellWidthFA(d + 1));
       // if time_dependent, then we don't want to fill the d/dt, mu = 0 terms
       pack(b, idx[loc].dalpha + d + time_dependent, k, j, i) = da;
       // 2d loop for metric
@@ -711,7 +712,8 @@ void SetCachedCoordinateSystem(Data *rc) {
           // if time_dependent, then we don't want to fill the d/dt, sigma = 0 terms
           const int flat =
               idx[loc].dg + nvar_deriv * Utils::Flatten2(mu, nu, NDFULL) + sigma;
-          const Real dg = robust::ratio(g_fp[mu][nu] - g_fm[mu][nu], coords.CellWidthFA(d + 1));
+          const Real dg =
+              robust::ratio(g_fp[mu][nu] - g_fm[mu][nu], coords.CellWidthFA(d + 1));
           pack(b, flat, k, j, i) = dg;
         }
       }
