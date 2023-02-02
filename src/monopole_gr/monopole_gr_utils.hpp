@@ -100,12 +100,12 @@ KOKKOS_INLINE_FUNCTION
 void GetCoordsAndDerivsSph(const int k, const int j, const int i,
                            const parthenon::Coordinates_t &coords, Real &r, Real &th,
                            Real &ph, Real &dr, Real &dth, Real &dph, Real &dv) {
-  r = coords.x1v(k, j, i);
-  th = coords.x2v(k, j, i);
-  ph = coords.x3v(k, j, i);
-  dr = coords.Dx(1, k, j, i);
-  dth = coords.Dx(2, k, j, i);
-  dph = coords.Dx(3, k, j, i);
+  r = coords.Xc<1>(k, j, i);
+  th = coords.Xc<2>(k, j, i);
+  ph = coords.Xc<3>(k, j, i);
+  dr = coords.CellWidthFA(1, k, j, i);
+  dth = coords.CellWidthFA(2, k, j, i);
+  dph = coords.CellWidthFA(3, k, j, i);
   const Real idr = (1. / 12.) * (dr * dr * dr) + dr * (r * r);
   dv = std::sin(th) * dth * dph * idr;
 }

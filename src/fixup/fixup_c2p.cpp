@@ -176,7 +176,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
 
         Real gamma_max, e_max;
-        bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+        bounds.GetCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i), coords.Xc<3>(k, j, i),
                            gamma_max, e_max);
 
         if (c2p_failure_force_fixup_both && rad_active) {

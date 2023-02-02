@@ -434,11 +434,11 @@ TaskStatus ReconstructEdgeStates(T *rc) {
         //  dJ/dx (@ Q) = (d - c)/dx
         //  dJ/dy (@ Q) = (a + b - e - f)/(4*dy)
         if (n < nspec) {
-          const Real idx = 1.0 / coords.Dx(X1DIR, k, j, 0);
+          const Real idx = 1.0 / coords.CellWidthFA(X1DIR, k, j, 0);
           const Real idx4 = 0.25 * idx;
-          const Real idy = 1.0 / coords.Dx(X2DIR, k, j, 0);
+          const Real idy = 1.0 / coords.CellWidthFA(X2DIR, k, j, 0);
           const Real idy4 = 0.25 * idy;
-          const Real idz = 1.0 / coords.Dx(X3DIR, k, j, 0);
+          const Real idz = 1.0 / coords.CellWidthFA(X3DIR, k, j, 0);
           const Real idz4 = 0.25 * idz;
           Real *J = &v(b, idx_J(n), k, j, 0);
           Real *Jjm1 = &v(b, idx_J(n), k, j - dj, 0);
@@ -537,7 +537,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   // TODO(BRR) add to radiation floors
   const Real kappaH_min = 1.e-20;
 
-  auto &coords = pmb->coords;
+  const parthenon::Coordinates_t &coords = pmb->coords;
 
   auto recon_fixup_strategy = rad_pkg->Param<ReconFixupStrategy>("recon_fixup_strategy");
 
@@ -568,9 +568,9 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           break;
         }
         Real X[4];
-        X[1] = (face == CellLocation::Face1 ? coords.x1f(k, j, i) : coords.x1v(k, j, i));
-        X[2] = (face == CellLocation::Face2 ? coords.x2f(k, j, i) : coords.x2v(k, j, i));
-        X[3] = (face == CellLocation::Face3 ? coords.x3f(k, j, i) : coords.x3v(k, j, i));
+        X[1] = (face == CellLocation::Face1 ? coords.Xf<1>(k, j, i) : coords.Xc<1>(k, j, i));
+        X[2] = (face == CellLocation::Face2 ? coords.Xf<2>(k, j, i) : coords.Xc<2>(k, j, i));
+        X[3] = (face == CellLocation::Face3 ? coords.Xf<3>(k, j, i) : coords.Xc<3>(k, j, i));
 
         Real W_ceiling, garbage;
         bounds.GetCeilings(X[1], X[2], X[3], W_ceiling, garbage);
@@ -591,7 +591,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
         const Real alpha = geom.Lapse(face, k, j, i);
         typename CLOSURE::LocalGeometryType g(geom, face, 0, k, j, i);
 
-        const Real dx = coords.Dx(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
+        const Real dx = coords.CellWidthFA(idir_in, k, j, i) * sqrt(cov_gamma(idir, idir));
 
         Real con_vpl[3] = {v(idx_qlv(0, idir), k, j, i), v(idx_qlv(1, idir), k, j, i),
                            v(idx_qlv(2, idir), k, j, i)};

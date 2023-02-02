@@ -337,21 +337,21 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         eos_lambda[1] = std::log10(v(b, tmp, k, j, i)); // use last temp as initial guess
 
         double rho_floor, sie_floor;
-        bounds.GetFloors(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+        bounds.GetFloors(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i), coords.Xc<3>(k, j, i),
                          rho_floor, sie_floor);
         double gamma_max, e_max;
-        bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
+        bounds.GetCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i), coords.Xc<3>(k, j, i),
                            gamma_max, e_max);
         Real bsqorho_max, bsqou_max;
-        bounds.GetMHDCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                              coords.x3v(k, j, i), bsqorho_max, bsqou_max);
+        bounds.GetMHDCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                              coords.Xc<3>(k, j, i), bsqorho_max, bsqou_max);
         Real J_floor;
-        bounds.GetRadiationFloors(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                  coords.x3v(k, j, i), J_floor);
+        bounds.GetRadiationFloors(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                                  coords.Xc<3>(k, j, i), J_floor);
         Real xi_max;
         Real garbage;
-        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max, garbage);
+        bounds.GetRadiationCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                                    coords.Xc<3>(k, j, i), xi_max, garbage);
 
         Real rho_floor_max = rho_floor;
         Real u_floor_max = rho_floor * sie_floor;

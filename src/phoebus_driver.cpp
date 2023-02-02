@@ -17,12 +17,12 @@
 #include <vector>
 
 // TODO(JCD): this should be exported by parthenon
+#include <amr_criteria/refinement_package.hpp>
 #include <bvals/cc/bvals_cc_in_one.hpp>
 #include <globals.hpp>
-#include <mesh/refinement_cc_in_one.hpp>
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
-#include <refinement/refinement.hpp>
+#include <prolong_restrict/prolong_restrict.hpp>
 #include <utils/error_checking.hpp>
 
 // Local Includes
@@ -148,7 +148,7 @@ void PhoebusDriver::PostInitializationCommunication() {
 
     if (pmesh->multilevel) {
       tl.AddTask(set | set_local,
-                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, md.get());
+                 parthenon::cell_centered_bvars::RestrictGhostHalos, md, false);
     }
   }
 
@@ -525,7 +525,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (pmesh->multilevel) {
       tl.AddTask(set_nonlocal | set_local,
-                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, mc1.get());
+                 parthenon::cell_centered_bvars::RestrictGhostHalos, mc1, false);
     }
   }
   // TODO(BRR) loop this in thoughtfully!
