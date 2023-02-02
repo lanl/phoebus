@@ -74,11 +74,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real r;
         if (spherical) {
-          r = std::abs(coords.x1v(i));
+          r = std::abs(coords.Xc<1>(i));
         } else {
-          Real x = coords.x1v(i);
-          Real y = ndim > 1 ? coords.x2v(j) : 0;
-          Real z = ndim > 2 ? coords.x3v(k) : 0;
+          Real x = coords.Xc<1>(i);
+          Real y = ndim > 1 ? coords.Xc<2>(j) : 0;
+          Real z = ndim > 2 ? coords.Xc<3>(k) : 0;
           r = std::sqrt(x * x + y * y + z * z);
         }
         const Real rho = rhoa;

@@ -68,7 +68,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::blandford_mckee", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real r = coords.x1v(i);
+        const Real r = coords.Xc<1>(i);
         Real vel = (std::abs(r) < tshock) ? rescale * r / tshock : 0;
         PARTHENON_REQUIRE(vel < 1, "Velocity subluminal");
         Real W = 1 / std::sqrt(1 - vel * vel);
