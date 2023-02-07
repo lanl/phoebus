@@ -1,0 +1,4 @@
+cmake_minimum_required(VERSION 3.10)
+project (reader)
+add_library(reader.hpp)
+add_executable (output reader.cpp main.cpp) 
