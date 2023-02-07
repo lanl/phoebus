@@ -1,0 +1,16 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <cmath>
+#include <sstream>
+#include <fstream>
+#include "reader.hpp"
+
+
+int main(int argc, char *argv[]){
+
+
+
+
+
+}

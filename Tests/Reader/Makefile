@@ -1,0 +1,6 @@
+ALL: compile run
+compile: reader.cpp main.cpp
+	g++ -o compile reader.cpp main.cpp -I.
+
+run: reader.cpp main.cpp
+	./compile "converted_ADM_stellartable.dat"
