@@ -195,8 +195,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real x = coords.x1v(i);
-        Real y = coords.x2v(j);
+        Real x = coords.Xc<1>(i);
+        Real y = coords.Xc<2>(j);
 
         if (is_snake) {
           y = y - a_snake * sin(k_snake * x);

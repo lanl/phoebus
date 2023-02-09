@@ -821,11 +821,11 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
           divb(k, j, i) = 0.5 *
                               (b(0, k, j, i) + b(0, k, j - 1, i) - b(0, k, j, i - 1) -
                                b(0, k, j - 1, i - 1)) /
-                              coords.Dx(X1DIR, k, j, i) +
+                              coords.CellWidthFA(X1DIR, k, j, i) +
                           0.5 *
                               (b(1, k, j, i) + b(1, k, j, i - 1) - b(1, k, j - 1, i) -
                                b(1, k, j - 1, i - 1)) /
-                              coords.Dx(X2DIR, k, j, i);
+                              coords.CellWidthFA(X2DIR, k, j, i);
         });
   } else if (ndim == 3) {
     // todo(jcd): these are supposed to be node centered, and this misses the
@@ -838,17 +838,17 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
                   (b(0, k, j, i) + b(0, k, j - 1, i) + b(0, k - 1, j, i) +
                    b(0, k - 1, j - 1, i) - b(0, k, j, i - 1) - b(0, k, j - 1, i - 1) -
                    b(0, k - 1, j, i - 1) - b(0, k - 1, j - 1, i - 1)) /
-                  coords.Dx(X1DIR, k, j, i) +
+                  coords.CellWidthFA(X1DIR, k, j, i) +
               0.25 *
                   (b(1, k, j, i) + b(1, k, j, i - 1) + b(1, k - 1, j, i) +
                    b(1, k - 1, j, i - 1) - b(1, k, j - 1, i) - b(1, k, j - 1, i - 1) -
                    b(1, k - 1, j - 1, i) - b(1, k - 1, j - 1, i - 1)) /
-                  coords.Dx(X2DIR, k, j, i) +
+                  coords.CellWidthFA(X2DIR, k, j, i) +
               0.25 *
                   (b(2, k, j, i) + b(2, k, j, i - 1) + b(2, k, j - 1, i) +
                    b(2, k, j - 1, i - 1) - b(2, k - 1, j, i) - b(2, k - 1, j, i - 1) -
                    b(2, k - 1, j - 1, i) - b(2, k - 1, j - 1, i - 1)) /
-                  coords.Dx(X3DIR, k, j, i);
+                  coords.CellWidthFA(X3DIR, k, j, i);
         });
   }
   return TaskStatus::complete;
@@ -879,7 +879,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
             const Real max_s =
                 std::max(csig(d, k, j, i),
                          std::max(fsig(d, k, j, i), fsig(d, k + dk, j + dj, i + di)));
-            ldt += max_s / coords.Dx(X1DIR + d, k, j, i);
+            ldt += max_s / coords.CellWidthFA(X1DIR + d, k, j, i);
           }
           lmin_dt = std::min(lmin_dt, 1.0 / (ldt + 1.e-50));
         },
@@ -890,7 +890,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
           Real ldt = 0.0;
           for (int d = 0; d < ndim; d++) {
-            ldt += csig(d, k, j, i) / coords.Dx(X1DIR + d, k, j, i);
+            ldt += csig(d, k, j, i) / coords.CellWidthFA(X1DIR + d, k, j, i);
           }
           lmin_dt = std::min(lmin_dt, 1.0 / (ldt + 1.e-50));
         },

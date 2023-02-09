@@ -68,7 +68,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real x = coords.x1v(i);
+        const Real x = coords.Xc<1>(i);
         Real lambda[2] = {0.5, 0.};
         if (iye > 0) {
           v(iye, k, j, i) = lambda[0];
