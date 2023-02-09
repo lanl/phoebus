@@ -53,7 +53,7 @@ void ReportError(Coordinates_t &coords, VariablePack<Real> &v, const int vindex,
   int k = 0;
   int j = 0;
   for (int i = 0; i < v.GetDim(1); i++) {
-    const Real x = coords.x1v(i);
+    const Real x = coords.Xc<1>(i);
     const Real val = f(x);
     const Real err = std::abs(val - v(vindex, k, j, i)) / val;
     if (err > max_error) {
@@ -101,7 +101,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::Sod", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real x = coords.x1v(i);
+        const Real x = coords.Xc<1>(i);
         v(irho, k, j, i) = rho_of_x(x);
         v(ieng, k, j, i) = u_of_x(x);
         v(ivlo, k, j, i) = v1_of_x(x);

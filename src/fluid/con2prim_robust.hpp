@@ -263,9 +263,9 @@ class ConToPrim {
                                                     Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     CellGeom g(geom, std::forward<Args>(args)...);
-    Real x1 = coords.x1v(std::forward<Args>(args)...);
-    Real x2 = coords.x2v(std::forward<Args>(args)...);
-    Real x3 = coords.x3v(std::forward<Args>(args)...);
+    Real x1 = coords.Xc<1>(std::forward<Args>(args)...);
+    Real x2 = coords.Xc<2>(std::forward<Args>(args)...);
+    Real x3 = coords.Xc<3>(std::forward<Args>(args)...);
     return solve(v, g, eos, x1, x2, x3);
   }
 

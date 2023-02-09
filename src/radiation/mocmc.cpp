@@ -11,6 +11,7 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+#include <coordinates/coordinates.hpp>
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
@@ -64,18 +65,19 @@ void MOCMCInitSamples(T *rc) {
 
   // Meshblock geometry
   const auto geom = Geometry::GetCoordinateSystem(rc);
+  const parthenon::Coordinates_t &coords = pmb->coords;
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
   const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
   const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
   const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
-  const Real &dx_i = pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
-  const Real &dx_j = pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
-  const Real &dx_k = pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
-  const Real &minx_i = pmb->coords.x1f(ib.s);
-  const Real &minx_j = pmb->coords.x2f(jb.s);
-  const Real &minx_k = pmb->coords.x3f(kb.s);
+  const Real &dx_i = coords.Dxf<1>(pmb->cellbounds.is(IndexDomain::interior));
+  const Real &dx_j = coords.Dxf<2>(pmb->cellbounds.js(IndexDomain::interior));
+  const Real &dx_k = coords.Dxf<3>(pmb->cellbounds.ks(IndexDomain::interior));
+  const Real &minx_i = coords.Xf<1>(ib.s);
+  const Real &minx_j = coords.Xf<2>(jb.s);
+  const Real &minx_k = coords.Xf<3>(kb.s);
 
   // Microphysics
   auto opac_pkg = pmb->packages.Get("opacity");

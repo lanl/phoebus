@@ -48,7 +48,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::rhs_tester", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real x = std::abs(coords.x1v(i));
+        const Real x = std::abs(coords.Xc<1>(i));
         const Real rho = 1;
         const Real P = x / 2;
         const Real vel = x / 2;
