@@ -49,7 +49,8 @@ using namespace parthenon::package::prelude;
   PROBLEM(homogeneous_sphere)                                                            \
   PROBLEM(torus)                                                                         \
   PROBLEM(p2c2p)                                                                         \
-  PROBLEM(tov)
+  PROBLEM(tov)                                                                           \
+  PROBLEM(homologous)
 
 // if you need problem-specific modifications to inputs, add the name here
 #define FOREACH_MODIFIER                                                                 \
