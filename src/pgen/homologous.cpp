@@ -15,7 +15,7 @@
 #include "geometry/geometry.hpp"
 #include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
-#include "/Work/Phoebus/phoebus/Tests/GRsolver/reader.hpp"
+#include "Tests/Reader/reader.hpp"
 
 // Homologously collapsing star.
 
@@ -48,16 +48,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
 
   
-  const Real Cv = pin->GetOrAddReal("homologous", "Cv", 1.0);
-  const Real gamma = pin->GetOrAddReal("homologous", "gamma", 1.3334);
+  const Real Cv = pin->GetOrAddReal("eos", "Cv", 1.0);
+  const Real gamma = pin->GetOrAddReal("eos", "gamma", 1.3334);
   const bool spherical = pin->GetOrAddReal("homologous", "spherical_coords", true);
   const string table = pin ->GetOrAddReal("homologous","table");
   auto &coords = pmb->coords;
   auto pmesh = pmb->pmy_mesh;
   int ndim = pmesh->ndim;
 
-  const Real v_inner = (4. / 3.) * M_PI * std::pow(rinner, 3.);
-  const Real uinner = Eexp / v_inner;
+  //const Real v_inner = (4. / 3.) * M_PI * std::pow(rinner, 3.);
+  //const Real uinner = Eexp / v_inner;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -91,7 +91,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   MonopoleGR::DumpToTxt("phoebus-metric-setup.dat",monopole_pkg);
 
   // Primitive Variables
-  auto MoveVectorToDevice(std::vector<double> &vec){
+  auto MoveVectorToDevice=[](std::vector<double> &vec){
     Kokkos::View<Real*, Kokkos::HostSpace, Kokkos::MemoryUnmanaged> hm (vec.data(),vec.size());
     return;
     Kokkos::create_mirror_view_and_copy(Kokkos::DefaultExecutionSpace::memory_space(),hm);
