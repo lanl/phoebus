@@ -143,4 +143,4 @@ warn_on_dt = false
 dtwarn_eps = 1e-5
 
 <homologous>
-table="/home/mari/Work/Phoebus/phoebus/Tests/Reader/converted_ADM_homologouscollapse.dat"
+table="../Tests/Reader/converted_ADM_homologouscollapse.dat"
