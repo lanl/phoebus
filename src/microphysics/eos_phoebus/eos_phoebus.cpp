@@ -49,6 +49,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   };
 
   bool needs_ye = false; // TODO(JMM) descriptive enough?
+  bool provides_entropy = false;
   names_t names;
   EOSBuilder::EOSType type;
   EOSBuilder::modifiers_t modifiers;
@@ -111,6 +112,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     base_params["use_sp5"].emplace<bool>(
         pin->GetOrAddBoolean(block_name, "use_sp5", true));
     auto use_ye = pin->GetOrAddBoolean("fluid", "Ye", false);
+    provides_entropy = true;
     PARTHENON_REQUIRE_THROWS(use_ye,
                              "\"StellarCollapse\" EOS requires that Ye be enabled!");
 #endif
@@ -156,6 +158,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("d.EOS", eos_device);
   params.Add("h.EOS", eos_host);
   params.Add("needs_ye", needs_ye);
+  params.Add("provides_entropy", provides_entropy);
 
   // Store eos params in case they're needed
   for (auto &name : names) {
