@@ -61,12 +61,12 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
   const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
   const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
-  const Real &dx_i = pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
-  const Real &dx_j = pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
-  const Real &dx_k = pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
-  const Real &minx_i = pmb->coords.x1f(ib.s);
-  const Real &minx_j = pmb->coords.x2f(jb.s);
-  const Real &minx_k = pmb->coords.x3f(kb.s);
+  const Real &dx_i = pmb->coords.Dxf<1>(pmb->cellbounds.is(IndexDomain::interior));
+  const Real &dx_j = pmb->coords.Dxf<2>(pmb->cellbounds.js(IndexDomain::interior));
+  const Real &dx_k = pmb->coords.Dxf<3>(pmb->cellbounds.ks(IndexDomain::interior));
+  const Real &minx_i = pmb->coords.Xf<1>(ib.s);
+  const Real &minx_j = pmb->coords.Xf<2>(jb.s);
+  const Real &minx_k = pmb->coords.Xf<3>(kb.s);
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   const Real d3x = dx_i * dx_j * dx_k;
@@ -353,9 +353,9 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
-  const Real &dx_i = pmb->coords.dx1f(pmb->cellbounds.is(IndexDomain::interior));
-  const Real &dx_j = pmb->coords.dx2f(pmb->cellbounds.js(IndexDomain::interior));
-  const Real &dx_k = pmb->coords.dx3f(pmb->cellbounds.ks(IndexDomain::interior));
+  const Real &dx_i = pmb->coords.Dxf<1>(pmb->cellbounds.is(IndexDomain::interior));
+  const Real &dx_j = pmb->coords.Dxf<2>(pmb->cellbounds.js(IndexDomain::interior));
+  const Real &dx_k = pmb->coords.Dxf<3>(pmb->cellbounds.ks(IndexDomain::interior));
   const Real d4x = dx_i * dx_j * dx_k * dt;
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto &t = swarm->Get<Real>("t").Get();

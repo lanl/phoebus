@@ -96,9 +96,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::radiation_advection", kb.s, kb.e, jb.s, jb.e, ib.s,
       ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real x = coords.x1v(i);
-        Real y = (ndim > 1 && shapedim > 1) ? coords.x2v(j) : 0;
-        Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
+        Real x = coords.Xc<1>(i);
+        Real y = (ndim > 1 && shapedim > 1) ? coords.Xc<2>(j) : 0;
+        Real z = (ndim > 2 && shapedim > 2) ? coords.Xc<3>(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
 
         v(prho, k, j, i) = rho0;

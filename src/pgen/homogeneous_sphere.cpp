@@ -60,7 +60,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::homogeneous_sphere", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real r = coords.x1v(i);
+        Real r = coords.Xc<1>(i);
 
         if (r < sphere_rad) {
           v(prho, k, j, i) = 1.0;

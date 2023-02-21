@@ -40,9 +40,9 @@ struct FaceGeom {
     gdd = gcon[d - 1][d - 1];
     g.SpacetimeMetric(loc, k, j, i, gcov);
     g.ContravariantShift(loc, k, j, i, beta);
-    X[1] = (loc == CellLocation::Face1 ? coords.x1f(k, j, i) : coords.x1v(k, j, i));
-    X[2] = (loc == CellLocation::Face2 ? coords.x2f(k, j, i) : coords.x2v(k, j, i));
-    X[3] = (loc == CellLocation::Face3 ? coords.x3f(k, j, i) : coords.x3v(k, j, i));
+    X[1] = (loc == CellLocation::Face1 ? coords.Xf<1>(k, j, i) : coords.Xc<1>(k, j, i));
+    X[2] = (loc == CellLocation::Face2 ? coords.Xf<2>(k, j, i) : coords.Xc<2>(k, j, i));
+    X[3] = (loc == CellLocation::Face3 ? coords.Xf<3>(k, j, i) : coords.Xc<3>(k, j, i));
   }
   const Real alpha;
   const Real gdet;
