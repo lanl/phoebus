@@ -270,7 +270,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
 
-  auto coords = pmb->coords;
+  const parthenon::Coordinates_t &coords = pmb->coords;
 
   const auto &opacities = opac->Param<Opacities>("opacities");
 
@@ -314,8 +314,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         // Bounds
         Real xi_max;
         Real tau_max;
-        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max, tau_max);
+        bounds.GetRadiationCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                                    coords.Xc<3>(k, j, i), xi_max, tau_max);
         const Real alpha_max = tau_max / (alpha * dt);
 
         Real rho = v(iblock, prho, k, j, i);

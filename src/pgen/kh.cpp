@@ -72,8 +72,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "Phoebus::ProblemGenerator::Sod", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         auto rng_gen = rng_pool.get_state();
-        const Real x = coords.x1v(i);
-        const Real y = std::fabs(coords.x2v(j));
+        const Real x = coords.Xc<1>(i);
+        const Real y = std::fabs(coords.Xc<2>(j));
         const Real rho = y < 0.25 ? rho1 : rho0;
         const Real P = y < 0.25 ? P1 : P0;
         const Real vel = y < 0.25 ? v1 : v0;

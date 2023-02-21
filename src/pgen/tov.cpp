@@ -92,11 +92,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real r;
         if (is_monopole_sph) {
-          r = coords.x1v(k, j, i);
+          r = coords.Xc<1>(k, j, i);
         } else { // Cartesian
-          const Real x1 = coords.x1v(k, j, i);
-          const Real x2 = coords.x2v(k, j, i);
-          const Real x3 = coords.x3v(k, j, i);
+          const Real x1 = coords.Xc<1>(k, j, i);
+          const Real x2 = coords.Xc<2>(k, j, i);
+          const Real x3 = coords.Xc<3>(k, j, i);
           r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
         }
         Real rho =

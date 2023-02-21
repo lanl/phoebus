@@ -64,9 +64,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "Phoebus::ProblemGenerator::advection", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real eos_lambda[2];
-        Real x = coords.x1v(i);
-        Real y = (ndim > 1 && shapedim > 1) ? coords.x2v(j) : 0;
-        Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
+        Real x = coords.Xc<1>(i);
+        Real y = (ndim > 1 && shapedim > 1) ? coords.Xc<2>(j) : 0;
+        Real z = (ndim > 2 && shapedim > 2) ? coords.Xc<3>(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
 
         if (iye > 0) {
