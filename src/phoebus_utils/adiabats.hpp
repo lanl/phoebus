@@ -16,47 +16,44 @@
 
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
-
 #include <utils/error_checking.hpp>
+
+#include <spiner/databox.hpp>
 
 #include "phoebus_utils/root_find.hpp"
 
 // a namespace?
-using singularity::EOS;
 
 template <typename D>
 void SampleRho(D rho, const Real rho_min, const Real rho_max, const int n_samps) {
   const Real drho = (rho_max - rho_min) / n_samps;
 
-  parthenon::par_for( 
-      DEFAULT_LOOP_PATTERN, "Adiabats::SampleRho", DevExecSpace(), 0, n_samps, 
-      KOKKOS_LAMBDA(const int i) {
-        rho(i) = rho_min + i * drho;
-      });
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "Adiabats::SampleRho", DevExecSpace(), 0,
+      n_samps, KOKKOS_LAMBDA(const int i) { rho(i) = rho_min + i * drho; });
 }
 
-template <typename D>
-void ComputeAdiabat(D rho, D temp, EOS &eos, const Real Ye, const Real S0, 
-    const Real T_min, const Real T_max, const int n_samps) {
-
+template <typename D, typename EOS>
+void ComputeAdiabats(D rho, D temp, EOS &eos, const Real Ye, const Real S0,
+                     const Real T_min, const Real T_max, const int n_samps) {
 
   const Real guess0 = (T_max - T_min) / 2.0;
 
-  parthenon::par_for( 
-      DEFAULT_LOOP_PATTERN, "Adiabats::ComputeAdiabats", DevExecSpace(), 0, n_samps, 
-      KOKKOS_LAMBDA(const int i) {
-
-        const Real rho = Rho(i);
-        Real lambda[2]; 
+  parthenon::par_for(
+      parthenon::loop_pattern_flatrange_tag, "Adiabats::ComputeAdiabats", DevExecSpace(),
+      0, n_samps, KOKKOS_LAMBDA(const int i) {
+        const Real Rho = std::pow(10.0, rho(i));
+        Real lambda[2];
         lambda[0] = Ye;
 
-        Real target = [&](const Real T) {
-          return eos.EntropyFromDensityTemperature(rho, T, lambda) - S0;
+        auto target = [&](const Real T) {
+          std::printf("%f \n", Rho);
+          return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
         };
 
         const Real guess = guess0;
         root_find::RootFind root_find;
-        temp(i) = root_find.regula_falsi(target, T_min, T_max, 1.e-6 * guess, guess);
+        temp(i) = root_find.regula_falsi(target, T_min, T_max, 1.e-10 * guess, guess);
       });
 }
 #endif // PHOEBUS_UTILS_ADIABATS_HPP_
