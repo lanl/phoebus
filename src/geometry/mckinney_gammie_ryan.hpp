@@ -76,6 +76,10 @@ class McKinneyGammieRyan {
       const Real dthJdX2 = dthJdy * dydX2;
       dthdX1 = -smooth_ * (thJ - thG) * std::exp(smooth_ * (x0_ - X1));
       dthdX2 = dthGdX2 + std::exp(smooth_ * (x0_ - X1)) * (dthJdX2 - dthGdX2);
+      printf("r: %e th: %e x0_: %e dthdX1 = %e dthdX2 = %e\n", r, th, x0_, dthdX1, dthdX2); 
+      printf("smooth: %e thJ: %e thG: %e x0_: %e X1: %e exp: %e\n",
+        smooth_, thJ, thG, x0_, X1, std::exp(smooth_ * (x0_ - X1)));
+      PARTHENON_FAIL("here");
     } else {
       dthdX1 = 0.0;
       dthdX2 = dthGdX2;
@@ -166,7 +170,7 @@ class McKinneyGammieRyan {
   }
   KOKKOS_INLINE_FUNCTION
   Real GetNorm_(Real alpha, Real xt) const {
-    return 0.5 * M_PI * 1. / (1. + 1. / (alpha_ + 1.) * 1. / std::pow(xt_, alpha_));
+    return 0.5 * M_PI * 1. / (1. + 1. / (alpha + 1.) * 1. / std::pow(xt, alpha_));
   }
   bool derefine_poles_ = true;
   Real h_ = 0.3;
