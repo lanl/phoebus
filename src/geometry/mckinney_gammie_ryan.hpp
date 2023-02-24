@@ -59,6 +59,10 @@ class McKinneyGammieRyan {
                   Real Jcon[NDSPACE][NDSPACE]) const {
     using robust::ratio;
     Real y, th, thJ;
+
+    // TODO(BRR) TEMPORARY
+    X1 = 0.2;
+    X2 = 0.25;
     const Real r = r_(X1);
     th_(X1, X2, y, th);
     C[0] = r;
@@ -76,10 +80,14 @@ class McKinneyGammieRyan {
       const Real dthJdX2 = dthJdy * dydX2;
       dthdX1 = -smooth_ * (thJ - thG) * std::exp(smooth_ * (x0_ - X1));
       dthdX2 = dthGdX2 + std::exp(smooth_ * (x0_ - X1)) * (dthJdX2 - dthGdX2);
-      printf("r: %e th: %e x0_: %e dthdX1 = %e dthdX2 = %e\n", r, th, x0_, dthdX1, dthdX2); 
+      printf("r: %e th: %e x0_: %e dthdX1 = %e dthdX2 = %e\n", r, th, x0_, dthdX1, dthdX2);
+      printf("mks_smooth = %e startx[1] = %e dthGdX2 = %e\n",
+      smooth_, x0_, dthGdX2);
       printf("smooth: %e thJ: %e thG: %e x0_: %e X1: %e exp: %e\n",
         smooth_, thJ, thG, x0_, X1, std::exp(smooth_ * (x0_ - X1)));
-      PARTHENON_FAIL("here");
+      printf("dydX2 = %e dthJdy = %e dthJdX2 = %e dthdX1 = %e dthdX2 = %e\n",
+        dydX2, dthJdy, dthJdX2, dthdX1, dthdX2);
+      PARTHENON_REQUIRE(X1 < 1.e50, "here");
     } else {
       dthdX1 = 0.0;
       dthdX2 = dthGdX2;
@@ -97,6 +105,17 @@ class McKinneyGammieRyan {
     Jcon[1][0] = -ratio(dthdX1, drdX1 * dthdX2); // th
     Jcon[1][1] = ratio(1., dthdX2);
     Jcon[2][2] = 1.; // phi
+
+    for (int ii = 0; ii < 3; ii++) {
+      for (int jj = 0; jj < 3; jj++) {
+        printf("Jcov[%i][%i] = %e\n", ii,jj,Jcov[ii][jj]);
+      }
+    }
+    for (int ii = 0; ii < 3; ii++) {
+      for (int jj = 0; jj < 3; jj++) {
+        printf("Jcon[%i][%i] = %e\n", ii,jj,Jcon[ii][jj]);
+      }
+    }
   }
 
   KOKKOS_INLINE_FUNCTION
