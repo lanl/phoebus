@@ -66,6 +66,7 @@ class McKinneyGammieRyan {
                   Real Jcon[NDSPACE][NDSPACE]) const {
     using robust::ratio;
     Real y, th, thJ;
+
     const Real r = r_(X1);
     th_(X1, X2, y, th);
     C[0] = r;
