@@ -87,13 +87,22 @@ class Modified {
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetric(Real X0, Real X1, Real X2, Real X3, Real g[NDFULL][NDFULL]) const {
 
+    X1 = 0.2;
+    X2 = 0.25;
     Real g0[NDFULL][NDFULL];
     Real C[NDSPACE];
     Real Jcov[NDSPACE][NDSPACE];
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
+    printf("C: %e %e %e\n", C[0], C[1], C[2]);
     s_.SpacetimeMetric(X0, C[0], C[1], C[2], g0);
     LinearAlgebra::SetZero(g, NDFULL, NDFULL);
+    SPACETIMELOOP(mu) {
+      SPACETIMELOOP(nu) {
+        printf("gcovks[%i][%i] = %e\n", mu, nu, g0[mu][nu]);
+      }
+    }
+    printf("\n");
     SPACETIMELOOP(mu) {
       SPACETIMELOOP(nu) {
         SPACETIMELOOP(lam) {
@@ -101,8 +110,10 @@ class Modified {
             g[mu][nu] += g0[lam][kap] * S2ST_(Jcov, lam, mu) * S2ST_(Jcov, kap, nu);
           }
         }
+        printf("gcov[%i][%i] = %e\n", mu, nu, g[mu][nu]);
       }
     }
+    exit(-1);
   }
   KOKKOS_INLINE_FUNCTION
   void SpacetimeMetricInverse(Real X0, Real X1, Real X2, Real X3,
