@@ -53,7 +53,14 @@ class McKinneyGammieRyan {
   McKinneyGammieRyan(bool derefine_poles, Real h, Real xt, Real alpha, Real x0,
                      Real smooth)
       : derefine_poles_(derefine_poles), h_(h), xt_(xt), alpha_(alpha), x0_(x0),
-        smooth_(smooth), norm_(GetNorm_(alpha_, xt_)) {}
+        smooth_(smooth), norm_(GetNorm_(alpha_, xt_)) {
+          printf("deref: %i\n", derefine_poles);
+          printf("h: %e\n", h_);
+          printf("xt: %e\n", xt_);
+          printf("alpha: %e\n", alpha_);
+          printf("x0: %e\n", x0_);
+          printf("smooth: %e\n", smooth_);
+          }
   KOKKOS_INLINE_FUNCTION
   void operator()(Real X1, Real X2, Real X3, Real C[NDSPACE], Real Jcov[NDSPACE][NDSPACE],
                   Real Jcon[NDSPACE][NDSPACE]) const {
@@ -76,10 +83,14 @@ class McKinneyGammieRyan {
       const Real dthJdX2 = dthJdy * dydX2;
       dthdX1 = -smooth_ * (thJ - thG) * std::exp(smooth_ * (x0_ - X1));
       dthdX2 = dthGdX2 + std::exp(smooth_ * (x0_ - X1)) * (dthJdX2 - dthGdX2);
+      if (dthdX1 > 1.e10 || dthdX2> 1.e10) {
       printf("r: %e th: %e x0_: %e dthdX1 = %e dthdX2 = %e\n", r, th, x0_, dthdX1, dthdX2); 
       printf("smooth: %e thJ: %e thG: %e x0_: %e X1: %e exp: %e\n",
         smooth_, thJ, thG, x0_, X1, std::exp(smooth_ * (x0_ - X1)));
       PARTHENON_FAIL("here");
+      }
+      dthdX1 = 0.0;
+      dthdX2 = dthGdX2;
     } else {
       dthdX1 = 0.0;
       dthdX2 = dthGdX2;
@@ -157,7 +168,21 @@ class McKinneyGammieRyan {
       th = thG;
     }
     // coordinate singularity fix at the poles. Avoid theta = 0.
-    if (std::abs(th) < robust::EPS()) th = robust::sgn(th) * robust::EPS();
+    //if (std::fabs(th) < robust::EPS()) th = robust::sgn(th) * robust::EPS();
+    constexpr Real SINGSMALL = 1.e-20;
+    if (std::fabs(th) < SINGSMALL) {
+      if (th >= 0.) 
+        th = SINGSMALL;
+      else if (th < 0)
+        th = -SINGSMALL;
+    }
+    if (std::fabs(M_PI - th) < SINGSMALL) {
+      if (th >= M_PI) 
+        th = M_PI + SINGSMALL;
+      else if (th < M_PI)
+        th = M_PI - SINGSMALL;
+    }
+    //if (std::fabs(M_PI - th) < robust::EPS()) th = 
   }
   KOKKOS_INLINE_FUNCTION
   Real thG_(Real X2) const {
