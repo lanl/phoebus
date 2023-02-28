@@ -1,4 +1,4 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
+// © 2021-2023. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -46,13 +46,18 @@ class McKinneyGammieRyan {
  public:
   McKinneyGammieRyan()
       : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(0), smooth_(0.5),
-        norm_(GetNorm_(alpha_, xt_)) {}
+        norm_(GetNorm_(alpha_, xt_)) {
+          //PARTHENON_FAIL("Wrong constructor!");
+          }
   McKinneyGammieRyan(Real x0) // this is the most common use-case
       : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(x0), smooth_(0.5),
-        norm_(GetNorm_(alpha_, xt_)) {}
+      //: derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(0), smooth_(0.5),
+        norm_(GetNorm_(alpha_, xt_)) {
+          printf("x0_:%e\n", x0_);}
   McKinneyGammieRyan(bool derefine_poles, Real h, Real xt, Real alpha, Real x0,
                      Real smooth)
       : derefine_poles_(derefine_poles), h_(h), xt_(xt), alpha_(alpha), x0_(x0),
+      //: derefine_poles_(derefine_poles), h_(h), xt_(xt), alpha_(alpha), x0_(0),
         smooth_(smooth), norm_(GetNorm_(alpha_, xt_)) {}
   KOKKOS_INLINE_FUNCTION
   void operator()(Real X1, Real X2, Real X3, Real C[NDSPACE], Real Jcov[NDSPACE][NDSPACE],
@@ -65,6 +70,7 @@ class McKinneyGammieRyan {
     C[0] = r;
     C[1] = th;
     C[2] = X3;
+    //printf("X1: %e X2: %e X3: %e r: %e th: %e\n", X1, X2, X3, r, th);
 
     const Real drdX1 = std::exp(X1);
     const Real dthGdX2 = M_PI + M_PI * (1 - h_) * std::cos(2 * M_PI * X2);
@@ -75,8 +81,12 @@ class McKinneyGammieRyan {
       const Real dydX2 = 2.;
       const Real dthJdy = norm_ * (1 + std::pow(y / xt_, alpha_));
       const Real dthJdX2 = dthJdy * dydX2;
-      dthdX1 = -smooth_ * (thJ - thG) * std::exp(smooth_ * (x0_ - X1));
-      dthdX2 = dthGdX2 + std::exp(smooth_ * (x0_ - X1)) * (dthJdX2 - dthGdX2);
+//      PARTHENON_REQUIRE(x0_ >= X1, "Can't have negative smoothing!");
+      const Real fac = x0_ - X1;
+      //const Real fac = std::min<double>(0., x0_ - X1);
+      dthdX1 = -smooth_ * (thJ - thG) * std::exp(smooth_ * fac);
+      //PARTHENON_REQUIRE(x0_ > 1.e-10, "Zero x0?");
+      dthdX2 = dthGdX2 + std::exp(smooth_ * fac) * (dthJdX2 - dthGdX2);
     } else {
       dthdX1 = 0.0;
       dthdX2 = dthGdX2;
@@ -148,7 +158,14 @@ class McKinneyGammieRyan {
     if (derefine_poles_) {
       Real thJ;
       thJ_(X2, y, thJ);
-      th = thG + std::exp(smooth_ * (x0_ - X1)) * (thJ - thG);
+  //    if (x0_ < X1) {
+  //      printf("x0_: %e X1: %e\n", x0_, X1);
+  //    }
+  //    PARTHENON_REQUIRE(x0_ >= X1, "Can't have negative smoothing!");
+      //const Real fac = std::min<double>(0., x0_ - X1);
+      const Real fac = x0_ - X1;
+      //PARTHENON_REQUIRE(x0_ > 1.e-10, "Zero x0?");
+      th = thG + std::exp(smooth_ * fac) * (thJ - thG);
     } else {
       y = 0;
       th = thG;
