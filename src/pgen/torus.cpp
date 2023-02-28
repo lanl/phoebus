@@ -401,6 +401,7 @@ void ProblemModifier(ParameterInput *pin) {
     x1min = xh - (ninside + 0.5) * dx;
   }
   pin->SetReal("parthenon/mesh", "x1min", x1min);
+  //pin->SetReal("parthenon/mesh", "x1min", 1.839377375392926839e-01);
 
   if (parthenon::Globals::my_rank == 0) {
     printf("Torus: Setting inner radius to %g\n"
