@@ -157,7 +157,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real cs = omega.imag() / (std::sqrt(2) * kk);
 
   auto &coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   auto gpkg = pmb->packages.Get("geometry");
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 

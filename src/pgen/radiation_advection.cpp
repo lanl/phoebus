@@ -45,7 +45,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   Params &phoebus_params = pmb->packages.Get("phoebus")->AllParams();
 
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   const Real MASS = unit_conv.GetMassCGSToCode();
@@ -86,7 +86,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   phoebus_params.Add("radiation_advection/Hz", Hz);
 
   auto rad = pmb->packages.Get("radiation").get();
-  auto species = rad->Param<std::vector<singularity::RadiationType>>("species");
+  auto species = rad->Param<std::vector<Microphysics::RadiationType>>("species");
   auto num_species = rad->Param<int>("num_species");
 
   const Real W = 1 / sqrt(1 - vx * vx);
