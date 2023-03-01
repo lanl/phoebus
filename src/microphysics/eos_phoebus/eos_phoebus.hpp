@@ -26,7 +26,17 @@ namespace Microphysics {
 //  using MyEOS=singularity::impl::Variant<IdealGas>;
 
 namespace EOS {
-using EOS = singularity::UnmodifiedEOS;
+
+#ifdef SPINER_USE_HDF
+using UnmodifiedEOS =
+    singularity::Variant<singularity::IdealGas, singularity::SpinerEOSDependsRhoT,
+                         singularity::SpinerEOSDependsRhoSie,
+                         singularity::StellarCollapse>;
+#else
+using UnmodifiedEOS = singularity::Variant<singularity::IdealGas>;
+#endif
+
+using EOS = UnmodifiedEOS;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 } // namespace EOS
