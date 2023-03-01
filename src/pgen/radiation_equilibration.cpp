@@ -19,8 +19,8 @@
 
 namespace radiation_equilibration {
 
-using radiation::species;
 using Microphysics::RadiationType;
+using radiation::species;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
