@@ -479,6 +479,17 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
   const std::string rad_method =
       pman.pinput->GetOrAddString("radiation", "method", "None");
 
+  if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS)) {
+    bool derefine_poles = pman.pinput->GetOrAddBoolean("coordinates", "derefine_poles", true);
+    if (derefine_poles) {
+      const std::string ix2_bc = pman.pinput->GetOrAddString("phoebus", "ix2_bc", "outflow");
+      const std::string ox2_bc = pman.pinput->GetOrAddString("phoebus", "ox2_bc", "outflow");
+      PARTHENON_REQUIRE(ix2_bc != "reflect" &&
+        ox2_bc != "reflect",
+        "Reflecting X2 BCs not supported for \"derefine_poles = true\"!");
+    }
+  }
+
   for (int d = 1; d <= 3; ++d) {
     // outer = 0 for inner face, outer = 1 for outer face
     for (int outer = 0; outer <= 1; ++outer) {

@@ -60,6 +60,16 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   params.Add("h", h);
   params.Add("xt", xt);
   params.Add("alpha", alpha);
+  // Require x0 to be <= x1 of the innermost ghost cell face to avoid issues with mapping theta 
+  // outside of [0, pi]
+  // This calculation assumes no mesh refinement, but works for any refinement because ghost cell
+  // layers of refined blocks will always have smaller extents
+  const Real x1min =  pin->GetReal("parthenon/mesh", "x1min");
+  const Real x1max =  pin->GetReal("parthenon/mesh", "x1max");
+  const int nx1 = pin->GetInteger("parthenon/mesh", "nx1");
+  const Real dx1 = (x1max - x1min) / nx1;
+  const int nghost = pin->GetInteger("parthenon/mesh", "nghost");
+  x0 = std::min<Real>(x0, std::max<Real>(0., x1min - nghost * dx1));
   params.Add("x0", x0);
   params.Add("smooth", smooth);
   params.Add("Rh", Rh);

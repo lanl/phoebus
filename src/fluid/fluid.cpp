@@ -665,66 +665,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto coords = pmb->coords;
-  
- // parthenon::par_for(DEFAULT_LOOP_PATTERN, "geomtst", DevExecSpace(), 0, 0,
- //   KOKKOS_LAMBDA(const int n) {
-
- //       const int i = 4;
- //       const int j = 4;
- //       const int k = 0;
- //     double dg[4][4][4] = {0};
- //       geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
- //       Real gcov4[4][4];
- //       geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
- //       Real gcon4[4][4];
- //       geom.SpacetimeMetricInverse(CellLocation::Cent, k, j, i, gcon4);
- //       Real gcon[3][3];
- //       geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
- //       Real gcov[3][3];
- //       geom.Metric(CellLocation::Cent, k, j, i, gcov);
- //       Real gammadet = geom.DetGamma(CellLocation::Cent, k, j, i);
- //       Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
- //       Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
- //       Real shift[3];
- //       geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
- //       const Real X1 = coords.Xc<1>(k, j, i);
- //       const Real X2 = coords.Xc<2>(k, j, i);
- //       printf("x1min: %e\n", pmb->pmy_mesh->mesh_size.x1min);
- //       printf("x1max: %e\n", pmb->pmy_mesh->mesh_size.x1max);
- //       printf("X1: %e X2: %e\n", X1, X2); 
- //       printf("dx1: %e\n", coords.Dxc<1>(i));
- //       SPACETIMELOOP2(mu, nu) {
- //         printf("gcov[%i][%i] = %e\n", mu, nu, gcov4[mu][nu]);
- //       }
- //       SPACETIMELOOP2(mu, nu) {
- //         printf("gcon[%i][%i] = %e\n", mu, nu, gcon4[mu][nu]);
- //       }
- //       SPACELOOP2(ii, jj) {
- //         printf("gammacov[%i][%i] = %e\n", ii, jj, gcov[ii][jj]);
- //       }
- //       SPACELOOP2(ii, jj) {
- //         printf("gammacon[%i][%i] = %e\n", ii, jj, gcon[ii][jj]);
- //       }
- //       Real conn_ddd[4][4][4];
- //       Geometry::Utils::SetConnectionCoeffFromMetricDerivs(dg, conn_ddd);
- //       //geom.ConnectionCoefficient(CellLocation::Cent, k, j, i, conn_ddd);
- //       Real conn_udd[4][4][4] = {0};
- //       SPACETIMELOOP2(ii, jj) {
- //         SPACETIMELOOP2(mu, nu) {
- //           conn_udd[mu][ii][jj] += gcon4[mu][nu]*conn_ddd[nu][ii][jj];
- //         }
- //       }
- //       SPACETIMELOOP3(ii,jj,kk) {
- //         printf("conn_udd[%i][%i][%i] = %e\n", ii, jj, kk, conn_udd[ii][jj][kk]);
- //       }
- //       printf("gdet: %e\n", gdet);
- //       printf("alpha: %e\n", lapse);
- //       printf("shift: %e %e %e\n", shift[0], shift[1], shift[2]);
- //       printf("g^0i = %e %e %e\n", shift[0]/(lapse*lapse),
- //         shift[1]/(lapse*lapse),
- //         shift[2]/(lapse*lapse));
- //   });
- // exit(-1);
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
@@ -779,6 +719,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                          src(ceng, k, j, i) = gdet * TGam;
 #endif // USE_VALENCIA
         }
+
 
 #if SET_FLUX_SRC_DIAGS
         src(idiag, k, j, i) = 0.0;

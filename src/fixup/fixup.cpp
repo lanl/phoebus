@@ -705,6 +705,59 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   namespace c = fluid_cons;
   namespace cr = radmoment_cons;
 
+  
+  //{
+  //PackIndexMap imap;
+  //auto v = rc->PackVariablesAndFluxes(
+  //    std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield}),
+  //    std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield}), imap);
+  //const auto crho = imap[c::density].first;
+  //const auto cener = imap[c::energy].first;
+  //const auto cmom = imap.GetFlatIdx(c::momentum);
+  //const auto cb = imap.GetFlatIdx(c::bfield);
+  //parthenon::par_for(
+  //    DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
+  //    ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+  //      v.flux(X1DIR, crho, k, j, i) = 0.0;
+  //      v.flux(X1DIR, cener, k, j, i) = 0.0;
+  //      SPACELOOP(ii) {
+  //        v.flux(X1DIR, cmom(ii), k, j, i) == 0.0;
+  //        v.flux(X1DIR, cb(ii), k, j, i) == 0.0;
+  //      }
+  //    });
+  //parthenon::par_for(
+  //    DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
+  //    ib.e+1, ib.e+1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+  //      v.flux(X1DIR, crho, k, j, i) = 0.0;
+  //      v.flux(X1DIR, cener, k, j, i) = 0.0;
+  //      SPACELOOP(ii) {
+  //        v.flux(X1DIR, cmom(ii), k, j, i) == 0.0;
+  //        v.flux(X1DIR, cb(ii), k, j, i) == 0.0;
+  //      }
+  //    });
+  //parthenon::par_for(
+  //    DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
+  //    ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+  //      v.flux(X2DIR, crho, k, j, i) = 0.0;
+  //      v.flux(X2DIR, cener, k, j, i) = 0.0;
+  //      SPACELOOP(ii) {
+  //        v.flux(X2DIR, cmom(ii), k, j, i) == 0.0;
+  //        v.flux(X2DIR, cb(ii), k, j, i) == 0.0;
+  //      }
+  //    });
+  //parthenon::par_for(
+  //    DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.e+1, jb.e+1,
+  //    ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+  //      v.flux(X2DIR, crho, k, j, i) = 0.0;
+  //      v.flux(X2DIR, cener, k, j, i) = 0.0;
+  //      SPACELOOP(ii) {
+  //        v.flux(X2DIR, cmom(ii), k, j, i) == 0.0;
+  //        v.flux(X2DIR, cb(ii), k, j, i) == 0.0;
+  //      }
+  //    });
+  //}
+  //return TaskStatus::complete;
+
   // x1-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
     if (ix1_bc == "outflow") {
