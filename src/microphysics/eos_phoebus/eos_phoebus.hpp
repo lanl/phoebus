@@ -1,4 +1,4 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
+// © 2021-2023. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -28,15 +28,12 @@ namespace Microphysics {
 namespace EOS {
 
 #ifdef SPINER_USE_HDF
-using UnmodifiedEOS =
-    singularity::Variant<singularity::IdealGas, singularity::SpinerEOSDependsRhoT,
-                         singularity::SpinerEOSDependsRhoSie,
-                         singularity::StellarCollapse>;
+using EOS =
+    singularity::Variant<singularity::UnitSystem<singularity::IdealGas>,
+                         singularity::UnitSystem<singularity::StellarCollapse>>;
 #else
-using UnmodifiedEOS = singularity::Variant<singularity::IdealGas>;
+using EOS = singularity::Variant<singularity::UnitSystem<singularity::IdealGas>>;
 #endif
-
-using EOS = UnmodifiedEOS;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 } // namespace EOS
