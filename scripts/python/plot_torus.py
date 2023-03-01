@@ -207,7 +207,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
   fig.tight_layout()
 
   savename = str(ifname).rjust(5,"0") + '.png'
-  plt.savefig(savename, dpi=300, bbox_inches='tight')
+  plt.savefig(savename, dpi=150, bbox_inches='tight')
   plt.close(fig)
 
 if __name__ == "__main__":
