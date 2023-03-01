@@ -28,9 +28,8 @@ namespace Microphysics {
 namespace EOS {
 
 #ifdef SPINER_USE_HDF
-using EOS =
-    singularity::Variant<singularity::UnitSystem<singularity::IdealGas>,
-                         singularity::UnitSystem<singularity::StellarCollapse>>;
+using EOS = singularity::Variant<singularity::UnitSystem<singularity::IdealGas>,
+                                 singularity::UnitSystem<singularity::StellarCollapse>>;
 #else
 using EOS = singularity::Variant<singularity::UnitSystem<singularity::IdealGas>>;
 #endif
