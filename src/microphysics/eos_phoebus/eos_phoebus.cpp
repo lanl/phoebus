@@ -56,11 +56,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 #endif
   };
 
+  // If using StellarCollapse, we need additional variables.
+  // We also need table max and min values, regardless of the EOS.
+  // These can be used for floors/ceilings or for root find bounds
+
+  Real lambda[2] = {0.};
+  Real rho_min;
+  Real sie_min;
+  Real T_min;
+  Real rho_max;
+  Real sie_max;
+  Real T_max;
+
   std::string eos_type = pin->GetString(block_name, std::string("type"));
   params.Add("type", eos_type);
+  bool needs_ye = false;
   if (eos_type.compare(IdealGas::EosType()) == 0) {
     const Real gm1 = pin->GetReal(block_name, "Gamma") - 1.0;
     const Real Cv = pin->GetReal(block_name, "Cv");
+    params.Add("gm1", gm1);
+    params.Add("Cv", Cv);
 
     EOS eos_host = UnitSystem<IdealGas>(IdealGas(gm1, Cv),
                                         eos_units_init::length_time_units_init_tag,
@@ -69,14 +84,32 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     params.Add("d.EOS", eos_device);
     params.Add("h.EOS", eos_host);
+
+    rho_min = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
+    sie_min = pin->GetOrAddReal("fixup", "sie0_floor", 0.0);
+    lambda[2] = {0.};
+    T_min = eos_host.TemperatureFromDensityInternalEnergy(rho_min, sie_min, lambda);
+    rho_max = pin->GetOrAddReal("fixup", "rho0_ceiling", 1e18);
+    sie_max = pin->GetOrAddReal("fixup", "sie0_ceiling", 1e35);
+    T_max = eos_host.TemperatureFromDensityInternalEnergy(rho_max, sie_max, lambda);
 #ifdef SPINER_USE_HDF
   } else if (eos_type == StellarCollapse::EosType()) {
+    // We request that Ye and temperature exist, but do not provide them.
+    Metadata m = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Derived,
+                           Metadata::OneCopy, Metadata::Requires});
+    pkg->AddField(fluid_prim::ye, m);
+    pkg->AddField(fluid_prim::temperature, m);
+
     const std::string filename = pin->GetString(block_name, "filename");
     const bool use_sp5 = pin->GetOrAddBoolean(block_name, "use_sp5", true);
     const bool filter_bmod = pin->GetOrAddBoolean(block_name, "filter_bmod", true);
     const bool use_ye = pin->GetOrAddBoolean("fluid", "Ye", false);
     PARTHENON_REQUIRE_THROWS(use_ye,
                              "\"StellarCollapse\" EOS requires that Ye be enabled!");
+    needs_ye = use_ye;
+    params.Add("filename", filename);
+    params.Add("use_sp5", use_sp5);
+    params.Add("filter_bmod", filter_bmod);
 
     EOS eos_host =
         UnitSystem<StellarCollapse>(StellarCollapse(filename, use_sp5, filter_bmod),
@@ -86,6 +119,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     params.Add("d.EOS", eos_device);
     params.Add("h.EOS", eos_host);
+
+    Real M_unit = unit_conv.GetMassCodeToCGS();
+    Real L_unit = unit_conv.GetLengthCodeToCGS();
+    Real rho_unit = M_unit / std::pow(L_unit, 3);
+    Real T_unit = unit_conv.GetTemperatureCodeToCGS();
+    // Always C^2
+    Real sie_unit = std::pow(pc.c, 2);
+    Real press_unit = rho_unit * sie_unit;
+
+    // TODO(JMM): To get around current limitations of
+    // singularity-eos, I just load the table and throw it away.  This
+    // will be resolved in a future version of singularity-eos.
+    // See issue #69.
+    StellarCollapse eos_sc = StellarCollapse(filename, use_sp5, filter_bmod);
+    sie_min = eos_sc.sieMin() / sie_unit;
+    sie_max = eos_sc.sieMax() / sie_unit;
+    T_min = eos_sc.TMin() / T_unit;
+    T_max = eos_sc.TMax() / T_unit;
+    rho_min = eos_sc.rhoMin() / rho_unit;
+    rho_max = eos_sc.rhoMax() / rho_unit;
 #endif
   } else {
     std::stringstream error_mesg;
@@ -97,6 +150,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     error_mesg << std::endl;
     PARTHENON_THROW(error_mesg);
   }
+
+  params.Add("needs_ye", needs_ye);
+
+  params.Add("sie_min", sie_min);
+  params.Add("sie_max", sie_max);
+  params.Add("T_min", T_min);
+  params.Add("T_max", T_max);
+  params.Add("rho_min", rho_min);
+  params.Add("rho_max", rho_max);
 
   return pkg;
 }
