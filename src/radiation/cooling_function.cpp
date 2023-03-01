@@ -18,7 +18,7 @@
 namespace radiation {
 
 using Microphysics::Opacities;
-using singularity::RadiationType;
+using Microphysics::RadiationType;
 
 TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace p = fluid_prim;

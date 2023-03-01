@@ -16,8 +16,6 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
-// singularity
-#include <singularity-eos/eos/eos.hpp>
 
 #include "closure.hpp"
 #include "closure_mocmc.hpp"
@@ -38,8 +36,8 @@ namespace pr = radmoment_prim;
 namespace ir = radmoment_internal;
 namespace im = mocmc_internal;
 using Microphysics::Opacities;
-using singularity::EOS;
-using singularity::RadiationType;
+using Microphysics::EOS::EOS;
+using Microphysics::RadiationType;
 using vpack_types::FlatIdx;
 
 constexpr int MAX_SPECIES = 3;

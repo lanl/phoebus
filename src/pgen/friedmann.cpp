@@ -52,7 +52,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real eps = pin->GetOrAddReal("friedmann", "sie", 1.0);
   const Real u = rho * eps;
 
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);

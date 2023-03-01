@@ -17,11 +17,17 @@
 #include <memory>
 #include <parthenon/package.hpp>
 
+#include <singularity-eos/eos/eos.hpp>
+
 using namespace parthenon::package::prelude;
 
 namespace Microphysics {
 
+//  using MyEOS=singularity::impl::Variant<IdealGas>;
+
 namespace EOS {
+using EOS = singularity::UnmodifiedEOS;
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 } // namespace EOS
 
