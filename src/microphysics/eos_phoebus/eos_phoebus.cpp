@@ -48,25 +48,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
   };
 
-
   // Temporary EOS short-circuit
-  {const Real gm1 = pin->GetReal(block_name, "Gamma") - 1.0;
-  const Real Cv = pin->GetReal(block_name, "Cv");
-  const bool needs_ye = false;
+  {
+    const Real gm1 = pin->GetReal(block_name, "Gamma") - 1.0;
+    const Real Cv = pin->GetReal(block_name, "Cv");
+    const bool needs_ye = false;
 
+    EOS eos_host = IdealGas(gm1, Cv);
+    EOS eos_device = eos_host.GetOnDevice();
 
-  EOS eos_host = IdealGas(gm1, Cv);
-  EOS eos_device = eos_host.GetOnDevice();
-
-  params.Add("d.EOS", eos_device);
-  params.Add("h.EOS", eos_host);
-  params.Add("needs_ye", needs_ye);
-}
-
+    params.Add("d.EOS", eos_device);
+    params.Add("h.EOS", eos_host);
+    params.Add("needs_ye", needs_ye);
+  }
 
   printf("here\n");
   exit(-1);
-
 
   bool needs_ye = false; // TODO(JMM) descriptive enough?
   names_t names;

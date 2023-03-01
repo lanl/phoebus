@@ -31,13 +31,13 @@
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/radiation.hpp"
 
+using Microphysics::RadiationType;
 using radiation::ClosureEquation;
 using radiation::ClosureSettings;
 using radiation::ClosureVerbosity;
 using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
-using Microphysics::RadiationType;
 
 namespace fixup {
 

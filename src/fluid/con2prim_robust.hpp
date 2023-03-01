@@ -26,6 +26,7 @@ using namespace parthenon::package::prelude;
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/root_find.hpp"

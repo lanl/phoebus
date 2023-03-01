@@ -75,8 +75,8 @@ class PressResidual {
 };
 
 KOKKOS_FUNCTION
-Real energy_from_rho_P(const EOS &eos, const Real rho, const Real P,
-                       const Real emin, const Real emax, const Real Ye) {
+Real energy_from_rho_P(const EOS &eos, const Real rho, const Real P, const Real emin,
+                       const Real emax, const Real Ye) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
   PressResidual res(eos, rho, P, Ye);
   root_find::RootFind root;

@@ -16,7 +16,6 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
-
 #include "closure.hpp"
 #include "closure_mocmc.hpp"
 #include "geodesics.hpp"
@@ -36,8 +35,8 @@ namespace pr = radmoment_prim;
 namespace ir = radmoment_internal;
 namespace im = mocmc_internal;
 using Microphysics::Opacities;
-using Microphysics::EOS::EOS;
 using Microphysics::RadiationType;
+using Microphysics::EOS::EOS;
 using vpack_types::FlatIdx;
 
 constexpr int MAX_SPECIES = 3;
