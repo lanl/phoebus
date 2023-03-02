@@ -29,7 +29,10 @@
 
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
+#include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
+
+using parthenon::MetadataFlag;
 
 // statically defined vars from riemann.hpp
 std::vector<std::string> riemann::FluxState::recon_vars, riemann::FluxState::flux_vars;
@@ -164,10 +167,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
 
-  Metadata mprim_threev = Metadata(prim_flags_vec, three_vec);
+  Metadata mprim_threev = Metadata(prim_flags_vector, three_vec);
   Metadata mprim_scalar = Metadata(prim_flags_scalar);
   Metadata mcons_scalar = Metadata(cons_flags_scalar);
-  Metadata mcons_threev = Metadata(cons_flags_vec, three_vec);
+  Metadata mcons_threev = Metadata(cons_flags_vector, three_vec);
 
   // TODO(BRR) Should these go in a "phoebus" package?
   const std::string ix1_bc = pin->GetString("phoebus", "ix1_bc");
