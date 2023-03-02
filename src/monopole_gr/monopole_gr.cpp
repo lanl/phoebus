@@ -28,9 +28,6 @@
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
-// Singularity
-#include <singularity-eos/eos/eos.hpp>
-
 // Phoebus
 #include "geometry/geometry_utils.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"

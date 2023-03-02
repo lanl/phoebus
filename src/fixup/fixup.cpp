@@ -17,12 +17,12 @@
 
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
-#include <singularity-eos/eos/eos.hpp>
 
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/fluid.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
@@ -32,13 +32,14 @@
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/radiation.hpp"
 
+using Microphysics::RadiationType;
+using Microphysics::EOS::EOS;
 using radiation::ClosureEquation;
 using radiation::ClosureSettings;
 using radiation::ClosureVerbosity;
 using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
-using singularity::RadiationType;
 
 namespace fixup {
 
@@ -312,7 +313,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
   const int num_species = enable_rad_floors ? rad_pkg->Param<int>("num_species") : 0;
 
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eos_pkg->Param<EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 

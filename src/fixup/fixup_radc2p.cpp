@@ -17,7 +17,6 @@
 
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
-#include <singularity-eos/eos/eos.hpp>
 
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
@@ -32,13 +31,13 @@
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/radiation.hpp"
 
+using Microphysics::RadiationType;
 using radiation::ClosureEquation;
 using radiation::ClosureSettings;
 using radiation::ClosureVerbosity;
 using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
-using singularity::RadiationType;
 
 namespace fixup {
 
