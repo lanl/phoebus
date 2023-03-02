@@ -111,6 +111,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     base_params["filename"].emplace<std::string>(pin->GetString(block_name, "filename"));
     base_params["use_sp5"].emplace<bool>(
         pin->GetOrAddBoolean(block_name, "use_sp5", true));
+    base_params["filter_bmod"].emplace<bool>(
+        pin->GetOrAddBoolean(block_name, "filter_bmod", true));
     auto use_ye = pin->GetOrAddBoolean("fluid", "Ye", false);
     provides_entropy = true;
     PARTHENON_REQUIRE_THROWS(use_ye,
