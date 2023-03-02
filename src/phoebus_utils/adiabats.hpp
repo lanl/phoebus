@@ -56,7 +56,6 @@ void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
     lrho_max_new = rho_max;
   };
   lrho_max_new = std::log10(lrho_max_new);
-  std::printf("%e %e\n", lrho_min_new, lrho_max_new);
 }
 
 template <typename D>
@@ -82,7 +81,6 @@ void ComputeAdiabats(D rho, D temp, const EOS &eos, const Real Ye, const Real S0
         lambda[0] = Ye;
 
         auto target = [&](const Real T) {
-          //std::printf("%e %e\n", Rho, T);
           return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
         };
 
