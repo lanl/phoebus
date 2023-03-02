@@ -443,8 +443,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         flux_div /*| geom_src*/, fluid::CopyFluxDivergence<MeshData<Real>>, mdudt.get());
 #endif
 
-    auto add_rhs = tl.AddTask(flux_div, SumData<std::string, MeshData<Real>>,
-                              src_names, mdudt.get(), mgsrc.get(), mdudt.get());
+    auto add_rhs = tl.AddTask(flux_div, SumData<std::string, MeshData<Real>>, src_names,
+                              mdudt.get(), mgsrc.get(), mdudt.get());
 
     auto avg_data = tl.AddTask(flux_div, AverageIndependentData<MeshData<Real>>,
                                mc0.get(), mbase.get(), beta);

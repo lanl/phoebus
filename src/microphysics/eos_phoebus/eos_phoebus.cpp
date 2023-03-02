@@ -38,10 +38,11 @@ parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
 using names_t = std::vector<std::string>;
 const names_t valid_eos_names = {IdealGas::EosType()
-#ifdef SPINER_USE_HDF		
-				 , StellarCollapse::EosType()
-#endif				 
-};	 
+#ifdef SPINER_USE_HDF
+                                     ,
+                                 StellarCollapse::EosType()
+#endif
+};
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto pkg = std::make_shared<StateDescriptor>("eos");
