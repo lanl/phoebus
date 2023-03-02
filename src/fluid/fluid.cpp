@@ -131,40 +131,43 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real sigma_cutoff = pin->GetOrAddReal("fluid", "sigma_cutoff", 1.0);
   params.Add("sigma_cutoff", sigma_cutoff);
 
-  Metadata m;
   std::vector<int> three_vec(1, 3);
+
+  std::vector<MetadataFlag> prim_flags_vector = {Metadata::Cell, Metadata::Intensive,
+                                                 Metadata::Vector, Metadata::Derived,
+                                                 Metadata::OneCopy};
+  std::vector<MetadataFlag> prim_flags_scalar = {Metadata::Cell, Metadata::Intensive,
+                                                 Metadata::Derived, Metadata::OneCopy};
+  std::vector<MetadataFlag> cons_flags_scalar = {Metadata::Cell, Metadata::Independent,
+                                                 Metadata::Intensive, Metadata::Conserved,
+                                                 Metadata::WithFluxes};
+  std::vector<MetadataFlag> cons_flags_vector = {
+      Metadata::Cell,      Metadata::Independent, Metadata::Intensive,
+      Metadata::Conserved, Metadata::Vector,      Metadata::WithFluxes};
 
   const std::string bc_vars = pin->GetOrAddString("phoebus/mesh", "bc_vars", "conserved");
   params.Add("bc_vars", bc_vars);
 
-  Metadata mprim_threev = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
-                                    Metadata::Derived, Metadata::OneCopy},
-                                   three_vec);
-  Metadata mprim_scalar = Metadata(
-      {Metadata::Cell, Metadata::Intensive, Metadata::Derived, Metadata::OneCopy});
-  Metadata mcons_scalar =
-      Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-                Metadata::Conserved, Metadata::WithFluxes});
-  Metadata mcons_threev =
-      Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-                Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
-               three_vec);
-
   if (bc_vars == "conserved") {
-    mcons_scalar.Set(Metadata::FillGhost);
-    mcons_threev.Set(Metadata::FillGhost);
+    cons_flags_scalar.push_back(Metadata::FillGhost);
+    cons_flags_vector.push_back(Metadata::FillGhost);
   } else if (bc_vars == "primitive") {
-    mprim_scalar.Set(Metadata::FillGhost);
-    mprim_threev.Set(Metadata::FillGhost);
+    prim_flags_scalar.push_back(Metadata::FillGhost);
+    prim_flags_vector.push_back(Metadata::FillGhost);
     // TODO(BRR) Still set FillGhost on conserved variables to ensure buffers exist.
     // Fixing this requires modifying parthenon Metadata logic.
-    mcons_scalar.Set(Metadata::FillGhost);
-    mcons_threev.Set(Metadata::FillGhost);
+    cons_flags_scalar.push_back(Metadata::FillGhost);
+    cons_flags_vector.push_back(Metadata::FillGhost);
   } else {
     PARTHENON_REQUIRE_THROWS(
         bc_vars == "conserved" || bc_vars == "primitive",
         "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
+
+  Metadata mprim_threev = Metadata(prim_flags_vec, three_vec);
+  Metadata mprim_scalar = Metadata(prim_flags_scalar);
+  Metadata mcons_scalar = Metadata(cons_flags_scalar);
+  Metadata mcons_threev = Metadata(cons_flags_vec, three_vec);
 
   // TODO(BRR) Should these go in a "phoebus" package?
   const std::string ix1_bc = pin->GetString("phoebus", "ix1_bc");
