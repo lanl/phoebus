@@ -29,14 +29,21 @@
 #include "phoebus_utils/unit_conversions.hpp"
 #include "phoebus_utils/variables.hpp"
 
+using namespace singularity;
+
 namespace Microphysics {
 namespace EOS {
 
 parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
 using names_t = std::vector<std::string>;
+const names_t valid_eos_names = {IdealGas::EosType()
+#ifdef SPINER_USE_HDF		
+				 , StellarCollapse::EosType()
+#endif				 
+};	 
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
-  using namespace singularity;
   auto pkg = std::make_shared<StateDescriptor>("eos");
   Params &params = pkg->AllParams();
 
@@ -47,14 +54,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const Real mass_unit = unit_conv.GetMassCodeToCGS();
   const Real length_unit = unit_conv.GetLengthCodeToCGS();
   const Real temp_unit = unit_conv.GetTemperatureCodeToCGS();
-  const bool use_length_time = true;
-
-  const std::vector<std::string> valid_eos_names = {IdealGas::EosType()
-#ifdef SPINER_USE_HDF
-                                                        ,
-                                                    StellarCollapse::EosType()
-#endif
-  };
 
   // If using StellarCollapse, we need additional variables.
   // We also need table max and min values, regardless of the EOS.
