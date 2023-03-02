@@ -24,30 +24,39 @@
 
 // a namespace?
 
-template <typename D, typename EOS>
-void GetRhoBounds(const EOs &eos, const Real rho_min, const Real rho_max, 
-                  const Real T_min, const Real T_max, const Real Ye, const Real S0, 
-                  Real &lrho_min_new, Real lrho_max_new) {
-
-  auto target = [&](const Real Rho) {
-    return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
-  };
+template <typename EOS>
+void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
+                  const Real T_min, const Real T_max, const Real Ye, const Real S0,
+                  Real &lrho_min_new, Real &lrho_max_new) {
 
   root_find::RootFind root_find;
+  root_find::RootFindStatus status;
   Real lambda[2];
   lambda[0] = Ye;
 
   // lower density bound
-  Real guess = rho_min;
+  Real guess = 1.1 * rho_min;
   Real T = T_min;
-  lrho_min_new = root_find.regula_falsi(target, rho_min, rho_max, 1.e-10 * guess, guess);
+  auto target = [&](const Real Rho) {
+    return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
+  };
+  lrho_min_new =
+      root_find.regula_falsi(target, rho_min, rho_max, 1.e-8 * guess, guess, &status);
+  if (status == root_find::RootFindStatus::failure) {
+    lrho_min_new = rho_min;
+  };
   lrho_min_new = std::log10(lrho_min_new);
 
   // upper density bound
-  Real guess = rho_max;
-  Real T = T_max;
-  lrho_max_new = root_find.regula_falsi(target, rho_min, rho_max, 1.e-10 * guess, guess);
+  guess = 0.9 * rho_max;
+  T = T_max;
+  lrho_max_new =
+      root_find.regula_falsi(target, rho_min, rho_max, 1.e-8 * guess, guess, &status);
+  if (status == root_find::RootFindStatus::failure) {
+    lrho_max_new = rho_max;
+  };
   lrho_max_new = std::log10(lrho_max_new);
+  std::printf("%e %e\n", lrho_min_new, lrho_max_new);
 }
 
 template <typename D>
@@ -72,9 +81,8 @@ void ComputeAdiabats(D rho, D temp, const EOS &eos, const Real Ye, const Real S0
         Real lambda[2];
         lambda[0] = Ye;
 
-        //TODO: convert entropy to our units.
-        // OR: revert rho, T, and convert entropy to code?
         auto target = [&](const Real T) {
+          //std::printf("%e %e\n", Rho, T);
           return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
         };
 
