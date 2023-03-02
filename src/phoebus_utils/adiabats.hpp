@@ -24,6 +24,32 @@
 
 // a namespace?
 
+template <typename D, typename EOS>
+void GetRhoBounds(const EOs &eos, const Real rho_min, const Real rho_max, 
+                  const Real T_min, const Real T_max, const Real Ye, const Real S0, 
+                  Real &lrho_min_new, Real lrho_max_new) {
+
+  auto target = [&](const Real Rho) {
+    return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
+  };
+
+  root_find::RootFind root_find;
+  Real lambda[2];
+  lambda[0] = Ye;
+
+  // lower density bound
+  Real guess = rho_min;
+  Real T = T_min;
+  lrho_min_new = root_find.regula_falsi(target, rho_min, rho_max, 1.e-10 * guess, guess);
+  lrho_min_new = std::log10(lrho_min_new);
+
+  // upper density bound
+  Real guess = rho_max;
+  Real T = T_max;
+  lrho_max_new = root_find.regula_falsi(target, rho_min, rho_max, 1.e-10 * guess, guess);
+  lrho_max_new = std::log10(lrho_max_new);
+}
+
 template <typename D>
 void SampleRho(D rho, const Real rho_min, const Real rho_max, const int n_samps) {
   const Real drho = (rho_max - rho_min) / n_samps;
@@ -34,7 +60,7 @@ void SampleRho(D rho, const Real rho_min, const Real rho_max, const int n_samps)
 }
 
 template <typename D, typename EOS>
-void ComputeAdiabats(D rho, D temp, EOS &eos, const Real Ye, const Real S0,
+void ComputeAdiabats(D rho, D temp, const EOS &eos, const Real Ye, const Real S0,
                      const Real T_min, const Real T_max, const int n_samps) {
 
   const Real guess0 = (T_max - T_min) / 2.0;
@@ -46,8 +72,9 @@ void ComputeAdiabats(D rho, D temp, EOS &eos, const Real Ye, const Real S0,
         Real lambda[2];
         lambda[0] = Ye;
 
+        //TODO: convert entropy to our units.
+        // OR: revert rho, T, and convert entropy to code?
         auto target = [&](const Real T) {
-          std::printf("%f \n", Rho);
           return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
         };
 
@@ -55,5 +82,34 @@ void ComputeAdiabats(D rho, D temp, EOS &eos, const Real Ye, const Real S0,
         root_find::RootFind root_find;
         temp(i) = root_find.regula_falsi(target, T_min, T_max, 1.e-10 * guess, guess);
       });
+}
+
+/**
+ * Find the minimum enthalpy along as adiabat as computed above
+ **/
+template <typename D, typename EOS>
+Real MinEnthalpy(D rho, D temp, const Real Ye, const EOS &eos, const int n_samps) {
+  Real min_h = 0.0;
+  Real min_enthalpy = 1e30;
+  parthenon::par_reduce(
+      parthenon::loop_pattern_mdrange_tag, "Adiabats::MinEnthalpy", DevExecSpace(), 0,
+      n_samps, 0, n_samps,
+      KOKKOS_LAMBDA(const int i, const int j, Real &min_enthalpy) {
+        const Real Rho = std::pow(10.0, rho(i));
+        const Real T = temp(i);
+        Real lambda[2];
+        lambda[0] = Ye;
+
+        auto enthalpy_sc = [&]() {
+          const Real P = eos.PressureFromDensityTemperature(Rho, T, lambda);
+          const Real e = eos.InternalEnergyFromDensityTemperature(Rho, T, lambda);
+          return 1.0 + e + P / Rho;
+        };
+
+        const Real h = enthalpy_sc();
+        min_enthalpy = (h < min_enthalpy) ? h : min_enthalpy;
+      },
+      Kokkos::Min<Real>(min_h));
+  return min_h;
 }
 #endif // PHOEBUS_UTILS_ADIABATS_HPP_
