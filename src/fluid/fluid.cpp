@@ -27,8 +27,6 @@
 #include "riemann.hpp"
 #include "tmunu.hpp"
 
-#include <singularity-eos/eos/eos.hpp>
-
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
@@ -462,7 +460,7 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
                                                 c2p_fail_on_ceilings);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto coords = pmb->coords;
 
@@ -497,7 +495,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   auto invert = con2prim::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto fail = rc->Get(internal_variables::fail).data;
 

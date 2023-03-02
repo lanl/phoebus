@@ -40,7 +40,7 @@ using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
 using namespace radiation;
 using Microphysics::Opacities;
-using singularity::EOS;
+using Microphysics::EOS::EOS;
 
 class GasRadTemperatureResidual {
  public:
@@ -140,7 +140,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<EOS>("d.EOS");
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
 
   auto geom = Geometry::GetCoordinateSystem(rc);
