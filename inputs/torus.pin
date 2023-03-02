@@ -82,7 +82,11 @@ method = derivative_order_1
 max_level = 3
 
 <eos>
-type = IdealGas
+# type = IdealGas
+type = StellarCollapse
+filter_bmod = false
+filename = ../../Data/sfho.h5
+use_sp5 = false
 Gamma = 1.66666666666666666666666667
 Cv = 1.0
 
@@ -100,7 +104,7 @@ recon = weno5
 c2p_max_iter = 100
 c2p_tol = 1.e-8
 c2p_method = robust
-Ye = false
+Ye = true
 mhd = true
 
 <geometry>
@@ -137,3 +141,9 @@ rin = 6.0
 rmax = 12.0
 n_inside_horizon = 5
 magnetized = true
+entropy = 4
+
+<units>
+scale_free = false
+geom_mass_msun = 2.8
+fluid_mass_g = 1.e26
