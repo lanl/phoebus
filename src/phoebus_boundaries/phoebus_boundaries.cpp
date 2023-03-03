@@ -144,6 +144,74 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   }
 }
 
+void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
+  std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
+  auto geom = Geometry::GetCoordinateSystem(rc.get());
+
+  auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
+  PackIndexMap imap;
+  auto q = rc->PackVariables(std::vector<parthenon::MetadataFlag>{Metadata::FillGhost},
+                             imap, coarse);
+  auto nb = IndexRange{0, q.GetDim(4) - 1};
+  auto domain = IndexDomain::inner_x2;
+  const int j0 = bounds.GetBoundsJ(IndexDomain::interior).s;
+
+  auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
+  std::string bc_vars = fluid->Param<std::string>("bc_vars");
+  PARTHENON_REQUIRE(bc_vars == "primitive", "Polar X2 reflecting BCs not supported");
+
+  const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity, false);
+  const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield, false);
+
+    pmb->par_for_bndry(
+        "PolarInnerX2Prim", nb, domain, coarse,
+        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+          const int jref = -j + 2*j0 - 1; 
+          if (l == idx_pvel(1)) {
+            q(l, k, j, i) = -q(l, k, jref, i);
+          } else if (l == idx_pb(1)) {
+            //q(l, k, j, i) = -geom.Lapse(CellLocation::Cent, k, jref, i) / geom.Lapse(CellLocation::Cent, k, j, i)*q(l, k, jref, i);
+            q(l, k, j, i) = -q(l, k, jref, i);
+          } else {
+            q(l, k, j, i) = q(l, k, jref, i);
+          }
+        });
+}
+
+void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
+  std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
+  auto geom = Geometry::GetCoordinateSystem(rc.get());
+
+  auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
+  PackIndexMap imap;
+  auto q = rc->PackVariables(std::vector<parthenon::MetadataFlag>{Metadata::FillGhost},
+                             imap, coarse);
+  auto nb = IndexRange{0, q.GetDim(4) - 1};
+  auto domain = IndexDomain::outer_x2;
+  const int j0 = bounds.GetBoundsJ(IndexDomain::interior).e;
+
+  auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
+  std::string bc_vars = fluid->Param<std::string>("bc_vars");
+  PARTHENON_REQUIRE(bc_vars == "primitive", "Polar X2 reflecting BCs not supported");
+
+  const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity, false);
+  const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield, false);
+
+    pmb->par_for_bndry(
+        "PolarOuterX2Prim", nb, domain, coarse,
+        KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+          const int jref = -j + 2*(j0 + 1) - 1; 
+          if (l == idx_pvel(1)) {
+            q(l, k, j, i) = -q(l, k, jref, i);
+          } else if (l == idx_pb(1)) {
+            q(l, k, j, i) = -q(l, k, jref, i);
+            //q(l, k, j, i) = -geom.Lapse(CellLocation::Cent, k, jref, i) / geom.Lapse(CellLocation::Cent, k, j, i)*q(l, k, jref, i);
+          } else {
+            q(l, k, j, i) = q(l, k, jref, i);
+          }
+        });
+}
+
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
@@ -475,6 +543,10 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
       {Boundaries::ReflectInnerX1, Boundaries::ReflectOuterX1},
       {Boundaries::ReflectInnerX2, Boundaries::ReflectOuterX2},
       {Boundaries::ReflectInnerX3, Boundaries::ReflectOuterX3}};
+  static const parthenon::BValFunc polar[][2] = {
+      {parthenon::BValFunc(), parthenon::BValFunc()},
+      {Boundaries::PolarInnerX2, Boundaries::PolarOuterX2},
+      {parthenon::BValFunc(), parthenon::BValFunc()}};
 
   const std::string rad_method =
       pman.pinput->GetOrAddString("radiation", "method", "None");
@@ -484,9 +556,9 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
     if (derefine_poles) {
       const std::string ix2_bc = pman.pinput->GetOrAddString("phoebus", "ix2_bc", "outflow");
       const std::string ox2_bc = pman.pinput->GetOrAddString("phoebus", "ox2_bc", "outflow");
-      PARTHENON_REQUIRE(ix2_bc != "reflect" &&
-        ox2_bc != "reflect",
-        "Reflecting X2 BCs not supported for \"derefine_poles = true\"!");
+      PARTHENON_REQUIRE(ix2_bc != "reflect" && ix2_bc != "polar" &&
+        ox2_bc != "reflect" && ox2_bc != "polar",
+        "Polar and Reflecting X2 BCs not supported for \"derefine_poles = true\"!");
     }
   }
 
@@ -503,6 +575,9 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
       const std::string bc = pman.pinput->GetOrAddString("phoebus", name, "outflow");
       if (bc == "reflect") {
         pman.app_input->boundary_conditions[loc[d - 1][outer]] = reflect[d - 1][outer];
+      } else if (bc == "polar") {
+        PARTHENON_REQUIRE(d == 2, "Polar boundary conditions only supported in X2!");
+        pman.app_input->boundary_conditions[loc[d-1][outer]] = polar[d-1][outer];
       } else if (bc == "outflow") {
         pman.app_input->boundary_conditions[loc[d - 1][outer]] = outflow[d - 1][outer];
         if (d == 1) {
