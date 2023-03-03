@@ -43,16 +43,6 @@ struct FaceGeom {
     X[1] = (loc == CellLocation::Face1 ? coords.Xf<1>(k, j, i) : coords.Xc<1>(k, j, i));
     X[2] = (loc == CellLocation::Face2 ? coords.Xf<2>(k, j, i) : coords.Xc<2>(k, j, i));
     X[3] = (loc == CellLocation::Face3 ? coords.Xf<3>(k, j, i) : coords.Xc<3>(k, j, i));
-    //if (i == 4 && j == 4 && loc == CellLocation::Face2) {
-    //  printf("gcov:\n");
-    //  SPACETIMELOOP2(mu,nu) {
-    //    printf("  [%i][%i] = %e\n", mu, nu, gcov[mu][nu]);
-    //  }
-    //  printf("beta: %e %e %e\n", beta[0], beta[1], beta[2]);
-    //  printf("alpha: %e\n", alpha);
-    //  printf("gdet: %e\n", gdet);
-    //  printf("X: %e %e %e\n", X[1], X[2], X[3]);
-    //}
   }
   const Real alpha;
   const Real gdet;

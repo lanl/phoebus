@@ -706,59 +706,6 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   namespace c = fluid_cons;
   namespace cr = radmoment_cons;
 
-  
-  //{
-  //PackIndexMap imap;
-  //auto v = rc->PackVariablesAndFluxes(
-  //    std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield}),
-  //    std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield}), imap);
-  //const auto crho = imap[c::density].first;
-  //const auto cener = imap[c::energy].first;
-  //const auto cmom = imap.GetFlatIdx(c::momentum);
-  //const auto cb = imap.GetFlatIdx(c::bfield);
-  //parthenon::par_for(
-  //    DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
-  //    ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-  //      v.flux(X1DIR, crho, k, j, i) = 0.0;
-  //      v.flux(X1DIR, cener, k, j, i) = 0.0;
-  //      SPACELOOP(ii) {
-  //        v.flux(X1DIR, cmom(ii), k, j, i) == 0.0;
-  //        v.flux(X1DIR, cb(ii), k, j, i) == 0.0;
-  //      }
-  //    });
-  //parthenon::par_for(
-  //    DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
-  //    ib.e+1, ib.e+1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-  //      v.flux(X1DIR, crho, k, j, i) = 0.0;
-  //      v.flux(X1DIR, cener, k, j, i) = 0.0;
-  //      SPACELOOP(ii) {
-  //        v.flux(X1DIR, cmom(ii), k, j, i) == 0.0;
-  //        v.flux(X1DIR, cb(ii), k, j, i) == 0.0;
-  //      }
-  //    });
-  //parthenon::par_for(
-  //    DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
-  //    ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-  //      v.flux(X2DIR, crho, k, j, i) = 0.0;
-  //      v.flux(X2DIR, cener, k, j, i) = 0.0;
-  //      SPACELOOP(ii) {
-  //        v.flux(X2DIR, cmom(ii), k, j, i) == 0.0;
-  //        v.flux(X2DIR, cb(ii), k, j, i) == 0.0;
-  //      }
-  //    });
-  //parthenon::par_for(
-  //    DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.e+1, jb.e+1,
-  //    ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-  //      v.flux(X2DIR, crho, k, j, i) = 0.0;
-  //      v.flux(X2DIR, cener, k, j, i) = 0.0;
-  //      SPACELOOP(ii) {
-  //        v.flux(X2DIR, cmom(ii), k, j, i) == 0.0;
-  //        v.flux(X2DIR, cb(ii), k, j, i) == 0.0;
-  //      }
-  //    });
-  //}
-  //return TaskStatus::complete;
-
   // x1-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
     if (ix1_bc == "outflow") {
@@ -841,8 +788,10 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ix2_bc == "polar") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
-          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>(
+              {c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>(
+              {c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
           imap);
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy].first;
@@ -859,24 +808,24 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
               v.flux(X2DIR, idx_cmom(ii), k, j, i) = 0.0;
               v.flux(X2DIR, idx_cb(ii), k, j, i) = 0.0;
             }
-            v.flux(X1DIR, idx_cb(1), k, j-1, i) = - v.flux(X1DIR, idx_cb(1), k, j, i);
+            v.flux(X1DIR, idx_cb(1), k, j - 1, i) = -v.flux(X1DIR, idx_cb(1), k, j, i);
             if (ndim == 3) {
-              v.flux(X3DIR, idx_cb(1), k, j-1, i) = - v.flux(X3DIR, idx_cb(1), k, j, i);
+              v.flux(X3DIR, idx_cb(1), k, j - 1, i) = -v.flux(X3DIR, idx_cb(1), k, j, i);
             }
 
             if (idx_E.IsValid()) {
-            for (int ispec = 0; ispec < num_species; ispec++) {
-              v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
-            }
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
+                v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
+                v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+              }
             }
           });
     } else if (ix2_bc == "reflect") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
-          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, cr::E, cr::F}),
           imap);
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy].first;
@@ -892,10 +841,6 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
             v.flux(X2DIR, idx_cmom(0), k, j, i) = 0.0;
             v.flux(X2DIR, idx_cmom(2), k, j, i) = 0.0;
 
-            //SPACELOOP(ii) {
-            //  v.flux(X2DIR, idx_cmom(ii), k, j, i) = 0.0;
-            //  v.flux(X2DIR, idx_cb(ii), k, j, i) = 0.0;
-            //}
             for (int ispec = 0; ispec < num_species; ispec++) {
               v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
               v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
@@ -919,8 +864,10 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ox2_bc == "polar") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
-          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>(
+              {c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>(
+              {c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
           imap);
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy].first;
@@ -929,32 +876,32 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
       auto idx_E = imap.GetFlatIdx(cr::E, false);
       auto idx_F = imap.GetFlatIdx(cr::F, false);
       parthenon::par_for(
-          DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e+1, jb.e+1,
-          ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e + 1,
+          jb.e + 1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X2DIR, crho, k, j, i) = 0.0;
             v.flux(X2DIR, cener, k, j, i) = 0.0;
             SPACELOOP(ii) {
               v.flux(X2DIR, idx_cmom(ii), k, j, i) = 0.0;
               v.flux(X2DIR, idx_cb(ii), k, j, i) = 0.0;
             }
-            v.flux(X1DIR, idx_cb(1), k, j, i) = - v.flux(X1DIR, idx_cb(1), k, j-1, i);
+            v.flux(X1DIR, idx_cb(1), k, j, i) = -v.flux(X1DIR, idx_cb(1), k, j - 1, i);
             if (ndim == 3) {
-              v.flux(X3DIR, idx_cb(1), k, j, i) = - v.flux(X3DIR, idx_cb(1), k, j-1, i);
+              v.flux(X3DIR, idx_cb(1), k, j, i) = -v.flux(X3DIR, idx_cb(1), k, j - 1, i);
             }
 
             if (idx_E.IsValid()) {
-            for (int ispec = 0; ispec < num_species; ispec++) {
-              v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
-            }
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
+                v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
+                v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+              }
             }
           });
     } else if (ox2_bc == "reflect") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
-          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, cr::E, cr::F}),
           imap);
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy].first;
@@ -969,11 +916,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
             v.flux(X2DIR, cener, k, j, i) = 0.0;
             v.flux(X2DIR, idx_cmom(0), k, j, i) = 0.0;
             v.flux(X2DIR, idx_cmom(2), k, j, i) = 0.0;
-            
-            //SPACELOOP(ii) {
-            //  v.flux(X2DIR, idx_cmom(ii), k, j, i) = 0.0;
-            //  v.flux(X2DIR, idx_cb(ii), k, j, i) = 0.0;
-            //}
+
             if (idx_E.IsValid()) {
               for (int ispec = 0; ispec < num_species; ispec++) {
                 v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
