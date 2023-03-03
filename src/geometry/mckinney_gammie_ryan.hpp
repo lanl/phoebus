@@ -188,11 +188,11 @@ class McKinneyGammieRyan {
     // if (std::fabs(M_PI - th) < robust::EPS()) th =
   }
   KOKKOS_INLINE_FUNCTION
-  Real thG_(Real X2) const {
+  Real thG_(const Real X2) const {
     return M_PI * X2 + ((1. - h_) / 2.) * std::sin(2. * M_PI * X2);
   }
   KOKKOS_INLINE_FUNCTION
-  void thJ_(Real X2, Real &y, Real &thJ) const {
+  void thJ_(const Real X2, Real &y, Real &thJ) const {
     y = 2. * X2 - 1.;
     thJ = norm_ * y * (1. + std::pow(y / xt_, alpha_) / (alpha_ + 1.)) + 0.5 * M_PI;
   }

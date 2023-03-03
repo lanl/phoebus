@@ -838,6 +838,40 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X2DIR, crho, k, j, i) = std::min(v.flux(X2DIR, crho, k, j, i), 0.0);
           });
+    } else if (ix2_bc == "polar") {
+      PackIndexMap imap;
+      auto v = rc->PackVariablesAndFluxes(
+          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          imap);
+      const auto crho = imap[c::density].first;
+      const auto cener = imap[c::energy].first;
+      auto idx_cb = imap.GetFlatIdx(c::bfield, false);
+      auto idx_cmom = imap.GetFlatIdx(c::momentum);
+      auto idx_E = imap.GetFlatIdx(cr::E, false);
+      auto idx_F = imap.GetFlatIdx(cr::F, false);
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
+          ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            v.flux(X2DIR, crho, k, j, i) = 0.0;
+            v.flux(X2DIR, cener, k, j, i) = 0.0;
+            SPACELOOP(ii) {
+              v.flux(X2DIR, idx_cmom(ii), k, j, i) = 0.0;
+              v.flux(X2DIR, idx_cb(ii), k, j, i) = 0.0;
+            }
+            v.flux(X1DIR, idx_cb(1), k, j-1, i) = - v.flux(X1DIR, idx_cb(1), k, j, i);
+            if (ndim == 3) {
+              v.flux(X3DIR, idx_cb(1), k, j-1, i) = - v.flux(X3DIR, idx_cb(1), k, j, i);
+            }
+
+            if (idx_E.IsValid()) {
+            for (int ispec = 0; ispec < num_species; ispec++) {
+              v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
+              v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
+              v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+            }
+            }
+          });
     } else if (ix2_bc == "reflect") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
@@ -881,6 +915,40 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e + 1,
           jb.e + 1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
             v.flux(X2DIR, crho, k, j, i) = std::max(v.flux(X2DIR, crho, k, j, i), 0.0);
+          });
+    } else if (ox2_bc == "polar") {
+      PackIndexMap imap;
+      auto v = rc->PackVariablesAndFluxes(
+          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F}),
+          imap);
+      const auto crho = imap[c::density].first;
+      const auto cener = imap[c::energy].first;
+      auto idx_cb = imap.GetFlatIdx(c::bfield, false);
+      auto idx_cmom = imap.GetFlatIdx(c::momentum);
+      auto idx_E = imap.GetFlatIdx(cr::E, false);
+      auto idx_F = imap.GetFlatIdx(cr::F, false);
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e+1, jb.e+1,
+          ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            v.flux(X2DIR, crho, k, j, i) = 0.0;
+            v.flux(X2DIR, cener, k, j, i) = 0.0;
+            SPACELOOP(ii) {
+              v.flux(X2DIR, idx_cmom(ii), k, j, i) = 0.0;
+              v.flux(X2DIR, idx_cb(ii), k, j, i) = 0.0;
+            }
+            v.flux(X1DIR, idx_cb(1), k, j, i) = - v.flux(X1DIR, idx_cb(1), k, j-1, i);
+            if (ndim == 3) {
+              v.flux(X3DIR, idx_cb(1), k, j, i) = - v.flux(X3DIR, idx_cb(1), k, j-1, i);
+            }
+
+            if (idx_E.IsValid()) {
+            for (int ispec = 0; ispec < num_species; ispec++) {
+              v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
+              v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
+              v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+            }
+            }
           });
     } else if (ox2_bc == "reflect") {
       PackIndexMap imap;
