@@ -19,8 +19,8 @@
 
 namespace radiation_equilibration {
 
+using Microphysics::RadiationType;
 using radiation::species;
-using singularity::RadiationType;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -58,7 +58,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   const auto opac =
       pmb->packages.Get("opacity")->template Param<Microphysics::Opacities>("opacities");
 

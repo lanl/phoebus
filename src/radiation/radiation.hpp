@@ -30,6 +30,7 @@ using namespace parthenon;
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "microphysics/opac_phoebus/opac_phoebus.hpp"
 
 using namespace phoebus;
@@ -56,7 +57,7 @@ enum class ReconFixupStrategy {
 };
 
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
-using singularity::RadiationType;
+using Microphysics::RadiationType;
 
 constexpr int MaxNumRadiationSpecies = 3;
 constexpr RadiationType species[MaxNumRadiationSpecies] = {
