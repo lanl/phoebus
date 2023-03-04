@@ -81,8 +81,8 @@ class EnthalpyResidual {
 
   KOKKOS_INLINE_FUNCTION
   Real operator()(const Real rho) {
-    const Real hsc = enthalpy_sc(rho);
-    return hm1_ - hsc + h_min_sc_; // hm1 = h_sc - h_min_sc
+    const Real h_sc = enthalpy_sc(rho);
+    return hm1_ - h_sc + h_min_sc_; // hm1 = h_sc - h_min_sc
   }
 
  private:
@@ -169,6 +169,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
   const Real Ye = pin->GetOrAddReal("torus", "Ye", 0.5);
   Real S = pin->GetOrAddReal("torus", "entropy", 4.0);
+  Real lambda[2];
+  lambda[0] = Ye;
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
@@ -229,7 +231,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   RNGPool rng_pool(seed);
 
-  // TODO: Make some databoxes for my adiabats
   // Long term it might be nice to just compute adiabats for IdealGas too,
   // once it is exposed in singularity-eos, to unify code
   const int nsamps = 180; // TODO move this?
@@ -238,27 +239,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Spiner::DataBox temp_d(Spiner::AllocationTarget::Device, nsamps);
   // compute adiabats
   // TODO: transition this to a package.
-  Real rho_min = pmb->packages.Get("eos")->Param<Real>("rho_min");
-  Real rho_max = pmb->packages.Get("eos")->Param<Real>("rho_max");
-  //rho_min *= unit_conv.GetMassDensityCodeToCGS();
-  //rho_max *= unit_conv.GetMassDensityCodeToCGS();
+  const Real rho_min = pmb->packages.Get("eos")->Param<Real>("rho_min");
+  const Real rho_max = pmb->packages.Get("eos")->Param<Real>("rho_max");
   const Real lrho_min = std::log10(rho_min);
   const Real lrho_max = std::log10(rho_max);
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
-  const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max"); 
+  const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
+  // S *= unit_conv.GetEntropyCGSToCode();
   temp_d.setRange(0, lrho_min, lrho_max, nsamps);
 
-  // TODO: need to be smarter about rho bounds.
-  SampleRho(rho_d, lrho_min+1.5, lrho_max - 1.5, nsamps);
-  Real lambda[2];
-  lambda[0] = 0.1;
-  Real temp = eos.EntropyFromDensityTemperature( rho_min, T_min, lambda );
-  temp *= unit_conv.GetEntropyCodeToCGS();
-  S /= unit_conv.GetEntropyCGSToCode();
-  std::printf("%e %f\n", temp, S);
-  PARTHENON_REQUIRE( false, "stop!" );
-  ComputeAdiabats(rho_d, temp_d, eos, 0.1, S, T_min, T_max, nsamps);
-  //const Real h_min_sc = MinEnthalpy(rho_d, temp_d, Ye, eos, nsamps);
+  Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
+  GetRhoBounds(eos, rho_min, rho_max, T_min, T_max, Ye, S, lrho_min_adiabat,
+               lrho_max_adiabat);
+  const Real rho_min_adiabat = std::pow(10.0, lrho_min_adiabat);
+  const Real rho_max_adiabat = std::pow(10.0, lrho_max_adiabat);
+  SampleRho(rho_d, lrho_min_adiabat, lrho_max_adiabat, nsamps);
+  ComputeAdiabats(rho_d, temp_d, eos, Ye, S, T_min, T_max, nsamps);
+  const Real h_min_sc = MinEnthalpy(rho_d, temp_d, Ye, eos, nsamps);
 
   Real uphi_rmax;
   const Real hm1_rmax =
@@ -266,15 +263,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // TODO(JMM): This will need to change when we move to realistic
   // EOS's for the torus.
-  //EnthalpyResidual res_h(hm1_rmax, temp_d, Ye, h_min_sc, eos);
-  //root_find::RootFind rf;
-  //const Real guess_h = 0.5 * std::pow(10.0, lrho_max - lrho_min);
-  //const Real rho_rmax = rf.regula_falsi(res_h, rho_min, rho_max, 1e-6 * guess_h, guess_h);
-   const Real rho_rmax = std::pow(hm1_rmax * (gam - 1.) / (kappa * gam), 1. / (gam
-   - 1.));
-  const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
+  EnthalpyResidual res_h(hm1_rmax, temp_d, Ye, h_min_sc, eos);
+  root_find::RootFind rf;
+  const Real guess_h = 0.5 * (rho_max_adiabat - rho_min_adiabat);
+  const Real rho_rmax =
+      rf.regula_falsi(res_h, rho_min_adiabat, rho_max_adiabat, 1e-8 * guess_h, guess_h);
+  // const Real rho_rmax = std::pow(hm1_rmax * (gam - 1.) / (kappa * gam), 1. / (gam
+  // - 1.)); const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
+  const Real T_rmax = temp_d.interpToReal(std::log10(rho_rmax));
+  const Real u_rmax = eos.InternalEnergyFromDensityTemperature(rho_rmax, T_rmax, lambda);
 
-  PARTHENON_REQUIRE(false, "stop the shpw");
   pmb->par_for(
       "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -294,15 +292,25 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             Real th = tr.bl_theta(x1, x2);
 
             Real lnh = -1.0;
+            Real hm1;
             Real uphi;
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
 
-            if (lnh > 0.0) {
+            // Q: How to calc the min lnh if h < 0.0?
+            if (lnh > std::log(h_min_sc)) {
               // TODO: need to get rho, T, from hm1. The rest follow
               Real hm1 = std::exp(lnh) - 1.;
-              Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
-              // u is density or specific? I think specific
-              Real u = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
+              // Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
+              // Real u = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
+              EnthalpyResidual res_h(hm1, temp_d, Ye, h_min_sc, eos);
+              root_find::RootFind rf;
+              const Real guess_h = 0.5 * (rho_max_adiabat - rho_min_adiabat);
+              Real rho = rf.regula_falsi(res_h, rho_min_adiabat, rho_max_adiabat,
+                                         1e-8 * guess_h, guess_h);
+              const Real T = temp_d.interpToReal(std::log10(rho));
+              Real lambda[2];
+              lambda[0] = Ye;
+              Real u = eos.InternalEnergyFromDensityTemperature(rho, T, lambda);
 
               rho /= rho_rmax;
 
