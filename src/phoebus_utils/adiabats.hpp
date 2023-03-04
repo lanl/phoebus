@@ -59,16 +59,16 @@ void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
 }
 
 template <typename D>
-void SampleRho(D rho, const Real rho_min, const Real rho_max, const int n_samps) {
-  const Real drho = (rho_max - rho_min) / n_samps;
+void SampleRho(D lrho, const Real lrho_min, const Real lrho_max, const int n_samps) {
+  const Real dlrho = (lrho_max - lrho_min) / n_samps;
 
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "Adiabats::SampleRho", DevExecSpace(), 0,
-      n_samps, KOKKOS_LAMBDA(const int i) { rho(i) = rho_min + i * drho; });
+      n_samps, KOKKOS_LAMBDA(const int i) { lrho(i) = lrho_min + i * dlrho; });
 }
 
 template <typename D, typename EOS>
-void ComputeAdiabats(D rho, D temp, const EOS &eos, const Real Ye, const Real S0,
+void ComputeAdiabats(D lrho, D temp, const EOS &eos, const Real Ye, const Real S0,
                      const Real T_min, const Real T_max, const int n_samps) {
 
   const Real guess0 = (T_max - T_min) / 2.0;
@@ -76,7 +76,7 @@ void ComputeAdiabats(D rho, D temp, const EOS &eos, const Real Ye, const Real S0
   parthenon::par_for(
       parthenon::loop_pattern_flatrange_tag, "Adiabats::ComputeAdiabats", DevExecSpace(),
       0, n_samps, KOKKOS_LAMBDA(const int i) {
-        const Real Rho = std::pow(10.0, rho(i));
+        const Real Rho = std::pow(10.0, lrho(i));
         Real lambda[2];
         lambda[0] = Ye;
 
