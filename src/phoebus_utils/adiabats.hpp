@@ -94,15 +94,15 @@ void ComputeAdiabats(D rho, D temp, const EOS &eos, const Real Ye, const Real S0
  * Find the minimum enthalpy along as adiabat as computed above
  **/
 template <typename D, typename EOS>
-Real MinEnthalpy(D rho, D temp, const Real Ye, const EOS &eos, const int n_samps) {
+Real MinEnthalpy(D lrho, D temp, const Real Ye, const EOS &eos, const int n_samps) {
   Real min_h = 0.0;
   Real min_enthalpy = 1e30;
   parthenon::par_reduce(
-      parthenon::loop_pattern_mdrange_tag, "Adiabats::MinEnthalpy", DevExecSpace(), 0,
-      n_samps, 0, n_samps,
-      KOKKOS_LAMBDA(const int i, const int j, Real &min_enthalpy) {
-        const Real Rho = std::pow(10.0, rho(i));
-        const Real T = temp(i);
+      parthenon::loop_pattern_flatrange_tag, "Adiabats::MinEnthalpy", DevExecSpace(), 0,
+      n_samps,
+      KOKKOS_LAMBDA(const int i, Real &min_enthalpy) {
+        const Real Rho = std::pow(10.0, lrho(i));
+        const Real T = temp.interpToReal(std::log10(Rho));
         Real lambda[2];
         lambda[0] = Ye;
 
