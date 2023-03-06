@@ -184,6 +184,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos_h = pmb->packages.Get("eos")->Param<singularity::EOS>("h.EOS");
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
@@ -235,8 +236,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // once it is exposed in singularity-eos, to unify code
   const int nsamps = 180; // TODO move this?
                           // int as host. device obj as get on deivce.
-  Spiner::DataBox rho_d(Spiner::AllocationTarget::Device, nsamps);
-  Spiner::DataBox temp_d(Spiner::AllocationTarget::Device, nsamps);
+  Spiner::DataBox rho_h(Spiner::AllocationTarget::Device, nsamps);
+  Spiner::DataBox temp_h(Spiner::AllocationTarget::Device, nsamps);
   // compute adiabats
   // TODO: transition this to a package.
   const Real rho_min = pmb->packages.Get("eos")->Param<Real>("rho_min");
@@ -246,16 +247,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
   const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
   // S *= unit_conv.GetEntropyCGSToCode();
-  temp_d.setRange(0, lrho_min, lrho_max, nsamps);
+  temp_h.setRange(0, lrho_min, lrho_max, nsamps);
 
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
-  GetRhoBounds(eos, rho_min, rho_max, T_min, T_max, Ye, S, lrho_min_adiabat,
+  GetRhoBounds(eos_h, rho_min, rho_max, T_min, T_max, Ye, S, lrho_min_adiabat,
                lrho_max_adiabat);
   const Real rho_min_adiabat = std::pow(10.0, lrho_min_adiabat);
   const Real rho_max_adiabat = std::pow(10.0, lrho_max_adiabat);
-  SampleRho(rho_d, lrho_min_adiabat, lrho_max_adiabat, nsamps);
-  ComputeAdiabats(rho_d, temp_d, eos, Ye, S, T_min, T_max, nsamps);
-  const Real h_min_sc = MinEnthalpy(rho_d, temp_d, Ye, eos, nsamps);
+  SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
+  ComputeAdiabats(rho_h, temp_h, eos_h, Ye, S, T_min, T_max, nsamps);
+  const Real h_min_sc = MinEnthalpy(rho_h, temp_h, Ye, eos_h, nsamps);
 
   Real uphi_rmax;
   const Real hm1_rmax =
@@ -263,16 +264,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // TODO(JMM): This will need to change when we move to realistic
   // EOS's for the torus.
-  EnthalpyResidual res_h(hm1_rmax, temp_d, Ye, h_min_sc, eos);
+  EnthalpyResidual res_h(hm1_rmax, temp_h, Ye, h_min_sc, eos_h);
   root_find::RootFind rf;
   const Real guess_h = 0.5 * (rho_max_adiabat - rho_min_adiabat);
   const Real rho_rmax =
       rf.regula_falsi(res_h, rho_min_adiabat, rho_max_adiabat, 1e-8 * guess_h, guess_h);
   // const Real rho_rmax = std::pow(hm1_rmax * (gam - 1.) / (kappa * gam), 1. / (gam
   // - 1.)); const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
-  const Real T_rmax = temp_d.interpToReal(std::log10(rho_rmax));
-  const Real u_rmax = eos.InternalEnergyFromDensityTemperature(rho_rmax, T_rmax, lambda);
+  const Real T_rmax = temp_h.interpToReal(std::log10(rho_rmax));
+  const Real u_rmax = eos_h.InternalEnergyFromDensityTemperature(rho_rmax, T_rmax, lambda);
 
+  // Get adiabat databoxes on device
+  auto rho_d = rho_h.getOnDevice();
+  auto temp_d = temp_h.getOnDevice();
   pmb->par_for(
       "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
