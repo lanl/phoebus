@@ -1,4 +1,4 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
+// © 2021-2023. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -17,11 +17,23 @@
 #include <memory>
 #include <parthenon/package.hpp>
 
+#include <singularity-eos/eos/eos.hpp>
+
 using namespace parthenon::package::prelude;
 
 namespace Microphysics {
 
+//  using MyEOS=singularity::impl::Variant<IdealGas>;
+
 namespace EOS {
+
+#ifdef SPINER_USE_HDF
+using EOS = singularity::Variant<singularity::UnitSystem<singularity::IdealGas>,
+                                 singularity::UnitSystem<singularity::StellarCollapse>>;
+#else
+using EOS = singularity::Variant<singularity::UnitSystem<singularity::IdealGas>>;
+#endif
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 } // namespace EOS
 

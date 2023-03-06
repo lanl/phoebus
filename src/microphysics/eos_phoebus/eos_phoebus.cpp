@@ -1,4 +1,4 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
+// © 2021-2023. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -29,90 +29,116 @@
 #include "phoebus_utils/unit_conversions.hpp"
 #include "phoebus_utils/variables.hpp"
 
+using namespace singularity;
+
 namespace Microphysics {
 namespace EOS {
 
 parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 
 using names_t = std::vector<std::string>;
+const names_t valid_eos_names = {IdealGas::EosType()
+#ifdef SPINER_USE_HDF
+                                     ,
+                                 StellarCollapse::EosType()
+#endif
+};
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
-  using namespace singularity;
   auto pkg = std::make_shared<StateDescriptor>("eos");
   Params &params = pkg->AllParams();
 
   const std::string block_name = "eos";
-  auto FillRealParams = [&](ParameterInput *pin, EOSBuilder::params_t &params,
-                            const names_t &param_names) {
-    for (auto &name : param_names) {
-      params[name].emplace<Real>(pin->GetReal(block_name, name));
-    }
-  };
 
-  bool needs_ye = false; // TODO(JMM) descriptive enough?
-  names_t names;
-  EOSBuilder::EOSType type;
-  EOSBuilder::modifiers_t modifiers;
-  EOSBuilder::params_t base_params;
-  EOSBuilder::params_t relativity_params;
-  EOSBuilder::params_t units_params;
-  // EOSBuilder::params_t shifted_params, scaled_params;
+  phoebus::UnitConversions unit_conv(pin);
+  const Real time_unit = unit_conv.GetTimeCodeToCGS();
+  const Real mass_unit = unit_conv.GetMassCodeToCGS();
+  const Real length_unit = unit_conv.GetLengthCodeToCGS();
+  const Real temp_unit = unit_conv.GetTemperatureCodeToCGS();
 
-  const std::vector<std::string> valid_eos_names = {IdealGas::EosType()
-#ifdef SPINER_USE_HDF
-                                                        ,
-                                                    SpinerEOSDependsRhoT::EosType(),
-                                                    SpinerEOSDependsRhoSie::EosType()
-#endif
-  };
+  // If using StellarCollapse, we need additional variables.
+  // We also need table max and min values, regardless of the EOS.
+  // These can be used for floors/ceilings or for root find bounds
+
+  Real lambda[2] = {0.};
+  Real rho_min;
+  Real sie_min;
+  Real T_min;
+  Real rho_max;
+  Real sie_max;
+  Real T_max;
+
   std::string eos_type = pin->GetString(block_name, std::string("type"));
   params.Add("type", eos_type);
+  bool needs_ye = false;
   if (eos_type.compare(IdealGas::EosType()) == 0) {
-    type = EOSBuilder::EOSType::IdealGas;
-    names = {"Cv"};
-    Real gm1 = pin->GetReal(block_name, std::string("Gamma")) - 1.0;
+    const Real gm1 = pin->GetReal(block_name, "Gamma") - 1.0;
+    const Real Cv = pin->GetReal(block_name, "Cv");
     params.Add("gm1", gm1);
-    base_params["gm1"].emplace<Real>(gm1);
-    /*
-      // TODO(JMM): Disabling these for now
-  } else if (eos_type.compare(Gruneisen::EosType()) == 0) {
-    type = EOSBuilder::EOSType::Gruneisen;
-    names = {"C0", "s1", "s2", "s3", "G0", "b", "rho0", "T0", "P0", "Cv"};
-  } else if (eos_type.compare(JWL::EosType()) == 0) {
-    type = EOSBuilder::EOSType::JWL;
-    names = {"A", "B", "R1", "R2", "w", "rho0", "Cv"};
-  } else if (eos_type.compare(DavisProducts::EosType()) == 0) {
-    type = EOSBuilder::EOSType::DavisProducts;
-    names = {"a", "b", "k", "n", "vc", "pc", "E0", "Cv"};
-  } else if (eos_type.compare(DavisReactants::EosType()) == 0) {
-    type = EOSBuilder::EOSType::DavisReactants;
-    names = {"rho0", "e0", "P0", "T0",    "A",  "B",
-             "C",    "G0", "Z",  "alpha", "Cv0"};
-    */
+    params.Add("Cv", Cv);
+
+    EOS eos_host = UnitSystem<IdealGas>(IdealGas(gm1, Cv),
+                                        eos_units_init::length_time_units_init_tag,
+                                        time_unit, mass_unit, length_unit, temp_unit);
+    EOS eos_device = eos_host.GetOnDevice();
+
+    params.Add("d.EOS", eos_device);
+    params.Add("h.EOS", eos_host);
+
+    rho_min = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
+    sie_min = pin->GetOrAddReal("fixup", "sie0_floor", 0.0);
+    lambda[2] = {0.};
+    T_min = eos_host.TemperatureFromDensityInternalEnergy(rho_min, sie_min, lambda);
+    rho_max = pin->GetOrAddReal("fixup", "rho0_ceiling", 1e18);
+    sie_max = pin->GetOrAddReal("fixup", "sie0_ceiling", 1e35);
+    T_max = eos_host.TemperatureFromDensityInternalEnergy(rho_max, sie_max, lambda);
 #ifdef SPINER_USE_HDF
-  } else if (eos_type.compare(SpinerEOSDependsRhoT::EosType()) == 0) {
-    type = EOSBuilder::EOSType::SpinerEOSDependsRhoT;
-    base_params["filename"].emplace<std::string>(pin->GetString(block_name, "filename"));
-    base_params["reproducibility_mode"].emplace<bool>(
-        pin->GetOrAddBoolean(block_name, "reproducibility_mode", false));
-    if (pin->DoesParameterExist("block_name", "sesame_id")) {
-      base_params["matid"].emplace<int>(pin->GetInteger(block_name, "sesame_id"));
-    } else if (pin->DoesParameterExist("block_name", "material_name")) {
-      base_params["materialName"].emplace<std::string>(
-          pin->GetString(block_name, "sesame_name"));
-    } else {
-      std::stringstream msg;
-      msg << "Neither sesame_id nor sesame_name exists for material " << block_name
-          << std::endl;
-      PARTHENON_THROW(msg);
-    }
   } else if (eos_type == StellarCollapse::EosType()) {
-    type = EOSBuilder::EOSType::StellarCollapse;
-    base_params["filename"].emplace<std::string>(pin->GetString(block_name, "filename"));
-    base_params["use_sp5"].emplace<bool>(
-        pin->GetOrAddBoolean(block_name, "use_sp5", true));
-    auto use_ye = pin->GetOrAddBoolean("fluid", "Ye", false);
+    // We request that Ye and temperature exist, but do not provide them.
+    Metadata m = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Derived,
+                           Metadata::OneCopy, Metadata::Requires});
+    pkg->AddField(fluid_prim::ye, m);
+    pkg->AddField(fluid_prim::temperature, m);
+
+    const std::string filename = pin->GetString(block_name, "filename");
+    const bool use_sp5 = pin->GetOrAddBoolean(block_name, "use_sp5", true);
+    const bool filter_bmod = pin->GetOrAddBoolean(block_name, "filter_bmod", true);
+    const bool use_ye = pin->GetOrAddBoolean("fluid", "Ye", false);
     PARTHENON_REQUIRE_THROWS(use_ye,
                              "\"StellarCollapse\" EOS requires that Ye be enabled!");
+    needs_ye = use_ye;
+    params.Add("filename", filename);
+    params.Add("use_sp5", use_sp5);
+    params.Add("filter_bmod", filter_bmod);
+
+    EOS eos_host =
+        UnitSystem<StellarCollapse>(StellarCollapse(filename, use_sp5, filter_bmod),
+                                    eos_units_init::length_time_units_init_tag, time_unit,
+                                    mass_unit, length_unit, temp_unit);
+    EOS eos_device = eos_host.GetOnDevice();
+
+    params.Add("d.EOS", eos_device);
+    params.Add("h.EOS", eos_host);
+
+    Real M_unit = unit_conv.GetMassCodeToCGS();
+    Real L_unit = unit_conv.GetLengthCodeToCGS();
+    Real rho_unit = M_unit / std::pow(L_unit, 3);
+    Real T_unit = unit_conv.GetTemperatureCodeToCGS();
+    // Always C^2
+    Real sie_unit = std::pow(pc.c, 2);
+    Real press_unit = rho_unit * sie_unit;
+
+    // TODO(JMM): To get around current limitations of
+    // singularity-eos, I just load the table and throw it away.  This
+    // will be resolved in a future version of singularity-eos.
+    // See issue #69.
+    StellarCollapse eos_sc = StellarCollapse(filename, use_sp5, filter_bmod);
+    sie_min = eos_sc.sieMin() / sie_unit;
+    sie_max = eos_sc.sieMax() / sie_unit;
+    T_min = eos_sc.TMin() / T_unit;
+    T_max = eos_sc.TMax() / T_unit;
+    rho_min = eos_sc.rhoMin() / rho_unit;
+    rho_max = eos_sc.rhoMax() / rho_unit;
 #endif
   } else {
     std::stringstream error_mesg;
@@ -124,86 +150,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     error_mesg << std::endl;
     PARTHENON_THROW(error_mesg);
   }
-  FillRealParams(pin, base_params, names);
 
-  phoebus::UnitConversions unit_conv(pin);
-
-  // modifiers
-  /*
-  // TODO(JMM): Disabling this for now
-  Real shift = pin->GetOrAddReal(block_name, "shift", 0.0);
-  Real scale = pin->GetOrAddReal(block_name, "scale", 1.0);
-  if (shift != 0.0) {
-    shifted_params["shift"].emplace<Real>(shift);
-    modifiers[EOSBuilder::EOSModifier::Shifted] = shifted_params;
-  }
-  if (scale != 1.0) {
-    scaled_params["scale"].emplace<Real>(scale);
-    modifiers[EOSBuilder::EOSModifier::Scaled] = scaled_params;
-  }
-  */
-  units_params["use_length_time"].emplace<bool>(true);
-  units_params["time_unit"].emplace<Real>(unit_conv.GetTimeCodeToCGS());
-  units_params["length_unit"].emplace<Real>(unit_conv.GetLengthCodeToCGS());
-  units_params["mass_unit"].emplace<Real>(unit_conv.GetMassCodeToCGS());
-  units_params["temp_unit"].emplace<Real>(unit_conv.GetTemperatureCodeToCGS());
-  modifiers[EOSBuilder::EOSModifier::UnitSystem] = units_params;
-
-  // Build the EOS
-  singularity::EOS eos_host = EOSBuilder::buildEOS(type, base_params, modifiers);
-  singularity::EOS eos_device = eos_host.GetOnDevice();
-
-  params.Add("d.EOS", eos_device);
-  params.Add("h.EOS", eos_host);
   params.Add("needs_ye", needs_ye);
-
-  // Store eos params in case they're needed
-  for (auto &name : names) {
-    params.Add(name, (pin->GetReal(block_name, name)));
-  }
-
-  // If using StellarCollapse, we need additional variables.
-  // We also need table max and min values, regardless of the EOS.
-  // These can be used for floors/ceilings or for root find bounds
-  Real rho_min = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
-  Real sie_min = pin->GetOrAddReal("fixup", "sie0_floor", 0.0);
-  Real lambda[2] = {0.};
-  Real T_min = eos_host.TemperatureFromDensityInternalEnergy(rho_min, sie_min, lambda);
-  Real rho_max = pin->GetOrAddReal("fixup", "rho0_ceiling", 1e18);
-  Real sie_max = pin->GetOrAddReal("fixup", "sie0_ceiling", 1e35);
-  Real T_max = eos_host.TemperatureFromDensityInternalEnergy(rho_max, sie_max, lambda);
-#ifdef SPINER_USE_HDF
-  if (eos_type == StellarCollapse::EosType()) {
-    // We request that Ye and temperature exist, but do not provide them.
-    Metadata m = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Derived,
-                           Metadata::OneCopy, Metadata::Requires});
-
-    pkg->AddField(fluid_prim::ye, m);
-    pkg->AddField(fluid_prim::temperature, m);
-
-    // TODO(JMM): To get around current limitations of
-    // singularity-eos, I just load the table and throw it away.  This
-    // will be resolved in a future version of singularity-eos.
-    // See issue #69.
-    singularity::StellarCollapse eos_sc(pin->GetString(block_name, "filename"),
-                                        pin->GetOrAddBoolean(block_name, "use_sp5", true),
-                                        false);
-    Real M_unit = unit_conv.GetMassCodeToCGS();
-    Real L_unit = unit_conv.GetLengthCodeToCGS();
-    Real rho_unit = M_unit / std::pow(L_unit, 3);
-    Real T_unit = unit_conv.GetTemperatureCodeToCGS();
-    // Always C^2
-    Real sie_unit = std::pow(pc.c, 2);
-    Real press_unit = rho_unit * sie_unit;
-
-    sie_min = eos_sc.sieMin() / sie_unit;
-    sie_max = eos_sc.sieMax() / sie_unit;
-    T_min = eos_sc.TMin() / T_unit;
-    T_max = eos_sc.TMax() / T_unit;
-    rho_min = eos_sc.rhoMin() / rho_unit;
-    rho_max = eos_sc.rhoMax() / rho_unit;
-  }
-#endif // SPINER_USE_HDF
 
   params.Add("sie_min", sie_min);
   params.Add("sie_max", sie_max);

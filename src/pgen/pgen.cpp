@@ -18,6 +18,8 @@
 
 namespace phoebus {
 
+using Microphysics::EOS::EOS;
+
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   std::string name = pin->GetString("phoebus", "problem");
 
@@ -57,7 +59,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 class PressResidual {
  public:
   KOKKOS_INLINE_FUNCTION
-  PressResidual(const singularity::EOS &eos, const Real rho, const Real P, const Real Ye)
+  PressResidual(const EOS &eos, const Real rho, const Real P, const Real Ye)
       : eos_(eos), rho_(rho), P_(P) {
     lambda_[0] = Ye;
   }
@@ -67,14 +69,14 @@ class PressResidual {
   }
 
  private:
-  const singularity::EOS &eos_;
+  const EOS &eos_;
   Real rho_, P_;
   Real lambda_[2];
 };
 
 KOKKOS_FUNCTION
-Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P,
-                       const Real emin, const Real emax, const Real Ye) {
+Real energy_from_rho_P(const EOS &eos, const Real rho, const Real P, const Real emin,
+                       const Real emax, const Real Ye) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
   PressResidual res(eos, rho, P, Ye);
   root_find::RootFind root;

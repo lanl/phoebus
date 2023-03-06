@@ -27,11 +27,12 @@
 #include "riemann.hpp"
 #include "tmunu.hpp"
 
-#include <singularity-eos/eos/eos.hpp>
-
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
+#include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
+
+using parthenon::MetadataFlag;
 
 // statically defined vars from riemann.hpp
 std::vector<std::string> riemann::FluxState::recon_vars, riemann::FluxState::flux_vars;
@@ -133,40 +134,43 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real sigma_cutoff = pin->GetOrAddReal("fluid", "sigma_cutoff", 1.0);
   params.Add("sigma_cutoff", sigma_cutoff);
 
-  Metadata m;
   std::vector<int> three_vec(1, 3);
+
+  std::vector<MetadataFlag> prim_flags_vector = {Metadata::Cell, Metadata::Intensive,
+                                                 Metadata::Vector, Metadata::Derived,
+                                                 Metadata::OneCopy};
+  std::vector<MetadataFlag> prim_flags_scalar = {Metadata::Cell, Metadata::Intensive,
+                                                 Metadata::Derived, Metadata::OneCopy};
+  std::vector<MetadataFlag> cons_flags_scalar = {Metadata::Cell, Metadata::Independent,
+                                                 Metadata::Intensive, Metadata::Conserved,
+                                                 Metadata::WithFluxes};
+  std::vector<MetadataFlag> cons_flags_vector = {
+      Metadata::Cell,      Metadata::Independent, Metadata::Intensive,
+      Metadata::Conserved, Metadata::Vector,      Metadata::WithFluxes};
 
   const std::string bc_vars = pin->GetOrAddString("phoebus/mesh", "bc_vars", "conserved");
   params.Add("bc_vars", bc_vars);
 
-  Metadata mprim_threev = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
-                                    Metadata::Derived, Metadata::OneCopy},
-                                   three_vec);
-  Metadata mprim_scalar = Metadata(
-      {Metadata::Cell, Metadata::Intensive, Metadata::Derived, Metadata::OneCopy});
-  Metadata mcons_scalar =
-      Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-                Metadata::Conserved, Metadata::WithFluxes});
-  Metadata mcons_threev =
-      Metadata({Metadata::Cell, Metadata::Independent, Metadata::Intensive,
-                Metadata::Conserved, Metadata::Vector, Metadata::WithFluxes},
-               three_vec);
-
   if (bc_vars == "conserved") {
-    mcons_scalar.Set(Metadata::FillGhost);
-    mcons_threev.Set(Metadata::FillGhost);
+    cons_flags_scalar.push_back(Metadata::FillGhost);
+    cons_flags_vector.push_back(Metadata::FillGhost);
   } else if (bc_vars == "primitive") {
-    mprim_scalar.Set(Metadata::FillGhost);
-    mprim_threev.Set(Metadata::FillGhost);
+    prim_flags_scalar.push_back(Metadata::FillGhost);
+    prim_flags_vector.push_back(Metadata::FillGhost);
     // TODO(BRR) Still set FillGhost on conserved variables to ensure buffers exist.
     // Fixing this requires modifying parthenon Metadata logic.
-    mcons_scalar.Set(Metadata::FillGhost);
-    mcons_threev.Set(Metadata::FillGhost);
+    cons_flags_scalar.push_back(Metadata::FillGhost);
+    cons_flags_vector.push_back(Metadata::FillGhost);
   } else {
     PARTHENON_REQUIRE_THROWS(
         bc_vars == "conserved" || bc_vars == "primitive",
         "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
+
+  Metadata mprim_threev = Metadata(prim_flags_vector, three_vec);
+  Metadata mprim_scalar = Metadata(prim_flags_scalar);
+  Metadata mcons_scalar = Metadata(cons_flags_scalar);
+  Metadata mcons_threev = Metadata(cons_flags_vector, three_vec);
 
   // TODO(BRR) Should these go in a "phoebus" package?
   const std::string ix1_bc = pin->GetString("phoebus", "ix1_bc");
@@ -462,7 +466,7 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
                                                 c2p_fail_on_ceilings);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto coords = pmb->coords;
 
@@ -497,7 +501,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   auto invert = con2prim::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
 
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto fail = rc->Get(internal_variables::fail).data;
 
@@ -821,11 +825,11 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
           divb(k, j, i) = 0.5 *
                               (b(0, k, j, i) + b(0, k, j - 1, i) - b(0, k, j, i - 1) -
                                b(0, k, j - 1, i - 1)) /
-                              coords.Dx(X1DIR, k, j, i) +
+                              coords.CellWidthFA(X1DIR, k, j, i) +
                           0.5 *
                               (b(1, k, j, i) + b(1, k, j, i - 1) - b(1, k, j - 1, i) -
                                b(1, k, j - 1, i - 1)) /
-                              coords.Dx(X2DIR, k, j, i);
+                              coords.CellWidthFA(X2DIR, k, j, i);
         });
   } else if (ndim == 3) {
     // todo(jcd): these are supposed to be node centered, and this misses the
@@ -838,17 +842,17 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
                   (b(0, k, j, i) + b(0, k, j - 1, i) + b(0, k - 1, j, i) +
                    b(0, k - 1, j - 1, i) - b(0, k, j, i - 1) - b(0, k, j - 1, i - 1) -
                    b(0, k - 1, j, i - 1) - b(0, k - 1, j - 1, i - 1)) /
-                  coords.Dx(X1DIR, k, j, i) +
+                  coords.CellWidthFA(X1DIR, k, j, i) +
               0.25 *
                   (b(1, k, j, i) + b(1, k, j, i - 1) + b(1, k - 1, j, i) +
                    b(1, k - 1, j, i - 1) - b(1, k, j - 1, i) - b(1, k, j - 1, i - 1) -
                    b(1, k - 1, j - 1, i) - b(1, k - 1, j - 1, i - 1)) /
-                  coords.Dx(X2DIR, k, j, i) +
+                  coords.CellWidthFA(X2DIR, k, j, i) +
               0.25 *
                   (b(2, k, j, i) + b(2, k, j, i - 1) + b(2, k, j - 1, i) +
                    b(2, k, j - 1, i - 1) - b(2, k - 1, j, i) - b(2, k - 1, j, i - 1) -
                    b(2, k - 1, j - 1, i) - b(2, k - 1, j - 1, i - 1)) /
-                  coords.Dx(X3DIR, k, j, i);
+                  coords.CellWidthFA(X3DIR, k, j, i);
         });
   }
   return TaskStatus::complete;
@@ -879,7 +883,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
             const Real max_s =
                 std::max(csig(d, k, j, i),
                          std::max(fsig(d, k, j, i), fsig(d, k + dk, j + dj, i + di)));
-            ldt += max_s / coords.Dx(X1DIR + d, k, j, i);
+            ldt += max_s / coords.CellWidthFA(X1DIR + d, k, j, i);
           }
           lmin_dt = std::min(lmin_dt, 1.0 / (ldt + 1.e-50));
         },
@@ -890,7 +894,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {
           Real ldt = 0.0;
           for (int d = 0; d < ndim; d++) {
-            ldt += csig(d, k, j, i) / coords.Dx(X1DIR + d, k, j, i);
+            ldt += csig(d, k, j, i) / coords.CellWidthFA(X1DIR + d, k, j, i);
           }
           lmin_dt = std::min(lmin_dt, 1.0 / (ldt + 1.e-50));
         },

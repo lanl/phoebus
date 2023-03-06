@@ -157,7 +157,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real cs = omega.imag() / (std::sqrt(2) * kk);
 
   auto &coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   auto gpkg = pmb->packages.Get("geometry");
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
@@ -195,8 +195,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::Linear_Modes", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real x = coords.x1v(i);
-        Real y = coords.x2v(j);
+        Real x = coords.Xc<1>(i);
+        Real y = coords.Xc<2>(j);
 
         if (is_snake) {
           y = y - a_snake * sin(k_snake * x);
