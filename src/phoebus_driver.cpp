@@ -413,6 +413,13 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
           (ib == 0 ? tl.AddTask(spacetime_to_device, MonopoleGR::CheckRateOfChange,
                                 monopole.get(), tm.dt / 2)
                    : none);
+      if ((stage == 1) && (tm.ncycle % tm.ncycle_out == 0) && (Globals::my_rank == 0)) {
+	auto dump_spacetime = tl.AddTask(spacetime_to_device,[](int ncycle, int ncycle_out, StateDescriptor *pkg) {
+	  MonopoleGR::DumpToTxt("metric_" + std::to_string(static_cast<int>(ncycle / ncycle_out)) + ".dat", pkg);
+	  return TaskStatus::complete;
+	}, tm.ncycle, tm.ncycle_out, monopole.get());
+	
+      }
     }
   }
 
@@ -659,6 +666,7 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   parthenon::Packages_t packages;
 
+
   packages.Add(phoebus::Initialize(pin.get()));
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
   packages.Add(Microphysics::Opacity::Initialize(pin.get()));
@@ -684,9 +692,9 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (enable_tov && !enable_monopole) {
     PARTHENON_THROW("MonopoleGR required for TOV initialization");
   }
-  if (enable_monopole && !enable_tov) {
-    PARTHENON_THROW("Currently monopole GR only enabled with TOV");
-  }
+  //if (enable_monopole && !enable_tov) {
+  //  PARTHENON_THROW("Currently monopole GR only enabled with TOV");
+  //}
   if ((enable_monopole && !(is_monopole_cart || is_monopole_sph)) ||
       (is_monopole_cart || is_monopole_sph) && !enable_monopole) {
     PARTHENON_THROW("MonopoleGR must be coupled with monopole metric");
@@ -704,6 +712,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     }
   }
   return packages;
+
 }
 
 TaskListStatus PhoebusDriver::MonteCarloStep() {
