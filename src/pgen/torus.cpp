@@ -40,7 +40,7 @@ using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
 using namespace radiation;
 using Microphysics::Opacities;
-using singularity::EOS;
+using Microphysics::EOS::EOS;
 
 class GasRadTemperatureResidual {
  public:
@@ -140,7 +140,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<EOS>("d.EOS");
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
 
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -196,16 +196,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         auto rng_gen = rng_pool.get_state();
-        const Real dx_sub = coords.Dx(X1DIR, k, j, i) / nsub;
-        const Real dy_sub = coords.Dx(X2DIR, k, j, i) / nsub;
+        const Real dx_sub = coords.CellWidthFA(X1DIR, k, j, i) / nsub;
+        const Real dy_sub = coords.CellWidthFA(X2DIR, k, j, i) / nsub;
         v(irho, k, j, i) = 0.0;
         v(ieng, k, j, i) = 0.0;
         SPACELOOP(d) { v(ivlo + d, k, j, i) = 0.0; }
-        const Real x3 = coords.x3v(k, j, i);
+        const Real x3 = coords.Xc<3>(k, j, i);
         for (int m = 0; m < nsub; m++) {
           for (int n = 0; n < nsub; n++) {
-            const Real x1 = coords.x1f(k, j, i) + (m + 0.5) * dx_sub;
-            const Real x2 = coords.x2f(k, j, i) + (n + 0.5) * dy_sub;
+            const Real x1 = coords.Xf<1>(k, j, i) + (m + 0.5) * dx_sub;
+            const Real x2 = coords.Xf<2>(k, j, i) + (n + 0.5) * dy_sub;
 
             Real r = tr.bl_radius(x1);
             Real th = tr.bl_theta(x1, x2);
@@ -244,8 +244,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             }
           }
         }
-        const Real x1v = coords.x1v(k, j, i);
-        const Real x2v = coords.x2v(k, j, i);
+        const Real x1v = coords.Xc<1>(k, j, i);
+        const Real x2v = coords.Xc<2>(k, j, i);
 
         v(ieng, k, j, i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
 
@@ -364,9 +364,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // primitives by a factor of alpha.
           const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
           v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
-                             (2.0 * coords.Dx(X2DIR, k, j, i) * gamdet);
+                             (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gamdet);
           v(iblo + 1, k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
-                                 (2.0 * coords.Dx(X1DIR, k, j, i) * gamdet);
+                                 (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gamdet);
           v(ibhi, k, j, i) = 0.0;
         });
   }

@@ -101,7 +101,7 @@ if(PHOEBUS_ENABLE_CUDA)
   set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
   # Get around a bug with atomics on Cray
   # This option will eventually be deprecated, so care required.
-  set(Kokkos_ENABLE_IMPL_DESUL_ATOMICS OFF CACHE BOOL "" FORCE)
+  # set(Kokkos_ENABLE_IMPL_DESUL_ATOMICS OFF CACHE BOOL "" FORCE)
 endif()
 
 # HDF5

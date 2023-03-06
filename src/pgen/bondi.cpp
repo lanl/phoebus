@@ -134,7 +134,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto &coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
@@ -154,13 +154,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::Bondi", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real x1 = coords.x1v(k, j, i);
-        const Real x2 = coords.x2v(k, j, i);
-        const Real x3 = coords.x3v(k, j, i);
+        Real x1 = coords.Xc<1>(k, j, i);
+        const Real x2 = coords.Xc<2>(k, j, i);
+        const Real x3 = coords.Xc<3>(k, j, i);
 
         Real r = tr.bl_radius(x1);
         while (r < Rhor) {
-          x1 += coords.dx1v(i);
+          x1 += coords.Dxc<1>(i);
           r = tr.bl_radius(x1);
         }
 

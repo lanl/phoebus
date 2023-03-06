@@ -17,12 +17,12 @@
 
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
-#include <singularity-eos/eos/eos.hpp>
 
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/tetrads.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
@@ -38,7 +38,6 @@ using radiation::ClosureVerbosity;
 using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
-using singularity::RadiationType;
 
 namespace fixup {
 
@@ -153,7 +152,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
   const int ndim = pmb->pmy_mesh->ndim;
 
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
@@ -176,8 +175,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
 
         Real gamma_max, e_max;
-        bounds.GetCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i), coords.x3v(k, j, i),
-                           gamma_max, e_max);
+        bounds.GetCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                           coords.Xc<3>(k, j, i), gamma_max, e_max);
 
         if (c2p_failure_force_fixup_both && rad_active) {
           if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail ||

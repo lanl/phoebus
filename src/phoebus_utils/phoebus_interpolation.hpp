@@ -125,7 +125,7 @@ KOKKOS_INLINE_FUNCTION void GetWeights(const Real x, const int nx,
                                        const Coordinates_t &coords, int &ix,
                                        weights_t &w) {
   const Real min = Coordinates::GetXv<DIR>(0, coords);
-  const Real dx = coords.Dx(DIR);
+  const Real dx = coords.CellWidthFA(DIR);
   ix = std::min(std::max(0, static_cast<int>(robust::ratio(x - min, dx))), nx - 2);
   const Real floor = min + ix * dx;
   w[1] = robust::ratio(x - floor, dx);
