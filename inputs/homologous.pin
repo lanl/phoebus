@@ -30,7 +30,8 @@ variables = p.density,  &
             p.energy,   &
             c.energy,   &
 	    pressure,	&
-      	    cs, &
+      	    temperature, &
+	    gamma1, &   #rho*dp/drho/p
       	    p.ye, &
       	    g.c.coord, &
      	    g.n.coord, &
@@ -59,11 +60,11 @@ dt_init_fact = 1.e-6
 <parthenon/mesh>
 nghost = 4
 #refinement = adaptive
-#numlevel = 3
+numlevel = 3
 
-nx1         = 1024        # Number of zones in X1-direction
-x1min       = 0           # minimum value of X1
-x1max       = 250         # maximum value of X1
+nx1         = 1000        # Number of zones in X1-direction
+x1min       = 0       # minimum value of X1
+x1max       =  336.20997070715276         # maximum value of X1
 ix1_bc      = user        # Inner-X1 boundary condition flag
 ox1_bc      = user        # Outer-X1 boundary condition flag
 
@@ -82,7 +83,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 1024
+nx1 = 1000
 nx2 = 1
 nx3 = 1
 
@@ -126,8 +127,8 @@ gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
-npoints = 2048
-rout = 250
+npoints = 1001
+rout = 336.20997070715276
 # Disables time derivatives. Runs only at initialization
 force_static = false
 # Runs the first n subcycles. Then freezes. Source terms are not disabled.
@@ -143,4 +144,4 @@ warn_on_dt = false
 dtwarn_eps = 1e-5
 
 <homologous>
-table="../Tests/Reader/converted_ADM_homologouscollapse.dat"
+table=../../../Tests/HomologousCollapse/converted_ADM_homologouscollapse.dat
