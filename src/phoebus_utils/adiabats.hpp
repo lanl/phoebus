@@ -48,16 +48,21 @@ void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
   lrho_min_new = std::log10(lrho_min_new);
 
   // upper density bound
-  guess = 0.9 * rho_max;
-  T = T_max;
+  guess = 0.75 * rho_max;
+  T = T_max; // go down a bit?
   lrho_max_new =
       root_find.regula_falsi(target, rho_min, rho_max, 1.e-8 * guess, guess, &status);
   if (status == root_find::RootFindStatus::failure) {
     lrho_max_new = rho_max;
   };
   lrho_max_new = std::log10(lrho_max_new);
+
+  // shrink upper bound slightly to avoid table edge
+  const Real SHRINK = 0.01;
+  lrho_max_new -= SHRINK * (lrho_max_new - lrho_min_new);
 }
 
+// sample log rho
 template <typename D>
 void SampleRho(D lrho, const Real lrho_min, const Real lrho_max, const int n_samps) {
   const Real dlrho = (lrho_max - lrho_min) / n_samps;
@@ -67,6 +72,9 @@ void SampleRho(D lrho, const Real lrho_min, const Real lrho_max, const int n_sam
       n_samps, KOKKOS_LAMBDA(const int i) { lrho(i) = lrho_min + i * dlrho; });
 }
 
+/**
+ * Given Ye and a target entropy, compute density and temperature of constant entropy
+ **/
 template <typename D, typename EOS>
 void ComputeAdiabats(D lrho, D temp, const EOS &eos, const Real Ye, const Real S0,
                      const Real T_min, const Real T_max, const int n_samps) {
@@ -91,7 +99,7 @@ void ComputeAdiabats(D lrho, D temp, const EOS &eos, const Real Ye, const Real S
 }
 
 /**
- * Find the minimum enthalpy along as adiabat as computed above
+ * Find the minimum enthalpy along an adiabat as computed above
  **/
 template <typename D, typename EOS>
 Real MinEnthalpy(D lrho, D temp, const Real Ye, const EOS &eos, const int n_samps) {
@@ -102,7 +110,7 @@ Real MinEnthalpy(D lrho, D temp, const Real Ye, const EOS &eos, const int n_samp
       n_samps,
       KOKKOS_LAMBDA(const int i, Real &min_enthalpy) {
         const Real Rho = std::pow(10.0, lrho(i));
-        const Real T = temp.interpToReal(std::log10(Rho));
+        const Real T = temp.interpToReal(lrho(i));
         Real lambda[2];
         lambda[0] = Ye;
 
