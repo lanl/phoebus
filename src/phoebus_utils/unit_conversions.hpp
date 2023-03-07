@@ -50,8 +50,8 @@ class UnitConversions {
   Real GetTemperatureCodeToCGS() const { return temperature_; }
   Real GetTemperatureCGSToCode() const { return 1. / temperature_; }
 
-  Real GetEntropyCodeToCGS() const { return energy_ / temperature_; }
-  Real GetEntropyCGSToCode() const { return temperature_ / energy_; }
+  Real GetEntropyCodeToCGS() const { return (energy_ / mass_)/ temperature_; }
+  Real GetEntropyCGSToCode() const { return mass_ * temperature_ / energy_; }
 
  private:
   bool scale_free_;
