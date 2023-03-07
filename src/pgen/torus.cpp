@@ -188,6 +188,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
+  S *= unit_conv.GetEntropyCGSToCode();
 
   // logic to get the nuclear eos as needed.
   bool provides_entropy = pmb->packages.Get("eos")->Param<bool>("provides_entropy");
@@ -246,7 +247,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real lrho_max = std::log10(rho_max);
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
   const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
-  // S *= unit_conv.GetEntropyCGSToCode();
+
   temp_h.setRange(0, lrho_min, lrho_max, nsamps);
 
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
@@ -254,6 +255,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                lrho_max_adiabat);
   const Real rho_min_adiabat = std::pow(10.0, lrho_min_adiabat);
   const Real rho_max_adiabat = std::pow(10.0, lrho_max_adiabat);
+
   SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
   ComputeAdiabats(rho_h, temp_h, eos_h, Ye, S, T_min, T_max, nsamps);
   const Real h_min_sc = MinEnthalpy(rho_h, temp_h, Ye, eos_h, nsamps);
@@ -272,7 +274,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // const Real rho_rmax = std::pow(hm1_rmax * (gam - 1.) / (kappa * gam), 1. / (gam
   // - 1.)); const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
   const Real T_rmax = temp_h.interpToReal(std::log10(rho_rmax));
-  const Real u_rmax = eos_h.InternalEnergyFromDensityTemperature(rho_rmax, T_rmax, lambda);
+  const Real u_rmax =
+      eos_h.InternalEnergyFromDensityTemperature(rho_rmax, T_rmax, lambda) * rho_rmax;
 
   // Get adiabat databoxes on device
   auto rho_d = rho_h.getOnDevice();
@@ -295,13 +298,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             Real r = tr.bl_radius(x1);
             Real th = tr.bl_theta(x1, x2);
 
-            Real lnh = -1.0;
+            Real lnh = -100.0;
             Real hm1;
             Real uphi;
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
 
             // Q: How to calc the min lnh if h < 0.0?
-            if (lnh > std::log(h_min_sc)) {
+            if (lnh > 0.0) { // std::log(h_min_sc)) {
               // TODO: need to get rho, T, from hm1. The rest follow
               Real hm1 = std::exp(lnh) - 1.;
               // Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
@@ -314,7 +317,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               const Real T = temp_d.interpToReal(std::log10(rho));
               Real lambda[2];
               lambda[0] = Ye;
-              Real u = eos.InternalEnergyFromDensityTemperature(rho, T, lambda);
+              Real u = eos.InternalEnergyFromDensityTemperature(rho, T, lambda) * rho;
 
               rho /= rho_rmax;
 
