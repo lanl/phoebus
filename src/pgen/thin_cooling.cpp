@@ -50,7 +50,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &coords = pmb->coords;
   auto eospkg = pmb->packages.Get("eos");
-  auto eos = eospkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eospkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 

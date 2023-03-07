@@ -22,13 +22,11 @@
 #include <parthenon/package.hpp>
 using namespace parthenon::package::prelude;
 
-// singulaarity
-#include <singularity-eos/eos/eos.hpp>
-
 #include "con2prim_statistics.hpp"
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -50,7 +48,7 @@ class Residual {
   KOKKOS_FUNCTION
   Residual(const Real D, const Real q, const Real bsq, const Real bsq_rpsq,
            const Real rsq, const Real rbsq, const Real v0sq, const Real Ye,
-           const singularity::EOS &eos, const fixup::Bounds &bnds, const Real x1,
+           const Microphysics::EOS::EOS &eos, const fixup::Bounds &bnds, const Real x1,
            const Real x2, const Real x3, const Real floor_scale_fac)
       : D_(D), q_(q), bsq_(bsq), bsq_rpsq_(bsq_rpsq), rsq_(rsq), rbsq_(rbsq), v0sq_(v0sq),
         eos_(eos), bounds_(bnds), x1_(x1), x2_(x2), x3_(x3),
@@ -165,7 +163,7 @@ class Residual {
 
  private:
   const Real D_, q_, bsq_, bsq_rpsq_, rsq_, rbsq_, v0sq_;
-  const singularity::EOS &eos_;
+  const Microphysics::EOS::EOS &eos_;
   const fixup::Bounds &bounds_;
   const Real x1_, x2_, x3_;
   const Real floor_scale_fac_;
@@ -258,7 +256,7 @@ class ConToPrim {
 
   template <typename CoordinateSystem, class... Args>
   KOKKOS_INLINE_FUNCTION ConToPrimStatus operator()(const CoordinateSystem &geom,
-                                                    const singularity::EOS &eos,
+                                                    const Microphysics::EOS::EOS &eos,
                                                     const Coordinates_t &coords,
                                                     Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
@@ -292,7 +290,7 @@ class ConToPrim {
 
   KOKKOS_INLINE_FUNCTION
   ConToPrimStatus solve(const VarAccessor<T> &v, const CellGeom &g,
-                        const singularity::EOS &eos, const Real x1, const Real x2,
+                        const Microphysics::EOS::EOS &eos, const Real x1, const Real x2,
                         const Real x3) const {
     int num_nans = std::isnan(v(crho)) + std::isnan(v(cmom_lo)) + std::isnan(v(ceng));
     if (num_nans > 0) return ConToPrimStatus::failure;

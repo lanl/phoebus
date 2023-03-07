@@ -58,7 +58,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto intrinsic = tov_pkg->Param<TOV::State_t>("tov_intrinsic");
 
   auto coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
 
   const auto pmin = tov_pkg->Param<Real>("pmin");
   const Real rhomin = pin->GetOrAddReal("tov", "rhomin", 1e-12);
