@@ -371,6 +371,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   const int sig_hi = imap[impl::cell_signal_speed].second;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
+  auto coords = pmb->coords;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
