@@ -21,11 +21,9 @@
 #include <parthenon/package.hpp>
 using namespace parthenon::package::prelude;
 
-// singulaarity
-#include <singularity-eos/eos/eos.hpp>
-
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -42,12 +40,12 @@ class Residual {
  public:
   KOKKOS_FUNCTION
   Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq, const Real BdotS,
-           const singularity::EOS &eos)
+           const Microphysics::EOS::EOS &eos)
       : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS),
         Ye_(std::numeric_limits<Real>::signaling_NaN()), eos_(eos) {}
   KOKKOS_FUNCTION
   Residual(const Real D, const Real tau, const Real Bsq, const Real Ssq, const Real BdotS,
-           const Real Ye, const singularity::EOS &eos)
+           const Real Ye, const Microphysics::EOS::EOS &eos)
       : D_(D), tau_(tau), Bsq_(Bsq), Ssq_(Ssq), BdotSsq_(BdotS * BdotS), Ye_(Ye),
         eos_(eos) {
     lambda_[0] = Ye_;
@@ -79,7 +77,7 @@ class Residual {
   }
 #endif
  private:
-  const singularity::EOS &eos_;
+  const Microphysics::EOS::EOS &eos_;
   const Real D_, tau_, Bsq_, Ssq_, BdotSsq_, Ye_;
   Real lambda_[2] = {0., 0.};
 };
@@ -165,14 +163,14 @@ class ConToPrim {
   }
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION ConToPrimStatus operator()(const singularity::EOS &eos,
+  KOKKOS_INLINE_FUNCTION ConToPrimStatus operator()(const Microphysics::EOS::EOS &eos,
                                                     Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
     return solve(v, eos);
   }
 
   template <typename CoordinateSystem, class... Args>
-  KOKKOS_INLINE_FUNCTION void Finalize(const singularity::EOS &eos,
+  KOKKOS_INLINE_FUNCTION void Finalize(const Microphysics::EOS::EOS &eos,
                                        const CoordinateSystem &geom,
                                        Args &&...args) const {
     VarAccessor<T> v(var, std::forward<Args>(args)...);
@@ -202,7 +200,7 @@ class ConToPrim {
 
   KOKKOS_INLINE_FUNCTION
   void finalize(const VarAccessor<T> &v, const CellGeom &g,
-                const singularity::EOS &eos) const {
+                const Microphysics::EOS::EOS &eos) const {
     const Real igdet = 1.0 / g.gdet;
     const Real &D = v(scr_lo + iD);
     const Real &Bsq = v(scr_lo + iBsq);
@@ -256,7 +254,7 @@ class ConToPrim {
   }
 
   KOKKOS_INLINE_FUNCTION
-  ConToPrimStatus solve(const VarAccessor<T> &v, const singularity::EOS &eos,
+  ConToPrimStatus solve(const VarAccessor<T> &v, const Microphysics::EOS::EOS &eos,
                         bool print = false) const {
     using robust::make_positive;
     using robust::ratio;

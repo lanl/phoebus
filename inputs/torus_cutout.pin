@@ -3,8 +3,8 @@
 problem = torus
 ix1_bc = outflow
 ox1_bc = outflow
-ix2_bc = reflect
-ox2_bc = reflect
+ix2_bc = outflow
+ox2_bc = outflow
 
 <parthenon/job>
 problem_id  = torus       # problem ID: basename of output filenames

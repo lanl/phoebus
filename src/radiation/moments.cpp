@@ -15,8 +15,6 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
-#include <singularity-eos/eos/eos.hpp>
-
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -34,7 +32,7 @@ namespace radiation {
 
 using fixup::Bounds;
 using Microphysics::Opacities;
-using singularity::EOS;
+using Microphysics::EOS::EOS;
 
 template <class T>
 class ReconstructionIndexer {

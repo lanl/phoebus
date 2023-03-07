@@ -15,8 +15,6 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
-#include <singularity-eos/eos/eos.hpp>
-
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -35,7 +33,7 @@ namespace radiation {
 
 using fixup::Bounds;
 using Microphysics::Opacities;
-using singularity::EOS;
+using Microphysics::EOS::EOS;
 
 template <typename CLOSURE>
 class SourceResidual4 {
@@ -212,7 +210,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eos_pkg->Param<EOS>("d.EOS");
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
