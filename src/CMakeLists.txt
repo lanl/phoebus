@@ -13,8 +13,11 @@
 
 add_executable(phoebus
   main.cpp # first
-
+  
   # alphabetical
+  ccsn/ccsn.hpp
+  ccsn/ccsn.cpp
+
   fixup/fixup.hpp
   fixup/fixup.cpp
   fixup/fixup_c2p.cpp
@@ -83,6 +86,7 @@ add_executable(phoebus
   pgen/advection.cpp
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
+  pgen/ccsn.cpp
   pgen/check_cached_geom.cpp
   pgen/friedmann.cpp
   pgen/homogeneous_sphere.cpp
