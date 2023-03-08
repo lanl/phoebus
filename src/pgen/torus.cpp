@@ -317,9 +317,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               const Real T = temp_d.interpToReal(std::log10(rho));
               Real lambda[2];
               lambda[0] = Ye;
+              //TODO: setting u incorrectly?
               Real u = eos.InternalEnergyFromDensityTemperature(rho, T, lambda) * rho;
 
               rho /= rho_rmax;
+              u /= u_rmax;
 
               Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
               Real gcov[4][4];
@@ -476,6 +478,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     radiation::MomentPrim2Con(rc);
   }
 
+  free(rho_h);
+  free(rho_d);
+  free(temp_h);
+  free(temp_d);
   fixup::ApplyFloors(rc);
 }
 
