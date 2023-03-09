@@ -116,6 +116,12 @@ KOKKOS_FUNCTION
 Real ucon_norm(Real ucon[4], Real gcov[4][4]);
 void ComputeBetas(Mesh *pmesh, const Real rho_min_bnorm, Real &beta_min_global,
                   Real &beta_pmax);
+KOKKOS_FUNCTION
+void GetStateFromEnthalpy(const EOS &eos, const int eos_type, const Real hm1,
+                          const Spiner::DataBox rho, const Spiner::DataBox temp,
+                          const Real Ye, const Real h_min_sc, const Real kappa,
+                          const Real gam, const Real Cv, const Real rho_rmax,
+                          Real &rho_out, Real &u_out);
 // ----------------------------------------------------------------------
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
@@ -154,6 +160,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // The Fishbone solver needs to know about Ye
   // and the eos machinery needs to construct adiabats.
   const std::string eos_type = pin->GetString("eos", "type");
+  const int eos_type_int = (eos_type == "IdealGas") ? 0 : 1;
   // TODO: allow other eos
   // TODO: Q: How to modify gam, cv = ...
   //  PARTHENON_REQUIRE_THROWS(eos_type == "IdealGas",
@@ -235,10 +242,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // Long term it might be nice to just compute adiabats for IdealGas too,
   // once it is exposed in singularity-eos, to unify code
-  const int nsamps = 180; // TODO move this?
-                          // int as host. device obj as get on deivce.
-  Spiner::DataBox rho_h(Spiner::AllocationTarget::Device, nsamps);
-  Spiner::DataBox temp_h(Spiner::AllocationTarget::Device, nsamps);
+  int nsamps = 180; // TODO move this?
+  if (eos_type != "StellarCollapse") { nsamps = 1; }
+  Spiner::DataBox rho_h(nsamps);
+  Spiner::DataBox temp_h(nsamps);
   // compute adiabats
   // TODO: transition this to a package.
   const Real rho_min = pmb->packages.Get("eos")->Param<Real>("rho_min");
@@ -266,16 +273,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   // TODO(JMM): This will need to change when we move to realistic
   // EOS's for the torus.
-  EnthalpyResidual res_h(hm1_rmax, temp_h, Ye, h_min_sc, eos_h);
-  root_find::RootFind rf;
-  const Real guess_h = 0.5 * (rho_max_adiabat - rho_min_adiabat);
-  const Real rho_rmax =
-      rf.regula_falsi(res_h, rho_min_adiabat, rho_max_adiabat, 1e-8 * guess_h, guess_h);
-  // const Real rho_rmax = std::pow(hm1_rmax * (gam - 1.) / (kappa * gam), 1. / (gam
-  // - 1.)); const Real u_rmax = kappa * std::pow(rho_rmax, gam) / (gam - 1.) / rho_rmax;
-  const Real T_rmax = temp_h.interpToReal(std::log10(rho_rmax));
-  const Real u_rmax =
-      eos_h.InternalEnergyFromDensityTemperature(rho_rmax, T_rmax, lambda) * rho_rmax;
+  Real rho_rmax, u_rmax;
+  GetStateFromEnthalpy(eos, eos_type_int, hm1_rmax, rho_h, temp_h, Ye, h_min_sc, 
+      kappa, gam, Cv, rho_rmax, rho_rmax, u_rmax);
 
   // Get adiabat databoxes on device
   auto rho_d = rho_h.getOnDevice();
@@ -298,31 +298,18 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             Real r = tr.bl_radius(x1);
             Real th = tr.bl_theta(x1, x2);
 
-            Real lnh = -100.0;
+            Real lnh = -1.0;
             Real hm1;
             Real uphi;
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
 
-            // Q: How to calc the min lnh if h < 0.0?
-            if (lnh > 0.0) { // std::log(h_min_sc)) {
+            if (lnh > 0.0) {
               // TODO: need to get rho, T, from hm1. The rest follow
               Real hm1 = std::exp(lnh) - 1.;
-              // Real rho = std::pow(hm1 * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
-              // Real u = kappa * std::pow(rho, gam) / (gam - 1.) / rho_rmax;
-              EnthalpyResidual res_h(hm1, temp_d, Ye, h_min_sc, eos);
-              root_find::RootFind rf;
-              const Real guess_h = 0.5 * (rho_max_adiabat - rho_min_adiabat);
-              Real rho = rf.regula_falsi(res_h, rho_min_adiabat, rho_max_adiabat,
-                                         1e-8 * guess_h, guess_h);
-              const Real T = temp_d.interpToReal(std::log10(rho));
-              Real lambda[2];
-              lambda[0] = Ye;
-              //TODO: setting u incorrectly?
-              Real u = eos.InternalEnergyFromDensityTemperature(rho, T, lambda) * rho;
-
-              rho /= rho_rmax;
-              u /= u_rmax;
-
+              Real rho, u;
+              GetStateFromEnthalpy(eos, eos_type_int, hm1, rho_d, temp_d, Ye, h_min_sc, 
+                  kappa, gam, Cv, rho_rmax, rho, u);
+              
               Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
               Real gcov[4][4];
               bl.SpacetimeMetric(0.0, r, th, x3, gcov);
@@ -365,6 +352,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                : v(ieng, k, j, i);
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
             v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), lambda);
+        // std::printf("%e %e\n", v(itmp,k,j,i),
+        // temp_d.interpToReal(std::log10(v(irho,k,j,i))));
         v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i),
                                                               v(itmp, k, j, i), lambda);
         v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
@@ -635,6 +624,41 @@ Real log_enthalpy(const Real r, const Real th, const Real a, const Real rin, con
            std::sqrt(SS / AA) * up1 / sth;
   }
   return lnh;
+}
+
+/**
+ * cheeky way to make this pgen work for ideal and nuclear EoS
+ * There's probably a better way to do this
+ **/
+KOKKOS_FUNCTION
+void GetStateFromEnthalpy(const EOS &eos, const int eos_type, const Real hm1,
+                          const Spiner::DataBox rho, const Spiner::DataBox temp,
+                          const Real Ye, const Real h_min_sc, const Real kappa,
+                          const Real gam, const Real Cv, const Real rho_rmax,
+                          Real &rho_out, Real &u_out) {
+  if (eos_type == 0) { // Ideal Gas
+    rho_out = std::pow(hm1 * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
+    u_out = kappa * std::pow(rho_out, gam) / (gam - 1.) / rho_rmax;
+    rho_out /= rho_rmax;
+  } else if (eos_type == 1) { // StellarCollapse
+    const int N = rho.size() - 1;
+    const Real rho_min = std::pow(10.0, rho(0));
+    const Real rho_max = std::pow(10.0, rho(N));
+
+    EnthalpyResidual res_h(hm1, temp, Ye, h_min_sc, eos);
+    root_find::RootFind rf;
+    const Real guess_h = 0.5 * (rho_max - rho_min);
+
+    rho_out = rf.regula_falsi(res_h, rho_min, rho_max, 1e-8 * guess_h, guess_h);
+    Real T = temp.interpToReal(std::log10(rho_out));
+
+    Real lambda[2];
+    lambda[0] = Ye;
+    u_out = eos.InternalEnergyFromDensityTemperature(rho_out, T, lambda) * rho_out;
+  } else {
+    PARTHENON_REQUIRE_THROWS( eos_type == 0 || eos_type == 1, 
+        "GetStateFromEnthalpy only implemented for IdealGas and StellarCollapse.");
+  }
 }
 
 KOKKOS_FUNCTION
