@@ -43,9 +43,8 @@ UnitConversions::UnitConversions(ParameterInput *pin) {
         "Must provide exactly one of geom_mass_g, geom_mass_msun, "
         "geom_length_cm!");
 
-    PARTHENON_REQUIRE(
-        fluid_mass_g_exists + fluid_density_g_exists == 1,
-        "Cannot provide both fluid_mass_g and fluid_density_g");
+    PARTHENON_REQUIRE(fluid_mass_g_exists + fluid_density_g_exists == 1,
+                      "Cannot provide both fluid_mass_g and fluid_density_g");
 
     if (geom_mass_g_exists) {
       Real geom_mass_ = pin->GetReal("units", "geom_mass_g");
