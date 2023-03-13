@@ -269,7 +269,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
     SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
     ComputeAdiabats(rho_h, temp_h, eos_h, Ye, S, T_min, T_max, nsamps);
-    Real h_min_sc = MinEnthalpy(rho_h, temp_h, Ye, eos_h, nsamps);
+    h_min_sc = MinEnthalpy(rho_h, temp_h, Ye, eos_h, nsamps);
   }
   Real uphi_rmax;
   const Real hm1_rmax =
@@ -356,8 +356,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                : v(ieng, k, j, i);
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
             v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), lambda);
-        // std::printf("%e %e\n", v(itmp,k,j,i),
-        // temp_d.interpToReal(std::log10(v(irho,k,j,i))));
         v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i),
                                                               v(itmp, k, j, i), lambda);
         v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
