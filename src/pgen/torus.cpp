@@ -243,9 +243,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Long term it might be nice to just compute adiabats for IdealGas too,
   // once it is exposed in singularity-eos, to unify code
   int nsamps = 180; // TODO move this?
-  if (eos_type != "StellarCollapse") { nsamps = 1; }
+  if (eos_type != "StellarCollapse") {
+    nsamps = 1;
+  }
   Spiner::DataBox rho_h(nsamps);
   Spiner::DataBox temp_h(nsamps);
+
   // compute adiabats
   // TODO: transition this to a package.
   const Real rho_min = pmb->packages.Get("eos")->Param<Real>("rho_min");
@@ -254,19 +257,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real lrho_max = std::log10(rho_max);
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
   const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
-
   temp_h.setRange(0, lrho_min, lrho_max, nsamps);
 
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
-  GetRhoBounds(eos_h, rho_min, rho_max, T_min, T_max, Ye, S, lrho_min_adiabat,
-               lrho_max_adiabat);
-  const Real rho_min_adiabat = std::pow(10.0, lrho_min_adiabat);
-  const Real rho_max_adiabat = std::pow(10.0, lrho_max_adiabat);
+  Real h_min_sc;
+  if (eos_type == "StellarCollapse") {
+    GetRhoBounds(eos_h, rho_min, rho_max, T_min, T_max, Ye, S, lrho_min_adiabat,
+                 lrho_max_adiabat);
+    const Real rho_min_adiabat = std::pow(10.0, lrho_min_adiabat);
+    const Real rho_max_adiabat = std::pow(10.0, lrho_max_adiabat);
 
-  SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
-  ComputeAdiabats(rho_h, temp_h, eos_h, Ye, S, T_min, T_max, nsamps);
-  const Real h_min_sc = MinEnthalpy(rho_h, temp_h, Ye, eos_h, nsamps);
-
+    SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
+    ComputeAdiabats(rho_h, temp_h, eos_h, Ye, S, T_min, T_max, nsamps);
+    Real h_min_sc = MinEnthalpy(rho_h, temp_h, Ye, eos_h, nsamps);
+  }
   Real uphi_rmax;
   const Real hm1_rmax =
       std::exp(log_enthalpy(rmax, 0.5 * M_PI, a, rin, angular_mom, uphi_rmax)) - 1.0;
@@ -274,8 +278,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // TODO(JMM): This will need to change when we move to realistic
   // EOS's for the torus.
   Real rho_rmax, u_rmax;
-  GetStateFromEnthalpy(eos, eos_type_int, hm1_rmax, rho_h, temp_h, Ye, h_min_sc, 
-      kappa, gam, Cv, rho_rmax, rho_rmax, u_rmax);
+  GetStateFromEnthalpy(eos, eos_type_int, hm1_rmax, rho_h, temp_h, Ye, h_min_sc, kappa,
+                       gam, Cv, 1.0, rho_rmax, u_rmax);
 
   // Get adiabat databoxes on device
   auto rho_d = rho_h.getOnDevice();
@@ -307,9 +311,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               // TODO: need to get rho, T, from hm1. The rest follow
               Real hm1 = std::exp(lnh) - 1.;
               Real rho, u;
-              GetStateFromEnthalpy(eos, eos_type_int, hm1, rho_d, temp_d, Ye, h_min_sc, 
-                  kappa, gam, Cv, rho_rmax, rho, u);
-              
+              GetStateFromEnthalpy(eos, eos_type_int, hm1, rho_d, temp_d, Ye, h_min_sc,
+                                   kappa, gam, Cv, rho_rmax, rho, u);
+
               Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
               Real gcov[4][4];
               bl.SpacetimeMetric(0.0, r, th, x3, gcov);
@@ -656,7 +660,8 @@ void GetStateFromEnthalpy(const EOS &eos, const int eos_type, const Real hm1,
     lambda[0] = Ye;
     u_out = eos.InternalEnergyFromDensityTemperature(rho_out, T, lambda) * rho_out;
   } else {
-    PARTHENON_REQUIRE_THROWS( eos_type == 0 || eos_type == 1, 
+    PARTHENON_REQUIRE_THROWS(
+        eos_type == 0 || eos_type == 1,
         "GetStateFromEnthalpy only implemented for IdealGas and StellarCollapse.");
   }
 }
