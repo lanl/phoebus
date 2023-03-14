@@ -23,11 +23,11 @@
 #include "phoebus_utils/root_find.hpp"
 
 // a namespace?
+using Microphysics::EOS::EOS;
 
-template <typename EOS>
-void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
-                  const Real T_min, const Real T_max, const Real Ye, const Real S0,
-                  Real &lrho_min_new, Real &lrho_max_new) {
+inline void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
+                         const Real T_min, const Real T_max, const Real Ye, const Real S0,
+                         Real &lrho_min_new, Real &lrho_max_new) {
 
   root_find::RootFind root_find;
   root_find::RootFindStatus status;
@@ -63,8 +63,8 @@ void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
 }
 
 // sample log rho
-template <typename D>
-void SampleRho(D lrho, const Real lrho_min, const Real lrho_max, const int n_samps) {
+inline void SampleRho(Spiner::DataBox lrho, const Real lrho_min, const Real lrho_max,
+                      const int n_samps) {
   const Real dlrho = (lrho_max - lrho_min) / n_samps;
 
   parthenon::par_for(
@@ -75,9 +75,9 @@ void SampleRho(D lrho, const Real lrho_min, const Real lrho_max, const int n_sam
 /**
  * Given Ye and a target entropy, compute density and temperature of constant entropy
  **/
-template <typename D, typename EOS>
-void ComputeAdiabats(D lrho, D temp, const EOS &eos, const Real Ye, const Real S0,
-                     const Real T_min, const Real T_max, const int n_samps) {
+inline void ComputeAdiabats(Spiner::DataBox lrho, Spiner::DataBox temp, const EOS &eos,
+                            const Real Ye, const Real S0, const Real T_min,
+                            const Real T_max, const int n_samps) {
 
   const Real guess0 = (T_max - T_min) / 2.0;
 
@@ -101,8 +101,8 @@ void ComputeAdiabats(D lrho, D temp, const EOS &eos, const Real Ye, const Real S
 /**
  * Find the minimum enthalpy along an adiabat as computed above
  **/
-template <typename D, typename EOS>
-Real MinEnthalpy(D lrho, D temp, const Real Ye, const EOS &eos, const int n_samps) {
+inline Real MinEnthalpy(Spiner::DataBox lrho, Spiner::DataBox temp, const Real Ye,
+                        const EOS &eos, const int n_samps) {
   Real min_h = 0.0;
   Real min_enthalpy = 1e30;
   parthenon::par_reduce(
