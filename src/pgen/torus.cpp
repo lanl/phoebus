@@ -44,6 +44,9 @@ using namespace radiation;
 using Microphysics::Opacities;
 using Microphysics::EOS::EOS;
 
+// Hack to avoid using a string
+enum EosType { IdealGas, StellarCollapse };
+
 class GasRadTemperatureResidual {
  public:
   KOKKOS_FUNCTION
@@ -117,7 +120,7 @@ Real ucon_norm(Real ucon[4], Real gcov[4][4]);
 void ComputeBetas(Mesh *pmesh, const Real rho_min_bnorm, Real &beta_min_global,
                   Real &beta_pmax);
 KOKKOS_FUNCTION
-void GetStateFromEnthalpy(const EOS &eos, const int eos_type, const Real hm1,
+void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1,
                           const Spiner::DataBox rho, const Spiner::DataBox temp,
                           const Real Ye, const Real h_min_sc, const Real kappa,
                           const Real gam, const Real Cv, const Real rho_rmax,
@@ -160,11 +163,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // The Fishbone solver needs to know about Ye
   // and the eos machinery needs to construct adiabats.
   const std::string eos_type = pin->GetString("eos", "type");
-  const int eos_type_int = (eos_type == "IdealGas") ? 0 : 1;
-  // TODO: allow other eos
-  // TODO: Q: How to modify gam, cv = ...
-  //  PARTHENON_REQUIRE_THROWS(eos_type == "IdealGas",
-  //                           "Torus setup only works with ideal gas");
+  const EosType eos_type_enum = (eos_type == "IdealGas") ? IdealGas : StellarCollapse;
+  PARTHENON_REQUIRE_THROWS(eos_type == "IdealGas" || eos_type == "StellarCollapse",
+                           "Torus setup only works with ideal gas");
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real Cv = pin->GetReal("eos", "Cv");
 
@@ -196,9 +197,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   S *= unit_conv.GetEntropyCGSToCode();
-
-  // logic to get the nuclear eos as needed.
-  bool provides_entropy = pmb->packages.Get("eos")->Param<bool>("provides_entropy");
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -275,10 +273,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real hm1_rmax =
       std::exp(log_enthalpy(rmax, 0.5 * M_PI, a, rin, angular_mom, uphi_rmax)) - 1.0;
 
-  // TODO(JMM): This will need to change when we move to realistic
-  // EOS's for the torus.
   Real rho_rmax, u_rmax;
-  GetStateFromEnthalpy(eos, eos_type_int, hm1_rmax, rho_h, temp_h, Ye, h_min_sc, kappa,
+  GetStateFromEnthalpy(eos, eos_type_enum, hm1_rmax, rho_h, temp_h, Ye, h_min_sc, kappa,
                        gam, Cv, 1.0, rho_rmax, u_rmax);
 
   // Get adiabat databoxes on device
@@ -308,10 +304,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
 
             if (lnh > 0.0) {
-              // TODO: need to get rho, T, from hm1. The rest follow
               Real hm1 = std::exp(lnh) - 1.;
               Real rho, u;
-              GetStateFromEnthalpy(eos, eos_type_int, hm1, rho_d, temp_d, Ye, h_min_sc,
+              GetStateFromEnthalpy(eos, eos_type_enum, hm1, rho_d, temp_d, Ye, h_min_sc,
                                    kappa, gam, Cv, rho_rmax, rho, u);
 
               Real ucon_bl[] = {0.0, 0.0, 0.0, uphi};
@@ -633,16 +628,16 @@ Real log_enthalpy(const Real r, const Real th, const Real a, const Real rin, con
  * There's probably a better way to do this
  **/
 KOKKOS_FUNCTION
-void GetStateFromEnthalpy(const EOS &eos, const int eos_type, const Real hm1,
+void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1,
                           const Spiner::DataBox rho, const Spiner::DataBox temp,
                           const Real Ye, const Real h_min_sc, const Real kappa,
                           const Real gam, const Real Cv, const Real rho_rmax,
                           Real &rho_out, Real &u_out) {
-  if (eos_type == 0) { // Ideal Gas
+  if (eos_type == IdealGas) { // Ideal Gas
     rho_out = std::pow(hm1 * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
     u_out = kappa * std::pow(rho_out, gam) / (gam - 1.) / rho_rmax;
     rho_out /= rho_rmax;
-  } else if (eos_type == 1) { // StellarCollapse
+  } else if (eos_type == StellarCollapse) { // StellarCollapse
     const int N = rho.size() - 1;
     const Real rho_min = std::pow(10.0, rho(0));
     const Real rho_max = std::pow(10.0, rho(N));
@@ -659,7 +654,7 @@ void GetStateFromEnthalpy(const EOS &eos, const int eos_type, const Real hm1,
     u_out = eos.InternalEnergyFromDensityTemperature(rho_out, T, lambda) * rho_out;
   } else {
     PARTHENON_REQUIRE_THROWS(
-        eos_type == 0 || eos_type == 1,
+        eos_type == IdealGas || eos_type == StellarCollapse,
         "GetStateFromEnthalpy only implemented for IdealGas and StellarCollapse.");
   }
 }

@@ -66,7 +66,6 @@ UnitConversions::UnitConversions(ParameterInput *pin) {
 
     if (fluid_density_g_exists) {
       mass_ = length_ * length_ * length_ * pin->GetReal("units", "fluid_density_g");
-      std::printf("mass_ = %e\n", mass_);
     }
   }
 
