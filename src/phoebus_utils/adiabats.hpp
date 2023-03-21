@@ -20,11 +20,13 @@
 
 #include <spiner/databox.hpp>
 
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/root_find.hpp"
 
 // a namespace?
 using Microphysics::EOS::EOS;
 
+template <typename EOS>
 inline void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
                          const Real T_min, const Real T_max, const Real Ye, const Real S0,
                          Real &lrho_min_new, Real &lrho_max_new) {
@@ -67,63 +69,56 @@ inline void SampleRho(Spiner::DataBox lrho, const Real lrho_min, const Real lrho
                       const int n_samps) {
   const Real dlrho = (lrho_max - lrho_min) / n_samps;
 
-  parthenon::par_for(
-      parthenon::loop_pattern_flatrange_tag, "Adiabats::SampleRho", DevExecSpace(), 0,
-      n_samps, KOKKOS_LAMBDA(const int i) { lrho(i) = lrho_min + i * dlrho; });
+  for ( int i = 0; i < n_samps; i++ ) { lrho(i) = lrho_min + i * dlrho; }
 }
 
 /**
  * Given Ye and a target entropy, compute density and temperature of constant entropy
  **/
+template <typename EOS>
 inline void ComputeAdiabats(Spiner::DataBox lrho, Spiner::DataBox temp, const EOS &eos,
                             const Real Ye, const Real S0, const Real T_min,
                             const Real T_max, const int n_samps) {
 
   const Real guess0 = (T_max - T_min) / 2.0;
 
-  parthenon::par_for(
-      parthenon::loop_pattern_flatrange_tag, "Adiabats::ComputeAdiabats", DevExecSpace(),
-      0, n_samps, KOKKOS_LAMBDA(const int i) {
-        const Real Rho = std::pow(10.0, lrho(i));
-        Real lambda[2];
-        lambda[0] = Ye;
+  for ( int i = 0; i < n_samps; i++ ) { 
+    const Real Rho = std::pow(10.0, lrho(i));
+    Real lambda[2];
+    lambda[0] = Ye;
 
-        auto target = [&](const Real T) {
-          return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
-        };
+    auto target = [&](const Real T) {
+      return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
+    };
 
-        const Real guess = guess0;
-        root_find::RootFind root_find;
-        temp(i) = root_find.regula_falsi(target, T_min, T_max, 1.e-10 * guess, guess);
-      });
+    const Real guess = guess0;
+    root_find::RootFind root_find;
+    temp(i) = root_find.regula_falsi(target, T_min, T_max, 1.e-10 * guess, guess);
+      }
 }
 
 /**
  * Find the minimum enthalpy along an adiabat as computed above
  **/
+template <typename EOS>
 inline Real MinEnthalpy(Spiner::DataBox lrho, Spiner::DataBox temp, const Real Ye,
                         const EOS &eos, const int n_samps) {
-  Real min_h = 0.0;
   Real min_enthalpy = 1e30;
-  parthenon::par_reduce(
-      parthenon::loop_pattern_flatrange_tag, "Adiabats::MinEnthalpy", DevExecSpace(), 0,
-      n_samps,
-      KOKKOS_LAMBDA(const int i, Real &min_enthalpy) {
-        const Real Rho = std::pow(10.0, lrho(i));
-        const Real T = temp.interpToReal(lrho(i));
-        Real lambda[2];
-        lambda[0] = Ye;
+  for ( int i = 0; i < n_samps; i++ ) { 
+    const Real Rho = std::pow(10.0, lrho(i));
+    const Real T = temp.interpToReal(lrho(i));
+    Real lambda[2];
+    lambda[0] = Ye;
 
-        auto enthalpy_sc = [&]() {
-          const Real P = eos.PressureFromDensityTemperature(Rho, T, lambda);
-          const Real e = eos.InternalEnergyFromDensityTemperature(Rho, T, lambda);
-          return 1.0 + e + P / Rho;
-        };
+    auto enthalpy_sc = [&]() {
+      const Real P = eos.PressureFromDensityTemperature(Rho, T, lambda);
+      const Real e = eos.InternalEnergyFromDensityTemperature(Rho, T, lambda);
+      return 1.0 + e + P / Rho;
+    };
 
-        const Real h = enthalpy_sc();
-        min_enthalpy = (h < min_enthalpy) ? h : min_enthalpy;
-      },
-      Kokkos::Min<Real>(min_h));
-  return min_h;
+    const Real h = enthalpy_sc();
+    min_enthalpy = (h < min_enthalpy) ? h : min_enthalpy;
+    }
+  return min_enthalpy;
 }
 #endif // PHOEBUS_UTILS_ADIABATS_HPP_
