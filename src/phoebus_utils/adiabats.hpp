@@ -69,7 +69,9 @@ inline void SampleRho(Spiner::DataBox lrho, const Real lrho_min, const Real lrho
                       const int n_samps) {
   const Real dlrho = (lrho_max - lrho_min) / n_samps;
 
-  for ( int i = 0; i < n_samps; i++ ) { lrho(i) = lrho_min + i * dlrho; }
+  for (int i = 0; i < n_samps; i++) {
+    lrho(i) = lrho_min + i * dlrho;
+  }
 }
 
 /**
@@ -82,7 +84,7 @@ inline void ComputeAdiabats(Spiner::DataBox lrho, Spiner::DataBox temp, const EO
 
   const Real guess0 = (T_max - T_min) / 2.0;
 
-  for ( int i = 0; i < n_samps; i++ ) { 
+  for (int i = 0; i < n_samps; i++) {
     const Real Rho = std::pow(10.0, lrho(i));
     Real lambda[2];
     lambda[0] = Ye;
@@ -94,7 +96,7 @@ inline void ComputeAdiabats(Spiner::DataBox lrho, Spiner::DataBox temp, const EO
     const Real guess = guess0;
     root_find::RootFind root_find;
     temp(i) = root_find.regula_falsi(target, T_min, T_max, 1.e-10 * guess, guess);
-      }
+  }
 }
 
 /**
@@ -104,7 +106,7 @@ template <typename EOS>
 inline Real MinEnthalpy(Spiner::DataBox lrho, Spiner::DataBox temp, const Real Ye,
                         const EOS &eos, const int n_samps) {
   Real min_enthalpy = 1e30;
-  for ( int i = 0; i < n_samps; i++ ) { 
+  for (int i = 0; i < n_samps; i++) {
     const Real Rho = std::pow(10.0, lrho(i));
     const Real T = temp.interpToReal(lrho(i));
     Real lambda[2];
@@ -118,7 +120,7 @@ inline Real MinEnthalpy(Spiner::DataBox lrho, Spiner::DataBox temp, const Real Y
 
     const Real h = enthalpy_sc();
     min_enthalpy = (h < min_enthalpy) ? h : min_enthalpy;
-    }
+  }
   return min_enthalpy;
 }
 #endif // PHOEBUS_UTILS_ADIABATS_HPP_

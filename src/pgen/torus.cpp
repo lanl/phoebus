@@ -637,7 +637,7 @@ void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1
     rho_out = std::pow(hm1 * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
     u_out = kappa * std::pow(rho_out, gam) / (gam - 1.) / rho_rmax;
     rho_out /= rho_rmax;
-  } else  { // StellarCollapse
+  } else { // StellarCollapse
     const int N = rho.size() - 1;
     const Real rho_min = std::pow(10.0, rho(0));
     const Real rho_max = std::pow(10.0, rho(N));
