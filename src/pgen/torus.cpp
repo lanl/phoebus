@@ -44,7 +44,7 @@ using namespace radiation;
 using Microphysics::Opacities;
 using Microphysics::EOS::EOS;
 
-// Hack to avoid using a string
+// If adding more EoS functionality, extend this and GetStateFromEnthalpy
 enum EosType { IdealGas, StellarCollapse };
 
 class GasRadTemperatureResidual {
@@ -72,7 +72,7 @@ class GasRadTemperatureResidual {
 
 /**
  * enthalpy residual for use with nuclear eos
- * computes fishbone enthalpy - nuclear EOS enthalpy to find
+ * computes fishbone enthalpy - EOS enthalpy to find
  * density, temperature given the correct enthalpy
  **/
 class EnthalpyResidual {
@@ -247,7 +247,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Spiner::DataBox rho_h(nsamps);
   Spiner::DataBox temp_h(nsamps);
 
-  // compute adiabats
   // TODO: transition this to a package.
   const Real rho_min = pmb->packages.Get("eos")->Param<Real>("rho_min");
   const Real rho_max = pmb->packages.Get("eos")->Param<Real>("rho_max");
@@ -255,8 +254,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real lrho_max = std::log10(rho_max);
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
   const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
-  // Get adiabat databoxes on device
 
+  /**
+   * TODO(BLB): Once adiabat infrastructure can reproduce ideal torus 
+   * with given kappa, this hacky if(StellarCollapse) business can be cleaned
+   **/ 
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
   Real h_min_sc;
   if (eos_type == "StellarCollapse") {
