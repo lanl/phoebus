@@ -255,13 +255,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real lrho_max = std::log10(rho_max);
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
   const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
-  temp_h.setRange(0, lrho_min, lrho_max, nsamps);
+  // Get adiabat databoxes on device
 
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
   Real h_min_sc;
   if (eos_type == "StellarCollapse") {
     GetRhoBounds(eos_h, rho_min, rho_max, T_min, T_max, Ye, S, lrho_min_adiabat,
                  lrho_max_adiabat);
+    temp_h.setRange(0, lrho_min_adiabat, lrho_max_adiabat, nsamps);
     const Real rho_min_adiabat = std::pow(10.0, lrho_min_adiabat);
     const Real rho_max_adiabat = std::pow(10.0, lrho_max_adiabat);
 
@@ -274,10 +275,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       std::exp(log_enthalpy(rmax, 0.5 * M_PI, a, rin, angular_mom, uphi_rmax)) - 1.0;
 
   Real rho_rmax, u_rmax;
-  GetStateFromEnthalpy(eos, eos_type_enum, hm1_rmax, rho_h, temp_h, Ye, h_min_sc, kappa,
+  GetStateFromEnthalpy(eos_h, eos_type_enum, hm1_rmax, rho_h, temp_h, Ye, h_min_sc, kappa,
                        gam, Cv, 1.0, rho_rmax, u_rmax);
 
-  // Get adiabat databoxes on device
   auto rho_d = rho_h.getOnDevice();
   auto temp_d = temp_h.getOnDevice();
   pmb->par_for(
@@ -422,6 +422,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
         rng_pool.free_state(rng_gen);
       });
+  free(rho_h);
+  free(rho_d);
+  free(temp_h);
+  free(temp_d);
 
   // get vector potential
   ParArrayND<Real> A("vector potential", jb.e + 1, ib.e + 1);
@@ -464,10 +468,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     radiation::MomentPrim2Con(rc);
   }
 
-  free(rho_h);
-  free(rho_d);
-  free(temp_h);
-  free(temp_d);
   fixup::ApplyFloors(rc);
 }
 
@@ -637,7 +637,7 @@ void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1
     rho_out = std::pow(hm1 * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
     u_out = kappa * std::pow(rho_out, gam) / (gam - 1.) / rho_rmax;
     rho_out /= rho_rmax;
-  } else if (eos_type == StellarCollapse) { // StellarCollapse
+  } else  { // StellarCollapse
     const int N = rho.size() - 1;
     const Real rho_min = std::pow(10.0, rho(0));
     const Real rho_max = std::pow(10.0, rho(N));
@@ -652,10 +652,6 @@ void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1
     Real lambda[2];
     lambda[0] = Ye;
     u_out = eos.InternalEnergyFromDensityTemperature(rho_out, T, lambda) * rho_out;
-  } else {
-    PARTHENON_REQUIRE_THROWS(
-        eos_type == IdealGas || eos_type == StellarCollapse,
-        "GetStateFromEnthalpy only implemented for IdealGas and StellarCollapse.");
   }
 }
 
