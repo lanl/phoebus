@@ -415,8 +415,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                 monopole.get(), tm.dt / 2)
                    : none);
       if ((stage == 1) && (tm.ncycle % tm.ncycle_out == 0) && (Globals::my_rank == 0)) {
-	auto dump_spacetime = tl.AddTask(spacetime_to_device,[](int ncycle, int ncycle_out, StateDescriptor *pkg) {
-	  MonopoleGR::DumpToTxt("metric_" + std::to_string(static_cast<int>(ncycle / ncycle_out)) + ".dat", pkg);
+	auto dump_spacetime = tl.AddTask(spacetime_to_device,[](int ncycle, int ncycle_out_mesh, StateDescriptor *pkg) {
+	  MonopoleGR::DumpToTxt("metric_" + std::to_string(static_cast<int>(ncycle / ncycle_out_mesh)) + ".dat", pkg);
 	  return TaskStatus::complete;
 	}, tm.ncycle, tm.ncycle_out, monopole.get());
 	
