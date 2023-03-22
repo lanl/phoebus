@@ -142,7 +142,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Reduction objects.
   AllReduce<Matter_host_t> matter_reducer;
-  matter_reducer.val = matter_h;
+  matter_reducer.val = matter_cells_h;
   AllReduce<Volumes_host_t> volumes_reducer;
   volumes_reducer.val = integration_vols_h;
 
