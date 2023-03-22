@@ -20,6 +20,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 // Parthenon
 #include <globals.hpp>
@@ -29,6 +30,7 @@
 #include <utils/error_checking.hpp>
 
 // Phoebus
+#include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/robust.hpp"
@@ -38,6 +40,7 @@
 
 using namespace parthenon::package::prelude;
 using parthenon::AllReduce;
+using parthenon::MetadataFlag;
 
 namespace MonopoleGR {
 
@@ -184,6 +187,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Radius radius(rin, rout, npoints);
   params.Add("radius", radius);
 
+  // One-copy variables containing metric on grid for use in outputs/restartsœ
+  bool allocate_on_grid = pin->GetOrAddBoolean("monopole_gr", "allocate_on_grid", false);
+  if (allocate_on_grid) {
+    std::vector<MetadataFlag> geom_flags = {Metadata::Private,
+      Metadata::Cell, Metadata::Derived, Metadata::OneCopy};
+    Metadata mgeom = Metadata(geom_flags);
+    monopole_gr->AddField("a", mgeom);
+    monopole_gr->AddField("Krr", mgeom);
+    monopole_gr->AddField("alpha", mgeom);
+    monopole_gr->AddField("rho_ADM", mgeom);
+    monopole_gr->AddField("j_ADM", mgeom);
+    monopole_gr->AddField("TrcS_ADM", mgeom);
+    monopole_gr->AddField("Srr_ADM", mgeom);
+    monopole_gr->FillDerivedBlock = InterpMetricToGrid<MeshBlockData<Real>>;
+  }
+  
   monopole_gr->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return monopole_gr;
@@ -568,6 +587,81 @@ TaskStatus DivideVols(StateDescriptor *pkg) {
     matter_h(v, 0) = matter_cells_h(v, 0);
   }
 
+  return TaskStatus::complete;
+}
+
+template<typename T>
+TaskStatus InterpMetricToGrid(T *rc) {
+  auto *pmb = rc->GetParentPointer().get();
+  StateDescriptor *pkg = pmb->packages.Get("monopole_gr").get();
+  auto &params = pkg->AllParams();
+
+  auto enabled = params.Get<bool>("enable_monopole_gr");
+  if (!enabled) return TaskStatus::complete;
+
+  auto radius = params.Get<MonopoleGR::Radius>("radius");
+  auto matter = params.Get<Matter_t>("matter");
+  auto hypersurface = params.Get<Hypersurface_t>("hypersurface");
+  auto alpha = params.Get<Alpha_t>("lapse");
+
+  const bool is_monopole_sph =
+      (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
+
+  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  parthenon::Coordinates_t coords = pmb->coords;
+
+  using Transformation_t = Geometry::SphericalToCartesian;
+  auto const &geom_pkg = pmb->packages.Get("geometry");
+  auto transform = Geometry::GetTransformation<Transformation_t>(geom_pkg.get());
+
+  const std::vector<std::string> vars{"monopole_gr::a",
+				      "monopole_gr::Krr",
+				      "monopole_gr::alpha",
+				      "monopole_gr::rho_ADM",
+				      "monopole_gr::j_ADM",
+				      "monopole_gr::TrcS_ADM",
+				      "monopole_gr::Srr_ADM"};
+  PackIndexMap imap;
+  auto v = rc->PackVariables(vars, imap);
+  const int ia = imap["monopole_gr::a"].first;
+  const int iK = imap["monopole_gr::Krr"].first;
+  const int ialpha = imap["monopole_gr::alpha"].first;
+  const int irho = imap["monopole_gr::rho_ADM"].first;
+  const int iJ = imap["monopole_gr::j_ADM"].first;
+  const int iTrcS = imap["monopole_gr::TrcS_ADM"].first;
+  const int iSrr = imap["monopole_gr::Srr_ADM"].first;
+
+  parthenon::par_for(
+		     DEFAULT_LOOP_PATTERN,
+		     "Interp metric to grid",
+		     DevExecSpace(),
+		     0, v.GetDim(5) - 1,
+		     kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+		     KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+		       Real x1 = coords.Xc<1>(k, j, i);
+		       Real x2 = coords.Xc<2>(k, j, i);
+		       Real x3 = coords.Xc<3>(k, j, i);
+		       Real C[3], s2c[3][3], c2s[3][3];
+
+		       Real r;
+		       if (is_monopole_sph) {
+			 r = std::abs(x1);
+		       }
+		       else { // Cartesian
+			 r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
+			 transform(x1, x2, x3, C, c2s, s2c);
+		       }
+
+		       v(b, ia, k, j, i) = Interpolate(r, hypersurface, radius, Hypersurface::A);
+		       v(b, iK, k, j, i) = Interpolate(r, hypersurface, radius, Hypersurface::K);
+		       v(b, ialpha, k, j, i) = Interpolate(r, alpha, radius);
+		       v(b, irho, k, j, i) = Interpolate(r, matter, radius, Matter::RHO);
+		       v(b, iJ, k, j, i) = Interpolate(r, matter, radius, Matter::J_R);
+		       v(b, iTrcS, k, j, i) = Interpolate(r, matter, radius, Matter::trcS);
+		       v(b, iSrr, k, j, i) = Interpolate(r, matter, radius, Matter::Srr);
+		     });
   return TaskStatus::complete;
 }
 
