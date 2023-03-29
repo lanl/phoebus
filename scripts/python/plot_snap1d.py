@@ -73,7 +73,7 @@ def plot_dump(filename, varname,
       x = data.x
       using_phoebus_coords = False
     else:
-      x = coord[...,1]
+      x = coord[:,1,:,:,:]
 
     # Aligned to cell centers if NONSTANDARD_SHAPE_IO_BROKEN
     # but whatever
