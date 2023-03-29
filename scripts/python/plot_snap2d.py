@@ -57,9 +57,9 @@ def plot_dump(filename, varname,
     # outputs for variables of non-standard shape don't work
     coordname = "g.c.coord"
     coord = data.Get(coordname, False)
-    z = coord[...,3]
-    y = coord[...,2]
-    x = coord[...,1]
+    z = coord[:,3,:,:,:]
+    y = coord[:,2,:,:,:]
+    x = coord[:,1,:,:,:]
 
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)
