@@ -20,9 +20,14 @@ x,y coordinates.
 from __future__ import print_function
 from argparse import ArgumentParser
 import numpy as np
+import warnings
 
 import matplotlib
 matplotlib.use('Agg')
+try:
+    import cmocean
+except:
+    warnings.warn("cmocean package not found. some colormaps unavailable.")
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -55,11 +60,13 @@ def plot_dump(filename, varname,
 
     # We have to play this stupid game because
     # outputs for variables of non-standard shape don't work
-    coordname = "g.c.coord"
+    nG = data.NGhost
+    coordname = "g.n.coord"
     coord = data.Get(coordname, False)
-    z = coord[:,3,:,:,:]
-    y = coord[:,2,:,:,:]
-    x = coord[:,1,:,:,:]
+    z = coord[:,3,:,nG-1:-1-nG,nG-1:-1-nG]
+    print(np.shape(z))
+    y = coord[:,2,:,nG-1:-1-nG,nG-1:-1-nG]
+    x = coord[:,1,:,nG-1:-1-nG,nG-1:-1-nG]
 
     if plane == 'xz':
         rho = np.sqrt(x**2 + y**2)
@@ -92,7 +99,7 @@ def plot_dump(filename, varname,
           print("WARNING plotting the 0th index of multidimensional variable!")
           val = val[:,:,0]
 
-        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:], shading='gouraud',
+        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:],
                             vmin=qmin, vmax=qmax, cmap=colormap)
 
     plt.xlim(x1bounds[0], x1bounds[1])
