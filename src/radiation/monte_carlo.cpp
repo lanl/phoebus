@@ -278,21 +278,21 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             z(m) = minx_k + (k - kb.s + 0.5) * dx_k;
 
             // Sample energy and set weight
-            Real nu;
+            Real lnu;
             int counter = 0;
             Real prob;
             do {
-              nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
+              lnu = rng_gen.drand() * (lnu_max - lnu_min) + lnu_min;
               counter++;
               PARTHENON_REQUIRE(counter < 100000,
                                 "Inefficient or impossible frequency sampling!");
-              Real lnu = log(nu);
               Real dn = (lnu - lnu_min) / dlnu;
               int n = static_cast<int>(dn);
               dn = dn - n;
               prob = (1. - dn) * dNdlnu(n, sidx, k, j, i) +
                      dn * dNdlnu(n + 1, sidx, k, j, i);
             } while (rng_gen.drand() > prob);
+            Real nu = exp(lnu);
 
             weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
