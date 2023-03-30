@@ -18,12 +18,14 @@
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
 
+#include "analysis/history.hpp"
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/fluid.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/programming_utils.hpp"
+#include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -71,6 +73,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
   bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", false);
   bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", false);
+  bool enable_phi_enforcement = pin->GetOrAddBoolean("fixup", "enable_phi_enforcement", false);
+  params.Add("enable_phi_enforcement", enable_phi_enforcement);
+  Real enforced_phi = pin->GetOrAddReal("fixup", "enforced_phi", 0.);
+  params.Add("enforced_phi", enforced_phi);
+  Real enforced_phi_timescale = pin->GetOrAddReal("fixup", "enforced_phi_timescale", 1.e3);
+  params.Add("enforced_phi_timescale", enforced_phi_timescale);
+  int enforced_phi_cadence = pin->GetOrAddInteger("fixup", "enforced_phi_cadence", 10);
+  params.Add("enforced_phi_cadence", enforced_phi_cadence);
+  if (enable_phi_enforcement) {
+    PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
+      "Phi enforcement only supported for BH geometry!");
+  }
 
   if (enable_mhd_floors && !enable_mhd) {
     enable_mhd_floors = false;
@@ -641,6 +655,110 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           }
         }
       });
+
+  return TaskStatus::complete;
+}
+
+TaskStatus EndOfStepModify(MeshData<Real> *md, const Real dt) {
+  auto *pm = md->GetParentPointer();
+  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+
+  const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
+
+  namespace p = fluid_prim;
+  namespace c = fluid_cons;
+  const std::vector<std::string> vars({p::bfield, c::bfield});
+  PackIndexMap imap;
+  auto pack = md->PackVariables(vars, imap);
+
+  const int pblo = imap[p::bfield].first;
+  const int cblo = imap[c::bfield].first;
+
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+  auto geom = Geometry::GetCoordinateSystem(md);
+  auto gpkg = pm->packages.Get("geometry");
+  bool derefine_poles = gpkg->Param<bool>("derefine_poles");
+Real h = gpkg->Param<Real>("h");
+Real xt = gpkg->Param<Real>("xt");
+Real alpha = gpkg->Param<Real>("alpha");
+Real x0 = gpkg->Param<Real>("x0");
+Real smooth = gpkg->Param<Real>("smooth");
+  auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
+
+  if (enable_phi_enforcement) {
+    const Real enforced_phi = fix_pkg->Param<Real>("enforced_phi");
+    const Real enforced_phi_timescale = fix_pkg->Param<Real>("enforced_phi_timescale");
+    const int enforced_phi_cadence = fix_pkg->Param<int>("enforced_phi_cadence");
+
+    // Measure phi
+    const Real phi_proc = History::ReduceMagneticFluxPhi(md);
+    const Real phi = reduction::Sum(phi_proc);
+
+    // Calculate amount of phi to add this timestep
+    const Real dphi = (enforced_phi - phi)*dt/enforced_phi_timescale;//*enforced_phi_cadence;
+
+    // Update B field
+    ParArrayND<Real> A("vector potential", pack.GetDim(5), jb.e + 1, ib.e + 1);
+    parthenon::par_for(parthenon::LoopPatternMDRange(), "Phoebus::Fixup::EndOfStepModify::EvaluateQ",
+    DevExecSpace(),
+      0, pack.GetDim(5) - 1, jb.s + 1, jb.e, ib.s + 1, ib.e,
+      KOKKOS_LAMBDA(const int b, const int j, const int i) {
+        const auto &coords = pack.GetCoords(b);
+        const Real x1 = coords.Xc<1>(0, j, i);
+        const Real x2 = coords.Xc<2>(0, j, i);
+        const Real r = tr.bl_radius(x1);
+        const Real th = tr.bl_theta(x1, x2);
+
+        const Real x = r * sin(th);
+        const Real z = r * cos(th);
+        const Real a_hyp = 2.;
+        const Real b_hyp = 60.;
+        const Real x_hyp = a_hyp * sqrt( 1. + pow(z/b_hyp, 2.));
+        const Real q = (pow(x,2) - pow(x_hyp,2))/pow(x_hyp, 2.);
+        if (x < x_hyp) {
+          A(b,j,i) = q;
+        }
+      }
+      );
+
+    parthenon::par_for(parthenon::LoopPatternMDRange(), "Phoebus::Fixup::EndOfStepModify::EvaluateBField", DevExecSpace(),
+      0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e-1, ib.s, ib.e-1,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        const auto &coords = pack.GetCoords(b);
+        const Real gammadet = geom.DetGamma(CellLocation::Cent, b,k, j, i);
+        pack(b, pblo, k, j, i) += (-(A(b, j, i) - A(b, j + 1, i) + A(b, j, i + 1) - A(b, j + 1, i + 1)) /(2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gammadet));
+        pack(b, pblo+1, k, j, i) += ((A(b,j, i) + A(b,j + 1, i) - A(b,j, i + 1) - A(b,j + 1, i + 1)) /(2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
+
+        // Used by ReduceMagneticFluxPhi
+        pack(b,cblo, k, j, i) = pack(b,pblo, k, j, i) * gammadet;
+        pack(b,cblo + 1, k, j, i) = pack(b,pblo + 1, k, j, i) * gammadet;
+      }
+    );
+
+    // Measure change in phi
+    const Real fiducial_phi_proc = History::ReduceMagneticFluxPhi(md);
+    const Real fiducial_phi = reduction::Sum(fiducial_phi_proc);
+    printf("here! phi: %e\n", fiducial_phi);
+    exit(-1);
+
+    // Rescale the phi contribution
+
+//    pmb->par_for("Phoebus::Fixup::EndOfStepModify::EvaluateBField",
+//      kb.s, kb.e, jb.s, jb.e-1, ib.s, ib.e-1,
+//      KOKKOS_LAMBDA(const int k, const int j, const int i) {
+//        const real gammadet = geom.DetGamma(CellLocation::Cent, k, j, i);
+//        v(pblo, k, j, i) += (-(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /(2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gamdet));
+//        v(pblo, k, j, i) += ((A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /(2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gamdet));
+//      }
+//
+//      // Update conserved vars
+//      p2c();
+//    );
+  }
+
 
   return TaskStatus::complete;
 }

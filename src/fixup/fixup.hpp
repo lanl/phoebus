@@ -38,6 +38,7 @@ template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc);
 template <typename T>
 TaskStatus SourceFixup(T *rc);
+TaskStatus EndOfStepModify(MeshData<Real>, const Real dt);
 
 static struct ConstantRhoSieFloor {
 } constant_rho_sie_floor_tag;
