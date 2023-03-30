@@ -290,9 +290,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Real dn = (lnu - lnu_min) / dlnu;
               int n = static_cast<int>(dn);
               dn = dn - n;
-              prob = (1. - dn) * dNdlnu(n, sidx, k, j, i) + dn * dNdlnu(n + 1, sidx, k, j, i);
+              prob = (1. - dn) * dNdlnu(n, sidx, k, j, i) +
+                     dn * dNdlnu(n + 1, sidx, k, j, i);
             } while (rng_gen.drand() > prob);
-
 
             weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
