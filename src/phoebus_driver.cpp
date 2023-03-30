@@ -613,6 +613,22 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
   }
 
+  // Communicate flux corrections and update independent data with fluxes and geometric
+  // sources
+  TaskRegion &sync_region_5 = tc.AddRegion(num_partitions);
+  PARTHENON_REQUIRE(num_partitions == 1, "Reductions don't work for multiple partitions?");
+  if (stage == integrator->nstages) {
+    for (int i = 0; i < num_partitions; i++) {
+    auto &tl = sync_region_5[i];
+
+    auto &md = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
+
+    auto end_mods = tl.AddTask(none, fixup::EndOfStepModify, md, dt);
+
+  }
+    }
+
+
   return tc;
 } // namespace phoebus
 
