@@ -37,7 +37,7 @@
 #include "phoebus_driver.hpp"
 #include "phoebus_package.hpp"
 #include "phoebus_utils/robust.hpp"
-#include "progenitor/progenitor.hpp"
+#include "progenitor/progenitordata.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
 
