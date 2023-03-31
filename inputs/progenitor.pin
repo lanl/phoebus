@@ -11,6 +11,7 @@
 # publicly and display publicly, and to permit others to do so.
 
 
+
 <phoebus>
 problem = homologous
 ix1_bc = reflect
@@ -23,30 +24,31 @@ problem_id  = homologous # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = p.density,  &
-            c.density,  &
+      	    c.density,  &
             p.velocity, &
             c.momentum, &
             p.energy,   &
             c.energy,   &
-            pressure,   &
-            cs, &
-            p.ye, &
-            g.c.coord, &
-            g.n.coord, &
-            g.c.alpha, &
-            g.c.detgam, &
-            g.c.gcov, &
-            g.c.dg, &
-            g.c.dalpha, &
-            flux_divergence, &
-            monopole_gr::a, &
+	    pressure,	&
+	    temperature, &
+      	    cs, &
+      	    p.ye, &
+      	    g.c.coord, &
+     	    g.n.coord, &
+	    g.c.alpha, &
+	    g.c.detgam, &
+	    g.c.gcov, &
+	    g.c.dg, &
+	    g.c.dalpha, &
+	    flux_divergence, &
+	    monopole_gr::a, &
             monopole_gr::Krr, &
             monopole_gr::alpha, &
             monopole_gr::rho_ADM, &
             monopole_gr::j_ADM, &
             monopole_gr::TrcS_ADM, &
             monopole_gr::Srr_ADM, &
-            src_terms
+	    src_terms
 
 file_type   = hdf5      # Tabular data dump
 dt          = 0.001         # time increment between outputs
@@ -57,7 +59,7 @@ dt = 1
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 6      # time limit
+tlim        = 10      # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -66,10 +68,11 @@ dt_init_fact = 1.e-6
 nghost = 4
 #refinement = adaptive
 numlevel = 3
+bc_vars = conserved
 
-nx1         = 500        # Number of zones in X1-direction
+nx1         = 8000        # Number of zones in X1-direction
 x1min       = 0       # minimum value of X1
-x1max       =  0.10086475522209183         # maximum value of X1
+x1max       = 1.         # maximum value of X1
 ix1_bc      = user        # Inner-X1 boundary condition flag
 ox1_bc      = user        # Outer-X1 boundary condition flag
 
@@ -88,7 +91,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 500
+nx1 = 2000
 nx2 = 1
 nx3 = 1
 
@@ -97,11 +100,13 @@ field = c.c.bulk.rho
 method = derivative_order_1
 max_level = 3
 
-
 <eos>
-type = IdealGas
-Gamma = 1.33334
-Cv = 1.0
+type = StellarCollapse
+filename = SFHo.h5
+use_sp5 = false
+#type=IdealGas
+#Gamma = 1.33334
+#Cv = 1.0
 
 <physics>
 hydro = true
@@ -114,9 +119,9 @@ xorder = 2
 cfl = 0.25
 riemann = llf
 recon = weno5
+#c2p_method = classic
 c2p_max_iter = 1000
-Ye = false
-
+Ye = true
 
 <fixup>
 enable_floors = true
@@ -124,17 +129,19 @@ enable_ceilings = true
 enable_flux_fixup = true
 enable_c2p_fixup = true
 floor_type = ConstantRhoSie
-rho0_floor = 1.0e-5
-sie0_floor =   3.982563941315319e-05
+rho0_floor = 1.0e-10
+sie0_floor = 1.0e-11
 ceiling_type = ConstantGamSie
 sie0_ceiling = 10.0;
 gam0_ceiling = 10.0;
 
+
+
 <monopole_gr>
 enabled = true
 allocate_on_grid = true
-npoints = 501
-rout = 0.10086475522209183
+npoints = 8001
+rout = 1.
 # Disables time derivatives. Runs only at initialization
 force_static = false
 # Runs the first n subcycles. Then freezes. Source terms are not disabled.
@@ -149,6 +156,11 @@ dtfac = 0.9
 warn_on_dt = false
 dtwarn_eps = 1e-5
 
+<units>
+scale_free = false
+fluid_mass_g = 1.3140924486113762e+37
+geom_mass_g = 1.3140924486113762e+37
+
 <progenitor>
 enabled=true
-tablepath=converted_ADM_homologouscollapse10000.dat   ### NEED TO CHANGE ONCE WE WILL ADD DATA DIRECTORY
+tablepath=converted_ADM_stellartable.dat
