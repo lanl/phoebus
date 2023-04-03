@@ -144,7 +144,7 @@ namespace homologous {
 	Real vel_vec_out[3]={0};
 	vel_vec_in[0] = velocity_dev.interpToReal(r);
 	if (is_monopole_cart){
-	  SPCELOOP2 (i, j){
+	  SPACELOOP2(i, j){
 	      vel_vec_out[i]+=s2c[i][j]*vel_vec_in[j];
 	  }
 	}
