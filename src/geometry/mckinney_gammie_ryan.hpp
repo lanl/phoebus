@@ -1,4 +1,4 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
+// © 2021-2023. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -59,6 +59,7 @@ class McKinneyGammieRyan {
                   Real Jcon[NDSPACE][NDSPACE]) const {
     using robust::ratio;
     Real y, th, thJ;
+
     const Real r = r_(X1);
     th_(X1, X2, y, th);
     C[0] = r;
@@ -74,8 +75,9 @@ class McKinneyGammieRyan {
       const Real dydX2 = 2.;
       const Real dthJdy = norm_ * (1 + std::pow(y / xt_, alpha_));
       const Real dthJdX2 = dthJdy * dydX2;
-      dthdX1 = -smooth_ * (thJ - thG) * std::exp(smooth_ * (x0_ - X1));
-      dthdX2 = dthGdX2 + std::exp(smooth_ * (x0_ - X1)) * (dthJdX2 - dthGdX2);
+      const Real fac = x0_ - X1;
+      dthdX1 = -smooth_ * (thJ - thG) * std::exp(smooth_ * fac);
+      dthdX2 = dthGdX2 + std::exp(smooth_ * fac) * (dthJdX2 - dthGdX2);
     } else {
       dthdX1 = 0.0;
       dthdX2 = dthGdX2;
@@ -147,26 +149,40 @@ class McKinneyGammieRyan {
     if (derefine_poles_) {
       Real thJ;
       thJ_(X2, y, thJ);
-      th = thG + std::exp(smooth_ * (x0_ - X1)) * (thJ - thG);
+      const Real fac = x0_ - X1;
+      th = thG + std::exp(smooth_ * fac) * (thJ - thG);
     } else {
       y = 0;
       th = thG;
     }
     // coordinate singularity fix at the poles. Avoid theta = 0.
-    if (std::abs(th) < robust::EPS()) th = robust::sgn(th) * robust::EPS();
+    constexpr Real SINGSMALL = 1.e-20;
+    if (std::fabs(th) < SINGSMALL) {
+      if (th >= 0.)
+        th = SINGSMALL;
+      else if (th < 0)
+        th = -SINGSMALL;
+    }
+    if (std::fabs(M_PI - th) < SINGSMALL) {
+      if (th >= M_PI)
+        th = M_PI + SINGSMALL;
+      else if (th < M_PI)
+        th = M_PI - SINGSMALL;
+    }
+    // if (std::fabs(M_PI - th) < robust::EPS()) th =
   }
   KOKKOS_INLINE_FUNCTION
-  Real thG_(Real X2) const {
+  Real thG_(const Real X2) const {
     return M_PI * X2 + ((1. - h_) / 2.) * std::sin(2. * M_PI * X2);
   }
   KOKKOS_INLINE_FUNCTION
-  void thJ_(Real X2, Real &y, Real &thJ) const {
+  void thJ_(const Real X2, Real &y, Real &thJ) const {
     y = 2. * X2 - 1.;
     thJ = norm_ * y * (1. + std::pow(y / xt_, alpha_) / (alpha_ + 1.)) + 0.5 * M_PI;
   }
   KOKKOS_INLINE_FUNCTION
   Real GetNorm_(Real alpha, Real xt) const {
-    return 0.5 * M_PI * 1. / (1. + 1. / (alpha_ + 1.) * 1. / std::pow(xt_, alpha_));
+    return 0.5 * M_PI * 1. / (1. + 1. / (alpha + 1.) * 1. / std::pow(xt, alpha_));
   }
   bool derefine_poles_ = true;
   Real h_ = 0.3;
