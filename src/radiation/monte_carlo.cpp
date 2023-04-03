@@ -259,12 +259,12 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Geometry::Tetrads Tetrads(Ucon, Gcov);
           Real detG = geom.DetG(CellLocation::Cent, k, j, i);
           int dNs = v(iNs + sidx, k, j, i);
+          auto rng_gen = rng_pool.get_state();
 
           // Loop over particles to create in this zone
-          for (int n = 0; n < static_cast<int>(dNs); n++) {
+          for (int n = 0; n < dNs; n++) {
             const int m =
                 new_indices(starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
-            auto rng_gen = rng_pool.get_state();
 
             // Set particle species
             swarm_species(m) = static_cast<int>(s);
@@ -278,15 +278,21 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             z(m) = minx_k + (k - kb.s + 0.5) * dx_k;
 
             // Sample energy and set weight
-            Real nu;
+            Real lnu;
             int counter = 0;
+            Real prob;
             do {
-              nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
+              lnu = rng_gen.drand() * (lnu_max - lnu_min) + lnu_min;
               counter++;
               PARTHENON_REQUIRE(counter < 100000,
                                 "Inefficient or impossible frequency sampling!");
-            } while (rng_gen.drand() >
-                     LogLinearInterp(nu, sidx, k, j, i, dNdlnu, lnu_min, dlnu));
+              Real dn = (lnu - lnu_min) / dlnu;
+              int n = static_cast<int>(dn);
+              dn = dn - n;
+              prob = (1. - dn) * dNdlnu(n, sidx, k, j, i) +
+                     dn * dNdlnu(n + 1, sidx, k, j, i);
+            } while (rng_gen.drand() > prob);
+            Real nu = exp(lnu);
 
             weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
@@ -311,8 +317,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             // TODO(BRR) lepton sign
             v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
 
-            rng_pool.free_state(rng_gen);
           } // for n
+          rng_pool.free_state(rng_gen);
         });
   } // for sidx
 

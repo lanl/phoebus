@@ -64,8 +64,9 @@ constexpr RadiationType species[MaxNumRadiationSpecies] = {
     RadiationType::NU_ELECTRON, RadiationType::NU_ELECTRON_ANTI, RadiationType::NU_HEAVY};
 
 KOKKOS_INLINE_FUNCTION
-Real LogLinearInterp(Real x, int sidx, int k, int j, int i, ParArrayND<Real> table,
+Real LogLinearInterp(Real x, int sidx, int k, int j, int i, const ParArrayND<Real> &table,
                      Real lx_min, Real dlx) {
+  PARTHENON_FAIL("This function cannot currently be called on device for some reason!");
   Real lx = log(x);
   Real dn = (lx - lx_min) / dlx;
   int n = static_cast<int>(dn);
