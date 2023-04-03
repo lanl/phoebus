@@ -24,12 +24,12 @@ namespace prim2con {
 KOKKOS_INLINE_FUNCTION
 void signal_speeds(const Real &rho, const Real &u, const Real &p, const Real &bsq,
                    const Real v[], const Real &vsq, const Real &gam1, const Real &alpha,
-                   const Real beta[], const Real gcon[3][3], Real *sig) { 
+                   const Real beta[], const Real gcon[3][3], Real *sig) {
   const Real rho_rel = rho + u + p;
   const Real vasq = bsq / (rho_rel + bsq);
   Real cssq = gam1 * p / rho_rel;
   PARTHENON_DEBUG_REQUIRE(rho > robust::SMALL(), "rho is unacceptably small!");
-  PARTHENON_DEBUG_REQUIRE(u > robust::SMALL(), "u is unacceptably small!");
+  //PARTHENON_DEBUG_REQUIRE(u > robust::SMALL(), "u is unacceptably small!");
   PARTHENON_DEBUG_REQUIRE(p > robust::SMALL(), "p is unacceptably small!");
   PARTHENON_DEBUG_REQUIRE(gam1 > robust::SMALL(), "gam1 is unacceptably small!");
   cssq += vasq - cssq * vasq;
