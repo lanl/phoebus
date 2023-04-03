@@ -184,9 +184,6 @@ include(cmake/Fluid.cmake)
 message("\nConfiguring src")
 add_subdirectory(src)
 
-# Testing / Reader
-add_subdirectory(Tests)
-
 # TODO(JMM): Testing?
 if(PHOEBUS_ENABLE_UNIT_TESTS OR PHOEBUS_ENABLE_INTEGRATION_TESTS OR PHOEBUS_ENABLE_REGRESSION_TESTS)
   message("\nConfiguring tests")

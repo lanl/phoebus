@@ -106,7 +106,7 @@ namespace homologous {
   MonopoleGR::SpacetimeToDevice(monopole_pkg.get());
   MonopoleGR::DumpToTxt("phoebus-metric-setup.dat",monopole_pkg.get());
   monopole_initialized = true;
-  } // if statement
+  } // if (!monopole_initialized)
   
   // Primitive Variables
   using Transformation_t = Geometry::SphericalToCartesian;
@@ -144,10 +144,8 @@ namespace homologous {
 	Real vel_vec_out[3]={0};
 	vel_vec_in[0] = velocity_dev.interpToReal(r);
 	if (is_monopole_cart){
-	  for ( int i=0; i<3; ++i){
-	    for (int j=0; j<3; ++j){
+	  SPCELOOP2 (i, j){
 	      vel_vec_out[i]+=s2c[i][j]*vel_vec_in[j];
-	    }
 	  }
 	}
 	else {
@@ -155,7 +153,7 @@ namespace homologous {
 	}
 	
         v(irho, k, j, i) = mass_density_dev.interpToReal(r);
-        for (int d = 0 ; d < 3; ++d){
+        SPACELOOP(d) {
 	  v(ivlo+d, k, j, i) = vel_vec_out[d];
 	}
 	v(iprs, k, j, i) = pressure_dev.interpToReal(r);
@@ -168,7 +166,7 @@ namespace homologous {
 	Real vcon[3]={v(ivlo, k, j, i), v(ivlo+1, k, j, i), v(ivlo+2, k, j, i)};
 	geom.Metric(CellLocation::Cent, k, j, i, Gammacov);
 	Real Gamma = phoebus::GetLorentzFactor(vcon, Gammacov);
-	for (int d = 0 ; d < 3; ++d){
+	SPACELOOP(d) {
 	 v(ivlo+d, k, j, i) *= Gamma;
 	}
 	

@@ -688,9 +688,10 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (enable_tov && !enable_monopole) {
     PARTHENON_THROW("MonopoleGR required for TOV initialization");
   }
-  //if (enable_monopole && !enable_tov) {
-  //  PARTHENON_THROW("Currently monopole GR only enabled with TOV");
-  //}
+  const auto enable_progenitor = progenitor_pkg->Param<bool>("enabled");
+  if (enable_monopole && !(enable_tov || enable_progenitor)) {
+    PARTHENON_THROW("Currently monopole GR only enabled with TOV or Progenitor packages");
+  }
   if ((enable_monopole && !(is_monopole_cart || is_monopole_sph)) ||
       (is_monopole_cart || is_monopole_sph) && !enable_monopole) {
     PARTHENON_THROW("MonopoleGR must be coupled with monopole metric");
@@ -708,7 +709,6 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     }
   }
   return packages;
-
 }
 
 TaskListStatus PhoebusDriver::MonteCarloStep() {
