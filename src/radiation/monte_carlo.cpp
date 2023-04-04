@@ -314,8 +314,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               // detG is in both numerator and denominator
               v(mu, k, j, i) -= 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
             }
-            // TODO(BRR) lepton sign
-            v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
+            v(Gye, k, j, i) += LeptonSign(s) / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
 
           } // for n
           rng_pool.free_state(rng_gen);
@@ -437,7 +436,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
                                  1. / d4x * weight(n) * k3(n));
               // TODO(BRR) Add Ucon[0] in the below
-              Kokkos::atomic_add(&(v(iGye, k, j, i)), 1. / d4x * weight(n) * mp_code);
+              Kokkos::atomic_add(&(v(iGye, k, j, i)), LeptonSign(s) / d4x * weight(n) * mp_code);
 
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]), 1.);
