@@ -34,7 +34,7 @@
 // Relativity utils
 #include "phoebus_utils/adiabats.hpp"
 
-// using namespace phoebus;
+using namespace Adiabats;
 using singularity::StellarCollapse;
 
 TEST_CASE("ADIABATS", "[compute_adiabats]") {

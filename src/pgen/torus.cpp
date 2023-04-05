@@ -251,15 +251,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
   Real h_min_sc;
   if (eos_type == "StellarCollapse") {
-    GetRhoBounds(eos_h, rho_min, rho_max, T_min, T_max, Ye, S, lrho_min_adiabat,
-                 lrho_max_adiabat);
+    Adiabats::GetRhoBounds(eos_h, rho_min, rho_max, T_min, T_max, Ye, S, lrho_min_adiabat,
+                           lrho_max_adiabat);
     temp_h.setRange(0, lrho_min_adiabat, lrho_max_adiabat, nsamps);
     const Real rho_min_adiabat = std::pow(10.0, lrho_min_adiabat);
     const Real rho_max_adiabat = std::pow(10.0, lrho_max_adiabat);
 
-    SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
-    ComputeAdiabats(rho_h, temp_h, eos_h, Ye, S, T_min, T_max, nsamps);
-    h_min_sc = MinEnthalpy(rho_h, temp_h, Ye, eos_h, nsamps);
+    Adiabats::SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
+    Adiabats::ComputeAdiabats(rho_h, temp_h, eos_h, Ye, S, T_min, T_max, nsamps);
+    h_min_sc = Adiabats::MinEnthalpy(rho_h, temp_h, Ye, eos_h, nsamps);
   }
   Real uphi_rmax;
   const Real hm1_rmax =
