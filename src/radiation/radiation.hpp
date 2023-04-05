@@ -63,6 +63,12 @@ constexpr int MaxNumRadiationSpecies = 3;
 constexpr RadiationType species[MaxNumRadiationSpecies] = {
     RadiationType::NU_ELECTRON, RadiationType::NU_ELECTRON_ANTI, RadiationType::NU_HEAVY};
 
+KOKKOS_FORCEINLINE_FUNCTION
+int LeptonSign(const RadiationType s) {
+  /* 0 is abs(s) >= 2, otherwise 2s-1 = -1,1 */
+  return (std::abs(static_cast<int>(s)) < 2) * (2 * static_cast<int>(s) - 1);
+}
+
 KOKKOS_INLINE_FUNCTION
 Real LogLinearInterp(Real x, int sidx, int k, int j, int i, const ParArrayND<Real> &table,
                      Real lx_min, Real dlx) {
