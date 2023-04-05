@@ -165,7 +165,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const std::string eos_type = pin->GetString("eos", "type");
   const EosType eos_type_enum = (eos_type == "IdealGas") ? IdealGas : StellarCollapse;
   PARTHENON_REQUIRE_THROWS(eos_type == "IdealGas" || eos_type == "StellarCollapse",
-                           "Torus setup only works with ideal gas");
+                           "Torus setup only works with ideal gas or stellar collapse EOS");
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real Cv = pin->GetReal("eos", "Cv");
 
