@@ -96,7 +96,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
-  Real wgtC = 1.e40 * unit_conv.GetTimeCodeToCGS(); // Typical-ish value
+  Real wgtC = 1.e40;// Typical-ish value
 
   pmb->par_for(
       "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
