@@ -14,6 +14,8 @@
 #ifndef PHOEBUS_UTILS_ADIABATS_HPP_
 #define PHOEBUS_UTILS_ADIABATS_HPP_
 
+#include <limits>
+
 #include <globals.hpp>
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
@@ -31,10 +33,14 @@ inline void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
                          const Real T_min, const Real T_max, const Real Ye, const Real S0,
                          Real &lrho_min_new, Real &lrho_max_new) {
 
+  // adjust bounds slightly to avoid edges
+  const Real ADJUST = 0.01; //0.01
   root_find::RootFind root_find;
   root_find::RootFindStatus status;
   Real lambda[2];
   lambda[0] = Ye;
+
+  const Real epsilon = std::numeric_limits<Real>::epsilon();
 
   // lower density bound
   Real guess = 1.1 * rho_min;
@@ -43,25 +49,24 @@ inline void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
     return eos.EntropyFromDensityTemperature(Rho, T, lambda) - S0;
   };
   lrho_min_new =
-      root_find.regula_falsi(target, rho_min, rho_max, 1.e-8 * guess, guess, &status);
+      root_find.regula_falsi(target, rho_min, rho_max, epsilon * guess, guess, &status);
   if (status == root_find::RootFindStatus::failure) {
     lrho_min_new = rho_min;
   };
   lrho_min_new = std::log10(lrho_min_new);
+  lrho_min_new += ADJUST * std::abs(lrho_min_new);
 
   // upper density bound
-  guess = 0.75 * rho_max;
+  guess = 0.1 * rho_max;
   T = T_max; // go down a bit?
   lrho_max_new =
-      root_find.regula_falsi(target, rho_min, rho_max, 1.e-8 * guess, guess, &status);
+      root_find.regula_falsi(target, rho_min, rho_max, epsilon * guess, guess, &status);
   if (status == root_find::RootFindStatus::failure) {
     lrho_max_new = rho_max;
   };
   lrho_max_new = std::log10(lrho_max_new);
 
-  // shrink upper bound slightly to avoid table edge
-  const Real SHRINK = 0.01;
-  lrho_max_new -= SHRINK * (lrho_max_new - lrho_min_new);
+  lrho_max_new -= ADJUST * (lrho_max_new - lrho_min_new);
 }
 
 // sample log rho
@@ -83,6 +88,7 @@ inline void ComputeAdiabats(Spiner::DataBox lrho, Spiner::DataBox temp, const EO
                             const Real T_max, const int n_samps) {
 
   const Real guess0 = (T_max - T_min) / 2.0;
+  const Real epsilon = std::numeric_limits<Real>::epsilon();
 
   for (int i = 0; i < n_samps; i++) {
     const Real Rho = std::pow(10.0, lrho(i));
@@ -95,7 +101,7 @@ inline void ComputeAdiabats(Spiner::DataBox lrho, Spiner::DataBox temp, const EO
 
     const Real guess = guess0;
     root_find::RootFind root_find;
-    temp(i) = root_find.regula_falsi(target, T_min, T_max, 1.e-10 * guess, guess);
+    temp(i) = root_find.regula_falsi(target, T_min, T_max, epsilon * guess, guess);
   }
 }
 
