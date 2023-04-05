@@ -14,8 +14,8 @@
 #include "geometry/geometry.hpp"
 
 // stdlib includes
-#include <memory>
 #include <cmath>
+#include <memory>
 #include <string>
 #include <vector>
 // external includes
@@ -37,12 +37,11 @@
 // Ascii Reader
 #include "progenitor/ascii_reader.hpp"
 
-
 using parthenon::Real;
 
 TEST_CASE("READER", "[reader_utils]") {
   std::vector<Real> mydata[11];
-  AsciiReader::readtable("../../tst/unit/phoebus_utils/fake_table.dat",mydata);
+  AsciiReader::readtable("../../tst/unit/phoebus_utils/fake_table.dat", mydata);
   const int npoints = mydata[0].size();
   int n_wrong = 0;
   double rho = mydata[AsciiReader::COLUMNS::rho][0];
@@ -50,14 +49,16 @@ TEST_CASE("READER", "[reader_utils]") {
   double press = mydata[AsciiReader::COLUMNS::press][0];
   double temp = mydata[AsciiReader::COLUMNS::temp][0];
   double ye = mydata[AsciiReader::COLUMNS::ye][0];
-  for (int i=1 ; i < npoints; ++i){
-    if (mydata[AsciiReader::COLUMNS::temp][i]-temp > 1.e-5){
+  for (int i = 1; i < npoints; ++i) {
+    if (mydata[AsciiReader::COLUMNS::temp][i] - temp > 1.e-5) {
       n_wrong += 1;
     }
-    if (mydata[AsciiReader::COLUMNS::ye][i]-ye > 1.e-5){
+    if (mydata[AsciiReader::COLUMNS::ye][i] - ye > 1.e-5) {
       n_wrong += 1;
     }
-    if (mydata[AsciiReader::COLUMNS::rho][i]*mydata[AsciiReader::COLUMNS::eps][i]-press > 1.e-5){
+    if (mydata[AsciiReader::COLUMNS::rho][i] * mydata[AsciiReader::COLUMNS::eps][i] -
+            press >
+        1.e-5) {
       n_wrong += 1;
     }
     temp = mydata[AsciiReader::COLUMNS::temp][i];

@@ -38,7 +38,7 @@ TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt);
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 inline void DumpCurrentState(StateDescriptor *pkg) { DumpToTxt("metric-last.dat", pkg); }
 TaskStatus DivideVols(StateDescriptor *pkg);
-template<typename T>
+template <typename T>
 TaskStatus InterpMetricToGrid(T *rc);
 } // namespace MonopoleGR
 

@@ -15,22 +15,18 @@
 // the public, perform publicly and display publicly, and to permit others to do so.
 //========================================================================================
 
-
 #ifndef PROGENITOR_HPP_INCLUDED
 #define PROGENITOR_HPP_INCLUDED
-#include <string>
-#include <vector>
 #include <parthenon/package.hpp>
+#include <string>
 #include <utils/error_checking.hpp>
+#include <vector>
 
 using namespace parthenon::package::prelude;
 
-
 namespace Progenitor {
 
-  std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
-  
+std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
-
-} // namespace progenitor
+} // namespace Progenitor
 #endif
