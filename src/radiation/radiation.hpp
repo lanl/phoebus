@@ -69,7 +69,6 @@ int LeptonSign(const RadiationType s) {
   return (std::abs(static_cast<int>(s)) < 2) * (2 * static_cast<int>(s) - 1);
 }
 
-
 KOKKOS_INLINE_FUNCTION
 Real LogLinearInterp(Real x, int sidx, int k, int j, int i, const ParArrayND<Real> &table,
                      Real lx_min, Real dlx) {
