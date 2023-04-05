@@ -25,6 +25,9 @@ variables = p.density,       &
             c.energy,        &
             pressure,      	 &
             g.c.coord,       &
+            g.f1.coord,       &
+            g.f2.coord,       &
+            g.f3.coord,       &
             g.n.coord,       &
             g.c.detgam,      &
             g.c.bcon,        &
@@ -82,12 +85,15 @@ method = derivative_order_1
 max_level = 3
 
 <eos>
-type = IdealGas
-#type = StellarCollapse
-#filename = ../../Data/sfho.h5
-#use_sp5 = false
+#type = IdealGas
+type = StellarCollapse
+filename = ../../Data/sfho.h5
+use_sp5 = false
+filter_bmod = false
 Gamma = 1.66666666666666666666666667
 Cv = 1.0
+rho_min = 1e-8
+sie_min = 1e-8
 
 <physics>
 hydro = true
@@ -103,7 +109,7 @@ recon = weno5
 c2p_max_iter = 100
 c2p_tol = 1.e-8
 c2p_method = robust
-Ye = true
+Ye = false
 mhd = true
 
 <geometry>
@@ -143,7 +149,7 @@ magnetized = true
 entropy = 4
 
 # For tabulated EoS
-#<units>
-#scale_free = false
-#geom_mass_msun = 2.8
-#fluid_density_g = 1.e11
+<units>
+scale_free = false
+geom_mass_msun = 2.8
+fluid_density_g = 1.e11
