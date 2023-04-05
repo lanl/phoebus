@@ -25,7 +25,8 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/root_find.hpp"
 
-// a namespace?
+namespace Adiabats {
+
 using Microphysics::EOS::EOS;
 
 template <typename EOS>
@@ -129,4 +130,6 @@ inline Real MinEnthalpy(Spiner::DataBox lrho, Spiner::DataBox temp, const Real Y
   }
   return min_enthalpy;
 }
+
+} // namespace Adiabats
 #endif // PHOEBUS_UTILS_ADIABATS_HPP_
