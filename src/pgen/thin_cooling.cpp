@@ -63,7 +63,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const bool do_nu_e = pin->GetBoolean("radiation", "do_nu_electron");
   const bool do_nu_ebar = pin->GetBoolean("radiation", "do_nu_electron_anti");
-  PARTHENON_REQUIRE(do_nu_e != do_nu_ebar, "Thincooling only supports nu_e or nu_e_bar neutrinos, not both.");
+  PARTHENON_REQUIRE(do_nu_e != do_nu_ebar,
+                    "Thincooling only supports nu_e or nu_e_bar neutrinos, not both.");
 
   // set Ye based on radiation type
   const Real Ye0 = (do_nu_e) ? 0.5 : 0.0;
