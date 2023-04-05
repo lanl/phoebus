@@ -153,4 +153,4 @@ entropy = 4
 <units>
 scale_free = false
 geom_mass_msun = 2.8
-fluid_density_g = 1.e11
+fluid_density_cgs = 1.e11
