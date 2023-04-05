@@ -238,7 +238,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   RNGPool rng_pool(seed);
 
-  int nsamps = 180; // for adiabats 
+  int nsamps = 180; // for adiabats
   if (eos_type != "StellarCollapse") {
     nsamps = 1;
   }
@@ -252,7 +252,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
   const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
 
-  // adiabat calculation for table 
+  // adiabat calculation for table
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
   Real h_min_sc;
   if (eos_type == "StellarCollapse") {
