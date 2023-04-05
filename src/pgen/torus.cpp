@@ -238,16 +238,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   RNGPool rng_pool(seed);
 
-  // Long term it might be nice to just compute adiabats for IdealGas too,
-  // once it is exposed in singularity-eos, to unify code
-  int nsamps = 180; // TODO move this?
+  int nsamps = 180; // for adiabats 
   if (eos_type != "StellarCollapse") {
     nsamps = 1;
   }
   Spiner::DataBox rho_h(nsamps);
   Spiner::DataBox temp_h(nsamps);
 
-  // TODO: transition this to a package.
   const Real rho_min = pmb->packages.Get("eos")->Param<Real>("rho_min");
   const Real rho_max = pmb->packages.Get("eos")->Param<Real>("rho_max");
   const Real lrho_min = std::log10(rho_min);
@@ -255,10 +252,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
   const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
 
-  /**
-   * TODO(BLB): Once adiabat infrastructure can reproduce ideal torus 
-   * with given kappa, this hacky if(StellarCollapse) business can be cleaned
-   **/ 
+  // adiabat calculation for table 
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
   Real h_min_sc;
   if (eos_type == "StellarCollapse") {
@@ -640,6 +634,7 @@ void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1
     u_out = kappa * std::pow(rho_out, gam) / (gam - 1.) / rho_rmax;
     rho_out /= rho_rmax;
   } else { // StellarCollapse
+    const Real epsilon = std::numeric_limits<Real>::epsilon();
     const int N = rho.size() - 1;
     const Real rho_min = std::pow(10.0, rho(0));
     const Real rho_max = std::pow(10.0, rho(N));
@@ -648,7 +643,7 @@ void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1
     root_find::RootFind rf;
     const Real guess_h = 0.5 * (rho_max - rho_min);
 
-    rho_out = rf.regula_falsi(res_h, rho_min, rho_max, 1e-8 * guess_h, guess_h);
+    rho_out = rf.regula_falsi(res_h, rho_min, rho_max, epsilon * guess_h, guess_h);
     Real T = temp.interpToReal(std::log10(rho_out));
 
     Real lambda[2];

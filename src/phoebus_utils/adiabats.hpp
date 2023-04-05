@@ -34,7 +34,7 @@ inline void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
                          Real &lrho_min_new, Real &lrho_max_new) {
 
   // adjust bounds slightly to avoid edges
-  const Real ADJUST = 0.01; //0.01
+  const Real ADJUST = 0.01; // 0.01
   root_find::RootFind root_find;
   root_find::RootFindStatus status;
   Real lambda[2];
