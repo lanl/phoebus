@@ -147,15 +147,15 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
         // paranoid. Need to make sure we don't need miss any cells in
         // the 1d grid.
         // No correctness issue from making this too big,
-	int i1dleft = std::max(0,radius1d.index(r - dr) - 1);
-        int i1dright = std::min(radius1d.index(r + dr) + 1, npoints-1);
+        int i1dleft = std::max(0, radius1d.index(r - dr) - 1);
+        int i1dright = std::min(radius1d.index(r + dr) + 1, npoints - 1);
 
         // Loop through the 1d grid, and do the thing
         // TODO(JMM): Thanks I hate it.
         Real dr1d = radius1d.dx();
         for (int i1d = i1dleft; i1d <= i1dright; ++i1d) {
           Real r1d = radius1d.x(i1d);
-	  //printf("%d %d %d %d %d %.14e %.14e %.14e %.14e\n",b,k,j,i,i1d,r1d,dr1d,r,dr);
+          // printf("%d %d %d %d %d %.14e %.14e %.14e %.14e\n",b,k,j,i,i1d,r1d,dr1d,r,dr);
           Real weight = GetVolIntersectHelper(r1d, dr1d, r, dr) * dv;
           // Yucky atomics
           Kokkos::atomic_add(&vols(i1d), weight);

@@ -444,8 +444,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         flux_div /*| geom_src*/, fluid::CopyFluxDivergence<MeshData<Real>>, mdudt.get());
 #endif
 
-    auto add_rhs = tl.AddTask(flux_div, SumData<std::vector<std::string>, MeshData<Real>>, src_names,
-                              mdudt.get(), mgsrc.get(), mdudt.get());
+    auto add_rhs = tl.AddTask(flux_div, SumData<std::vector<std::string>, MeshData<Real>>,
+                              src_names, mdudt.get(), mgsrc.get(), mdudt.get());
 
     auto avg_data = tl.AddTask(flux_div, AverageIndependentData<MeshData<Real>>,
                                mc0.get(), mbase.get(), beta);
@@ -660,7 +660,6 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   parthenon::Packages_t packages;
 
-
   packages.Add(phoebus::Initialize(pin.get()));
   packages.Add(Microphysics::EOS::Initialize(pin.get()));
   packages.Add(Microphysics::Opacity::Initialize(pin.get()));
@@ -671,12 +670,12 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
   packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
   packages.Add(Progenitor::Initialize(pin.get()));
-  
+
   // TODO(JMM): I need to do this before problem generators get
   // called. For now I'm hacking this in here. But in the long term,
   // it may require a shift in how parthenon does things.
   auto tov_pkg = packages.Get("tov");
-  auto progenitor_pkg=packages.Get("progenitor");
+  auto progenitor_pkg = packages.Get("progenitor");
   auto monopole_pkg = packages.Get("monopole_gr");
   auto eos_pkg = packages.Get("eos");
   const auto enable_tov = tov_pkg->Param<bool>("enabled");

@@ -112,6 +112,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
 
+  if (method == "cooling_function") {
+    const bool do_liebendorfer =
+        pin->GetOrAddBoolean("radiation", "do_liebendorfer", false);
+    const bool do_lightbulb = pin->GetOrAddBoolean("radiation", "do_lightbulb", false);
+    const Real lum = pin->GetOrAddReal("radiation", "lum", 4.0e52);
+    params.Add("radiation", "do_liebendorfer");
+    params.Add("radiation", "do_lightbulb");
+    params.Add("radiation", "lum");
+  }
+
   if (method == "mocmc") {
     std::string swarm_name = "mocmc";
     Metadata swarm_metadata({Metadata::Provides});
