@@ -94,6 +94,7 @@ Gamma = 1.66666666666666666666666667
 Cv = 1.0
 rho_min = 1e-8
 sie_min = 1e-8
+nsamps_adiabat = 180
 
 <physics>
 hydro = true

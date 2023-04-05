@@ -177,8 +177,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int nsub = pin->GetOrAddInteger("torus", "nsub", 1);
   const Real Ye = pin->GetOrAddReal("torus", "Ye", 0.5);
   Real S = pin->GetOrAddReal("torus", "entropy", 4.0);
-  Real lambda[2];
-  lambda[0] = Ye;
+  const int nsamps = pin->GetOrAddReal("eos", "nsamps_adiabat", 1);
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
@@ -238,10 +237,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   RNGPool rng_pool(seed);
 
-  int nsamps = 180; // for adiabats
-  if (eos_type != "StellarCollapse") {
-    nsamps = 1;
-  }
   Spiner::DataBox rho_h(nsamps);
   Spiner::DataBox temp_h(nsamps);
 
