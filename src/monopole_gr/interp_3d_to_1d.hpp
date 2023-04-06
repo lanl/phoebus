@@ -147,8 +147,8 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
         // paranoid. Need to make sure we don't need miss any cells in
         // the 1d grid.
         // No correctness issue from making this too big,
-        int i1dleft = radius1d.index(r - dr) - 1;
-        int i1dright = radius1d.index(r + dr) + 1;
+        int i1dleft = std::max(0, radius1d.index(r - dr) - 1);
+        int i1dright = std::min(radius1d.index(r + dr) + 1, npoints - 1);
 
         // Loop through the 1d grid, and do the thing
         // TODO(JMM): Thanks I hate it.
