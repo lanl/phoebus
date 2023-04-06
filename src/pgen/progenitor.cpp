@@ -20,7 +20,6 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
-#include "phoebus_utils/ascii_reader.hpp"
 #include "progenitor/progenitordata.hpp"
 
 // Homologously collapsing star.
