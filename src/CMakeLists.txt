@@ -108,6 +108,7 @@ add_executable(phoebus
   phoebus_package.cpp
   phoebus_package.hpp
 
+  phoebus_utils/adiabats.hpp
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
