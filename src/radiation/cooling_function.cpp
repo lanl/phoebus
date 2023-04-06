@@ -178,7 +178,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
           }
           Kokkos::atomic_add(&(v(Gye, k, j, i)), Jye);
         });
-  }
+	}
 
   for (int sidx = 0; sidx < 3; sidx++) {
     // Apply cooling for each neutrino species separately

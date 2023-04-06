@@ -117,9 +117,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         pin->GetOrAddBoolean("radiation", "do_liebendorfer", false);
     const bool do_lightbulb = pin->GetOrAddBoolean("radiation", "do_lightbulb", false);
     const Real lum = pin->GetOrAddReal("radiation", "lum", 4.0e52);
-    params.Add("radiation", "do_liebendorfer");
-    params.Add("radiation", "do_lightbulb");
-    params.Add("radiation", "lum");
+    params.Add("do_liebendorfer", do_liebendorfer);
+    params.Add("do_lightbulb", do_lightbulb);
+    params.Add("lum", lum);
   }
 
   if (method == "mocmc") {
