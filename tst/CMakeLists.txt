@@ -42,6 +42,10 @@ catch_discover_tests(phoebus_unit_tests
 catch_discover_tests(phoebus_unit_tests 
   TEST_SPEC "[reader_utils]" TEST_PREFIX "reader:")
 
+if(PHOEBUS_ENABLE_DOWNLOADS)
+  catch_discover_tests(phoebus_unit_tests 
+    TEST_SPEC "[compute_adiabats]" TEST_PREFIX "adiabats:")
+endif()
 
 # Currently integration and regression tests 
 # are not integrated into the cmake build system 

@@ -110,6 +110,7 @@ add_executable(phoebus
   phoebus_package.cpp
   phoebus_package.hpp
 
+  phoebus_utils/adiabats.hpp
   phoebus_utils/ascii_reader.cpp
   phoebus_utils/ascii_reader.hpp
   phoebus_utils/cell_locations.hpp
