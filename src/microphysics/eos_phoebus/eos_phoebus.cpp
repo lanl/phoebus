@@ -71,6 +71,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string eos_type = pin->GetString(block_name, std::string("type"));
   params.Add("type", eos_type);
   bool needs_ye = false;
+  bool provides_entropy = false;
   if (eos_type.compare(IdealGas::EosType()) == 0) {
     const Real gm1 = pin->GetReal(block_name, "Gamma") - 1.0;
     const Real Cv = pin->GetReal(block_name, "Cv");
@@ -104,6 +105,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     const bool use_sp5 = pin->GetOrAddBoolean(block_name, "use_sp5", true);
     const bool filter_bmod = pin->GetOrAddBoolean(block_name, "filter_bmod", true);
     const bool use_ye = pin->GetOrAddBoolean("fluid", "Ye", false);
+    provides_entropy = true;
     PARTHENON_REQUIRE_THROWS(use_ye,
                              "\"StellarCollapse\" EOS requires that Ye be enabled!");
     needs_ye = use_ye;
@@ -152,6 +154,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   params.Add("needs_ye", needs_ye);
+  params.Add("provides_entropy", provides_entropy);
 
   params.Add("sie_min", sie_min);
   params.Add("sie_max", sie_max);

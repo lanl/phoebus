@@ -47,6 +47,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 # TODO(JMM): Pgen?
 include(CTest)
 option(PHOEBUS_ENABLE_UNIT_TESTS "Enable unit tests" OFF)
+option(PHOEBUS_ENABLE_DOWNLOADS "Enable table download" OFF)
 option(PHOEBUS_ENABLE_INTEGRATION_TESTS "Enable integration tests" OFF)
 option(PHOEBUS_ENABLE_REGRESSION_TESTS "Enable regression tests" OFF)
 option(PHOEBUS_ENABLE_CUDA "Enable cuda for riot and all dependencies" OFF)

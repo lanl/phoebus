@@ -100,7 +100,6 @@ add_executable(phoebus
   pgen/sedov.cpp
   pgen/torus.cpp
   pgen/tov.cpp
- 
 
   phoebus_boundaries/phoebus_boundaries.hpp
   phoebus_boundaries/phoebus_boundaries.cpp
@@ -110,8 +109,7 @@ add_executable(phoebus
   phoebus_package.cpp
   phoebus_package.hpp
 
-  phoebus_utils/ascii_reader.cpp
-  phoebus_utils/ascii_reader.hpp
+  phoebus_utils/adiabats.hpp
   phoebus_utils/cell_locations.hpp
   phoebus_utils/unit_conversions.cpp
   phoebus_utils/unit_conversions.hpp
@@ -124,6 +122,8 @@ add_executable(phoebus
   phoebus_utils/root_find.hpp
   phoebus_utils/variables.hpp
 
+  progenitor/ascii_reader.cpp
+  progenitor/ascii_reader.hpp
   progenitor/progenitordata.hpp
   progenitor/progenitordata.cpp
   

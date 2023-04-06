@@ -35,11 +35,16 @@ UnitConversions::UnitConversions(ParameterInput *pin) {
     int geom_mass_g_exists = pin->DoesParameterExist("units", "geom_mass_g");
     int geom_mass_msun_exists = pin->DoesParameterExist("units", "geom_mass_msun");
     int geom_length_cm_exists = pin->DoesParameterExist("units", "geom_length_cm");
+    int fluid_density_cgs_exists = pin->DoesParameterExist("units", "fluid_density_cgs");
+    int fluid_mass_g_exists = pin->DoesParameterExist("units", "fluid_mass_g");
 
     PARTHENON_REQUIRE(
         geom_mass_g_exists + geom_mass_msun_exists + geom_length_cm_exists == 1,
         "Must provide exactly one of geom_mass_g, geom_mass_msun, "
         "geom_length_cm!");
+
+    PARTHENON_REQUIRE(fluid_mass_g_exists + fluid_density_cgs_exists == 1,
+                      "Cannot provide both fluid_mass_g and fluid_density_cgs");
 
     if (geom_mass_g_exists) {
       Real geom_mass_ = pin->GetReal("units", "geom_mass_g");
@@ -55,7 +60,13 @@ UnitConversions::UnitConversions(ParameterInput *pin) {
       length_ = pin->GetReal("units", "geom_length_cm");
     }
 
-    mass_ = pin->GetReal("units", "fluid_mass_g");
+    if (fluid_mass_g_exists) {
+      mass_ = pin->GetReal("units", "fluid_mass_g");
+    }
+
+    if (fluid_density_cgs_exists) {
+      mass_ = length_ * length_ * length_ * pin->GetReal("units", "fluid_density_cgs");
+    }
   }
 
   time_ = length_ / pc.c;
