@@ -1,0 +1,6 @@
+# r mass_density temp Ye specific_internal_energy velocity pressure adm_density adm_momentum S_adm Srr_adm
+0.0 1.e14 1.e9 0.5 1.e7 0.0 1.e24 0 0 0 0 
+1.0 2.e14 1.e9 0.5 2.e7 0.0 4.e24 0 0 0 0 
+2.0 4.e14 1.e9 0.5 4.e7 0.0 16.e24 0 0 0 0 
+3.0 8.e14 1.e9 0.5 8.e7 0.0 64.e24 0 0 0 0 
+4.0 16.e14 1.e9 0.5 16.e7 0.0 256.e24 0 0 0 0 

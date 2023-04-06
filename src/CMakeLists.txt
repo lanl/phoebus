@@ -86,6 +86,7 @@ add_executable(phoebus
   pgen/check_cached_geom.cpp
   pgen/friedmann.cpp
   pgen/homogeneous_sphere.cpp
+  pgen/progenitor.cpp
   pgen/kh.cpp
   pgen/leptoneq.cpp
   pgen/linear_modes.cpp
@@ -121,6 +122,11 @@ add_executable(phoebus
   phoebus_utils/root_find.hpp
   phoebus_utils/variables.hpp
 
+  progenitor/ascii_reader.cpp
+  progenitor/ascii_reader.hpp
+  progenitor/progenitordata.hpp
+  progenitor/progenitordata.cpp
+  
   radiation/radiation.hpp
   radiation/radiation.cpp
   radiation/cooling_function.cpp

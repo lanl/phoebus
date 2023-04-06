@@ -44,4 +44,6 @@ target_include_directories(monopole_gr_unit_tests PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   )
 
+target_compile_definitions(monopole_gr_unit_tests PRIVATE PHOEBUS_IN_UNIT_TESTS)
+
 target_sources(phoebus_unit_tests PRIVATE $<TARGET_OBJECTS:monopole_gr_unit_tests>)

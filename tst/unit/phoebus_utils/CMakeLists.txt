@@ -36,9 +36,11 @@ endif()
 
 add_library(phoebus_utils_unit_tests OBJECT
   test_relativity_utils.cpp
+  test_reader.cpp
   test_adiabats.cpp
 
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/geometry.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/progenitor/ascii_reader.cpp
 )
 
 target_link_libraries(phoebus_utils_unit_tests
