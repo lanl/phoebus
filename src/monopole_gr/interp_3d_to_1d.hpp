@@ -155,7 +155,6 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
         Real dr1d = radius1d.dx();
         for (int i1d = i1dleft; i1d <= i1dright; ++i1d) {
           Real r1d = radius1d.x(i1d);
-          // printf("%d %d %d %d %d %.14e %.14e %.14e %.14e\n",b,k,j,i,i1d,r1d,dr1d,r,dr);
           Real weight = GetVolIntersectHelper(r1d, dr1d, r, dr) * dv;
           // Yucky atomics
           Kokkos::atomic_add(&vols(i1d), weight);

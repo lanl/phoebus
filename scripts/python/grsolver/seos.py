@@ -13,10 +13,7 @@ def FindTemperature(rho,p,lmbda,tmin,tmax,eos):
         def f(x):
             return eos.PressureFromDensityTemperature(rho,x,lmbda)-p
         sol=bisect(f,tmin,tmax)
-        #T=sol.x[0]
         T=sol
-        #print('T=',T, 'rho=',rho,'p=',p)
-
         return T
 
 def CalculateInternalEnergy(rho,ye,p,tmin,tmax,filename):

@@ -9,6 +9,7 @@ from sys import exit
 import math
 from astropy.io import ascii
 from astropy.table import Table
+from astropy import constants as const
 import scipy
 from scipy.interpolate import interp1d
 from scipy.integrate import odeint
@@ -16,31 +17,33 @@ from scipy.integrate import solve_ivp
 from scipy import optimize
 from numpy import diff
 from seos import CalculateInternalEnergy
+from argparse import ArgumentParser
 
-
-G=6.68e-8
-c=2.989e10
+G=const.G.cgs.value
+c=const.c.cgs.value
 
 class GR_Solver:
-        def __init__(self,prob,R,Ni):
+        def __init__(self,prob,R,Ni,loc,filename,eosfilename):
                 self.problem=prob
                 self.R=R
                 self.Ni=Ni
+                self.loc=loc
+                self.filename=filename
+                self.eosfilename=eosfilename
                 return
 
         # IMPORT DATA
         def Data(self):
                 if (self.problem=='homologouscollapse'):
-                        loc='/home/mari/Work/Phoebus/phoebus/Tests/HomologousCollapse/'
-                        r_data=np.load(loc+'r.npy')
-                        v=np.load(loc+'v.npy')
-                        v_ang=np.load(loc+'v_ang.npy')
-                        rho_m=np.load(loc+'rho_m.npy')
-                        rho=np.load(loc+'rho.npy')
-                        p=np.load(loc+'p.npy')
-                        eps=np.load(loc+'eps.npy')
-                        temp=np.load(loc+'temp.npy')
-                        ye=np.load(loc+'ye.npy')
+                        r_data=np.load(self.loc+'/r.npy')
+                        v=np.load(self.loc+'/v.npy')
+                        v_ang=np.load(self.loc+'/v_ang.npy')
+                        rho_m=np.load(self.loc+'/rho_m.npy')
+                        rho=np.load(self.loc+'/rho.npy')
+                        p=np.load(self.loc+'/p.npy')
+                        eps=np.load(self.loc+'/eps.npy')
+                        temp=np.load(self.loc+'/temp.npy')
+                        ye=np.load(self.loc+'/ye.npy')
                         
                 if (self.problem=='tov'):
                         r_data=np.load('TOV_DATA/tov_r.npy')*1.e2
@@ -64,10 +67,7 @@ class GR_Solver:
                         ye=[]
                         temp=[]
                         sie=[]
-                        #name='s'+m+'_presn'
-                        name='s12.0_presn'
-                        loc='/home/mari/Work/Phoebus/phoebus/Tests/GRsolver/'+name
-                        data0 =ascii.read(loc,header_start=1,data_start=2,delimiter="\t",guess=False)
+                        data0 =ascii.read(self.loc+self.filename,header_start=1,data_start=2,delimiter="\t",guess=False)
                         for line in data0:
                                 spl=line[0].split()
                                 r_data.append(spl[2])
@@ -88,13 +88,9 @@ class GR_Solver:
                 sie=np.array(sie[0:ind],dtype=float)
                 ye=np.array(ye[0:ind],dtype=float)
                 if (self.problem=='stellartable'):
-                        eosfilename='SFHo.h5'
-                        eps,u,temp1=CalculateInternalEnergy(rho_m,ye,p,1e8,1e12,eosfilename)
+                        eps,u,temp1=CalculateInternalEnergy(rho_m,ye,p,1e8,1e12,self.eosfilename)
                         rho=rho_m+u/c**2.   ### energy density
-                        #eps=u/rho_m    ### specific internal energy
-                        print('temp_ratio=',temp1/temp)
-                        print('eps_ratio=',eps/sie)
-
+                        
         # RETURN ORIGINAL DATA FOR GRID FROM DATA
                 self.r0=r_data
                 self.rho=rho
@@ -255,7 +251,7 @@ class GR_Solver:
                 return rho_adm,P_adm,S_adm,Srr_adm, a, K, alpha
 
 ##### EXTRAPOLATE DATA TO INCLUDE r=0 
-        def ExtrapolateData(self):
+        def ExtrapolateData(self,savemetric=False):
                 r=np.linspace(0,max(self.R),10000)
                 rho_adm0,P_adm0,S_adm0,Srr_adm0,a0,K0,alpha0=self.Iterate(doplot=False)
                 rho_adm=interp1d(self.R,rho_adm0,fill_value='extrapolate')(r)
@@ -265,9 +261,10 @@ class GR_Solver:
                 a=interp1d(self.R,a0,fill_value='extrapolate')(r)
                 K=interp1d(self.R,K0,fill_value='extrapolate')(r)
                 alpha=interp1d(self.R,alpha0,fill_value='extrapolate')(r)
-                #np.save('a',a)
-                #np.save('K',K)
-                #np.save('alpha',alpha)
+                if(savemetric==True):
+                        np.save('a',a)
+                        np.save('K',K)
+                        np.save('alpha',alpha)
 
                 return r, rho_adm, P_adm, S_adm, Srr_adm
 
@@ -296,21 +293,25 @@ class GR_Solver:
 
 def main():
         # INITIALIZE PROBLEM
-        #problem='homologouscollapse'
-        problem='stellartable'
-        if (problem=='tov'):
+        parser = ArgumentParser(prog="grsolver", description="generates initial input for Phoebus in CGS units")
+        parser.add_argument("problem", type=str)
+        parser.add_argument("loc", type=str, help="File location")
+        parser.add_argument("filename", type=str, help="File to read (progenitor)")
+        parser.add_argument("eosfilename", type=str, help="tabulated equation of state, default is SFHo.h5")
+        args = parser.parse_args()
+        if (args.problem=='tov'):
                 r=np.linspace(0.00001,2500,1000)*1.e2
-        if(problem=='stellartable'):
+        if(args.problem=='stellartable'):
                 r=np.linspace(45,10000,1000)*1.e5
-        if (problem == 'homologouscollapse'):
-                r=np.load("/home/mari/Work/Phoebus/phoebus/Tests/HomologousCollapse/r.npy")
+        if (args.problem == 'homologouscollapse'):
+                r=np.load(args.loc+"/r.npy")
 
         Ni=100
         # INITIALIZE CLASS 
-        GRsolver=GR_Solver(problem,r,Ni)
+        GRsolver=GR_Solver(args.problem,r,Ni,args.loc,args.filename,args.eosfilename)
         GRsolver.Data()
-        filename='ADM_'+problem+'.dat'
-        GRsolver.SaveFinalData(filename)
+        filename='ADM_'+args.problem+'.dat'
+        GRsolver.SaveFinalData(args.filename)
         return
         
         

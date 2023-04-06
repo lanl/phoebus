@@ -7,11 +7,12 @@ import matplotlib.pyplot as pl
 import sys
 import glob
 from scipy.integrate import odeint
+from astropy import constants as const
 
+G=const.G.cgs.value
+c=const.c.cgs.value
+msun=const.M_sun.cgs.value
 
-G=6.69e-8
-c=3.e10
-msun=2.e33
 def solvef(rs,lmbda,doplot=False):    #Solves the second order equation for density normalization function f (eq. 16)
     def func(u,x):
         return (u[1],-2./x*u[1]-u[0]**3.+lmbda)
