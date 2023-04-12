@@ -17,7 +17,6 @@
 
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
-#include <singularity-eos/eos/eos.hpp>
 
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/prim2con.hpp"
@@ -32,13 +31,13 @@
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/radiation.hpp"
 
+using Microphysics::RadiationType;
 using radiation::ClosureEquation;
 using radiation::ClosureSettings;
 using radiation::ClosureVerbosity;
 using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
-using singularity::RadiationType;
 
 namespace fixup {
 
@@ -127,8 +126,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         Real xi_max;
         Real garbage;
-        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max, garbage);
+        bounds.GetRadiationCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                                    coords.Xc<3>(k, j, i), xi_max, garbage);
 
         // It is assumed that the fluid is already fixed up
         auto fail = [&](const int k, const int j, const int i) {

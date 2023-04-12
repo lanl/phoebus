@@ -112,6 +112,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
 
+  if (method == "cooling_function") {
+    const bool do_liebendorfer =
+        pin->GetOrAddBoolean("radiation", "do_liebendorfer", false);
+    const bool do_lightbulb = pin->GetOrAddBoolean("radiation", "do_lightbulb", false);
+    const Real lum = pin->GetOrAddReal("radiation", "lum", 4.0e52);
+    params.Add("do_liebendorfer", do_liebendorfer);
+    params.Add("do_lightbulb", do_lightbulb);
+    params.Add("lum", lum);
+  }
+
   if (method == "mocmc") {
     std::string swarm_name = "mocmc";
     Metadata swarm_metadata({Metadata::Provides});
@@ -581,11 +591,13 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
             const Real rad_speed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
             const Real asym_speed = std::fabs(asym_sigl);
 
-            const Real dx = coords.Dx(X1DIR + d, k, j, i) * sqrt(cov_gamma(d, d));
+            const Real dx =
+                coords.CellWidthFA(X1DIR + d, k, j, i) * sqrt(cov_gamma(d, d));
             const Real a = tanh(ratio(1.0, std::pow(std::abs(kappaH * dx), 1)));
             const Real csig = a * rad_speed + (1. - a) * asym_speed;
 
-            lmin_dt = std::min(lmin_dt, 1.0 / (csig / coords.Dx(X1DIR + d, k, j, i)));
+            lmin_dt =
+                std::min(lmin_dt, 1.0 / (csig / coords.CellWidthFA(X1DIR + d, k, j, i)));
           }
         }
       },

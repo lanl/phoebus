@@ -40,6 +40,7 @@ namespace History {
 Real ReduceMassAccretionRate(MeshData<Real> *md);
 Real ReduceJetEnergyFlux(MeshData<Real> *md);
 Real ReduceJetMomentumFlux(MeshData<Real> *md);
+Real ReduceMagneticFluxPhi(MeshData<Real> *md);
 
 template <typename Reducer_t>
 Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
@@ -70,7 +71,7 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
         // that automatically does the
         // reduction operation locally
         const auto &coords = pack.GetCoords(b);
-        const Real vol = volume_weighting ? coords.Volume(k, j, i) : 1.0;
+        const Real vol = volume_weighting ? coords.CellVolume(k, j, i) : 1.0;
         reducer.join(lresult, pack(b, ivar.first + idx, k, j, i) * vol);
       },
       reducer);

@@ -17,12 +17,12 @@
 #include <vector>
 
 // TODO(JCD): this should be exported by parthenon
+#include <amr_criteria/refinement_package.hpp>
 #include <bvals/cc/bvals_cc_in_one.hpp>
 #include <globals.hpp>
-#include <mesh/refinement_cc_in_one.hpp>
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
-#include <refinement/refinement.hpp>
+#include <prolong_restrict/prolong_restrict.hpp>
 #include <utils/error_checking.hpp>
 
 // Local Includes
@@ -37,6 +37,7 @@
 #include "phoebus_driver.hpp"
 #include "phoebus_package.hpp"
 #include "phoebus_utils/robust.hpp"
+#include "progenitor/progenitordata.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
 
@@ -147,8 +148,8 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto set = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBounds<nonlocal>, md);
 
     if (pmesh->multilevel) {
-      tl.AddTask(set | set_local,
-                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, md.get());
+      tl.AddTask(set | set_local, parthenon::cell_centered_bvars::RestrictGhostHalos, md,
+                 false);
     }
   }
 
@@ -443,8 +444,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         flux_div /*| geom_src*/, fluid::CopyFluxDivergence<MeshData<Real>>, mdudt.get());
 #endif
 
-    auto add_rhs = tl.AddTask(flux_div, SumData<std::string, MeshData<Real>>, src_names,
-                              mdudt.get(), mgsrc.get(), mdudt.get());
+    auto add_rhs = tl.AddTask(flux_div, SumData<std::vector<std::string>, MeshData<Real>>,
+                              src_names, mdudt.get(), mgsrc.get(), mdudt.get());
 
     auto avg_data = tl.AddTask(flux_div, AverageIndependentData<MeshData<Real>>,
                                mc0.get(), mbase.get(), beta);
@@ -525,7 +526,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (pmesh->multilevel) {
       tl.AddTask(set_nonlocal | set_local,
-                 parthenon::cell_centered_refinement::RestrictPhysicalBounds, mc1.get());
+                 parthenon::cell_centered_bvars::RestrictGhostHalos, mc1, false);
     }
   }
   // TODO(BRR) loop this in thoughtfully!
@@ -668,11 +669,13 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(fixup::Initialize(pin.get()));
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
   packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
+  packages.Add(Progenitor::Initialize(pin.get()));
 
   // TODO(JMM): I need to do this before problem generators get
   // called. For now I'm hacking this in here. But in the long term,
   // it may require a shift in how parthenon does things.
   auto tov_pkg = packages.Get("tov");
+  auto progenitor_pkg = packages.Get("progenitor");
   auto monopole_pkg = packages.Get("monopole_gr");
   auto eos_pkg = packages.Get("eos");
   const auto enable_tov = tov_pkg->Param<bool>("enabled");
@@ -684,8 +687,9 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   if (enable_tov && !enable_monopole) {
     PARTHENON_THROW("MonopoleGR required for TOV initialization");
   }
-  if (enable_monopole && !enable_tov) {
-    PARTHENON_THROW("Currently monopole GR only enabled with TOV");
+  const auto enable_progenitor = progenitor_pkg->Param<bool>("enabled");
+  if (enable_monopole && !(enable_tov || enable_progenitor)) {
+    PARTHENON_THROW("Currently monopole GR only enabled with TOV or Progenitor packages");
   }
   if ((enable_monopole && !(is_monopole_cart || is_monopole_sph)) ||
       (is_monopole_cart || is_monopole_sph) && !enable_monopole) {
