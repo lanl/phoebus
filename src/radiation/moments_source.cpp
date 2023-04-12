@@ -15,8 +15,6 @@
 #include <kokkos_abstraction.hpp>
 #include <utils/error_checking.hpp>
 
-#include <singularity-eos/eos/eos.hpp>
-
 #include "phoebus_utils/linear_algebra.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -35,7 +33,7 @@ namespace radiation {
 
 using fixup::Bounds;
 using Microphysics::Opacities;
-using singularity::EOS;
+using Microphysics::EOS::EOS;
 
 template <typename CLOSURE>
 class SourceResidual4 {
@@ -212,7 +210,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   StateDescriptor *opac = pmb->packages.Get("opacity").get();
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  auto eos = eos_pkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eos_pkg->Param<EOS>("d.EOS");
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
@@ -270,7 +268,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
 
-  auto coords = pmb->coords;
+  const parthenon::Coordinates_t &coords = pmb->coords;
 
   const auto &opacities = opac->Param<Opacities>("opacities");
 
@@ -314,8 +312,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         // Bounds
         Real xi_max;
         Real tau_max;
-        bounds.GetRadiationCeilings(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                    coords.x3v(k, j, i), xi_max, tau_max);
+        bounds.GetRadiationCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                                    coords.Xc<3>(k, j, i), xi_max, tau_max);
         const Real alpha_max = tau_max / (alpha * dt);
 
         Real rho = v(iblock, prho, k, j, i);

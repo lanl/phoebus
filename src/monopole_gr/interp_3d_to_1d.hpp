@@ -147,8 +147,8 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
         // paranoid. Need to make sure we don't need miss any cells in
         // the 1d grid.
         // No correctness issue from making this too big,
-        int i1dleft = radius1d.index(r - dr) - 1;
-        int i1dright = radius1d.index(r + dr) + 1;
+        int i1dleft = std::max(0, radius1d.index(r - dr) - 1);
+        int i1dright = std::min(radius1d.index(r + dr) + 1, npoints - 1);
 
         // Loop through the 1d grid, and do the thing
         // TODO(JMM): Thanks I hate it.
@@ -221,9 +221,9 @@ GetMonopoleVarsHelper(const EnergyMomentum &tmunu, const Geometry_t &geom,
     Real s2c[NS][NS], c2s[NS][NS];
 
     parthenon::Coordinates_t coords = p.GetCoords(b);
-    const Real X1 = coords.x1v(i);
-    const Real X2 = coords.x2v(j);
-    const Real X3 = coords.x3v(k);
+    const Real X1 = coords.Xc<1>(i);
+    const Real X2 = coords.Xc<2>(j);
+    const Real X3 = coords.Xc<3>(k);
     transform(X1, X2, X3, C, c2s, s2c);
     // const Real r = C[0];
     // const Real th = C[1];
@@ -256,11 +256,11 @@ GetCoordsAndCellWidthsHelper(const Transform &transform, const Pack &p, const in
                              Real &ph, Real &dr, Real &dth, Real &dph, Real &dv) {
   const parthenon::Coordinates_t &coords = p.GetCoords(b);
   if (IS_CART) {
-    transform.GetCoordsAndDerivatives(coords.x1v(k, j, i), coords.x2v(k, j, i),
-                                      coords.x3v(k, j, i), coords.Dx(1, k, j, i),
-                                      coords.Dx(2, k, j, i), coords.Dx(3, k, j, i), r, th,
-                                      ph, dr, dth, dph);
-    dv = coords.Volume(k, j, i);
+    transform.GetCoordsAndDerivatives(
+        coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i), coords.Xc<3>(k, j, i),
+        coords.CellWidthFA(1, k, j, i), coords.CellWidthFA(2, k, j, i),
+        coords.CellWidthFA(3, k, j, i), r, th, ph, dr, dth, dph);
+    dv = coords.CellVolume(k, j, i);
   } else {
     Interp3DTo1D::GetCoordsAndDerivsSph(k, j, i, coords, r, th, ph, dr, dth, dph, dv);
   }

@@ -68,24 +68,24 @@ class IndexerMeshBlock {
   KOKKOS_INLINE_FUNCTION
   void GetX(CellLocation loc, int k, int j, int i, Real &X1, Real &X2, Real &X3) const {
     // defaults
-    X1 = coordinates_.x1v(i);
-    X2 = coordinates_.x2v(j);
-    X3 = coordinates_.x3v(k);
+    X1 = coordinates_.Xc<1>(i);
+    X2 = coordinates_.Xc<2>(j);
+    X3 = coordinates_.Xc<3>(k);
     // overwrite
     switch (loc) {
     case CellLocation::Face1:
-      X1 = coordinates_.x1f(i);
+      X1 = coordinates_.Xf<1>(i);
       break;
     case CellLocation::Face2:
-      X2 = coordinates_.x2f(j);
+      X2 = coordinates_.Xf<2>(j);
       break;
     case CellLocation::Face3:
-      X3 = coordinates_.x3f(k);
+      X3 = coordinates_.Xf<3>(k);
       break;
     case CellLocation::Corn:
-      X1 = coordinates_.x1f(i);
-      X2 = coordinates_.x2f(j);
-      X3 = coordinates_.x3f(k);
+      X1 = coordinates_.Xf<1>(i);
+      X2 = coordinates_.Xf<2>(j);
+      X3 = coordinates_.Xf<3>(k);
       break;
     default: // CellLocation::Cent:
       break;
@@ -114,24 +114,24 @@ class IndexerMesh {
   void GetX(CellLocation loc, int b, int k, int j, int i, Real &X1, Real &X2,
             Real &X3) const {
     // defaults
-    X1 = coordinates_(b).x1v(i);
-    X2 = coordinates_(b).x2v(j);
-    X3 = coordinates_(b).x3v(k);
+    X1 = coordinates_(b).Xc<1>(i);
+    X2 = coordinates_(b).Xc<2>(j);
+    X3 = coordinates_(b).Xc<3>(k);
     // overwrite
     switch (loc) {
     case CellLocation::Face1:
-      X1 = coordinates_(b).x1f(i);
+      X1 = coordinates_(b).Xf<1>(i);
       break;
     case CellLocation::Face2:
-      X2 = coordinates_(b).x2f(j);
+      X2 = coordinates_(b).Xf<2>(j);
       break;
     case CellLocation::Face3:
-      X3 = coordinates_(b).x3f(k);
+      X3 = coordinates_(b).Xf<3>(k);
       break;
     case CellLocation::Corn:
-      X1 = coordinates_(b).x1f(i);
-      X2 = coordinates_(b).x2f(j);
-      X3 = coordinates_(b).x3f(k);
+      X1 = coordinates_(b).Xf<1>(i);
+      X2 = coordinates_(b).Xf<2>(j);
+      X3 = coordinates_(b).Xf<3>(k);
       break;
     default: // CellLocation::Cent:
       break;

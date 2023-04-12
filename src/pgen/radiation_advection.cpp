@@ -45,7 +45,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   Params &phoebus_params = pmb->packages.Get("phoebus")->AllParams();
 
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   const Real MASS = unit_conv.GetMassCGSToCode();
@@ -86,7 +86,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   phoebus_params.Add("radiation_advection/Hz", Hz);
 
   auto rad = pmb->packages.Get("radiation").get();
-  auto species = rad->Param<std::vector<singularity::RadiationType>>("species");
+  auto species = rad->Param<std::vector<Microphysics::RadiationType>>("species");
   auto num_species = rad->Param<int>("num_species");
 
   const Real W = 1 / sqrt(1 - vx * vx);
@@ -96,9 +96,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::radiation_advection", kb.s, kb.e, jb.s, jb.e, ib.s,
       ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        Real x = coords.x1v(i);
-        Real y = (ndim > 1 && shapedim > 1) ? coords.x2v(j) : 0;
-        Real z = (ndim > 2 && shapedim > 2) ? coords.x3v(k) : 0;
+        Real x = coords.Xc<1>(i);
+        Real y = (ndim > 1 && shapedim > 1) ? coords.Xc<2>(j) : 0;
+        Real z = (ndim > 2 && shapedim > 2) ? coords.Xc<3>(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
 
         v(prho, k, j, i) = rho0;

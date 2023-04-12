@@ -50,7 +50,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &coords = pmb->coords;
   auto eospkg = pmb->packages.Get("eos");
-  auto eos = eospkg->Param<singularity::EOS>("d.EOS");
+  auto eos = eospkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
@@ -60,8 +60,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::LeptonEq", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real x = coords.x1v(i);
-        const Real y = coords.x2v(j);
+        const Real x = coords.Xc<1>(i);
+        const Real y = coords.Xc<2>(j);
         v(irho, k, j, i) = rho0;
         v(itmp, k, j, i) = T0;
 

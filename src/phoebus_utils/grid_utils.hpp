@@ -29,15 +29,15 @@ template <int dir>
 KOKKOS_FORCEINLINE_FUNCTION Real GetXv(const int i, const Coordinates_t &coord);
 template <>
 KOKKOS_FORCEINLINE_FUNCTION Real GetXv<X1DIR>(const int i, const Coordinates_t &coord) {
-  return coord.x1v(i);
+  return coord.Xc<1>(i);
 }
 template <>
 KOKKOS_FORCEINLINE_FUNCTION Real GetXv<X2DIR>(const int i, const Coordinates_t &coord) {
-  return coord.x2v(i);
+  return coord.Xc<2>(i);
 }
 template <>
 KOKKOS_FORCEINLINE_FUNCTION Real GetXv<X3DIR>(const int i, const Coordinates_t &coord) {
-  return coord.x3v(i);
+  return coord.Xc<3>(i);
 }
 KOKKOS_FORCEINLINE_FUNCTION Real GetXv(const int i, const int dir,
                                        const Coordinates_t &coord) {
