@@ -66,7 +66,7 @@ constexpr RadiationType species[MaxNumRadiationSpecies] = {
 KOKKOS_FORCEINLINE_FUNCTION
 int LeptonSign(const RadiationType s) {
   /* 0 is abs(s) >= 2, otherwise 2s-1 = -1,1 */
-  return (std::abs(static_cast<int>(s)) < 2) * (2 * static_cast<int>(s) - 1);
+  return (std::abs(static_cast<int>(s)) < 2) * (- 2 * static_cast<int>(s) + 1);
 }
 
 KOKKOS_INLINE_FUNCTION
