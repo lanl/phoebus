@@ -415,9 +415,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
 
-          Real alphanu = 4. * M_PI *
-                         opacities.AbsorptionCoefficient(
-                             v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
+          Real alphanu = opacities.AbsorptionCoefficient(
+              v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units
 
