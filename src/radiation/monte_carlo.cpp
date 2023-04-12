@@ -315,7 +315,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               // detG is in both numerator and denominator
               v(mu, k, j, i) -= 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
             }
-            v(Gye, k, j, i) += LeptonSign(s) / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
+            v(Gye, k, j, i) -= LeptonSign(s) / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
 
           } // for n
           rng_pool.free_state(rng_gen);
