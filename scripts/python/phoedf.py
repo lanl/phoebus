@@ -11,7 +11,10 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
-from parthenon_tools import phdf
+import sys
+sys.path.insert(0, '../../external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/')
+import phdf
+#from parthenon_tools import phdf
 
 from phoebus_constants import *
 from phoebus_eos import *
@@ -72,7 +75,7 @@ class phoedf(phdf.phdf):
     self.gcov = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
     for mu in range(4):
       for nu in range(4):
-        self.gcov[:,mu,nu,:,:,:] = self.flatgcov[:,flatten_indices(mu,nu),:,self.NGhost:-self.NGhost,self.NGhost:-self.NGhost]
+        self.gcov[:,mu,nu,:,:,:] = self.flatgcov[:,flatten_indices(mu,nu),:,:,:]
     del(self.flatgcov)
     self.gcon = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
     for b in range(self.NumBlocks):
@@ -153,7 +156,7 @@ class phoedf(phdf.phdf):
 
   def GetHcov(self):
     if self.Hcov is None:
-      self.Hcov = self.Get("r.p.H", flatten=False) * self.GetJ()[:,:,np.newaxis,:,:,:]
+      self.Hcov = self.Get("r.p.H", flatten=False) * self.GetJ()[:,np.newaxis,:,:,:,:]
       assert self.Hcov is not None
 
     return self.Hcov
@@ -240,8 +243,6 @@ class phoedf(phdf.phdf):
       Ye = np.zeros(self.ScalarField)
       self.Tg[:,:,:,:] = eos.T_from_rho_u_Ye(rho[:,:,:,:]*self.MassDensityCodeToCGS,
         u[:,:,:,:]*self.EnergyDensityCodeToCGS, Ye[:,:,:,:]) / self.TemperatureCodeToCGS
-
-      print('%e' % np.max(self.Tg*self.TemperatureCodeToCGS))
 
       self.Tg = np.clip(self.Tg, 1.e-100, 1.e100)
 
@@ -344,7 +345,7 @@ class phoedf(phdf.phdf):
 
       for ii in range(3):
         self.E[:,:,:,:,:] += 2. * Gamma[:,np.newaxis,:,:,:] * vcon[:,ii,np.newaxis,:,:,:] * \
-                             Hcov[:,ii,:,k,j,i]
+                             Hcov[:,ii,:,:,:,:]
 
       # TODO(BRR) tilPi component
 
@@ -352,7 +353,7 @@ class phoedf(phdf.phdf):
 
   def GetF(self):
     if self.F is None:
-      self.F = np.zeros([self.NumBlocks, self.NumSpecies, 3, self.Nx3, self.Nx2, self.Nx1])
+      self.F = np.zeros([self.NumBlocks, 3, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1])
 
       Gamma = self.GetGamma()
       vcon = self.GetVpCon() / Gamma[:,np.newaxis,:,:,:]
@@ -360,15 +361,17 @@ class phoedf(phdf.phdf):
       Hcov = self.GetHcov()
       gammacon = self.gammacon
 
-      self.F[:,:,:,:,:,:] = 4. * Gamma[:,np.newaxis,np.newaxis,:,:,:]**2 / 3. * \
-                            vcon[:,:,np.newaxis,:,:,:] * J[:,np.newaxis,:,:,:,:]
-      for ii in range(3):
-        self.F[:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,:,:,:] * vcon[:,:,np.newaxis,:,:,:] * \
-                               vcon[:,ii,np.newaxis,:,:,:]*Hcov[:,ii,:,:,:,:]
+      for idir in range(3):
+        for ispec in range(self.NumSpecies):
+          self.F[:,idir,ispec,:,:,:] = 4. * Gamma[:,:,:,:]**2 / 3. * \
+                                vcon[:,idir,:,:,:] * J[:,ispec,:,:,:]
+        for ii in range(3):
+          self.F[:,idir,ispec,:,:,:] += Gamma[:,:,:,:] * vcon[:,idir,:,:,:] * \
+                                 vcon[:,ii,:,:,:]*Hcov[:,ii,ispec,:,:,:]
 
-      for ii in range(3):
-        self.F[:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,:,:,:] * \
-                               gammacon[:,:,ii,np.newaxis,:,:,:] * Hcov[:,ii,:,:,:,:]
+        for ii in range(3):
+          self.F[:,idir,ispec,:,:,:] += Gamma[:,:,:,:] * \
+                                 gammacon[:,idir,ii,:,:,:] * Hcov[:,ii,ispec,:,:,:]
 
       # TODO(BRR) tilPi component
 
@@ -384,21 +387,21 @@ class phoedf(phdf.phdf):
       Hcov = self.GetHcov()
       gammacon = self.gammacon
 
-      self.P[:,:,:,:,:,:,:] = (4. / 3. * Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:]**2 * \
-                               vcon[:,:,np.newaxis,np.newaxis,:,:,:] * \
-                               vcon[:,np.newaxis,:,np.newaxis,:,:,:] + \
-                               1. / 3. * gammacon[:,:,:,np.newaxis,:,:,:]) * \
-                              J[:,np.newaxis,np.newaxis,:,:,:,:]
       for ii in range(3):
-        self.P[:,:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:] * \
-                                 vcon[:,:,np.newaxis,np.newaxis,:,:,:] * \
-                                 gammacon[:,:,ii,np.newaxis,:,:,:] * \
-                                 Hcov[:,np.newaxis,ii,:,:,:,:]
-      for ii in range(3):
-        self.P[:,:,:,:,:,:,:] += Gamma[:,np.newaxis,np.newaxis,np.newaxis,:,:,:] * \
-                                 vcon[:,np.newaxis,:,np.newaxis,:,:,:] * \
-                                 gammacon[:,:,ii,np.newaxis,:,:,:] * \
-                                 Hcov[:,ii,np.newaxis,:,:,:,:]
+        for jj in range(3):
+          for ispec in range(self.NumSpecies):
+            self.P[:,ii,jj,ispec,:,:,:] = (4. / 3. * Gamma[:,:,:,:]**2 * \
+                                           vcon[:,ii,:,:,:]*vcon[:,jj,:,:,:] + \
+                                           1. / 3. * gammacon[:,ii,jj,:,:,:]) * \
+                                           J[:,ispec,:,:,:]
+
+          for kk in range(3):
+            self.P[:,ii,jj,ispec,:,:,:] += Gamma[:,:,:,:] * vcon[:,ii,:,:,:] * \
+                                           gammacon[:,jj,kk,:,:,:] * Hcov[:,kk,ispec,:,:,:]
+
+          for kk in range(3):
+            self.P[:,ii,jj,ispec,:,:,:] += Gamma[:,:,:,:] * vcon[:,jj,:,:,:] * \
+                                           gammacon[:,ii,kk,:,:,:] * Hcov[:,kk,ispec,:,:,:]
 
       # TODO(BRR) tilPi component
 

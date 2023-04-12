@@ -37,7 +37,11 @@ def get_torus_fluxes(dfile):
   rho = dfile.GetRho()
   ucon = dfile.Getucon()
   gdet = dfile.gdet
+  alpha = dfile.alpha
   rho = dfile.GetRho()
+  Bcon = dfile.GetBcon()
+  bsq = dfile.GetPm() * 2
+  sigma = bsq / rho
 
   E = dfile.GetE()
   F = dfile.GetF()
@@ -51,9 +55,7 @@ def get_torus_fluxes(dfile):
   for b in range(dfile.NumBlocks):
     x1max = max(x1max, dfile.BlockBounds[b][1])
   xh = dfile.Params['geometry/xh']
-  print(f'ximax : {x1max}')
 
-  print(dfile.NumBlocks)
   mdot_in = 0.
   mdot_out = 0.
   Eg_in = 0.
@@ -64,9 +66,11 @@ def get_torus_fluxes(dfile):
   Er_out = 0.
   Lr_in = 0.
   Lr_out = 0.
-  phi = 0.
+  Phi = 0.
+  Pj = 0. # Measured at r = 40 when sigma > 1
+  Pjm = 0.
+  Pjr = 0.
   for b in range(dfile.NumBlocks):
-    print(f'{b}\n\n')
     blockBounds = dfile.BlockBounds[b]
 
     dx2 = (blockBounds[3] - blockBounds[2]) / dfile.MeshBlockSize[1]
@@ -89,6 +93,23 @@ def get_torus_fluxes(dfile):
           for ispec in range(dfile.NumSpecies):
             Er_in += -dx2*dx3*gdet[b,k,j,i_eh]*Rmunu_concov[1,0,ispec]
             Lr_in += dx2*dx3*gdet[b,k,j,i_eh]*Rmunu_concov[1,3,ispec]
+
+      for j in range(Nx2):
+        for k in range(Nx3):
+          Phi += dx2*dx3*gdet[b,k,j,i_eh]*np.fabs(Bcon[b,0,k,j,i_eh] / alpha[b,k,j,i_eh])
+
+    if blockBounds[0] < 1.6 and blockBounds[1] > 1.6:
+      # Nx1 // 2 is kind of cheating...
+      i = Nx1 // 2
+      for j in range(Nx2):
+        for k in range(Nx3):
+          if sigma[b,k,j,i] > 1.:
+            Tmunu_concov = dfile.GetTmunu_concov(b,k,j,i)
+            Rmunu_concov = dfile.GetRmunu_concov(b,k,j,i)
+            Pj -= dx2*dx3*gdet[b,k,j,i] * Tmunu_concov[1,0]
+            Pjm -= dx2*dx3*gdet[b,k,j,i] * rho[b,k,j,i] * ucon[b,1,k,j,i]
+            for ispec in range(dfile.NumSpecies):
+              Pjr -= dx2*dx3*gdet[b,k,j,i] * Rmunu_concov[1,0,ispec]
 
     # Block contains outer boundary
     if np.fabs(blockBounds[1] - x1max) / x1max < 1.e-10:
@@ -125,6 +146,13 @@ def get_torus_fluxes(dfile):
 
   fluxes['Lg_out'] = Lg_out
   fluxes['Lr_out'] = Lr_out
+
+  fluxes['Phi'] = Phi
+  fluxes['phi'] = Phi / np.sqrt(np.fabs(mdot_in))
+
+  fluxes['Pj'] = Pj
+  fluxes['Pjm'] = Pjm
+  fluxes['Pjr'] = Pjr
 
 
   return fluxes
