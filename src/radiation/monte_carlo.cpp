@@ -315,7 +315,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               // detG is in both numerator and denominator
               v(mu, k, j, i) -= 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
             }
-            v(Gye, k, j, i) += LeptonSign(s) / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
+            v(Gye, k, j, i) -= LeptonSign(s) / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
 
           } // for n
           rng_pool.free_state(rng_gen);
@@ -415,9 +415,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
 
-          Real alphanu = 4. * M_PI *
-                         opacities.AbsorptionCoefficient(
-                             v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
+          Real alphanu = opacities.AbsorptionCoefficient(
+              v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units
 
