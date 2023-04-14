@@ -78,6 +78,7 @@ constexpr char fail[] = "fail";
 constexpr char Gcov[] = "Gcov";
 constexpr char Gye[] = "Gye";
 constexpr char c2p_mu[] = "c2p_mu";
+constexpr char tau[] = "light_bulb_tau";
 } // namespace internal_variables
 
 namespace geometric_variables {
