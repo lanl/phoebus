@@ -144,9 +144,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(irho, k, j, i) = mass_density_dev.interpToReal(r);
         SPACELOOP(d) { v(ivlo + d, k, j, i) = vel_vec_out[d]; }
         v(iprs, k, j, i) = pressure_dev.interpToReal(r);
-        v(ieng, k, j, i) = u;
+	v(ieng, k, j, i) = u;
         v(itmp, k, j, i) = T;
-        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+	v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                v(irho, k, j, i), v(itmp, k, j, i), lambda) /
                            v(iprs, k, j, i);
         Real Gammacov[3][3] = {0};

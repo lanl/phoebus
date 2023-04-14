@@ -386,6 +386,7 @@ class ConToPrim {
     v(peng) *= v(prho);
     v(prs) = eos.PressureFromDensityTemperature(v(prho), v(tmp), eos_lambda);
     v(gm1) = eos.BulkModulusFromDensityTemperature(v(prho), v(tmp), eos_lambda) / v(prs);
+    //std::cout<<"p="<<v(prs)<<"    "<< "rho="<<v(prho)<<"    "<<"temp="<<v(tmp)<<"    "<<"sie="<<v(peng)<<std::endl;
     PARTHENON_DEBUG_REQUIRE(v(prs) > robust::SMALL(), "Pressure must be positive");
 
     Real vel[3];
