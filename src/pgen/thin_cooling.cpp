@@ -60,6 +60,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const Real x1max = pin->GetReal("parthenon/mesh", "x1max");
   const std::string rad_method = pin->GetString("radiation", "method");
+
+  const bool do_nu_e = pin->GetBoolean("radiation", "do_nu_electron");
+  const bool do_nu_ebar = pin->GetBoolean("radiation", "do_nu_electron_anti");
+  PARTHENON_REQUIRE(do_nu_e != do_nu_ebar,
+                    "Thincooling only supports nu_e or nu_e_bar neutrinos, not both.");
+
+  // set Ye based on radiation type
+  const Real Ye0 = (do_nu_e) ? 0.5 : 0.0;
   /*if (x1max > 1.e-7 && rad_method == "cooling_function") {
     PARTHENON_THROW("Set x1max = 1.e-7 for the cooling_function rad method to get small "
                     "enough timesteps!");
@@ -69,7 +77,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "Phoebus::ProblemGenerator::ThinCooling", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const Real x = coords.Xc<1>(i);
-        Real lambda[2] = {0.5, 0.};
+        Real lambda[2] = {Ye0, 0.};
         if (iye > 0) {
           v(iye, k, j, i) = lambda[0];
         }
@@ -82,7 +90,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                v(irho, k, j, i), v(itmp, k, j, i), lambda) /
                            v(iprs, k, j, i);
-        v(iye, k, j, i) = 0.5; // TODO(BRR) change depending on species
+        v(iye, k, j, i) = Ye0;
 
         for (int d = 0; d < 3; d++)
           v(ivlo + d, k, j, i) = 0.0;

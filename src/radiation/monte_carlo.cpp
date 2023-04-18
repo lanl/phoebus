@@ -72,6 +72,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real d3x = dx_i * dx_j * dx_k;
 
   auto &phoebus_pkg = pmb->packages.Get("phoebus");
+  auto &unit_conv = phoebus_pkg->Param<phoebus::UnitConversions>("unit_conv");
   auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
 
   const Real h_code = code_constants.h;
@@ -259,12 +260,12 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           Geometry::Tetrads Tetrads(Ucon, Gcov);
           Real detG = geom.DetG(CellLocation::Cent, k, j, i);
           int dNs = v(iNs + sidx, k, j, i);
+          auto rng_gen = rng_pool.get_state();
 
           // Loop over particles to create in this zone
-          for (int n = 0; n < static_cast<int>(dNs); n++) {
+          for (int n = 0; n < dNs; n++) {
             const int m =
                 new_indices(starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
-            auto rng_gen = rng_pool.get_state();
 
             // Set particle species
             swarm_species(m) = static_cast<int>(s);
@@ -278,15 +279,21 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             z(m) = minx_k + (k - kb.s + 0.5) * dx_k;
 
             // Sample energy and set weight
-            Real nu;
+            Real lnu;
             int counter = 0;
+            Real prob;
             do {
-              nu = exp(rng_gen.drand() * (lnu_max - lnu_min) + lnu_min);
+              lnu = rng_gen.drand() * (lnu_max - lnu_min) + lnu_min;
               counter++;
               PARTHENON_REQUIRE(counter < 100000,
                                 "Inefficient or impossible frequency sampling!");
-            } while (rng_gen.drand() >
-                     LogLinearInterp(nu, sidx, k, j, i, dNdlnu, lnu_min, dlnu));
+              Real dn = (lnu - lnu_min) / dlnu;
+              int n = static_cast<int>(dn);
+              dn = dn - n;
+              prob = (1. - dn) * dNdlnu(n, sidx, k, j, i) +
+                     dn * dNdlnu(n + 1, sidx, k, j, i);
+            } while (rng_gen.drand() > prob);
+            Real nu = exp(lnu);
 
             weight(m) = GetWeight(wgtC / wgtCfac, nu);
 
@@ -308,11 +315,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
               // detG is in both numerator and denominator
               v(mu, k, j, i) -= 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
             }
-            // TODO(BRR) lepton sign
-            v(Gye, k, j, i) -= 1. / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
+            v(Gye, k, j, i) -= LeptonSign(s) / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
 
-            rng_pool.free_state(rng_gen);
           } // for n
+          rng_pool.free_state(rng_gen);
         });
   } // for sidx
 
@@ -409,9 +415,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
 
-          Real alphanu = 4. * M_PI *
-                         opacities.AbsorptionCoefficient(
-                             v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
+          Real alphanu = opacities.AbsorptionCoefficient(
+              v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units
 
@@ -431,7 +436,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
                                  1. / d4x * weight(n) * k3(n));
               // TODO(BRR) Add Ucon[0] in the below
-              Kokkos::atomic_add(&(v(iGye, k, j, i)), 1. / d4x * weight(n) * mp_code);
+              Kokkos::atomic_add(&(v(iGye, k, j, i)),
+                                 LeptonSign(s) / d4x * weight(n) * mp_code);
 
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]), 1.);
