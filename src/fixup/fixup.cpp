@@ -695,7 +695,7 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
   Real smooth = gpkg->Param<Real>("smooth");
   auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
-  if (enable_phi_enforcement) {
+  if (enable_phi_enforcement) {// && t > 175) {
     const Real enforced_phi = fix_pkg->Param<Real>("enforced_phi");
     const Real enforced_phi_timescale = fix_pkg->Param<Real>("enforced_phi_timescale");
     const Real enforced_phi_cadence = fix_pkg->Param<Real>("enforced_phi_cadence");
@@ -708,15 +708,19 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
           DevExecSpace(), 0, pack.GetDim(5) - 1, jb.s + 1, jb.e, ib.s + 1, ib.e,
           KOKKOS_LAMBDA(const int b, const int j, const int i) {
             const auto &coords = pack.GetCoords(b);
-            const Real x1 = coords.Xc<1>(0, j, i);
-            const Real x2 = coords.Xc<2>(0, j, i);
+            const Real x1 = coords.Xf<1>(0, j, i);
+            const Real x2 = coords.Xf<2>(0, j, i);
             const Real r = tr.bl_radius(x1);
             const Real th = tr.bl_theta(x1, x2);
 
+            if (i == 10) {
+              printf("[%i %i %i] r: %e th: %e\n", 0,j,i,r,th);
+            }
+
             const Real x = r * sin(th);
             const Real z = r * cos(th);
-            const Real a_hyp = 2.;
-            const Real b_hyp = 60.;
+            const Real a_hyp = 1.2;
+            const Real b_hyp = 3.*a_hyp;
             const Real x_hyp = a_hyp * sqrt(1. + pow(z / b_hyp, 2.));
             const Real q = (pow(x, 2) - pow(x_hyp, 2)) / pow(x_hyp, 2.);
             if (x < x_hyp) {
@@ -788,14 +792,24 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
           });
     }
 
+  // Temporary!!
+    phi_factor = 1.e5;
+
   // Properly update B field
+  printf("fac: %e\n", phi_factor*dt);
       parthenon::par_for(
           parthenon::LoopPatternMDRange(),
           "Phoebus::Fixup::EndOfStepModify::EvaluateBField", DevExecSpace(), 0,
-      pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e - 1,
-      ib.s, ib.e - 1, KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+      pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e,
+      ib.s, ib.e, KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
             const auto &coords = pack.GetCoords(b);
             const Real gammadet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+
+            if (i == 10) {
+              printf("[%i %i %i]\n", k, j, i);
+              printf("  before b: %e %e %e\n", pack(b, pblo, k, j, i),
+                pack(b, pblo+1, k, j, i), pack(b, pblo+2, k, j, i));
+            }
 
         pack(b, pblo, k, j, i) +=
             phi_factor*dt*(-(A(b, j, i) - A(b, j + 1, i) + A(b, j, i + 1) - A(b, j + 1, i + 1)) /
@@ -803,6 +817,16 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
         pack(b, pblo + 1, k, j, i) +=
             phi_factor*dt*((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
              (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
+
+            if (i == 10) {
+              printf("  after b: %e %e %e\n", pack(b, pblo, k, j, i),
+                pack(b, pblo+1, k, j, i), pack(b, pblo+2, k, j, i));
+            }
+
+        if (i == 5 && j == 5) {
+          printf("b: %e %e %e\n", pack(b, pblo, k, j, i), pack(b, pblo+1, k, j, i),
+            pack(b, pblo+2, k, j, i));
+        }
       });
   }
 
