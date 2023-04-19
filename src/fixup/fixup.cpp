@@ -81,8 +81,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real enforced_phi_timescale =
       pin->GetOrAddReal("fixup", "enforced_phi_timescale", 1.e3);
   params.Add("enforced_phi_timescale", enforced_phi_timescale);
-  Real enforced_phi_cadence = pin->GetOrAddInteger("fixup", "enforced_phi_cadence", 10);
+  Real enforced_phi_cadence = pin->GetOrAddReal("fixup", "enforced_phi_cadence", 10.);
   params.Add("enforced_phi_cadence", enforced_phi_cadence);
+  Real enforced_phi_start_time = pin->GetOrAddReal("fixup", "enforced_phi_start_time", 175.);
+  params.Add("enforced_phi_start_time", enforced_phi_start_time);
   if (enable_phi_enforcement) {
     PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
                       "Phi enforcement only supported for BH geometry!");
@@ -695,10 +697,12 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
   Real smooth = gpkg->Param<Real>("smooth");
   auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
-  if (enable_phi_enforcement){//  && t > 175) {
+  if (enable_phi_enforcement) {
     const Real enforced_phi = fix_pkg->Param<Real>("enforced_phi");
     const Real enforced_phi_timescale = fix_pkg->Param<Real>("enforced_phi_timescale");
     const Real enforced_phi_cadence = fix_pkg->Param<Real>("enforced_phi_cadence");
+    const Real enforced_phi_start_time = fix_pkg->Param<Real>("enforced_phi_start_time");
+    if (t > enforced_phi_start_time) {
 
     // This only needs to be done at initialization
     ParArrayND<Real> A("vector potential", pack.GetDim(5), jb.e + 2, ib.e + 2);
@@ -832,7 +836,8 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
       ///      pack(b, pblo+2, k, j, i));
       //  }
       });
-  }
+      } // enforced_phi_start_time
+  } // enable_phi_enforcement
 
   return TaskStatus::complete;
 }
