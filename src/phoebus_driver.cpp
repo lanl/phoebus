@@ -54,7 +54,7 @@ namespace phoebus {
 PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm,
                              const bool is_restart)
     : EvolutionDriver(pin, app_in, pm),
-      integrator(std::make_unique<StagedIntegrator>(pin)), is_restart_(is_restart) {
+      integrator(std::make_unique<parthenon::LowStorageIntegrator>(pin)), is_restart_(is_restart) {
 
   // fail if these are not specified in the input file
   pin->CheckRequired("parthenon/mesh", "ix1_bc");
