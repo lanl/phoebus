@@ -37,7 +37,11 @@ McKinneyGammieRyan GetTransformation<McKinneyGammieRyan>(StateDescriptor *pkg) {
   Real alpha = pkg->Param<Real>("alpha");
   Real x0 = pkg->Param<Real>("x0");
   Real smooth = pkg->Param<Real>("smooth");
-  return McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
+  Real hexp_br = pkg->Param<Real>("hexp_br");
+  Real hexp_nsq = pkg->Param<Real>("hexp_nsq");
+  Real hexp_csq = pkg->Param<Real>("hexp_csq");
+  return McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth, hexp_br, hexp_nsq,
+                            hexp_csq);
 }
 
 } // namespace Geometry

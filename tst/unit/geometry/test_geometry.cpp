@@ -549,9 +549,12 @@ TEST_CASE("McKinneyGammieRyan", "[geometry]") {
     constexpr Real poly_alpha = 14.0;
     constexpr Real mks_smooth = 0.5;
     constexpr Real x0 = -0.4409148982097008;
+    constexpr Real hexp_br = 1000.;
+    constexpr Real hexp_nsq = 1.;
+    constexpr Real hexp_csq = 4.;
     WHEN("We create a modifier object") {
       McKinneyGammieRyan transformation(derefine_poles, hslope, poly_xt, poly_alpha, x0,
-                                        mks_smooth);
+                                        mks_smooth, hexp_br, hexp_nsq, hexp_csq);
       THEN("The modifier can be called on device") {
         int n_wrong = 100;
         Kokkos::parallel_reduce(
