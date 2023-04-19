@@ -740,9 +740,13 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
     if (last_stage && t >= next_dphi_dt_update_time) {
       next_dphi_dt_update_time += enforced_phi_cadence;
 
+      // Record mdot
+      const Real mdot_proc = History::ReduceMassAccretionRate(md);
+      const Real mdot = reduction::Sum(mdot_proc);
+
       // Measure phi
       const Real phi_proc = History::ReduceMagneticFluxPhi(md);
-      const Real phi = reduction::Sum(phi_proc);
+      const Real phi = reduction::Sum(phi_proc) / std::sqrt(mdot);
       //printf("Original phi: %e\n", phi);
 
       // Calculate amount of phi to add this timestep
@@ -773,7 +777,7 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
 
       // Measure change in phi
       const Real fiducial_phi_proc = History::ReduceMagneticFluxPhi(md);
-      const Real fiducial_phi = reduction::Sum(fiducial_phi_proc);
+      const Real fiducial_phi = reduction::Sum(fiducial_phi_proc) / std::sqrt(mdot);
      // printf("here! phi: %e\n", fiducial_phi);
       phi_factor = dphi / (fiducial_phi - phi) / dt;
      // printf("phi_factor: %e\n", phi_factor);
