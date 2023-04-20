@@ -129,7 +129,7 @@ TaskStatus MomentCon2Prim(T *rc);
 template <class T>
 TaskStatus MomentPrim2Con(T *rc, IndexDomain domain = IndexDomain::entire);
 
-template <class T>
+template <class T, bool ENERGY = true>
 TaskStatus ReconstructEdgeStates(T *rc);
 
 template <class T>
