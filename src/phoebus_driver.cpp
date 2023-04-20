@@ -329,9 +329,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto moment_flux = moment_flux_E; 
       if (rad_moment_number_evolve) { 
         moment_recon =
-            tl.AddTask(moment_flux_E, radiation::ReconstructEdgeStates<MDT, RadEnergyMoment::Number>, sc0.get());
+            tl.AddTask(moment_flux_E, radiation::ReconstructEdgeStates<MDT, radiation::RadEnergyMoment::Number>, sc0.get());
         moment_flux =
-            tl.AddTask(moment_recon, radiation::CalculateFluxes<MDT, RadEnergyMoment::Number>, sc0.get());
+            tl.AddTask(moment_recon, radiation::CalculateFluxes<MDT, radiation::RadEnergyMoment::Number>, sc0.get());
       }
       auto moment_geom_src = tl.AddTask(none, radiation::CalculateGeometricSource<MDT>,
                                         sc0.get(), gsrc.get());
