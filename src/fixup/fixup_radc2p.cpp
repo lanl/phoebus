@@ -41,14 +41,11 @@ using robust::ratio;
 
 namespace fixup {
 
-template <typename T, class CLOSURE>
+template <typename T, class CLOSURE, radiation::RadEnergyMoment EMOMENT>
 TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
-  namespace ir = radmoment_internal;
-  namespace pr = radmoment_prim;
-  namespace cr = radmoment_cons;
 
   auto *pmb = rc->GetParentPointer().get();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -62,9 +59,10 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
   bool update_rad = rad_pkg->Param<bool>("active");
   if (!enable_c2p_fixup || !update_rad) return TaskStatus::complete;
-
-  const std::vector<std::string> vars({p::velocity, p::ye, c::ye, pr::J, pr::H, cr::E,
-                                       cr::F, ir::tilPi, ir::c2pfail, impl::fail});
+  
+  auto var = radiation::RadiationVariableNames::GetByMomentType(EMOMENT);
+  const std::vector<std::string> vars({p::velocity, p::ye, c::ye, var.J, var.H, var.E,
+                                       var.F, var.tilPi, var.c2pfail, impl::fail});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -72,13 +70,13 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   auto idx_pvel = imap.GetFlatIdx(p::velocity);
   int pye = imap[p::ye].second; // negative if not present
   int cye = imap[c::ye].second;
-  auto idx_J = imap.GetFlatIdx(pr::J, false);
-  auto idx_H = imap.GetFlatIdx(pr::H, false);
-  auto idx_E = imap.GetFlatIdx(cr::E, false);
-  auto idx_F = imap.GetFlatIdx(cr::F, false);
+  auto idx_J = imap.GetFlatIdx(var.J, false);
+  auto idx_H = imap.GetFlatIdx(var.H, false);
+  auto idx_E = imap.GetFlatIdx(var.E, false);
+  auto idx_F = imap.GetFlatIdx(var.F, false);
   int ifluidfail = imap[impl::fail].first;
-  int iradfail = imap[ir::c2pfail].first;
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  int iradfail = imap[var.c2pfail].first;
+  auto iTilPi = imap.GetFlatIdx(var.tilPi, false);
 
   bool report_c2p_fails = fix_pkg->Param<bool>("report_c2p_fails");
   if (report_c2p_fails) {
@@ -227,22 +225,28 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
   StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
   const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
+  auto do_num = rad_pkg->Param<bool>("do_number_evolution");
   std::string method;
   if (enable_rad_floors) {
     method = rad_pkg->Param<std::string>("method");
   } else {
     return TaskStatus::complete;
   }
-
+  using namespace radiation;
   // TODO(BRR) share these settings somewhere else. Set at configure time?
-  using settings =
+  using settings_N =
+      ClosureSettings<ClosureEquation::number_conserve, ClosureVerbosity::quiet>;
+  using settings_E =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureM1<settings>>(rc);
+    if (do_num) RadConservedToPrimitiveFixupImpl<T, ClosureM1<settings_N>, RadEnergyMoment::Number>(rc);
+    return RadConservedToPrimitiveFixupImpl<T, ClosureM1<settings_E>, RadEnergyMoment::Energy>(rc);
   } else if (method == "moment_eddington") {
-    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<settings>>(rc);
+    if (do_num) RadConservedToPrimitiveFixupImpl<T, ClosureEdd<settings_N>, RadEnergyMoment::Number>(rc);
+    return RadConservedToPrimitiveFixupImpl<T, ClosureEdd<settings_E>, RadEnergyMoment::Energy>(rc);
   } else if (method == "mocmc") {
-    return RadConservedToPrimitiveFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc);
+    if (do_num) RadConservedToPrimitiveFixupImpl<T, ClosureMOCMC<settings_N>, RadEnergyMoment::Number>(rc);
+    return RadConservedToPrimitiveFixupImpl<T, ClosureMOCMC<settings_E>, RadEnergyMoment::Energy>(rc);
   }
   return TaskStatus::fail;
 }
