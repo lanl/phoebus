@@ -107,7 +107,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
 
     ax = axes[0,2]
     Pg = dfile.GetPg()
-    Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
+    Pm = np.clip(dfile.GetPm(), 1.e-100, 1.e100)
     lbeta = np.log10(Pg/Pm)
     for b in range(nblocks):
       im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lbeta[b,0,:,:].transpose(), vmin=-2, vmax=2,
@@ -182,7 +182,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords='cartesian
 
     ax = axes[1,1]
     Pg = dfile.GetPg()
-    Pm = np.clip(dfile.GetPm(), 1.e-20, 1.e20)
+    Pm = np.clip(dfile.GetPm(), 1.e-100, 1.e100)
     lbeta = np.log10(Pg/Pm)
     for b in range(nblocks):
       im = ax.pcolormesh(xplot[b,:,:], yplot[b,:,:], lbeta[b,0,:,:].transpose(), vmin=-2, vmax=2,
@@ -217,6 +217,7 @@ if __name__ == "__main__":
   parser.add_argument('--savefig', type=bool, default=False, help='Whether to save figure')
   parser.add_argument('--numin', type=float, default=1.e-4, help='Minimum frequency (Hz)')
   parser.add_argument('--numax', type=float, default=1.e2, help='Maximum frequency (Hz)')
+  parser.add_argument('--rlim', type=float, default=40., help='Maximum radius to plot')
   parser.add_argument('--nnu', type=int, default=100, help='Number of frequency support points')
   parser.add_argument('--coords', type=str, default="cartesian", help='Coordinates to plot in')
   parser.add_argument('files', type=str, nargs='+',
@@ -226,4 +227,4 @@ if __name__ == "__main__":
   matplotlib.use('Agg')
 
   for i, fname in enumerate(args.files):
-    plot_frame(i, fname, args.savefig, coords=args.coords)
+    plot_frame(i, fname, args.savefig, rlim = args.rlim, coords=args.coords)

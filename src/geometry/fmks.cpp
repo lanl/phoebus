@@ -47,7 +47,7 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Real x0 = pin->GetReal("parthenon/mesh", "x1min");
   Real smooth = pin->GetOrAddReal("coordinates", "smooth", 0.5);
   Real hexp_br = pin->GetOrAddReal("coordinates", "hexp_br", 1000.);
-  Real hexp_nsq = pin->GetOrAddReal("coordinates", "hexp_nsq", 1.0);
+  Real hexp_nsq = pin->GetOrAddReal("coordinates", "hexp_nsq", 4.0);
   Real hexp_csq = pin->GetOrAddReal("coordinates", "hexp_csq", 4.0);
   Real a = pin->GetReal("geometry", "a");
   Real Rh = 1.0 + sqrt(1.0 - a * a);
