@@ -620,10 +620,7 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
     auto &pmb = block;
     auto sc = pmb->swarm_data.Get();
     auto swarm = sc->Get(swarmName);
-    for (int n = 0; n < swarm->vbswarm->bd_var_.nbmax; n++) {
-      auto &nb = pmb->pbval->neighbor[n];
-      swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
-    }
+    swarm->ResetCommunication();
   }
 
   return TaskStatus::complete;
