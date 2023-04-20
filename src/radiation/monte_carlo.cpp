@@ -419,6 +419,9 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units
+          Real Ucon[4];
+          Real vel[3] = {v(pvlo, k, j, i), v(pvlo + 1, k, j, i), v(pvlo + 2, k, j, i)};
+          GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
 
           bool absorbed = false;
 
@@ -435,9 +438,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                  1. / d4x * weight(n) * k2(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
                                  1. / d4x * weight(n) * k3(n));
-              // TODO(BRR) Add Ucon[0] in the below
               Kokkos::atomic_add(&(v(iGye, k, j, i)),
-                                 LeptonSign(s) / d4x * weight(n) * mp_code);
+                                 LeptonSign(s) / d4x * weight(n) * mp_code * Ucon[0]);
 
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]), 1.);
