@@ -192,7 +192,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   bool rad_mocmc_active = false;
   if (rad_active) {
     rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
+  } 
+  bool rad_moment_number_evolve = false;
+  if (rad_moments_active) {
+    rad_moment_number_evolve = rad->Param<bool>("do_number_evolution");
   }
+
   const auto monopole_enabled = monopole->Param<bool>("enable_monopole_gr");
   // Force static here means monopole only called at initialization.
   // and source terms are disabled
@@ -312,13 +317,22 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     if (rad_moments_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
-      auto moment_recon =
-          tl.AddTask(none, radiation::ReconstructEdgeStates<MDT>, sc0.get());
-      // TODO(BRR) Remove from task list if not using due to MOCMC
       auto get_opacities =
-          tl.AddTask(moment_recon, radiation::MomentCalculateOpacities<MDT>, sc0.get());
-      auto moment_flux =
-          tl.AddTask(get_opacities, radiation::CalculateFluxes<MDT>, sc0.get());
+          tl.AddTask(none, radiation::MomentCalculateOpacities<MDT>, sc0.get());
+      
+      auto moment_recon_E =
+          tl.AddTask(get_opacities, radiation::ReconstructEdgeStates<MDT>, sc0.get());
+      // TODO(BRR) Remove from task list if not using due to MOCMC
+      auto moment_flux_E =
+          tl.AddTask(moment_recon_E, radiation::CalculateFluxes<MDT>, sc0.get());
+      auto moment_recon = moment_recon_E;
+      auto moment_flux = moment_flux_E; 
+      if (rad_moment_number_evolve) { 
+        moment_recon =
+            tl.AddTask(moment_flux_E, radiation::ReconstructEdgeStates<MDT, RadEnergyMoment::Number>, sc0.get());
+        moment_flux =
+            tl.AddTask(moment_recon, radiation::CalculateFluxes<MDT, RadEnergyMoment::Number>, sc0.get());
+      }
       auto moment_geom_src = tl.AddTask(none, radiation::CalculateGeometricSource<MDT>,
                                         sc0.get(), gsrc.get());
       sndrcv_flux_depend = sndrcv_flux_depend | moment_flux;

@@ -72,6 +72,7 @@ constexpr char srcfail[] = "r.i.src_fail";
   constexpr char dJ[] = "r.i.n.dJ";
   constexpr char kappaJ[] = "r.i.n.kappaJ";
   constexpr char kappaH[] = "r.i.n.kappaH";
+  constexpr char kappaH_mean[] = "r.i.n.kappaH_mean";
   constexpr char JBB[] = "r.i.n.JBB";
   constexpr char tilPi[] = "r.i.n.tilPi";
   }

@@ -123,16 +123,18 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
 // Moment tasks
+enum class RadEnergyMoment {Number, Energy};
+
 template <class T>
 TaskStatus MomentCon2Prim(T *rc);
 
 template <class T>
 TaskStatus MomentPrim2Con(T *rc, IndexDomain domain = IndexDomain::entire);
 
-template <class T, bool ENERGY = true>
+template <class T, RadEnergyMoment EMOMENT = RadEnergyMoment::Energy>
 TaskStatus ReconstructEdgeStates(T *rc);
 
-template <class T>
+template <class T, RadEnergyMoment EMOMENT = RadEnergyMoment::Energy>
 TaskStatus CalculateFluxes(T *rc);
 
 template <class T>
