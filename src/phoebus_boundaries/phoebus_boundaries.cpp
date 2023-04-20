@@ -416,7 +416,7 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     }
   }
 
-  if (pkg_rad->Param<bool>("active")) {
+  if (pkg_rad->Param<bool>("active") && pkg_rad->Param<bool>("moments_active")) {
     // Fluid and rad always have same value
     // std::string bc_vars = pkg_rad->Param<std::string>("bc_vars");
     if (bc_vars == "primitive") {
@@ -508,6 +508,29 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
               pman.app_input
                   ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x1] =
                   Boundaries::SetSwarmOX1Outflow;
+            }
+          }
+        }
+        if (d == 2) {
+          if (outer == 0) {
+            if (rad_method == "mocmc") {
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x2] =
+                  Boundaries::SetSwarmNoWorkBC;
+            } else {
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x2] =
+                  Boundaries::SetSwarmIX2Outflow;
+            }
+          } else if (outer == 1) {
+            if (rad_method == "mocmc") {
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x2] =
+                  Boundaries::SetSwarmNoWorkBC;
+            } else {
+              pman.app_input
+                  ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x2] =
+                  Boundaries::SetSwarmOX2Outflow;
             }
           }
         }
