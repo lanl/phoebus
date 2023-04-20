@@ -123,16 +123,18 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
 // Moment tasks
+enum class RadEnergyMoment {Number, Energy};
+
 template <class T>
 TaskStatus MomentCon2Prim(T *rc);
 
 template <class T>
 TaskStatus MomentPrim2Con(T *rc, IndexDomain domain = IndexDomain::entire);
 
-template <class T>
+template <class T, RadEnergyMoment EMOMENT = RadEnergyMoment::Energy>
 TaskStatus ReconstructEdgeStates(T *rc);
 
-template <class T>
+template <class T, RadEnergyMoment EMOMENT = RadEnergyMoment::Energy>
 TaskStatus CalculateFluxes(T *rc);
 
 template <class T>
@@ -164,6 +166,52 @@ template <class T>
 TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid);
 
 TaskStatus MOCMCUpdateParticleCount(Mesh *pmesh, std::vector<Real> *resolution);
+
+struct RadiationVariableNames {
+  static RadiationVariableNames GetByMomentType(RadEnergyMoment type) {
+    namespace cr = radmoment_cons;
+    namespace pr = radmoment_prim;
+    namespace ir = radmoment_internal; 
+    if (type == RadEnergyMoment::Number) { 
+      return RadiationVariableNames{cr::num::E, cr::num::F, 
+                                    pr::num::J, pr::num::H, 
+                                    ir::num::xi, ir::num::phi,
+                                    ir::ql, ir::qr,
+                                    ir::ql_v, ir::qr_v, 
+                                    ir::num::dJ, ir::num::kappaJ, ir::num::kappaH, 
+                                    ir::num::JBB, ir::num::tilPi, ir::num::kappaH_mean,
+                                    ir::c2pfail, ir::srcfail};
+    } else /*if (type == RadEnergyMoment::Energy)*/ { 
+      return RadiationVariableNames{cr::E, cr::F, 
+                                    pr::J, pr::H, 
+                                    ir::xi, ir::phi, 
+                                    ir::ql, ir::qr,
+                                    ir::ql_v, ir::qr_v, 
+                                    ir::dJ, ir::kappaJ, ir::kappaH, 
+                                    ir::JBB, ir::tilPi, ir::kappaH_mean,
+                                    ir::c2pfail, ir::srcfail};
+    }
+  }
+  const std::string& E; 
+  const std::string& F; 
+  const std::string& J;
+  const std::string& H; 
+  
+  const std::string& xi; 
+  const std::string& phi; 
+  const std::string& ql; 
+  const std::string& qr; 
+  const std::string& ql_v; 
+  const std::string& qr_v; 
+  const std::string& dJ; 
+  const std::string& kappaJ; 
+  const std::string& kappaH; 
+  const std::string& JBB; 
+  const std::string& tilPi;
+  const std::string& kappaH_mean; 
+  const std::string& c2pfail; 
+  const std::string& srcfail; 
+};
 
 } // namespace radiation
 

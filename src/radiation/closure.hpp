@@ -48,8 +48,8 @@ enum class ClosureVerbosity { quiet, v1, v2 };
 template <ClosureEquation EQ = ClosureEquation::energy_conserve,
           ClosureVerbosity VB = ClosureVerbosity::quiet>
 struct ClosureSettings {
-  static const ClosureEquation eqn_type = EQ;
-  static const ClosureVerbosity verbosity = VB;
+  static constexpr ClosureEquation eqn_type = EQ;
+  static constexpr ClosureVerbosity verbosity = VB;
 };
 
 enum class ClosureCon2PrimStrategy {
@@ -66,7 +66,7 @@ template <class SET = ClosureSettings<>>
 class ClosureEdd {
  public:
   using LocalGeometryType = LocalThreeGeometry;
-
+  static constexpr ClosureEquation eqn_type = SET::eqn_type;
   //-------------------------------------------------------------------------------------
   /// Constructor just calculates the inverse 3-metric, covariant three-velocity, and the
   /// Lorentz factor for the given background state.

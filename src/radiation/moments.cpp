@@ -57,12 +57,8 @@ class ReconstructionIndexer {
   const int block_;
 };
 
-template <class T, class CLOSURE, bool STORE_GUESS>
+template <class T, class CLOSURE, bool STORE_GUESS, RadEnergyMoment EMOMENT>
 TaskStatus MomentCon2PrimImpl(T *rc) {
-  namespace cr = radmoment_cons;
-  namespace pr = radmoment_prim;
-  namespace ir = radmoment_internal;
-
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
 
@@ -70,25 +66,27 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
 
+  auto var = RadiationVariableNames::GetByMomentType(EMOMENT);  
+  
   std::vector<std::string> variables{
-      cr::E,  cr::F,   pr::J,       pr::H,    fluid_prim::velocity,
-      ir::xi, ir::phi, ir::c2pfail, ir::tilPi};
+      var.E, var.F, var.J, var.H, fluid_prim::velocity,
+      var.xi, var.phi, var.c2pfail, var.tilPi};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  auto cE = imap.GetFlatIdx(cr::E);
-  auto pJ = imap.GetFlatIdx(pr::J);
-  auto cF = imap.GetFlatIdx(cr::F);
-  auto pH = imap.GetFlatIdx(pr::H);
+  auto cE = imap.GetFlatIdx(var.E);
+  auto pJ = imap.GetFlatIdx(var.J);
+  auto cF = imap.GetFlatIdx(var.F);
+  auto pH = imap.GetFlatIdx(var.H);
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto iTilPi = imap.GetFlatIdx(var.tilPi, false);
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(2);
 
-  auto iXi = imap.GetFlatIdx(ir::xi);
-  auto iPhi = imap.GetFlatIdx(ir::phi);
+  auto iXi = imap.GetFlatIdx(var.xi);
+  auto iPhi = imap.GetFlatIdx(var.phi);
 
-  auto ifail = imap[ir::c2pfail].first;
+  auto ifail = imap[var.c2pfail].first;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   const Real pi = acos(-1);
@@ -124,7 +122,6 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         Vec covF = {{v(b, cF(ispec, 0), k, j, i) * isdetgam,
                      v(b, cF(ispec, 1), k, j, i) * isdetgam,
                      v(b, cF(ispec, 2), k, j, i) * isdetgam}};
-
         if (iTilPi.IsValid()) {
           SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
         } else {
@@ -171,15 +168,21 @@ TaskStatus MomentCon2Prim(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
+  auto do_num = rad->Param<bool>("do_number_evolution");
 
-  using settings =
+  using settings_E =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  using settings_N =
+      ClosureSettings<ClosureEquation::number_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentCon2PrimImpl<T, ClosureM1<settings>, true>(rc);
+    if (do_num) MomentCon2PrimImpl<T, ClosureM1<settings_N>, true, RadEnergyMoment::Number>(rc);
+    return MomentCon2PrimImpl<T, ClosureM1<settings_E>, true, RadEnergyMoment::Energy>(rc);
   } else if (method == "moment_eddington") {
-    return MomentCon2PrimImpl<T, ClosureEdd<settings>, false>(rc);
+    if (do_num) MomentCon2PrimImpl<T, ClosureEdd<settings_N>, false, RadEnergyMoment::Number>(rc);
+    return MomentCon2PrimImpl<T, ClosureEdd<settings_E>, false, RadEnergyMoment::Energy>(rc);
   } else if (method == "mocmc") {
-    return MomentCon2PrimImpl<T, ClosureMOCMC<settings>, false>(rc);
+    if (do_num) MomentCon2PrimImpl<T, ClosureMOCMC<settings_N>, false, RadEnergyMoment::Number>(rc);
+    return MomentCon2PrimImpl<T, ClosureMOCMC<settings_E>, false, RadEnergyMoment::Energy>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown");
   }
@@ -188,31 +191,28 @@ TaskStatus MomentCon2Prim(T *rc) {
 // template TaskStatus MomentCon2Prim<MeshData<Real>>(MeshData<Real> *);
 template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
-template <class T, class CLOSURE>
+template <class T, class CLOSURE, RadEnergyMoment EMOMENT>
 TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
-  namespace cr = radmoment_cons;
-  namespace pr = radmoment_prim;
-  namespace ir = radmoment_internal;
-
   auto *pm = rc->GetParentPointer().get();
 
   IndexRange ib = pm->cellbounds.GetBoundsI(domain);
   IndexRange jb = pm->cellbounds.GetBoundsJ(domain);
   IndexRange kb = pm->cellbounds.GetBoundsK(domain);
-
-  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity};
+  
+  auto var = RadiationVariableNames::GetByMomentType(EMOMENT);  
+  std::vector<std::string> variables{var.E, var.F, var.J, var.H, fluid_prim::velocity};
   if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    variables.push_back(ir::tilPi);
+    variables.push_back(var.tilPi);
   }
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  auto cE = imap.GetFlatIdx(cr::E);
-  auto pJ = imap.GetFlatIdx(pr::J);
-  auto cF = imap.GetFlatIdx(cr::F);
-  auto pH = imap.GetFlatIdx(pr::H);
+  auto cE = imap.GetFlatIdx(var.E);
+  auto pJ = imap.GetFlatIdx(var.J);
+  auto cF = imap.GetFlatIdx(var.F);
+  auto pH = imap.GetFlatIdx(var.H);
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto iTilPi = imap.GetFlatIdx(var.tilPi, false);
 
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(2);
@@ -256,7 +256,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         PARTHENON_DEBUG_REQUIRE(!std::isnan(J), "NAN J in rad P2C!");
 
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
-
         v(b, cE(ispec), k, j, i) = sdetgam * E;
         for (int idir = dirB.s; idir <= dirB.e; ++idir) {
           v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
@@ -271,14 +270,21 @@ TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
-  using settings =
+  auto do_num = rad->Param<bool>("do_number_evolution");
+
+  using settings_N =
+      ClosureSettings<ClosureEquation::number_conserve, ClosureVerbosity::quiet>;
+  using settings_E =
       ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
   if (method == "moment_m1") {
-    return MomentPrim2ConImpl<T, ClosureM1<settings>>(rc, domain);
+    if (do_num) MomentPrim2ConImpl<T, ClosureM1<settings_N>, RadEnergyMoment::Number>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureM1<settings_E>, RadEnergyMoment::Energy>(rc, domain);
   } else if (method == "moment_eddington") {
-    return MomentPrim2ConImpl<T, ClosureEdd<settings>>(rc, domain);
+    if (do_num) MomentPrim2ConImpl<T, ClosureEdd<settings_N>, RadEnergyMoment::Number>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureEdd<settings_E>, RadEnergyMoment::Energy>(rc, domain);
   } else if (method == "mocmc") {
-    return MomentPrim2ConImpl<T, ClosureMOCMC<settings>>(rc, domain);
+    if (do_num) MomentPrim2ConImpl<T, ClosureMOCMC<settings_N>, RadEnergyMoment::Number>(rc, domain);
+    return MomentPrim2ConImpl<T, ClosureMOCMC<settings_E>, RadEnergyMoment::Energy>(rc, domain);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
@@ -288,7 +294,7 @@ TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
 template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
                                                         IndexDomain);
 
-template <class T>
+template <class T, RadEnergyMoment EMOMENT>
 TaskStatus ReconstructEdgeStates(T *rc) {
   using namespace PhoebusReconstruction;
 
@@ -304,27 +310,24 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
   const int dk = (pmb->pmy_mesh->ndim > 2 ? 1 : 0);
 
-  namespace cr = radmoment_cons;
-  namespace pr = radmoment_prim;
-  namespace ir = radmoment_internal;
-
+  auto var = RadiationVariableNames::GetByMomentType(EMOMENT);  
   PackIndexMap imap_ql, imap_qr, imap;
   VariablePack<Real> ql_base =
-      rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
+      rc->PackVariables(std::vector<std::string>{var.ql}, imap_ql);
   VariablePack<Real> qr_base =
-      rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
-  std::vector<std::string> variables = {pr::J, pr::H, ir::tilPi};
-  variables.push_back(ir::dJ);
+      rc->PackVariables(std::vector<std::string>{var.qr}, imap_qr);
+  
+  std::vector<std::string> variables = {var.J, var.H, var.tilPi, var.dJ};
   VariablePack<Real> v = rc->PackVariables(variables, imap);
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_dJ = imap.GetFlatIdx(ir::dJ);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_J = imap.GetFlatIdx(var.J);
+  auto idx_dJ = imap.GetFlatIdx(var.dJ);
+  auto iTilPi = imap.GetFlatIdx(var.tilPi, false);
 
-  ParArrayND<Real> ql_v = rc->Get(ir::ql_v).data;
-  ParArrayND<Real> qr_v = rc->Get(ir::qr_v).data;
+  ParArrayND<Real> ql_v = rc->Get(var.ql_v).data;
+  ParArrayND<Real> qr_v = rc->Get(var.qr_v).data;
   VariablePack<Real> v_vel =
       rc->PackVariables(std::vector<std::string>{fluid_prim::velocity});
-  auto qIdx = imap_ql.GetFlatIdx(ir::ql);
+  auto qIdx = imap_ql.GetFlatIdx(var.ql);
 
   const int nspec = qIdx.DimSize(1);
   int nrecon = 4 * nspec;
@@ -332,7 +335,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
     nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
   }
 
-  const int offset = imap_ql[ir::ql].first;
+  const int offset = imap_ql[var.ql].first;
 
   const int nblock = ql_base.GetDim(5);
   const int ndim = pmb->pmy_mesh->ndim;
@@ -485,11 +488,12 @@ TaskStatus ReconstructEdgeStates(T *rc) {
 
   return TaskStatus::complete;
 }
-template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Real> *);
+template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>, RadEnergyMoment::Number>(MeshBlockData<Real> *);
+template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>, RadEnergyMoment::Energy>(MeshBlockData<Real> *);
 
 // This really only works for MeshBlockData right now since fluxes don't have a block
 // index
-template <class T, class CLOSURE>
+template <class T, class CLOSURE, RadEnergyMoment EMOMENT>
 TaskStatus CalculateFluxesImpl(T *rc) {
   auto *pmb = rc->GetParentPointer().get();
   StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
@@ -504,25 +508,23 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
   const int dk = (pmb->pmy_mesh->ndim > 2 ? 1 : 0);
 
-  namespace cr = radmoment_cons;
-  namespace pr = radmoment_prim;
-  namespace ir = radmoment_internal;
+  auto var = RadiationVariableNames::GetByMomentType(EMOMENT); 
 
   PackIndexMap imap_ql, imap_qr, imap;
-  std::vector<std::string> vars{ir::ql, ir::qr, ir::ql_v, ir::qr_v, ir::dJ, ir::kappaH};
-  std::vector<std::string> flxs{cr::E, cr::F};
+  std::vector<std::string> vars{var.ql, var.qr, var.ql_v, var.qr_v, var.dJ, var.kappaH};
+  std::vector<std::string> flxs{var.E, var.F};
 
   auto v = rc->PackVariablesAndFluxes(vars, flxs, imap);
 
-  auto idx_qlv = imap.GetFlatIdx(ir::ql_v);
-  auto idx_qrv = imap.GetFlatIdx(ir::qr_v);
-  auto idx_ql = imap.GetFlatIdx(ir::ql);
-  auto idx_qr = imap.GetFlatIdx(ir::qr);
-  auto idx_dJ = imap.GetFlatIdx(ir::dJ);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
+  auto idx_qlv = imap.GetFlatIdx(var.ql_v);
+  auto idx_qrv = imap.GetFlatIdx(var.qr_v);
+  auto idx_ql = imap.GetFlatIdx(var.ql);
+  auto idx_qr = imap.GetFlatIdx(var.qr);
+  auto idx_dJ = imap.GetFlatIdx(var.dJ);
+  auto idx_kappaH = imap.GetFlatIdx(var.kappaH);
 
-  auto idx_Ff = imap.GetFlatIdx(cr::F);
-  auto idx_Ef = imap.GetFlatIdx(cr::E);
+  auto idx_Ff = imap.GetFlatIdx(var.F);
+  auto idx_Ef = imap.GetFlatIdx(var.E);
 
   auto num_species = rad_pkg->Param<int>("num_species");
 
@@ -746,25 +748,27 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   return TaskStatus::complete;
 }
 
-template <class T>
+template <class T, RadEnergyMoment EMOMENT>
 TaskStatus CalculateFluxes(T *rc) {
   auto *pm = rc->GetParentPointer().get();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
-  using settings =
-      ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>;
+  using settings = typename std::conditional<EMOMENT == RadEnergyMoment::Number, 
+                                    ClosureSettings<ClosureEquation::number_conserve, ClosureVerbosity::quiet>,
+                                    ClosureSettings<ClosureEquation::energy_conserve, ClosureVerbosity::quiet>>::type;
   if (method == "moment_m1") {
-    return CalculateFluxesImpl<T, ClosureM1<settings>>(rc);
+    return CalculateFluxesImpl<T, ClosureM1<settings>, EMOMENT>(rc);
   } else if (method == "moment_eddington") {
-    return CalculateFluxesImpl<T, ClosureEdd<settings>>(rc);
+    return CalculateFluxesImpl<T, ClosureEdd<settings>, EMOMENT>(rc);
   } else if (method == "mocmc") {
-    return CalculateFluxesImpl<T, ClosureMOCMC<settings>>(rc);
+    return CalculateFluxesImpl<T, ClosureMOCMC<settings>, EMOMENT>(rc);
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
   return TaskStatus::fail;
 }
-template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
+template TaskStatus CalculateFluxes<MeshBlockData<Real>, RadEnergyMoment::Number>(MeshBlockData<Real> *);
+template TaskStatus CalculateFluxes<MeshBlockData<Real>, RadEnergyMoment::Energy>(MeshBlockData<Real> *);
 
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
@@ -872,17 +876,20 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
             }
           }
           SPACELOOP2(ii, jj) { con_T[ii + 1][jj + 1] += conP(ii, jj); }
-
-          Real TGam = 0.0;
-          SPACETIMELOOP2(m, n) {
-            Real gam0 = 0.;
-            SPACETIMELOOP(r) { gam0 += con_g[0][r] * Gamma[r][m][n]; }
-            TGam += con_T[m][n] * gam0;
+          
+          if constexpr(CLOSURE::eqn_type == ClosureEquation::energy_conserve) {
+            Real TGam = 0.0;
+            SPACETIMELOOP2(m, n) {
+              Real gam0 = 0.;
+              SPACETIMELOOP(r) { gam0 += con_g[0][r] * Gamma[r][m][n]; }
+              TGam += con_T[m][n] * gam0;
+            }
+            Real Ta = 0.0;
+            SPACETIMELOOP(m) { Ta += con_T[m][0] * dlnalp[m]; }
+            v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * alp * alp * (Ta - TGam);
+          } else { 
+            v_src(iblock, idx_E_src(ispec), k, j, i) = 0.0;
           }
-          Real Ta = 0.0;
-          SPACETIMELOOP(m) { Ta += con_T[m][0] * dlnalp[m]; }
-          v_src(iblock, idx_E_src(ispec), k, j, i) = sdetgam * alp * alp * (Ta - TGam);
-
           SPACELOOP(l) {
             Real src_mom = 0.0;
             SPACETIMELOOP2(m, n) {

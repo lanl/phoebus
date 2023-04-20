@@ -36,11 +36,19 @@ constexpr char ye[] = "c.ye";
 namespace radmoment_prim {
 constexpr char J[] = "r.p.J";
 constexpr char H[] = "r.p.H";
+  namespace num {
+  constexpr char J[] = "r.p.n.J";
+  constexpr char H[] = "r.p.n.H";
+  } // namespace num
 } // namespace radmoment_prim
 
 namespace radmoment_cons {
 constexpr char E[] = "r.c.E";
 constexpr char F[] = "r.c.F";
+  namespace num {
+  constexpr char E[] = "r.c.n.E";
+  constexpr char F[] = "r.c.n.F";
+  } // namespace radmoment_cons
 } // namespace radmoment_cons
 
 namespace radmoment_internal {
@@ -58,6 +66,16 @@ constexpr char tilPi[] = "r.i.tilPi";
 constexpr char kappaH_mean[] = "r.i.kappaH_mean";
 constexpr char c2pfail[] = "r.i.c2p_fail";
 constexpr char srcfail[] = "r.i.src_fail";
+  namespace num { 
+  constexpr char xi[] = "r.i.n.xi";
+  constexpr char phi[] = "r.i.n.phi";
+  constexpr char dJ[] = "r.i.n.dJ";
+  constexpr char kappaJ[] = "r.i.n.kappaJ";
+  constexpr char kappaH[] = "r.i.n.kappaH";
+  constexpr char kappaH_mean[] = "r.i.n.kappaH_mean";
+  constexpr char JBB[] = "r.i.n.JBB";
+  constexpr char tilPi[] = "r.i.n.tilPi";
+  }
 } // namespace radmoment_internal
 
 namespace mocmc_internal {
