@@ -593,6 +593,36 @@ TEST_CASE("McKinneyGammieRyan", "[geometry]") {
               if (GetDifference(Jcon[0][0], 0.32222996) > EPS) update += 1;
               if (GetDifference(Jcon[1][0], 0.00112507) > EPS) update += 1;
               if (GetDifference(Jcon[1][1], 0.43532481) > EPS) update += 1;
+
+              // Now for a location where hyper-exponential coordinates are active
+              constexpr Real Xfar[] = {0., 8.5, X[2], X[3]};
+              transformation(Xfar[1], Xfar[2], Xfar[3], C, Jcov, Jcon);
+              // r
+              if (GetDifference(C[0], 4.914768840299134354e+03) > EPS) update += 1;
+              // theta
+              if (GetDifference(C[1], 1.178102621601838651e+00) > EPS) update += 1;
+              // phi
+              if (GetDifference(C[2], 3.2724923474893677) > EPS) update += 1;
+              // Jcov
+              if (std::abs(Jcov[0][1] > EPS)) update += 1;
+              if (std::abs(Jcov[0][2] > EPS)) update += 1;
+              if (std::abs(Jcov[1][2] > EPS)) update += 1;
+              if (std::abs(Jcov[2][0] > EPS)) update += 1;
+              if (std::abs(Jcov[2][1] > EPS)) update += 1;
+              if (GetDifference(Jcov[2][2], 1) > EPS) update += 1;
+              if (GetDifference(Jcov[0][0], 4.914768840299134354e+03) > EPS) update += 1;
+              if (GetDifference(Jcov[1][0], -2.015412862105097876e-04) > EPS) update += 1;
+              if (GetDifference(Jcov[1][1], 2.933523525877780980e+00) > EPS) update += 1;
+              // Jcon
+              if (std::abs(Jcon[0][1] > EPS)) update += 1;
+              if (std::abs(Jcon[0][2] > EPS)) update += 1;
+              if (std::abs(Jcon[1][2] > EPS)) update += 1;
+              if (std::abs(Jcon[2][0] > EPS)) update += 1;
+              if (std::abs(Jcon[2][1] > EPS)) update += 1;
+              if (GetDifference(Jcon[2][2], 1) > EPS) update += 1;
+              if (GetDifference(Jcon[0][0], 2.034683690106441685e-04) > EPS) update += 1;
+              if (GetDifference(Jcon[1][0], 1.397884708672635997e-08) > EPS) update += 1;
+              if (GetDifference(Jcon[1][1], 3.408869883532895662e-01) > EPS) update += 1;
             },
             n_wrong);
         REQUIRE(n_wrong == 0);
