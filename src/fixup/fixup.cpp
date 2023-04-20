@@ -675,30 +675,30 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
 
   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
 
-  namespace p = fluid_prim;
-  namespace c = fluid_cons;
-  const std::vector<std::string> vars({p::bfield, c::bfield});
-  PackIndexMap imap;
-  auto pack = md->PackVariables(vars, imap);
-
-  const int pblo = imap[p::bfield].first;
-  const int cblo = imap[c::bfield].first;
-
-  const auto ib = md->GetBoundsI(IndexDomain::interior);
-  const auto jb = md->GetBoundsJ(IndexDomain::interior);
-  const auto kb = md->GetBoundsK(IndexDomain::interior);
-
-  auto geom = Geometry::GetCoordinateSystem(md);
-  auto gpkg = pm->packages.Get("geometry");
-  bool derefine_poles = gpkg->Param<bool>("derefine_poles");
-  Real h = gpkg->Param<Real>("h");
-  Real xt = gpkg->Param<Real>("xt");
-  Real alpha = gpkg->Param<Real>("alpha");
-  Real x0 = gpkg->Param<Real>("x0");
-  Real smooth = gpkg->Param<Real>("smooth");
-  auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
-
   if (enable_phi_enforcement) {
+    namespace p = fluid_prim;
+    namespace c = fluid_cons;
+    const std::vector<std::string> vars({p::bfield, c::bfield});
+    PackIndexMap imap;
+    auto pack = md->PackVariables(vars, imap);
+
+    const int pblo = imap[p::bfield].first;
+    const int cblo = imap[c::bfield].first;
+
+    const auto ib = md->GetBoundsI(IndexDomain::interior);
+    const auto jb = md->GetBoundsJ(IndexDomain::interior);
+    const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+    auto geom = Geometry::GetCoordinateSystem(md);
+    auto gpkg = pm->packages.Get("geometry");
+    bool derefine_poles = gpkg->Param<bool>("derefine_poles");
+    Real h = gpkg->Param<Real>("h");
+    Real xt = gpkg->Param<Real>("xt");
+    Real alpha = gpkg->Param<Real>("alpha");
+    Real x0 = gpkg->Param<Real>("x0");
+    Real smooth = gpkg->Param<Real>("smooth");
+    auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
+
     const Real enforced_phi = fix_pkg->Param<Real>("enforced_phi");
     const Real enforced_phi_timescale = fix_pkg->Param<Real>("enforced_phi_timescale");
     const Real enforced_phi_cadence = fix_pkg->Param<Real>("enforced_phi_cadence");
