@@ -419,9 +419,10 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units
-          Real Ucon[4];
           Real vel[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
-          GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
+          Real W = GetLorentzFactor(v, geom, CellLocation::Cent, k, j, i);
+          Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real Ucon0 = robust::ratio(W, std::abs(alpha));
 
           bool absorbed = false;
 
