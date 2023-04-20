@@ -420,7 +420,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units
           Real Ucon[4];
-          Real vel[3] = {v(pvlo, k, j, i), v(pvlo + 1, k, j, i), v(pvlo + 2, k, j, i)};
+          Real vel[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
           GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
 
           bool absorbed = false;
