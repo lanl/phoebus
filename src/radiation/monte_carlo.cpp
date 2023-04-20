@@ -440,7 +440,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
                                  1. / d4x * weight(n) * k3(n));
               Kokkos::atomic_add(&(v(iGye, k, j, i)),
-                                 LeptonSign(s) / d4x * weight(n) * mp_code * Ucon[0]);
+                                 LeptonSign(s) / d4x * weight(n) * mp_code * Ucon0);
 
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]), 1.);
