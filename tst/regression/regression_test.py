@@ -46,6 +46,34 @@ def soft_equiv(val, ref, tol = 1.e-5):
   else:
     return True
 
+# -- Read value of parameter in input file
+def read_input_value(block, key, input_file):
+  with open(input_file, 'r') as infile:
+    lines = infile.readlines()
+    for line in lines:
+      sline = line.strip()
+
+      # Skip empty lines and comments
+      if len(sline) == 0 or sline[0] == '#':
+        continue
+
+      # Check for block
+      elif sline[0] == '<':
+        current_block = sline.split('<')[1].split('>')[0]
+        continue
+
+      # Ignore multi-value lines
+      elif len(sline.split('=')) != 2 or ',' in sline or '&' in sline:
+        continue
+
+      else:
+          current_key = sline.split('=')[0].strip()
+
+          if block == current_block and key == current_key:
+              return sline.split('=')[1].strip()
+
+  assert False, "block/key not found!"
+
 # -- Modify key in input file, add key (and block) if not present, write new file
 def modify_input(dict_key, value, input_file):
   key = dict_key.split('/')[-1]
@@ -191,6 +219,18 @@ def cleanup():
 def gold_comparison(variables, input_file, modified_inputs={},
                     executable=None, geometry='Minkowski', use_gpu=False, use_mpiexec=False,
                     build_type='Release', upgold=False, compression_factor=1, tolerance=1.e-5):
+
+  problem = read_input_value('phoebus', 'problem', input_file)
+  print('\n=== GOLD COMPARISON TEST PROBLEM ===')
+  print(f'= problem:     {problem}')
+  print(f'= executable:  {executable}')
+  print(f'= geometry:    {geometry}')
+  print(f'= use_gpu:     {use_gpu}')
+  print(f'= use_mpiexec: {use_mpiexec}')
+  print(f'= build_type:  {build_type}')
+  print(f'= compression: {compression_factor}')
+  print(f'= tolerance:   {tolerance}')
+  print('====================================\n')
 
   if executable is None:
     executable = os.path.join(BUILD_DIR, 'src', 'phoebus')
