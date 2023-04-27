@@ -354,14 +354,15 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
   // Extra per-step user work
   TaskRegion &sync_region_5 = tc.AddRegion(num_partitions);
-  PARTHENON_REQUIRE(num_partitions == 1, "Reductions don't work for multiple partitions?");
+  PARTHENON_REQUIRE(num_partitions == 1,
+                    "Reductions don't work for multiple partitions?");
   for (int i = 0; i < num_partitions; i++) {
     auto &tl = sync_region_5[i];
 
     auto &md = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
 
-    auto end_mods = tl.AddTask(none, fixup::EndOfStepModify, md.get(), t, dt, stage==integrator->nstages);
-
+    auto end_mods = tl.AddTask(none, fixup::EndOfStepModify, md.get(), t, dt,
+                               stage == integrator->nstages);
   }
   // This is a bad pattern. Having a per-mesh data p2c would help.
   TaskRegion &async_region_4 = tc.AddRegion(num_independent_task_lists);
@@ -635,28 +636,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       }
     }
   }
-
-  //// Extra per-step user work
-  //TaskRegion &sync_region_5 = tc.AddRegion(num_partitions);
-  //PARTHENON_REQUIRE(num_partitions == 1, "Reductions don't work for multiple partitions?");
-  //for (int i = 0; i < num_partitions; i++) {
-  //  auto &tl = sync_region_5[i];
-
-  //  auto &md = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
-
-  //  auto end_mods = tl.AddTask(none, fixup::EndOfStepModify, md.get(), t, dt, stage==integrator->nstages);
-
-  //}
-  //// This is a bad pattern. Having a per-mesh data p2c would help.
-  //TaskRegion &async_region_4 = tc.AddRegion(num_independent_task_lists);
-  //for (int i = 0; i < blocks.size(); i++) {
-  //  auto &pmb = blocks[i];
-  //  auto &tl = async_region_3[i];
-  //  auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
-
-  //  auto p2c = tl.AddTask(none, PrimitiveToConserved, sc);
-  //}
-
 
   return tc;
 } // namespace phoebus
