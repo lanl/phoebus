@@ -81,8 +81,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real enforced_phi_timescale =
       pin->GetOrAddReal("fixup", "enforced_phi_timescale", 1.e3);
   params.Add("enforced_phi_timescale", enforced_phi_timescale);
-  Real enforced_phi_cadence = pin->GetOrAddInteger("fixup", "enforced_phi_cadence", 10);
+  Real enforced_phi_cadence = pin->GetOrAddReal("fixup", "enforced_phi_cadence", 10.);
   params.Add("enforced_phi_cadence", enforced_phi_cadence);
+  Real enforced_phi_start_time =
+      pin->GetOrAddReal("fixup", "enforced_phi_start_time", 175.);
+  params.Add("enforced_phi_start_time", enforced_phi_start_time);
   if (enable_phi_enforcement) {
     PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
                       "Phi enforcement only supported for BH geometry!");
@@ -672,51 +675,53 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
 
   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
 
-  namespace p = fluid_prim;
-  namespace c = fluid_cons;
-  const std::vector<std::string> vars({p::bfield, c::bfield});
-  PackIndexMap imap;
-  auto pack = md->PackVariables(vars, imap);
-
-  const int pblo = imap[p::bfield].first;
-  const int cblo = imap[c::bfield].first;
-
-  const auto ib = md->GetBoundsI(IndexDomain::interior);
-  const auto jb = md->GetBoundsJ(IndexDomain::interior);
-  const auto kb = md->GetBoundsK(IndexDomain::interior);
-
-  auto geom = Geometry::GetCoordinateSystem(md);
-  auto gpkg = pm->packages.Get("geometry");
-  bool derefine_poles = gpkg->Param<bool>("derefine_poles");
-  Real h = gpkg->Param<Real>("h");
-  Real xt = gpkg->Param<Real>("xt");
-  Real alpha = gpkg->Param<Real>("alpha");
-  Real x0 = gpkg->Param<Real>("x0");
-  Real smooth = gpkg->Param<Real>("smooth");
-  auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
-
   if (enable_phi_enforcement) {
+    namespace p = fluid_prim;
+    namespace c = fluid_cons;
+    const std::vector<std::string> vars({p::bfield, c::bfield});
+    PackIndexMap imap;
+    auto pack = md->PackVariables(vars, imap);
+
+    const int pblo = imap[p::bfield].first;
+    const int cblo = imap[c::bfield].first;
+
+    const auto ib = md->GetBoundsI(IndexDomain::interior);
+    const auto jb = md->GetBoundsJ(IndexDomain::interior);
+    const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+    auto geom = Geometry::GetCoordinateSystem(md);
+    auto gpkg = pm->packages.Get("geometry");
+    bool derefine_poles = gpkg->Param<bool>("derefine_poles");
+    Real h = gpkg->Param<Real>("h");
+    Real xt = gpkg->Param<Real>("xt");
+    Real alpha = gpkg->Param<Real>("alpha");
+    Real x0 = gpkg->Param<Real>("x0");
+    Real smooth = gpkg->Param<Real>("smooth");
+    auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
+
     const Real enforced_phi = fix_pkg->Param<Real>("enforced_phi");
     const Real enforced_phi_timescale = fix_pkg->Param<Real>("enforced_phi_timescale");
     const Real enforced_phi_cadence = fix_pkg->Param<Real>("enforced_phi_cadence");
+    const Real enforced_phi_start_time = fix_pkg->Param<Real>("enforced_phi_start_time");
+    if (t > enforced_phi_start_time) {
 
-    // This only needs to be done at initialization
-    ParArrayND<Real> A("vector potential", pack.GetDim(5), jb.e + 1, ib.e + 1);
+      // This only needs to be done at initialization
+      ParArrayND<Real> A("vector potential", pack.GetDim(5), jb.e + 2, ib.e + 2);
       // Update B field
       parthenon::par_for(
           parthenon::LoopPatternMDRange(), "Phoebus::Fixup::EndOfStepModify::EvaluateQ",
-          DevExecSpace(), 0, pack.GetDim(5) - 1, jb.s + 1, jb.e, ib.s + 1, ib.e,
+          DevExecSpace(), 0, pack.GetDim(5) - 1, jb.s, jb.e + 1, ib.s, ib.e + 1,
           KOKKOS_LAMBDA(const int b, const int j, const int i) {
             const auto &coords = pack.GetCoords(b);
-            const Real x1 = coords.Xc<1>(0, j, i);
-            const Real x2 = coords.Xc<2>(0, j, i);
+            const Real x1 = coords.Xf<1>(0, j, i);
+            const Real x2 = coords.Xf<2>(0, j, i);
             const Real r = tr.bl_radius(x1);
             const Real th = tr.bl_theta(x1, x2);
 
             const Real x = r * sin(th);
             const Real z = r * cos(th);
-            const Real a_hyp = 2.;
-            const Real b_hyp = 60.;
+            const Real a_hyp = 1.2;
+            const Real b_hyp = 3. * a_hyp;
             const Real x_hyp = a_hyp * sqrt(1. + pow(z / b_hyp, 2.));
             const Real q = (pow(x, 2) - pow(x_hyp, 2)) / pow(x_hyp, 2.);
             if (x < x_hyp) {
@@ -724,87 +729,87 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
             }
           });
 
-    // Recalculate dphi_dt occasionally
-    if (last_stage && t >= next_dphi_dt_update_time) {
-      next_dphi_dt_update_time += enforced_phi_cadence;
+      // Recalculate dphi_dt occasionally
+      if (last_stage && t >= next_dphi_dt_update_time) {
+        next_dphi_dt_update_time += enforced_phi_cadence;
 
-      // Measure phi
-      const Real phi_proc = History::ReduceMagneticFluxPhi(md);
-      const Real phi = reduction::Sum(phi_proc);
-      printf("Original phi: %e\n", phi);
+        // Record mdot
+        const Real mdot_proc = History::ReduceMassAccretionRate(md);
+        const Real mdot = reduction::Sum(mdot_proc);
 
-      // Calculate amount of phi to add this timestep
-      const Real dphi =
-          (enforced_phi - phi) * dt / enforced_phi_timescale; //*enforced_phi_cadence;
-      dphi_dt = dphi / dt;
-      printf("dphi: %e\n", dphi);
-      printf("dphi_dt: %e\n", dphi_dt);
+        // Measure phi
+        const Real phi_proc = History::ReduceMagneticFluxPhi(md);
+        const Real phi = reduction::Sum(phi_proc) / std::sqrt(mdot);
 
+        // Calculate amount of phi to add this timestep
+        const Real dphi = (enforced_phi - phi) * dt / enforced_phi_timescale;
+        dphi_dt = dphi / dt;
+
+        parthenon::par_for(
+            parthenon::LoopPatternMDRange(),
+            "Phoebus::Fixup::EndOfStepModify::EvaluateBField", DevExecSpace(), 0,
+            pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
+            KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+              const auto &coords = pack.GetCoords(b);
+              const Real gammadet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+              pack(b, pblo, k, j, i) +=
+                  (-(A(b, j, i) - A(b, j + 1, i) + A(b, j, i + 1) - A(b, j + 1, i + 1)) /
+                   (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gammadet));
+              pack(b, pblo + 1, k, j, i) +=
+                  ((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
+                   (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
+
+              // Used by ReduceMagneticFluxPhi
+              pack(b, cblo, k, j, i) = pack(b, pblo, k, j, i) * gammadet;
+              pack(b, cblo + 1, k, j, i) = pack(b, pblo + 1, k, j, i) * gammadet;
+            });
+
+        // Measure change in phi
+        const Real fiducial_phi_proc = History::ReduceMagneticFluxPhi(md);
+        const Real fiducial_phi = reduction::Sum(fiducial_phi_proc) / std::sqrt(mdot);
+        phi_factor = dphi / (fiducial_phi - phi) / dt;
+
+        // Remove the fiducial contribution
+        parthenon::par_for(
+            parthenon::LoopPatternMDRange(),
+            "Phoebus::Fixup::EndOfStepModify::EvaluateBField", DevExecSpace(), 0,
+            pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
+            KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+              const auto &coords = pack.GetCoords(b);
+              const Real gammadet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+
+              pack(b, pblo, k, j, i) -=
+                  (-(A(b, j, i) - A(b, j + 1, i) + A(b, j, i + 1) - A(b, j + 1, i + 1)) /
+                   (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gammadet));
+              pack(b, pblo + 1, k, j, i) -=
+                  ((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
+                   (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
+
+              pack(b, cblo, k, j, i) = pack(b, pblo, k, j, i) * gammadet;
+              pack(b, cblo + 1, k, j, i) = pack(b, pblo + 1, k, j, i) * gammadet;
+            });
+      }
+
+      // Properly update B field
       parthenon::par_for(
           parthenon::LoopPatternMDRange(),
           "Phoebus::Fixup::EndOfStepModify::EvaluateBField", DevExecSpace(), 0,
-          pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
+          pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
           KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
             const auto &coords = pack.GetCoords(b);
             const Real gammadet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+
             pack(b, pblo, k, j, i) +=
+                phi_factor * dt *
                 (-(A(b, j, i) - A(b, j + 1, i) + A(b, j, i + 1) - A(b, j + 1, i + 1)) /
                  (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gammadet));
             pack(b, pblo + 1, k, j, i) +=
+                phi_factor * dt *
                 ((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
                  (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
-
-            // Used by ReduceMagneticFluxPhi
-            pack(b, cblo, k, j, i) = pack(b, pblo, k, j, i) * gammadet;
-            pack(b, cblo + 1, k, j, i) = pack(b, pblo + 1, k, j, i) * gammadet;
           });
-
-      // Measure change in phi
-      const Real fiducial_phi_proc = History::ReduceMagneticFluxPhi(md);
-      const Real fiducial_phi = reduction::Sum(fiducial_phi_proc);
-      printf("here! phi: %e\n", fiducial_phi);
-      phi_factor = dphi / (fiducial_phi - phi) / dt;
-      printf("phi_factor: %e\n", phi_factor);
-      // exit(-1);
-
-      // Remove the fiducial contribution
-      parthenon::par_for(
-          parthenon::LoopPatternMDRange(),
-          "Phoebus::Fixup::EndOfStepModify::EvaluateBField", DevExecSpace(), 0,
-          pack.GetDim(5) - 1, kb.s, kb.e, jb.s,
-          jb.e - 1, ib.s, ib.e - 1, KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-            const auto &coords = pack.GetCoords(b);
-            const Real gammadet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
-
-            pack(b, pblo, k, j, i) -=
-                (-(A(b, j, i) - A(b, j + 1, i) + A(b, j, i + 1) - A(b, j + 1, i + 1)) /
-                 (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gammadet));
-            pack(b, pblo + 1, k, j, i) -=
-                ((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
-                 (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
-
-            pack(b, cblo, k, j, i) = pack(b, pblo, k, j, i) * gammadet;
-            pack(b, cblo + 1, k, j, i) = pack(b, pblo + 1, k, j, i) * gammadet;
-          });
-    }
-
-  // Properly update B field
-      parthenon::par_for(
-          parthenon::LoopPatternMDRange(),
-          "Phoebus::Fixup::EndOfStepModify::EvaluateBField", DevExecSpace(), 0,
-      pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e - 1,
-      ib.s, ib.e - 1, KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-            const auto &coords = pack.GetCoords(b);
-            const Real gammadet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
-
-        pack(b, pblo, k, j, i) +=
-            phi_factor*dt*(-(A(b, j, i) - A(b, j + 1, i) + A(b, j, i + 1) - A(b, j + 1, i + 1)) /
-             (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gammadet));
-        pack(b, pblo + 1, k, j, i) +=
-            phi_factor*dt*((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
-             (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
-      });
-  }
+    } // enforced_phi_start_time
+  }   // enable_phi_enforcement
 
   return TaskStatus::complete;
 }
