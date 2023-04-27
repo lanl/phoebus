@@ -68,6 +68,7 @@ ix3_bc      = periodic      # Inner-X3 boundary condition flag
 ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 
 num_threads = 1         # maximum number of OMP threads
+pack_size = -1
 
 # Commenting out meshblock sizes makes the simulation 1 meshblock
 #<parthenon/meshblock>
