@@ -354,15 +354,43 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
   // Extra per-step user work
   TaskRegion &sync_region_5 = tc.AddRegion(num_partitions);
+  int sync_region_5_dep_id;
   PARTHENON_REQUIRE(num_partitions == 1,
                     "Reductions don't work for multiple partitions?");
+  net_field_totals.val.resize(2); // Mdot, Phi
+  for (int i = 0; i < 2; i++) {
+    net_field_totals.val[i] = 0.;
+  }
   for (int i = 0; i < num_partitions; i++) {
+    sync_region_5_dep_id = 0;
     auto &tl = sync_region_5[i];
 
     auto &md = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
 
-    auto end_mods = tl.AddTask(none, fixup::EndOfStepModify, md.get(), t, dt,
-                               stage == integrator->nstages);
+    auto sum_mdot_1 = tl.AddTask(none, fixup::SumMdotPhiForNetFieldScaling, md.get(), t,
+                                 &(net_field_totals.val));
+
+    // TODO(BRR) StartVecReduce and FinishVecReduce
+
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, sum_mdot_1);
+    sync_region_5_dep_id++;
+
+    // TODO(BRR) only do these tasks if we are actually updating the net field controls!
+    TaskID start_reduce_1 =
+        (i == 0 ? tl.AddTask(sum_mdot_1, &AllReduce<std::vector<Real>>::StartReduce,
+                             &net_field_totals, MPI_SUM)
+                : none);
+    // Test the reduction until it completes
+    TaskID finish_reduce_1 = tl.AddTask(
+        start_reduce_1, &AllReduce<std::vector<Real>>::CheckReduce, &net_field_totals);
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, finish_reduce_1);
+    sync_region_5_dep_id++;
+
+    auto mod_net = tl.AddTask(finish_reduce_1, fixup::ModifyNetField, md.get(), t, dt,
+                              &(net_field_totals.val), true, 1.);
+
+    //    auto end_mods = tl.AddTask(none, fixup::EndOfStepModify, md.get(), t, dt,
+    //                               stage == integrator->nstages);
   }
   // This is a bad pattern. Having a per-mesh data p2c would help.
   TaskRegion &async_region_4 = tc.AddRegion(num_independent_task_lists);
