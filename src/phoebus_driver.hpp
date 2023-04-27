@@ -38,7 +38,7 @@ class PhoebusDriver : public EvolutionDriver {
   TaskListStatus Step();
 
  private:
-  std::unique_ptr<StagedIntegrator> integrator;
+  std::unique_ptr<parthenon::LowStorageIntegrator> integrator;
   const bool is_restart_;
   Real dt_init, dt_init_fact;
 
