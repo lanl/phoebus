@@ -54,10 +54,6 @@ else
 fi
 
 echo "Formatting Python files..."
-#directories=("tst/" "script/")
-#for dir in "${directories[@]}"; do
-#    find "$dir" -name "*.py" -exec ${PFM} {} \;
-#done
 REPO=$(git rev-parse --show-toplevel)
 for f in $(git grep --untracked -ail res -- :/*.py); do
     if [ ${VERBOSE} -ge 1 ]; then
