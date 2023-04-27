@@ -29,7 +29,8 @@ void signal_speeds(const Real &rho, const Real &u, const Real &p, const Real &bs
   const Real vasq = bsq / (rho_rel + bsq);
   Real cssq = gam1 * p / rho_rel;
   PARTHENON_DEBUG_REQUIRE(rho > robust::SMALL(), "rho is unacceptably small!");
-  PARTHENON_DEBUG_REQUIRE(u > robust::SMALL(), "u is unacceptably small!");
+  // PARTHENON_DEBUG_REQUIRE(u > robust::SMALL(), "u is unacceptably small!"); //This
+  // interferes with floors with initial conditions
   PARTHENON_DEBUG_REQUIRE(p > robust::SMALL(), "p is unacceptably small!");
   PARTHENON_DEBUG_REQUIRE(gam1 > robust::SMALL(), "gam1 is unacceptably small!");
   cssq += vasq - cssq * vasq;

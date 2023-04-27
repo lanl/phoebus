@@ -47,6 +47,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 # TODO(JMM): Pgen?
 include(CTest)
 option(PHOEBUS_ENABLE_UNIT_TESTS "Enable unit tests" OFF)
+option(PHOEBUS_ENABLE_DOWNLOADS "Enable table download" OFF)
 option(PHOEBUS_ENABLE_INTEGRATION_TESTS "Enable integration tests" OFF)
 option(PHOEBUS_ENABLE_REGRESSION_TESTS "Enable regression tests" OFF)
 option(PHOEBUS_ENABLE_CUDA "Enable cuda for riot and all dependencies" OFF)
@@ -101,7 +102,7 @@ if(PHOEBUS_ENABLE_CUDA)
   set(Kokkos_ENABLE_CUDA_LAMBDA ON CACHE BOOL "" FORCE)
   # Get around a bug with atomics on Cray
   # This option will eventually be deprecated, so care required.
-  set(Kokkos_ENABLE_IMPL_DESUL_ATOMICS OFF CACHE BOOL "" FORCE)
+  # set(Kokkos_ENABLE_IMPL_DESUL_ATOMICS OFF CACHE BOOL "" FORCE)
 endif()
 
 # HDF5

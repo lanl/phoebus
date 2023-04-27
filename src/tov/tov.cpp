@@ -24,9 +24,6 @@
 
 using namespace parthenon::package::prelude;
 
-// Singularity
-#include <singularity-eos/eos/eos.hpp>
-
 // Phoebus
 #include "analysis/history.hpp"
 #include "geometry/geometry_utils.hpp"
