@@ -85,11 +85,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("enforced_phi_cadence", enforced_phi_cadence);
   Real enforced_phi_start_time =
       pin->GetOrAddReal("fixup", "enforced_phi_start_time", 175.);
+  PARTHENON_REQUIRE(enforced_phi_start_time >= 0.,
+                    "Phi enforcement start time must be non-negative!");
   params.Add("enforced_phi_start_time", enforced_phi_start_time);
   if (enable_phi_enforcement) {
     PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
                       "Phi enforcement only supported for BH geometry!");
   }
+  // Mutable parameters for following sanity maintenance
+  params.Add("dphi_dt", 0., true);
+  params.Add("next_dphi_dt_update_time", enforced_phi_start_time, true);
+  params.Add("phi_factor", 0., true);
 
   if (enable_mhd_floors && !enable_mhd) {
     enable_mhd_floors = false;
@@ -664,10 +670,6 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   return TaskStatus::complete;
 }
 
-static Real dphi_dt = 0.;
-static Real next_dphi_dt_update_time = 0.;
-static Real phi_factor = 0.;
-
 TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
                            bool last_stage) {
   auto *pm = md->GetParentPointer();
@@ -703,6 +705,11 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
     const Real enforced_phi_timescale = fix_pkg->Param<Real>("enforced_phi_timescale");
     const Real enforced_phi_cadence = fix_pkg->Param<Real>("enforced_phi_cadence");
     const Real enforced_phi_start_time = fix_pkg->Param<Real>("enforced_phi_start_time");
+
+    Real phi_factor = fix_pkg->Param<Real>("phi_factor");
+    Real dphi_dt = fix_pkg->Param<Real>("dphi_dt");
+    Real next_dphi_dt_update_time = fix_pkg->Param<Real>("next_dphi_dt_update_time");
+
     if (t > enforced_phi_start_time) {
 
       // This only needs to be done at initialization
@@ -788,6 +795,10 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
               pack(b, cblo, k, j, i) = pack(b, pblo, k, j, i) * gammadet;
               pack(b, cblo + 1, k, j, i) = pack(b, pblo + 1, k, j, i) * gammadet;
             });
+
+        fix_pkg->UpdateParam<Real>("phi_factor", phi_factor);
+        fix_pkg->UpdateParam<Real>("dphi_dt", dphi_dt);
+        fix_pkg->UpdateParam<Real>("next_dphi_dt_update_time", next_dphi_dt_update_time);
       }
 
       // Properly update B field
@@ -813,6 +824,139 @@ TaskStatus EndOfStepModify(MeshData<Real> *md, const Real t, const Real dt,
 
   return TaskStatus::complete;
 }
+
+// TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t,
+//                                         std::vector<Real> *sums) {
+//   printf("%s:%i\n", __FILE__, __LINE__);
+//   auto *pm = md->GetParentPointer();
+//   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+//
+//   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
+//
+//   if (enable_phi_enforcement) {
+//     const Real enforced_phi_start_time =
+//     fix_pkg->Param<Real>("enforced_phi_start_time"); const Real
+//     next_dphi_dt_update_time =
+//         fix_pkg->Param<Real>("next_dphi_dt_update_time");
+//     if (t >= next_dphi_dt_update_time && t >= enforced_phi_start_time) {
+//       const Real Mdot = History::ReduceMassAccretionRate(md);
+//       const Real Phi = History::ReduceMagneticFluxPhi(md);
+//       printf("Per-MD sum: Mdot: %e Phi: %e\n", Mdot, Phi);
+//
+//       (*sums)[0] += Mdot;
+//       (*sums)[1] += Phi;
+//     }
+//   }
+//   printf("%s:%i\n", __FILE__, __LINE__);
+//
+//   return TaskStatus::complete;
+// }
+
+// TODO(BRR) separate task to update
+
+// TaskStatus UpdateNetFieldScaleControls(MeshData<Real> *md, const Real t, const Real dt,
+//                                        const Real Mdot, const Real Phi) {
+//   printf("%s:%i\n", __FILE__, __LINE__);
+//   auto *pm = md->GetParentPointer();
+//   printf("%s:%i\n", __FILE__, __LINE__);
+//   return TaskStatus::complete;
+// }
+//
+// TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
+//                           const Real Mdot, const Real Phi, const bool fiducial,
+//                           const Real fiducial_factor) {
+//   printf("%s:%i\n", __FILE__, __LINE__);
+//   printf("Mdot: %e Phi: %e\n", Mdot, Phi);
+//   auto *pm = md->GetParentPointer();
+//   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+//
+//   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
+//
+//   if (enable_phi_enforcement) {
+//
+//     const Real next_dphi_dt_update_time =
+//         fix_pkg->Param<Real>("next_dphi_dt_update_time");
+//
+//     namespace p = fluid_prim;
+//     namespace c = fluid_cons;
+//     const std::vector<std::string> vars({p::bfield, c::bfield});
+//     PackIndexMap imap;
+//     auto pack = md->PackVariables(vars, imap);
+//
+//     const int pblo = imap[p::bfield].first;
+//     const int cblo = imap[c::bfield].first;
+//
+//     const auto ib = md->GetBoundsI(IndexDomain::interior);
+//     const auto jb = md->GetBoundsJ(IndexDomain::interior);
+//     const auto kb = md->GetBoundsK(IndexDomain::interior);
+//
+//     auto geom = Geometry::GetCoordinateSystem(md);
+//     auto gpkg = pm->packages.Get("geometry");
+//     bool derefine_poles = gpkg->Param<bool>("derefine_poles");
+//     Real h = gpkg->Param<Real>("h");
+//     Real xt = gpkg->Param<Real>("xt");
+//     Real alpha = gpkg->Param<Real>("alpha");
+//     Real x0 = gpkg->Param<Real>("x0");
+//     Real smooth = gpkg->Param<Real>("smooth");
+//     const Real Rh = gpkg->Param<Real>("Rh");
+//     auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
+//
+//     Real phi_factor = fix_pkg->Param<Real>("phi_factor");
+//     if (fiducial) {
+//       phi_factor = fiducial_factor;
+//     }
+//
+//     if (t >= next_dphi_dt_update_time) {
+//       //  next_dphi_dt_update_time += enforced_phi_cadence;
+//
+//       // Calculate hyperbola-based magnetic field configuration inside the event
+//       horizon ParArrayND<Real> A("vector potential", pack.GetDim(5), jb.e + 2, ib.e +
+//       2); parthenon::par_for(
+//           DEFAULT_LOOP_PATTERN, "Phoebus::Fixup::EndOfStepModify::EvaluateQ",
+//           DevExecSpace(), 0, pack.GetDim(5) - 1, jb.s, jb.e + 1, ib.s, ib.e + 1,
+//           KOKKOS_LAMBDA(const int b, const int j, const int i) {
+//             const auto &coords = pack.GetCoords(b);
+//             const Real x1 = coords.Xf<1>(0, j, i);
+//             const Real x2 = coords.Xf<2>(0, j, i);
+//             const Real r = tr.bl_radius(x1);
+//             const Real th = tr.bl_theta(x1, x2);
+//
+//             const Real x = r * std::sin(th);
+//             const Real z = r * std::cos(th);
+//             const Real a_hyp = Rh;
+//             const Real b_hyp = 3. * a_hyp;
+//             const Real x_hyp = a_hyp * std::sqrt(1. + std::pow(z / b_hyp, 2.));
+//             const Real q = (std::pow(x, 2) - std::pow(x_hyp, 2)) / std::pow(x_hyp, 2.);
+//             if (x < x_hyp) {
+//               A(b, j, i) = q;
+//             }
+//           });
+//
+//       // Modify B field
+//       parthenon::par_for(
+//           DEFAULT_LOOP_PATTERN, "Phoebus::Fixup::EndOfStepModify::EvaluateBField",
+//           DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+//           KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+//             const auto &coords = pack.GetCoords(b);
+//             const Real gammadet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+//
+//             pack(b, pblo, k, j, i) +=
+//                 phi_factor * dt *
+//                 (-(A(b, j, i) - A(b, j + 1, i) + A(b, j, i + 1) - A(b, j + 1, i + 1)) /
+//                  (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gammadet));
+//             pack(b, pblo + 1, k, j, i) +=
+//                 phi_factor * dt *
+//                 ((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
+//                  (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
+//           });
+//
+//       // TODO(BRR) optionally call p2c here?
+//     } // t >= next_dphi_dt_update_time
+//   }   // enable_phie_enforcement
+//
+//   exit(-1);
+//   return TaskStatus::complete;
+// }
 
 template <typename T>
 TaskStatus ApplyFloors(T *rc) {

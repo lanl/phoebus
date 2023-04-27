@@ -40,6 +40,13 @@ template <typename T>
 TaskStatus SourceFixup(T *rc);
 TaskStatus EndOfStepModify(MeshData<Real> *, const Real t, const Real dt,
                            const bool last_stage);
+TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t,
+                                        std::vector<Real> *sums);
+TaskStatus ModifyNetField(MeshData<Real> *, const Real t, const Real dt,
+                          std::vector<Real> *vals, const bool fiducial,
+                          const Real fiducial_factor = 1.);
+TaskStatus EvaluateNetFieldScaleControls(MeshData<Real> *, const Real t, const Real dt,
+                                         const Real Mdot, const Real Phi);
 
 static struct ConstantRhoSieFloor {
 } constant_rho_sie_floor_tag;
