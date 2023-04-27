@@ -61,14 +61,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
   auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::blandford_mckee", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real r = coords.x1v(i);
+        const Real r = coords.Xc<1>(i);
         Real vel = (std::abs(r) < tshock) ? rescale * r / tshock : 0;
         PARTHENON_REQUIRE(vel < 1, "Velocity subluminal");
         Real W = 1 / std::sqrt(1 - vel * vel);

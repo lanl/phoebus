@@ -69,7 +69,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto &coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<singularity::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc.get());
   auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
   auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
@@ -77,7 +77,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::Sod", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real x = coords.x1v(i);
+        const Real x = coords.Xc<1>(i);
         const Real rho = x < 0.5 ? rhol : rhor;
         const Real P = x < 0.5 ? Pl : Pr;
         const Real vel = x < 0.5 ? vl : vr;

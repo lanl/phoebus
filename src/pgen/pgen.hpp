@@ -19,9 +19,6 @@
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
 
-// singularity includes
-#include <singularity-eos/eos/eos.hpp>
-
 // internal includes
 #include "fluid/fluid.hpp"
 #include "geometry/geometry.hpp"
@@ -50,7 +47,8 @@ using namespace parthenon::package::prelude;
   PROBLEM(homogeneous_sphere)                                                            \
   PROBLEM(torus)                                                                         \
   PROBLEM(p2c2p)                                                                         \
-  PROBLEM(tov)
+  PROBLEM(tov)                                                                           \
+  PROBLEM(homologous)
 
 // if you need problem-specific modifications to inputs, add the name here
 #define FOREACH_MODIFIER                                                                 \
@@ -120,7 +118,7 @@ static std::map<std::string, std::function<void(ParameterInput *pin, Mesh *pmesh
 */
 
 KOKKOS_FUNCTION
-Real energy_from_rho_P(const singularity::EOS &eos, const Real rho, const Real P,
+Real energy_from_rho_P(const Microphysics::EOS::EOS &eos, const Real rho, const Real P,
                        const Real emin, const Real emax, const Real Ye = 0.0);
 
 } // namespace phoebus
