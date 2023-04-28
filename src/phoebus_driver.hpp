@@ -47,6 +47,7 @@ class PhoebusDriver : public EvolutionDriver {
   AllReduce<int> particles_outstanding;
 
   AllReduce<std::vector<Real>> net_field_totals;
+  AllReduce<std::vector<Real>> net_field_totals_2;
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
