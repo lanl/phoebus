@@ -1,4 +1,4 @@
-// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// © 2021-2023. Triad National Security, LLC. All rights reserved.
 // This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -17,9 +17,11 @@
 #include <cmath>
 #include <limits>
 
+#include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
+using namespace parthenon::driver::prelude;
 
 namespace fixup {
 
@@ -40,13 +42,20 @@ template <typename T>
 TaskStatus SourceFixup(T *rc);
 TaskStatus EndOfStepModify(MeshData<Real> *, const Real t, const Real dt,
                            const bool last_stage);
-TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t,
+TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t, const int stage,
                                         std::vector<Real> *sums);
-TaskStatus ModifyNetField(MeshData<Real> *, const Real t, const Real dt,
-                          std::vector<Real> *vals, const bool fiducial,
-                          const Real fiducial_factor = 1.);
+TaskStatus ModifyNetField(MeshData<Real> *, const Real t, const Real dt, const int stage,
+                          const bool fiducial, const Real fiducial_factor = 1.);
 TaskStatus EvaluateNetFieldScaleControls(MeshData<Real> *, const Real t, const Real dt,
-                                         const Real Mdot, const Real Phi);
+                                         const int stage, const Real Mdot,
+                                         const Real Phi);
+TaskStatus NetFieldStartReduce(MeshData<Real> *md, const Real t, const int stage,
+                               AllReduce<std::vector<Real>> *net_field_totals);
+TaskStatus NetFieldCheckReduce(MeshData<Real> *md, const Real t, const int stage,
+                               AllReduce<std::vector<Real>> *net_field_totals);
+TaskStatus UpdateNetFieldScaleControls(MeshData<Real> *md, const Real t, const Real dt,
+                                       const int stage, std::vector<Real> *vals0,
+                                       std::vector<Real> *vals1);
 
 static struct ConstantRhoSieFloor {
 } constant_rho_sie_floor_tag;

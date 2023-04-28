@@ -358,8 +358,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   PARTHENON_REQUIRE(num_partitions == 1,
                     "Reductions don't work for multiple partitions?");
   net_field_totals.val.resize(2); // Mdot, Phi
+  net_field_totals_2.val.resize(2);
   for (int i = 0; i < 2; i++) {
     net_field_totals.val[i] = 0.;
+    net_field_totals_2.val[i] = 0.;
   }
   for (int i = 0; i < num_partitions; i++) {
     sync_region_5_dep_id = 0;
@@ -367,27 +369,56 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto &md = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
 
-    auto sum_mdot_1 = tl.AddTask(none, fixup::SumMdotPhiForNetFieldScaling, md.get(), t,
-                                 &(net_field_totals.val));
+    // Begin tuning region that only evaluates occasionally and on first stage
+    // TODO(BRR) Setting scale factor of B field need only be done once per simulation
 
-    // TODO(BRR) StartVecReduce and FinishVecReduce
+    // Evaluate current Mdot, Phi
+    auto sum_mdot_1 = tl.AddTask(none, fixup::SumMdotPhiForNetFieldScaling, md.get(), t,
+                                 stage, &(net_field_totals.val));
 
     sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, sum_mdot_1);
     sync_region_5_dep_id++;
 
-    // TODO(BRR) only do these tasks if we are actually updating the net field controls!
-    TaskID start_reduce_1 =
-        (i == 0 ? tl.AddTask(sum_mdot_1, &AllReduce<std::vector<Real>>::StartReduce,
-                             &net_field_totals, MPI_SUM)
-                : none);
+    TaskID start_reduce_1 = (i == 0 ? tl.AddTask(sum_mdot_1, fixup::NetFieldStartReduce,
+                                                 md.get(), t, stage, &net_field_totals)
+                                    : none);
     // Test the reduction until it completes
-    TaskID finish_reduce_1 = tl.AddTask(
-        start_reduce_1, &AllReduce<std::vector<Real>>::CheckReduce, &net_field_totals);
+    TaskID finish_reduce_1 = tl.AddTask(start_reduce_1, fixup::NetFieldCheckReduce,
+                                        md.get(), t, stage, &net_field_totals);
     sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, finish_reduce_1);
     sync_region_5_dep_id++;
 
-    auto mod_net = tl.AddTask(finish_reduce_1, fixup::ModifyNetField, md.get(), t, dt,
-                              &(net_field_totals.val), true, 1.);
+    auto mod_net = tl.AddTask(finish_reduce_1, fixup::ModifyNetField, md.get(), t,
+                              beta * dt, stage, true, 1.);
+
+    // Evaluate Mdot, Phi (only Phi changes) after modifying B field
+    auto sum_mdot_2 = tl.AddTask(mod_net, fixup::SumMdotPhiForNetFieldScaling, md.get(),
+                                 t, stage, &(net_field_totals_2.val));
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, sum_mdot_2);
+    sync_region_5_dep_id++;
+
+    TaskID start_reduce_2 = (i == 0 ? tl.AddTask(sum_mdot_2, fixup::NetFieldStartReduce,
+                                                 md.get(), t, stage, &net_field_totals_2)
+                                    : none);
+    // Test the reduction until it completes
+    TaskID finish_reduce_2 = tl.AddTask(start_reduce_2, fixup::NetFieldCheckReduce,
+                                        md.get(), t, stage, &net_field_totals_2);
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, finish_reduce_2);
+    sync_region_5_dep_id++;
+
+    // Remove artificial contribution to net field
+    auto mod_net_2 = tl.AddTask(finish_reduce_2, fixup::ModifyNetField, md.get(), t,
+                                beta * dt, stage, true, -1.);
+
+    auto set_scale =
+        tl.AddTask(mod_net_2, fixup::UpdateNetFieldScaleControls, md.get(), t, dt, stage,
+                   &(net_field_totals.val), &(net_field_totals_2.val));
+
+    // End tuning region that only evaluates occasionally and on first stage
+
+    // Update net field every stage of every timestep given current tuning parameters
+    auto update_netfield = tl.AddTask(set_scale, fixup::ModifyNetField, md.get(), t,
+                                      beta * dt, stage, false, 0.0);
 
     //    auto end_mods = tl.AddTask(none, fixup::EndOfStepModify, md.get(), t, dt,
     //                               stage == integrator->nstages);
