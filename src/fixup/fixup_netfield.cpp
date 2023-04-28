@@ -38,7 +38,6 @@ namespace fixup {
 
 TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t, const int stage,
                                         std::vector<Real> *sums) {
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pm = md->GetParentPointer();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
 
@@ -53,14 +52,12 @@ TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t, const 
       if (t >= next_dphi_dt_update_time && t >= enforced_phi_start_time) {
         const Real Mdot = History::ReduceMassAccretionRate(md);
         const Real Phi = History::ReduceMagneticFluxPhi(md);
-        printf("Per-MD sum: Mdot: %e Phi: %e\n", Mdot, Phi);
 
         (*sums)[0] += Mdot;
         (*sums)[1] += Phi;
       }
     }
   }
-  printf("%s:%i\n", __FILE__, __LINE__);
 
   return TaskStatus::complete;
 }
@@ -115,7 +112,6 @@ TaskStatus UpdateNetFieldScaleControls(MeshData<Real> *md, const Real t, const R
   if (stage != 1) {
     return TaskStatus::complete;
   }
-  printf("%s:%i\n", __FILE__, __LINE__);
   auto *pm = md->GetParentPointer();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
 
@@ -144,13 +140,6 @@ TaskStatus UpdateNetFieldScaleControls(MeshData<Real> *md, const Real t, const R
         dphi_dt += dphi_dt_change;
       }
 
-      // if (dphi_dt > 0. && dphi_dt * fiducial_dphi > 0.) {
-      //   dphi_dt = std::clamp(fiducial_dphi, 3. / 4. * dphi_dt, 4. / 3. * dphi_dt);
-      // } else {
-      //   dphi_dt = (enforced_phi - (*vals0)[1]) / enforced_phi_timescale;
-      // }
-      // printf("dphi_dt: %e phi_factor: %e\n", dphi_dt, phi_factor);
-
       fix_pkg->UpdateParam("phi_factor", phi_factor);
       fix_pkg->UpdateParam("dphi_dt", dphi_dt);
 
@@ -158,12 +147,8 @@ TaskStatus UpdateNetFieldScaleControls(MeshData<Real> *md, const Real t, const R
       const Real enforced_phi_cadence = fix_pkg->Param<Real>("enforced_phi_cadence");
       fix_pkg->UpdateParam("next_dphi_dt_update_time",
                            next_dphi_dt_update_time + enforced_phi_cadence);
-      printf("next_dphi_dt_update_time = %e\n", next_dphi_dt_update_time);
     }
   }
-  printf("%s:%i\n", __FILE__, __LINE__);
-  printf("vals0: %e %e\n", (*vals0)[0], (*vals0)[1]);
-  printf("vals1: %e %e\n", (*vals1)[0], (*vals1)[1]);
   return TaskStatus::complete;
 }
 
@@ -216,7 +201,6 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
     if (fiducial) {
       phi_factor = fiducial_factor;
     }
-    printf("phi_factor: %e\n", phi_factor);
 
     // TODO(BRR) temporary
     const int rank = parthenon::Globals::my_rank;
@@ -242,10 +226,6 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
           if (x < x_hyp) {
             A(b, j, i) = q;
           }
-          //          if (i == 10) {
-          //
-          //            printf("[%i] A(%i %i %i) = %e\n", rank, b, j, i, A(b, j, i));
-          //          }
         });
 
     // Modify B field
@@ -265,34 +245,10 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
               ((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
                (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
 
-          pack(b, pblo, k, j, i) = 1.;
-          pack(b, pblo + 1, k, j, i) = 1.;
-
-          if (i == 10 && j == 84 && rank == 0 && b == 0) {
-            printf("b: %e %e\n", pack(b, pblo, k, j, i), pack(b, pblo + 1, k, j, i));
-            printf("A1: %e %e %e %e\n", A(b, j, i), A(b, j + 1, i), A(b, j, i + 1),
-                   A(b, j + 1, i + 1));
-            printf("A2: %e %e %e %e\n", A(b, j, i), A(b, j + 1, i), A(b, j, i + 1),
-                   A(b, j + 1, i + 1));
-            printf("fac: %e dx: %e %e gammadet: %e\n", phi_factor,
-                   coords.CellWidthFA(X2DIR, k, j, i), coords.CellWidthFA(X1DIR, k, j, i),
-                   gammadet);
-            // exit(-1);
-          }
-
-          // if (i == 10) {
-          //   printf("[%i] b(%i %i %i) = %e %e\n", rank, b, j, i, pack(b, pblo, k, j, i),
-          //          pack(b, pblo + 1, k, j, i));
-          // }
-
           SPACELOOP(ii) {
             pack(b, cblo + ii, k, j, i) = pack(b, pblo + ii, k, j, i) * gammadet;
           }
         });
-
-    if (!fiducial) {
-      // P2C
-    }
   } // enable_phi_enforcement
 
   return TaskStatus::complete;

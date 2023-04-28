@@ -419,9 +419,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     // Update net field every stage of every timestep given current tuning parameters
     auto update_netfield = tl.AddTask(set_scale, fixup::ModifyNetField, md.get(), t,
                                       beta * dt, stage, false, 0.0);
-
-    //    auto end_mods = tl.AddTask(none, fixup::EndOfStepModify, md.get(), t, dt,
-    //                               stage == integrator->nstages);
   }
   // This is a bad pattern. Having a per-mesh data p2c would help.
   TaskRegion &async_region_4 = tc.AddRegion(num_independent_task_lists);
@@ -430,7 +427,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &tl = async_region_4[i];
     auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
 
-    auto p2c = tl.AddTask(none, fluid::PrimitiveToConserved, sc.get());
+    StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+    const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
+
+    if (enable_phi_enforcement) {
+      auto p2c = tl.AddTask(none, fluid::PrimitiveToConserved, sc.get());
+    }
   }
 
   TaskRegion &sync_region_2 = tc.AddRegion(num_partitions);
