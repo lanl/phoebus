@@ -194,6 +194,7 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
   auto pmb = md->GetParentPointer();
   auto &pars = pmb->packages.Get("geometry")->AllParams();
   const Real xh = pars.Get<Real>("xh");
+  printf("xh: %e\n", xh);
 
   namespace c = fluid_cons;
   const std::vector<std::string> vars({c::bfield});
@@ -223,6 +224,9 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
           auto flux = (CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i + 1) +
                        (xh - coords.Xc<1>(i + 1)) * m) *
                       dx2 * dx3;
+
+          // printf("[%i %i %i %i] m: %e flux: %e b: %e lapse: %e\n", b, k, j, i, m, flux,
+          //        pack(b, cb_lo, k, j, i), geom.Lapse(CellLocation::Cent, k, j, i));
 
           lresult += flux;
         } else {
