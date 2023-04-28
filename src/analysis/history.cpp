@@ -194,7 +194,6 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
   auto pmb = md->GetParentPointer();
   auto &pars = pmb->packages.Get("geometry")->AllParams();
   const Real xh = pars.Get<Real>("xh");
-  printf("xh: %e\n", xh);
 
   namespace c = fluid_cons;
   const std::vector<std::string> vars({c::bfield});
