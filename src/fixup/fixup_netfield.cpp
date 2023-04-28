@@ -17,6 +17,7 @@
 
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
+#include <globals.hpp>
 
 #include "analysis/history.hpp"
 #include "fluid/con2prim_robust.hpp"
@@ -131,7 +132,8 @@ TaskStatus UpdateNetFieldScaleControls(MeshData<Real> *md, const Real t, const R
 
       Real phi_factor = (*vals1)[1] - (*vals0)[1];
       // Limit change of dphi_dt to some factor of the original value if is non-zero
-      const Real fiducial_dphi = (enforced_phi - (*vals0)[1]) / enforced_phi_timescale;
+      const Real fiducial_dphi =
+          (enforced_phi - (*vals0)[1] / std::sqrt((*vals0)[0])) / enforced_phi_timescale;
       const Real dphi_dt_change = fiducial_dphi - dphi_dt;
       const Real reference_dphi_dt_change =
           robust::sgn(dphi_dt_change) * std::fabs(dphi_dt);
@@ -216,6 +218,9 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
     }
     printf("phi_factor: %e\n", phi_factor);
 
+    // TODO(BRR) temporary
+    const int rank = parthenon::Globals::my_rank;
+
     // Calculate hyperbola-based magnetic field configuration inside the event horizon
     ParArrayND<Real> A("vector potential", pack.GetDim(5), jb.e + 2, ib.e + 2);
     parthenon::par_for(
@@ -237,6 +242,10 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
           if (x < x_hyp) {
             A(b, j, i) = q;
           }
+          //          if (i == 10) {
+          //
+          //            printf("[%i] A(%i %i %i) = %e\n", rank, b, j, i, A(b, j, i));
+          //          }
         });
 
     // Modify B field
@@ -255,6 +264,26 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
               phi_factor *
               ((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
                (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
+
+          pack(b, pblo, k, j, i) = 1.;
+          pack(b, pblo + 1, k, j, i) = 1.;
+
+          if (i == 10 && j == 84 && rank == 0 && b == 0) {
+            printf("b: %e %e\n", pack(b, pblo, k, j, i), pack(b, pblo + 1, k, j, i));
+            printf("A1: %e %e %e %e\n", A(b, j, i), A(b, j + 1, i), A(b, j, i + 1),
+                   A(b, j + 1, i + 1));
+            printf("A2: %e %e %e %e\n", A(b, j, i), A(b, j + 1, i), A(b, j, i + 1),
+                   A(b, j + 1, i + 1));
+            printf("fac: %e dx: %e %e gammadet: %e\n", phi_factor,
+                   coords.CellWidthFA(X2DIR, k, j, i), coords.CellWidthFA(X1DIR, k, j, i),
+                   gammadet);
+            // exit(-1);
+          }
+
+          // if (i == 10) {
+          //   printf("[%i] b(%i %i %i) = %e %e\n", rank, b, j, i, pack(b, pblo, k, j, i),
+          //          pack(b, pblo + 1, k, j, i));
+          // }
 
           SPACELOOP(ii) {
             pack(b, cblo + ii, k, j, i) = pack(b, pblo + ii, k, j, i) * gammadet;

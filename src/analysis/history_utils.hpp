@@ -37,16 +37,16 @@ KOKKOS_INLINE_FUNCTION Real CalcMassFlux(Pack &pack, Geometry &geom, const int p
                                          const int b, const int k, const int j,
                                          const int i) {
 
-  Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-  Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+  Real gdet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+  Real lapse = geom.Lapse(CellLocation::Cent, b, k, j, i);
   Real shift[3];
-  geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+  geom.ContravariantShift(CellLocation::Cent, b, k, j, i, shift);
 
   const Real vel[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
                       pack(b, pvel_hi, k, j, i)};
 
   Real gcov4[4][4];
-  geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
+  geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, gcov4);
   const Real W = phoebus::GetLorentzFactor(vel, gcov4);
   const Real ucon = vel[0] - shift[0] * W / lapse;
 
@@ -60,7 +60,7 @@ KOKKOS_INLINE_FUNCTION Real CalcMagnetization(Pack &pack, Geometry &geom,
                                               const int prho, const int b, const int k,
                                               const int j, const int i) {
   Real gam[3][3];
-  geom.Metric(CellLocation::Cent, k, j, i, gam);
+  geom.Metric(CellLocation::Cent, b, k, j, i, gam);
   const Real Bp[] = {pack(b, pb_lo, k, j, i), pack(b, pb_lo + 1, k, j, i),
                      pack(b, pb_hi, k, j, i)};
   const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
@@ -80,11 +80,11 @@ KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom,
                                              const int b, const int k, const int j,
                                              const int i) {
   Real gam[3][3];
-  geom.Metric(CellLocation::Cent, k, j, i, gam);
-  Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-  Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+  geom.Metric(CellLocation::Cent, b, k, j, i, gam);
+  Real gdet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+  Real lapse = geom.Lapse(CellLocation::Cent, b, k, j, i);
   Real shift[3];
-  geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+  geom.ContravariantShift(CellLocation::Cent, b, k, j, i, shift);
 
   const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
                        pack(b, pvel_hi, k, j, i)};
@@ -118,11 +118,11 @@ KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
                                                const int b, const int k, const int j,
                                                const int i) {
   Real gam[3][3];
-  geom.Metric(CellLocation::Cent, k, j, i, gam);
-  Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-  Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+  geom.Metric(CellLocation::Cent, b, k, j, i, gam);
+  Real gdet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+  Real lapse = geom.Lapse(CellLocation::Cent, b, k, j, i);
   Real shift[3];
-  geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+  geom.ContravariantShift(CellLocation::Cent, b, k, j, i, shift);
 
   const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
                        pack(b, pvel_hi, k, j, i)};
@@ -158,7 +158,7 @@ template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real CalcMagneticFluxPhi(Pack &pack, Geometry &geom,
                                                 const int cb_lo, const int b, const int k,
                                                 const int j, const int i) {
-  Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+  Real lapse = geom.Lapse(CellLocation::Cent, b, k, j, i);
 
   // \int B^r sqrt(-gdet) := (detgam B^r) * lapse
   return std::abs(pack(b, cb_lo, k, j, i)) * lapse;
