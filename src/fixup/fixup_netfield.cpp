@@ -130,14 +130,24 @@ TaskStatus UpdateNetFieldScaleControls(MeshData<Real> *md, const Real t, const R
       const Real enforced_phi_timescale = fix_pkg->Param<Real>("enforced_phi_timescale");
 
       Real phi_factor = (*vals1)[1] - (*vals0)[1];
-      // Limit change of dphi_dt
-      if (dphi_dt > 0.) {
-        dphi_dt = std::clamp((enforced_phi - (*vals0)[1]) / enforced_phi_timescale,
-                             3. / 4. * dphi_dt, 4. / 3. * dphi_dt);
+      // Limit change of dphi_dt to some factor of the original value if is non-zero
+      const Real fiducial_dphi = (enforced_phi - (*vals0)[1]) / enforced_phi_timescale;
+      const Real dphi_dt_change = fiducial_dphi - dphi_dt;
+      const Real reference_dphi_dt_change =
+          robust::sgn(dphi_dt_change) * std::fabs(dphi_dt);
+      if (dphi_dt != 0.) {
+        dphi_dt += std::clamp(dphi_dt_change, 3. / 4. * reference_dphi_dt_change,
+                              4. / 3. * reference_dphi_dt_change);
       } else {
-        dphi_dt = (enforced_phi - (*vals0)[1]) / enforced_phi_timescale;
+        dphi_dt += dphi_dt_change;
       }
-      printf("dphi_dt: %e phi_factor: %e\n", dphi_dt, phi_factor);
+
+      // if (dphi_dt > 0. && dphi_dt * fiducial_dphi > 0.) {
+      //   dphi_dt = std::clamp(fiducial_dphi, 3. / 4. * dphi_dt, 4. / 3. * dphi_dt);
+      // } else {
+      //   dphi_dt = (enforced_phi - (*vals0)[1]) / enforced_phi_timescale;
+      // }
+      // printf("dphi_dt: %e phi_factor: %e\n", dphi_dt, phi_factor);
 
       fix_pkg->UpdateParam("phi_factor", phi_factor);
       fix_pkg->UpdateParam("dphi_dt", dphi_dt);
