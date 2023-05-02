@@ -224,9 +224,6 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
                        (xh - coords.Xc<1>(i + 1)) * m) *
                       dx2 * dx3;
 
-          // printf("[%i %i %i %i] m: %e flux: %e b: %e lapse: %e\n", b, k, j, i, m, flux,
-          //        pack(b, cb_lo, k, j, i), geom.Lapse(CellLocation::Cent, k, j, i));
-
           lresult += flux;
         } else {
           lresult += 0.0;
