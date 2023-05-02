@@ -63,8 +63,7 @@ class phoedf(phdf.phdf):
         if self.RadiationActive:
             self.NumSpecies = self.Params["radiation/num_species"]
 
-        # TODO(BRR) store output data only once with get/load functions
-
+        # Construct geometry from gcov
         if geomfile is None:
             self.flatgcov = self.Get("g.c.gcov", flatten=False)
 
@@ -72,6 +71,7 @@ class phoedf(phdf.phdf):
             ind = [[0, 1, 3, 6], [1, 2, 4, 7], [3, 4, 5, 8], [6, 7, 8, 9]]
             return ind[mu][nu]
 
+        # Not necessary to provide Minkowski geometry
         if self.flatgcov is None:
             if self.Params["geometry/geometry_name"] == "Minkowski":
                 self.flatgcov = np.zeros(
@@ -81,11 +81,37 @@ class phoedf(phdf.phdf):
                 self.flatgcov[:, flatten_indices(1, 1), :, :, :] = 1.0
                 self.flatgcov[:, flatten_indices(2, 2), :, :, :] = 1.0
                 self.flatgcov[:, flatten_indices(3, 3), :, :, :] = 1.0
+            else:
+                assert (
+                    False
+                ), "Geometry not provided in dump file but also not Minkowski!"
         self.gcov = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
+
+        # Account for included ghost zones in flattened geometry data
+        if self.flatgcov.shape[-1] > 1:
+            istart = 4
+            iend = -4
+        else:
+            istart = None
+            iend = None
+        if self.flatgcov.shape[-2] > 1:
+            jstart = 4
+            jend = -4
+        else:
+            jstart = None
+            jend = None
+        if self.flatgcov.shape[-3] > 1:
+            kstart = 4
+            kend = -4
+        else:
+            kstart = None
+            kend = None
+
+        # Unroll gcov for convenience
         for mu in range(4):
             for nu in range(4):
                 self.gcov[:, mu, nu, :, :, :] = self.flatgcov[
-                    :, flatten_indices(mu, nu), :, :, :
+                    :, flatten_indices(mu, nu), kstart:kend, jstart:jend, istart:iend
                 ]
         del self.flatgcov
         self.gcon = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
