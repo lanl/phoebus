@@ -419,6 +419,10 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
               v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units
+          Real vel[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+          Real W = GetLorentzFactor(vel, geom, CellLocation::Cent, k, j, i);
+          Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real Ucon0 = robust::ratio(W, std::abs(alpha));
 
           bool absorbed = false;
 
@@ -435,9 +439,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                  1. / d4x * weight(n) * k2(n));
               Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
                                  1. / d4x * weight(n) * k3(n));
-              // TODO(BRR) Add Ucon[0] in the below
               Kokkos::atomic_add(&(v(iGye, k, j, i)),
-                                 LeptonSign(s) / d4x * weight(n) * mp_code);
+                                 LeptonSign(s) / d4x * weight(n) * mp_code * Ucon0);
 
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]), 1.);
@@ -620,10 +623,7 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
     auto &pmb = block;
     auto sc = pmb->swarm_data.Get();
     auto swarm = sc->Get(swarmName);
-    for (int n = 0; n < swarm->vbswarm->bd_var_.nbmax; n++) {
-      auto &nb = pmb->pbval->neighbor[n];
-      swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
-    }
+    swarm->ResetCommunication();
   }
 
   return TaskStatus::complete;

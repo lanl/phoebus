@@ -208,8 +208,8 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
     // Calculate hyperbola-based magnetic field configuration inside the event horizon
     ParArrayND<Real> A("vector potential", pack.GetDim(5), jb.e + 2, ib.e + 2);
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "Phoebus::Fixup::EndOfStepModify::EvaluateQ",
-        DevExecSpace(), 0, pack.GetDim(5) - 1, jb.s, jb.e + 1, ib.s, ib.e + 1,
+        DEFAULT_LOOP_PATTERN, "Phoebus::Fixup::ModifyNetField::EvaluateQ", DevExecSpace(),
+        0, pack.GetDim(5) - 1, jb.s, jb.e + 1, ib.s, ib.e + 1,
         KOKKOS_LAMBDA(const int b, const int j, const int i) {
           const auto &coords = pack.GetCoords(b);
           const Real x1 = coords.Xf<1>(0, j, i);
@@ -230,7 +230,7 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
 
     // Modify B field
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "Phoebus::Fixup::EndOfStepModify::EvaluateBField",
+        DEFAULT_LOOP_PATTERN, "Phoebus::Fixup::ModifyNetField::EvaluateBField",
         DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
           const auto &coords = pack.GetCoords(b);
