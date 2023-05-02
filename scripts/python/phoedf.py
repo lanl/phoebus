@@ -88,21 +88,21 @@ class phoedf(phdf.phdf):
         self.gcov = np.zeros([self.NumBlocks, 4, 4, self.Nx3, self.Nx2, self.Nx1])
 
         # Account for included ghost zones in flattened geometry data
-        if self.flatgcov.shape[-1] > 1:
-            istart = 4
-            iend = -4
+        if self.flatgcov.shape[-1] != self.Nx1:
+            istart = self.NGhost
+            iend = -self.NGhost
         else:
             istart = None
             iend = None
-        if self.flatgcov.shape[-2] > 1:
-            jstart = 4
-            jend = -4
+        if self.flatgcov.shape[-2] != self.Nx2:
+            jstart = self.NGhost
+            jend = -self.NGhost
         else:
             jstart = None
             jend = None
-        if self.flatgcov.shape[-3] > 1:
-            kstart = 4
-            kend = -4
+        if self.flatgcov.shape[-3] != self.Nx3:
+            kstart = self.NGhost
+            kend = -self.NGhost
         else:
             kstart = None
             kend = None
