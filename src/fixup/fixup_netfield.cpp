@@ -202,9 +202,6 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
       phi_factor = fiducial_factor;
     }
 
-    // TODO(BRR) temporary
-    const int rank = parthenon::Globals::my_rank;
-
     // Calculate hyperbola-based magnetic field configuration inside the event horizon
     ParArrayND<Real> A("vector potential", pack.GetDim(5), jb.e + 2, ib.e + 2);
     parthenon::par_for(
