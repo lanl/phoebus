@@ -355,8 +355,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   // Extra per-step user work
   TaskRegion &sync_region_5 = tc.AddRegion(num_partitions);
   int sync_region_5_dep_id;
-  PARTHENON_REQUIRE(num_partitions == 1,
-                    "Reductions don't work for multiple partitions?");
   net_field_totals.val.resize(2); // Mdot, Phi
   net_field_totals_2.val.resize(2);
   for (int i = 0; i < 2; i++) {
