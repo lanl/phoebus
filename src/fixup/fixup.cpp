@@ -76,26 +76,27 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool enable_phi_enforcement =
       pin->GetOrAddBoolean("fixup", "enable_phi_enforcement", false);
   params.Add("enable_phi_enforcement", enable_phi_enforcement);
-  Real enforced_phi = pin->GetReal("fixup", "enforced_phi");
-  params.Add("enforced_phi", enforced_phi);
-  Real enforced_phi_timescale =
-      pin->GetOrAddReal("fixup", "enforced_phi_timescale", 1.e3);
-  params.Add("enforced_phi_timescale", enforced_phi_timescale);
-  Real enforced_phi_cadence = pin->GetOrAddReal("fixup", "enforced_phi_cadence", 10.);
-  params.Add("enforced_phi_cadence", enforced_phi_cadence);
-  Real enforced_phi_start_time =
-      pin->GetOrAddReal("fixup", "enforced_phi_start_time", 175.);
-  PARTHENON_REQUIRE(enforced_phi_start_time >= 0.,
-                    "Phi enforcement start time must be non-negative!");
-  params.Add("enforced_phi_start_time", enforced_phi_start_time);
   if (enable_phi_enforcement) {
     PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
                       "Phi enforcement only supported for BH geometry!");
+    Real enforced_phi = pin->GetReal("fixup", "enforced_phi");
+    params.Add("enforced_phi", enforced_phi);
+    Real enforced_phi_timescale =
+        pin->GetOrAddReal("fixup", "enforced_phi_timescale", 1.e3);
+    params.Add("enforced_phi_timescale", enforced_phi_timescale);
+    Real enforced_phi_cadence = pin->GetOrAddReal("fixup", "enforced_phi_cadence", 10.);
+    params.Add("enforced_phi_cadence", enforced_phi_cadence);
+    Real enforced_phi_start_time =
+        pin->GetOrAddReal("fixup", "enforced_phi_start_time", 175.);
+    PARTHENON_REQUIRE(enforced_phi_start_time >= 0.,
+                      "Phi enforcement start time must be non-negative!");
+    params.Add("enforced_phi_start_time", enforced_phi_start_time);
+
+    // Mutable parameters for following sanity maintenance
+    params.Add("dphi_dt", 0., true);
+    params.Add("next_dphi_dt_update_time", enforced_phi_start_time, true);
+    params.Add("phi_factor", 0., true);
   }
-  // Mutable parameters for following sanity maintenance
-  params.Add("dphi_dt", 0., true);
-  params.Add("next_dphi_dt_update_time", enforced_phi_start_time, true);
-  params.Add("phi_factor", 0., true);
 
   if (enable_mhd_floors && !enable_mhd) {
     enable_mhd_floors = false;
