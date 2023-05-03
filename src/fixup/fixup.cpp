@@ -76,7 +76,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool enable_phi_enforcement =
       pin->GetOrAddBoolean("fixup", "enable_phi_enforcement", false);
   params.Add("enable_phi_enforcement", enable_phi_enforcement);
-  Real enforced_phi = pin->GetOrAddReal("fixup", "enforced_phi", 0.);
+  Real enforced_phi = pin->GetReal("fixup", "enforced_phi");
   params.Add("enforced_phi", enforced_phi);
   Real enforced_phi_timescale =
       pin->GetOrAddReal("fixup", "enforced_phi_timescale", 1.e3);
