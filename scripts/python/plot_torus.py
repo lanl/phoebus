@@ -42,6 +42,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
 
     dfile = phoedf(fname)
 
+    rad_active = dfile.Params["radiation/active"]
+
     a = dfile.Params["geometry/a"]
     hslope = dfile.Params["geometry/h"]
 

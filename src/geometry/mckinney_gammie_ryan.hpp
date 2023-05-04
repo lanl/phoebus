@@ -204,7 +204,7 @@ class McKinneyGammieRyan {
   Real smooth_ = 0.5;
   Real norm_;
   Real hexp_br_ = 1000.;
-  Real hexp_nsq_ = 1.;
+  Real hexp_nsq_ = 4.;
   Real hexp_csq_ = 4.;
 };
 
