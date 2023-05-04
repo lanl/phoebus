@@ -117,7 +117,6 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     ax.set_title(r"$\Gamma$")
 
     if rad_active:
-
         ax = axes[0, 2]
         Pg = dfile.GetPg()
         Pm = np.clip(dfile.GetPm(), 1.0e-20, 1.0e20)
@@ -272,7 +271,6 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description="Plot neutrino thermalization")
     parser.add_argument(
         "-gf",
