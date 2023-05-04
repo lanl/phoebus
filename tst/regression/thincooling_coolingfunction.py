@@ -18,26 +18,36 @@ import os
 import sys
 import regression_test as rt
 
-parser = argparse.ArgumentParser(description='Run optically thin cooling as a test')
-parser.add_argument('--upgold', dest='upgold', action='store_true')
-parser.add_argument('--use_gpu', dest='use_gpu', action='store_true')
-parser.add_argument('--use_mpiexec', dest='use_mpiexec', action='store_true')
-parser.add_argument('--input', type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../inputs/thincooling.pin'))
-parser.add_argument('--executable', type=str, default=None)
-parser.add_argument('--build_type', type=str, default='Release', choices=['Debug', 'Release'])
+parser = argparse.ArgumentParser(description="Run optically thin cooling as a test")
+parser.add_argument("--upgold", dest="upgold", action="store_true")
+parser.add_argument("--use_gpu", dest="use_gpu", action="store_true")
+parser.add_argument("--use_mpiexec", dest="use_mpiexec", action="store_true")
+parser.add_argument(
+    "--input",
+    type=str,
+    default=os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "../../inputs/thincooling.pin"
+    ),
+)
+parser.add_argument("--executable", type=str, default=None)
+parser.add_argument(
+    "--build_type", type=str, default="Release", choices=["Debug", "Release"]
+)
 args = parser.parse_args()
 
 modified_inputs = {}
-modified_inputs['radiation/method'] = 'cooling_function'
+modified_inputs["radiation/method"] = "cooling_function"
 
-code = rt.gold_comparison(variables=['p.density', 'p.energy'],
-                          input_file=args.input,
-                          modified_inputs=modified_inputs,
-                          executable=args.executable,
-                          geometry='Minkowski',
-                          use_gpu=args.use_gpu,
-                          use_mpiexec=args.use_mpiexec,
-                          build_type=args.build_type,
-                          upgold=args.upgold)
+code = rt.gold_comparison(
+    variables=["p.density", "p.energy"],
+    input_file=args.input,
+    modified_inputs=modified_inputs,
+    executable=args.executable,
+    geometry="Minkowski",
+    use_gpu=args.use_gpu,
+    use_mpiexec=args.use_mpiexec,
+    build_type=args.build_type,
+    upgold=args.upgold,
+)
 
 sys.exit(code)
