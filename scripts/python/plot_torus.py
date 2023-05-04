@@ -289,6 +289,9 @@ if __name__ == "__main__":
         "--numax", type=float, default=1.0e2, help="Maximum frequency (Hz)"
     )
     parser.add_argument(
+        "--rlim", type=float, default=40.0, help="Maximum radius to plot"
+    )
+    parser.add_argument(
         "--nnu", type=int, default=100, help="Number of frequency support points"
     )
     parser.add_argument(
@@ -302,4 +305,4 @@ if __name__ == "__main__":
     matplotlib.use("Agg")
 
     for i, fname in enumerate(args.files):
-        plot_frame(i, fname, args.savefig, coords=args.coords)
+        plot_frame(i, fname, args.savefig, rlim=args.rlim, coords=args.coords)

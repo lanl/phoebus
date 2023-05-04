@@ -51,6 +51,7 @@ if ! command -v ${PFM} &> /dev/null; then
 else
     PFM=$(command -v ${PFM})
     echo "black Python formatter found: ${PFM}"
+    echo "black version: $(${PFM} --version)"
 fi
 
 echo "Formatting Python files..."
@@ -59,6 +60,6 @@ for f in $(git grep --untracked -ail res -- :/*.py); do
     if [ ${VERBOSE} -ge 1 ]; then
        echo ${f}
     fi
-    ${PFM} ${REPO}/${f}
+    ${PFM} -q ${REPO}/${f}
 done
 echo "...Done"
