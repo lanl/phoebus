@@ -124,6 +124,7 @@ do_fd_on_grid = false
 <coordinates>
 derefine_poles = false
 r_outer = 250
+# hexp_br = 1000. # Initial break radius for hyperexponential coordinates
 
 <fixup>
 enable_floors = true
