@@ -1,4 +1,4 @@
-// © 2022. Triad National Security, LLC. All rights reserved.  This
+// © 2022-2023. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -32,10 +32,17 @@ Real inline Min(const Real &x) {
   return xmin;
 }
 
+Real inline Sum(const Real &x) {
+  Real xsum;
+  MPI_Allreduce(&x, &xsum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  return xsum;
+}
+
 #else
 
 Real inline Max(const Real &x) { return x; }
 Real inline Min(const Real &x) { return x; }
+Real inline Sum(const Real &x) { return x; }
 
 #endif // MPI_PARALLEL
 

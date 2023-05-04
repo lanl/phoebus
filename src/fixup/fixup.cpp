@@ -18,12 +18,14 @@
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
 
+#include "analysis/history.hpp"
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/fluid.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/programming_utils.hpp"
+#include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -71,6 +73,30 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
   bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", false);
   bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", false);
+  bool enable_phi_enforcement =
+      pin->GetOrAddBoolean("fixup", "enable_phi_enforcement", false);
+  params.Add("enable_phi_enforcement", enable_phi_enforcement);
+  if (enable_phi_enforcement) {
+    PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
+                      "Phi enforcement only supported for BH geometry!");
+    Real enforced_phi = pin->GetReal("fixup", "enforced_phi");
+    params.Add("enforced_phi", enforced_phi);
+    Real enforced_phi_timescale =
+        pin->GetOrAddReal("fixup", "enforced_phi_timescale", 1.e3);
+    params.Add("enforced_phi_timescale", enforced_phi_timescale);
+    Real enforced_phi_cadence = pin->GetOrAddReal("fixup", "enforced_phi_cadence", 10.);
+    params.Add("enforced_phi_cadence", enforced_phi_cadence);
+    Real enforced_phi_start_time =
+        pin->GetOrAddReal("fixup", "enforced_phi_start_time", 175.);
+    PARTHENON_REQUIRE(enforced_phi_start_time >= 0.,
+                      "Phi enforcement start time must be non-negative!");
+    params.Add("enforced_phi_start_time", enforced_phi_start_time);
+
+    // Mutable parameters for following sanity maintenance
+    params.Add("dphi_dt", 0., true);
+    params.Add("next_dphi_dt_update_time", enforced_phi_start_time, true);
+    params.Add("phi_factor", 0., true);
+  }
 
   if (enable_mhd_floors && !enable_mhd) {
     enable_mhd_floors = false;

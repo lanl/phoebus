@@ -23,7 +23,8 @@ import numpy as np
 import warnings
 
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 try:
     import cmocean
 except:
@@ -40,14 +41,19 @@ try:
 except ModuleNotFoundError:
     from phdf import phdf
 
-def plot_dump(filename, varname,
-              savename,
-              plane='xz',
-              cbar_label = None,
-              x1bounds=None, x2bounds=None,
-              cbarbounds=None,
-              colormap='viridis',
-              log=True):
+
+def plot_dump(
+    filename,
+    varname,
+    savename,
+    plane="xz",
+    cbar_label=None,
+    x1bounds=None,
+    x2bounds=None,
+    cbarbounds=None,
+    colormap="viridis",
+    log=True,
+):
     data = phdf(filename)
     print(data)
     time = data.Time
@@ -63,18 +69,18 @@ def plot_dump(filename, varname,
     nG = data.NGhost
     coordname = "g.n.coord"
     coord = data.Get(coordname, False)
-    z = coord[:,3,:,nG-1:-1-nG,nG-1:-1-nG]
+    z = coord[:, 3, :, nG - 1 : -1 - nG, nG - 1 : -1 - nG]
     print(np.shape(z))
-    y = coord[:,2,:,nG-1:-1-nG,nG-1:-1-nG]
-    x = coord[:,1,:,nG-1:-1-nG,nG-1:-1-nG]
+    y = coord[:, 2, :, nG - 1 : -1 - nG, nG - 1 : -1 - nG]
+    x = coord[:, 1, :, nG - 1 : -1 - nG, nG - 1 : -1 - nG]
 
-    if plane == 'xz':
-        rho = np.sqrt(x**2 + y**2)
+    if plane == "xz":
+        rho = np.sqrt(x ** 2 + y ** 2)
         x = rho
         y = z
 
     if cbarbounds is not None:
-        qmin,qmax = cbarbounds
+        qmin, qmax = cbarbounds
     else:
         qmin = q.min()
         qmax = q.max()
@@ -89,76 +95,92 @@ def plot_dump(filename, varname,
     if cbar_label is None:
         cbar_label = varname
         if log:
-            cbar_label = r'$\log_{10}$' + cbar_label
+            cbar_label = r"$\log_{10}$" + cbar_label
 
     fig = plt.figure()
     p = fig.add_subplot(111, aspect=1)
     for i in range(NB):
-        val = q[i,0,:,:]
+        val = q[i, 0, :, :]
         if len(val.shape) > 2:
-          print("WARNING plotting the 0th index of multidimensional variable!")
-          val = val[:,:,0]
+            print("WARNING plotting the 0th index of multidimensional variable!")
+            val = val[:, :, 0]
 
-        mesh = p.pcolormesh(x[i,0,:,:], y[i,0,:,:], val[:,:],
-                            vmin=qmin, vmax=qmax, cmap=colormap)
+        mesh = p.pcolormesh(
+            x[i, 0, :, :], y[i, 0, :, :], val[:, :], vmin=qmin, vmax=qmax, cmap=colormap
+        )
 
     plt.xlim(x1bounds[0], x1bounds[1])
     plt.ylim(x2bounds[0], x2bounds[1])
 
-    plt.xlabel(r'$x$')
-    plt.ylabel(r'$y$')
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$y$")
     plt.colorbar(mesh, label=cbar_label)
 
     plt.title("t = %g" % time)
 
-    plt.savefig(savename, dpi=300, bbox_inches='tight')
+    plt.savefig(savename, dpi=300, bbox_inches="tight")
     plt.clf()
     plt.cla()
     plt.close()
     return
 
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="Plot a 2d simulation snapshot.")
-    parser.add_argument('--plane', type=str, default='xz',
-                        choices=['xy','xz'],
-                        help='plane to project onto')
-    parser.add_argument('--xbounds', type=float, nargs=2, default=None,
-                        help='min and max bounds for x')
-    parser.add_argument('--ybounds', type=float, nargs=2, default=None,
-                        help='min and max bounds for y')
-    parser.add_argument('--cbarbounds', type=float, nargs=2, default=None,
-                        help='min and max values of colorbar')
-    parser.add_argument('--cmap', type=str, default='viridis',
-                        help='colormap')
-    parser.add_argument('--cbarlabel', type=str, default=None,
-                        help='Color bar label')
-    parser.add_argument('-s','--saveprefix', type=str,
-                        default="", help='Prefix for file save names')
-    parser.add_argument('-l','--linear',action='store_true',
-                        help='Use linear, instead of log scale')
-    parser.add_argument('--pdf', action='store_true',
-                        help="Save as pdf instead of png")
-    parser.add_argument('--nproc', type=int, default=1,
-                        help="Number of CPUs to use")
-    parser.add_argument('varname', type=str, help='Variable to plot')
-    parser.add_argument('files', type=str, nargs='+',
-                        help='Files to take a snapshot of')
+    parser.add_argument(
+        "--plane",
+        type=str,
+        default="xz",
+        choices=["xy", "xz"],
+        help="plane to project onto",
+    )
+    parser.add_argument(
+        "--xbounds", type=float, nargs=2, default=None, help="min and max bounds for x"
+    )
+    parser.add_argument(
+        "--ybounds", type=float, nargs=2, default=None, help="min and max bounds for y"
+    )
+    parser.add_argument(
+        "--cbarbounds",
+        type=float,
+        nargs=2,
+        default=None,
+        help="min and max values of colorbar",
+    )
+    parser.add_argument("--cmap", type=str, default="viridis", help="colormap")
+    parser.add_argument("--cbarlabel", type=str, default=None, help="Color bar label")
+    parser.add_argument(
+        "-s", "--saveprefix", type=str, default="", help="Prefix for file save names"
+    )
+    parser.add_argument(
+        "-l", "--linear", action="store_true", help="Use linear, instead of log scale"
+    )
+    parser.add_argument("--pdf", action="store_true", help="Save as pdf instead of png")
+    parser.add_argument("--nproc", type=int, default=1, help="Number of CPUs to use")
+    parser.add_argument("varname", type=str, help="Variable to plot")
+    parser.add_argument(
+        "files", type=str, nargs="+", help="Files to take a snapshot of"
+    )
     args = parser.parse_args()
     log = not args.linear
-    postfix = '.pdf' if args.pdf else '.png'
+    postfix = ".pdf" if args.pdf else ".png"
+
     def make_frame(pair):
-        i,f = pair
-        savename = args.saveprefix + str(i).rjust(5,"0") + postfix
+        i, f = pair
+        savename = args.saveprefix + str(i).rjust(5, "0") + postfix
         print(savename)
-        plot_dump(f, args.varname, savename,
-                  plane = args.plane,
-                  cbar_label = args.cbarlabel,
-                  x1bounds = args.xbounds,
-                  x2bounds = args.ybounds,
-                  cbarbounds = args.cbarbounds,
-                  colormap = args.cmap,
-                  log = log)
+        plot_dump(
+            f,
+            args.varname,
+            savename,
+            plane=args.plane,
+            cbar_label=args.cbarlabel,
+            x1bounds=args.xbounds,
+            x2bounds=args.ybounds,
+            cbarbounds=args.cbarbounds,
+            colormap=args.cmap,
+            log=log,
+        )
 
     p = Pool(processes=args.nproc)
-    p.map(make_frame,enumerate(args.files))
-
+    p.map(make_frame, enumerate(args.files))
