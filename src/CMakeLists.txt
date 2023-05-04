@@ -20,6 +20,7 @@ add_executable(phoebus
   fixup/fixup_c2p.cpp
   fixup/fixup_radc2p.cpp
   fixup/fixup_src.cpp
+  fixup/fixup_netfield.cpp
 
   fluid/con2prim.hpp
   fluid/con2prim_robust.hpp

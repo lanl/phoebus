@@ -37,6 +37,7 @@ SCRIPT_NAME = os.path.basename(__main__.__file__).split(".py")[0]
 # Utility functions
 #
 
+
 # -- Compare two values up to some floating point tolerance
 def soft_equiv(val, ref, tol=1.0e-5):
     numerator = np.fabs(val - ref)
@@ -46,6 +47,35 @@ def soft_equiv(val, ref, tol=1.0e-5):
         return False
     else:
         return True
+
+
+# -- Read value of parameter in input file
+def read_input_value(block, key, input_file):
+    with open(input_file, "r") as infile:
+        lines = infile.readlines()
+        for line in lines:
+            sline = line.strip()
+
+            # Skip empty lines and comments
+            if len(sline) == 0 or sline[0] == "#":
+                continue
+
+            # Check for block
+            elif sline[0] == "<":
+                current_block = sline.split("<")[1].split(">")[0]
+                continue
+
+            # Ignore multi-value lines
+            elif len(sline.split("=")) != 2 or "," in sline or "&" in sline:
+                continue
+
+            else:
+                current_key = sline.split("=")[0].strip()
+
+                if block == current_block and key == current_key:
+                    return sline.split("=")[1].strip()
+
+    assert False, "block/key not found!"
 
 
 # -- Modify key in input file, add key (and block) if not present, write new file
@@ -79,7 +109,6 @@ def modify_input(dict_key, value, input_file):
                 continue
 
             else:
-
                 current_key = sline.split("=")[0].strip()
                 current_value = sline.split("=")[1].strip()
 
@@ -116,6 +145,7 @@ def modify_input(dict_key, value, input_file):
 # ------------------------------------------------------------------------------------------------ #
 # Common regression test tools
 #
+
 
 # -- Configure and build phoebus with problem-specific options
 def build_code(geometry, use_gpu=False, build_type="Release"):
@@ -216,6 +246,17 @@ def gold_comparison(
     compression_factor=1,
     tolerance=1.0e-5,
 ):
+    problem = read_input_value("phoebus", "problem", input_file)
+    print("\n=== GOLD COMPARISON TEST PROBLEM ===")
+    print(f"= problem:     {problem}")
+    print(f"= executable:  {executable}")
+    print(f"= geometry:    {geometry}")
+    print(f"= use_gpu:     {use_gpu}")
+    print(f"= use_mpiexec: {use_mpiexec}")
+    print(f"= build_type:  {build_type}")
+    print(f"= compression: {compression_factor}")
+    print(f"= tolerance:   {tolerance}")
+    print("====================================\n")
 
     if executable is None:
         executable = os.path.join(BUILD_DIR, "src", "phoebus")
