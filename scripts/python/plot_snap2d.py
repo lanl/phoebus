@@ -99,7 +99,7 @@ def plot_dump(
     fig = plt.figure()
     p = fig.add_subplot(111, aspect=1)
     for i in range(NB):
-        val = 100.0 * (q[i, 0, :, :] - 0.225)
+        val = q[i, 0, :, :]
         if len(val.shape) > 2:
             print("WARNING plotting the 0th index of multidimensional variable!")
             val = val[:, :, 0]
