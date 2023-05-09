@@ -46,6 +46,7 @@ void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1
 
   constexpr Real DELTA = 1.0e-6;
 
+  // TODO(BLB) extend later to exploit spacetime symmetries. Template on geometry?
   SPACETIMELOOP(mu) {
     source[mu] = 0.;
     Xp[0] = X0;
