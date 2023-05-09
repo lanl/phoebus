@@ -70,7 +70,6 @@ def plot_dump(
     coordname = "g.n.coord"
     coord = data.Get(coordname, False)
     z = coord[:, 3, :, nG - 1 : -1 - nG, nG - 1 : -1 - nG]
-    print(np.shape(z))
     y = coord[:, 2, :, nG - 1 : -1 - nG, nG - 1 : -1 - nG]
     x = coord[:, 1, :, nG - 1 : -1 - nG, nG - 1 : -1 - nG]
 
@@ -100,7 +99,7 @@ def plot_dump(
     fig = plt.figure()
     p = fig.add_subplot(111, aspect=1)
     for i in range(NB):
-        val = q[i, 0, :, :]
+        val = 100.0 * (q[i, 0, :, :] - 0.225)
         if len(val.shape) > 2:
             print("WARNING plotting the 0th index of multidimensional variable!")
             val = val[:, :, 0]

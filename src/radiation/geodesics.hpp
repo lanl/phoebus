@@ -46,7 +46,7 @@ void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1
 
   constexpr Real DELTA = 1.0e-6;
 
-  SPACETIMELOOP(mu) { 
+  SPACETIMELOOP(mu) {
     source[mu] = 0.;
     Xp[0] = X0;
     Xp[1] = X1;
@@ -66,8 +66,7 @@ void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1
     }
 
     source[mu] *= -1.0 / (2.0 * Kcon0);
-
-  }  
+  }
 }
 
 KOKKOS_INLINE_FUNCTION
@@ -108,11 +107,6 @@ void PushParticle(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kco
   X1 += 0.5 * dt * (c1[1] + c2[1]);
   X2 += 0.5 * dt * (c1[2] + c2[2]);
   X3 += 0.5 * dt * (c1[3] + c2[3]);
-  if ( X1 < 0.0 ) {
-    std::printf("X1 < 0 in Push %f %f %f %f\n ", X1, c1[1], c2[1], X1-0.5*dt*(c1[1]+c2[1]));
-    std::printf("X2 in Push %f %f %f %f\n ", X2, c1[2], c2[2], X2-0.5*dt*(c1[2]+c2[2]));
-    std::printf("X3 in Push %f %f %f %f\n ", X3, c1[3], c2[3], X3-0.5*dt*(c1[3]+c2[3]));
-  }
 
   Kcov0 += 0.5 * dt * (d1[0] + d2[0]);
   Kcov1 += 0.5 * dt * (d1[1] + d2[1]);
