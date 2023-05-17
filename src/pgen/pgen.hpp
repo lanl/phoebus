@@ -48,7 +48,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(p2c2p)                                                                         \
   PROBLEM(tov)                                                                           \
   PROBLEM(homologous)                                                                    \
-  PROBLEM(standing_accretion_shock)                                                                         
+  PROBLEM(standing_accretion_shock)
 
 // if you need problem-specific modifications to inputs, add the name here
 #define FOREACH_MODIFIER                                                                 \
