@@ -75,15 +75,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real rPNS = pin->GetOrAddReal("standing_accretion_shock", "rPNS", 60);
   const Real eps_ff_ke = pin->GetOrAddReal("standing_accretion_shock", "eps_ff_ke", 0.3); 
 
-  // Solution constants
-  const Real uc = std::sqrt(1.0 / (2. * rs));
-  const Real Vc = -std::sqrt(std::pow(uc, 2) / (1. - 3. * std::pow(uc, 2)));
-  const Real Tc = -n * std::pow(Vc, 2) / ((n + 1.) * (n * std::pow(Vc, 2) - 1.));
-  const Real C1 = uc * std::pow(rs, 2) * std::pow(Tc, n);
-  const Real C2 =
-      std::pow(1. + (1. + n) * Tc, 2) *
-      (1. - 2. / rs + std::pow(C1, 2) / (std::pow(rs, 4) * std::pow(Tc, 2 * n)));
-
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -115,7 +106,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
   pmb->par_for(
-      "Phoebus::ProblemGenerator::Bondi", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      "Phoebus::ProblemGenerator::StandingAccrectionShock", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real x1 = coords.Xc<1>(k, j, i);
         const Real x2 = coords.Xc<2>(k, j, i);
