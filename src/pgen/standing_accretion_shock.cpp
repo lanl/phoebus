@@ -15,6 +15,7 @@
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "pgen/pgen.hpp"
 #include "utils/error_checking.hpp"
+#include "phoebus_utils/unit_conversions.hpp"
 
 // namespace phoebus {
 
@@ -69,9 +70,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real n = 1.0 / (gam - 1.0);
   PARTHENON_REQUIRE_THROWS(std::fabs(n - Cv) < 1.e-12, "Bondi requires Cv = 1/(Gamma-1)");
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
-  const Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot", 1.e-2);
+  const Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot", 0.2);
   const Real rShock = pin->GetOrAddReal("standing_accretion_shock", "rShock", 200);
-  const Real rPNS = pin->GetOrAddReal("standing_accretion_shock", "rPNS", 1.3);
+  const Real rPNS = pin->GetOrAddReal("standing_accretion_shock", "rPNS", 60);
   const Real eps_ff_ke = pin->GetOrAddReal("standing_accretion_shock", "eps_ff_ke", 0.3); 
 
   // Solution constants
@@ -92,6 +93,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
+
+  auto &unit_conv =
+      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
+
+  // convert to CGS then to code units
+  Mdot *= ( (solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode() );
+  rShock *= (1.e5 * unit_conv.GetLengthCGSToCode() );
+  rPNS *= (1.e5 * unit_conv.GetLengthCGSToCode() );  
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 

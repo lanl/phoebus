@@ -107,7 +107,7 @@ a = 0
 derefine_poles = false
 
 <standing_accretion_shock>
-Mdot = 1.e-2           # Msun / sc
+Mdot = 0.2             # Msun / sec
 rShock = 200           # km
-rPNS = 1.3             # Msun
+rPNS = 60              # km
 eps_ff_ke = 0.3        # fraction of the free-fall kinetic energy at the initial location of the shock
