@@ -107,6 +107,7 @@ a = 0
 derefine_poles = false
 
 <standing_accretion_shock>
+Mdot = 1.e-2           # Msun / sc
+rShock = 200           # km
+rPNS = 1.3             # Msun
 eps_dissociation = 0.3 # amount of specific “thermal energy” available after nuclear binding energy has been removed from eps for dissociated nuclei.
-p1 = 1                 # initial postshock pressure 
-rho1 = 1               # initial postshock density
