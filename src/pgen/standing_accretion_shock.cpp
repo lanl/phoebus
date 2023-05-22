@@ -61,19 +61,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int itmp = imap[fluid_prim::temperature].first;
   const int igm1 = imap[fluid_prim::gamma1].first;
 
-  // this only works with ideal gases
   const std::string eos_type = pin->GetString("eos", "type");
-  PARTHENON_REQUIRE_THROWS(eos_type == "IdealGas",
-                           "Standing Accretion Shock setup only works with ideal gas");
+  const EosType eos_type_enum = (eos_type == "IdealGas") ? IdealGas : StellarCollapse;
+  PARTHENON_REQUIRE_THROWS(eos_type == "IdealGas" || eos_type == "StellarCollapse",
+                           "Standing Accretion Shock setup only works with ideal gas or stellar collapse EOS");
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real Cv = pin->GetReal("eos", "Cv");
-  const Real n = 1.0 / (gam - 1.0);
-  PARTHENON_REQUIRE_THROWS(std::fabs(n - Cv) < 1.e-12, "Bondi requires Cv = 1/(Gamma-1)");
-  PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
+  
   const Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot", 0.2);
   const Real rShock = pin->GetOrAddReal("standing_accretion_shock", "rShock", 200);
   const Real rPNS = pin->GetOrAddReal("standing_accretion_shock", "rPNS", 60);
-  const Real eps_ff_ke = pin->GetOrAddReal("standing_accretion_shock", "eps_ff_ke", 0.3);
+  const Real eps0 = pin->GetOrAddReal("standing_accretion_shock", "eps0", 1.e-20);  
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -112,11 +110,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real x2 = coords.Xc<2>(k, j, i);
         const Real x3 = coords.Xc<3>(k, j, i);
 
-        Real r = tr.bl_radius(x1);
-        while (r < Rhor) {
-          x1 += coords.Dxc<1>(i);
-          r = tr.bl_radius(x1);
-        }
+	Real r = tr.bl_radius(x1);   // r = e^(x1min)
+        //const Real lapse0 = geom.Lapse(CellLocation::Cent, rShock, j, i);
+
+        //if (r < rShock) {
+        //   const Real W0 = 1. / lapse0
+        //   const Real rho0 = Mdot / (4. * PI * std::pow(rShock,2) * W0 * std::abs(vr0))  //  code units
+        //   v(irho, k, j, i) = rho0;
+        //   v(ieng, k, j, i) = eps0;        
+        // }
 
         Real eos_lambda[2];
         if (iye > 0) {
@@ -124,6 +126,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           eos_lambda[0] = v(iye, k, j, i);
         }
 
+	// set initial quantities?
         v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
         v(irho, k, j, i) = std::pow(v(itmp, k, j, i), n);
         v(ieng, k, j, i) = v(irho, k, j, i) * v(itmp, k, j, i) / (gam - 1.0);
@@ -132,7 +135,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                            v(iprs, k, j, i);
-        Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
+
+	// set initial radial velocity?
+	Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
         ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
 
         Real gcov[4][4];
