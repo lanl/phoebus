@@ -62,16 +62,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int igm1 = imap[fluid_prim::gamma1].first;
 
   const std::string eos_type = pin->GetString("eos", "type");
-  const EosType eos_type_enum = (eos_type == "IdealGas") ? IdealGas : StellarCollapse;
-  PARTHENON_REQUIRE_THROWS(eos_type == "IdealGas" || eos_type == "StellarCollapse",
-                           "Standing Accretion Shock setup only works with ideal gas or stellar collapse EOS");
-  const Real gam = pin->GetReal("eos", "Gamma");
-  const Real Cv = pin->GetReal("eos", "Cv");
-  
-  const Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot", 0.2);
-  const Real rShock = pin->GetOrAddReal("standing_accretion_shock", "rShock", 200);
-  const Real rPNS = pin->GetOrAddReal("standing_accretion_shock", "rPNS", 60);
-  const Real eps0 = pin->GetOrAddReal("standing_accretion_shock", "eps0", 1.e-20);  
+  PARTHENON_REQUIRE_THROWS(
+      eos_type == "StellarCollapse",
+      "Standing Accretion Shock setup only works with StellarCollapse EOS");
+
+  const Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot",
+                                      0.2); // pin in units of (Msun / sec)
+  const Real rShock = pin->GetOrAddReal("standing_accretion_shock", "rShock",
+                                        200); // pin in units of (km)
+  const Real target_mach = pin->GetOrAddReal("standing_accretion_shock", "target_mach",
+                                             100); // pin in units of (dimensionless)
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -89,7 +89,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // convert to CGS then to code units
   Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
   rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
-  rPNS *= (1.e5 * unit_conv.GetLengthCGSToCode());
+  const Real Tmin =
+      11604525006.1598 * unit_conv.GetTemperatureCGSToCode(); // 1 MeV => K => code units
+  const Real Tmax = 2901131251539.96 *
+                    unit_conv.GetTemperatureCGSToCode(); // 250 MeV => K => code units
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -110,36 +113,57 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real x2 = coords.Xc<2>(k, j, i);
         const Real x3 = coords.Xc<3>(k, j, i);
 
-	Real r = tr.bl_radius(x1);   // r = e^(x1min)
-        //const Real lapse0 = geom.Lapse(CellLocation::Cent, rShock, j, i);
+        Real r = tr.bl_radius(x1); // r = e^(x1min)
+        Real vel_rad;
 
-        //if (r < rShock) {
-        //   const Real W0 = 1. / lapse0
-        //   const Real rho0 = Mdot / (4. * PI * std::pow(rShock,2) * W0 * std::abs(vr0))  //  code units
-        //   v(irho, k, j, i) = rho0;
-        //   v(ieng, k, j, i) = eps0;        
-        // }
-
+        // set Ye everywhere
         Real eos_lambda[2];
         if (iye > 0) {
           v(iye, k, j, i) = 0.5;
           eos_lambda[0] = v(iye, k, j, i);
         }
 
-	// set initial quantities?
-        v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
-        v(irho, k, j, i) = std::pow(v(itmp, k, j, i), n);
-        v(ieng, k, j, i) = v(irho, k, j, i) * v(itmp, k, j, i) / (gam - 1.0);
-        v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(
-            v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), eos_lambda);
-        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
-                           v(iprs, k, j, i);
+        if (r < rShock) {
+          const Real lapse0 = geom.Lapse(
+              CellLocation::Cent, k, j,
+              rShock); // cold, free falling, lapse equal to value at shock radius
+          const Real W0 = 1. / lapse0;
+          const Real vr0 = abs((std::sqrt(W0 - 1)) / (std::sqrt(W0)));
+          vel_rad = const Real rho0 =
+              Mdot / (4. * PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+          v(irho, k, j, i) = rho0;
+          Real T0 = temperature_from_rho_mach(
+              &eos, const Real rho0, const Real target_mach, const Real Tmin,
+              const Real Tmax, const Real Ye = 0.5, const Real vr0);
+          v(itmp, k, j, i) = T0;
+          v(ieng, k, j, i) =
+              rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T0, eos_lambda);
+          v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
+              v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
+          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+                                 v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
+                             v(iprs, k, j, i);
 
-	// set initial radial velocity?
-	Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
-        ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
+        } else {
+          const Real lapse1 = geom.Lapse(CellLocation::Cent, k, j, r);
+          const Real W0 = 1. / lapse0;
+          const Real vr0 = abs((std::sqrt(W0 - 1)) / (std::sqrt(W0)));
+          const Real rho0 = Mdot / (4. * PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+          const Real gamma = 1.4;
+          const Real psi = std::pow(2, lapse1) *
+                           ((gamma - 1) / gamma * (W0 - 1) /
+                            W0); // here we assume epsilonND = 0 and accounted for in EoS
+           const Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4.*psi)/2;
+           const Real rho1 = rho0*W0*(vr0/vr1);
+	   v(irho, k, j, i) = rho1;
+           Real T1 = temperature_from_rho_mach(&eos, const Real rho1, const Real target_mach, const Real Tmin, const Real Tmax, const Real Ye = 0.5, const Real vr1);
+           v(itmp, k, j, i) = T1;
+           v(ieng, k, j, i) = rho1 * eos.InternalEnergyFromDensityTemperature(rho1, T1, eos_lambda);
+           v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
+           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) / v(iprs, k, j, i);
+        }
 
+        Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
         Real gcov[4][4];
         const Real th = tr.bl_theta(x1, x2);
         bl.SpacetimeMetric(0.0, r, th, x3, gcov);

@@ -114,3 +114,4 @@ fluid_density_cgs = 1.e9     # gives mass = 7.07e24 g
 <standing_accretion_shock>
 Mdot = 0.2             # Msun / sec
 rShock = 200           # km
+target_mach = 100      # target Mach number for upstream flow in preshock region 

@@ -84,4 +84,28 @@ Real energy_from_rho_P(const EOS &eos, const Real rho, const Real P, const Real 
   return rho * eroot;
 }
 
+KOKKOS_FUNCTION
+Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target_mach,
+                               const Real Tmin, const Real Tmax, const Real Ye,
+                               const Real vr0) {
+  root_find::RootFind root;
+  const Real epsilon = 1.e-10;
+  Real Troot = root.regula_falsi(
+      [&](const Real T) {
+        Real lambda[2];
+        lambda[0] = Ye;
+        Real P = eos.PressureFromDensityTemperature(rho, T, lambda);
+        Real eps = eos.EnergyFromDensityTemperature(rho, T, lambda);
+        Real bmod = eos.BulkModulusFromDensityTemperature(rho, T, lambda);
+        Real u = rho * eps;            // convert eps / V to specific internal energy
+        Real w = rho + P + u;          // h = 1 + eps + P/rho | w = rho * h == rho + u + P
+        Real cs = std::sqrt(bmod / w); // cs^2 = bmod / w
+        Real mach = vr0 / cs;          // radial component of preshock velocity
+        Real mach_res = mach - target_mach;
+        return mach_res;
+      },
+      Tmin, Tmax, epsilon * mach_res, std::max(Tmin, epsilon));
+  return Troot;
+}
+
 } // namespace phoebus
