@@ -125,7 +125,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         if (r < rShock) {
-	  Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
+          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
           Real W0 = 1. / lapse0;
           Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
           Real rho0 = Mdot / (4. * PI * std::pow(r, 2) * W0 * std::abs(vr0));
