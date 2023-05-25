@@ -119,7 +119,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
         const Real W0 = 1. / lapse0;
         const Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
-        const Real rho0 = Mdot / (4. * PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
         const Real gamma = 1.4;
 
         // set Ye everywhere
@@ -130,6 +129,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         if (r < rShock) {
+          Real rho0 = Mdot / (4. * PI * std::pow(r, 2) * W0 * std::abs(vr0));
           Real T0 = temperature_from_rho_mach(
               &eos, const Real rho0, const Real target_mach, const Real Tmin,
               const Real Tmax, const Real vr0, eos_lambda[0]);
@@ -216,6 +216,29 @@ Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
   if (discr < 0) printf("discr = %g   %g %g %g\n", discr, AA, BB, CC);
   PARTHENON_REQUIRE(discr >= 0, "discr < 0");
   return (-BB - std::sqrt(discr)) / (2. * AA);
+}
+
+KOKKOS_FUNCTION
+Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target_mach,
+                               const Real Tmin, const Real Tmax, const Real vr0,
+                               const Real Ye) {
+  root_find::RootFind root;
+  const Real epsilon = 1.e-10;
+  Real Troot = root.regula_falsi(
+      [&](const Real T) {
+        Real lambda[2];
+        lambda[0] = Ye;
+        Real P = eos.PressureFromDensityTemperature(rho, T, lambda);
+        Real eps = eos.EnergyFromDensityTemperature(rho, T, lambda);
+        Real bmod = eos.BulkModulusFromDensityTemperature(rho, T, lambda);
+        Real u = rho * eps;            // convert eps / V to specific internal energy
+        Real w = rho + P + u;          // h = 1 + eps + P/rho | w = rho * h == rho + u + P
+        Real cs = std::sqrt(bmod / w); // cs^2 = bmod / w
+        Real mach = vr0 / cs;          // radial component of preshock velocity
+        return mach - target_mach;
+      },
+      Tmin, Tmax, epsilon * mach, std::max(Tmin, epsilon));
+  return Troot;
 }
 
 } // namespace standing_accretion_shock
