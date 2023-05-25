@@ -115,10 +115,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
         Real r = tr.bl_radius(x1); // r = e^(x1min)
         Real vel_rad;
-
-        const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
-        const Real W0 = 1. / lapse0;
-        const Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
         const Real gamma = 1.4;
 
         // set Ye everywhere
@@ -129,6 +125,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         if (r < rShock) {
+	  Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
+          Real W0 = 1. / lapse0;
+          Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
           Real rho0 = Mdot / (4. * PI * std::pow(r, 2) * W0 * std::abs(vr0));
           Real T0 = temperature_from_rho_mach(
               &eos, const Real rho0, const Real target_mach, const Real Tmin,

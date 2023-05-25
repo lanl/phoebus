@@ -83,6 +83,5 @@ Real energy_from_rho_P(const EOS &eos, const Real rho, const Real P, const Real 
   Real eroot = root.regula_falsi(res, emin, emax, 1.e-10 * P, emin - 1.e10);
   return rho * eroot;
 }
-}
 
 } // namespace phoebus
