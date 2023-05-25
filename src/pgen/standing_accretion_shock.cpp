@@ -116,6 +116,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real r = tr.bl_radius(x1); // r = e^(x1min)
         Real vel_rad;
 
+        const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
+        const Real W0 = 1. / lapse0;
+        const Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
+        const Real rho0 = Mdot / (4. * PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+        const Real gamma = 1.4;
+
         // set Ye everywhere
         Real eos_lambda[2];
         if (iye > 0) {
@@ -124,17 +130,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         if (r < rShock) {
-          const Real lapse0 = geom.Lapse(
-              CellLocation::Cent, k, j,
-              rShock); // cold, free falling, lapse equal to value at shock radius
-          const Real W0 = 1. / lapse0;
-          const Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
-          vel_rad = const Real rho0 =
-              Mdot / (4. * PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
-          v(irho, k, j, i) = rho0;
           Real T0 = temperature_from_rho_mach(
               &eos, const Real rho0, const Real target_mach, const Real Tmin,
               const Real Tmax, const Real vr0, eos_lambda[0]);
+          v(irho, k, j, i) = rho0;
           v(itmp, k, j, i) = T0;
           v(ieng, k, j, i) =
               rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T0, eos_lambda);
@@ -144,69 +143,79 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
 
+          vel_rad = vr0;
+          Real ucon_bl[] = {0.0, vel_rad, 0.0, 0.0};
+          Real gcov[4][4];
+          const Real th = tr.bl_theta(x1, x2);
+          bl.SpacetimeMetric(0.0, r, th, x3, gcov);
+          ucon_bl[0] = ucon_norm(ucon_bl, gcov);
+
+          Real ucon[4];
+          tr.bl_to_fmks(x1, x2, x3, a, ucon_bl, ucon);
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          ucon[0] = ucon_norm(ucon, gcov);
+
+          const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real beta[3];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+          Real W = lapse * ucon[0];
+
+          // finally compute three-velocity
+          for (int d = 0; d < 3; d++) {
+            v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
+          }
+
         } else {
-          const Real lapse1 = geom.Lapse(CellLocation::Cent, k, j, r);
-          const Real W0 = 1. / lapse0;
-          const Real vr0 = abs((std::sqrt(W0 - 1)) / (std::sqrt(W0)));
-          const Real rho0 = Mdot / (4. * PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
-          const Real gamma = 1.4;
-          const Real psi = std::pow(2, lapse1) *
-                           ((gamma - 1) / gamma * (W0 - 1) /
-                            W0); // here we assume epsilonND = 0 and accounted for in EoS
-           const Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4.*psi)/2;
-           const Real rho1 = rho0*W0*(vr0/vr1);
-	   v(irho, k, j, i) = rho1;
-           Real T1 = temperature_from_rho_mach(&eos, const Real rho1, const Real target_mach, const Real Tmin, const Real Tmax, const Real vr1, eos_lambda[0]);
-           v(itmp, k, j, i) = T1;
-           v(ieng, k, j, i) = rho1 * eos.InternalEnergyFromDensityTemperature(rho1, T1, eos_lambda);
-           v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
-           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) / v(iprs, k, j, i);
-        }
+          Real lapse1 = geom.Lapse(CellLocation::Cent, k, j, r);
+          Real psi = std::pow(2, lapse1) * ((gamma - 1) / gamma * (W0 - 1) / W0);
+          Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4.*psi)/2;
+          Real rho1 = rho0*W0*(vr0/vr1);
+	  Real T1 = temperature_from_rho_mach(&eos, const Real rho1, const Real target_mach, const Real Tmin, const Real Tmax, const Real vr1, eos_lambda[0]);
+	  v(irho, k, j, i) = rho1;
+          v(itmp, k, j, i) = T1;
+          v(ieng, k, j, i) = rho1 * eos.InternalEnergyFromDensityTemperature(rho1, T1, eos_lambda);
+          v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
+          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) / v(iprs, k, j, i);
 
-        Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
-        Real gcov[4][4];
-        const Real th = tr.bl_theta(x1, x2);
-        bl.SpacetimeMetric(0.0, r, th, x3, gcov);
-        Real AA = gcov[0][0];
-        Real BB = 2. * (gcov[0][1] * ucon_bl[1] + gcov[0][2] * ucon_bl[2] +
-                        gcov[0][3] * ucon_bl[3]);
-        Real CC = 1. + gcov[1][1] * ucon_bl[1] * ucon_bl[1] +
-                  gcov[2][2] * ucon_bl[2] * ucon_bl[2] +
-                  gcov[3][3] * ucon_bl[3] * ucon_bl[3] +
-                  2. * (gcov[1][2] * ucon_bl[1] * ucon_bl[2] +
-                        gcov[1][3] * ucon_bl[1] * ucon_bl[3] +
-                        gcov[2][3] * ucon_bl[2] * ucon_bl[3]);
-        Real discr = BB * BB - 4. * AA * CC;
-        ucon_bl[0] = (-BB - std::sqrt(discr)) / (2. * AA);
-        const Real W_bl = ucon_bl[0] * bl.Lapse(0.0, r, th, x3);
+	  vel_rad = vr1;
+          Real ucon_bl[] = {0.0, vel_rad, 0.0, 0.0};
+          Real gcov[4][4];
+          const Real th = tr.bl_theta(x1, x2);
+          bl.SpacetimeMetric(0.0, r, th, x3, gcov);
+          ucon_bl[0] = ucon_norm(ucon_bl, gcov);
 
-        Real ucon[4];
-        tr.bl_to_fmks(x1, x2, x3, a, ucon_bl, ucon);
+          Real ucon[4];
+          tr.bl_to_fmks(x1, x2, x3, a, ucon_bl, ucon);
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          ucon[0] = ucon_norm(ucon, gcov);
 
-        // ucon won't be properly normalized here if x1 is not consistent with i
-        // so renormalize
-        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-        AA = gcov[0][0];
-        BB = 2. * (gcov[0][1] * ucon[1] + gcov[0][2] * ucon[2] + gcov[0][3] * ucon[3]);
-        CC = 1. + gcov[1][1] * ucon[1] * ucon[1] + gcov[2][2] * ucon[2] * ucon[2] +
-             gcov[3][3] * ucon[3] * ucon[3] +
-             2. * (gcov[1][2] * ucon[1] * ucon[2] + gcov[1][3] * ucon[1] * ucon[3] +
-                   gcov[2][3] * ucon[2] * ucon[3]);
-        discr = BB * BB - 4. * AA * CC;
-        PARTHENON_REQUIRE(discr > 0, "discr < 0");
-        ucon[0] = (-BB - std::sqrt(discr)) / (2. * AA);
+          const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real beta[3];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+          Real W = lapse * ucon[0];
 
-        // now get three velocity
-        const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
-        Real beta[3];
-        geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-        Real W = lapse * ucon[0];
-        for (int d = 0; d < 3; d++) {
-          v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
+          // finally compute three-velocity
+          for (int d = 0; d < 3; d++) {
+        v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
+          }
         }
       });
 
   fluid::PrimitiveToConserved(rc);
+}
+
+KOKKOS_FUNCTION
+Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
+  Real AA = gcov[0][0];
+  Real BB = 2. * (gcov[0][1] * ucon[1] + gcov[0][2] * ucon[2] + gcov[0][3] * ucon[3]);
+  Real CC = 1. + gcov[1][1] * ucon[1] * ucon[1] + gcov[2][2] * ucon[2] * ucon[2] +
+            gcov[3][3] * ucon[3] * ucon[3] +
+            2. * (gcov[1][2] * ucon[1] * ucon[2] + gcov[1][3] * ucon[1] * ucon[3] +
+                  gcov[2][3] * ucon[2] * ucon[3]);
+  Real discr = BB * BB - 4. * AA * CC;
+  if (discr < 0) printf("discr = %g   %g %g %g\n", discr, AA, BB, CC);
+  PARTHENON_REQUIRE(discr >= 0, "discr < 0");
+  return (-BB - std::sqrt(discr)) / (2. * AA);
 }
 
 } // namespace standing_accretion_shock

@@ -101,10 +101,9 @@ Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target
         Real w = rho + P + u;          // h = 1 + eps + P/rho | w = rho * h == rho + u + P
         Real cs = std::sqrt(bmod / w); // cs^2 = bmod / w
         Real mach = vr0 / cs;          // radial component of preshock velocity
-        Real mach_res = mach - target_mach;
-        return mach_res;
+        return mach - target_mach;
       },
-      Tmin, Tmax, epsilon * mach_res, std::max(Tmin, epsilon));
+      Tmin, Tmax, epsilon * mach, std::max(Tmin, epsilon));
   return Troot;
 }
 
