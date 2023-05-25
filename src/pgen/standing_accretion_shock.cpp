@@ -21,6 +21,9 @@
 
 namespace standing_accretion_shock {
 
+using Microphysics::EOS::EOS;
+enum EosType { StellarCollapse };
+
 KOKKOS_INLINE_FUNCTION
 void bl_to_ks(const Real r, const Real a, Real *ucon_bl, Real *ucon_ks) {
   using namespace Geometry;
@@ -137,7 +140,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
           Real W0 = 1. / lapse0;
           Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
-          Real rho0 = Mdot / (4. * PI * std::pow(r, 2) * W0 * std::abs(vr0));
+          Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
           Real T0 = temperature_from_rho_mach(
               &eos, const Real rho0, const Real target_mach, const Real Tmin,
               const Real Tmax, const Real vr0, eos_lambda[0]);
