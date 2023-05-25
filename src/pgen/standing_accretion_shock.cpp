@@ -128,13 +128,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               CellLocation::Cent, k, j,
               rShock); // cold, free falling, lapse equal to value at shock radius
           const Real W0 = 1. / lapse0;
-          const Real vr0 = abs((std::sqrt(W0 - 1)) / (std::sqrt(W0)));
+          const Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
           vel_rad = const Real rho0 =
               Mdot / (4. * PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
           v(irho, k, j, i) = rho0;
           Real T0 = temperature_from_rho_mach(
               &eos, const Real rho0, const Real target_mach, const Real Tmin,
-              const Real Tmax, eos_lambda[0], const Real vr0);
+              const Real Tmax, const Real vr0, eos_lambda[0]);
           v(itmp, k, j, i) = T0;
           v(ieng, k, j, i) =
               rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T0, eos_lambda);
@@ -156,7 +156,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
            const Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4.*psi)/2;
            const Real rho1 = rho0*W0*(vr0/vr1);
 	   v(irho, k, j, i) = rho1;
-           Real T1 = temperature_from_rho_mach(&eos, const Real rho1, const Real target_mach, const Real Tmin, const Real Tmax, eos_lambda[0], const Real vr1);
+           Real T1 = temperature_from_rho_mach(&eos, const Real rho1, const Real target_mach, const Real Tmin, const Real Tmax, const Real vr1, eos_lambda[0]);
            v(itmp, k, j, i) = T1;
            v(ieng, k, j, i) = rho1 * eos.InternalEnergyFromDensityTemperature(rho1, T1, eos_lambda);
            v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);

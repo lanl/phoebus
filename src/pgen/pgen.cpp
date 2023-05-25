@@ -86,8 +86,8 @@ Real energy_from_rho_P(const EOS &eos, const Real rho, const Real P, const Real 
 
 KOKKOS_FUNCTION
 Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target_mach,
-                               const Real Tmin, const Real Tmax, const Real Ye,
-                               const Real vr0) {
+                               const Real Tmin, const Real Tmax, const Real vr0,
+                               const Real Ye) {
   root_find::RootFind root;
   const Real epsilon = 1.e-10;
   Real Troot = root.regula_falsi(
