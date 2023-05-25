@@ -100,8 +100,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
   // convert to CGS then to code units
-  Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
-  rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
+  Mdot_conv =
+      Mdot * ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
+  rShock_conv = rShock * 1.e5 * unit_conv.GetLengthCGSToCode();
   const Real Tmin =
       11604525006.1598 * unit_conv.GetTemperatureCGSToCode(); // 1 MeV => K => code units
   const Real Tmax = 2901131251539.96 *
@@ -137,11 +138,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           eos_lambda[0] = v(iye, k, j, i);
         }
 
-        if (r < rShock) {
+        if (r < rShock_conv) {
           Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
           Real W0 = 1. / lapse0;
           Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
-          Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
+          Real rho0 = Mdot_conv / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
           Real T0 = temperature_from_rho_mach(
               eos, const Real rho0, const Real target_mach, const Real Tmin,
               const Real Tmax, const Real vr0, eos_lambda[0]);
