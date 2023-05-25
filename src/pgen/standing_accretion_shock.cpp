@@ -37,6 +37,15 @@ void bl_to_ks(const Real r, const Real a, Real *ucon_bl, Real *ucon_ks) {
   SPACETIMELOOP2(mu, nu) { ucon_ks[mu] += trans[mu][nu] * ucon_bl[nu]; }
 }
 
+// Prototypes
+// ----------------------------------------------------------------------
+KOKKOS_FUNCTION
+Real ucon_norm(Real ucon[4], Real gcov[4][4]);
+Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target_mach,
+                               const Real Tmin, const Real Tmax, const Real vr0,
+                               const Real Ye);
+// ----------------------------------------------------------------------
+
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
