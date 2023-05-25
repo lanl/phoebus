@@ -14,6 +14,7 @@
 #include "geometry/boyer_lindquist.hpp"
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "pgen/pgen.hpp"
+#include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
 #include "utils/error_checking.hpp"
 
@@ -142,7 +143,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
           Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
           Real T0 = temperature_from_rho_mach(
-              &eos, const Real rho0, const Real target_mach, const Real Tmin,
+              eos, const Real rho0, const Real target_mach, const Real Tmin,
               const Real Tmax, const Real vr0, eos_lambda[0]);
           v(irho, k, j, i) = rho0;
           v(itmp, k, j, i) = T0;
@@ -181,7 +182,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real psi = std::pow(2, lapse1) * ((gamma - 1) / gamma * (W0 - 1) / W0);
           Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4.*psi)/2;
           Real rho1 = rho0*W0*(vr0/vr1);
-	  Real T1 = temperature_from_rho_mach(&eos, const Real rho1, const Real target_mach, const Real Tmin, const Real Tmax, const Real vr1, eos_lambda[0]);
+	  Real T1 = temperature_from_rho_mach(eos, const Real rho1, const Real target_mach, const Real Tmin, const Real Tmax, const Real vr1, eos_lambda[0]);
 	  v(irho, k, j, i) = rho1;
           v(itmp, k, j, i) = T1;
           v(ieng, k, j, i) = rho1 * eos.InternalEnergyFromDensityTemperature(rho1, T1, eos_lambda);
