@@ -86,6 +86,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
+  auto Tmin = pmb->packages.Get("eos")->Param<Real>("T_min");
+  auto Tmax = pmb->packages.Get("eos")->Param<Real>("T_max");
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
@@ -96,10 +98,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // convert to CGS then to code units
   Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
   rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
-  const Real Tmin =
-      11604525006.1598 * unit_conv.GetTemperatureCGSToCode(); // 1 MeV => K => code units
-  const Real Tmax = 2901131251539.96 *
-                    unit_conv.GetTemperatureCGSToCode(); // 250 MeV => K => code units
+  // const Real Tmin = 1.16e9 * unit_conv.GetTemperatureCGSToCode(); // 0.1 MeV => K =>
+  // code units const Real Tmax = 1.85e12 * unit_conv.GetTemperatureCGSToCode(); // 160
+  // MeV => K => code units
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
