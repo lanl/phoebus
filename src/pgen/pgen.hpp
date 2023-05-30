@@ -121,6 +121,10 @@ KOKKOS_FUNCTION
 Real energy_from_rho_P(const Microphysics::EOS::EOS &eos, const Real rho, const Real P,
                        const Real emin, const Real emax, const Real Ye = 0.0);
 
+Real temperature_from_rho_mach(const Microphysics::EOS::EOS &eos, const Real rho,
+                               const Real target_mach, const Real Tmin, const Real Tmax,
+                               const Real vr0, const Real Ye);
+
 } // namespace phoebus
 
 #endif
