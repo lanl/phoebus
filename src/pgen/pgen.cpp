@@ -101,6 +101,8 @@ class MachResidual {
     Real w = rho_ + P + u;         // h = 1 + eps + P/rho | w = rho * h == rho + u + P
     Real cs = std::sqrt(bmod / w); // cs^2 = bmod / w
     Real mach = vr0_ / cs;         // radial component of preshock velocity
+    // printf("Mach Residual Func produced: u, w, cs, Mach, vr0 = %g %g %g %g %g\n", u, w,
+    // cs, mach, vr0_);
     return mach - target_mach_;
   }
 
@@ -114,11 +116,12 @@ KOKKOS_FUNCTION
 Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target_mach,
                                const Real Tmin, const Real Tmax, const Real vr0,
                                const Real Ye) {
-  const Real epsilon = 1.e-10;
+  // printf("passing values of: rho, vr0, Mach_target, Ye = %g %g %g %g\n", rho, vr0,
+  // target_mach, Ye);
   MachResidual res(eos, rho, vr0, target_mach, Ye);
   root_find::RootFind root;
   Real Troot =
-      root.regula_falsi(res, Tmin, Tmax, epsilon * target_mach, std::max(Tmin, epsilon));
+      root.regula_falsi(res, Tmin, Tmax, 1.e-10 * target_mach, std::max(Tmin, 1.e-10));
   return Troot;
 }
 

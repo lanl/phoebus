@@ -88,6 +88,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   auto Tmin = pmb->packages.Get("eos")->Param<Real>("T_min");
   auto Tmax = pmb->packages.Get("eos")->Param<Real>("T_max");
+  printf("from SC: Tmin, Tmax = %g %g\n", Tmin, Tmax);
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
@@ -98,9 +99,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // convert to CGS then to code units
   Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
   rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
-  // const Real Tmin = 1.16e9 * unit_conv.GetTemperatureCGSToCode(); // 0.1 MeV => K =>
-  // code units const Real Tmax = 1.85e12 * unit_conv.GetTemperatureCGSToCode(); // 160
-  // MeV => K => code units
+  Real Tmin_in =
+      1.16e9 * unit_conv.GetTemperatureCGSToCode(); // 0.1 MeV => K => code units
+  Real Tmax_in =
+      1.85e12 * unit_conv.GetTemperatureCGSToCode(); // 160  MeV => K => code units
+  printf("from input: Tmin_in, Tmax_in = %g %g\n", Tmin_in, Tmax_in);
+  const Real Mpns = 1.3 * solar_mass * unit_conv.GetMassCGSToCode();
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -123,7 +127,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
         Real r = tr.bl_radius(x1); // r = e^(x1min)
         Real vel_rad;
-        const Real gamma = 1.4;
+        const Real gamma = 4. / 3.;
 
         // set Ye everywhere
         Real eos_lambda[2];
@@ -135,10 +139,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         if (r < rShock) {
           Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
           Real W0 = 1. / lapse0;
-          Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
+          Real vr0 = -1. * std::sqrt(W0 * W0 - 1.) / W0;
+          // Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
           Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
+          Real alphasq = 1 - (2. * 1.3 / r);
+          Real psi = alphasq * ((gamma - 1) / gamma) * ((W0 - 1) / W0);
+          Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
+          Real rho1 = rho0 * W0 * (vr0 / vr1);
+          printf("inside shock: passing values of: r, rho0, vr0, vr1, Mach_target, "
+                 "lapse0, psi  = %g %g %g %g %g %g %g\n",
+                 r, rho0, vr0, vr1, target_mach, lapse0, psi);
           Real T0 = phoebus::temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax,
-                                                       vr0, eos_lambda[0]);
+                                                       vr1, eos_lambda[0]);
+          // printf("found T0 of: T0 at r, rho0, vr0, Mach_target = %g %g %g %g %g \n",
+          // T0, r, rho0, vr0, target_mach);
           v(irho, k, j, i) = rho0;
           v(itmp, k, j, i) = T0;
           v(ieng, k, j, i) =
@@ -175,13 +189,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // beyond rShock, quantities defined by value at rShock
           Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
           Real W0 = 1. / lapse0;
-          Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
+          Real vr0 = -1. * std::sqrt(W0 * W0 - 1.) / W0;
+          // Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
           Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
-
-          Real lapse1 = geom.Lapse(CellLocation::Cent, k, j, r);
-          Real psi = std::pow(2, lapse1) * ((gamma - 1) / gamma * (W0 - 1) / W0);
-          Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2;
+          Real alphasq = 1 - (2. * Mpns / r);
+          Real psi = alphasq * ((gamma - 1) / gamma) * ((W0 - 1) / W0);
+          Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
           Real rho1 = rho0 * W0 * (vr0 / vr1);
+          printf("outside shock: passing values of: r, rho0, vr0, vr1, Mach_target, "
+                 "lapse0, psi  = %g %g %g %g %g %g %g\n",
+                 r, rho0, vr0, vr1, target_mach, lapse0, psi);
           Real T1 = phoebus::temperature_from_rho_mach(eos, rho1, target_mach, Tmin, Tmax,
                                                        vr1, eos_lambda[0]);
           v(irho, k, j, i) = rho1;
