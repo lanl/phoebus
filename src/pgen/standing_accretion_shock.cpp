@@ -85,10 +85,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto &coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("h.EOS");
   auto Tmin = pmb->packages.Get("eos")->Param<Real>("T_min");
   auto Tmax = pmb->packages.Get("eos")->Param<Real>("T_max");
-  printf("from SC: Tmin, Tmax = %g %g\n", Tmin, Tmax);
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
@@ -99,12 +98,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // convert to CGS then to code units
   Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
   rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
-  Real Tmin_in =
-      1.16e9 * unit_conv.GetTemperatureCGSToCode(); // 0.1 MeV => K => code units
-  Real Tmax_in =
-      1.85e12 * unit_conv.GetTemperatureCGSToCode(); // 160  MeV => K => code units
-  printf("from input: Tmin_in, Tmax_in = %g %g\n", Tmin_in, Tmax_in);
-  const Real Mpns = 1.3 * solar_mass * unit_conv.GetMassCGSToCode();
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -136,27 +129,21 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           eos_lambda[0] = v(iye, k, j, i);
         }
 
-        if (r < rShock) {
-          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
+        if (r > rShock) {
+          // preshock - 0
+          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
           Real W0 = 1. / lapse0;
           Real vr0 = -1. * std::sqrt(W0 * W0 - 1.) / W0;
-          // Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
-          Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
-          Real alphasq = 1 - (2. * 1.3 / r);
-          Real psi = alphasq * ((gamma - 1) / gamma) * ((W0 - 1) / W0);
-          Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
-          Real rho1 = rho0 * W0 * (vr0 / vr1);
-          printf("inside shock: passing values of: r, rho0, vr0, vr1, Mach_target, "
-                 "lapse0, psi  = %g %g %g %g %g %g %g\n",
-                 r, rho0, vr0, vr1, target_mach, lapse0, psi);
-          Real T0 = phoebus::temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax,
-                                                       vr1, eos_lambda[0]);
-          // printf("found T0 of: T0 at r, rho0, vr0, Mach_target = %g %g %g %g %g \n",
-          // T0, r, rho0, vr0, target_mach);
+          Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+          // printf("preshock (r>rShock): passing values of: r, rho0, vr0, lapse0, psi  =
+          // %g %g %g %g\n",r, rho0, vr0, lapse0);
+
+          Real T = phoebus::temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax,
+                                                      vr0, eos_lambda[0]);
           v(irho, k, j, i) = rho0;
-          v(itmp, k, j, i) = T0;
+          v(itmp, k, j, i) = T;
           v(ieng, k, j, i) =
-              rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T0, eos_lambda);
+              rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T, eos_lambda);
           v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
@@ -175,36 +162,36 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           ucon[0] = ucon_norm(ucon, gcov);
 
-          const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+          const Real lapsed = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-          Real W = lapse * ucon[0];
+          Real Wd = lapsed * ucon[0];
 
           // finally compute three-velocity
           for (int d = 0; d < 3; d++) {
-            v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
+            v(ivlo + d, k, j, i) = ucon[d + 1] + Wd * beta[d] / lapsed;
           }
 
         } else {
-          // beyond rShock, quantities defined by value at rShock
+          // postshock - 1
           Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
           Real W0 = 1. / lapse0;
           Real vr0 = -1. * std::sqrt(W0 * W0 - 1.) / W0;
-          // Real vr0 = abs((std::sqrt(W0 - 1.)) / (std::sqrt(W0)));
-          Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
-          Real alphasq = 1 - (2. * Mpns / r);
-          Real psi = alphasq * ((gamma - 1) / gamma) * ((W0 - 1) / W0);
+          Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
+
+          Real alphasq = 1. - (2. / r);
+          Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1.) / W0);
           Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
           Real rho1 = rho0 * W0 * (vr0 / vr1);
-          printf("outside shock: passing values of: r, rho0, vr0, vr1, Mach_target, "
-                 "lapse0, psi  = %g %g %g %g %g %g %g\n",
-                 r, rho0, vr0, vr1, target_mach, lapse0, psi);
-          Real T1 = phoebus::temperature_from_rho_mach(eos, rho1, target_mach, Tmin, Tmax,
-                                                       vr1, eos_lambda[0]);
+
+          const Real epsND = 0.003; // 2.7e16 ergs / g for M = 1.3Mpns
+
+          // printf("postshock r<rShock: passing values of: r, rho1, vr1, lapse0, psi  =
+          // %g %g %g %g %g\n",r, rho1, vr1, lapse0, psi);
           v(irho, k, j, i) = rho1;
-          v(itmp, k, j, i) = T1;
-          v(ieng, k, j, i) =
-              rho1 * eos.InternalEnergyFromDensityTemperature(rho1, T1, eos_lambda);
+          v(ieng, k, j, i) = (W0 - 1. + epsND * (gamma - 1.)) / (gamma);
+          v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+              rho1, v(ieng, k, j, i) / rho1, eos_lambda);
           v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
@@ -223,14 +210,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           ucon[0] = ucon_norm(ucon, gcov);
 
-          const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+          const Real lapsed = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-          Real W = lapse * ucon[0];
+          Real Wd = lapsed * ucon[0];
 
           // finally compute three-velocity
           for (int d = 0; d < 3; d++) {
-            v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
+            v(ivlo + d, k, j, i) = ucon[d + 1] + Wd * beta[d] / lapsed;
           }
         }
       });
