@@ -22,28 +22,6 @@
 
 namespace standing_accretion_shock {
 
-KOKKOS_INLINE_FUNCTION
-void bl_to_ks(const Real r, const Real a, Real *ucon_bl, Real *ucon_ks) {
-  using namespace Geometry;
-  Real trans[NDFULL][NDFULL];
-  LinearAlgebra::SetZero(trans, NDFULL, NDFULL);
-  const Real idenom = 1.0 / (r * r - 2.0 * r + a * a);
-  trans[0][0] = 1.0;
-  trans[0][1] = 2.0 * r * idenom;
-  trans[1][1] = 1.0;
-  trans[2][2] = 1.0;
-  trans[3][1] = a * idenom;
-  trans[3][3] = 1.0;
-  LinearAlgebra::SetZero(ucon_ks, NDFULL);
-  SPACETIMELOOP2(mu, nu) { ucon_ks[mu] += trans[mu][nu] * ucon_bl[nu]; }
-}
-
-// Prototypes
-// ----------------------------------------------------------------------
-KOKKOS_FUNCTION
-Real ucon_norm(Real ucon[4], Real gcov[4][4]);
-// ----------------------------------------------------------------------
-
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
@@ -119,7 +97,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real x3 = coords.Xc<3>(k, j, i);
 
         Real r = tr.bl_radius(x1); // r = e^(x1min)
-        Real vel_rad;
         const Real gamma = 4. / 3.;
 
         // set Ye everywhere
@@ -150,18 +127,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
 
-          vel_rad = vr0;
-          Real ucon_bl[] = {0.0, vel_rad, 0.0, 0.0};
-          Real gcov[4][4];
-          const Real th = tr.bl_theta(x1, x2);
-          bl.SpacetimeMetric(0.0, r, th, x3, gcov);
-          ucon_bl[0] = ucon_norm(ucon_bl, gcov);
-
-          Real ucon[4];
-          tr.bl_to_fmks(x1, x2, x3, a, ucon_bl, ucon);
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-          ucon[0] = ucon_norm(ucon, gcov);
-
+          Real ucon[4] = {0.0, vr0, 0.0, 0.0};
           const Real lapsed = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
@@ -177,7 +143,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
           Real W0 = 1. / lapse0;
           Real vr0 = -1. * std::sqrt(W0 * W0 - 1.) / W0;
-          Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
+          Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
 
           Real alphasq = 1. - (2. / r);
           Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1.) / W0);
@@ -198,18 +164,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
 
-          vel_rad = vr1;
-          Real ucon_bl[] = {0.0, vel_rad, 0.0, 0.0};
-          Real gcov[4][4];
-          const Real th = tr.bl_theta(x1, x2);
-          bl.SpacetimeMetric(0.0, r, th, x3, gcov);
-          ucon_bl[0] = ucon_norm(ucon_bl, gcov);
-
-          Real ucon[4];
-          tr.bl_to_fmks(x1, x2, x3, a, ucon_bl, ucon);
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
-          ucon[0] = ucon_norm(ucon, gcov);
-
+          Real ucon[4] = {0.0, vr1, 0.0, 0.0};
           const Real lapsed = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
@@ -223,20 +178,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       });
 
   fluid::PrimitiveToConserved(rc);
-}
-
-KOKKOS_FUNCTION
-Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
-  Real AA = gcov[0][0];
-  Real BB = 2. * (gcov[0][1] * ucon[1] + gcov[0][2] * ucon[2] + gcov[0][3] * ucon[3]);
-  Real CC = 1. + gcov[1][1] * ucon[1] * ucon[1] + gcov[2][2] * ucon[2] * ucon[2] +
-            gcov[3][3] * ucon[3] * ucon[3] +
-            2. * (gcov[1][2] * ucon[1] * ucon[2] + gcov[1][3] * ucon[1] * ucon[3] +
-                  gcov[2][3] * ucon[2] * ucon[3]);
-  Real discr = BB * BB - 4. * AA * CC;
-  if (discr < 0) printf("discr = %g   %g %g %g\n", discr, AA, BB, CC);
-  PARTHENON_REQUIRE(discr >= 0, "discr < 0");
-  return (-BB - std::sqrt(discr)) / (2. * AA);
 }
 
 } // namespace standing_accretion_shock
