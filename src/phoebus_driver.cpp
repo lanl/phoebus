@@ -652,7 +652,7 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
       auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
       auto calc_tau = tl.AddTask(none, radiation::LightBulbCalcTau, sc0.get());
       auto check_do_gain_local = tl.AddTask(calc_tau, radiation::CheckDoGain, sc0.get(), &(pdo_gain_reducer->val));
-      auto start_gain_reducer = (ib == 0 ? tl.AddTask(check_do_gain_local, &parthenon::AllReduce<bool>::StartReduce, pdo_gain_reducer, MPI_MAX):none);
+      auto start_gain_reducer = (ib == 0 ? tl.AddTask(check_do_gain_local, &parthenon::AllReduce<bool>::StartReduce, pdo_gain_reducer, MPI_LOR):none);
       auto finish_gain_reducer = tl.AddTask(start_gain_reducer, &parthenon::AllReduce<bool>::CheckReduce, pdo_gain_reducer);
       int reg_dep_id = 0;
       async_region.AddRegionalDependencies(reg_dep_id++, ib, finish_gain_reducer);

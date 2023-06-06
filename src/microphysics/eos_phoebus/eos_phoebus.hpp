@@ -27,13 +27,15 @@ namespace Microphysics {
 
 namespace EOS {
 
+using EOS = singularity::Variant<
+    singularity::UnitSystem<singularity::IdealGas>, singularity::IdealGas
 #ifdef SPINER_USE_HDF
-using EOS = singularity::Variant<singularity::UnitSystem<singularity::IdealGas>,
-                                 singularity::UnitSystem<singularity::StellarCollapse>>;
-#else
-using EOS = singularity::Variant<singularity::UnitSystem<singularity::IdealGas>>;
-#endif
+    ,
+    singularity::UnitSystem<singularity::StellarCollapse>, singularity::StellarCollapse
+#endif // SPINER_USE_HDF
+    >;
 
+  
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 } // namespace EOS
 
