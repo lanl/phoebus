@@ -37,6 +37,8 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg);
 TaskStatus CheckRateOfChange(StateDescriptor *pkg, Real dt);
 void DumpToTxt(const std::string &filename, StateDescriptor *pkg);
 inline void DumpCurrentState(StateDescriptor *pkg) { DumpToTxt("metric-last.dat", pkg); }
+void DumpHypersurface(const std::string &filename, Matter_host_t &matter,
+                      Hypersurface_host_t &hypersurface, Radius &r, int npoints);
 TaskStatus DivideVols(StateDescriptor *pkg);
 template <typename T>
 TaskStatus InterpMetricToGrid(T *rc);

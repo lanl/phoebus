@@ -335,7 +335,8 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   }
   for (int v = 0; v < NHYPER; ++v) {
     if (std::isnan(hypersurface_h(v, npoints - 1))) {
-      PARTHENON_FAIL("Bad ODE integration.");
+      DumpHypersurface("bad_ode_state.txt", matter_h, hypersurface_h, radius, npoints);
+      PARTHENON_FAIL("Bad ODE integration. State dumped to bad_ode_state.txt");
     }
   }
 
@@ -642,6 +643,20 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
             gradients_h(Gradients::DKDR, i), gradients_h(Gradients::DBETADT, i),
             matter_cells_h(Matter::RHO, i), matter_cells_h(Matter::J_R, i),
             matter_cells_h(Matter::trcS, i), matter_cells_h(Matter::Srr, i), vols_h(i));
+  }
+  fclose(pf);
+}
+
+void DumpHypersurface(const std::string &filename, Matter_host_t &matter,
+                      Hypersurface_host_t &hypersurface, Radius &r, int npoints) {
+  FILE *pf;
+  pf = fopen(filename.c_str(), "w");
+  fprintf(pf, "#it\tr\trho\tJ_r\ttrcS\tSrr\tA\tK\n");
+  for (int i = 0; i < npoints; ++i) {
+    fprintf(pf, "%d\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\n", i, r.x(i),
+            matter(Matter::RHO, i), matter(Matter::J_R, i), matter(Matter::trcS, i),
+            matter(Matter::Srr, i), hypersurface(Hypersurface::A, i),
+            hypersurface(Hypersurface::K, i));
   }
   fclose(pf);
 }
