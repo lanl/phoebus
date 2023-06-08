@@ -12,20 +12,59 @@
 // publicly, and to permit others to do so.
 
 #include "geometry/boyer_lindquist.hpp"
-#include "geometry/mckinney_gammie_ryan.hpp"
 #include "pgen/pgen.hpp"
 #include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
 #include "utils/error_checking.hpp"
 
-// namespace phoebus {
-
 namespace standing_accretion_shock {
+
+parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
+using Microphysics::EOS::EOS;
+
+class MachResidual {
+ public:
+  KOKKOS_FUNCTION
+  MachResidual(const EOS &eos, const Real rho, const Real vr0, const Real target_mach,
+               const Real Ye)
+      : eos_(eos), rho_(rho), vr0_(vr0), target_mach_(target_mach) {
+    lambda_[0] = Ye;
+  }
+  KOKKOS_INLINE_FUNCTION
+  Real operator()(const Real T) {
+    Real P = eos_.PressureFromDensityTemperature(rho_, T, lambda_);
+    Real eps = eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda_);
+    Real bmod = eos_.BulkModulusFromDensityTemperature(rho_, T, lambda_);
+    Real u = rho_ * eps;             // convert eps / V to specific internal energy
+    Real w = rho_ + P + u;           // h = 1 + eps + P/rho | w = rho * h == rho + u + P
+    Real cs = std::sqrt(bmod / w);   // cs^2 = bmod / w
+    Real mach = std::abs(vr0_) / cs; // radial component of preshock velocity
+    // printf("Mach Residual Func produced: u, w, cs, Mach, vr0 = %g %g %g %g %g\n", u, w,
+    // cs, mach, vr0_);
+    return mach - target_mach_;
+  }
+
+ private:
+  const EOS &eos_;
+  Real rho_, vr0_, target_mach_;
+  Real lambda_[2];
+};
+
+// protehypes----
+KOKKOS_FUNCTION
+Real temperature_from_rho_mach(const Microphysics::EOS::EOS &eos, const Real rho,
+                               const Real target_mach, const Real Tmin, const Real Tmax,
+                               const Real vr0, const Real Ye);
+KOKKOS_FUNCTION
+Real ucon_norm(Real ucon[4], Real gcov[4][4]);
+
+//--------------
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
-  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
-                    "Problem \"standing_accretion_shock\" requires \"FMKS\" geometry!");
+  PARTHENON_REQUIRE(
+      typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoyerLindquist),
+      "Problem \"standing_accretion_shock\" requires \"BoyerLindquist\" geometry!");
 
   auto rc = pmb->meshblock_data.Get().get();
 
@@ -51,12 +90,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       eos_type == "StellarCollapse",
       "Standing Accretion Shock setup only works with StellarCollapse EOS");
 
-  Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot",
-                                0.2); // pin in units of (Msun / sec)
-  Real rShock = pin->GetOrAddReal("standing_accretion_shock", "rShock",
-                                  200); // pin in units of (km)
-  const Real target_mach = pin->GetOrAddReal("standing_accretion_shock", "target_mach",
-                                             100); // pin in units of (dimensionless)
+  Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot", 0.2);
+  Real rShock = pin->GetOrAddReal("standing_accretion_shock", "rShock", 200);
+  const Real target_mach =
+      pin->GetOrAddReal("standing_accretion_shock", "target_mach", 100);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -73,21 +110,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
-  // convert to CGS then to code units
   Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
   rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
+  const Real MPNS = 1.3 * solar_mass * unit_conv.GetMassCGSToCode();
+  const Real rs =
+      (2. * pc.g_newt * MPNS / (std::pow(pc.c, 2))) * unit_conv.GetLengthCGSToCode();
+
+  printf("rShock (code units) = %g \n", rShock);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
-
-  // set up transformation stuff
-  auto gpkg = pmb->packages.Get("geometry");
-  bool derefine_poles = gpkg->Param<bool>("derefine_poles");
-  Real h = gpkg->Param<Real>("h");
-  Real xt = gpkg->Param<Real>("xt");
-  Real alpha = gpkg->Param<Real>("alpha");
-  Real x0 = gpkg->Param<Real>("x0");
-  Real smooth = gpkg->Param<Real>("smooth");
-  auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::StandingAccrectionShock", kb.s, kb.e, jb.s, jb.e, ib.s,
@@ -96,8 +127,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real x2 = coords.Xc<2>(k, j, i);
         const Real x3 = coords.Xc<3>(k, j, i);
 
-        Real r = tr.bl_radius(x1); // r = e^(x1min)
+        Real r = std::abs(x1);
         const Real gamma = 4. / 3.;
+        const Real epsND = 0.003; // 2.7e16 ergs / g for M = 1.3Mpns
+
+        // printf("0 (preshock region)  x1, r, rho0, vr0, lapse0, W0 = %g %g %g %g %g
+        // %g\n",x1, r, rho0, vr0, lapse0, W0);
 
         // set Ye everywhere
         Real eos_lambda[2];
@@ -106,54 +141,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           eos_lambda[0] = v(iye, k, j, i);
         }
 
-        if (r > rShock) {
-          // preshock - 0
-          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
+        // postshock - 1
+        if (r < rShock) {
+
+          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
           Real W0 = 1. / lapse0;
-          Real vr0 = -1. * std::sqrt(W0 * W0 - 1.) / W0;
-          Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
-          // printf("preshock (r>rShock): passing values of: r, rho0, vr0, lapse0, psi  =
-          // %g %g %g %g\n",r, rho0, vr0, lapse0);
-
-          Real T = phoebus::temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax,
-                                                      vr0, eos_lambda[0]);
-          v(irho, k, j, i) = rho0;
-          v(itmp, k, j, i) = T;
-          v(ieng, k, j, i) =
-              rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T, eos_lambda);
-          v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
-              v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
-          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                                 v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
-                             v(iprs, k, j, i);
-
-          Real ucon[4] = {0.0, vr0, 0.0, 0.0};
-          const Real lapsed = geom.Lapse(CellLocation::Cent, k, j, i);
-          Real beta[3];
-          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-          Real Wd = lapsed * ucon[0];
-
-          // finally compute three-velocity
-          for (int d = 0; d < 3; d++) {
-            v(ivlo + d, k, j, i) = ucon[d + 1] + Wd * beta[d] / lapsed;
-          }
-
-        } else {
-          // postshock - 1
-          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
-          Real W0 = 1. / lapse0;
-          Real vr0 = -1. * std::sqrt(W0 * W0 - 1.) / W0;
-          Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+          Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
+          Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
 
           Real alphasq = 1. - (2. / r);
           Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1.) / W0);
-          Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
+          Real vr1 = -1. * (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
           Real rho1 = rho0 * W0 * (vr0 / vr1);
 
-          const Real epsND = 0.003; // 2.7e16 ergs / g for M = 1.3Mpns
-
-          // printf("postshock r<rShock: passing values of: r, rho1, vr1, lapse0, psi  =
-          // %g %g %g %g %g\n",r, rho1, vr1, lapse0, psi);
+          printf("inside shock (postshock region)  r, rho1, vr1 = %g %g %g\n", r, rho1,
+                 vr1);
+          // printf("inside shock (postshock region)  r, alphasq, psi, rho0, vr0,  rho1,
+          // vr1 = %g %g %g %g %g %g %g\n",r, alphasq, psi, rho0, vr0,  rho1, vr1);
           v(irho, k, j, i) = rho1;
           v(ieng, k, j, i) = (W0 - 1. + epsND * (gamma - 1.)) / (gamma);
           v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
@@ -164,20 +168,100 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
 
-          Real ucon[4] = {0.0, vr1, 0.0, 0.0};
-          const Real lapsed = geom.Lapse(CellLocation::Cent, k, j, i);
+          // construct contravariant 4-velocity
+          Real ucon[] = {0.0, vr1, 0.0, 0.0};
+
+          // initialize spacetime metric
+          Real gcov[4][4];
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          ucon[0] = ucon_norm(ucon, gcov);
+
+          // now get three velocity
+          const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-          Real Wd = lapsed * ucon[0];
+          Real W = lapse * ucon[0];
 
-          // finally compute three-velocity
           for (int d = 0; d < 3; d++) {
-            v(ivlo + d, k, j, i) = ucon[d + 1] + Wd * beta[d] / lapsed;
+            v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
           }
+
+          printf("POSTSHOCK r = %g u^0 (should match vr1) = %g\n", r, v(ivlo, k, j, i));
+
+          // preshock - 0
+        } else {
+
+          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
+          Real W0 = 1. / lapse0;
+          Real vr0 = std::sqrt(lapse0 * lapse0 - 1.);
+          Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+
+          printf("PRESHOCK: passing values of: r, rho0, vr0 = %g %g %g\n", r, rho0, vr0);
+          Real T = temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax, vr0,
+                                             eos_lambda[0]);
+
+          // printf("PRESHOCK:  r = %e T (K) = %e\n", r, T/pc.kb);
+
+          v(irho, k, j, i) = rho0;
+          v(itmp, k, j, i) = T;
+          v(ieng, k, j, i) =
+              rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T, eos_lambda);
+          v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
+              v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
+          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
+                                 v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
+                             v(iprs, k, j, i);
+
+          // construct contravariant 4-velocity
+          Real ucon[] = {0.0, vr0, 0.0, 0.0};
+
+          // initialize spacetime metric
+          Real gcov[4][4];
+          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
+          ucon[0] = ucon_norm(ucon, gcov);
+
+          // now get three velocity
+          const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real beta[3];
+          geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
+          Real W = lapse * ucon[0];
+
+          for (int d = 0; d < 3; d++) {
+            v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
+          }
+
+          printf("preshock r = %g u^0 (should match vr0) = %g\n", r, v(ivlo, k, j, i));
         }
       });
 
   fluid::PrimitiveToConserved(rc);
+}
+
+KOKKOS_FUNCTION
+Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target_mach,
+                               const Real Tmin, const Real Tmax, const Real vr0,
+                               const Real Ye) {
+  // printf("passing values of: rho, vr0, Mach_target, Ye = %g %g %g %g\n", rho, vr0,
+  // target_mach, Ye);
+  MachResidual res(eos, rho, vr0, target_mach, Ye);
+  root_find::RootFind root;
+  Real Troot =
+      root.regula_falsi(res, Tmin, Tmax, 1.e-10 * target_mach, std::max(Tmin, 1.e-10));
+  return Troot;
+}
+
+KOKKOS_FUNCTION
+Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
+  Real AA = gcov[0][0];
+  Real BB = 2. * (gcov[0][1] * ucon[1] + gcov[0][2] * ucon[2] + gcov[0][3] * ucon[3]);
+  Real CC = 1. + gcov[1][1] * ucon[1] * ucon[1] + gcov[2][2] * ucon[2] * ucon[2] +
+            gcov[3][3] * ucon[3] * ucon[3] +
+            2. * (gcov[1][2] * ucon[1] * ucon[2] + gcov[1][3] * ucon[1] * ucon[3] +
+                  gcov[2][3] * ucon[2] * ucon[3]);
+  Real discr = BB * BB - 4. * AA * CC;
+  if (discr < 0) printf("discr = %g   %g %g %g\n", discr, AA, BB, CC);
+  PARTHENON_REQUIRE(discr >= 0, "discr < 0");
+  return (-BB - std::sqrt(discr)) / (2. * AA);
 }
 
 } // namespace standing_accretion_shock
