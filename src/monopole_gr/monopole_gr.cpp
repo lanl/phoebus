@@ -335,7 +335,9 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   }
   for (int v = 0; v < NHYPER; ++v) {
     if (std::isnan(hypersurface_h(v, npoints - 1))) {
-      DumpHypersurface("bad_ode_state.txt", matter_h, hypersurface_h, radius, npoints);
+      if (parthenon::Globals::my_rank == 0) {
+        DumpHypersurface("bad_ode_state.txt", matter_h, hypersurface_h, radius, npoints);
+      }
       PARTHENON_FAIL("Bad ODE integration. State dumped to bad_ode_state.txt");
     }
   }
@@ -507,7 +509,7 @@ TaskStatus SpacetimeToDevice(StateDescriptor *pkg) {
 
         Real dadt = dadr * beta(i) + a * dbetadr - alpha(i) * a * K;
         if (i == 0) dadt = 0;
-        Real dalphadt =
+        Real dalphadt = 
             beta(i) * ((a * beta(i) * dadt / alpha(i)) + a2 * K * beta(i) +
                        2 * dadr * (1 - beta2) - 2 * (a2 * beta(i) / alpha(i)) * dbetadr);
         Real dadror = (r > 1e-2) ? dadr / r : 1;
