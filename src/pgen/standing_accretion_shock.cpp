@@ -39,8 +39,6 @@ class MachResidual {
     Real w = rho_ + P + u;           // h = 1 + eps + P/rho | w = rho * h == rho + u + P
     Real cs = std::sqrt(bmod / w);   // cs^2 = bmod / w
     Real mach = std::abs(vr0_) / cs; // radial component of preshock velocity
-    // printf("Mach Residual Func produced: u, w, cs, Mach, vr0 = %g %g %g %g %g\n", u, w,
-    // cs, mach, vr0_);
     return mach - target_mach_;
   }
 
@@ -50,15 +48,12 @@ class MachResidual {
   Real lambda_[2];
 };
 
-// protehypes----
 KOKKOS_FUNCTION
 Real temperature_from_rho_mach(const Microphysics::EOS::EOS &eos, const Real rho,
                                const Real target_mach, const Real Tmin, const Real Tmax,
                                const Real vr0, const Real Ye);
 KOKKOS_FUNCTION
 Real ucon_norm(Real ucon[4], Real gcov[4][4]);
-
-//--------------
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -131,10 +126,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real gamma = 4. / 3.;
         const Real epsND = 0.003; // 2.7e16 ergs / g for M = 1.3Mpns
 
-        // printf("0 (preshock region)  x1, r, rho0, vr0, lapse0, W0 = %g %g %g %g %g
-        // %g\n",x1, r, rho0, vr0, lapse0, W0);
-
-        // set Ye everywhere
         Real eos_lambda[2];
         if (iye > 0) {
           v(iye, k, j, i) = 0.5;
@@ -154,10 +145,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real vr1 = -1. * (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
           Real rho1 = rho0 * W0 * (vr0 / vr1);
 
-          printf("inside shock (postshock region)  r, rho1, vr1 = %g %g %g\n", r, rho1,
-                 vr1);
-          // printf("inside shock (postshock region)  r, alphasq, psi, rho0, vr0,  rho1,
-          // vr1 = %g %g %g %g %g %g %g\n",r, alphasq, psi, rho0, vr0,  rho1, vr1);
           v(irho, k, j, i) = rho1;
           v(ieng, k, j, i) = (W0 - 1. + epsND * (gamma - 1.)) / (gamma);
           v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
@@ -168,15 +155,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
 
-          // construct contravariant 4-velocity
           Real ucon[] = {0.0, vr1, 0.0, 0.0};
-
-          // initialize spacetime metric
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           ucon[0] = ucon_norm(ucon, gcov);
 
-          // now get three velocity
           const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
@@ -186,21 +169,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
           }
 
-          printf("POSTSHOCK r = %g u^0 (should match vr1) = %g\n", r, v(ivlo, k, j, i));
-
           // preshock - 0
         } else {
 
           Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
           Real W0 = 1. / lapse0;
-          Real vr0 = std::sqrt(lapse0 * lapse0 - 1.);
+          Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
           Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
 
-          printf("PRESHOCK: passing values of: r, rho0, vr0 = %g %g %g\n", r, rho0, vr0);
           Real T = temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax, vr0,
                                              eos_lambda[0]);
-
-          // printf("PRESHOCK:  r = %e T (K) = %e\n", r, T/pc.kb);
 
           v(irho, k, j, i) = rho0;
           v(itmp, k, j, i) = T;
@@ -212,15 +190,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
 
-          // construct contravariant 4-velocity
           Real ucon[] = {0.0, vr0, 0.0, 0.0};
-
-          // initialize spacetime metric
           Real gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           ucon[0] = ucon_norm(ucon, gcov);
 
-          // now get three velocity
           const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
           Real beta[3];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
@@ -229,8 +203,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           for (int d = 0; d < 3; d++) {
             v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
           }
-
-          printf("preshock r = %g u^0 (should match vr0) = %g\n", r, v(ivlo, k, j, i));
         }
       });
 
@@ -241,8 +213,6 @@ KOKKOS_FUNCTION
 Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target_mach,
                                const Real Tmin, const Real Tmax, const Real vr0,
                                const Real Ye) {
-  // printf("passing values of: rho, vr0, Mach_target, Ye = %g %g %g %g\n", rho, vr0,
-  // target_mach, Ye);
   MachResidual res(eos, rho, vr0, target_mach, Ye);
   root_find::RootFind root;
   Real Troot =
