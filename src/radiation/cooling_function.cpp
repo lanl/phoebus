@@ -59,13 +59,13 @@ TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc) {
         Real tau;
         if (lRho < xl2) {
           tau = std::pow(10, (yl2 - yl1) / (xl2 - xl1) * (lRho - xl1) +
-                                 yl1); // maybe *tnue42?
+                                 yl1); 
         } else if (lRho > xl3) {
           tau = std::pow(10, (yl4 - yl3) / (xl4 - xl3) * (lRho - xl3) +
-                                 yl3); // maybe *tnue42?
+                                 yl3); 
         } else {
           tau = std::pow(10, (yl3 - yl2) / (xl3 - xl2) * (lRho - xl2) +
-                                 yl2); // maybe *tnue42?
+                                 yl2); 
         }
         v(ptau, k, j, i) = tau;
       });
@@ -129,7 +129,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   const int ptemp = imap[p::temperature].first;
   const int pye = imap[p::ye].first;
   const int penergy = imap[p::energy].first;
-  // auto [Gcov_lo, Gcov_hi] = imap[iv::Gcov];
   const int Gcov_lo = imap[iv::Gcov].first;
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
@@ -205,7 +204,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
           const Real lRho6 = lRho3 * lRho3;
           constexpr Real lRhoMin = LightBulb::Liebendorfer::LRHOMIN;
           constexpr Real lRhoMax = LightBulb::Liebendorfer::LRHOMAX;
-          bool do_heatcool = (lRhoMin <= lRho && lRho <= lRhoMax);
+          bool do_densityregion = (lRhoMin <= lRho && lRho <= lRhoMax); //better name?
           constexpr Real rnorm = LightBulb::HeatAndCool::RNORM;
           constexpr Real MeVToCGS = 1.16040892301e10;
           constexpr Real Tnorm = 2.0 * MeVToCGS;
@@ -223,7 +222,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             constexpr Real a5 = LightBulb::Liebendorfer::A5;
             constexpr Real a6 = LightBulb::Liebendorfer::A6;
 
-            if (do_heatcool) {
+            if (do_rendityregion) {
               const Real Ye_fit = (a0 + a1 * lRho + a2 * lRho2 + a3 * lRho3 + a4 * lRho4 +
                                    a5 * lRho5 + a6 * lRho6);
               Real dYe = std::max(-0.05 * Ye, std::min(0.0, Ye_fit - Ye));
@@ -275,12 +274,10 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
               v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS() * heat;
           v(GcovCool, k, j, i) =
               v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS() * cool;
-          if (do_gain == 1) {
-          }
           Kokkos::atomic_add(&(v(Gye, k, j, i)), Jye);
         });
-  } else {
-
+  }
+  else {
     for (int sidx = 0; sidx < 3; sidx++) {
       // Apply cooling for each neutrino species separately
       if (do_species[sidx]) {
