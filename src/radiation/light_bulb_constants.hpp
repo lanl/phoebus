@@ -40,9 +40,8 @@ namespace HeatAndCool {
   constexpr Real YL4 = 3.4;
   
   constexpr Real CFAC = 1.399e20;
-  constexpr Real HFAC = 1.544e20; // maybe *tnue42
-  constexpr Real RNORM = 1.e7;
-  constexpr Real CSNS = 0.1279229392793791;  //IN CODE UNITS 
+  constexpr Real HFAC = 1.544e20; 
+  constexpr Real RNORM = 1.e7; 
 } // namespace HeatAndCool
 } // namespace LightBulb
 
