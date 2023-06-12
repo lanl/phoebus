@@ -922,7 +922,14 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
           tl.AddTask(send, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
     }
 
-    TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
+    /**
+     * NOTE: this task region is size 1
+     * In the resolution controls we loop over meshblocks
+     * and call MPI reduce.
+     * Probably more performant to change this, but will
+     * require restructuring some resolution controls.
+     **/
+    TaskRegion &tuning_region = tc.AddRegion(1);
     {
       particle_resolution.val.resize(4); // made, absorbed, scattered, total
       for (int i = 0; i < 4; i++) {
