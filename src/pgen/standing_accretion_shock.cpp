@@ -16,6 +16,7 @@
 #include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
 #include "utils/error_checking.hpp"
+#include <cmath>
 
 namespace standing_accretion_shock {
 
@@ -135,14 +136,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // postshock - 1
         if (r < rShock) {
 
-          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
-          Real W0 = 1. / lapse0;
-          Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
+          const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
+          const Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
+          const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
           Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
 
           Real alphasq = 1. - (2. / r);
           Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1.) / W0);
-          Real vr1 = -1. * (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
+          Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
           Real rho1 = rho0 * W0 * (vr0 / vr1);
 
           v(irho, k, j, i) = rho1;
@@ -154,6 +155,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
+
+          printf("POSTSHOCK r, W0,vr1,  rho1, eint1, T1(K), P1, gma1  = %g %g %g %g %g "
+                 "%g %g %g\n",
+                 r, W0, vr1, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
+                 v(iprs, k, j, i), v(igm1, k, j, i));
 
           Real ucon[] = {0.0, vr1, 0.0, 0.0};
           Real gcov[4][4];
@@ -172,10 +178,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // preshock - 0
         } else {
 
-          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
-          Real W0 = 1. / lapse0;
+          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
           Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
-          Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+          const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
+          Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
 
           Real T = temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax, vr0,
                                              eos_lambda[0]);
@@ -189,6 +195,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
+
+          printf("PRESHOCK r, W0, vr0,  rho0, eint, T0, P0, gma1  = %g %g %g %g %g %g %g "
+                 "%g\n",
+                 r, W0, vr0, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
+                 v(iprs, k, j, i), v(igm1, k, j, i));
 
           Real ucon[] = {0.0, vr0, 0.0, 0.0};
           Real gcov[4][4];
