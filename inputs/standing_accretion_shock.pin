@@ -12,7 +12,7 @@
 
 <phoebus>
 problem = standing_accretion_shock
-ix1_bc = outflow
+ix1_bc = reflect
 ox1_bc = outflow
 ix2_bc = reflect
 ox2_bc = reflect
@@ -29,18 +29,19 @@ variables = p.density,  &
             c.energy,   &
             pressure,	&
             cs,         &
+            temperature,&
             p.ye,       &
             g.c.coord,  &
             g.n.coord
 
 file_type   = hdf5      # Tabular data dump
-dt          = 1.e-3     # time increment between outputs
+dt          = 100       # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 1.0       # time limit
+tlim        = 5000      # time limit
 integrator  = rk2       # time integration algorithm
-ncycle_out  = 1         # interval for stdout summary info
+ncycle_out  = 100       # interval for stdout summary info
 dt_init_fact = 1.e-6
 
 <parthenon/mesh>
@@ -49,8 +50,8 @@ nghost = 4
 #numlevel = 3
 
 nx1         = 256           # Number of zones in X1-direction
-x1min       = 3.44199       # minimum value of X1 | rPNS | x1min = ln R (code units), R = 60 (km) => R = 31.2492 (code units) => x1min = 3.44199
-x1max       = 5.5           # maximum value of X1 | rmax | x1max => 472.5 (km)
+x1min       = 31.2942       # minimum value of X1 | rPNS | x1min = ln R (code units), R = 60 (km) => R = 31.2492 (code units) => x1min = 3.44199
+x1max       = 246.087       # maximum value of X1 | rmax | x1max => 472.5 (km)
 ix1_bc      = user          # Inner-X1 boundary condition flag
 ox1_bc      = user          # Outer-X1 boundary condition flag
 
@@ -103,9 +104,6 @@ mhd = false
 <geometry>
 a = 0
 
-<coordinates>
-derefine_poles = false
-
 <units>
 scale_free = false
 geom_mass_msun = 1.3         # canonical M=1.3Msun NS sets our length scale of L = G M / c^2 = 1.93 km
@@ -115,3 +113,4 @@ fluid_density_cgs = 1.e9     # gives mass = 7.07e24 g
 Mdot = 0.2             # Msun / sec
 rShock = 200           # km
 target_mach = 100      # target Mach number for upstream flow in preshock region 
+target_mach_ps = 1     # target Mach number for postshock region 

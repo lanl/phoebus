@@ -88,8 +88,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot", 0.2);
   Real rShock = pin->GetOrAddReal("standing_accretion_shock", "rShock", 200);
-  const Real target_mach =
-      pin->GetOrAddReal("standing_accretion_shock", "target_mach", 100);
+  const Real target_mach = pin->GetOrAddReal("standing_accretion_shock", "target_mach", 100);
+  const Real target_mach_ps = pin->GetOrAddReal("standing_accretion_shock", "target_mach_ps", 1);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -108,9 +108,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
   rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
-  const Real MPNS = 1.3 * solar_mass * unit_conv.GetMassCGSToCode();
-  const Real rs =
-      (2. * pc.g_newt * MPNS / (std::pow(pc.c, 2))) * unit_conv.GetLengthCGSToCode();
+  const Real MPNS = 1.3 * solar_mass; // grams
+  const Real rs = (2. * pc.g_newt * MPNS / (std::pow(pc.c, 2))) * unit_conv.GetLengthCGSToCode();
 
   printf("rShock (code units) = %g \n", rShock);
 
@@ -139,27 +138,25 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
           const Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
           const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
-          Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
+          const Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
 
-          Real alphasq = 1. - (2. / r);
-          Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1.) / W0);
-          Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
+          //Real alphasq = 1. - (rs / r);
+          const Real lapse1 = geom.Lapse(CellLocation::Cent, k, j, r);
+          Real vr1 = -1. * std::sqrt(lapse1 * lapse1 - 1.);
+
+          //Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1.) / W0);
+          //Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
           Real rho1 = rho0 * W0 * (vr0 / vr1);
 
-          v(irho, k, j, i) = rho1;
-          v(ieng, k, j, i) = (W0 - 1. + epsND * (gamma - 1.)) / (gamma);
-          v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-              rho1, v(ieng, k, j, i) / rho1, eos_lambda);
-          v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
-              v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
-          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                                 v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
-                             v(iprs, k, j, i);
+	  Real T1 = temperature_from_rho_mach(eos, rho1, target_mach_ps, Tmin, Tmax, vr1, eos_lambda[0]);
 
-          printf("POSTSHOCK r, W0,vr1,  rho1, eint1, T1(K), P1, gma1  = %g %g %g %g %g "
-                 "%g %g %g\n",
-                 r, W0, vr1, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
-                 v(iprs, k, j, i), v(igm1, k, j, i));
+	  v(irho, k, j, i) = rho1;
+          v(itmp, k, j, i) = T1;
+          v(ieng, k, j, i) = rho1 * eos.InternalEnergyFromDensityTemperature(rho1, T1, eos_lambda);
+          v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
+          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) / v(iprs, k, j, i);
+
+          printf("POSTSHOCK r, W0,vr1,  rho1, eint1, T1(K), P1, gma1  = %g %g %g %g %g %g %g %g\n",r, W0, vr1, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i), v(iprs, k, j, i), v(igm1, k, j, i));
 
           Real ucon[] = {0.0, vr1, 0.0, 0.0};
           Real gcov[4][4];
@@ -175,31 +172,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
           }
 
-          // preshock - 0
+        // preshock - 0
         } else {
 
-          Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
-          Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
+          const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
+          const Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
           const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
-          Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
+          const Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
 
-          Real T = temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax, vr0,
-                                             eos_lambda[0]);
+          Real T = temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax, vr0, eos_lambda[0]);
 
           v(irho, k, j, i) = rho0;
           v(itmp, k, j, i) = T;
-          v(ieng, k, j, i) =
-              rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T, eos_lambda);
-          v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
-              v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
-          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                                 v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
-                             v(iprs, k, j, i);
+          v(ieng, k, j, i) = rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T, eos_lambda);
+          v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
+          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) / v(iprs, k, j, i);
 
-          printf("PRESHOCK r, W0, vr0,  rho0, eint, T0, P0, gma1  = %g %g %g %g %g %g %g "
-                 "%g\n",
-                 r, W0, vr0, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
-                 v(iprs, k, j, i), v(igm1, k, j, i));
+          printf("PRESHOCK r, W0, vr0,  rho0, eint, T0, P0, gma1  = %g %g %g %g %g %g %g %g\n",r, W0, vr0, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),v(iprs, k, j, i), v(igm1, k, j, i));
 
           Real ucon[] = {0.0, vr0, 0.0, 0.0};
           Real gcov[4][4];
