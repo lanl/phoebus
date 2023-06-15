@@ -14,11 +14,11 @@
 #include "radiation.hpp"
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "radiation/local_three_geometry.hpp"
 #include "reconstruction.hpp"
-#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 
 #include "closure.hpp"
 
@@ -122,12 +122,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("do_lightbulb", do_lightbulb);
     params.Add("lum", lum);
     if (do_lightbulb) {
-	physics->AddField(iv::GcovHeat, mscalar);
-	physics->AddField(iv::GcovCool, mscalar);
-	physics->AddField(iv::compweight, mscalar);
+      physics->AddField(iv::GcovHeat, mscalar);
+      physics->AddField(iv::GcovCool, mscalar);
+      physics->AddField(iv::compweight, mscalar);
       std::string eos_type = pin->GetString("eos", "type");
       if (eos_type != singularity::StellarCollapse::EosType()) {
-	PARTHENON_THROW("Lightbulb only supported with stellar collapse EOS");
+        PARTHENON_THROW("Lightbulb only supported with stellar collapse EOS");
       }
       Metadata m({Metadata::Cell, Metadata::OneCopy});
       physics->AddField(iv::tau, m);
@@ -516,7 +516,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("moments_active", moments_active);
 
-  if(method!="cooling_function"){
+  if (method != "cooling_function") {
     physics->EstimateTimestepBlock = EstimateTimestepBlock;
   }
   return physics;
@@ -529,7 +529,8 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace iv = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({c::density, c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
+  std::vector<std::string> vars(
+      {c::density, c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int crho = imap[c::density].first;
@@ -551,8 +552,8 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
         v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
         v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
-	v(cye, k, j, i) += v(Gye, k, j, i) * dt;
-	});
+        v(cye, k, j, i) += v(Gye, k, j, i) * dt;
+      });
   return TaskStatus::complete;
 }
 

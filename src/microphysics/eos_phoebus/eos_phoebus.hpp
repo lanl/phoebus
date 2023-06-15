@@ -35,7 +35,6 @@ using EOS = singularity::Variant<
 #endif // SPINER_USE_HDF
     >;
 
-  
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 } // namespace EOS
 
