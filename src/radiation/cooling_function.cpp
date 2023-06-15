@@ -58,14 +58,11 @@ TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc) {
         constexpr Real yl4 = LightBulb::HeatAndCool::YL4;
         Real tau;
         if (lRho < xl2) {
-          tau = std::pow(10, (yl2 - yl1) / (xl2 - xl1) * (lRho - xl1) +
-                                 yl1); 
+          tau = std::pow(10, (yl2 - yl1) / (xl2 - xl1) * (lRho - xl1) + yl1);
         } else if (lRho > xl3) {
-          tau = std::pow(10, (yl4 - yl3) / (xl4 - xl3) * (lRho - xl3) +
-                                 yl3); 
+          tau = std::pow(10, (yl4 - yl3) / (xl4 - xl3) * (lRho - xl3) + yl3);
         } else {
-          tau = std::pow(10, (yl3 - yl2) / (xl3 - xl2) * (lRho - xl2) +
-                                 yl2); 
+          tau = std::pow(10, (yl3 - yl2) / (xl3 - xl2) * (lRho - xl2) + yl2);
         }
         v(ptau, k, j, i) = tau;
       });
@@ -204,7 +201,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
           const Real lRho6 = lRho3 * lRho3;
           constexpr Real lRhoMin = LightBulb::Liebendorfer::LRHOMIN;
           constexpr Real lRhoMax = LightBulb::Liebendorfer::LRHOMAX;
-          bool do_densityregion = (lRhoMin <= lRho && lRho <= lRhoMax); //better name?
+          bool do_densityregion = (lRhoMin <= lRho && lRho <= lRhoMax); // better name?
           constexpr Real rnorm = LightBulb::HeatAndCool::RNORM;
           constexpr Real MeVToCGS = 1.16040892301e10;
           constexpr Real Tnorm = 2.0 * MeVToCGS;
@@ -222,7 +219,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             constexpr Real a5 = LightBulb::Liebendorfer::A5;
             constexpr Real a6 = LightBulb::Liebendorfer::A6;
 
-            if (do_rendityregion) {
+            if (do_densityregion) {
               const Real Ye_fit = (a0 + a1 * lRho + a2 * lRho2 + a3 * lRho3 + a4 * lRho4 +
                                    a5 * lRho5 + a6 * lRho6);
               Real dYe = std::max(-0.05 * Ye, std::min(0.0, Ye_fit - Ye));
@@ -262,7 +259,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
           Real tempr = 1 / 30.76 / 9e20;
           Real H = heat * CGSToCodeFact;
           Real C = cool * CGSToCodeFact;
-          J = cdensity * (H - C); // looks like Cufe
+          J = cdensity * (H - C);                // looks like Cufe
           Real Gcov_tetrad[4] = {J, 0., 0., 0.}; // minus sign included above
           Real Gcov_coord[4];
           Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
@@ -276,8 +273,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
               v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS() * cool;
           Kokkos::atomic_add(&(v(Gye, k, j, i)), Jye);
         });
-  }
-  else {
+  } else {
     for (int sidx = 0; sidx < 3; sidx++) {
       // Apply cooling for each neutrino species separately
       if (do_species[sidx]) {
