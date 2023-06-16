@@ -122,9 +122,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("do_lightbulb", do_lightbulb);
     params.Add("lum", lum);
     if (do_lightbulb) {
-      physics->AddField(iv::GcovHeat, mscalar);
-      physics->AddField(iv::GcovCool, mscalar);
-      physics->AddField(iv::compweight, mscalar);
       std::string eos_type = pin->GetString("eos", "type");
       if (eos_type != singularity::StellarCollapse::EosType()) {
         PARTHENON_THROW("Lightbulb only supported with stellar collapse EOS");
