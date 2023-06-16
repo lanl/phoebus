@@ -127,7 +127,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
         Real r = std::abs(x1);
         const Real gamma = 4. / 3.;
-        const Real epsND = 0.003; // 2.7e16 ergs / g for M = 1.3Mpns
 
         Real eos_lambda[2];
         if (iye > 0) {
@@ -141,30 +140,29 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
           const Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
           const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
-          const Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
-          const Real alphasq = 1. - (rs / r);
-          const Real lapse1 = geom.Lapse(CellLocation::Cent, k, j, r);
-          const Real vr1 = -1. * std::sqrt(lapse1 * lapse1 - 1.);
+          const Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
 
-          Real rho1 = rho0 * W0 * (vr0 / vr1);
+          const Real alphasq = 1. - (rs / r);
+          const Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1.) / W0);
+          const Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
+          const Real rho1 = rho0 * W0 * (vr0 / vr1);
+
           Real h1 = (rho0 * vr0 * W0 * W0) / (rho1 * vr1);
-          Real p1 = (rho0 * vr0 * vr0 * W0 * W0 - rho0 * vr0 * vr1 * W0 * W0) / alphasq;
+          Real p1 = (-h1 * rho1 * vr1 * vr1 + rho0 * vr0 * vr0 * W0 * W0) / alphasq;
           Real eps1 = h1 - 1. - p1 / rho1;
 
           v(irho, k, j, i) = rho1;
           v(itmp, k, j, i) =
               eos.TemperatureFromDensityInternalEnergy(rho1, eps1, eos_lambda);
           v(ieng, k, j, i) = rho1 * eps1;
-          v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
-              v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
+          v(iprs, k, j, i) = p1;
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
 
-          printf("POSTSHOCK r, W0,vr1,  rho1, eint1, T1(K), P1, gma1  = %g %g %g %g %g "
-                 "%g %g %g\n",
-                 r, W0, vr1, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
-                 v(iprs, k, j, i), v(igm1, k, j, i));
+          // printf("POSTSHOCK r, alphasq, W0,vr1,  rho1, eint1, T1(K), P1, gma1  = %g %g
+          // %g %g %g %g %g %g %g\n",r, alphasq,W0, vr1, v(irho, k, j, i), v(ieng, k, j,
+          // i), v(itmp, k, j, i),v(iprs, k, j, i), v(igm1, k, j, i));
 
           Real ucon[] = {0.0, vr1, 0.0, 0.0};
           Real gcov[4][4];
@@ -201,10 +199,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
 
-          printf("PRESHOCK r, W0, vr0,  rho0, eint, T0, P0, gma1  = %g %g %g %g %g %g %g "
-                 "%g\n",
-                 r, W0, vr0, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
-                 v(iprs, k, j, i), v(igm1, k, j, i));
+          // printf("PRESHOCK r, W0, vr0,  rho0, eint, T0, P0, gma1  = %g %g %g %g %g %g
+          // %g %g\n",r, W0, vr0, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j,
+          // i),v(iprs, k, j, i), v(igm1, k, j, i));
 
           Real ucon[] = {0.0, vr0, 0.0, 0.0};
           Real gcov[4][4];
@@ -220,6 +217,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
           }
         }
+
+        printf("r, vr,  rho, eint, T, P, gma1  = %g %g %g %g %g %g %g\n", r,
+               v(ivlo, k, j, i), v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
+               v(iprs, k, j, i), v(igm1, k, j, i));
       });
 
   fluid::PrimitiveToConserved(rc);
