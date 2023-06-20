@@ -11,6 +11,10 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+
+// Parthenon
+#include <globals.hpp>
+
 #include "geometry/boyer_lindquist.hpp"
 #include "pgen/pgen.hpp"
 #include "phoebus_utils/root_find.hpp"
@@ -40,7 +44,8 @@ class MachResidual {
     Real w = rho_ + P + u;           // h = 1 + eps + P/rho | w = rho * h == rho + u + P
     Real cs = std::sqrt(bmod / w);   // cs^2 = bmod / w
     Real mach = std::abs(vr0_) / cs; // radial component of preshock velocity
-    return mach - target_mach_;
+    //printf("rho, vr0,  target_mach, P, eps, cs, mach, T  = %g %g %g %g %g %g %g %g\n", rho_, vr0_,  target_mach_, P, eps, cs, mach, T);
+    return target_mach_ - mach;
   }
 
  private:
@@ -88,10 +93,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot", 0.2);
   Real rShock = pin->GetOrAddReal("standing_accretion_shock", "rShock", 200);
-  const Real target_mach =
-      pin->GetOrAddReal("standing_accretion_shock", "target_mach", 100);
-  const Real target_mach_ps =
-      pin->GetOrAddReal("standing_accretion_shock", "target_mach_ps", 1);
+  Real target_mach = pin->GetOrAddReal("standing_accretion_shock", "target_mach", 100);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -101,18 +103,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   auto Tmin = pmb->packages.Get("eos")->Param<Real>("T_min");
   auto Tmax = pmb->packages.Get("eos")->Param<Real>("T_max");
-
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
 
-  auto &unit_conv =
-      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
+  auto &unit_conv = pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
   Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
   rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
-  const Real MPNS = 1.3 * solar_mass; // grams
-  const Real rs =
-      (2. * pc.g_newt * MPNS / (std::pow(pc.c, 2))) * unit_conv.GetLengthCGSToCode();
+  Real MPNS = 1.3 * solar_mass;
+  Real rs = (2. * pc.g_newt * MPNS / (std::pow(pc.c, 2))) * unit_conv.GetLengthCGSToCode();
 
   printf("rShock (code units) = %g \n", rShock);
 
@@ -151,6 +150,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real p1 = (-h1 * rho1 * vr1 * vr1 + rho0 * vr0 * vr0 * W0 * W0) / alphasq;
           Real eps1 = h1 - 1. - p1 / rho1;
 
+          if (std::isnan(vr0) || std::isnan(rho0) || std::isnan(vr1) ||  std::isnan(rho1)) {
+             printf("std::isnan(vr0) || std::isnan(rho0) || std::isnan(vr1) ||  std::isnan(rho1) @ r = %i %i %i %i %g \n", std::isnan(vr0), std::isnan(rho0), std::isnan(vr1), std::isnan(rho1), r);
+
+	  }
+
           v(irho, k, j, i) = rho1;
           v(itmp, k, j, i) =
               eos.TemperatureFromDensityInternalEnergy(rho1, eps1, eos_lambda);
@@ -181,10 +185,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // preshock - 0
         } else {
 
-          const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, r);
+          const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
           const Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
           const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
-          const Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
+          const Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+          //printf("r, lapse0, vr0, W0, rho0  = %g %g %g %g %g \n", r, lapse0, vr0, W0, rho0);
+
+          if (std::isnan(vr0) || std::isnan(rho0) )  {
+             printf("std::isnan(vr0) || std::isnan(rho0) @ r = %i %i %g \n", std::isnan(vr0), std::isnan(rho0), r);
+
+          }
+
 
           Real T = temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax, vr0,
                                              eos_lambda[0]);
@@ -218,9 +229,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           }
         }
 
-        printf("r, vr,  rho, eint, T, P, gma1  = %g %g %g %g %g %g %g\n", r,
-               v(ivlo, k, j, i), v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
-               v(iprs, k, j, i), v(igm1, k, j, i));
+        //int num_nans = std::isnan(v(ivlo, k, j, i)) + std::isnan(v(irho, k, j, i)) + std::isnan(v(ieng, k, j, i)) + std::isnan(v(itmp, k, j, i)) + std::isnan(v(iprs, k, j, i)) + std::isnan(v(igm1, k, j, i));
+        //PARTHENON_REQUIRE(num_nans == 0, "NaNs founds");
+	//printf("num_nans, r = %i %g \n", num_nans, r);
+
+        //printf("r, vr,  rho, eint, T, P, gma1  = %g %g %g %g %g %g %g\n", r,
+        //       v(ivlo, k, j, i), v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
+        //       v(iprs, k, j, i), v(igm1, k, j, i));
       });
 
   fluid::PrimitiveToConserved(rc);
@@ -233,7 +248,7 @@ Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target
   MachResidual res(eos, rho, vr0, target_mach, Ye);
   root_find::RootFind root;
   Real Troot =
-      root.regula_falsi(res, Tmin, Tmax, 1.e-10 * target_mach, std::max(Tmin, 1.e-10));
+      root.regula_falsi(res, Tmin, Tmax, 1.e-6 * target_mach, std::max(Tmin, 1.e-3));
   return Troot;
 }
 
