@@ -45,7 +45,7 @@ class MachResidual {
     Real cs = std::sqrt(bmod / w);   // cs^2 = bmod / w
     Real mach = std::abs(vr0_) / cs; // radial component of preshock velocity
     //printf("rho, vr0,  target_mach, P, eps, cs, mach, T  = %g %g %g %g %g %g %g %g\n", rho_, vr0_,  target_mach_, P, eps, cs, mach, T);
-    return target_mach_ - mach;
+    return mach - target_mach_;
   }
 
  private:
@@ -137,36 +137,36 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         if (r < rShock) {
 
           const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
-          const Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
+          const Real vr0 = -1.*std::sqrt(lapse0 * lapse0 - 1.);
           const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
-          const Real rho0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
+          const Real rho_0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
+	  const Real rho_0_Shock = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+          const Real T0 = temperature_from_rho_mach(eos, rho_0_Shock, target_mach, Tmin, Tmax, vr0,eos_lambda[0]);
+	  const Real p0 = eos.PressureFromDensityTemperature(rho_0_Shock, T0, eos_lambda);
+          const Real eps0 = eos.InternalEnergyFromDensityTemperature(rho_0_Shock, T0, eos_lambda);
+          const Real h0 = 1. + eps0 + p0/rho_0_Shock;
 
-          const Real alphasq = 1. - (rs / r);
+	  const Real alphasq = 1. - (rs / r);
           const Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1.) / W0);
           const Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
-          const Real rho1 = rho0 * W0 * (vr0 / vr1);
+	  const Real W1 = 1. / sqrt(1. - std::pow(vr1, 2));
+          const Real rho1 = (rho_0 * W0 * vr0) / (W1 * vr1);
+          const Real h1 = (h0 * vr0 * W0 * W0 * rho_0) / (W1 * W1 * rho1 * vr1);
+          const Real p1 = (alphasq * p0 + h0 * vr0 * vr0 * W0 * W0 * rho_0 - h1 * vr1 * vr1 * W1 * W1 * rho1) / alphasq;
+          const Real eps1 = h1 - 1. - p1 / rho1;
 
-          Real h1 = (rho0 * vr0 * W0 * W0) / (rho1 * vr1);
-          Real p1 = (-h1 * rho1 * vr1 * vr1 + rho0 * vr0 * vr0 * W0 * W0) / alphasq;
-          Real eps1 = h1 - 1. - p1 / rho1;
-
-          if (std::isnan(vr0) || std::isnan(rho0) || std::isnan(vr1) ||  std::isnan(rho1)) {
-             printf("std::isnan(vr0) || std::isnan(rho0) || std::isnan(vr1) ||  std::isnan(rho1) @ r = %i %i %i %i %g \n", std::isnan(vr0), std::isnan(rho0), std::isnan(vr1), std::isnan(rho1), r);
+          if (std::isnan(vr0) || std::isnan(rho_0) || std::isnan(vr1) ||  std::isnan(rho1)) {
+             printf("std::isnan(vr0) || std::isnan(rho_0) || std::isnan(vr1) ||  std::isnan(rho1) @ r = %i %i %i %i %g \n", std::isnan(vr0), std::isnan(rho_0), std::isnan(vr1), std::isnan(rho1), r);
 
 	  }
 
           v(irho, k, j, i) = rho1;
-          v(itmp, k, j, i) =
-              eos.TemperatureFromDensityInternalEnergy(rho1, eps1, eos_lambda);
+          v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho1, eps1, eos_lambda);
           v(ieng, k, j, i) = rho1 * eps1;
           v(iprs, k, j, i) = p1;
-          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                                 v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
-                             v(iprs, k, j, i);
+          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) / v(iprs, k, j, i);
 
-          // printf("POSTSHOCK r, alphasq, W0,vr1,  rho1, eint1, T1(K), P1, gma1  = %g %g
-          // %g %g %g %g %g %g %g\n",r, alphasq,W0, vr1, v(irho, k, j, i), v(ieng, k, j,
-          // i), v(itmp, k, j, i),v(iprs, k, j, i), v(igm1, k, j, i));
+          //printf("POSTSHOCK r, alphasq, W0,vr1,  rho1, eint1, T1(K), P1, gma1  = %g %g %g %g %g %g %g %g %g\n",r, alphasq,W0, vr1, v(irho, k, j, i), v(ieng, k, j,i), v(itmp, k, j, i),v(iprs, k, j, i), v(igm1, k, j, i));
 
           Real ucon[] = {0.0, vr1, 0.0, 0.0};
           Real gcov[4][4];
@@ -186,33 +186,30 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         } else {
 
           const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
-          const Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
+          const Real vr0 = -1.*std::sqrt(lapse0 * lapse0 - 1.);
           const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
-          const Real rho0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
-          //printf("r, lapse0, vr0, W0, rho0  = %g %g %g %g %g \n", r, lapse0, vr0, W0, rho0);
+          const Real rho_0 = Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
+          //printf("r, lapse0, vr0, W0, rho_0  = %g %g %g %g %g \n", r, lapse0, vr0, W0, rho_0);
 
-          if (std::isnan(vr0) || std::isnan(rho0) )  {
-             printf("std::isnan(vr0) || std::isnan(rho0) @ r = %i %i %g \n", std::isnan(vr0), std::isnan(rho0), r);
+          if (std::isnan(vr0) || std::isnan(rho_0) )  {
+             printf("std::isnan(vr0) || std::isnan(rho_0) @ r = %i %i %g \n", std::isnan(vr0), std::isnan(rho_0), r);
 
           }
 
 
-          Real T = temperature_from_rho_mach(eos, rho0, target_mach, Tmin, Tmax, vr0,
-                                             eos_lambda[0]);
+          Real T = temperature_from_rho_mach(eos, rho_0, target_mach, Tmin, Tmax, vr0,eos_lambda[0]);
 
-          v(irho, k, j, i) = rho0;
+          v(irho, k, j, i) = rho_0;
           v(itmp, k, j, i) = T;
           v(ieng, k, j, i) =
-              rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T, eos_lambda);
+              rho_0 * eos.InternalEnergyFromDensityTemperature(rho_0, T, eos_lambda);
           v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
 
-          // printf("PRESHOCK r, W0, vr0,  rho0, eint, T0, P0, gma1  = %g %g %g %g %g %g
-          // %g %g\n",r, W0, vr0, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j,
-          // i),v(iprs, k, j, i), v(igm1, k, j, i));
+          //printf("PRESHOCK r, W0, vr0,  rho_0, eint, T0, P0, gma1  = %g %g %g %g %g %g %g %g\n",r, W0, vr0, v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),v(iprs, k, j, i), v(igm1, k, j, i));
 
           Real ucon[] = {0.0, vr0, 0.0, 0.0};
           Real gcov[4][4];
@@ -229,13 +226,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           }
         }
 
-        //int num_nans = std::isnan(v(ivlo, k, j, i)) + std::isnan(v(irho, k, j, i)) + std::isnan(v(ieng, k, j, i)) + std::isnan(v(itmp, k, j, i)) + std::isnan(v(iprs, k, j, i)) + std::isnan(v(igm1, k, j, i));
-        //PARTHENON_REQUIRE(num_nans == 0, "NaNs founds");
+        int num_nans = std::isnan(v(ivlo, k, j, i)) + std::isnan(v(irho, k, j, i)) + std::isnan(v(ieng, k, j, i)) + std::isnan(v(itmp, k, j, i)) + std::isnan(v(iprs, k, j, i)) + std::isnan(v(igm1, k, j, i));
+        PARTHENON_REQUIRE(num_nans == 0, "NaNs founds");
 	//printf("num_nans, r = %i %g \n", num_nans, r);
 
-        //printf("r, vr,  rho, eint, T, P, gma1  = %g %g %g %g %g %g %g\n", r,
-        //       v(ivlo, k, j, i), v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),
-        //       v(iprs, k, j, i), v(igm1, k, j, i));
+        //printf("r, vr, rho, eint, T, P, gma1  = %g %g %g %g %g %g %g\n", r,v(ivlo, k, j, i), v(irho, k, j, i), v(ieng, k, j, i), v(itmp, k, j, i),v(iprs, k, j, i), v(igm1, k, j, i));
       });
 
   fluid::PrimitiveToConserved(rc);
@@ -248,7 +243,7 @@ Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target
   MachResidual res(eos, rho, vr0, target_mach, Ye);
   root_find::RootFind root;
   Real Troot =
-      root.regula_falsi(res, Tmin, Tmax, 1.e-6 * target_mach, std::max(Tmin, 1.e-3));
+      root.regula_falsi(res, Tmin, Tmax, 1.e-6 * target_mach, Tmin-1e-10);
   return Troot;
 }
 
