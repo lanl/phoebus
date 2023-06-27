@@ -35,23 +35,23 @@ variables = p.density,  &
             g.n.coord
 
 file_type   = hdf5      # Tabular data dump
-dt          = 5.e-3     # time increment between outputs
+dt          = 100       # time increment between outputs
 
 <parthenon/time>
-nlim        = 100       # cycle limit
+nlim        = -1        # cycle limit
 tlim        = 5000      # time limit
-integrator  = rk4       # time integration algorithm
-ncycle_out  = 1         # interval for stdout summary info
-dt_init_fact = 1.e-9
+integrator  = rk2       # time integration algorithm
+ncycle_out  = 100       # interval for stdout summary info
+dt_init_fact = 1.e-6
 
 <parthenon/mesh>
 nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 256           # Number of zones in X1-direction
-x1min       = 31.2942       # minimum value of X1 | rPNS | x1min = ln R (code units), R = 60 (km) => R = 31.2492 (code units) => x1min = 3.44199
-x1max       = 246.087       # maximum value of X1 | rmax | x1max => 472.5 (km)
+nx1         = 1024          # Number of zones in X1-direction
+x1min       = 3.44199       # minimum value of X1 | rPNS | x1min = ln R (code units), R = 60 (km) => R = 31.2492 (code units) => x1min = 3.44199
+x1max       = 5.43896       # maximum value of X1 | rmax | x1max => 472.5 (km)
 ix1_bc      = user          # Inner-X1 boundary condition flag
 ox1_bc      = user          # Outer-X1 boundary condition flag
 
@@ -77,7 +77,7 @@ num_threads = 1         # maximum number of OMP threads
 <parthenon/refinement0>
 field = c.c.bulk.rho
 method = derivative_order_1
-max_level = 3
+max_level = 1
 
 <eos>
 type = IdealGas
@@ -102,16 +102,22 @@ Ye = true
 mhd = false
 
 <fixup>
-enable_floors = false
+enable_floors = true
 enable_ceilings = false
-enable_flux_fixup = false
-enable_c2p_fixup = false
+enable_flux_fixup = true
+enable_c2p_fixup = true
 floor_type = ConstantRhoSie
 rho0_floor = 1.e-3
 sie0_floor = 1.e-8
+rho0_ceiling = 5.e1
+sie0_ceiling = 1.e1
+
 
 <geometry>
 a = 0
+
+<coordinates>
+derefine_poles = false
 
 <units>
 scale_free = false

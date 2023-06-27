@@ -57,9 +57,8 @@ Real ucon_norm(Real ucon[4], Real gcov[4][4]);
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
-  PARTHENON_REQUIRE(
-      typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoyerLindquist),
-      "Problem \"standing_accretion_shock\" requires \"BoyerLindquist\" geometry!");
+  PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
+                    "Problem \"standing_accretion_shock\" requires \"FMKS\" geometry!");
 
   auto rc = pmb->meshblock_data.Get().get();
 
@@ -111,6 +110,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
+  // set up transformation stuff
+  auto gpkg = pmb->packages.Get("geometry");
+  bool derefine_poles = gpkg->Param<bool>("derefine_poles");
+  Real h = gpkg->Param<Real>("h");
+  Real xt = gpkg->Param<Real>("xt");
+  Real alpha = gpkg->Param<Real>("alpha");
+  Real x0 = gpkg->Param<Real>("x0");
+  Real smooth = gpkg->Param<Real>("smooth");
+  auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
+
   pmb->par_for(
       "Phoebus::ProblemGenerator::StandingAccrectionShock", kb.s, kb.e, jb.s, jb.e, ib.s,
       ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -118,7 +127,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real x2 = coords.Xc<2>(k, j, i);
         const Real x3 = coords.Xc<3>(k, j, i);
 
-        Real r = std::abs(x1);
+        // Real r = std::abs(x1);
+        Real r = tr.bl_radius(x1);
         const Real gamma = 4. / 3.;
         const Real alpha0 = std::sqrt(1. - (rs / rShock));
         const Real W0 = 1. / alpha0;
