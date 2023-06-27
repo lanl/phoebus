@@ -35,21 +35,21 @@ variables = p.density,  &
             g.n.coord
 
 file_type   = hdf5      # Tabular data dump
-dt          = 100       # time increment between outputs
+dt          = 5.e-3     # time increment between outputs
 
 <parthenon/time>
-nlim        = -1        # cycle limit
+nlim        = 100       # cycle limit
 tlim        = 5000      # time limit
-integrator  = rk2       # time integration algorithm
-ncycle_out  = 100       # interval for stdout summary info
-dt_init_fact = 1.e-6
+integrator  = rk4       # time integration algorithm
+ncycle_out  = 1         # interval for stdout summary info
+dt_init_fact = 1.e-9
 
 <parthenon/mesh>
 nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 128           # Number of zones in X1-direction
+nx1         = 256           # Number of zones in X1-direction
 x1min       = 31.2942       # minimum value of X1 | rPNS | x1min = ln R (code units), R = 60 (km) => R = 31.2492 (code units) => x1min = 3.44199
 x1max       = 246.087       # maximum value of X1 | rmax | x1max => 472.5 (km)
 ix1_bc      = user          # Inner-X1 boundary condition flag
@@ -80,9 +80,9 @@ method = derivative_order_1
 max_level = 3
 
 <eos>
-type = StellarCollapse
-filename = /usr/projects/w22_stars/EoS/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.1_20120817.h5
-use_sp5 = false
+type = IdealGas
+Gamma = 1.3333333333333333
+Cv = 3.0  
 
 <physics>
 hydro = true
@@ -92,25 +92,23 @@ rad = false
 
 <fluid>
 xorder = 2
-cfl = 0.8
+cfl = 0.5
 riemann = llf
-recon = linear
+recon = weno5
 c2p_method = robust
-c2p_max_iter = 100
+c2p_max_iter = 1000
 c2p_tol = 1.e-8
 Ye = true
 mhd = false
 
 <fixup>
-enable_floors = true
-enable_ceilings = true
-enable_flux_fixup = true
-enable_c2p_fixup = true
+enable_floors = false
+enable_ceilings = false
+enable_flux_fixup = false
+enable_c2p_fixup = false
 floor_type = ConstantRhoSie
-rho0_floor = 1.e-2
-sie0_floor = 1.e4
-rho0_ceiling = 2.
-sie0_ceiling = 1.e7
+rho0_floor = 1.e-3
+sie0_floor = 1.e-8
 
 <geometry>
 a = 0
@@ -123,6 +121,4 @@ fluid_density_cgs = 1.e9     # gives mass = 7.07e24 g
 <standing_accretion_shock>
 Mdot = 0.2             # Msun / sec
 rShock = 200           # km
-target_mach = 100      # target Mach number for upstream flow in preshock region 
-rhomin = 1.e-2
-rhomax = 3.
+target_mach = -100      # target Mach number for upstream flow in preshock region 

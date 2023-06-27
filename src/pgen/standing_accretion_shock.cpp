@@ -35,14 +35,10 @@ class MachResidual {
     lambda_[0] = Ye;
   }
   KOKKOS_INLINE_FUNCTION
-  Real operator()(const Real T) {
-    Real P = eos_.PressureFromDensityTemperature(rho_, T, lambda_);
-    Real eps = eos_.InternalEnergyFromDensityTemperature(rho_, T, lambda_);
-    Real bmod = eos_.BulkModulusFromDensityTemperature(rho_, T, lambda_);
-    Real u = rho_ * eps;             // convert eps / V to specific internal energy
-    Real w = rho_ + P + u;           // h = 1 + eps + P/rho | w = rho * h == rho + u + P
-    Real cs = std::sqrt(bmod / w);   // cs^2 = bmod / w
-    Real mach = std::abs(vr0_) / cs; // radial component of preshock velocity
+  Real operator()(const Real eps) {
+    const Real gamma = 4. / 3.;
+    Real cs = std::sqrt(gamma * (gamma - 1.) * eps);
+    Real mach = vr0_ / cs;
     return mach - target_mach_;
   }
 
@@ -52,40 +48,12 @@ class MachResidual {
   Real lambda_[2];
 };
 
-class EnergyResidual {
- public:
-  KOKKOS_FUNCTION
-  EnergyResidual(const Real alphasq, const Real p0, const Real h0, const Real v0,
-                 const Real W0, const Real rho0, const Real W1)
-      : alphasq_(alphasq), p0_(p0), h0_(h0), v0_(v0), W0_(W0), rho0_(rho0), W1_(W1) {}
-  KOKKOS_INLINE_FUNCTION
-  Real operator()(const Real rho1) {
-    Real p1 = (-h0_ * std::pow(v0_, 2) * std::pow(W0_, 3) * std::pow(rho0_, 2) +
-               alphasq_ * p0_ * W1_ * rho1 +
-               h0_ * std::pow(v0_, 2) * std::pow(W0_, 2) * W1_ * rho0_ * rho1) /
-              (alphasq_ * W1_ * rho1);
-    Real v1 = (v0_ * W0_ * rho0_) / (W1_ * rho1);
-    Real h1 = (h0_ * v0_ * std::pow(W0_, 2) * rho0_) / (v1 * std::pow(W1_, 2) * rho1);
-    Real lhs = rho1 * h1 * std::pow(W1_, 2) * std::pow(v1, 2) + p1 * alphasq_;
-    Real rhs = rho0_ * h0_ * std::pow(W0_, 2) * std::pow(v0_, 2) + p0_ * alphasq_;
-    return lhs - rhs;
-  }
-
- private:
-  Real alphasq_, p0_, h0_, v0_, W0_, rho0_, W1_;
-};
-
 KOKKOS_FUNCTION
-Real temperature_from_rho_mach(const Microphysics::EOS::EOS &eos, const Real rho,
-                               const Real target_mach, const Real Tmin, const Real Tmax,
-                               const Real vr0, const Real Ye);
+Real eps_from_rho_mach(const Microphysics::EOS::EOS &eos, const Real rho,
+                       const Real target_mach, const Real epsmin, const Real epsmax,
+                       const Real vr0, const Real Ye);
 KOKKOS_FUNCTION
 Real ucon_norm(Real ucon[4], Real gcov[4][4]);
-
-KOKKOS_FUNCTION
-Real density_from_jump_conditions(const Real alphasq, const Real p0, const Real h0,
-                                  const Real v0, const Real W0, const Real rho0,
-                                  const Real W1, const Real Pmin, const Real Pmax);
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -114,35 +82,32 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const std::string eos_type = pin->GetString("eos", "type");
   PARTHENON_REQUIRE_THROWS(
-      eos_type == "StellarCollapse",
-      "Standing Accretion Shock setup only works with StellarCollapse EOS");
+      eos_type == "IdealGas",
+      "Standing Accretion Shock setup only works with Ideal Gas EOS");
 
   Real Mdot = pin->GetOrAddReal("standing_accretion_shock", "Mdot", 0.2);
   Real rShock = pin->GetOrAddReal("standing_accretion_shock", "rShock", 200);
-  Real target_mach = pin->GetOrAddReal("standing_accretion_shock", "target_mach", 100);
-  Real rhomin = pin->GetOrAddReal("standing_accretion_shock", "rhomin", 1e-2);
-  Real rhomax = pin->GetOrAddReal("standing_accretion_shock", "rhomax", 3);
+  Real target_mach = pin->GetOrAddReal("standing_accretion_shock", "target_mach", -100);
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto &coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
-  auto Tmin = pmb->packages.Get("eos")->Param<Real>("T_min");
-  auto Tmax = pmb->packages.Get("eos")->Param<Real>("T_max");
-  const Real a = pin->GetReal("geometry", "a");
-  auto bl = Geometry::BoyerLindquist(a);
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
+  const Real a = pin->GetReal("geometry", "a");
+  auto bl = Geometry::BoyerLindquist(a);
+
+  const Real epsmin = 1.e-9;
+  const Real epsmax = 1.e6;
 
   Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
   rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
   Real MPNS = 1.3 * solar_mass;
   Real rs =
       (2. * pc.g_newt * MPNS / (std::pow(pc.c, 2))) * unit_conv.GetLengthCGSToCode();
-
-  printf("rShock (code units) = %g \n", rShock);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -154,6 +119,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real x3 = coords.Xc<3>(k, j, i);
 
         Real r = std::abs(x1);
+        const Real gamma = 4. / 3.;
+        const Real alpha0 = std::sqrt(1. - (rs / rShock));
+        const Real W0 = 1. / alpha0;
+        const Real vr0 = -1. * std::sqrt(std::pow(W0, 2) - 1.) / W0;
+        const Real epsND = 0.003; // eps_bar * (W0-1), eps_bar=0.3
+        const Real eta = 0.95;
+
         Real eos_lambda[2];
         if (iye > 0) {
           v(iye, k, j, i) = 0.5;
@@ -163,38 +135,29 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // postshock - 1
         if (r < rShock) {
 
-          const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
-          const Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
-          const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
-          const Real rho_0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
           const Real rho_0_Shock =
               Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
-          const Real T0 = temperature_from_rho_mach(eos, rho_0_Shock, target_mach, Tmin,
-                                                    Tmax, vr0, eos_lambda[0]);
-          const Real p0 = eos.PressureFromDensityTemperature(rho_0_Shock, T0, eos_lambda);
-          const Real eps0 =
-              eos.InternalEnergyFromDensityTemperature(rho_0_Shock, T0, eos_lambda);
-          const Real h0 = 1. + eps0 + p0 / rho_0_Shock;
           const Real alphasq = 1. - (rs / r);
-          const Real W1 = 1.;
+          const Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1. - epsND) / W0);
+          const Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
+          const Real rho1 = (rho_0_Shock * W0 * vr0) / (vr1);
+          Real eps1 = (W0 - 1. + (gamma - 1) * epsND) / gamma;
 
-          Real rho1 = density_from_jump_conditions(alphasq, p0, h0, vr0, W0, rho_0_Shock,
-                                                   W1, rhomin, rhomax);
-          const Real p1 =
-              (-h0 * std::pow(vr0, 2) * std::pow(W0, 3) * std::pow(rho_0_Shock, 2) +
-               alphasq * p0 * W1 * rho1 +
-               h0 * std::pow(vr0, 2) * std::pow(W0, 2) * W1 * rho_0_Shock * rho1) /
-              (alphasq * W1 * rho1);
-          const Real vr1 = (vr0 * W0 * rho_0_Shock) / (W1 * rho1);
-          const Real h1 =
-              (h0 * vr0 * std::pow(W0, 2) * rho_0_Shock) / (vr1 * std::pow(W1, 2) * rho1);
-          const Real eps1 = h1 - 1. - p1 / rho1;
+          if (eps1 <= epsND) {
+            eps1 = 0;
+          } else if (eps1 > epsND && eps1 <= epsND * (eta + 1.) / eta) {
+            eps1 = eps1 - (eta * (eps1 - epsND));
+          } else {
+            eps1 = eps1 - epsND;
+          }
 
           v(irho, k, j, i) = rho1;
           v(itmp, k, j, i) =
               eos.TemperatureFromDensityInternalEnergy(rho1, eps1, eos_lambda);
-          v(ieng, k, j, i) = rho1 * eps1;
-          v(iprs, k, j, i) = p1;
+          v(ieng, k, j, i) = rho1 * eos.InternalEnergyFromDensityTemperature(
+                                        rho1, v(itmp, k, j, i), eos_lambda);
+          v(iprs, k, j, i) =
+              eos.PressureFromDensityTemperature(rho1, v(itmp, k, j, i), eos_lambda);
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
@@ -216,18 +179,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // preshock - 0
         } else {
 
-          const Real lapse0 = geom.Lapse(CellLocation::Cent, k, j, rShock);
-          const Real vr0 = -1. * std::sqrt(lapse0 * lapse0 - 1.);
-          const Real W0 = 1. / sqrt(1. - std::pow(vr0, 2));
           const Real rho_0 =
               Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
-          Real T = temperature_from_rho_mach(eos, rho_0, target_mach, Tmin, Tmax, vr0,
-                                             eos_lambda[0]);
-
+          Real eps0 = eps_from_rho_mach(eos, rho_0, target_mach, epsmin, epsmax, vr0,
+                                        eos_lambda[0]);
           v(irho, k, j, i) = rho_0;
-          v(itmp, k, j, i) = T;
-          v(ieng, k, j, i) =
-              rho_0 * eos.InternalEnergyFromDensityTemperature(rho_0, T, eos_lambda);
+          v(itmp, k, j, i) =
+              eos.TemperatureFromDensityInternalEnergy(rho_0, eps0, eos_lambda);
+          v(ieng, k, j, i) = rho_0 * eps0;
           v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
@@ -248,24 +207,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
           }
         }
-
-        int num_nans = std::isnan(v(ivlo, k, j, i)) + std::isnan(v(irho, k, j, i)) +
-                       std::isnan(v(ieng, k, j, i)) + std::isnan(v(itmp, k, j, i)) +
-                       std::isnan(v(iprs, k, j, i)) + std::isnan(v(igm1, k, j, i));
-        PARTHENON_REQUIRE(num_nans == 0, "NaNs founds");
       });
-
   fluid::PrimitiveToConserved(rc);
 }
 
 KOKKOS_FUNCTION
-Real temperature_from_rho_mach(const EOS &eos, const Real rho, const Real target_mach,
-                               const Real Tmin, const Real Tmax, const Real vr0,
-                               const Real Ye) {
+Real eps_from_rho_mach(const EOS &eos, const Real rho, const Real target_mach,
+                       const Real epsmin, const Real epsmax, const Real vr0,
+                       const Real Ye) {
   MachResidual res(eos, rho, vr0, target_mach, Ye);
   root_find::RootFind root;
-  Real Troot = root.regula_falsi(res, Tmin, Tmax, 1.e-6 * target_mach, Tmin - 1e-10);
-  return Troot;
+  Real epsroot =
+      root.regula_falsi(res, epsmin, epsmax, 1.e-6 * target_mach, epsmin * 1.2);
+  return epsroot;
 }
 
 KOKKOS_FUNCTION
@@ -280,16 +234,6 @@ Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
   if (discr < 0) printf("discr = %g   %g %g %g\n", discr, AA, BB, CC);
   PARTHENON_REQUIRE(discr >= 0, "discr < 0");
   return (-BB - std::sqrt(discr)) / (2. * AA);
-}
-
-KOKKOS_FUNCTION
-Real density_from_jump_conditions(const Real alphasq, const Real p0, const Real h0,
-                                  const Real v0, const Real W0, const Real rho0,
-                                  const Real W1, const Real rhomin, const Real rhomax) {
-  EnergyResidual res(alphasq, p0, h0, v0, W0, rho0, W1);
-  root_find::RootFind root;
-  Real rho1root = root.regula_falsi(res, rhomin, rhomax, 1.e-10, rhomin * 5);
-  return rho1root;
 }
 
 } // namespace standing_accretion_shock
