@@ -695,13 +695,13 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (rad->Param<bool>("active")) {
     num_species = rad->Param<int>("num_species");
   }
+  auto moments_active = rad->Param<bool>("moments_active");
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   const int ndim = pmb->pmy_mesh->ndim;
-
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace cr = radmoment_cons;
@@ -841,11 +841,13 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
             v.flux(X2DIR, idx_cmom(0), k, j, i) = 0.0;
             v.flux(X2DIR, idx_cmom(2), k, j, i) = 0.0;
 
-            for (int ispec = 0; ispec < num_species; ispec++) {
-              v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
-            }
+	    if (moments_active){
+	      for (int ispec = 0; ispec < num_species; ispec++) {
+		v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
+		v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
+		v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+	      }
+	    }
           });
     }
   }
