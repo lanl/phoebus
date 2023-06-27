@@ -135,6 +135,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // postshock - 1
         if (r < rShock) {
 
+          const Real rho_0 = Mdot / (4. * M_PI * std::pow(r, 2) * W0 * std::abs(vr0));
           const Real rho_0_Shock =
               Mdot / (4. * M_PI * std::pow(rShock, 2) * W0 * std::abs(vr0));
           const Real alphasq = 1. - (rs / r);
