@@ -140,7 +140,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           const Real alphasq = 1. - (rs / r);
           const Real psi = alphasq * ((gamma - 1.) / gamma) * ((W0 - 1. - epsND) / W0);
           const Real vr1 = (vr0 + std::sqrt(vr0 * vr0 - 4. * psi)) / 2.;
-          const Real rho1 = (rho_0_Shock * W0 * vr0) / (vr1);
+          const Real rho1 = (rho_0 * W0 * vr0) / (vr1);
           Real eps1 = (W0 - 1. + (gamma - 1) * epsND) / gamma;
 
           if (eps1 <= epsND) {
