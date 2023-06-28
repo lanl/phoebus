@@ -25,9 +25,9 @@ variables = p.density,       &
             c.energy,        &
             pressure,      	 &
             g.c.coord,       &
-            g.f1.coord,       &
-            g.f2.coord,       &
-            g.f3.coord,       &
+            g.f1.coord,      &
+            g.f2.coord,      &
+            g.f3.coord,      &
             g.n.coord,       &
             g.c.detgam,      &
             g.c.bcon,        &
@@ -39,6 +39,10 @@ variables = p.density,       &
 
 file_type   = hdf5      # Tabular data dump
 dt          = 5.0       # time increment between outputs
+
+<parthenon/output2>
+file_type   = hst       # History data dump
+dt          = 1.0       # Time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
@@ -120,6 +124,7 @@ do_fd_on_grid = false
 <coordinates>
 derefine_poles = false
 r_outer = 250
+# hexp_br = 1000. # Initial break radius for hyperexponential coordinates
 
 <fixup>
 enable_floors = true
@@ -136,6 +141,10 @@ ceiling_type = ConstantGamSie
 sie0_ceiling = 1.0
 gam0_ceiling = 10.0
 enable_ox1_fmks_inflow_check = true
+enable_phi_enforcement = false
+enforced_phi = 1.
+enforced_phi_timescale = 500.
+enforced_phi_cadence = 1.
 
 <torus>
 target_beta = 100.

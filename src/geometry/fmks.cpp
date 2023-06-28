@@ -46,6 +46,12 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   Real alpha = pin->GetOrAddReal("coordinates", "poly_alpha", 14);
   Real x0 = pin->GetReal("parthenon/mesh", "x1min");
   Real smooth = pin->GetOrAddReal("coordinates", "smooth", 0.5);
+  const Real hexp_br_large = 1.e30;
+  PARTHENON_REQUIRE(hexp_br_large < std::numeric_limits<Real>::max(),
+                    "Default hyperexponential break radius must be representable!");
+  Real hexp_br = pin->GetOrAddReal("coordinates", "hexp_br", hexp_br_large);
+  Real hexp_nsq = pin->GetOrAddReal("coordinates", "hexp_nsq", 4.0);
+  Real hexp_csq = pin->GetOrAddReal("coordinates", "hexp_csq", 4.0);
   Real a = pin->GetReal("geometry", "a");
   Real Rh = 1.0 + sqrt(1.0 - a * a);
   Real xh = log(Rh);
@@ -72,6 +78,9 @@ void Initialize<FMKSMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) {
   x0 = std::min<Real>(x0, std::max<Real>(0., x1min - nghost * dx1));
   params.Add("x0", x0);
   params.Add("smooth", smooth);
+  params.Add("hexp_br", hexp_br);
+  params.Add("hexp_nsq", hexp_nsq);
+  params.Add("hexp_csq", hexp_csq);
   params.Add("Rh", Rh);
   params.Add("xh", xh);
   params.Add("r_isco_p", r_isco_p);

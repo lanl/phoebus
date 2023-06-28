@@ -54,7 +54,7 @@ namespace phoebus {
 PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm,
                              const bool is_restart)
     : EvolutionDriver(pin, app_in, pm),
-      integrator(std::make_unique<StagedIntegrator>(pin)), is_restart_(is_restart) {
+      integrator(std::make_unique<LowStorageIntegrator>(pin)), is_restart_(is_restart) {
 
   // fail if these are not specified in the input file
   pin->CheckRequired("parthenon/mesh", "ix1_bc");
@@ -180,6 +180,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   BlockList_t &blocks = pmesh->block_list;
 
   const Real beta = integrator->beta[stage - 1];
+  const Real t = tm.time;
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
 
@@ -348,6 +349,87 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
           tl.AddTask(sample_recon, radiation::MOCMCEddington<MDT>, sc0.get());
 
       geom_src = geom_src | eddington;
+    }
+  }
+
+  // Extra per-step user work
+  TaskRegion &sync_region_5 = tc.AddRegion(num_partitions);
+  int sync_region_5_dep_id;
+  net_field_totals.val.resize(2); // Mdot, Phi
+  net_field_totals_2.val.resize(2);
+  for (int i = 0; i < 2; i++) {
+    net_field_totals.val[i] = 0.;
+    net_field_totals_2.val[i] = 0.;
+  }
+  for (int i = 0; i < num_partitions; i++) {
+    sync_region_5_dep_id = 0;
+    auto &tl = sync_region_5[i];
+
+    auto &md = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
+
+    // Begin tuning region that only evaluates occasionally and on first stage
+    // TODO(BRR) Setting scale factor of B field need only be done once per simulation
+
+    // Evaluate current Mdot, Phi
+    auto sum_mdot_1 = tl.AddTask(none, fixup::SumMdotPhiForNetFieldScaling, md.get(), t,
+                                 stage, &(net_field_totals.val));
+
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, sum_mdot_1);
+    sync_region_5_dep_id++;
+
+    TaskID start_reduce_1 = (i == 0 ? tl.AddTask(sum_mdot_1, fixup::NetFieldStartReduce,
+                                                 md.get(), t, stage, &net_field_totals)
+                                    : none);
+    // Test the reduction until it completes
+    TaskID finish_reduce_1 = tl.AddTask(start_reduce_1, fixup::NetFieldCheckReduce,
+                                        md.get(), t, stage, &net_field_totals);
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, finish_reduce_1);
+    sync_region_5_dep_id++;
+
+    auto mod_net = tl.AddTask(finish_reduce_1, fixup::ModifyNetField, md.get(), t,
+                              beta * dt, stage, true, 1.);
+
+    // Evaluate Mdot, Phi (only Phi changes) after modifying B field
+    auto sum_mdot_2 = tl.AddTask(mod_net, fixup::SumMdotPhiForNetFieldScaling, md.get(),
+                                 t, stage, &(net_field_totals_2.val));
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, sum_mdot_2);
+    sync_region_5_dep_id++;
+
+    TaskID start_reduce_2 = (i == 0 ? tl.AddTask(sum_mdot_2, fixup::NetFieldStartReduce,
+                                                 md.get(), t, stage, &net_field_totals_2)
+                                    : none);
+    // Test the reduction until it completes
+    TaskID finish_reduce_2 = tl.AddTask(start_reduce_2, fixup::NetFieldCheckReduce,
+                                        md.get(), t, stage, &net_field_totals_2);
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, finish_reduce_2);
+    sync_region_5_dep_id++;
+
+    // Remove artificial contribution to net field
+    auto mod_net_2 = tl.AddTask(finish_reduce_2, fixup::ModifyNetField, md.get(), t,
+                                beta * dt, stage, true, -1.);
+
+    auto set_scale =
+        tl.AddTask(mod_net_2, fixup::UpdateNetFieldScaleControls, md.get(), t, dt, stage,
+                   &(net_field_totals.val), &(net_field_totals_2.val));
+
+    // End tuning region that only evaluates occasionally and on first stage
+
+    // Update net field every stage of every timestep given current tuning parameters
+    auto update_netfield = tl.AddTask(set_scale, fixup::ModifyNetField, md.get(), t,
+                                      beta * dt, stage, false, 0.0);
+  }
+  // This is a bad pattern. Having a per-mesh data p2c would help.
+  TaskRegion &async_region_4 = tc.AddRegion(num_independent_task_lists);
+  for (int i = 0; i < blocks.size(); i++) {
+    auto &pmb = blocks[i];
+    auto &tl = async_region_4[i];
+    auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
+
+    StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+    const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
+
+    if (enable_phi_enforcement) {
+      auto p2c = tl.AddTask(none, fluid::PrimitiveToConserved, sc.get());
     }
   }
 
