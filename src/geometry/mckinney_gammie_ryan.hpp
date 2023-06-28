@@ -46,14 +46,20 @@ class McKinneyGammieRyan {
  public:
   McKinneyGammieRyan()
       : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(0), smooth_(0.5),
-        norm_(GetNorm_(alpha_, xt_)) {}
+        norm_(GetNorm_(alpha_, xt_)), hexp_br_(1000.), hexp_nsq_(4.0), hexp_csq_(4.0) {}
   McKinneyGammieRyan(Real x0) // this is the most common use-case
       : derefine_poles_(true), h_(0.3), xt_(0.82), alpha_(14), x0_(x0), smooth_(0.5),
-        norm_(GetNorm_(alpha_, xt_)) {}
+        norm_(GetNorm_(alpha_, xt_)), hexp_br_(1000.), hexp_nsq_(4.0), hexp_csq_(4.0) {}
+  McKinneyGammieRyan(bool derefine_poles, Real h, Real xt, Real alpha, Real x0,
+                     Real smooth, Real hexp_br, Real hexp_nsq, Real hexp_csq)
+      : derefine_poles_(derefine_poles), h_(h), xt_(xt), alpha_(alpha), x0_(x0),
+        smooth_(smooth), norm_(GetNorm_(alpha_, xt_)), hexp_br_(hexp_br),
+        hexp_nsq_(hexp_nsq), hexp_csq_(hexp_csq_) {}
   McKinneyGammieRyan(bool derefine_poles, Real h, Real xt, Real alpha, Real x0,
                      Real smooth)
       : derefine_poles_(derefine_poles), h_(h), xt_(xt), alpha_(alpha), x0_(x0),
-        smooth_(smooth), norm_(GetNorm_(alpha_, xt_)) {}
+        smooth_(smooth), norm_(GetNorm_(alpha_, xt_)), hexp_br_(1000.), hexp_nsq_(4.0),
+        hexp_csq_(4.0) {}
   KOKKOS_INLINE_FUNCTION
   void operator()(Real X1, Real X2, Real X3, Real C[NDSPACE], Real Jcov[NDSPACE][NDSPACE],
                   Real Jcon[NDSPACE][NDSPACE]) const {
@@ -66,7 +72,11 @@ class McKinneyGammieRyan {
     C[1] = th;
     C[2] = X3;
 
-    const Real drdX1 = std::exp(X1);
+    // const Real drdX1 = std::exp(X1);
+    const Real hexp_dr = X1 - hexp_br_;
+    const Real drdX1 =
+        std::exp(X1 + (hexp_dr > 0.) * hexp_csq_ * std::pow(hexp_dr, hexp_nsq_)) *
+        (1. + (hexp_dr > 0.) * hexp_csq_ * hexp_nsq_ * std::pow(hexp_dr, hexp_nsq_ - 1.));
     const Real dthGdX2 = M_PI + M_PI * (1 - h_) * std::cos(2 * M_PI * X2);
     Real dthdX1, dthdX2;
     if (derefine_poles_) {
@@ -142,7 +152,10 @@ class McKinneyGammieRyan {
 
  private:
   KOKKOS_INLINE_FUNCTION
-  Real r_(const Real X1) const { return std::exp(X1); }
+  Real r_(const Real X1) const {
+    const Real hexp_dr = X1 - hexp_br_;
+    return std::exp(X1 + (hexp_dr > 0.) * hexp_csq_ * std::pow(hexp_dr, hexp_nsq_));
+  }
   KOKKOS_INLINE_FUNCTION
   void th_(const Real X1, const Real X2, Real &y, Real &th) const {
     Real thG = thG_(X2);
@@ -169,7 +182,6 @@ class McKinneyGammieRyan {
       else if (th < M_PI)
         th = M_PI - SINGSMALL;
     }
-    // if (std::fabs(M_PI - th) < robust::EPS()) th =
   }
   KOKKOS_INLINE_FUNCTION
   Real thG_(const Real X2) const {
@@ -191,6 +203,9 @@ class McKinneyGammieRyan {
   Real x0_ = 0; // start point of smooth region
   Real smooth_ = 0.5;
   Real norm_;
+  Real hexp_br_ = 1000.;
+  Real hexp_nsq_ = 4.;
+  Real hexp_csq_ = 4.;
 };
 
 template <>
