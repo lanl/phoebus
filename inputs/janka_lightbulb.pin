@@ -1,8 +1,8 @@
 <phoebus>
-problem = lightbulb
+problem = janka_lightbulb
 
 <parthenon/job>
-problem_id  = thinlightbulb       # problem ID: basename of output filenames
+problem_id  = janka_lightbulb       # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = p.density,  &
@@ -25,7 +25,7 @@ dt_init_fact = 1.e-6
 <parthenon/mesh>
 nghost = 4
 
-nx1         = 4         # Number of zones in X1-direction
+nx1         = 5         # Number of zones in X1-direction
 x1min       = 0         # minimum value of X1
 x1max       = 5.e-4     # maximum value of X1 (for monte_carlo)
 ix1_bc      = periodic  # Inner-X1 boundary condition flag
@@ -76,7 +76,7 @@ c2p_max_iter = 100
 Ye = true
 
 <radiation>
-method = lightbulb
+method = janka_lightbulb
 
-<lightbulb>
+<janka_lightbulb>
 species = electron
