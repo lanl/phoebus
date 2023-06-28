@@ -113,10 +113,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
 
+  bool do_lightbulb = false;
   if (method == "cooling_function") {
     const bool do_liebendorfer =
         pin->GetOrAddBoolean("radiation", "do_liebendorfer", false);
-    const bool do_lightbulb = pin->GetOrAddBoolean("radiation", "do_lightbulb", false);
+    bool do_lightbulb = pin->GetOrAddBoolean("radiation", "do_lightbulb", false);
     const Real lum = pin->GetOrAddReal("radiation", "lum", 4.0);
     params.Add("do_liebendorfer", do_liebendorfer);
     params.Add("do_lightbulb", do_lightbulb);
@@ -515,7 +516,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("moments_active", moments_active);
 
-  if (method != "cooling_function") {
+  // TODO(JMM): Maybe need to re-enable this timestep check
+  if (!do_lightbulb) {
     physics->EstimateTimestepBlock = EstimateTimestepBlock;
   }
   return physics;
@@ -560,6 +562,8 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   namespace ir = radmoment_internal;
   namespace p = fluid_prim;
 
+  // Note that this is still used for the cooling function even though that option
+  // contains no transport. This is useful for consistency between methods.
   auto pmb = rc->GetBlockPointer();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
