@@ -26,6 +26,12 @@
 using namespace parthenon::package::prelude;
 
 namespace MonopoleGR {
+
+// forward declarations
+class Hypersurface_host_t;
+class Matter_host_t;
+class Radius;
+
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 Real EstimateTimeStep(StateDescriptor *pkg);
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
