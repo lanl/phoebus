@@ -114,8 +114,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   auto *pmb = rc->GetParentPointer().get();
 
   std::vector<std::string> vars({c::density, p::density, p::velocity, p::temperature,
-                                 p::ye, c::energy, iv::Gcov,
-				 iv::GcovHeat, iv::GcovCool,
+                                 p::ye, c::energy, iv::Gcov, iv::GcovHeat, iv::GcovCool,
                                  iv::Gye, iv::tau, p::energy});
 
   PackIndexMap imap;
@@ -131,8 +130,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
   const int ptau = imap[iv::tau].first;
-  const int GcovHeat=imap[iv::GcovHeat].first;
-  const int GcovCool=imap[iv::GcovCool].first;
+  const int GcovHeat = imap[iv::GcovHeat].first;
+  const int GcovCool = imap[iv::GcovCool].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -266,8 +265,10 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             // detg included above
             Kokkos::atomic_add(&(v(mu, k, j, i)), -Gcov_coord[mu - Gcov_lo]);
           }
-	  v(GcovHeat, k, j, i) = v(prho, k, j, i)*unit_conv.GetMassDensityCodeToCGS() * heat;
-	  v(GcovCool, k, j, i) = v(prho, k, j, i)*unit_conv.GetMassDensityCodeToCGS() * cool;
+          v(GcovHeat, k, j, i) =
+              v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS() * heat;
+          v(GcovCool, k, j, i) =
+              v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS() * cool;
           Kokkos::atomic_add(&(v(Gye, k, j, i)), Jye);
         });
   } else {

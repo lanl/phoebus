@@ -867,13 +867,13 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
             v.flux(X2DIR, idx_cmom(0), k, j, i) = 0.0;
             v.flux(X2DIR, idx_cmom(2), k, j, i) = 0.0;
 
-	    if (moments_active){
-	      for (int ispec = 0; ispec < num_species; ispec++) {
-		v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
-		v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
-		v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
-	      }
-	    }
+            if (moments_active) {
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
+                v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
+                v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+              }
+            }
           });
     }
   }
