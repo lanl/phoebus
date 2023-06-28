@@ -109,7 +109,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real MPNS = 1.3 * solar_mass;
   Real rs =
       (2. * pc.g_newt * MPNS / (std::pow(pc.c, 2))) * unit_conv.GetLengthCGSToCode();
-  i epsmin *= (-1.);
+  epsmin *= (-1.);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
