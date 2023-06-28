@@ -98,15 +98,18 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
-
-  const Real epsmin = 1.e-9;
-  const Real epsmax = 1.e6;
+  auto epsmin = pmb->packages.Get("eos")->Param<Real>("sie_min");
+  auto epsmax = pmb->packages.Get("eos")->Param<Real>("sie_max");
+  auto Cv = pmb->packages.Get("eos")->Param<Real>("Cv");
+  auto Tmin = pmb->packages.Get("eos")->Param<Real>("T_min");
+  auto Tmax = pmb->packages.Get("eos")->Param<Real>("T_max");
 
   Mdot *= ((solar_mass * unit_conv.GetMassCGSToCode()) / unit_conv.GetTimeCGSToCode());
   rShock *= (1.e5 * unit_conv.GetLengthCGSToCode());
   Real MPNS = 1.3 * solar_mass;
   Real rs =
       (2. * pc.g_newt * MPNS / (std::pow(pc.c, 2))) * unit_conv.GetLengthCGSToCode();
+  i epsmin *= (-1.);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -155,7 +158,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real eps1 = (W0 - 1. + (gamma - 1) * epsND) / gamma;
 
           if (eps1 <= epsND) {
-            eps1 = 0;
+            eps1 = epsmin;
           } else if (eps1 > epsND && eps1 <= epsND * (eta + 1.) / eta) {
             eps1 = eps1 - (eta * (eps1 - epsND));
           } else {
@@ -195,8 +198,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real eps0 = eps_from_rho_mach(eos, rho_0, target_mach, epsmin, epsmax, vr0,
                                         eos_lambda[0]);
           v(irho, k, j, i) = rho_0;
-          v(itmp, k, j, i) =
-              eos.TemperatureFromDensityInternalEnergy(rho_0, eps0, eos_lambda);
+          v(itmp, k, j, i) = std::max(Tmin, eps0 / Cv); // eos.TemperatureFromDensityInternalEnergy(rho_0,
+                                                        // eps0, eos_lambda);
           v(ieng, k, j, i) = rho_0 * eps0;
           v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
