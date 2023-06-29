@@ -98,8 +98,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
-  auto epsmin = pmb->packages.Get("eos")->Param<Real>("sie_min");
-  auto epsmax = pmb->packages.Get("eos")->Param<Real>("sie_max");
+  const Real epsmin = 1.e-10;
+  const Real epsmax = 1.e10;
   auto Cv = pmb->packages.Get("eos")->Param<Real>("Cv");
   auto Tmin = pmb->packages.Get("eos")->Param<Real>("T_min");
   auto Tmax = pmb->packages.Get("eos")->Param<Real>("T_max");
@@ -109,7 +109,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real MPNS = 1.3 * solar_mass;
   Real rs =
       (2. * pc.g_newt * MPNS / (std::pow(pc.c, 2))) * unit_conv.GetLengthCGSToCode();
-  epsmin *= (-1.);
+  epsmin = std::abs(epsmin);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -198,8 +198,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real eps0 = eps_from_rho_mach(eos, rho_0, target_mach, epsmin, epsmax, vr0,
                                         eos_lambda[0]);
           v(irho, k, j, i) = rho_0;
-          v(itmp, k, j, i) = std::max(Tmin, eps0 / Cv); // eos.TemperatureFromDensityInternalEnergy(rho_0,
-                                                        // eps0, eos_lambda);
+          v(itmp, k, j, i) = std::max(
+              Tmin, eps0 / Cv); // eos.TemperatureFromDensityInternalEnergy(rho_0,
+                                // eps0, eos_lambda);
           v(ieng, k, j, i) = rho_0 * eps0;
           v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda);
