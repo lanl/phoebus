@@ -49,9 +49,9 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 1024          # Number of zones in X1-direction
-x1min       = 3.44199       # minimum value of X1 | rPNS | x1min = ln R (code units), R = 60 (km) => R = 31.2492 (code units) => x1min = 3.44199
-x1max       = 5.43896       # maximum value of X1 | rmax | x1max => 472.5 (km)
+nx1         = 512           # Number of zones in X1-direction
+x1min       = 31.2492       # minimum value of X1 | rPNS | x1min = ln R (code units), R = 60 (km) => R = 31.2492 (code units) => x1min = 3.44199
+x1max       = 230.202       # maximum value of X1 | rmax | x1max => 472.5 (km)
 ix1_bc      = user          # Inner-X1 boundary condition flag
 ox1_bc      = user          # Outer-X1 boundary condition flag
 
@@ -79,10 +79,15 @@ field = c.c.bulk.rho
 method = derivative_order_1
 max_level = 1
 
+#<eos>
+#type = IdealGas
+#Gamma = 1.33
+#Cv = 3.0  
+
 <eos>
-type = IdealGas
-Gamma = 1.3333333333333333
-Cv = 3.0  
+type = StellarCollapse
+filename = /usr/projects/w22_stars/EoS/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.1_20120817.h5
+use_sp5 = false
 
 <physics>
 hydro = true
@@ -92,7 +97,7 @@ rad = false
 
 <fluid>
 xorder = 2
-cfl = 0.5
+cfl = 0.6
 riemann = llf
 recon = weno5
 c2p_method = robust
@@ -101,23 +106,8 @@ c2p_tol = 1.e-8
 Ye = true
 mhd = false
 
-<fixup>
-enable_floors = true
-enable_ceilings = false
-enable_flux_fixup = true
-enable_c2p_fixup = true
-floor_type = ConstantRhoSie
-rho0_floor = 1.e-3
-sie0_floor = 1.e-8
-rho0_ceiling = 5.e1
-sie0_ceiling = 1.e1
-
-
 <geometry>
 a = 0
-
-<coordinates>
-derefine_poles = false
 
 <units>
 scale_free = false
