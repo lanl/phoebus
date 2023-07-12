@@ -488,12 +488,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &mdudt = pmesh->mesh_data.GetOrAdd("dUdt", i);
     auto &mgsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", i);
 
-    auto send_flux =
-        tl.AddTask(none, parthenon::LoadAndSendFluxCorrections, mc0);
-    auto recv_flux =
-        tl.AddTask(none, parthenon::ReceiveFluxCorrections, mc0);
-    auto set_flux =
-        tl.AddTask(recv_flux, parthenon::SetFluxCorrections, mc0);
+    auto send_flux = tl.AddTask(none, parthenon::LoadAndSendFluxCorrections, mc0);
+    auto recv_flux = tl.AddTask(none, parthenon::ReceiveFluxCorrections, mc0);
+    auto set_flux = tl.AddTask(recv_flux, parthenon::SetFluxCorrections, mc0);
 
     auto flux_div =
         tl.AddTask(set_flux, parthenon::Update::FluxDivergence<MeshData<Real>>, mc0.get(),
@@ -579,7 +576,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &tl = async_region_3[i];
     auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
 
-    //auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
+    // auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
 
     auto set_bc = tl.AddTask(none, parthenon::ApplyBoundaryConditions, sc);
 
