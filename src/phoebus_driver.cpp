@@ -18,7 +18,6 @@
 
 // TODO(JCD): this should be exported by parthenon
 #include <amr_criteria/refinement_package.hpp>
-#include <bvals/cc/bvals_cc_in_one.hpp>
 #include <globals.hpp>
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
@@ -130,7 +129,8 @@ void PhoebusDriver::PostInitializationCommunication() {
     const auto local = parthenon::BoundaryType::local;
     const auto nonlocal = parthenon::BoundaryType::nonlocal;
 
-    auto start_recv =
+    /*
+      auto start_recv =
         tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveBoundBufs<any>, md);
 
     auto send = tl.AddTask(start_recv,
@@ -151,6 +151,9 @@ void PhoebusDriver::PostInitializationCommunication() {
       tl.AddTask(set | set_local, parthenon::cell_centered_bvars::RestrictGhostHalos, md,
                  false);
     }
+    */
+    auto boundary_tasks =
+        parthenon::AddBoundaryExchangeTasks(none, tl, md, pmesh->multilevel);
   }
 
   TaskRegion &async_region_2 = tc.AddRegion(blocks.size());
@@ -159,9 +162,9 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto &tl = async_region_2[i];
     auto &sc = pmb->meshblock_data.Get();
 
-    auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
+    //auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
 
-    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+    auto set_bc = tl.AddTask(none, parthenon::ApplyBoundaryConditions, sc);
 
     auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
 
@@ -277,9 +280,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
     auto &tl = sync_region_1[ib];
 
-    tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveBoundBufs<any>, sc1);
+    tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, sc1);
     if (pmesh->multilevel) {
-      tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveFluxCorrections, sc0);
+      tl.AddTask(none, parthenon::StartReceiveFluxCorrections, sc0);
     }
   }
 
@@ -511,11 +514,11 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &mgsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", i);
 
     auto send_flux =
-        tl.AddTask(none, parthenon::cell_centered_bvars::LoadAndSendFluxCorrections, mc0);
+        tl.AddTask(none, parthenon::LoadAndSendFluxCorrections, mc0);
     auto recv_flux =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveFluxCorrections, mc0);
+        tl.AddTask(none, parthenon::ReceiveFluxCorrections, mc0);
     auto set_flux =
-        tl.AddTask(recv_flux, parthenon::cell_centered_bvars::SetFluxCorrections, mc0);
+        tl.AddTask(recv_flux, parthenon::SetFluxCorrections, mc0);
 
     auto flux_div =
         tl.AddTask(set_flux, parthenon::Update::FluxDivergence<MeshData<Real>>, mc0.get(),
@@ -591,6 +594,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &tl = sync_region_4[ip];
     auto &mc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ip);
 
+    /*
     auto send_local =
         tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundBufs<local>, mc1);
     auto send_nonlocal =
@@ -605,11 +609,13 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
         tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, mc1);
     auto set_nonlocal = tl.AddTask(
         recv_nonlocal, parthenon::cell_centered_bvars::SetBounds<nonlocal>, mc1);
-
     if (pmesh->multilevel) {
-      tl.AddTask(set_nonlocal | set_local,
+      tl.AddTask(boundary_tasks,
                  parthenon::cell_centered_bvars::RestrictGhostHalos, mc1, false);
     }
+    */
+    auto boundary_tasks =
+        parthenon::AddBoundaryExchangeTasks(none, tl, mc1, pmesh->multilevel);
   }
   // TODO(BRR) loop this in thoughtfully!
   TaskRegion &async_region_3 = tc.AddRegion(num_independent_task_lists);
@@ -618,9 +624,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &tl = async_region_3[i];
     auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
 
-    auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
+    //auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
 
-    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+    auto set_bc = tl.AddTask(none, parthenon::ApplyBoundaryConditions, sc);
 
     auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
 
