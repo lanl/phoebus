@@ -129,29 +129,6 @@ void PhoebusDriver::PostInitializationCommunication() {
     const auto local = parthenon::BoundaryType::local;
     const auto nonlocal = parthenon::BoundaryType::nonlocal;
 
-    /*
-      auto start_recv =
-        tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveBoundBufs<any>, md);
-
-    auto send = tl.AddTask(start_recv,
-                           parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, md);
-
-    auto send_local =
-        tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundBufs<local>, md);
-    auto recv_local = tl.AddTask(
-        start_recv, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, md);
-    auto set_local =
-        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, md);
-
-    auto recv = tl.AddTask(
-        start_recv, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, md);
-    auto set = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBounds<nonlocal>, md);
-
-    if (pmesh->multilevel) {
-      tl.AddTask(set | set_local, parthenon::cell_centered_bvars::RestrictGhostHalos, md,
-                 false);
-    }
-    */
     auto boundary_tasks =
         parthenon::AddBoundaryExchangeTasks(none, tl, md, pmesh->multilevel);
   }
@@ -161,8 +138,6 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto &pmb = blocks[i];
     auto &tl = async_region_2[i];
     auto &sc = pmb->meshblock_data.Get();
-
-    //auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
 
     auto set_bc = tl.AddTask(none, parthenon::ApplyBoundaryConditions, sc);
 
@@ -594,26 +569,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &tl = sync_region_4[ip];
     auto &mc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ip);
 
-    /*
-    auto send_local =
-        tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundBufs<local>, mc1);
-    auto send_nonlocal =
-        tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, mc1);
-
-    auto recv_local =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, mc1);
-    auto recv_nonlocal =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, mc1);
-
-    auto set_local =
-        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, mc1);
-    auto set_nonlocal = tl.AddTask(
-        recv_nonlocal, parthenon::cell_centered_bvars::SetBounds<nonlocal>, mc1);
-    if (pmesh->multilevel) {
-      tl.AddTask(boundary_tasks,
-                 parthenon::cell_centered_bvars::RestrictGhostHalos, mc1, false);
-    }
-    */
     auto boundary_tasks =
         parthenon::AddBoundaryExchangeTasks(none, tl, mc1, pmesh->multilevel);
   }
