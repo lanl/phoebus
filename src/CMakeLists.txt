@@ -145,6 +145,10 @@ add_executable(phoebus
 
   tov/tov.hpp
   tov/tov.cpp
+
+  # HL : Turn on this later
+  #Z4c/Z4c.hpp
+  #Z4c/Z4c.cpp
 )
 
 set(MAX_NUMBER_CONSERVED_VARS 9 CACHE INTEGER "Maximum number of conserved variables")
