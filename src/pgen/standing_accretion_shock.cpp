@@ -30,15 +30,21 @@ namespace standing_accretion_shock {
 parthenon::constants::PhysicalConstants<parthenon::constants::CGS> pc;
 using Microphysics::EOS::EOS;
 
-constexpr int NSASW = 4;
+constexpr int NSASW = 8;
 constexpr int R = 0;
 constexpr int RHO = 1;
 constexpr int VR = 2;
 constexpr int EPS = 3;
+constexpr int PRES = 4;
+constexpr int HEAT = 5;
+constexpr int S = 6;
+constexpr int OMEGA = 7;
 
 using State_t = parthenon::ParArray2D<Real>;
 using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
 using Radius = Spiner::RegularGrid1D;
+
+std::pair<int, int> Get1DProfileNumZones(const std::string model_filename);
 
 template <typename ParArray2D>
 void Get1DProfileData(const std::string model_filename, const int num_zones,
@@ -91,25 +97,27 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // info about model file
   std::string model_filename =
       pin->GetOrAddString("standing_accretion_shock", "model_filename", "file.txt");
-  const int num_zones = 1000 - 1;
-  const int num_comments = 6;
-  const int num_vars = 4;
+
+  std::pair<int, int> p = Get1DProfileNumZones(model_filename);
+  const int num_zones = p.first - 1;
+  const int num_comments = p.second;
+
+  printf("1D model read in with %d number of zones. \n", num_zones);
+  printf("1D model read in with %d number of comments. \n", num_comments);
 
   // Kokkos views for loading in data
   State_t state_raw_d("state raw", NSASW, num_zones);
   State_host_t state_raw_h = Kokkos::create_mirror_view(state_raw_d);
 
-  Get1DProfileData(model_filename, num_zones, num_comments, num_vars, state_raw_h);
+  Get1DProfileData(model_filename, num_zones, num_comments, NSASW, state_raw_h);
 
   Kokkos::deep_copy(state_raw_d, state_raw_h);
 
-  // auto base = params.Get<standing_accretion_shock::State_t>("state_raw_d");
+  const Real rhomin = 1.e-16;
+  const Real epsmin = 1.e-16;
 
-  const Real rhomin = 1.e-6;
-  const Real epsmin = 1e-16;
-
-  const Real rin = state_raw_h(R, 0);
-  const Real rout = state_raw_h(R, num_zones - 1);
+  Real rin = state_raw_h(R, 0);
+  Real rout = state_raw_h(R, num_zones - 1);
 
   printf("rin  = %.14e (code units)\n", rin);
   printf("rout  = %.14e (code units)\n", rout);
@@ -136,14 +144,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real eps =
             std::max(epsmin, MonopoleGR::Interpolate(r, state_raw_d, raw_radius, EPS));
         Real vr = std::max(-1., MonopoleGR::Interpolate(r, state_raw_d, raw_radius, VR));
-        Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, eos_lambda);
 
         v(irho, k, j, i) = rho;
-        v(itmp, k, j, i) = T;
         v(ieng, k, j, i) = rho * eps;
         v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho, eps, eos_lambda);
         v(igm1, k, j, i) =
-            eos.BulkModulusFromDensityTemperature(rho, T, eos_lambda) / v(iprs, k, j, i);
+            eos.BulkModulusFromDensityInternalEnergy(rho, eps, eos_lambda) /
+            v(iprs, k, j, i);
 
         Real ucon[] = {0.0, vr, 0.0, 0.0};
         Real gcov[4][4];
@@ -160,6 +167,50 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
       });
   fluid::PrimitiveToConserved(rc.get());
+}
+
+std::pair<int, int> Get1DProfileNumZones(const std::string model_filename) {
+
+  // open file
+  std::ifstream inputfile(model_filename);
+  const std::string whitespace(" \t\n\r");
+
+  // error check
+  if (!inputfile.is_open()) {
+    std::cout << model_filename << " not found :( \n.";
+    exit(-1);
+  }
+
+  int nz = 0;
+  int nc = 0;
+  std::string line;
+  std::string comment1("#");
+  std::string comment2("//");
+
+  // get number of zones from 1d file
+  while (!inputfile.eof()) {
+
+    getline(inputfile, line);
+
+    std::size_t first_nonws = line.find_first_not_of(whitespace);
+
+    // skip empty lines
+    if (first_nonws == std::string::npos) {
+      continue;
+    }
+
+    // skip comments
+    if (line.find(comment1) == first_nonws || line.find(comment2) == first_nonws) {
+      nc++;
+      continue;
+    }
+
+    nz++;
+  }
+
+  inputfile.close();
+
+  return std::make_pair(nz + 1, nc);
 }
 
 template <typename ParArray2D>
@@ -188,7 +239,7 @@ void Get1DProfileData(const std::string model_filename, const int num_zones,
     }
   }
 
-  printf("Read 1D profile into state array.\n");
+  printf("Read 1D profile  into state array.\n");
 
   inputfile.close();
 }
