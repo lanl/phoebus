@@ -183,7 +183,9 @@ endif()
 # target_compile_options(phoebus PUBLIC -G -lineinfo)
 
 target_link_libraries(phoebus PRIVATE parthenon
-  hdf5::hdf5 hdf5::hdf5_hl
   # singularity-eos::singularity-eos
   # singularity-opac::singularity-opac
 )
+if (PHOEBUS_ENABLE_HDF5)
+  target_link_libraries(phoebus PRIVATE hdf5::hdf5 hdf5::hdf5_hl)
+endif()
