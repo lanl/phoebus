@@ -141,7 +141,7 @@ void PhoebusDriver::PostInitializationCommunication() {
 
     auto set_bc = none;
     // called in boundary exchange tasks
-    //auto set_bc = tl.AddTask(none, parthenon::ApplyBoundaryConditions, sc);
+    // auto set_bc = tl.AddTask(none, parthenon::ApplyBoundaryConditions, sc);
 
     auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
 
