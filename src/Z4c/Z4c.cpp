@@ -11,6 +11,14 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+/*
+Breif : Main function for Z4c formulation for the 
+        Einstein's equations
+Date : Jul.19.2023
+Author : Hyun Lim
+
+*/
+
 // stdlib
 #include <cmath>
 #include <cstdio>
@@ -38,11 +46,15 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/robust.hpp"
 
+// Z4c header to contain some utils including FD computations
 #include "Z4c.hpp"
 
 using namespace parthenon::package::prelude;
 using parthenon::AllReduce;
 using parthenon::MetadataFlag;
+
+
+
 
 namespace Z4c {
 
