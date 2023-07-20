@@ -35,10 +35,6 @@ constexpr int R = 0;
 constexpr int RHO = 1;
 constexpr int VR = 2;
 constexpr int EPS = 3;
-constexpr int PRES = 4;
-constexpr int HEAT = 5;
-constexpr int S = 6;
-constexpr int OMEGA = 7;
 
 using State_t = parthenon::ParArray2D<Real>;
 using State_host_t = typename parthenon::ParArray2D<Real>::HostMirror;
@@ -152,18 +148,20 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             eos.BulkModulusFromDensityInternalEnergy(rho, eps, eos_lambda) /
             v(iprs, k, j, i);
 
-        Real ucon[] = {0.0, vr, 0.0, 0.0};
+        // three-velocity
+        const Real vcon[3] = {vr, 0.0, 0.0};
+        Real vsq = 0.;
+        SPACELOOP2(ii, jj) { vsq += vcon[ii] * vcon[jj]; }
+        const Real W = 1. / sqrt(1. - vsq);
+
+        // four-velocity
+        Real ucon[] = {0.0, W * vcon[0], 0.0, 0.0};
         Real gcov[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
         ucon[0] = ucon_norm(ucon, gcov);
 
-        const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
-        Real beta[3];
-        geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
-        Real W = lapse * ucon[0];
-
         for (int d = 0; d < 3; d++) {
-          v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
+          v(ivlo + d, k, j, i) = ucon[d + 1];
         }
       });
   fluid::PrimitiveToConserved(rc.get());
