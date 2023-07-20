@@ -22,7 +22,6 @@
 
 // singularity includes
 #include <singularity-eos/eos/eos.hpp>
-#include <singularity-eos/eos/eos_builder.hpp>
 
 // phoebus includes
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"

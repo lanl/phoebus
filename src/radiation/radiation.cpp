@@ -126,9 +126,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       physics->AddField(iv::GcovHeat, mscalar);
       physics->AddField(iv::GcovCool, mscalar);
       std::string eos_type = pin->GetString("eos", "type");
+#ifdef SPINER_USE_HDF
       if (eos_type != singularity::StellarCollapse::EosType()) {
         PARTHENON_THROW("Lightbulb only supported with stellar collapse EOS");
       }
+#else
+      PARTHENON_THROW("Lightbulb only supported with HDF5 support");
+#endif // SPINER_USE_HDF
       Metadata m({Metadata::Cell, Metadata::OneCopy});
       physics->AddField(iv::tau, m);
       parthenon::AllReduce<bool> do_gain_reducer;
