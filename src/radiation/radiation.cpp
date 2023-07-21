@@ -251,6 +251,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // This system targets 1 scattering per light crossing time.
     // This explicit Monte Carlo method is not accurate once optical depths per
     // zone become >~ 1.
+    const Real wgtC = pin->GetOrAddReal("radiation", "wgtC", 1.e40);
+    params.Add("wgtC", wgtC, true);
+    params.Add("Jtot", 0.0, true); // for updating wgtC
     int num_particles = pin->GetOrAddInteger("radiation", "num_particles", 100);
     params.Add("num_particles", num_particles);
 
