@@ -169,6 +169,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   const bool do_liebendorfer = rad->Param<bool>("do_liebendorfer");
   const bool do_lightbulb = rad->Param<bool>("do_lightbulb");
   if (do_lightbulb) {
+#ifdef SPINER_USE_HDF
     const Real lum = rad->Param<Real>("lum");
     auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
     singularity::StellarCollapse eos_sc =
@@ -271,6 +272,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
               v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS() * cool;
           Kokkos::atomic_add(&(v(Gye, k, j, i)), Jye);
         });
+#else
+    PARTHENON_THROW("Lighbulb only supported with HDF5");
+#endif // SPINER_USE_HDF
   } else {
     for (int sidx = 0; sidx < 3; sidx++) {
       // Apply cooling for each neutrino species separately
