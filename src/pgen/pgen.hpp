@@ -40,6 +40,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(sedov)                                                                         \
   PROBLEM(blandford_mckee)                                                               \
   PROBLEM(bondi)                                                                         \
+  PROBLEM(boosted_bondi)                                                                 \
   PROBLEM(radiation_advection)                                                           \
   PROBLEM(radiation_equilibration)                                                       \
   PROBLEM(rotor)                                                                         \
@@ -53,13 +54,14 @@ using namespace parthenon::package::prelude;
 #define FOREACH_MODIFIER                                                                 \
   MODIFIER(phoebus)                                                                      \
   MODIFIER(torus)                                                                        \
-  MODIFIER(radiation_advection)
-
+  MODIFIER(radiation_advection)                                                          \
+  
 // if you need problem-specific post-initialization modifiers to initial conditions, add
 // the name here
 #define FOREACH_POSTINIT_MODIFIER                                                        \
   POSTINIT_MODIFIER(phoebus)                                                             \
-  POSTINIT_MODIFIER(torus)
+  POSTINIT_MODIFIER(torus)                                                               \
+  
 
 /*
 // DO NOT TOUCH THE MACROS BELOW

@@ -13,6 +13,8 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
+PHDF_PATH = '/users/adithan/phoebus/bin/parthenon_tools/parthenon_tools/'
+
 import argparse
 import numpy as np
 import matplotlib
@@ -24,7 +26,9 @@ import shutil
 import os
 from subprocess import call, DEVNULL
 import glob
-from parthenon_tools import phdf
+sys.path.append(PHDF_PATH)
+import phdf
+#from parthenon_tools import phdf
 import time
 from enum import Enum
 from phoebus_constants import cgs, scalefree
@@ -32,7 +36,7 @@ import phoebus_utils
 from phoedf import phoedf
 
 
-def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian"):
+def plot_frame(ifname, fname, savefig, geomfile=None, rlim=2000, coords="cartesian"):
     print(fname)
 
     xlim = 0
@@ -91,8 +95,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
             xplot[b, :, :],
             yplot[b, :, :],
             ldensity[b, 0, :, :].transpose(),
-            vmin=-5,
-            vmax=0,
+            vmin=-4,
+            vmax=-1,
             cmap=cmap_uniform,
         )
     div = make_axes_locatable(ax)
@@ -289,7 +293,7 @@ if __name__ == "__main__":
         "--numax", type=float, default=1.0e2, help="Maximum frequency (Hz)"
     )
     parser.add_argument(
-        "--rlim", type=float, default=40.0, help="Maximum radius to plot"
+        "--rlim", type=float, default=50.0, help="Maximum radius to plot"
     )
     parser.add_argument(
         "--nnu", type=int, default=100, help="Number of frequency support points"

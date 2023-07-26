@@ -1,7 +1,7 @@
 # PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
-# PHDF_PATH = '/home/brryan/github/phoebus/external/parthenon/scripts/python/'
+PHDF_PATH = '/users/adithan/phoebus/bin/parthenon_tools/parthenon_tools/'
 # DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
-DUMP_NAMES = "torus.out1.*.phdf"
+DUMP_NAMES = "/users/adithan/phoebus/bin/bondi.out1.*.phdf"
 
 import argparse
 import numpy as np
@@ -13,14 +13,14 @@ import os
 from subprocess import call, DEVNULL
 import glob
 
-# sys.path.append(PHDF_PATH)
-# import phdf
-from parthenon_tools import phdf
+sys.path.append(PHDF_PATH)
+import phdf
+#from parthenon_tools import phdf
 import time
 from enum import Enum
 
-# plot = "mks"
-plot = "cartesian"
+plot = "fmks"
+#plot = "cartesian"
 
 # Outer radius to plot or None
 rmax = 40
