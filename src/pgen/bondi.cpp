@@ -186,7 +186,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                            v(iprs, k, j, i);
         Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
-        ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2)); // add initial const velocity here (this is in boyer-lindquist coords)
+        ucon_bl[1] = (-C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2)) + vx*cph*sth)/(1+-C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2))* vx*cph*sth); // add initial const velocity here (this is in boyer-lindquist coords)
         ucon_bl[2] = vx / r * cth * sph;
         ucon_bl[3] = -vx / r * robust::ratio(sth,sph);
 

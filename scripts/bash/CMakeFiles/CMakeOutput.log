@@ -1,0 +1,134 @@
+The system is: Linux - 5.3.18-150300.59.87_11.0.78-cray_shasta_c - x86_64
+Compiling the C compiler identification source file "CMakeCCompilerId.c" succeeded.
+Compiler: /opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/bin/nvc 
+Build flags: 
+Id flags:  
+
+The output was:
+0
+
+
+Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "a.out"
+
+The C compiler identification is NVHPC, found in "/users/adithan/phoebus/scripts/bash/CMakeFiles/3.22.3/CompilerIdC/a.out"
+
+Detecting C compiler ABI info compiled with the following output:
+Change Dir: /users/adithan/phoebus/scripts/bash/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_90ded/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_90ded.dir/build.make CMakeFiles/cmTC_90ded.dir/build
+gmake[1]: Entering directory '/users/adithan/phoebus/scripts/bash/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o
+/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/bin/nvc   -v -MD -MT CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -c /usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/share/cmake-3.22/Modules/CMakeCCompilerABI.c
+Export NVCOMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/22.3
+Export PGI=/opt/nvidia/hpc_sdk
+Create file CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o.d
+
+/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/bin/tools/cpp1 --llalign -Dunix -D__unix -D__unix__ -Dlinux -D__linux -D__linux__ -D__NO_MATH_INLINES -D__LP64__ -D__x86_64 -D__x86_64__ -D__LONG_MAX__=9223372036854775807L '-D__SIZE_TYPE__=unsigned long int' '-D__PTRDIFF_TYPE__=long int' -D__amd64 -D__amd64__ -D__k8 -D__k8__ -D__MMX__ -D__SSE__ -D__SSE2__ -D__SSE3__ -D__SSSE3__ -D__SSE4A__ -D__ABM__ -D__SSE4_1__ -D__SSE4_2__ -D__AVX__ -D__AVX2__ -D__F16C__ -D__FMA__ -D__XSAVE__ -D__XSAVEOPT__ -D__XSAVEC__ -D__XSAVES__ -D__POPCNT__ -D__SHA__ -D__AES__ -D__PCLMUL__ -D__CLFLUSHOPT__ -D__FSGSBASE__ -D__RDRND__ -D__BMI__ -D__BMI2__ -D__LZCNT__ -D__FXSR__ -D__MWAITX__ -D__CLZERO__ -D__PGI -D__NVCOMPILER -D_PGCG_SOURCE --c -I- -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/extras/qd/include/qd -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/comm_libs/nvshmem/include -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/comm_libs/nccl/include -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/cuda/include -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/math_libs/include --sys_include /opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/include --sys_include /usr/lib64/gcc/x86_64-suse-linux/7/include --sys_include /usr/local/include --sys_include /usr/lib64/gcc/x86_64-suse-linux/7/include-fixed --sys_include /usr/lib64/gcc/x86_64-suse-linux/7/../../../../x86_64-suse-linux/include --sys_include /usr/include -D__PGLLVM__ -D__NVCOMPILER_LLVM__ -D__extension__= --preinclude _cplus_preinclude.h --preinclude_macros _cplus_macros.h --gnu_version=70500 -D__pgnu_vsn=70500 --dependencies_target_to_stdout CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o --dependencies_to_file CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o.d -q -o /tmp/nvcviJo-NDHxoAK.il /usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/share/cmake-3.22/Modules/CMakeCCompilerABI.c
+
+/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/bin/tools/cpp2 /usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/share/cmake-3.22/Modules/CMakeCCompilerABI.c -opt 1 -x 119 0xa10000 -x 122 0x40 -x 123 0x1000 -x 127 4 -x 127 17 -x 19 0x400000 -x 28 0x40000 -x 120 0x10000000 -x 70 0x8000 -x 122 1 -x 125 0x20000 -quad -x 59 4 -tp zen2 -x 120 0x1000 -astype 0 -x 121 1 -fn /usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/share/cmake-3.22/Modules/CMakeCCompilerABI.c -il /tmp/nvcviJo-NDHxoAK.il -x 123 0x80000000 -x 123 4 -x 2 0x400 -x 119 0x20 -def __pgnu_vsn=70500 -x 70 0x40000000 -x 183 4 -x 121 0x800 -x 6 0x20000 -x 122 0x400000 -y 125 0x100000 -x 249 130 -x 120 0x200000 -x 70 0x40000000 -x 8 0x40000000 -x 164 0x800000 -x 85 0x2000 -x 85 0x4000 -x 34 0x40000000 -x 53 0x800000 -x 83 0x1 -x 84 0x3c7 -x 85 0x1 -x 206 0x02 -x 68 0x1 -x 39 4 -x 56 0x10 -x 26 0x10 -x 26 1 -x 56 0x4000 -y 163 0xc0000000 -x 189 0x10 -y 189 0x4000000 -gnuvsn 70500 -x 69 0x200 -x 123 0x400 -cmdline '+nvc /tmp/nvcviJo-NDHxoAK.il -v -MD -MT CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -c' -asm /tmp/nvcLiJoVMF7K3BE.ll
+NVC++/x86-64 Linux 22.3-0: compilation successful
+
+/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/share/llvm/bin/llc /tmp/nvcLiJoVMF7K3BE.ll -march=x86-64 -mcpu=native -mattr=+mmx -mattr=+sse -mattr=+sse2 -mattr=+sse3 -mattr=+ssse3 -mattr=+sse4a -mattr=+sse4.1 -mattr=+sse4.2 -mattr=+avx -mattr=+avx2 -mattr=+f16c -mattr=+fma -mattr=+xsave -mattr=+xsaveopt -mattr=+xsavec -mattr=+xsaves -mattr=+popcnt -mattr=+sha -mattr=+aes -mattr=+pclmul -mattr=+clflushopt -mattr=+fsgsbase -mattr=+rdrnd -mattr=+bmi -mattr=+bmi2 -mattr=+lzcnt -mattr=+fxsr -mattr=+mwaitx -mattr=+clzero -O1 -fast-isel=0 -non-global-value-max-name-size=4294967295 -x86-cmov-converter=0 -dwarf-directory=false --align-all-functions=6 --frame-pointer=none -o /tmp/nvcniJoNC8DvzWJ.s
+
+/usr/bin/as /tmp/nvcniJoNC8DvzWJ.s -o CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o
+Unlinking /tmp/nvcviJo-NDHxoAK.il
+Unlinking /tmp/nvc9iJo3NQRe06a.s
+Unlinking /tmp/nvcLiJoVMF7K3BE.ll
+Unlinking /tmp/nvcniJoNC8DvzWJ.s
+Unlinking /tmp/nvc1iJoFbaizjLV.llvm
+Linking C executable cmTC_90ded
+/usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/bin/cmake -E cmake_link_script CMakeFiles/cmTC_90ded.dir/link.txt --verbose=1
+/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/bin/nvc  -v CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -o cmTC_90ded 
+Export NVCOMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/22.3
+Export PGI=/opt/nvidia/hpc_sdk
+
+/usr/bin/ld /usr/lib64/crt1.o /usr/lib64/crti.o /opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib/trace_init.o /usr/lib64/gcc/x86_64-suse-linux/7/crtbegin.o --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -T /opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib/nvhpc.ld -L/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib -L/usr/lib64 -L/usr/lib64/gcc/x86_64-suse-linux/7 CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -rpath /opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib -rpath /usr/lib64/gcc/x86_64-suse-linux/7/../../../../lib64 -o cmTC_90ded -L/usr/lib64/gcc/x86_64-suse-linux/7/../../../../lib64 -lnvomp -ldl --as-needed -lnvhpcatm -latomic --no-as-needed -lpthread -lnvcpumath -lnsnvc -lnvc -lgcc -lc -lgcc_s -lm /usr/lib64/gcc/x86_64-suse-linux/7/crtend.o /usr/lib64/crtn.o
+gmake[1]: Leaving directory '/users/adithan/phoebus/scripts/bash/CMakeFiles/CMakeTmp'
+
+
+
+Parsed C implicit include dir info from above output: rv=start
+  warn: unable to parse implicit include dirs!
+
+
+Parsed C implicit link information from above output:
+  link line regex: [^( *|.*[/\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\]+-)?ld|collect2)[^/\]*( |$)]
+  ignore line: [Change Dir: /users/adithan/phoebus/scripts/bash/CMakeFiles/CMakeTmp]
+  ignore line: []
+  ignore line: [Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_90ded/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_90ded.dir/build.make CMakeFiles/cmTC_90ded.dir/build]
+  ignore line: [gmake[1]: Entering directory '/users/adithan/phoebus/scripts/bash/CMakeFiles/CMakeTmp']
+  ignore line: [Building C object CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o]
+  ignore line: [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/bin/nvc   -v -MD -MT CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -c /usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/share/cmake-3.22/Modules/CMakeCCompilerABI.c]
+  ignore line: [Export NVCOMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/22.3]
+  ignore line: [Export PGI=/opt/nvidia/hpc_sdk]
+  ignore line: [Create file CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o.d]
+  ignore line: []
+  ignore line: [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/bin/tools/cpp1 --llalign -Dunix -D__unix -D__unix__ -Dlinux -D__linux -D__linux__ -D__NO_MATH_INLINES -D__LP64__ -D__x86_64 -D__x86_64__ -D__LONG_MAX__=9223372036854775807L '-D__SIZE_TYPE__=unsigned long int' '-D__PTRDIFF_TYPE__=long int' -D__amd64 -D__amd64__ -D__k8 -D__k8__ -D__MMX__ -D__SSE__ -D__SSE2__ -D__SSE3__ -D__SSSE3__ -D__SSE4A__ -D__ABM__ -D__SSE4_1__ -D__SSE4_2__ -D__AVX__ -D__AVX2__ -D__F16C__ -D__FMA__ -D__XSAVE__ -D__XSAVEOPT__ -D__XSAVEC__ -D__XSAVES__ -D__POPCNT__ -D__SHA__ -D__AES__ -D__PCLMUL__ -D__CLFLUSHOPT__ -D__FSGSBASE__ -D__RDRND__ -D__BMI__ -D__BMI2__ -D__LZCNT__ -D__FXSR__ -D__MWAITX__ -D__CLZERO__ -D__PGI -D__NVCOMPILER -D_PGCG_SOURCE --c -I- -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/extras/qd/include/qd -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/comm_libs/nvshmem/include -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/comm_libs/nccl/include -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/cuda/include -I/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/math_libs/include --sys_include /opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/include --sys_include /usr/lib64/gcc/x86_64-suse-linux/7/include --sys_include /usr/local/include --sys_include /usr/lib64/gcc/x86_64-suse-linux/7/include-fixed --sys_include /usr/lib64/gcc/x86_64-suse-linux/7/../../../../x86_64-suse-linux/include --sys_include /usr/include -D__PGLLVM__ -D__NVCOMPILER_LLVM__ -D__extension__= --preinclude _cplus_preinclude.h --preinclude_macros _cplus_macros.h --gnu_version=70500 -D__pgnu_vsn=70500 --dependencies_target_to_stdout CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o --dependencies_to_file CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o.d -q -o /tmp/nvcviJo-NDHxoAK.il /usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/share/cmake-3.22/Modules/CMakeCCompilerABI.c]
+  ignore line: []
+  ignore line: [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/bin/tools/cpp2 /usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/share/cmake-3.22/Modules/CMakeCCompilerABI.c -opt 1 -x 119 0xa10000 -x 122 0x40 -x 123 0x1000 -x 127 4 -x 127 17 -x 19 0x400000 -x 28 0x40000 -x 120 0x10000000 -x 70 0x8000 -x 122 1 -x 125 0x20000 -quad -x 59 4 -tp zen2 -x 120 0x1000 -astype 0 -x 121 1 -fn /usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/share/cmake-3.22/Modules/CMakeCCompilerABI.c -il /tmp/nvcviJo-NDHxoAK.il -x 123 0x80000000 -x 123 4 -x 2 0x400 -x 119 0x20 -def __pgnu_vsn=70500 -x 70 0x40000000 -x 183 4 -x 121 0x800 -x 6 0x20000 -x 122 0x400000 -y 125 0x100000 -x 249 130 -x 120 0x200000 -x 70 0x40000000 -x 8 0x40000000 -x 164 0x800000 -x 85 0x2000 -x 85 0x4000 -x 34 0x40000000 -x 53 0x800000 -x 83 0x1 -x 84 0x3c7 -x 85 0x1 -x 206 0x02 -x 68 0x1 -x 39 4 -x 56 0x10 -x 26 0x10 -x 26 1 -x 56 0x4000 -y 163 0xc0000000 -x 189 0x10 -y 189 0x4000000 -gnuvsn 70500 -x 69 0x200 -x 123 0x400 -cmdline '+nvc /tmp/nvcviJo-NDHxoAK.il -v -MD -MT CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -c' -asm /tmp/nvcLiJoVMF7K3BE.ll]
+  ignore line: [NVC++/x86-64 Linux 22.3-0: compilation successful]
+  ignore line: []
+  ignore line: [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/share/llvm/bin/llc /tmp/nvcLiJoVMF7K3BE.ll -march=x86-64 -mcpu=native -mattr=+mmx -mattr=+sse -mattr=+sse2 -mattr=+sse3 -mattr=+ssse3 -mattr=+sse4a -mattr=+sse4.1 -mattr=+sse4.2 -mattr=+avx -mattr=+avx2 -mattr=+f16c -mattr=+fma -mattr=+xsave -mattr=+xsaveopt -mattr=+xsavec -mattr=+xsaves -mattr=+popcnt -mattr=+sha -mattr=+aes -mattr=+pclmul -mattr=+clflushopt -mattr=+fsgsbase -mattr=+rdrnd -mattr=+bmi -mattr=+bmi2 -mattr=+lzcnt -mattr=+fxsr -mattr=+mwaitx -mattr=+clzero -O1 -fast-isel=0 -non-global-value-max-name-size=4294967295 -x86-cmov-converter=0 -dwarf-directory=false --align-all-functions=6 --frame-pointer=none -o /tmp/nvcniJoNC8DvzWJ.s]
+  ignore line: []
+  ignore line: [/usr/bin/as /tmp/nvcniJoNC8DvzWJ.s -o CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o]
+  ignore line: [Unlinking /tmp/nvcviJo-NDHxoAK.il]
+  ignore line: [Unlinking /tmp/nvc9iJo3NQRe06a.s]
+  ignore line: [Unlinking /tmp/nvcLiJoVMF7K3BE.ll]
+  ignore line: [Unlinking /tmp/nvcniJoNC8DvzWJ.s]
+  ignore line: [Unlinking /tmp/nvc1iJoFbaizjLV.llvm]
+  ignore line: [Linking C executable cmTC_90ded]
+  ignore line: [/usr/projects/hpcsoft/cos2/common/x86_64/cmake/3.22.3/bin/cmake -E cmake_link_script CMakeFiles/cmTC_90ded.dir/link.txt --verbose=1]
+  ignore line: [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/bin/nvc  -v CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -o cmTC_90ded ]
+  ignore line: [Export NVCOMPILER=/opt/nvidia/hpc_sdk/Linux_x86_64/22.3]
+  ignore line: [Export PGI=/opt/nvidia/hpc_sdk]
+  ignore line: []
+  link line: [/usr/bin/ld /usr/lib64/crt1.o /usr/lib64/crti.o /opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib/trace_init.o /usr/lib64/gcc/x86_64-suse-linux/7/crtbegin.o --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -T /opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib/nvhpc.ld -L/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib -L/usr/lib64 -L/usr/lib64/gcc/x86_64-suse-linux/7 CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o -rpath /opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib -rpath /usr/lib64/gcc/x86_64-suse-linux/7/../../../../lib64 -o cmTC_90ded -L/usr/lib64/gcc/x86_64-suse-linux/7/../../../../lib64 -lnvomp -ldl --as-needed -lnvhpcatm -latomic --no-as-needed -lpthread -lnvcpumath -lnsnvc -lnvc -lgcc -lc -lgcc_s -lm /usr/lib64/gcc/x86_64-suse-linux/7/crtend.o /usr/lib64/crtn.o]
+    arg [/usr/bin/ld] ==> ignore
+    arg [/usr/lib64/crt1.o] ==> obj [/usr/lib64/crt1.o]
+    arg [/usr/lib64/crti.o] ==> obj [/usr/lib64/crti.o]
+    arg [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib/trace_init.o] ==> obj [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib/trace_init.o]
+    arg [/usr/lib64/gcc/x86_64-suse-linux/7/crtbegin.o] ==> obj [/usr/lib64/gcc/x86_64-suse-linux/7/crtbegin.o]
+    arg [--eh-frame-hdr] ==> ignore
+    arg [-m] ==> ignore
+    arg [elf_x86_64] ==> ignore
+    arg [-dynamic-linker] ==> ignore
+    arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
+    arg [-T] ==> ignore
+    arg [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib/nvhpc.ld] ==> ignore
+    arg [-L/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib] ==> dir [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib]
+    arg [-L/usr/lib64] ==> dir [/usr/lib64]
+    arg [-L/usr/lib64/gcc/x86_64-suse-linux/7] ==> dir [/usr/lib64/gcc/x86_64-suse-linux/7]
+    arg [CMakeFiles/cmTC_90ded.dir/CMakeCCompilerABI.c.o] ==> ignore
+    arg [-rpath] ==> ignore
+    arg [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib] ==> ignore
+    arg [-rpath] ==> ignore
+    arg [/usr/lib64/gcc/x86_64-suse-linux/7/../../../../lib64] ==> ignore
+    arg [-o] ==> ignore
+    arg [cmTC_90ded] ==> ignore
+    arg [-L/usr/lib64/gcc/x86_64-suse-linux/7/../../../../lib64] ==> dir [/usr/lib64/gcc/x86_64-suse-linux/7/../../../../lib64]
+    arg [-lnvomp] ==> lib [nvomp]
+    arg [-ldl] ==> lib [dl]
+    arg [--as-needed] ==> ignore
+    arg [-lnvhpcatm] ==> lib [nvhpcatm]
+    arg [-latomic] ==> lib [atomic]
+    arg [--no-as-needed] ==> ignore
+    arg [-lpthread] ==> lib [pthread]
+    arg [-lnvcpumath] ==> lib [nvcpumath]
+    arg [-lnsnvc] ==> lib [nsnvc]
+    arg [-lnvc] ==> lib [nvc]
+    arg [-lgcc] ==> lib [gcc]
+    arg [-lc] ==> lib [c]
+    arg [-lgcc_s] ==> lib [gcc_s]
+    arg [-lm] ==> lib [m]
+    arg [/usr/lib64/gcc/x86_64-suse-linux/7/crtend.o] ==> obj [/usr/lib64/gcc/x86_64-suse-linux/7/crtend.o]
+    arg [/usr/lib64/crtn.o] ==> obj [/usr/lib64/crtn.o]
+  collapse library dir [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib] ==> [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib]
+  collapse library dir [/usr/lib64] ==> [/usr/lib64]
+  collapse library dir [/usr/lib64/gcc/x86_64-suse-linux/7] ==> [/usr/lib64/gcc/x86_64-suse-linux/7]
+  collapse library dir [/usr/lib64/gcc/x86_64-suse-linux/7/../../../../lib64] ==> [/usr/lib64]
+  implicit libs: [nvomp;dl;nvhpcatm;atomic;pthread;nvcpumath;nsnvc;nvc;gcc;c;gcc_s;m]
+  implicit objs: [/usr/lib64/crt1.o;/usr/lib64/crti.o;/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib/trace_init.o;/usr/lib64/gcc/x86_64-suse-linux/7/crtbegin.o;/usr/lib64/gcc/x86_64-suse-linux/7/crtend.o;/usr/lib64/crtn.o]
+  implicit dirs: [/opt/nvidia/hpc_sdk/Linux_x86_64/22.3/compilers/lib;/usr/lib64;/usr/lib64/gcc/x86_64-suse-linux/7]
+  implicit fwks: []
+
+
