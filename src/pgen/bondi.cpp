@@ -172,6 +172,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(iye, k, j, i) = 0.5;
           eos_lambda[0] = v(iye, k, j, i);
         }
+
+	const Real th = tr.bl_theta(x1, x2);
 	const Real sth = std::sin(th);
         const Real cth = std::cos(th);
         const Real sph = std::sin(x3);
