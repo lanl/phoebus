@@ -38,7 +38,6 @@ add_library(geometry_unit_tests OBJECT
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_minkowski.hpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_minkowski.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/phoebus_utils/phoebus_interpolation.hpp
-
 )
 
 # Super annoying but it had to be done.
@@ -48,7 +47,6 @@ configure_file(../../../src/compile_constants.hpp.in generated/compile_constants
 target_link_libraries(geometry_unit_tests
   PRIVATE
   parthenon
-  singularity-eos::singularity-eos
   Catch2::Catch2
   Kokkos::kokkos)
 
@@ -56,8 +54,15 @@ target_include_directories(geometry_unit_tests PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/ports-of-call"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/spiner"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/variant/include"
   )
 
+target_compile_definitions(geometry_unit_tests PRIVATE
+  PORTABILITY_STRATEGY_KOKKOS)
 
 target_link_libraries(geometry_unit_tests PRIVATE Catch2::Catch2)
 target_sources(phoebus_unit_tests PRIVATE $<TARGET_OBJECTS:geometry_unit_tests>)
