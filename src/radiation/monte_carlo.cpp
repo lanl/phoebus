@@ -29,7 +29,6 @@ Real GetWeight(const Real wgtC, const Real nu) { return wgtC / nu; }
 /**
  * Integrate Jtot
  **/
-KOKKOS_INLINE_FUNCTION
 void ComputeTotalEmissivity(Mesh *pmesh) {
   auto rad = pmesh->packages.Get("radiation");
   auto opac = pmesh->packages.Get("opacity");
@@ -83,7 +82,6 @@ void ComputeTotalEmissivity(Mesh *pmesh) {
   rad->UpdateParam<Real>("Jtot", reduction::Sum(Jtot));
 }
 
-KOKKOS_INLINE_FUNCTION
 void SetWeight(Mesh *pmesh) {
   auto &phoebus_pkg = pmesh->packages.Get("phoebus");
   auto &unit_conv = phoebus_pkg->Param<phoebus::UnitConversions>("unit_conv");
