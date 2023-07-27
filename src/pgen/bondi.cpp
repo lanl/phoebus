@@ -15,8 +15,6 @@
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "pgen/pgen.hpp"
 #include "utils/error_checking.hpp"
-#include "phoebus_utils/robust.hpp"
-
 
 // namespace phoebus {
 
@@ -116,7 +114,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real Cv = pin->GetReal("eos", "Cv");
   const Real n = 1.0 / (gam - 1.0);
-  const Real vx = pin->GetReal("fluid", "vx");
   PARTHENON_REQUIRE_THROWS(std::fabs(n - Cv) < 1.e-12, "Bondi requires Cv = 1/(Gamma-1)");
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
@@ -173,12 +170,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           eos_lambda[0] = v(iye, k, j, i);
         }
 
-	const Real th = tr.bl_theta(x1, x2);
-	const Real sth = std::sin(th);
-        const Real cth = std::cos(th);
-        const Real sph = std::sin(x3);
-        const Real cph = std::cos(x3);
-
         v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
         v(irho, k, j, i) = std::pow(v(itmp, k, j, i), n);
         v(ieng, k, j, i) = v(irho, k, j, i) * v(itmp, k, j, i) / (gam - 1.0);
@@ -188,9 +179,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                            v(iprs, k, j, i);
         Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
-        ucon_bl[1] = (-C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2)) + vx*cph*sth)/(1+-C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2))* vx*cph*sth); // add initial const velocity here (this is in boyer-lindquist coords)
-        ucon_bl[2] = vx / r * cth * sph;
-        ucon_bl[3] = -vx / r * robust::ratio(sth,sph);
+        ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
 
         Real gcov[4][4];
         const Real th = tr.bl_theta(x1, x2);
@@ -206,10 +195,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                         gcov[2][3] * ucon_bl[2] * ucon_bl[3]);
         Real discr = BB * BB - 4. * AA * CC;
         ucon_bl[0] = (-BB - std::sqrt(discr)) / (2. * AA);
-        const Real W_bl = ucon_bl[0] * bl.Lapse(0.0, r, th, x3); // will change with non zero u[2] or u[3]
+        const Real W_bl = ucon_bl[0] * bl.Lapse(0.0, r, th, x3);
 
         Real ucon[4];
-        tr.bl_to_fmks(x1, x2, x3, a, ucon_bl, ucon);        
+        tr.bl_to_fmks(x1, x2, x3, a, ucon_bl, ucon);
+
         // ucon won't be properly normalized here if x1 is not consistent with i
         // so renormalize
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
@@ -236,10 +226,4 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   fluid::PrimitiveToConserved(rc);
 }
 
-  void ProblemModifier(ParameterInput *pin) {
-  Real router = pin->GetOrAddReal("coordinates", "r_outer", 40.0);
-  Real x1max = log(router);
-  pin->SetReal("parthenon/mesh", "x1max", x1max);
-  }
-  
 } // namespace bondi
