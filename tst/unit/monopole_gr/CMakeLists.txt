@@ -33,17 +33,21 @@ target_link_libraries(monopole_gr_unit_tests
   parthenon
   Catch2::Catch2
   Kokkos::kokkos
-  singularity-eos::singularity-eos
   )
 
 target_include_directories(monopole_gr_unit_tests PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/ports-of-call"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/spiner"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/variant/include"
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   )
 
 target_compile_definitions(monopole_gr_unit_tests PRIVATE PHOEBUS_IN_UNIT_TESTS)
+target_compile_definitions(monopole_gr_unit_tests PRIVATE
+  PORTABILITY_STRATEGY_KOKKOS)
 
 target_sources(phoebus_unit_tests PRIVATE $<TARGET_OBJECTS:monopole_gr_unit_tests>)

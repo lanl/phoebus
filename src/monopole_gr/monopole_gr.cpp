@@ -59,10 +59,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("force_static", force_static);
 
   // Only run the first n subcycles
+  auto restart = parthenon::Params::Mutability::Restart;
   int run_n_times = pin->GetOrAddInteger("monopole_gr", "run_n_times", -1);
   params.Add("run_n_times", run_n_times);
   int nth_call = 0;
-  params.Add("nth_call", nth_call, true); // mutable
+  params.Add("nth_call", nth_call, restart);
 
   // Time step control. Equivalent to CFL
   // Empirical. controls
@@ -162,29 +163,28 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Gradients_t gradients("monopole_gr gradients", NGRAD, npoints);
   Beta_t beta("monopole_gr shift", npoints);
 
-  params.Add("matter", matter);
-  params.Add("matter_h", matter_h);
-  params.Add("matter_cells", matter_cells);
-  params.Add("matter_cells_h", matter_cells_h);
-  params.Add("integration_volumes", integration_volumes);
-  params.Add("integration_volumes_h", integration_vols_h);
-  params.Add("hypersurface", hypersurface);
-  params.Add("hypersurface_h", hypersurface_h);
-  params.Add("lapse_h", alpha_h);
-  // Lapse is mutable because we swap between alpha and alpha_last
-  params.Add("lapse", alpha, true);
-  params.Add("lapse_last", alpha_last, true);
-  // mutable because the reducer is stateful
-  params.Add("matter_reducer", matter_reducer, true);
-  params.Add("volumes_reducer", volumes_reducer, true);
+  params.Add("matter", matter, restart);
+  params.Add("matter_h", matter_h, restart);
+  params.Add("matter_cells", matter_cells, restart);
+  params.Add("matter_cells_h", matter_cells_h, restart);
+  params.Add("integration_volumes", integration_volumes, restart);
+  params.Add("integration_volumes_h", integration_vols_h, restart);
+  params.Add("hypersurface", hypersurface, restart);
+  params.Add("hypersurface_h", hypersurface_h, restart);
+  params.Add("lapse_h", alpha_h, restart);
+  params.Add("lapse", alpha, restart);
+  params.Add("lapse_last", alpha_last, restart);
+  auto mutable_param = parthenon::Params::Mutability::Mutable;
+  params.Add("matter_reducer", matter_reducer, mutable_param);
+  params.Add("volumes_reducer", volumes_reducer, mutable_param);
   // M . alpha = b
-  params.Add("alpha_m_l", alpha_m_l); // hostonly arrays
-  params.Add("alpha_m_d", alpha_m_d);
-  params.Add("alpha_m_u", alpha_m_u);
-  params.Add("alpha_m_b", alpha_m_b);
+  params.Add("alpha_m_l", alpha_m_l, restart); // hostonly arrays
+  params.Add("alpha_m_d", alpha_m_d, restart);
+  params.Add("alpha_m_u", alpha_m_u, restart);
+  params.Add("alpha_m_b", alpha_m_b, restart);
   // geometry arrays
-  params.Add("gradients", gradients);
-  params.Add("shift", beta);
+  params.Add("gradients", gradients, restart);
+  params.Add("shift", beta, restart);
 
   // The radius object, returns radius vs index and index vs radius
   Radius radius(rin, rout, npoints);
@@ -335,7 +335,10 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   }
   for (int v = 0; v < NHYPER; ++v) {
     if (std::isnan(hypersurface_h(v, npoints - 1))) {
-      PARTHENON_FAIL("Bad ODE integration.");
+      if (parthenon::Globals::my_rank == 0) {
+        DumpHypersurface("bad_ode_state.txt", matter_h, hypersurface_h, radius, npoints);
+      }
+      PARTHENON_FAIL("Bad ODE integration. State dumped to bad_ode_state.txt");
     }
   }
 
@@ -642,6 +645,20 @@ void DumpToTxt(const std::string &filename, StateDescriptor *pkg) {
             gradients_h(Gradients::DKDR, i), gradients_h(Gradients::DBETADT, i),
             matter_cells_h(Matter::RHO, i), matter_cells_h(Matter::J_R, i),
             matter_cells_h(Matter::trcS, i), matter_cells_h(Matter::Srr, i), vols_h(i));
+  }
+  fclose(pf);
+}
+
+void DumpHypersurface(const std::string &filename, Matter_host_t &matter,
+                      Hypersurface_host_t &hypersurface, Radius &r, int npoints) {
+  FILE *pf;
+  pf = fopen(filename.c_str(), "w");
+  fprintf(pf, "#it\tr\trho\tJ_r\ttrcS\tSrr\tA\tK\n");
+  for (int i = 0; i < npoints; ++i) {
+    fprintf(pf, "%d\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\t%.14e\n", i, r.x(i),
+            matter(Matter::RHO, i), matter(Matter::J_R, i), matter(Matter::trcS, i),
+            matter(Matter::Srr, i), hypersurface(Hypersurface::A, i),
+            hypersurface(Hypersurface::K, i));
   }
   fclose(pf);
 }

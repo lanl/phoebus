@@ -48,18 +48,30 @@ target_link_libraries(phoebus_utils_unit_tests
     parthenon
     Catch2::Catch2
     Kokkos::kokkos
-    singularity-eos::singularity-eos
     )
+if (PHOEBUS_ENABLE_HDF5)
+  target_link_libraries(phoebus_utils_unit_tests PRIVATE hdf5::hdf5 hdf5::hdf5_hl )
+endif()
 
 target_include_directories(phoebus_utils_unit_tests PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/ports-of-call"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/spiner"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/variant/include"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../"
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   )
 
+target_compile_definitions(phoebus_utils_unit_tests PRIVATE
+  PORTABILITY_STRATEGY_KOKKOS)
+if (PHOEBUS_ENABLE_HDF5)
+  target_compile_definitions(phoebus_utils_unit_tests PRIVATE
+    SINGULARITY_USE_HDF
+    SPINER_USE_HDF
+  )
+endif()
 
-target_link_libraries(phoebus_utils_unit_tests PRIVATE Catch2::Catch2)
 target_sources(phoebus_unit_tests PRIVATE $<TARGET_OBJECTS:phoebus_utils_unit_tests>)

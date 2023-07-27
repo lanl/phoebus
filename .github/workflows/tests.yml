@@ -50,6 +50,8 @@ jobs:
             cmake -DCMAKE_BUILD_TYPE=Debug -DPHOEBUS_ENABLE_UNIT_TESTS=ON -DMAX_NUMBER_CONSERVED_VARS=10 -DPHOEBUS_GEOMETRY=FMKS -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON ../../../
             cmake --build . --parallel 8
             cd ..
+            # is there a run directory that shouldn't be here?
+            rm -rf run
             # TODO(BRR) add --use_gpu flag here if running on GPU
             # Release suite
             ./radiation_diffusion.py --executable build_minkowski_release/src/phoebus

@@ -459,6 +459,9 @@ if __name__ == "__main__":
         "--coords", type=str, default="cartesian", help="Coordinates to plot in"
     )
     parser.add_argument(
+        "--rlim", type=float, default=40., help="Outer radius at which to plot"
+    )
+    parser.add_argument(
         "files", type=str, nargs="+", help="Files to take a snapshot of"
     )
     args = parser.parse_args()
@@ -466,4 +469,4 @@ if __name__ == "__main__":
     matplotlib.use("Agg")
 
     for i, fname in enumerate(args.files):
-        plot_frame(i, fname, args.savefig, coords=args.coords)
+        plot_frame(i, fname, args.savefig, coords=args.coords, rlim=args.rlim)

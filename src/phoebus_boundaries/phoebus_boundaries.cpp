@@ -17,6 +17,7 @@
 #include <string>
 
 #include <bvals/boundary_conditions.hpp>
+#include <bvals/boundary_conditions_generic.hpp>
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
@@ -31,6 +32,8 @@ using namespace parthenon::package::prelude;
 #include "radiation/radiation.hpp"
 
 namespace Boundaries {
+
+parthenon::TopologicalElement CC = parthenon::TopologicalElement::CC;
 
 // Copied out of Parthenon, with slight modification
 enum class BCSide { Inner, Outer };
@@ -82,7 +85,7 @@ void GenericBC(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   // Do the thing
   pmb->par_for_bndry(
-      label, nb, domain, coarse,
+      label, nb, domain, CC, coarse,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         int kref, jref, iref, sgn;
         if (TYPE == BCType::Reflect) {
@@ -127,7 +130,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
-        "OutflowInnerX1Cons", nb, domain, coarse,
+        "OutflowInnerX1Cons", nb, domain, CC, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
           Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -136,7 +139,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         });
   } else if (bc_vars == "primitive") {
     pmb->par_for_bndry(
-        "OutflowInnerX1Prim", nb, domain, coarse,
+        "OutflowInnerX1Prim", nb, domain, CC, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
         });
@@ -163,7 +166,7 @@ void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield, false);
 
   pmb->par_for_bndry(
-      "PolarInnerX2Prim", nb, domain, coarse,
+      "PolarInnerX2Prim", nb, domain, CC, coarse,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         const int jref = -j + 2 * j0 - 1;
         if (l == idx_pvel(1)) {
@@ -195,8 +198,9 @@ void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity, false);
   const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield, false);
 
+  const std::string label = "PolarOuterX2Prim";
   pmb->par_for_bndry(
-      "PolarOuterX2Prim", nb, domain, coarse,
+      label, nb, domain, CC, coarse,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         const int jref = -j + 2 * (j0 + 1) - 1;
         if (l == idx_pvel(1)) {
@@ -233,7 +237,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
-        "OutflowOuterX1Cons", nb, IndexDomain::outer_x1, coarse,
+        "OutflowOuterX1Cons", nb, IndexDomain::outer_x1, CC, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
           Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -242,7 +246,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         });
   } else if (bc_vars == "primitive") {
     pmb->par_for_bndry(
-        "OutflowOuterX1Prim", nb, domain, coarse,
+        "OutflowOuterX1Prim", nb, domain, CC, coarse,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
         });
@@ -343,7 +347,7 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     const int num_species =
         pkg_rad->Param<bool>("active") ? pkg_rad->Param<int>("num_species") : 0;
     pmb->par_for_bndry(
-        "OutflowOuterX1PrimFixup", nb1, domain, coarse,
+        "OutflowOuterX1PrimFixup", nb1, domain, CC, coarse,
         KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
           // Enforce u^1 >= 0
           Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),

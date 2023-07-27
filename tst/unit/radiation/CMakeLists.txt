@@ -20,16 +20,22 @@ add_library(radiation_unit_tests OBJECT
 target_link_libraries(radiation_unit_tests
   PRIVATE
   parthenon
-  singularity-eos::singularity-eos
   Catch2::Catch2
   Kokkos::kokkos)
 
 target_include_directories(radiation_unit_tests PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/ports-of-call"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/spiner"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/variant/include"
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   )
 
+target_compile_definitions(radiation_unit_tests PRIVATE
+  PORTABILITY_STRATEGY_KOKKOS)
 
 target_link_libraries(radiation_unit_tests PRIVATE Catch2::Catch2)
 target_sources(phoebus_unit_tests PRIVATE $<TARGET_OBJECTS:radiation_unit_tests>)
