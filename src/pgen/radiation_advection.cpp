@@ -86,12 +86,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
   const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
   const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
-  const Real &x_min = pmb->coords.x1f(ib.s);
-  const Real &y_min = pmb->coords.x2f(jb.s);
-  const Real &z_min = pmb->coords.x3f(kb.s);
-  const Real &x_max = pmb->coords.x1f(ib.e + 1);
-  const Real &y_max = pmb->coords.x2f(jb.e + 1);
-  const Real &z_max = pmb->coords.x3f(kb.e + 1);
+  const Real &x_min = pmb->coords.Xf<1>(ib.s);
+  const Real &y_min = pmb->coords.Xf<2>(jb.s);
+  const Real &z_min = pmb->coords.Xf<3>(kb.s);
+  const Real &x_max = pmb->coords.Xf<1>(ib.e + 1);
+  const Real &y_max = pmb->coords.Xf<2>(jb.e + 1);
+  const Real &z_max = pmb->coords.Xf<3>(kb.e + 1);
 
   // const int n_tracers_block = (int)((num_tracers_total) / (nx_i * nx_j * nx_k));
   const int n_tracers_block = num_tracers_total;

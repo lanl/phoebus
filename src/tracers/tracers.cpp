@@ -64,7 +64,6 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   // update loop.
-  std::printf("%f\n", x(1));
   const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
       "Advect Tracers", 0, max_active_index, KOKKOS_LAMBDA(const int n) {
@@ -78,14 +77,16 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
           Real lapse = geom.Lapse(CellLocation::Cent, z(n), y(n), x(n));
           Real shift[3];
           geom.ContravariantShift(CellLocation::Cent, z(n), y(n), x(n), shift);
-          const Real vel[] = {pack(pvel_lo, k, j, i), pack(pvel_lo + 1, k, j, i),
-                              pack(pvel_hi, k, j, i)};
-          const Real W = phoebus::GetLorentzFactor(vel, gcov4); // Q: Interp this?
 
           // Get shift, W, lapse
-          Real vel_X1 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo) / W;
-          Real vel_X2 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo + 1) / W;
-          Real vel_X3 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_hi) / W;
+          const Real Wvel_X1 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo);
+          const Real Wvel_X2 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo + 1);
+          const Real Wvel_X3 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_hi);
+          const Real vel[] = {Wvel_X1, Wvel_X2, Wvel_X3};
+          const Real W = phoebus::GetLorentzFactor(vel, gcov4); // Q: Interp this?
+          const Real vel_X1 = Wvel_X1 / W;
+          const Real vel_X2 = Wvel_X2 / W;
+          const Real vel_X3 = Wvel_X3 / W;
 
           x(n) += (lapse * vel_X1 - shift[0]) * dt;
           y(n) += (lapse * vel_X2 - shift[1]) * dt;
