@@ -55,7 +55,7 @@ namespace phoebus {
 PhoebusDriver::PhoebusDriver(ParameterInput *pin, ApplicationInput *app_in, Mesh *pm,
                              const bool is_restart)
     : EvolutionDriver(pin, app_in, pm),
-      integrator(std::make_unique<StagedIntegrator>(pin)), is_restart_(is_restart) {
+      integrator(std::make_unique<LowStorageIntegrator>(pin)), is_restart_(is_restart) {
 
   // fail if these are not specified in the input file
   pin->CheckRequired("parthenon/mesh", "ix1_bc");
@@ -439,6 +439,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &mbase = pmesh->mesh_data.GetOrAdd("base", i);
     auto &mc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], i);
     auto &mc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
+    auto &sd0 = pmesh->swarm_data.GetorAdd(stage_name[stage-1], i);
     auto &mdudt = pmesh->mesh_data.GetOrAdd("dUdt", i);
     auto &mgsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", i);
 
