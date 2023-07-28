@@ -18,12 +18,14 @@
 #include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
 
+#include "analysis/history.hpp"
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/fluid.hpp"
 #include "fluid/prim2con.hpp"
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/programming_utils.hpp"
+#include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -71,6 +73,30 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool enable_mhd_floors = pin->GetOrAddBoolean("fixup", "enable_mhd_floors", false);
   bool enable_rad_floors = pin->GetOrAddBoolean("fixup", "enable_rad_floors", false);
   bool enable_rad_ceilings = pin->GetOrAddBoolean("fixup", "enable_rad_ceilings", false);
+  bool enable_phi_enforcement =
+      pin->GetOrAddBoolean("fixup", "enable_phi_enforcement", false);
+  params.Add("enable_phi_enforcement", enable_phi_enforcement);
+  if (enable_phi_enforcement) {
+    PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
+                      "Phi enforcement only supported for BH geometry!");
+    Real enforced_phi = pin->GetReal("fixup", "enforced_phi");
+    params.Add("enforced_phi", enforced_phi);
+    Real enforced_phi_timescale =
+        pin->GetOrAddReal("fixup", "enforced_phi_timescale", 1.e3);
+    params.Add("enforced_phi_timescale", enforced_phi_timescale);
+    Real enforced_phi_cadence = pin->GetOrAddReal("fixup", "enforced_phi_cadence", 10.);
+    params.Add("enforced_phi_cadence", enforced_phi_cadence);
+    Real enforced_phi_start_time =
+        pin->GetOrAddReal("fixup", "enforced_phi_start_time", 175.);
+    PARTHENON_REQUIRE(enforced_phi_start_time >= 0.,
+                      "Phi enforcement start time must be non-negative!");
+    params.Add("enforced_phi_start_time", enforced_phi_start_time);
+
+    // Mutable parameters for following sanity maintenance
+    params.Add("dphi_dt", 0., true);
+    params.Add("next_dphi_dt_update_time", enforced_phi_start_time, true);
+    params.Add("phi_factor", 0., true);
+  }
 
   if (enable_mhd_floors && !enable_mhd) {
     enable_mhd_floors = false;
@@ -695,13 +721,13 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (rad->Param<bool>("active")) {
     num_species = rad->Param<int>("num_species");
   }
+  auto moments_active = rad->Param<bool>("moments_active");
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
   const int ndim = pmb->pmy_mesh->ndim;
-
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace cr = radmoment_cons;
@@ -841,10 +867,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
             v.flux(X2DIR, idx_cmom(0), k, j, i) = 0.0;
             v.flux(X2DIR, idx_cmom(2), k, j, i) = 0.0;
 
-            for (int ispec = 0; ispec < num_species; ispec++) {
-              v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+            if (moments_active) {
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
+                v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
+                v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+              }
             }
           });
     }

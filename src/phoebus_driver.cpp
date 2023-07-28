@@ -18,7 +18,6 @@
 
 // TODO(JCD): this should be exported by parthenon
 #include <amr_criteria/refinement_package.hpp>
-#include <bvals/cc/bvals_cc_in_one.hpp>
 #include <globals.hpp>
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
@@ -131,27 +130,8 @@ void PhoebusDriver::PostInitializationCommunication() {
     const auto local = parthenon::BoundaryType::local;
     const auto nonlocal = parthenon::BoundaryType::nonlocal;
 
-    auto start_recv =
-        tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveBoundBufs<any>, md);
-
-    auto send = tl.AddTask(start_recv,
-                           parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, md);
-
-    auto send_local =
-        tl.AddTask(start_recv, parthenon::cell_centered_bvars::SendBoundBufs<local>, md);
-    auto recv_local = tl.AddTask(
-        start_recv, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, md);
-    auto set_local =
-        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, md);
-
-    auto recv = tl.AddTask(
-        start_recv, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, md);
-    auto set = tl.AddTask(recv, parthenon::cell_centered_bvars::SetBounds<nonlocal>, md);
-
-    if (pmesh->multilevel) {
-      tl.AddTask(set | set_local, parthenon::cell_centered_bvars::RestrictGhostHalos, md,
-                 false);
-    }
+    auto boundary_tasks =
+        parthenon::AddBoundaryExchangeTasks(none, tl, md, pmesh->multilevel);
   }
 
   TaskRegion &async_region_2 = tc.AddRegion(blocks.size());
@@ -160,9 +140,9 @@ void PhoebusDriver::PostInitializationCommunication() {
     auto &tl = async_region_2[i];
     auto &sc = pmb->meshblock_data.Get();
 
-    auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
-
-    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+    auto set_bc = none;
+    // called in boundary exchange tasks
+    // auto set_bc = tl.AddTask(none, parthenon::ApplyBoundaryConditions, sc);
 
     auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
 
@@ -181,6 +161,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   BlockList_t &blocks = pmesh->block_list;
 
   const Real beta = integrator->beta[stage - 1];
+  const Real t = tm.time;
   const Real dt = integrator->dt;
   const auto &stage_name = integrator->stage_name;
 
@@ -279,9 +260,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
     auto &tl = sync_region_1[ib];
 
-    tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveBoundBufs<any>, sc1);
+    tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, sc1);
     if (pmesh->multilevel) {
-      tl.AddTask(none, parthenon::cell_centered_bvars::StartReceiveFluxCorrections, sc0);
+      tl.AddTask(none, parthenon::StartReceiveFluxCorrections, sc0);
     }
   }
 
@@ -365,6 +346,87 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
   }
 
+  // Extra per-step user work
+  TaskRegion &sync_region_5 = tc.AddRegion(num_partitions);
+  int sync_region_5_dep_id;
+  net_field_totals.val.resize(2); // Mdot, Phi
+  net_field_totals_2.val.resize(2);
+  for (int i = 0; i < 2; i++) {
+    net_field_totals.val[i] = 0.;
+    net_field_totals_2.val[i] = 0.;
+  }
+  for (int i = 0; i < num_partitions; i++) {
+    sync_region_5_dep_id = 0;
+    auto &tl = sync_region_5[i];
+
+    auto &md = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
+
+    // Begin tuning region that only evaluates occasionally and on first stage
+    // TODO(BRR) Setting scale factor of B field need only be done once per simulation
+
+    // Evaluate current Mdot, Phi
+    auto sum_mdot_1 = tl.AddTask(none, fixup::SumMdotPhiForNetFieldScaling, md.get(), t,
+                                 stage, &(net_field_totals.val));
+
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, sum_mdot_1);
+    sync_region_5_dep_id++;
+
+    TaskID start_reduce_1 = (i == 0 ? tl.AddTask(sum_mdot_1, fixup::NetFieldStartReduce,
+                                                 md.get(), t, stage, &net_field_totals)
+                                    : none);
+    // Test the reduction until it completes
+    TaskID finish_reduce_1 = tl.AddTask(start_reduce_1, fixup::NetFieldCheckReduce,
+                                        md.get(), t, stage, &net_field_totals);
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, finish_reduce_1);
+    sync_region_5_dep_id++;
+
+    auto mod_net = tl.AddTask(finish_reduce_1, fixup::ModifyNetField, md.get(), t,
+                              beta * dt, stage, true, 1.);
+
+    // Evaluate Mdot, Phi (only Phi changes) after modifying B field
+    auto sum_mdot_2 = tl.AddTask(mod_net, fixup::SumMdotPhiForNetFieldScaling, md.get(),
+                                 t, stage, &(net_field_totals_2.val));
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, sum_mdot_2);
+    sync_region_5_dep_id++;
+
+    TaskID start_reduce_2 = (i == 0 ? tl.AddTask(sum_mdot_2, fixup::NetFieldStartReduce,
+                                                 md.get(), t, stage, &net_field_totals_2)
+                                    : none);
+    // Test the reduction until it completes
+    TaskID finish_reduce_2 = tl.AddTask(start_reduce_2, fixup::NetFieldCheckReduce,
+                                        md.get(), t, stage, &net_field_totals_2);
+    sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, finish_reduce_2);
+    sync_region_5_dep_id++;
+
+    // Remove artificial contribution to net field
+    auto mod_net_2 = tl.AddTask(finish_reduce_2, fixup::ModifyNetField, md.get(), t,
+                                beta * dt, stage, true, -1.);
+
+    auto set_scale =
+        tl.AddTask(mod_net_2, fixup::UpdateNetFieldScaleControls, md.get(), t, dt, stage,
+                   &(net_field_totals.val), &(net_field_totals_2.val));
+
+    // End tuning region that only evaluates occasionally and on first stage
+
+    // Update net field every stage of every timestep given current tuning parameters
+    auto update_netfield = tl.AddTask(set_scale, fixup::ModifyNetField, md.get(), t,
+                                      beta * dt, stage, false, 0.0);
+  }
+  // This is a bad pattern. Having a per-mesh data p2c would help.
+  TaskRegion &async_region_4 = tc.AddRegion(num_independent_task_lists);
+  for (int i = 0; i < blocks.size(); i++) {
+    auto &pmb = blocks[i];
+    auto &tl = async_region_4[i];
+    auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
+
+    StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+    const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
+
+    if (enable_phi_enforcement) {
+      auto p2c = tl.AddTask(none, fluid::PrimitiveToConserved, sc.get());
+    }
+  }
+
   TaskRegion &sync_region_2 = tc.AddRegion(num_partitions);
   for (int ib = 0; ib < num_partitions; ib++) {
     auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
@@ -443,12 +505,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &mdudt = pmesh->mesh_data.GetOrAdd("dUdt", i);
     auto &mgsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", i);
 
-    auto send_flux =
-        tl.AddTask(none, parthenon::cell_centered_bvars::LoadAndSendFluxCorrections, mc0);
-    auto recv_flux =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveFluxCorrections, mc0);
-    auto set_flux =
-        tl.AddTask(recv_flux, parthenon::cell_centered_bvars::SetFluxCorrections, mc0);
+    auto send_flux = tl.AddTask(none, parthenon::LoadAndSendFluxCorrections, mc0);
+    auto recv_flux = tl.AddTask(none, parthenon::ReceiveFluxCorrections, mc0);
+    auto set_flux = tl.AddTask(recv_flux, parthenon::SetFluxCorrections, mc0);
 
     auto flux_div =
         tl.AddTask(set_flux, parthenon::Update::FluxDivergence<MeshData<Real>>, mc0.get(),
@@ -524,25 +583,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &tl = sync_region_4[ip];
     auto &mc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ip);
 
-    auto send_local =
-        tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundBufs<local>, mc1);
-    auto send_nonlocal =
-        tl.AddTask(none, parthenon::cell_centered_bvars::SendBoundBufs<nonlocal>, mc1);
-
-    auto recv_local =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveBoundBufs<local>, mc1);
-    auto recv_nonlocal =
-        tl.AddTask(none, parthenon::cell_centered_bvars::ReceiveBoundBufs<nonlocal>, mc1);
-
-    auto set_local =
-        tl.AddTask(recv_local, parthenon::cell_centered_bvars::SetBounds<local>, mc1);
-    auto set_nonlocal = tl.AddTask(
-        recv_nonlocal, parthenon::cell_centered_bvars::SetBounds<nonlocal>, mc1);
-
-    if (pmesh->multilevel) {
-      tl.AddTask(set_nonlocal | set_local,
-                 parthenon::cell_centered_bvars::RestrictGhostHalos, mc1, false);
-    }
+    auto boundary_tasks =
+        parthenon::AddBoundaryExchangeTasks(none, tl, mc1, pmesh->multilevel);
   }
   // TODO(BRR) loop this in thoughtfully!
   TaskRegion &async_region_3 = tc.AddRegion(num_independent_task_lists);
@@ -551,9 +593,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &tl = async_region_3[i];
     auto &sc = pmb->meshblock_data.Get(stage_name[stage]);
 
-    auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
+    // auto prolongBound = tl.AddTask(none, parthenon::ProlongateBoundaries, sc);
 
-    auto set_bc = tl.AddTask(prolongBound, parthenon::ApplyBoundaryConditions, sc);
+    auto set_bc = tl.AddTask(none, parthenon::ApplyBoundaryConditions, sc);
 
     auto convert_bc = tl.AddTask(set_bc, Boundaries::ConvertBoundaryConditions, sc);
 
@@ -655,13 +697,36 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
 
   const auto rad_method = rad->Param<std::string>("method");
   if (rad_method == "cooling_function") {
+    parthenon::AllReduce<bool> *pdo_gain_reducer;
+    bool do_lightbulb = rad->Param<bool>("do_lightbulb");
+    if (do_lightbulb) {
+      pdo_gain_reducer = rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
+    }
     TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
     for (int ib = 0; ib < num_independent_task_lists; ib++) {
       auto pmb = blocks[ib].get();
       auto &tl = async_region[ib];
       auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+      auto finish_gain_reducer = none;
+      if (do_lightbulb) {
+        auto calc_tau = tl.AddTask(none, radiation::LightBulbCalcTau, sc0.get());
+        auto check_do_gain_local = tl.AddTask(calc_tau, radiation::CheckDoGain, sc0.get(),
+                                              &(pdo_gain_reducer->val));
+        auto start_gain_reducer =
+            (ib == 0 ? tl.AddTask(check_do_gain_local,
+                                  &parthenon::AllReduce<bool>::StartReduce,
+                                  pdo_gain_reducer, MPI_LOR)
+                     : none);
+        finish_gain_reducer =
+            tl.AddTask(start_gain_reducer, &parthenon::AllReduce<bool>::CheckReduce,
+                       pdo_gain_reducer);
+        int reg_dep_id = 0;
+        async_region.AddRegionalDependencies(reg_dep_id++, ib, finish_gain_reducer);
+      }
+
       auto calculate_four_force =
-          tl.AddTask(none, radiation::CoolingFunctionCalculateFourForce, sc0.get(), dt);
+          tl.AddTask(finish_gain_reducer, radiation::CoolingFunctionCalculateFourForce,
+                     sc0.get(), dt);
       auto apply_four_force = tl.AddTask(
           calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
     }
@@ -856,7 +921,14 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
           tl.AddTask(send, &SwarmContainer::Receive, sc0.get(), BoundaryCommSubset::all);
     }
 
-    TaskRegion &tuning_region = tc.AddRegion(num_task_lists_executed_independently);
+    /**
+     * NOTE: this task region is size 1
+     * In the resolution controls we loop over meshblocks
+     * and call MPI reduce.
+     * Probably more performant to change this, but will
+     * require restructuring some resolution controls.
+     **/
+    TaskRegion &tuning_region = tc.AddRegion(1);
     {
       particle_resolution.val.resize(4); // made, absorbed, scattered, total
       for (int i = 0; i < 4; i++) {

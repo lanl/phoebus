@@ -34,6 +34,8 @@
 // Relativity utils
 #include "phoebus_utils/adiabats.hpp"
 
+#ifdef SINGULARITY_USE_HDF
+
 using namespace Adiabats;
 using singularity::StellarCollapse;
 
@@ -87,3 +89,4 @@ TEST_CASE("ADIABATS", "[compute_adiabats]") {
     }
   }
 }
+#endif
