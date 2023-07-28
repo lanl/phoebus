@@ -200,9 +200,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
   const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
   const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
-  const Real &minx_i = pmb->coords.x1f(ib.s);
-  const Real &minx_j = pmb->coords.x2f(jb.s);
-  const Real &minx_k = pmb->coords.x3f(kb.s);
+  const Real &minx_i = pmb->coords.Xf<1>(ib.s);
+  const Real &minx_j = pmb->coords.Xf<2>(jb.s);
+  const Real &minx_k = pmb->coords.Xf<3>(kb.s);
 
   const int n_tracers_block = (int)((num_tracers_total) / (nx_i + nx_j + nx_k));
 
@@ -446,12 +446,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
 
           if (lnh > 0.0) {
-            const Real &x_min = pmb->coords.x1f(i);
-            const Real &y_min = pmb->coords.x2f(j);
-            const Real &z_min = pmb->coords.x3f(k);
-            const Real &x_max = pmb->coords.x1f(i + 1);
-            const Real &y_max = pmb->coords.x2f(j + 1);
-            const Real &z_max = pmb->coords.x3f(k + 1);
+            const Real &x_min = pmb->coords.Xf<1>(i);
+            const Real &y_min = pmb->coords.Xf<2>(j);
+            const Real &z_min = pmb->coords.Xf<3>(k);
+            const Real &x_max = pmb->coords.Xf<1>(i + 1);
+            const Real &y_max = pmb->coords.Xf<2>(j + 1);
+            const Real &z_max = pmb->coords.Xf<3>(k + 1);
             pmb->par_for(
                 "CreateTracers", 0, n_tracers_block - 1, KOKKOS_LAMBDA(const int n) {
                   auto rng_gen = rng_pool_tr.get_state();
