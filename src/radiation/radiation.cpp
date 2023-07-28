@@ -14,6 +14,7 @@
 #include "radiation.hpp"
 #include "fixup/fixup.hpp"
 #include "geometry/geometry.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/programming_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "radiation/local_three_geometry.hpp"
@@ -112,14 +113,34 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool absorption = pin->GetOrAddBoolean("radiation", "absorption", true);
   params.Add("absorption", absorption);
 
+  bool do_lightbulb = false;
   if (method == "cooling_function") {
     const bool do_liebendorfer =
         pin->GetOrAddBoolean("radiation", "do_liebendorfer", false);
-    const bool do_lightbulb = pin->GetOrAddBoolean("radiation", "do_lightbulb", false);
-    const Real lum = pin->GetOrAddReal("radiation", "lum", 4.0e52);
+    bool do_lightbulb = pin->GetOrAddBoolean("radiation", "do_lightbulb", false);
+    const Real lum = pin->GetOrAddReal("radiation", "lum", 4.0);
     params.Add("do_liebendorfer", do_liebendorfer);
     params.Add("do_lightbulb", do_lightbulb);
     params.Add("lum", lum);
+    if (do_lightbulb) {
+      physics->AddField(iv::GcovHeat, mscalar);
+      physics->AddField(iv::GcovCool, mscalar);
+      std::string eos_type = pin->GetString("eos", "type");
+#ifdef SPINER_USE_HDF
+      if (eos_type != singularity::StellarCollapse::EosType()) {
+        PARTHENON_THROW("Lightbulb only supported with stellar collapse EOS");
+      }
+#else
+      PARTHENON_THROW("Lightbulb only supported with HDF5 support");
+#endif // SPINER_USE_HDF
+      Metadata m({Metadata::Cell, Metadata::OneCopy});
+      physics->AddField(iv::tau, m);
+      parthenon::AllReduce<bool> do_gain_reducer;
+      bool always_gain = pin->GetOrAddBoolean("radiation", "always_gain", false);
+      do_gain_reducer.val = always_gain;
+      params.Add("do_gain_reducer", do_gain_reducer, true);
+      params.Add("always_gain", always_gain);
+    }
   }
 
   if (method == "mocmc") {
@@ -230,6 +251,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // This system targets 1 scattering per light crossing time.
     // This explicit Monte Carlo method is not accurate once optical depths per
     // zone become >~ 1.
+    const Real wgtC = pin->GetOrAddReal("radiation", "wgtC", 1.e40);
+    params.Add("wgtC", wgtC, true);
+    params.Add("Jtot", 0.0, true); // for updating wgtC
     int num_particles = pin->GetOrAddInteger("radiation", "num_particles", 100);
     params.Add("num_particles", num_particles);
 
@@ -499,8 +523,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("moments_active", moments_active);
 
-  physics->EstimateTimestepBlock = EstimateTimestepBlock;
-
+  // TODO(JMM): Maybe need to re-enable this timestep check
+  if (!do_lightbulb) {
+    physics->EstimateTimestepBlock = EstimateTimestepBlock;
+  }
   return physics;
 }
 
@@ -511,9 +537,11 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace iv = internal_variables;
   auto *pmb = rc->GetParentPointer().get();
 
-  std::vector<std::string> vars({c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
+  std::vector<std::string> vars(
+      {c::density, c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
+  const int crho = imap[c::density].first;
   const int ceng = imap[c::energy].first;
   const int cmom_lo = imap[c::momentum].first;
   const int cmom_hi = imap[c::momentum].second;
@@ -521,7 +549,6 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   const int Gcov_lo = imap[iv::Gcov].first;
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
-
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
@@ -535,7 +562,6 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
         v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
         v(cye, k, j, i) += v(Gye, k, j, i) * dt;
       });
-
   return TaskStatus::complete;
 }
 
