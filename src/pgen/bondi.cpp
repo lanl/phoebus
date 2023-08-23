@@ -113,6 +113,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                            "Bondi setup only works with ideal gas");
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real Cv = pin->GetReal("eos", "Cv");
+  //const Real vx = pin->GetReal("fluid", "vx");
   const Real n = 1.0 / (gam - 1.0);
   PARTHENON_REQUIRE_THROWS(std::fabs(n - Cv) < 1.e-12, "Bondi requires Cv = 1/(Gamma-1)");
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
@@ -159,6 +160,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real x3 = coords.Xc<3>(k, j, i);
 
         Real r = tr.bl_radius(x1);
+
+
         while (r < Rhor) {
           x1 += coords.Dxc<1>(i);
           r = tr.bl_radius(x1);
@@ -170,6 +173,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           eos_lambda[0] = v(iye, k, j, i);
         }
 
+	const Real th = tr.bl_theta(x1, x2);
+        const Real sth = std::sin(th);
+        const Real cth = std::cos(th);
+        const Real sph = std::sin(x3);
+        const Real cph = std::cos(x3);
+	
         v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
         v(irho, k, j, i) = std::pow(v(itmp, k, j, i), n);
         v(ieng, k, j, i) = v(irho, k, j, i) * v(itmp, k, j, i) / (gam - 1.0);
@@ -179,11 +188,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                            v(iprs, k, j, i);
         Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
-        ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
+        ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));// + vx*cph*sth)/(1-C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2))* vx*cph*sth);
+        //ucon_bl[2] = vx / r * cth * sph;
+        //ucon_bl[3] = -vx / r * robust::ratio(sth,sph);
           // modification of uconbl 1 and new ucon bl 2,3.. will be added here
 
         Real gcov[4][4];
-        const Real th = tr.bl_theta(x1, x2);
+        //const Real th = tr.bl_theta(x1, x2);
         bl.SpacetimeMetric(0.0, r, th, x3, gcov);
         Real AA = gcov[0][0];
         Real BB = 2. * (gcov[0][1] * ucon_bl[1] + gcov[0][2] * ucon_bl[2] +

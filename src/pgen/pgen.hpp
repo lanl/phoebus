@@ -40,7 +40,6 @@ using namespace parthenon::package::prelude;
   PROBLEM(sedov)                                                                         \
   PROBLEM(blandford_mckee)                                                               \
   PROBLEM(bondi)                                                                         \
-  PROBLEM(boosted_bondi)                                                                 \
   PROBLEM(radiation_advection)                                                           \
   PROBLEM(radiation_equilibration)                                                       \
   PROBLEM(rotor)                                                                         \
@@ -48,7 +47,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(torus)                                                                         \
   PROBLEM(p2c2p)                                                                         \
   PROBLEM(tov)                                                                           \
-  PROBLEM(homologous)
+  PROBLEM(homologous)                                                                    
 
 // if you need problem-specific modifications to inputs, add the name here
 #define FOREACH_MODIFIER                                                                 \
