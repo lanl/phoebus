@@ -36,6 +36,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata real_swarmvalue_metadata({Metadata::Real});
   physics->AddSwarmValue("id", swarm_name, Metadata({Metadata::Integer}));
 
+  // thermo variables
+  physics->AddSwarmValue("rho", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("temp", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("ye", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("entropy", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("vel_x", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("vel_y", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("vel_z", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("lorentz", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("lapse", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("shift_x", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("shift_y", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("shift_x", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("mass", swarm_name, real_swarmvalue_metadata);
+  
   return physics;
 } // Initialize
 
