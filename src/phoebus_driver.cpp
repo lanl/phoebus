@@ -501,7 +501,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &mbase = pmesh->mesh_data.GetOrAdd("base", i);
     auto &mc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], i);
     auto &mc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], i);
-    auto &sd0 = pmesh->swarm_data.GetorAdd(stage_name[stage-1], i);
     auto &mdudt = pmesh->mesh_data.GetOrAdd("dUdt", i);
     auto &mgsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", i);
 

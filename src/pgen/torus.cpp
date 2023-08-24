@@ -298,6 +298,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto rho_d = rho_h.getOnDevice();
   auto temp_d = temp_h.getOnDevice();
+  int ind_tracer = 0;
   pmb->par_for(
       "Phoebus::ProblemGenerator::Torus", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -438,39 +439,43 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           }
         } // do_rad
 
-        if (do_tracers) {
-          Real r = tr.bl_radius(x1v);
-          Real th = tr.bl_theta(x1v, x2v);
-          Real lnh = -1.0;
-          Real uphi;
-          if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
-
-          if (lnh > 0.0) {
-            const Real &x_min = pmb->coords.Xf<1>(i);
-            const Real &y_min = pmb->coords.Xf<2>(j);
-            const Real &z_min = pmb->coords.Xf<3>(k);
-            const Real &x_max = pmb->coords.Xf<1>(i + 1);
-            const Real &y_max = pmb->coords.Xf<2>(j + 1);
-            const Real &z_max = pmb->coords.Xf<3>(k + 1);
-            pmb->par_for(
-                "CreateTracers", 0, n_tracers_block - 1, KOKKOS_LAMBDA(const int n) {
-                  auto rng_gen = rng_pool_tr.get_state();
-
-                  // No rejection sampling at the moment.
-                  // Perhaps this can be improved in the future.
-
-                  x(n) = x_min + rng_gen.drand() * (x_max - x_min);
-                  y(n) = y_min + rng_gen.drand() * (y_max - y_min);
-                  z(n) = z_min + rng_gen.drand() * (z_max - z_min);
-
-                  rng_pool_tr.free_state(rng_gen);
-                }); // Create Tracers
-          }
-
-        } // do_tracers
+//        if (do_tracers) {
+//          Real r = tr.bl_radius(x1v);
+//          Real th = tr.bl_theta(x1v, x2v);
+//          Real lnh = -1.0;
+//          Real uphi;
+//          if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
+//
+//          if (lnh > 0.0) {
+//            const Real &x_min = pmb->coords.Xf<1>(i);
+//            const Real &y_min = pmb->coords.Xf<2>(j);
+//            const Real &z_min = pmb->coords.Xf<3>(k);
+//            const Real &x_max = pmb->coords.Xf<1>(i + 1);
+//            const Real &y_max = pmb->coords.Xf<2>(j + 1);
+//            const Real &z_max = pmb->coords.Xf<3>(k + 1);
+//            // HERE: need to do index gymnastics...
+//            pmb->par_for(
+//                "CreateTracers", ind_tracer, n_tracers_cell - 1, KOKKOS_LAMBDA(const int n) {
+//                  auto rng_gen = rng_pool_tr.get_state();
+//
+//                  // No rejection sampling at the moment.
+//                  // Perhaps this can be improved in the future.
+//
+//                  x(n) = x_min + rng_gen.drand() * (x_max - x_min);
+//                  y(n) = y_min + rng_gen.drand() * (y_max - y_min);
+//                  z(n) = z_min + rng_gen.drand() * (z_max - z_min);
+//                  //mass(n) = 0.0; // TODO ...
+//                  // call func to set tracer properties
+//
+//                  rng_pool_tr.free_state(rng_gen);
+//                }); // Create Tracers
+//          }
+//
+//        } // do_tracers
 
         rng_pool.free_state(rng_gen);
       });
+
   free(rho_h);
   free(rho_d);
   free(temp_h);
@@ -575,6 +580,11 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
   const bool harm_style_beta =
       pin->GetOrAddBoolean("torus", "harm_beta_normalization", true);
   const Real rho_min_bnorm = pin->GetOrAddReal("torus", "rho_min_bnorm", 1.e-4);
+  const Real rin = pin->GetOrAddReal("torus", "rin", 6.0);
+  const Real rmax = pin->GetOrAddReal("torus", "rmax", 12.0);
+  const Real a = pin->GetReal("geometry", "a");
+  const Real angular_mom = lfish_calc(rmax, a);
+
 
   Real beta_min, beta_pmax;
   ComputeBetas(pmesh, rho_min_bnorm, beta_min, beta_pmax);
@@ -591,6 +601,24 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
   for (auto &pmb : pmesh->block_list) {
     auto &rc = pmb->meshblock_data.Get();
     auto geom = Geometry::GetCoordinateSystem(rc.get());
+    auto coords = pmb->coords;
+    auto tracer_pkg = pmb->packages.Get("tracers");
+    bool do_tracers = tracer_pkg->Param<bool>("active");
+    auto &sc = pmb->swarm_data.Get();
+    auto &swarm = pmb->swarm_data.Get()->Get("tracers");
+    auto rng_pool_tr =
+      tracer_pkg->Param<RNGPool>("rng_pool"); // Q: Have 2 pools. combine/share?
+    const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
+
+    // set up transformation stuff
+    auto gpkg = pmb->packages.Get("geometry");
+    bool derefine_poles = gpkg->Param<bool>("derefine_poles");
+    Real h = gpkg->Param<Real>("h");
+    Real xt = gpkg->Param<Real>("xt");
+    Real alpha = gpkg->Param<Real>("alpha");
+    Real x0 = gpkg->Param<Real>("x0");
+    Real smooth = gpkg->Param<Real>("smooth");
+    auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
     auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
     auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
@@ -601,6 +629,33 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     const int iblo = imap[fluid_prim::bfield].first;
     const int ibhi = imap[fluid_prim::bfield].second;
 
+    int num_cells_disk;
+    pmb->par_reduce(
+        "Phoebus::ProblemGenerator::Torus::PostInitModifier::NumCellsTorus", kb.s, kb.e, jb.s, jb.e,
+        ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i, int &n_cells) {
+          n_cells = 0;
+          const Real x1 = coords.Xc<1>(k, j, i);
+          const Real x2 = coords.Xc<2>(k, j, i);
+          Real r = tr.bl_radius(x1);
+          Real th = tr.bl_theta(x1, x2);
+
+          Real lnh = -1.0;
+          Real hm1;
+          Real uphi;
+          if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
+          if (lnh > 0.0) n_cells++;
+        },
+        Kokkos::Sum<int>(num_cells_disk));
+
+    const int num_tracers_cell = (int) num_tracers_total / num_cells_disk;
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::Torus::DistributeTracers", kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          for (int ib = iblo; ib <= ibhi; ib++) {
+            v(ib, k, j, i) *= B_field_fac;
+          }
+        });
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
