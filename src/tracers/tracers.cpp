@@ -48,7 +48,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddSwarmValue("lapse", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("shift_x", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("shift_y", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("shift_x", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("shift_z", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("mass", swarm_name, real_swarmvalue_metadata);
   
   return physics;
