@@ -20,11 +20,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   Params &params = physics->AllParams();
 
-  int num_tracers = pin->GetOrAddInteger("Tracers", "num_tracers", 0);
+  int num_tracers = pin->GetOrAddInteger("tracers", "num_tracers", 0);
   params.Add("num_tracers", num_tracers);
 
   // Initialize random number generator pool
-  int rng_seed = pin->GetOrAddInteger("Tracers", "rng_seed", 1273);
+  int rng_seed = pin->GetOrAddInteger("tracers", "rng_seed", time(NULL));
   physics->AddParam<>("rng_seed", rng_seed);
   RNGPool rng_pool(rng_seed);
   physics->AddParam<>("rng_pool", rng_pool);
