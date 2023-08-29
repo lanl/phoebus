@@ -606,9 +606,14 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     bool do_tracers = tracer_pkg->Param<bool>("active");
     auto &sc = pmb->swarm_data.Get();
     auto &swarm = pmb->swarm_data.Get()->Get("tracers");
-    auto rng_pool_tr =
-      tracer_pkg->Param<RNGPool>("rng_pool"); // Q: Have 2 pools. combine/share?
+    auto rng_pool =
+      tracer_pkg->Param<RNGPool>("rng_pool");
     const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
+    auto &x = swarm->Get<Real>("x").Get();
+    auto &y = swarm->Get<Real>("y").Get();
+    auto &z = swarm->Get<Real>("z").Get();
+    auto &mass = swarm->Get<Real>("mass").Get();
+    auto &id = swarm->Get<int>("id").Get();
 
     // set up transformation stuff
     auto gpkg = pmb->packages.Get("geometry");
@@ -625,16 +630,24 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    auto v = rc->PackVariables({fluid_prim::bfield}, imap);
+    std::vector<std::string> vars = {fluid_prim::bfield, fluid_prim::density};
+    auto v = rc->PackVariables(vars, imap);
     const int iblo = imap[fluid_prim::bfield].first;
     const int ibhi = imap[fluid_prim::bfield].second;
+    const int irho = imap[fluid_prim::density].first;
 
-    int num_cells_disk;
+    /* lambda to flatten (k, j, i) -> n */
+    auto flatten = KOKKOS_LAMBDA(const int k, const int j, const int i){ 
+      return (i + (ib.e - ib.s + 1) * (j + (jb.s - jb.e + 1) * k));
+    };
+
+    
+    ParArray1D<int> indices("map from k,j,i to 1D particle array", (kb.e - kb.s + 1) * (jb.e - jb.s + 1) * (ib.e - ib.s + 1));
+    int num_cells_disk = 0;
+    /* sum cells on disk and create dincides array for mapping (k, j, i) -> n */
     pmb->par_reduce(
-        "Phoebus::ProblemGenerator::Torus::PostInitModifier::NumCellsTorus", kb.s, kb.e, jb.s, jb.e,
-        ib.s, ib.e,
-        KOKKOS_LAMBDA(const int k, const int j, const int i, int &n_cells) {
-          n_cells = 0;
+        "Phoebus::ProblemGenerator::Torus::SumDiskCells", kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i, int &n_cells_disk) {
           const Real x1 = coords.Xc<1>(k, j, i);
           const Real x2 = coords.Xc<2>(k, j, i);
           Real r = tr.bl_radius(x1);
@@ -644,18 +657,49 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           Real hm1;
           Real uphi;
           if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
-          if (lnh > 0.0) n_cells++;
-        },
-        Kokkos::Sum<int>(num_cells_disk));
+          if (lnh > 0.0) {
+            indices(flatten(k, j, i)) = n_cells_disk;
+            n_cells_disk++;
+          }   
+        }, Kokkos::Sum<int>(num_cells_disk));
 
-    const int num_tracers_cell = (int) num_tracers_total / num_cells_disk;
+    const int num_tracers_cell = std::round(num_tracers_total / num_cells_disk);
+    ParArrayND<int> new_indices;
+    swarm->AddEmptyParticles(num_tracers_cell * num_cells_disk, new_indices);
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus::DistributeTracers", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          for (int ib = iblo; ib <= ibhi; ib++) {
-            v(ib, k, j, i) *= B_field_fac;
+          auto rng_gen = rng_pool.get_state();
+          const Real x1 = coords.Xc<1>(k, j, i);
+          const Real x2 = coords.Xc<2>(k, j, i);
+          Real r = tr.bl_radius(x1);
+          Real th = tr.bl_theta(x1, x2);
+
+          Real lnh = -1.0;
+          Real hm1;
+          Real uphi;
+          if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
+          if (lnh > 0.0) {
+            int start_ind = indices(flatten(k, j, i)) * num_tracers_cell;
+            const Real &x_min = coords.Xf<1>(i);
+            const Real &y_min = coords.Xf<2>(j);
+            const Real &z_min = coords.Xf<3>(k);
+            const Real &x_max = coords.Xf<1>(i + 1);
+            const Real &y_max = coords.Xf<2>(j + 1);
+            const Real &z_max = coords.Xf<3>(k + 1);
+            const Real vol = coords.CellVolume(k, j, i);
+
+            /* loop over tracers on cell */
+            for ( int n = start_ind; n < start_ind + num_tracers_cell; ++n ) {
+              x(n) = x_min + rng_gen.drand() * (x_max - x_min);
+              y(n) = y_min + rng_gen.drand() * (y_max - y_min);
+              z(n) = z_min + rng_gen.drand() * (z_max - z_min);
+              mass(n) = v(irho, k, j, i) * vol / num_tracers_cell;
+              id(n) = num_tracers_cell * num_cells_disk * pmb->gid + n; // n_tracer * gid + n
+            }
           }
         });
+
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
