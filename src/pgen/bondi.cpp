@@ -113,7 +113,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                            "Bondi setup only works with ideal gas");
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real Cv = pin->GetReal("eos", "Cv");
-  //const Real vx = pin->GetReal("fluid", "vx");
+  const Real vx = pin->GetReal("fluid", "vx");
   const Real n = 1.0 / (gam - 1.0);
   PARTHENON_REQUIRE_THROWS(std::fabs(n - Cv) < 1.e-12, "Bondi requires Cv = 1/(Gamma-1)");
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
@@ -162,7 +162,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real r = tr.bl_radius(x1);
 
 
-        while (r < Rhor) {
+        while (r <= Rhor) {
           x1 += coords.Dxc<1>(i);
           r = tr.bl_radius(x1);
         }
@@ -188,14 +188,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                            v(iprs, k, j, i);
         Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
-        ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));// + vx*cph*sth)/(1-C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2))* vx*cph*sth);
-        //ucon_bl[2] = vx / r * cth * sph;
-        //ucon_bl[3] = -vx / r * robust::ratio(sth,sph);
+	Real gcov[4][4];
+	bl.SpacetimeMetric(0.0, r, th, x3, gcov);
+	     //ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
+        ucon_bl[1] = 1/(std::sqrt(gcov[1][1])) * vx * sth * cph;
+	//ucon_bl[2] = 1/(std::sqrt(gcov[2][2])) * vx * cth * cph;
+	//ucon_bl[3] = -1/(std::sqrt(gcov[3][3])) * vx * sph;
+        
+        
           // modification of uconbl 1 and new ucon bl 2,3.. will be added here
 
-        Real gcov[4][4];
+        //Real gcov[4][4];
         //const Real th = tr.bl_theta(x1, x2);
-        bl.SpacetimeMetric(0.0, r, th, x3, gcov);
+	//bl.SpacetimeMetric(0.0, r, th, x3, gcov);
         Real AA = gcov[0][0];
         Real BB = 2. * (gcov[0][1] * ucon_bl[1] + gcov[0][2] * ucon_bl[2] +
                         gcov[0][3] * ucon_bl[3]);
@@ -206,6 +211,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                         gcov[1][3] * ucon_bl[1] * ucon_bl[3] +
                         gcov[2][3] * ucon_bl[2] * ucon_bl[3]);
         Real discr = BB * BB - 4. * AA * CC;
+	//PARTHENON_REQUIRE(discr > 0, "discr_bl < 0");
+	if(discr<0){
+	  printf("discr_BL = %.3e\n", discr);
+	 }
         ucon_bl[0] = (-BB - std::sqrt(discr)) / (2. * AA);
         const Real W_bl = ucon_bl[0] * bl.Lapse(0.0, r, th, x3);
 
@@ -222,6 +231,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
              2. * (gcov[1][2] * ucon[1] * ucon[2] + gcov[1][3] * ucon[1] * ucon[3] +
                    gcov[2][3] * ucon[2] * ucon[3]);
         discr = BB * BB - 4. * AA * CC;
+	if(discr<0){
+	  printf("discr = %.3e\n", discr);}
         PARTHENON_REQUIRE(discr > 0, "discr < 0");
         ucon[0] = (-BB - std::sqrt(discr)) / (2. * AA);
 
