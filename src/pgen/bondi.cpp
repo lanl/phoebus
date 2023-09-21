@@ -190,10 +190,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
 	Real gcov[4][4];
 	bl.SpacetimeMetric(0.0, r, th, x3, gcov);
-	     //ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
-        ucon_bl[1] = 1/(std::sqrt(gcov[1][1])) * vx * sth * cph;
-	//ucon_bl[2] = 1/(std::sqrt(gcov[2][2])) * vx * cth * cph;
-	//ucon_bl[3] = -1/(std::sqrt(gcov[3][3])) * vx * sph;
+	if (r<=5){
+	ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));}
+	else {
+	  ucon_bl[1] = 1/(std::sqrt(gcov[1][1])) * vx * sth * cph -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
+	  ucon_bl[2] = 1/(std::sqrt(gcov[2][2])) * vx * cth * cph;
+	  ucon_bl[3] = -1/(std::sqrt(gcov[3][3])) * vx * sph;
+	}
         
         
           // modification of uconbl 1 and new ucon bl 2,3.. will be added here

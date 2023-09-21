@@ -38,11 +38,11 @@ variables = p.density,  &
             p.bfield
 
 file_type   = hdf5      # Tabular data dump
-dt          = 50.0      # time increment between outputs
+dt          = 10.0      # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 5000.0     # time limit
+tlim        = 10000.0     # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -107,13 +107,13 @@ vx = 0.01
 
 <geometry>
 a = 0
-r_outer = 100
+r_outer = 1000
 
 <coordinates>
 derefine_poles = false
 
 <bondi>
 mdot = 1
-rs = 5.0
+rs = 8.0
 Rhor = 2.0
 

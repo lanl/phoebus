@@ -13,7 +13,7 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
-PHDF_PATH = '/users/adithan/phoebus/bin/parthenon_tools/parthenon_tools/'
+PHDF_PATH = '/users/adithan/phoebus/external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/'
 
 import argparse
 import numpy as np
@@ -36,10 +36,10 @@ import phoebus_utils
 from phoedf import phoedf
 
 
-def plot_frame(ifname, fname, savefig, geomfile=None, rlim=2000, coords="cartesian"):
+def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian"):
     print(fname)
 
-    xlim = 0
+    xlim = 0 #plot xlim ranges from xlim->rlim
 
     cmap_uniform = "viridis"
     cmap_diverging = "RdYlBu"
@@ -105,7 +105,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=2000, coords="cartesi
     ax.set_title(r"$\log_{10}~\rho$")
 
     ax = axes[0, 1]
-    Gamma = dfile.GetGamma()
+    
+    '''Gamma = dfile.GetGamma()
     for b in range(nblocks):
         im = ax.pcolormesh(
             xplot[b, :, :],
@@ -119,7 +120,22 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=2000, coords="cartesi
     cax = div.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(im, cax=cax, orientation="vertical")
     ax.set_title(r"$\Gamma$")
-
+'''
+    vsq = np.log10(dfile.Getvsq())
+    for b in range(nblocks):
+        im = ax.pcolormesh(
+            xplot[b, :, :],
+            yplot[b, :, :],
+            vsq[b, 0, :, :].transpose(),
+            vmin=-6,
+            vmax=1,
+            cmap=cmap_uniform,
+        )
+    div = make_axes_locatable(ax)
+    cax = div.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(im, cax=cax, orientation="vertical")
+    ax.set_title(r"v$^{2}$")
+    
     if rad_active:
         ax = axes[0, 2]
         Pg = dfile.GetPg()
@@ -293,7 +309,7 @@ if __name__ == "__main__":
         "--numax", type=float, default=1.0e2, help="Maximum frequency (Hz)"
     )
     parser.add_argument(
-        "--rlim", type=float, default=50.0, help="Maximum radius to plot"
+        "--rlim", type=float, default=150.0, help="Maximum radius to plot"
     )
     parser.add_argument(
         "--nnu", type=int, default=100, help="Number of frequency support points"

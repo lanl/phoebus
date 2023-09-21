@@ -34,6 +34,7 @@ class phoedf(phdf.phdf):
 
         try:
             self.eos_type = self.Params["eos/type"].decode()
+            #print(self.Params["eos/type"])
         except (UnicodeDecodeError, AttributeError):
             self.eos_type = self.Params["eos/type"]
 
@@ -166,6 +167,7 @@ class phoedf(phdf.phdf):
         self.E = None
         self.F = None
         self.P = None
+        self.vsq = None
 
     def GetRho(self):
         if self.rho is None:
@@ -241,8 +243,10 @@ class phoedf(phdf.phdf):
         return self.bcon
 
     def GetEOS(self):
-        return eos_type_dict[self.eos_type](self.Params)
-
+        #print(bytearray(filter(None, self.eos_type)).decode())
+        #print(self.eos_type.decode())
+        return eos_type_dict[bytearray(filter(None, self.eos_type)).decode()](self.Params)
+         
     def GetOpacity(self, constants="cgs"):
         return opacity_type_dict[self.opacity_model](self.Params, constants)
 
@@ -371,6 +375,8 @@ class phoedf(phdf.phdf):
 
         return self.Gamma
 
+    
+
     def GetVpCon(self):
         if self.vpcon is None:
             self.vpcon = np.clip(
@@ -379,6 +385,24 @@ class phoedf(phdf.phdf):
             assert self.vpcon is not None
 
         return self.vpcon
+
+    def Getvsq(self):
+        if self.vsq is None:
+            self.vsq = np.zeros(self.ScalarField)
+            
+
+            vpcon = self.GetVpCon()
+            for ii in range(3):
+                for jj in range(3):
+                    self.vsq[:, :, :, :] += (
+                        self.gcov[:, ii + 1, jj + 1, :, :, :]
+                        * vpcon[:, ii, :, :, :]
+                        * vpcon[:, jj, :, :, :]
+                    )
+            
+
+        return self.vsq
+
 
     def Getucon(self):
         if self.ucon is None:

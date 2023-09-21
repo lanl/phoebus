@@ -1,5 +1,5 @@
 # PHDF_PATH = '/home/brryan/rpm/phoebus/external/parthenon/scripts/python/'
-PHDF_PATH = '/users/adithan/phoebus/bin/parthenon_tools/parthenon_tools/'
+PHDF_PATH = '/users/adithan/phoebus/external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/'
 # DUMP_NAMES = '/home/brryan/builds/phoebus/torus.out1.*.phdf'
 DUMP_NAMES = "/users/adithan/phoebus/bin/bondi.out1.*.phdf"
 
@@ -23,7 +23,7 @@ plot = "fmks"
 #plot = "cartesian"
 
 # Outer radius to plot or None
-rmax = 40
+rmax = 1000
 # rmax = None
 
 parser = argparse.ArgumentParser(description="Plot torus")
