@@ -103,7 +103,7 @@ c2p_max_iter = 100
 c2p_tol = 1.e-8
 Ye = false
 mhd = false
-vx = 0.01
+vx = 0
 
 <geometry>
 a = 0
