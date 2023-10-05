@@ -149,6 +149,9 @@ add_executable(phoebus
   # HL : Turn on this later
   #Z4c/Z4c.hpp
   #Z4c/Z4c.cpp
+  #Z4c/Z4c_utils.cpp
+  #Z4c/fd_compute.hpp
+  #Z4c/fd_stencil.hpp
 )
 
 set(MAX_NUMBER_CONSERVED_VARS 9 CACHE INTEGER "Maximum number of conserved variables")
