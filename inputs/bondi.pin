@@ -21,21 +21,25 @@ ox2_bc = reflect
 problem_id  = bondi       # problem ID: basename of output filenames
 
 <parthenon/output1>
-variables = p.density,  &
-	          c.density,  &
-            p.velocity, &
-	          c.momentum, &
-            p.energy,   &
-            c.energy,   &
-            pressure,	  &
-            cs,         &
-            p.ye,       &
-            g.c.coord,  &
-            g.n.coord, &
+variables = p.density,       &
+            c.density,       &
+            p.velocity,      &
+            c.momentum,      &
+            p.energy,        &
+            c.energy,        &
+            pressure,        &
+            g.c.coord,       &
+            g.f1.coord,      &
+            g.f2.coord,      &
+            g.f3.coord,      &
+            g.n.coord,       &
+            g.c.detgam,      &
+            g.c.bcon,        &
+            g.c.alpha,       &
+            g.c.gcov,        &
+            src_terms,       &
             flux_divergence, &
             p.bfield
-
-
 
 file_type   = hdf5      # Tabular data dump
 dt          = 10.0      # time increment between outputs
@@ -118,6 +122,7 @@ derefine_poles = false
 mdot = 1
 rs = 1187.0
 Rhor = 2.0
+r_circ = 0.0
 target_beta = 100.
 b_radius = 10.
 harm_beta_normalization = true

@@ -161,6 +161,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto bl = Geometry::BoyerLindquist(a);
 
   const Real b_rad = pin->GetOrAddReal("bondi", "b_radius", 10.);
+  const Real r_circ = pin->GetOrAddReal("bondi", "r_circ", 0.0);
 
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -195,6 +196,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         if (r > 5*Rhor) {
+          const Real th = tr.bl_theta(x1, x2);
+          Real sth = std::sin(th);
           v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
           v(irho, k, j, i) = std::pow(v(itmp, k, j, i), n);
           v(ieng, k, j, i) = v(irho, k, j, i) * v(itmp, k, j, i) / (gam - 1.0);
@@ -205,9 +208,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                              v(iprs, k, j, i);
           Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
           ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
+          ucon_bl[3] = std::sqrt(r_circ)*sth*sth;
 
           Real gcov[4][4];
-          const Real th = tr.bl_theta(x1, x2);
           bl.SpacetimeMetric(0.0, r, th, x3, gcov);
           Real AA = gcov[0][0];
           Real BB = 2. * (gcov[0][1] * ucon_bl[1] + gcov[0][2] * ucon_bl[2] +
