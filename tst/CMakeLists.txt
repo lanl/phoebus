@@ -18,8 +18,12 @@ target_link_libraries(phoebus_unit_tests
     parthenon
     Catch2::Catch2
     Kokkos::kokkos
-    singularity-eos::singularity-eos
+    # singularity-eos::singularity-eos
     )
+if (PHOEBUS_ENABLE_HDF5)
+  target_link_libraries(phoebus_unit_tests PRIVATE hdf5::hdf5 hdf5::hdf5_hl)
+endif()
+
 if (PHOEBUS_ENABLE_MPI)
   target_compile_definitions(phoebus_unit_tests
     PRIVATE

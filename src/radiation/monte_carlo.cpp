@@ -12,6 +12,7 @@
 // publicly, and to permit others to do so.
 
 #include "geodesics.hpp"
+#include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "radiation.hpp"
 
@@ -24,6 +25,77 @@ using Microphysics::Opacities;
 
 KOKKOS_INLINE_FUNCTION
 Real GetWeight(const Real wgtC, const Real nu) { return wgtC / nu; }
+
+/**
+ * Integrate Jtot
+ **/
+void ComputeTotalEmissivity(Mesh *pmesh) {
+  auto rad = pmesh->packages.Get("radiation");
+  auto opac = pmesh->packages.Get("opacity");
+
+  const auto &opacities = opac->Param<Opacities>("opacities");
+  auto species = rad->Param<std::vector<RadiationType>>("species");
+  const auto num_species = rad->Param<int>("num_species");
+  RadiationType species_d[MaxNumRadiationSpecies] = {};
+  for (int s = 0; s < num_species; s++) {
+    species_d[s] = species[s];
+  }
+  // TODO (BLB): pull outer loop into kokkos loop
+  Real Jtot = 0.0;
+  for (auto &pmb : pmesh->block_list) {
+    auto &rc = pmb->meshblock_data.Get();
+    auto geom = Geometry::GetCoordinateSystem(rc.get());
+    const auto coords = pmb->coords;
+
+    auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+    auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+    auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+    namespace p = fluid_prim;
+    PackIndexMap imap;
+    auto v = rc->PackVariables({p::density, p::temperature, p::ye}, imap);
+    const int prho = imap[p::density].first;
+    const int ptemp = imap[p::temperature].first;
+    const int pye = imap[p::ye].first;
+
+    Real Jtot_b = 0.0; // per block
+    // into par_for
+    pmb->par_reduce(
+        "Radiation::MonteCarlo::Jtot", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &result) {
+          const Real gdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+          const Real dx1 = coords.CellWidthFA(X1DIR, k, j, i);
+          const Real dx2 = coords.CellWidthFA(X2DIR, k, j, i);
+          const Real dx3 = coords.CellWidthFA(X3DIR, k, j, i);
+          const Real dens = v(prho, k, j, i);
+          const Real temp = v(ptemp, k, j, i);
+          const Real ye = v(pye, k, j, i);
+          for (int sidx = 0; sidx < num_species; sidx++) {
+            auto s = species_d[sidx];
+            Real J = opacities.Emissivity(dens, temp, ye, s);
+            result += J * gdet * dx1 * dx2 * dx3;
+          } // loop species
+        },
+        Jtot_b); // par_for
+    Jtot += Jtot_b;
+  } // loop block list
+  rad->UpdateParam<Real>("Jtot", reduction::Sum(Jtot));
+}
+
+void SetWeight(Mesh *pmesh) {
+  auto &phoebus_pkg = pmesh->packages.Get("phoebus");
+  auto &unit_conv = phoebus_pkg->Param<phoebus::UnitConversions>("unit_conv");
+  auto rad = pmesh->packages.Get("radiation");
+  const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
+
+  const Real sim_vol =
+      pmesh->mesh_size.x1max * pmesh->mesh_size.x2max * pmesh->mesh_size.x3max;
+  const Real h_code = code_constants.h;
+  const Real dNtot = rad->Param<Real>("tune_emission") /
+                     (std::pow(sim_vol, 1. / 3.) * 1.0); // Note: may need a dt term here?
+  rad->UpdateParam<Real>("wgtC", rad->Param<Real>("Jtot") / (h_code * dNtot) * nusamp[0]);
+}
 
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                      SwarmContainer *sc, const Real t0, const Real dt) {
@@ -96,7 +168,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int Gye = imap[iv::Gye].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
-  Real wgtC = 1.e40; // Typical-ish value
+  Real wgtC = rad->Param<Real>("wgtC");
 
   pmb->par_for(
       "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -487,10 +559,15 @@ TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh,
   const auto num_absorbed = rad->Param<Real>("num_absorbed");
   const auto num_scattered = rad->Param<Real>("num_scattered");
   const auto num_total = rad->Param<Real>("num_total");
+
   (*resolution)[static_cast<int>(ParticleResolution::emitted)] += num_emitted;
   (*resolution)[static_cast<int>(ParticleResolution::absorbed)] += num_absorbed;
   (*resolution)[static_cast<int>(ParticleResolution::scattered)] += num_scattered;
   (*resolution)[static_cast<int>(ParticleResolution::total)] += num_total;
+
+  // compute Jtot and update param
+  ComputeTotalEmissivity(pmesh);
+
   return TaskStatus::complete;
 }
 
@@ -499,12 +576,17 @@ TaskStatus MonteCarloUpdateParticleResolution(Mesh *pmesh,
 TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
                                   const Real t0, const Real dt) {
   auto rad = pmesh->packages.Get("radiation");
+  auto &code_constants =
+      pmesh->packages.Get("phoebus")->Param<phoebus::CodeConstants>("code_constants");
+  const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const auto tuning = rad->Param<std::string>("tuning");
   const auto t_tune_emission = rad->Param<Real>("t_tune_emission");
   const auto dt_tune_emission = rad->Param<Real>("dt_tune_emission");
   const auto t_tune_scattering = rad->Param<Real>("t_tune_scattering");
   const auto dt_tune_scattering = rad->Param<Real>("dt_tune_scattering");
   const auto num_particles = rad->Param<int>("num_particles");
+  const Real sim_vol =
+      pmesh->mesh_size.x1max * pmesh->mesh_size.x2max * pmesh->mesh_size.x3max;
 
   if (tuning == "static") {
     // Do nothing
@@ -514,7 +596,9 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
 
     // TODO(BRR) This should be Rout_rad (add it) or max cartesian size, and also actually
     // used.
-    // const Real L = 1.;
+    // Q: What's the "smart" way to determine this length scale?
+    // Knowledge of geometry?
+    const Real L = 1.0; // std::exp(pmesh->mesh_size.x1max);
 
     printf("t_tune_emission: %e t0 + dt: %e\n", t_tune_emission, t0 + dt);
     const auto num_emitted = (*resolution)[static_cast<int>(ParticleResolution::emitted)];
@@ -530,8 +614,9 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
       printf("emitted: %e absorbed: %e\n", num_emitted, num_absorbed);
 
       const Real real = num_emitted - num_absorbed;
-      const Real ideal = dt_tune_emission * num_particles;
+      const Real ideal = dt_tune_emission * num_particles / L;
       Real correction = ideal / real;
+      if (real < 0.0) correction = 4. / 3.;
 
       printf("real: %e ideal: %e correction: %e\n", real, ideal, correction);
 
@@ -546,6 +631,9 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
       rad->UpdateParam<Real>("num_emitted", 0.);
       rad->UpdateParam<Real>("num_absorbed", 0.);
       rad->UpdateParam<Real>("t_tune_emission", t_tune_emission + dt_tune_emission);
+
+      // update wgtC
+      SetWeight(pmesh);
     }
 
     if (t_tune_scattering < t0 + dt) {
