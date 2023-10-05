@@ -121,8 +121,8 @@ derefine_poles = false
 <bondi>
 mdot = 1
 rs = 1187.0
-Rhor = 2.0
 r_circ = 0.0
+r_cut = 10.0
 target_beta = 100.
 b_radius = 10.
 harm_beta_normalization = true

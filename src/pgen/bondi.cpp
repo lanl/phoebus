@@ -139,7 +139,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
-  const Real Rhor = pin->GetOrAddReal("bondi", "Rhor", 2.0);
 
   // Solution constants
   const Real uc = std::sqrt(1.0 / (2. * rs));
@@ -159,9 +158,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
+  const Real Rhor = 1.0 + sqrt(1.0 - a);
 
   const Real b_rad = pin->GetOrAddReal("bondi", "b_radius", 10.);
   const Real r_circ = pin->GetOrAddReal("bondi", "r_circ", 0.0);
+  const Real r_cut = pin->GetOrAddReal("bondi", "r_cut", 10.0);
 
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -195,7 +196,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           eos_lambda[0] = v(iye, k, j, i);
         }
 
-        if (r > 5*Rhor) {
+        if (r > r_cut) {
           const Real th = tr.bl_theta(x1, x2);
           Real sth = std::sin(th);
           v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
