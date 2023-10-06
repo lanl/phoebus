@@ -35,7 +35,8 @@ variables = p.density,  &
 	    g.c.gcov,	&
 	    src_terms,       &
             flux_divergence, &
-            p.bfield
+            p.bfield, &
+	    temperature
 
 file_type   = hdf5      # Tabular data dump
 dt          = 10.0      # time increment between outputs

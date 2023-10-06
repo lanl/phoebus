@@ -390,7 +390,7 @@ class phoedf(phdf.phdf):
         if self.vsq is None:
             self.vsq = np.zeros(self.ScalarField)
             
-            gamma = self.GetGamma()
+            Gamma = self.GetGamma()
             vpcon = self.GetVpCon()
             for ii in range(3):
                 for jj in range(3):
@@ -399,7 +399,7 @@ class phoedf(phdf.phdf):
                         * vpcon[:, ii, :, :, :]
                         * vpcon[:, jj, :, :, :]
                     )
-            self.vsq = self.vsq/(gamma*gamma)
+            self.vsq = self.vsq/(Gamma*Gamma)
 
         return self.vsq
 

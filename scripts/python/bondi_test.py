@@ -65,6 +65,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     nz = geomfile.MeshBlockSize[2]
 
     time = dfile.Time
+    x = np.exp(dfile.x[0, :])
+    y = dfile.y[0, :]
 
     # Get pcolormesh grid for each block
     x1block = np.zeros([nblocks, nx + 1, ny + 1])
@@ -88,75 +90,41 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
         xplot = x1block
         yplot = x2block
 
-    ax = axes[0, 0]
-    ldensity = np.log10(np.clip(dfile.Get("p.density", flatten=False), 1.0e-20, None))
-    for b in range(nblocks):
-        im = ax.pcolormesh(
-            xplot[b, :, :],
-            yplot[b, :, :],
-            ldensity[b, 0, :, :].transpose(),
-            vmin=-4,
-            vmax=-1,
-            cmap=cmap_uniform,
-        )
-    div = make_axes_locatable(ax)
-    cax = div.append_axes("right", size="5%", pad=0.05)
-    fig.colorbar(im, cax=cax, orientation="vertical")
-    ax.set_title(r"$\log_{10}~\rho$")
-
-    ax = axes[0, 1]
+    #fig, axes = plt.subplots(4, 1)    
+    ax = axes[0,0]
+    density = dfile.Get("p.density", flatten=False)[0,0,0,:]
     
-    '''Gamma = dfile.GetGamma()
-    for b in range(nblocks):
-        im = ax.pcolormesh(
-            xplot[b, :, :],
-            yplot[b, :, :],
-            Gamma[b, 0, :, :].transpose(),
-            vmin=1,
-            vmax=5,
-            cmap=cmap_uniform,
-        )
-    div = make_axes_locatable(ax)
-    cax = div.append_axes("right", size="5%", pad=0.05)
-    fig.colorbar(im, cax=cax, orientation="vertical")
-    ax.set_title(r"$\Gamma$")
-'''
-    '''
-    vsq = np.log10(dfile.Getvsq())
-    for b in range(nblocks):
-        im = ax.pcolormesh(
-            xplot[b, :, :],
-            yplot[b, :, :],
-            vsq[b, 0, :, :].transpose(),
-            vmin=-6,
-            vmax=1,
-            cmap=cmap_uniform,
-        )
-    div = make_axes_locatable(ax)
-    cax = div.append_axes("right", size="5%", pad=0.05)
-    fig.colorbar(im, cax=cax, orientation="vertical")
-    ax.set_title(r"v$^{2}$")
-'''
-    ucon = np.log10(np.clip(-dfile.Getucon(),1e-20,None))
-    Gamma = dfile.GetGamma()
+    im = ax.plot(x, density)
+    ax.set_ylabel("rho")
+    ax.set_yscale("log")
+
+    ax = axes[0,1]
+
     vpcon = dfile.GetVpCon()
-    #vr = vpcon[:,0,:,:,:]/Gamma
-    ur = ucon[:,1,:,:,:]
-    for b in range(nblocks):                                                                                                                                                                                           
-        im = ax.pcolormesh(                                                                                                                                                                                           
-            xplot[b, :, :],                                                                                                                                                                                           
-            yplot[b, :, :],                                                                                                                                                                                           
-            -ur[b, 0, :, :].transpose(),                                                                                                                                                                              
-            vmin=-6,                                                                                                                                                                                                  
-            vmax=10,                                                                                                                                                                                                   
-            cmap=cmap_uniform,                                                                                                                                                                                        
-        )                                                                                                                                                                                                              
-    div = make_axes_locatable(ax)                                                                                                                                                                                      
-    cax = div.append_axes("right", size="5%", pad=0.05)                                                                                                                                                                
-    fig.colorbar(im, cax=cax, orientation="vertical")                                                                                                                                                                 
-    ax.set_title(r"-u$^r$")    
+    gamma = dfile.GetGamma()
+    vr = vpcon[0,0,0,0,:]/gamma[0,0,0,:]
+    for b in range(nblocks):
+            im = ax.plot(x, vr)
+            ax.set_ylabel("vr")
+            #ax.set_yscale("log") 
+    
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+    #ax.set_title(r"v$^{2}$")
+    
     if rad_active:
-        ax = axes[0, 2]
+        ax = axes[0,2]
         Pg = dfile.GetPg()
         Pm = np.clip(dfile.GetPm(), 1.0e-20, 1.0e20)
         lbeta = np.log10(Pg / Pm)
@@ -174,7 +142,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
         fig.colorbar(im, cax=cax, orientation="vertical")
         ax.set_title(r"$\log_{10}~\beta_{\rm M}$")
 
-        ax = axes[0, 3]
+        ax = axes[0,3]
         lTg = np.log10(dfile.GetTg())
         for b in range(nblocks):
             im = ax.pcolormesh(
@@ -257,61 +225,46 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
         ax.set_title(r"$\log_{10}~\tau_{\rm zone}$")
 
     else:
-        ax = axes[1, 0]
-        lenergy = np.log10(np.clip(dfile.Get("p.energy", flatten=False), 1.0e-20, None))
-        for b in range(nblocks):
-            im = ax.pcolormesh(
-                xplot[b, :, :],
-                yplot[b, :, :],
-                lenergy[b, 0, :, :].transpose(),
-                vmin=-5,
-                vmax=0,
-                cmap=cmap_uniform,
-            )
-        div = make_axes_locatable(ax)
-        cax = div.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(im, cax=cax, orientation="vertical")
-        ax.set_title(r"$\log_{10}~u$")
+        #ax = axes[1,0]
+        #lenergy = np.clip(dfile.Get("p.energy", flatten=False), 1.0e-20, None)[0,0,0,:]
+        #for b in range(nblocks):
+        #    im = ax.plot(x, lenergy)
+        #    ax.set_ylabel("ug")
+        #    ax.set_yscale("log")
+        #ax.set_title(r"$\log_{10}~u$")
+        ax = axes[1,0]
+        uconr = dfile.Getucon()[0,0,0,0,:] 
+        im = ax.plot(x, uconr)
+        ax.set_ylabel(r"u$^r$")
+        #ax.set_yscale("log")
 
-        ax = axes[1, 1]
-        Pg = dfile.GetPg()
-        Pm = np.clip(dfile.GetPm(), 1.0e-20, 1.0e20)
+            
+        ax = axes[1,1]
+        Pg = dfile.GetPg()[0,0,0,:]
+        Pm = np.clip(dfile.GetPm(), 1.0e-20, 1.0e20)[0,0,0,:]
         lbeta = np.log10(Pg / Pm)
         for b in range(nblocks):
-            im = ax.pcolormesh(
-                xplot[b, :, :],
-                yplot[b, :, :],
-                lbeta[b, 0, :, :].transpose(),
-                vmin=-2,
-                vmax=2,
-                cmap=cmap_diverging,
-            )
-        div = make_axes_locatable(ax)
-        cax = div.append_axes("right", size="5%", pad=0.05)
-        fig.colorbar(im, cax=cax, orientation="vertical")
-        ax.set_title(r"$\log_{10}~\beta_{\rm M}$")
+            im = ax.plot(x,Pg)
+            ax.set_ylabel("Pg")
+            ax.set_yscale("log")
+        
 
-    for nrow, tmp_ax in enumerate(axes):
-        for ncol, ax in enumerate(tmp_ax):
-            if coords == "cartesian":
-                ax.set_xlim([xlim, rlim])
-                ax.set_ylim([-rlim, rlim])
-                ax.set_aspect("equal")
-            if ncol > 0:
-                ax.yaxis.set_ticklabels([])
+    #for nrow, tmp_ax in enumerate(axes):
+       # for ncol, ax in enumerate(tmp_ax):
+            #if coords == "cartesian":
+               # ax.set_xlim([0,x[-1]])
+                #ax.set_ylim([-rlim, rlim])
+                #ax.set_aspect("equal")
+            #if ncol > 0:
+                #ax.yaxis.set_ticklabels([])
 
+    #plt.gca().set_aspect('1')
     plt.suptitle("Time = %g M" % dfile.Time)
-
     fig.tight_layout()
 
     savename = str(ifname).rjust(5, "0") + ".png"
     plt.savefig(savename, dpi=300, bbox_inches="tight")
     plt.close(fig)
-
-    print('%.3e', vpcon[:, 0, 0, 0, :]
-                    - Gamma[:, 0, 0, :]
-                    * dfile.betacon[:, 0, 0, 0, :]
-                    / dfile.alpha[:, 0, 0, :])
 
 
 if __name__ == "__main__":
