@@ -127,6 +127,7 @@ target_beta = 100.
 b_radius = 10.
 harm_beta_normalization = true
 magnetized = true
+jitter = 0.01
 
 <fixup>
 enable_floors = true

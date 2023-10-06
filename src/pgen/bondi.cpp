@@ -19,6 +19,9 @@
 // Parthenon
 #include <globals.hpp>
 
+// Kokkos
+#include "Kokkos_Random.hpp"
+
 // Phoebus
 #include "fluid/con2prim_robust.hpp"
 #include "geometry/boyer_lindquist.hpp"
@@ -32,9 +35,7 @@
 #include "phoebus_utils/unit_conversions.hpp"
 #include "radiation/radiation.hpp"
 
-
-
-// namespace phoebus {
+typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 namespace bondi {
 
@@ -139,6 +140,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
+  const Real jitter = pin->GetOrAddReal("torus", "jitter", 0.01);
+
 
   // Solution constants
   const Real uc = std::sqrt(1.0 / (2. * rs));
@@ -199,9 +202,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         if (r > r_cut) {
           const Real th = tr.bl_theta(x1, x2);
           Real sth = std::sin(th);
+          Real rngfact = (1. + jitter * (rng_gen.drand() - 0.5));
           v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
           v(irho, k, j, i) = std::pow(v(itmp, k, j, i), n);
-          v(ieng, k, j, i) = v(irho, k, j, i) * v(itmp, k, j, i) / (gam - 1.0);
+          v(ieng, k, j, i) = v(irho, k, j, i) * v(itmp, k, j, i) * rngfact / (gam - 1.0);
           v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(
               v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), eos_lambda);
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
