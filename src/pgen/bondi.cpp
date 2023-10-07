@@ -141,6 +141,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
   const Real jitter = pin->GetOrAddReal("torus", "jitter", 0.01);
+  const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
 
   RNGPool rng_pool(seed);
 
