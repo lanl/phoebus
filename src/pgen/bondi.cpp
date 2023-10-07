@@ -142,6 +142,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
   const Real jitter = pin->GetOrAddReal("torus", "jitter", 0.01);
 
+  RNGPool rng_pool(seed);
 
   // Solution constants
   const Real uc = std::sqrt(1.0 / (2. * rs));
@@ -183,6 +184,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   pmb->par_for(
       "Phoebus::ProblemGenerator::Bondi", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        auto rng_gen = rng_pool.get_state();
         Real x1 = coords.Xc<1>(k, j, i);
         const Real x2 = coords.Xc<2>(k, j, i);
         const Real x3 = coords.Xc<3>(k, j, i);
