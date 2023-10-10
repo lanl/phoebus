@@ -140,8 +140,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
-  const Real jitter = pin->GetOrAddReal("torus", "jitter", 0.01);
-  const int seed = pin->GetOrAddInteger("torus", "seed", time(NULL));
+  const Real jitter = pin->GetOrAddReal("bondi", "jitter", 0.01);
+  const int seed = pin->GetOrAddInteger("bondi", "seed", time(NULL));
 
   RNGPool rng_pool(seed);
 
