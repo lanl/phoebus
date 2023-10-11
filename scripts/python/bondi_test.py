@@ -36,6 +36,19 @@ import phoebus_utils
 from phoedf import phoedf
 
 
+def ur_analytic(r,rs,T,gam):
+    uc = np.sqrt(1/(2*rs))
+    vc = -np.sqrt(uc**2/(1-3*uc**2))
+    n = 1/(gam-1)
+    Tc = -n * (vc**2)/((n+1)*(n*vc**2-1))
+    c1 = uc * rs**2 * Tc**n
+    ur = - c1/(r**2 * T**(n))
+    return ur
+def rho_analytic(T,gam):
+    n = 1/(gam-1)
+    rho = T**n
+    return rho
+
 def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian"):
     print(fname)
 
@@ -90,12 +103,16 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
         xplot = x1block
         yplot = x2block
 
+    temp = dfile.Get("temperature", flatten = False)[0,0,0,:]
+    ur_an = ur_analytic(x,1187,temp,1.4)
+    rho_an = rho_analytic(temp,1.4)
     #fig, axes = plt.subplots(4, 1)    
     ax = axes[0,0]
     density = dfile.Get("p.density", flatten=False)[0,0,0,:]
     
-    im = ax.plot(x, density)
-    ax.set_ylabel("rho")
+    ax.plot(x, density)
+    ax.plot(x, rho_an, '--', lw = 2)
+    ax.set_ylabel(r"$\rho$")
     ax.set_yscale("log")
 
     ax = axes[0,1]
@@ -103,10 +120,9 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     vpcon = dfile.GetVpCon()
     gamma = dfile.GetGamma()
     vr = vpcon[0,0,0,0,:]/gamma[0,0,0,:]
-    for b in range(nblocks):
-            im = ax.plot(x, vr)
-            ax.set_ylabel("vr")
-            #ax.set_yscale("log") 
+    ax.plot(x, vr)
+    ax.set_ylabel("vr")
+    #ax.set_yscale("log") 
     
 
 
@@ -233,8 +249,9 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
         #    ax.set_yscale("log")
         #ax.set_title(r"$\log_{10}~u$")
         ax = axes[1,0]
-        uconr = dfile.Getucon()[0,0,0,0,:] 
-        im = ax.plot(x, uconr)
+        uconr = dfile.Getucon()[0,1,0,0,:] 
+        ax.plot(x, uconr)
+        ax.plot(x, ur_an, '--')
         ax.set_ylabel(r"u$^r$")
         #ax.set_yscale("log")
 
@@ -243,8 +260,10 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
         Pg = dfile.GetPg()[0,0,0,:]
         Pm = np.clip(dfile.GetPm(), 1.0e-20, 1.0e20)[0,0,0,:]
         lbeta = np.log10(Pg / Pm)
+        t2 = Pg/density
         for b in range(nblocks):
-            im = ax.plot(x,Pg)
+            ax.plot(x,Pg)
+            #ax.plot(x,t2, '--')
             ax.set_ylabel("Pg")
             ax.set_yscale("log")
         

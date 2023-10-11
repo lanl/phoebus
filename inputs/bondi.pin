@@ -115,6 +115,6 @@ derefine_poles = false
 
 <bondi>
 mdot = 1
-rs = 8.0
+rs = 1187
 Rhor = 2.0
 
