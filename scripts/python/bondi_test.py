@@ -35,7 +35,7 @@ from phoebus_constants import cgs, scalefree
 import phoebus_utils
 from phoedf import phoedf
 
-
+# analytic expressions for u^r and rho using temperature from simulations
 def ur_analytic(r,rs,T,gam):
     uc = np.sqrt(1/(2*rs))
     vc = -np.sqrt(uc**2/(1-3*uc**2))
