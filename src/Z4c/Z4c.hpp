@@ -34,6 +34,7 @@ Author : Hyun Lim
 #define Z4C_HPP_
 
 #include "fd_compute.hpp"
+#include "Z4c_eqn.cpp"
 
 //TODO : Link to Phoebus
 
