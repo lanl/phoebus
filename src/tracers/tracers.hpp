@@ -25,9 +25,12 @@
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
+
 using namespace parthenon::driver::prelude;
 using namespace parthenon::package::prelude;
 using namespace parthenon;
+using Microphysics::EOS::EOS;
 
 #include "phoebus_utils/variables.hpp"
 
@@ -38,6 +41,8 @@ namespace tracers {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
 TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt);
+
+void FillTracers(MeshBlockData<Real> *rc);
 
 } // namespace tracers
 
