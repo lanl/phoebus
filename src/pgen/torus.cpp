@@ -439,39 +439,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           }
         } // do_rad
 
-//        if (do_tracers) {
-//          Real r = tr.bl_radius(x1v);
-//          Real th = tr.bl_theta(x1v, x2v);
-//          Real lnh = -1.0;
-//          Real uphi;
-//          if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
-//
-//          if (lnh > 0.0) {
-//            const Real &x_min = pmb->coords.Xf<1>(i);
-//            const Real &y_min = pmb->coords.Xf<2>(j);
-//            const Real &z_min = pmb->coords.Xf<3>(k);
-//            const Real &x_max = pmb->coords.Xf<1>(i + 1);
-//            const Real &y_max = pmb->coords.Xf<2>(j + 1);
-//            const Real &z_max = pmb->coords.Xf<3>(k + 1);
-//            // HERE: need to do index gymnastics...
-//            pmb->par_for(
-//                "CreateTracers", ind_tracer, n_tracers_cell - 1, KOKKOS_LAMBDA(const int n) {
-//                  auto rng_gen = rng_pool_tr.get_state();
-//
-//                  // No rejection sampling at the moment.
-//                  // Perhaps this can be improved in the future.
-//
-//                  x(n) = x_min + rng_gen.drand() * (x_max - x_min);
-//                  y(n) = y_min + rng_gen.drand() * (y_max - y_min);
-//                  z(n) = z_min + rng_gen.drand() * (z_max - z_min);
-//                  //mass(n) = 0.0; // TODO ...
-//                  // call func to set tracer properties
-//
-//                  rng_pool_tr.free_state(rng_gen);
-//                }); // Create Tracers
-//          }
-//
-//        } // do_tracers
 
         rng_pool.free_state(rng_gen);
       });
@@ -642,9 +609,12 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     };
 
     
-    ParArray1D<int> indices("map from k,j,i to 1D particle array", (kb.e - kb.s + 1) * (jb.e - jb.s + 1) * (ib.e - ib.s + 1));
+    // TODO (BLB): better way to construct & access indices array?
+    // Access as indices( flatten( k-kb.s, j-jb.s, i-ib.s ) )
+    const int mysize = (kb.e - kb.s + 1) * (jb.e - jb.s + 1) * (ib.e - ib.s + 1);
+    ParArray1D<int> indices("map from k,j,i to 1D particle array", mysize);
     int num_cells_disk = 0;
-    /* sum cells on disk and create dincides array for mapping (k, j, i) -> n */
+    /* sum cells on disk and create indices array for mapping (k, j, i) -> n */
     pmb->par_reduce(
         "Phoebus::ProblemGenerator::Torus::SumDiskCells", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i, int &n_cells_disk) {
@@ -658,7 +628,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           Real uphi;
           if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
           if (lnh > 0.0) {
-            indices(flatten(k, j, i)) = n_cells_disk;
+            indices(flatten(k-kb.s, j-jb.s, i-ib.s)) = n_cells_disk;
             n_cells_disk++;
           }   
         }, Kokkos::Sum<int>(num_cells_disk));
@@ -680,7 +650,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           Real uphi;
           if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
           if (lnh > 0.0) {
-            int start_ind = indices(flatten(k, j, i)) * num_tracers_cell;
+            int start_ind = indices(flatten(k-kb.s, j-jb.s, i-ib.s)) * num_tracers_cell;
             const Real &x_min = coords.Xf<1>(i);
             const Real &y_min = coords.Xf<2>(j);
             const Real &z_min = coords.Xf<3>(k);
