@@ -168,12 +168,18 @@ set(CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
 set(CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
 
 # singularity eos
-message("Configuring singularity-eos")
-add_subdirectory(external/singularity-eos singularity-eos)
+message(STATUS "Patching mpark::variant to support GPUs")
+execute_process(COMMAND patch -N -s -V never
+  ${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils/variant/include/mpark/variant.hpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils/cuda_compatibility.patch
+)
+
+# message("Configuring singularity-eos")
+# add_subdirectory(external/singularity-eos singularity-eos)
 
 # singularity opac
-message("Configuring singularity-opac")
-add_subdirectory(external/singularity-opac singularity-opac)
+# message("Configuring singularity-opac")
+# add_subdirectory(external/singularity-opac singularity-opac)
 
 # Geometry
 include(cmake/Geometry.cmake)
