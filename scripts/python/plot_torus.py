@@ -95,8 +95,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
             xplot[b, :, :],
             yplot[b, :, :],
             ldensity[b, 0, :, :].transpose(),
-            vmin=-4,
-            vmax=-1,
+            vmin=-10,
+            vmax=-4,
             cmap=cmap_uniform,
         )
     div = make_axes_locatable(ax)
@@ -105,23 +105,23 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     ax.set_title(r"$\log_{10}~\rho$")
 
     ax = axes[0, 1]
-    
-    '''Gamma = dfile.GetGamma()
+     
+    '''lGamma = np.log10(dfile.GetGamma()-1)
     for b in range(nblocks):
         im = ax.pcolormesh(
             xplot[b, :, :],
             yplot[b, :, :],
-            Gamma[b, 0, :, :].transpose(),
-            vmin=1,
-            vmax=5,
+            lGamma[b, 0, :, :].transpose(),
+            vmin=-4,
+            vmax=-1,
             cmap=cmap_uniform,
         )
     div = make_axes_locatable(ax)
     cax = div.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(im, cax=cax, orientation="vertical")
-    ax.set_title(r"$\Gamma$")
-'''
-    '''
+    ax.set_title(r"$\Gamma-1$")
+
+    
     vsq = np.log10(dfile.Getvsq())
     for b in range(nblocks):
         im = ax.pcolormesh(
@@ -136,25 +136,45 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     cax = div.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(im, cax=cax, orientation="vertical")
     ax.set_title(r"v$^{2}$")
-'''
-    ucon = np.log10(np.clip(-dfile.Getucon(),1e-20,None))
+       
+    ucon = dfile.Getucon()
     Gamma = dfile.GetGamma()
     vpcon = dfile.GetVpCon()
     #vr = vpcon[:,0,:,:,:]/Gamma
-    ur = ucon[:,1,:,:,:]
+    ur = np.log10(np.abs(ucon[:,1,:,:,:]))
+    #print(ur[0,0,0,:])
     for b in range(nblocks):                                                                                                                                                                                           
         im = ax.pcolormesh(                                                                                                                                                                                           
             xplot[b, :, :],                                                                                                                                                                                           
             yplot[b, :, :],                                                                                                                                                                                           
-            -ur[b, 0, :, :].transpose(),                                                                                                                                                                              
-            vmin=-6,                                                                                                                                                                                                  
-            vmax=10,                                                                                                                                                                                                   
+            ur[b, 0, :, :].transpose(),                                                                                                                                                                              
+            vmin=-5,                                                                                                                                                                                                  
+            vmax=-1,                                                                                                                                                                                                   
             cmap=cmap_uniform,                                                                                                                                                                                        
-        )                                                                                                                                                                                                              
+        )                                                                                                                                                                                                             
     div = make_axes_locatable(ax)                                                                                                                                                                                      
     cax = div.append_axes("right", size="5%", pad=0.05)                                                                                                                                                                
     fig.colorbar(im, cax=cax, orientation="vertical")                                                                                                                                                                 
-    ax.set_title(r"-u$^r$")    
+    ax.set_title(r"u$^r$")'''
+
+    ltemp = np.log10(np.clip(dfile.Get("temperature", flatten=False), 1.0e-20, None))
+    for b in range(nblocks):
+        im = ax.pcolormesh(
+            xplot[b, :, :],
+            yplot[b, :, :],
+            ltemp[b, 0, :, :].transpose(),
+            vmin=-4,
+            vmax=-1,
+            cmap=cmap_uniform,
+        )
+    div = make_axes_locatable(ax)
+    cax = div.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(im, cax=cax, orientation="vertical")
+    ax.set_title(r"$\log_{10}~T$")
+
+    ax = axes[0, 1]
+
+
     if rad_active:
         ax = axes[0, 2]
         Pg = dfile.GetPg()
@@ -264,8 +284,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
                 xplot[b, :, :],
                 yplot[b, :, :],
                 lenergy[b, 0, :, :].transpose(),
-                vmin=-5,
-                vmax=0,
+                vmin=-10,
+                vmax=-5,
                 cmap=cmap_uniform,
             )
         div = make_axes_locatable(ax)
@@ -308,10 +328,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     plt.savefig(savename, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
-    print('%.3e', vpcon[:, 0, 0, 0, :]
-                    - Gamma[:, 0, 0, :]
-                    * dfile.betacon[:, 0, 0, 0, :]
-                    / dfile.alpha[:, 0, 0, :])
+    #print('%.3e', vpcon[:, 0, 0, 0, :] - Gamma[:, 0, 0, :]* dfile.betacon[:, 0, 0, 0, :]/ dfile.alpha[:, 0, 0, :])
 
 
 if __name__ == "__main__":
@@ -333,7 +350,7 @@ if __name__ == "__main__":
         "--numax", type=float, default=1.0e2, help="Maximum frequency (Hz)"
     )
     parser.add_argument(
-        "--rlim", type=float, default=150.0, help="Maximum radius to plot"
+        "--rlim", type=float, default=200.0, help="Maximum radius to plot"
     )
     parser.add_argument(
         "--nnu", type=int, default=100, help="Number of frequency support points"

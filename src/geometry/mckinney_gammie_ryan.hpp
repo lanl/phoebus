@@ -72,11 +72,11 @@ class McKinneyGammieRyan {
     C[1] = th;
     C[2] = X3;
 
-    // const Real drdX1 = std::exp(X1);
+    //const Real drdX1 = std::exp(X1);
     const Real hexp_dr = X1 - hexp_br_;
     const Real drdX1 =
-        std::exp(X1 + (hexp_dr > 0.) * hexp_csq_ * std::pow(hexp_dr, hexp_nsq_)) *
-        (1. + (hexp_dr > 0.) * hexp_csq_ * hexp_nsq_ * std::pow(hexp_dr, hexp_nsq_ - 1.));
+    std::exp(X1 + (hexp_dr > 0.) * hexp_csq_ * std::pow(hexp_dr, hexp_nsq_)) *
+    (1. + (hexp_dr > 0.) * hexp_csq_ * hexp_nsq_ * std::pow(hexp_dr, hexp_nsq_ - 1.));
     const Real dthGdX2 = M_PI + M_PI * (1 - h_) * std::cos(2 * M_PI * X2);
     Real dthdX1, dthdX2;
     if (derefine_poles_) {

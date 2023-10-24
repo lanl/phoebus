@@ -20,6 +20,10 @@ ox2_bc = reflect
 <parthenon/job>
 problem_id  = bondi       # problem ID: basename of output filenames
 
+<parthenon/output0>
+file_type = rst
+dt = 200.0
+
 <parthenon/output1>
 variables = p.density,  &
 	          c.density,  &
@@ -39,11 +43,11 @@ variables = p.density,  &
 	    temperature
 
 file_type   = hdf5      # Tabular data dump
-dt          = 10.0      # time increment between outputs
+dt          = 20.0      # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 10000.0     # time limit
+tlim        = 100000.0     # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -55,7 +59,7 @@ nghost = 4
 
 nx1         = 256           # Number of zones in X1-direction
 x1min       = 0.59          # minimum value of X1
-x1max       = 5             # maximum value of X1
+x1max       = 10             # maximum value of X1
 ix1_bc      = user          # Inner-X1 boundary condition flag
 ox1_bc      = user          # Outer-X1 boundary condition flag
 
@@ -104,14 +108,15 @@ c2p_max_iter = 100
 c2p_tol = 1.e-8
 Ye = false
 mhd = false
-vx = 0
+vz = 0.1
 
 <geometry>
 a = 0
-r_outer = 1000
 
 <coordinates>
 derefine_poles = false
+r_outer = 10000
+hexp_br = 1000. # Initial break radius for hyperexponential coordinates
 
 <bondi>
 mdot = 1

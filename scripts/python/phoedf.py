@@ -126,9 +126,9 @@ class phoedf(phdf.phdf):
         self.alpha = np.zeros(self.ScalarField)
         self.alpha[:, :, :, :] = np.sqrt(-1.0 / self.gcon[:, 0, 0, :, :, :])
         self.betacon = np.zeros(self.ThreeVectorField)
-        self.betacon[:, :, :, :, :] = self.gcon[:, 1:, 0, :, :, :] * (
-            self.alpha[:, np.newaxis, :, :, :] ** 2
-        )
+        self.betacon[:, :, :, :, :] = -self.gcon[:, 1:, 0, :, :, :]/(self.gcon[:, 0, 0, :, :, :])
+
+        #* ( self.alpha[:, np.newaxis, :, :, :] ** 2)
         self.gammacon = np.zeros(self.ThreeTensorField)
         for ii in range(3):
             for jj in range(3):
@@ -169,6 +169,12 @@ class phoedf(phdf.phdf):
         self.P = None
         self.vsq = None
 
+    def GetLapse(self):
+        return self.alpha
+
+    def GetConShift(self):
+        return self.betacon
+    
     def GetRho(self):
         if self.rho is None:
             self.rho = self.Get("p.density", flatten=False)

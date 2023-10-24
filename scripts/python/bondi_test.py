@@ -78,7 +78,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     nz = geomfile.MeshBlockSize[2]
 
     time = dfile.Time
-    x = np.exp(dfile.x[0, :])
+    x = dfile.x[0, :]
     y = dfile.y[0, :]
 
     # Get pcolormesh grid for each block
@@ -104,8 +104,11 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
         yplot = x2block
 
     temp = dfile.Get("temperature", flatten = False)[0,0,0,:]
-    ur_an = ur_analytic(x,1187,temp,1.4)
+    ur_an = ur_analytic(np.exp(x),8,temp,1.4)/np.exp(x)
     rho_an = rho_analytic(temp,1.4)
+
+    #for i in range(10,x.shape[0]):
+        #print("x[%d] = %.3e, u_r[%d] = %.3e \n" %(i, x[i], i ,ur_analytic(np.exp(x[i]),1187,temp[i],1.4)/np.exp(x[i])))
     #fig, axes = plt.subplots(4, 1)    
     ax = axes[0,0]
     density = dfile.Get("p.density", flatten=False)[0,0,0,:]
@@ -116,14 +119,24 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     ax.set_yscale("log")
 
     ax = axes[0,1]
-
+    lapse = dfile.GetLapse()
+    shift = dfile.GetConShift()
+    #print(shift.shape)
+    #print(shift[0,0,0,0,:])
     vpcon = dfile.GetVpCon()
     gamma = dfile.GetGamma()
+    gamma2 = 1/(np.sqrt(1-(0.1)**2))
     vr = vpcon[0,0,0,0,:]/gamma[0,0,0,:]
-    ax.plot(x, vr)
-    ax.set_ylabel("vr")
-    #ax.set_yscale("log") 
+    vr_an = ur_an/ gamma[0,0,0,:] + shift[0,0,0,0,:]/lapse[0,0,0,:]
+
     
+
+    
+    ax.plot(np.exp(x), np.abs(vr))
+    ax.plot(np.exp(x), np.abs(vr_an), '--')
+    ax.set_ylabel("|vr|")
+    ax.set_yscale("log") 
+    ax.set_xscale("log") 
 
 
 
@@ -157,7 +170,7 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
         cax = div.append_axes("right", size="5%", pad=0.05)
         fig.colorbar(im, cax=cax, orientation="vertical")
         ax.set_title(r"$\log_{10}~\beta_{\rm M}$")
-
+        
         ax = axes[0,3]
         lTg = np.log10(dfile.GetTg())
         for b in range(nblocks):
@@ -249,12 +262,15 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
         #    ax.set_yscale("log")
         #ax.set_title(r"$\log_{10}~u$")
         ax = axes[1,0]
-        uconr = dfile.Getucon()[0,1,0,0,:] 
-        ax.plot(x, uconr)
-        ax.plot(x, ur_an, '--')
-        ax.set_ylabel(r"u$^r$")
-        #ax.set_yscale("log")
-
+        uconr = dfile.Getucon()[0,1,0,0,:]
+        slapse = shift[0,0,0,0,:]/lapse[0,0,0,:]
+#        for i in range(uconr.shape[0]):
+#	         print("i = %d, uconr[%d] = %.3e \n" %(i, i ,uconr[i]))
+        ax.plot(np.exp(x), -uconr/gamma[0,0,0,:])
+        ax.plot(np.exp(x), slapse, '--')
+        ax.set_ylabel(r"-u$^r$")
+        ax.set_yscale("log")
+        ax.set_xscale("log")
             
         ax = axes[1,1]
         Pg = dfile.GetPg()[0,0,0,:]

@@ -28,8 +28,8 @@ Real get_bondi_temp(const Real r, const Real n, const Real C1, const Real C2,
   // TODO(jcd): this hardcoded 0.8 is really only appropriate for gamma = 1.4.
   //            for other gamma, this Tguess may not fall between the two roots
   Real Tguess = Tc * std::pow(rc / r, 0.8);
-  Real Tmin = (r < rc ? 0.1 * Tguess : Tguess);
-  Real Tmax = (r < rc ? Tguess : 10. * Tguess);
+  Real Tmin = (r < rc ? 0.001 * Tguess : Tguess);
+  Real Tmax = (r < rc ? Tguess : 1000. * Tguess);
   Real f0, f1, fh;
   Real T0, T1, Th;
 
@@ -113,7 +113,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                            "Bondi setup only works with ideal gas");
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real Cv = pin->GetReal("eos", "Cv");
-  const Real vx = pin->GetReal("fluid", "vx");
+  const Real vz = pin->GetReal("fluid", "vz");
   const Real n = 1.0 / (gam - 1.0);
   PARTHENON_REQUIRE_THROWS(std::fabs(n - Cv) < 1.e-12, "Bondi requires Cv = 1/(Gamma-1)");
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
@@ -189,22 +189,28 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                            v(iprs, k, j, i);
         Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
 	Real gcov[4][4];
+	Real bl_lapse = bl.Lapse(0.0, r, th, x3);
+	Real bl_shift[3];
+	Real lf = 1/(std::sqrt(1-vz*vz));
+	bl.ContravariantShift(0.0, r, th, x3, bl_shift);
 	bl.SpacetimeMetric(0.0, r, th, x3, gcov);
-	if (vx!=0){
-	   printf("Bondi-Hoyle with v_inf = %.3e\n", vx);
-	if (r<=5){
+	if (vz!=0){
+	   printf("Bondi-Hoyle with v_inf = %.3e\n", vz);
+	if (r<=25){
 	ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));}
 	else {
-	  ucon_bl[1] = 1/(std::sqrt(gcov[1][1])) * vx * sth * cph;// -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
-	  ucon_bl[2] = 1/(std::sqrt(gcov[2][2])) * vx * cth * cph;
-	  //ucon_bl[3] = -1/(std::sqrt(gcov[3][3])) * vx * sph;
+	  ucon_bl[1] = lf*(1/(std::sqrt(gcov[1][1])) * vz * cth - bl_shift[0]/bl_lapse);// -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
+	  ucon_bl[2] = lf*(1/(std::sqrt(gcov[2][2])) * -vz * sth - bl_shift[1]/bl_lapse);
+	  //ucon_bl[3] = lf*(-1/(std::sqrt(gcov[3][3])) * vx * sph - bl_shift[2]/bl_lapse);
 	}}
 	else{
-	  printf("Stationary Bondi accretion \n");
+	  //printf("Stationary Bondi accretion \n");
 	   ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
 	}
         
-        
+	//if (k == 0 && j ==0){
+	//printf("i = %d, u_conbl2[%d] = %.3e \n", i,i,ucon_bl[3]);}  
+
           // modification of uconbl 1 and new ucon bl 2,3.. will be added here
 
         //Real gcov[4][4];
@@ -230,6 +236,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real ucon[4];
         tr.bl_to_fmks(x1, x2, x3, a, ucon_bl, ucon);
 
+	//if (k == 0 && j ==0){
+	//printf("i = %d, u_confmks0bn[%d] = %.3e \n", i,i,ucon[0]);}
+
         // ucon won't be properly normalized here if x1 is not consistent with i
         // so renormalize
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
@@ -245,6 +254,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         PARTHENON_REQUIRE(discr > 0, "discr < 0");
         ucon[0] = (-BB - std::sqrt(discr)) / (2. * AA);
 
+	//if (k == 0 && j ==0){
+	//printf("i = %d, u_confmks0an[%d] = %.3e \n", i,i,ucon[0]);}
         // now get three velocity
         const Real lapse = geom.Lapse(CellLocation::Cent, k, j, i);
         Real beta[3];
@@ -252,8 +263,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real W = lapse * ucon[0];
         for (int d = 0; d < 3; d++) {
           v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
+
+	  //if (v(ivlo + d, k, j, i) > 0){
+	    //printf("v[%d,%d,%d,%d] = %.3e\n", ivlo+d,k,j,i, v(ivlo + d, k, j, i));}
         }
-      });
+         
+            });
 
   fluid::PrimitiveToConserved(rc);
 }
