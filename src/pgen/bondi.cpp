@@ -215,8 +215,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                                  v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
                              v(iprs, k, j, i);
           Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
-          ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
-          ucon_bl[3] = std::sqrt(r_circ)*sth*sth;
+          Real r2 = r*r;
+          ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * r2 );
+          ucon_bl[3] = std::sqrt(r_circ)*sth*sth/r2;
 
           Real gcov[4][4];
           bl.SpacetimeMetric(0.0, r, th, x3, gcov);
