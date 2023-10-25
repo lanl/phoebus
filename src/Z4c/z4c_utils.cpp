@@ -45,7 +45,7 @@ Author : Hyun Lim
 #include "phoebus_utils/robust.hpp"
 
 // Z4c header to contain some utils including FD computations
-#include "Z4c.hpp"
+#include "z4c.hpp"
 
 // Some macro
 // TODO : maybe define different way?

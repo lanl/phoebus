@@ -34,9 +34,32 @@ Author : Hyun Lim
 #define Z4C_HPP_
 
 #include "fd_compute.hpp"
-#include "Z4c_eqn.cpp"
+#include "z4c_eqn.cpp"
 
 //TODO : Link to Phoebus
+#include <parthenon/package.hpp>
+
+#define VARIABLE(ns, varname)                                                            \
+  struct varname : public parthenon::variable_names::base_t<false> {                     \
+    template <class... Ts>                                                               \
+    KOKKOS_INLINE_FUNCTION varname(Ts &&...args)                                         \
+        : parthenon::variable_names::base_t<false>(std::forward<Ts>(args)...) {}         \
+    static std::string name() { return #ns "." #varname; }                               \
+  }
+
+namespace z4c { // fix consistencty with namespace everywhere
+  namespace constraint{
+  VARIABLE(z4c.c, H);
+  VARIABLE(z4c.c, M);
+  } // constraint
+  namespace evolution{
+  VARIABLE(z4c.c, At);
+  } // evolution
+
+// Prototype for package init
+std::shared_ptr<parthenon::StateDescriptor> Initialize(ParameterInput *pin);
+
+} // z4c
 
 // Some precomputation
 // compute spatial determinant of a 3x3  matrix

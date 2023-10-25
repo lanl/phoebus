@@ -47,27 +47,36 @@ Author : Hyun Lim
 #include "phoebus_utils/robust.hpp"
 
 // Z4c header to contain some utils including FD computations
-#include "Z4c.hpp"
+#include "z4c.hpp"
 
 using namespace parthenon::package::prelude;
 using parthenon::AllReduce;
 using parthenon::MetadataFlag;
 
-
-
-// TODO : Do I need this?
-namespace Z4c {
+namespace z4c {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
-  auto Z4c = std::make_shared<StateDescriptor>("Z4c");
-  Params &params = Z4c->AllParams();
+  auto z4c = std::make_shared<StateDescriptor>("z4c");
+  Params &params = z4c->AllParams();
 
-  bool enable_Z4c = pin->GetOrAddBoolean("Z4c", "enabled", false);
-  params.Add("enable_Z4c", enable_Z4c);
+  bool enable_z4c = pin->GetOrAddBoolean("z4c", "enabled", false);
+  params.Add("enable_z4c", enable_Z4c);
+  if (!enable_z4c) return z4c;
   
-  return Z4c
+  // Add vars
+  Metadata m_constraint_scalar({Metadata::Cell, Metadata::Metadata::Derived, Metadata::OneCopy});
+  Metadata m_constraint_vector({Metadata::Cell, Metadata::Metadata::Derived, Metadata::OneCopy}, std::vector<int>{3});
+  z4c->AddField<constraint::H>(m_constraint_scalar);
+  z4c->AddField<constraint::M>(m_constraint_vector);
+
+  Metadata m_evolution_rank2({Metadata::Cell, Metadata::Metadata::Derived, Metadata::OneCopy}, std::vector<int>{3,3});
+  z4c->AddField<evolution::At>(m_evolution_rank2);
+ 
+  
+
+  return z4c
 }
 
 #endif //PHOEBUS_UNIT_TEST
 
-}//namespace Z4c
+}//namespace z4c

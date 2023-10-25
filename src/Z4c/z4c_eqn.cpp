@@ -40,6 +40,29 @@ void Z4c::ADMConstraints(
   SetZ4cAliases(u_z4c, z4c);
   #endif
 
+  //TODO : make better
+constexpr size_t scratch_level = 1; // can be 0, 1, or 2. Depends on hardware. 0 is lower level cache usually. 2 is highest level (maybe main memory?)
+// gets allocation size for scratch memory for rank 2 tensor along pencil in i
+const auto scratch_size = parthenon::ScratchPad3D<Real>::shmem_size(NDIM, NDIM, Ni) /* + more sizes if desired */;
+
+// make loop...
+parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace(),
+  // scratch declarations
+  scratch_size, scratch_level,
+  // loop bounds
+  0, nblocks-1, kb.s, kb.e,
+  // lambda capture
+  KOKKOS_LAMBDA(parthenon::team_member_t member, const int b, const int k) {
+  // loop body
+
+  // request scratch memory.  Can now be used as a multid array.
+  ScratchPad3D<Real> ginverse(member.team_scratch(scratch_level), NDIM, NDIM, Ni);
+  // can keep declaring scratch arrays up to as much memory as requested in scratch_size above
+
+  // do stuff...
+});
+
+
   ILOOP2(k,j) {
     // -----------------------------------------------------------------------------------
     // derivatives
