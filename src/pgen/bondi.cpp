@@ -15,10 +15,23 @@
 #include "geometry/mckinney_gammie_ryan.hpp"
 #include "pgen/pgen.hpp"
 #include "utils/error_checking.hpp"
+#include "fluid/con2prim_robust.hpp"
+#include "phoebus_utils/adiabats.hpp"
+#include "phoebus_utils/reduction.hpp"
+#include "phoebus_utils/relativity_utils.hpp"
+#include "phoebus_utils/robust.hpp"
+#include "phoebus_utils/root_find.hpp"
+#include "phoebus_utils/unit_conversions.hpp"
+#include "radiation/radiation.hpp"
 
 // namespace phoebus {
 
+
 namespace bondi {
+
+using namespace radiation;
+using Microphysics::Opacities;
+using Microphysics::EOS::EOS;
 
 KOKKOS_FUNCTION
 Real get_bondi_temp(const Real r, const Real n, const Real C1, const Real C2,
@@ -134,12 +147,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  auto &coords = pmb->coords;
+  auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
-
+  auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   // set up transformation stuff
@@ -194,6 +207,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 	Real lf = 1/(std::sqrt(1-vz*vz));
 	bl.ContravariantShift(0.0, r, th, x3, bl_shift);
 	bl.SpacetimeMetric(0.0, r, th, x3, gcov);
+
+	if (r>20){
 	if (vz!=0){
 	   printf("Bondi-Hoyle with v_inf = %.3e\n", vz);
 	if (r<=25){
@@ -266,11 +281,25 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
 	  //if (v(ivlo + d, k, j, i) > 0){
 	    //printf("v[%d,%d,%d,%d] = %.3e\n", ivlo+d,k,j,i, v(ivlo + d, k, j, i));}
-        }
-         
+        }}
+
+	else {
+          Real rhoflr = 0.0;
+          Real epsflr;
+          floor.GetFloors(x1, x2, x3, rhoflr, epsflr);
+          for (int d = 0; d < 3; d++) {
+            v(ivlo + d, k, j, i) = 0.0;
+          }
+          v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
+          v(irho, k, j, i) = rhoflr;
+	  v(ieng, k, j, i) = v(ieng, k, j, i) / v(irho, k, j, i) < epsflr ? v(irho, k, j, i) * epsflr : v(ieng, k, j, i);
+          v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy( v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), eos_lambda);
+          v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature( v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) / v(iprs, k, j, i);
+        }         
             });
 
   fluid::PrimitiveToConserved(rc);
+  fixup::ApplyFloors(rc);
 }
 
 } // namespace bondi

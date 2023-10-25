@@ -22,7 +22,7 @@ problem_id  = bondi       # problem ID: basename of output filenames
 
 <parthenon/output0>
 file_type = rst
-dt = 200.0
+dt = 1000.0
 
 <parthenon/output1>
 variables = p.density,  &
@@ -111,7 +111,7 @@ mhd = false
 vz = 0.1
 
 <geometry>
-a = 0
+a = 0.9
 
 <coordinates>
 derefine_poles = false
