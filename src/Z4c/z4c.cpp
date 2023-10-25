@@ -68,11 +68,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata m_constraint_vector({Metadata::Cell, Metadata::Metadata::Derived, Metadata::OneCopy}, std::vector<int>{3});
   z4c->AddField<constraint::H>(m_constraint_scalar);
   z4c->AddField<constraint::M>(m_constraint_vector);
+  z4c->AddField<constraint::Z>(m_constraint_scalar);
 
+  Metadata m_evolution_scalar({Metadata::Cell, Metadata::Metadata::Derived, Metadata::OneCopy});
+  Metadata m_evolution_vector({Metadata::Cell, Metadata::Metadata::Derived, Metadata::OneCopy}, std::vector<int>{3});
   Metadata m_evolution_rank2({Metadata::Cell, Metadata::Metadata::Derived, Metadata::OneCopy}, std::vector<int>{3,3});
-  z4c->AddField<evolution::At>(m_evolution_rank2);
- 
-  
+  z4c->AddField<evolution_z4c::chi>(m_evolution_scalar);
+  z4c->AddField<evolution_z4c::g>(m_evolution_rank2);
+  z4c->AddField<evolution_z4c::Khat>(m_evolution_scalar);
+  z4c->AddField<evolution_z4c::A>(m_evolution_rank2);
+  z4c->AddField<evolution_z4c::Gam>(m_evolution_vector);
+  z4c->AddField<evolution_z4c::Theta>(m_evolution_scalar);
+  z4c->AddField<evolution_z4c::alpha>(m_evolution_scalar);
+  z4c->AddField<evolution_z4c::beta>(m_evolution_vector);
 
   return z4c
 }

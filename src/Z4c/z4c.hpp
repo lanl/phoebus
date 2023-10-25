@@ -17,11 +17,11 @@ Breif: General header for Z4c formulation
        Bernuzzi & Hilditch (2010) and Hilditch et al. (2013).
        The Z4c system is comprised of dynamical variable:
        chi: Conformal factor (scalar)
-       gt : Induced 3-metric (rank-2)
-       Kh : Trace of extrinsic curvature (scalar)
-       At : Traceless of extrinsic curvature (rank-2)
+       g : Induced 3-metric (rank-2)
+       Khat : Trace of extrinsic curvature (scalar)
+       A : Traceless of extrinsic curvature (rank-2)
        Theta : Temporal projection of Z4 vector (scalar)
-       Gt : Conformaly-related function (3-vector)
+       Gam : Conformaly-related function (3-vector)
 
        In addtion, we follow typical gauge choice:
        Bona-Masso for lapse, alpha (scalar) \TODO :maybe 1+log?
@@ -49,15 +49,35 @@ Author : Hyun Lim
 
 namespace z4c { // fix consistencty with namespace everywhere
   namespace constraint{
-  VARIABLE(z4c.c, H);
-  VARIABLE(z4c.c, M);
+  VARIABLE(z4c.c, H); // Hamiltoninan constraint
+  VARIABLE(z4c.c, M); // Momentum constraint
+  VARIABLE(z4c.c, Z); // Z-vector constraint
   } // constraint
-  namespace evolution{
-  VARIABLE(z4c.c, At);
-  } // evolution
+  namespace evolution_z4c{
+  VARIABLE(z4c.c, chi); // Conformal factor
+  VARIABLE(z4c.c, g); // Induced 3 metric
+  VARIABLE(z4c.c, Khat); // Trace of extrinsic curvature
+  VARIABLE(z4c.c, A); // Traceless of extrinsic curvature
+  VARIABLE(z4c.c, Gam); // Conformally related function 
+  VARIABLE(z4c.c, Theta); // Temporal projection of Z4 vector
+  VARIABLE(z4c.c, alpha); // Lapse
+  VARIABLE(z4c.c, beta); // Shift
+  } // evolution_z4c
+  namespace evolution_adm{
+  VARIABLE(z4c.c, g); // Induced 3 metric
+  VARIABLE(z4c.c, K); // Extrinsic curvature
+  VARIABLE(z4c.c, psi); // Psi scalar function
+  } // evolution_adm
+  namespace matter_source{ // TODO : this is not really the varialbe. We may not want them as like this
+  VARIABLE(z4c.c, rho); 
+  VARIABLE(z4c.c, Si); 
+  VARIABLE(z4c.c, Sij);
+  } // matter_source
 
-// Prototype for package init
-std::shared_ptr<parthenon::StateDescriptor> Initialize(ParameterInput *pin);
+  // TODO: add psi4 for GW extraction
+
+  // Prototype for package init
+  std::shared_ptr<parthenon::StateDescriptor> Initialize(ParameterInput *pin);
 
 } // z4c
 
