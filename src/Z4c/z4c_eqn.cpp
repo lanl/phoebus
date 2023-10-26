@@ -263,3 +263,300 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
     }
   }
 }
+
+TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
+  //TODO: boiler plate crap above
+  auto state = desc.GetPack(md_state);
+  auto rhs = desc.GetPack(md_rhs);
+
+  // in loop...
+  ILOOP2(md_state, size, level, b, k, j) {
+        // -----------------------------------------------------------------------------------
+    // 1st derivatives
+    //
+    // Scalars
+    for(int a = 0; a < NDIM; ++a) {
+      ILOOP1(i) {
+        dalpha_d(a,i) = FD.Dx(a, z4c.alpha(k,j,i));
+        dchi_d(a,i)   = FD.Dx(a, z4c.chi(k,j,i));
+        dKhat_d(a,i)  = FD.Dx(a, z4c.Khat(k,j,i));
+        dTheta_d(a,i) = FD.Dx(a, z4c.Theta(k,j,i));
+      }
+    }
+    // Vectors
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = 0; b < NDIM; ++b) {
+      ILOOP1(i) {
+        dbeta_du(b,a,i) = FD.Dx(b, z4c.beta_u(a,k,j,i));
+        dGam_du(b,a,i)  = FD.Dx(b, z4c.Gam_u(a,k,j,i));
+      }
+    }
+    // Tensors
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b)
+    for(int c = 0; c < NDIM; ++c) {
+      ILOOP1(i) {
+        dg_ddd(c,a,b,i) = FD.Dx(c, z4c.g_dd(a,b,k,j,i));
+        dA_ddd(c,a,b,i) = FD.Dx(c, z4c.A_dd(a,b,k,j,i));
+      }
+    }
+
+    // -----------------------------------------------------------------------------------
+    // 2nd derivatives
+    //
+    // Scalars
+    for(int a = 0; a < NDIM; ++a) {
+      ILOOP1(i) {
+        ddalpha_dd(a,a,i) = FD.Dxx(a, z4c.alpha(k,j,i));
+        ddchi_dd(a,a,i) = FD.Dxx(a, z4c.chi(k,j,i));
+      }
+      for(int b = a + 1; b < NDIM; ++b) {
+        ILOOP1(i) {
+          ddalpha_dd(a,b,i) = FD.Dxy(a, b, z4c.alpha(k,j,i));
+          ddchi_dd(a,b,i) = FD.Dxy(a, b, z4c.chi(k,j,i));
+        }
+      }
+    }
+        // Vectors
+    for(int c = 0; c < NDIM; ++c)
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b) {
+      if(a == b) {
+        ILOOP1(i) {
+          ddbeta_ddu(a,b,c,i) = FD.Dxx(a, z4c.beta_u(c,k,j,i));
+        }
+      }
+      else {
+        ILOOP1(i) {
+          ddbeta_ddu(a,b,c,i) = FD.Dxy(a, b, z4c.beta_u(c,k,j,i));
+        }
+      }
+    }
+    // Tensors
+    for(int c = 0; c < NDIM; ++c)
+    for(int d = c; d < NDIM; ++d)
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b) {
+      if(a == b) {
+        ILOOP1(i) {
+          ddg_dddd(a,b,c,d,i) = FD.Dxx(a, z4c.g_dd(c,d,k,j,i));
+        }
+      }
+      else {
+        ILOOP1(i) {
+          ddg_dddd(a,b,c,d,i) = FD.Dxy(a, b, z4c.g_dd(c,d,k,j,i));
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Advective derivatives
+    //
+    // Scalars
+    Lalpha.ZeroClear();
+    Lchi.ZeroClear();
+    LKhat.ZeroClear();
+    LTheta.ZeroClear();
+    for(int a = 0; a < NDIM; ++a) {
+      ILOOP1(i) {
+        Lalpha(i) += FD.Lx(a, z4c.beta_u(a,k,j,i), z4c.alpha(k,j,i));
+        Lchi(i) += FD.Lx(a, z4c.beta_u(a,k,j,i), z4c.chi(k,j,i));
+        LKhat(i) += FD.Lx(a, z4c.beta_u(a,k,j,i), z4c.Khat(k,j,i));
+        LTheta(i) += FD.Lx(a, z4c.beta_u(a,k,j,i), z4c.Theta(k,j,i));
+      }
+    }
+    // Vectors
+    Lbeta_u.ZeroClear();
+    LGam_u.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = 0; b < NDIM; ++b) {
+      ILOOP1(i) {
+        Lbeta_u(b,i) += FD.Lx(a, z4c.beta_u(a,k,j,i), z4c.beta_u(b,k,j,i));
+        LGam_u(b,i)  += FD.Lx(a, z4c.beta_u(a,k,j,i), z4c.Gam_u(b,k,j,i));
+      }
+    }
+    // Tensors
+    Lg_dd.ZeroClear();
+    LA_dd.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b)
+    for(int c = 0; c < NDIM; ++c) {
+      ILOOP1(i) {
+        Lg_dd(a,b,i) += FD.Lx(c, z4c.beta_u(c,k,j,i), z4c.g_dd(a,b,k,j,i));
+        LA_dd(a,b,i) += FD.Lx(c, z4c.beta_u(c,k,j,i), z4c.A_dd(a,b,k,j,i));
+      }
+    }
+    
+        // -----------------------------------------------------------------------------------
+    // Get K from Khat
+    //
+    ILOOP1(i) {
+      K(i) = z4c.Khat(k,j,i) + 2.*z4c.Theta(k,j,i);
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Inverse metric
+    //
+    ILOOP1(i) {
+      detg(i) = SpatialDet(z4c.g_dd, k, j, i);
+      SpatialInv(1.0/detg(i),
+          z4c.g_dd(0,0,k,j,i), z4c.g_dd(0,1,k,j,i), z4c.g_dd(0,2,k,j,i),
+          z4c.g_dd(1,1,k,j,i), z4c.g_dd(1,2,k,j,i), z4c.g_dd(2,2,k,j,i),
+          &g_uu(0,0,i), &g_uu(0,1,i), &g_uu(0,2,i),
+          &g_uu(1,1,i), &g_uu(1,2,i), &g_uu(2,2,i));
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Christoffel symbols
+    //
+    for(int c = 0; c < NDIM; ++c)
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b) {
+      ILOOP1(i) {
+        Gamma_ddd(c,a,b,i) = 0.5*(dg_ddd(a,b,c,i) + dg_ddd(b,a,c,i) - dg_ddd(c,a,b,i));
+      }
+    }
+    Gamma_udd.ZeroClear();
+    for(int c = 0; c < NDIM; ++c)
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b)
+    for(int d = 0; d < NDIM; ++d) {
+      ILOOP1(i) {
+        Gamma_udd(c,a,b,i) += g_uu(c,d,i)*Gamma_ddd(d,a,b,i);
+      }
+    }
+    // Gamma's computed from the conformal metric (not evolved)
+    Gamma_u.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = 0; b < NDIM; ++b)
+    for(int c = 0; c < NDIM; ++c) {
+      ILOOP1(i) {
+        Gamma_u(a,i) += g_uu(b,c,i)*Gamma_udd(a,b,c,i);
+      }
+    }
+    // -----------------------------------------------------------------------------------
+    // Curvature of conformal metric
+    //
+    R_dd.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b) {
+      for(int c = 0; c < NDIM; ++c) {
+        ILOOP1(i) {
+          R_dd(a,b,i) += 0.5*(z4c.g_dd(c,a,k,j,i)*dGam_du(b,c,i) +
+                              z4c.g_dd(c,b,k,j,i)*dGam_du(a,c,i) +
+                              Gamma_u(c,i)*(Gamma_ddd(a,b,c,i) + Gamma_ddd(b,a,c,i)));
+        }
+      }
+      for(int c = 0; c < NDIM; ++c)
+      for(int d = 0; d < NDIM; ++d) {
+        ILOOP1(i) {
+          R_dd(a,b,i) -= 0.5*g_uu(c,d,i)*ddg_dddd(c,d,a,b,i);
+        }
+      }
+      for(int c = 0; c < NDIM; ++c)
+      for(int d = 0; d < NDIM; ++d)
+      for(int e = 0; e < NDIM; ++e) {
+        ILOOP1(i) {
+          R_dd(a,b,i) += g_uu(c,d,i)*(
+              Gamma_udd(e,c,a,i)*Gamma_ddd(b,e,d,i) +
+              Gamma_udd(e,c,b,i)*Gamma_ddd(a,e,d,i) +
+              Gamma_udd(e,a,d,i)*Gamma_ddd(e,c,b,i));
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Derivatives of conformal factor phi
+    //
+    ILOOP1(i) {
+      chi_guarded(i) = std::max(z4c.chi(k,j,i), opt.chi_div_floor);
+      oopsi4(i) = pow(chi_guarded(i), -4./opt.chi_psi_power);
+    }
+
+    for(int a = 0; a < NDIM; ++a) {
+      ILOOP1(i) {
+        dphi_d(a,i) = dchi_d(a,i)/(chi_guarded(i) * opt.chi_psi_power);
+      }
+    }
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b) {
+      ILOOP1(i) {
+        Real const ddphi_ab = ddchi_dd(a,b,i)/(chi_guarded(i) * opt.chi_psi_power) -
+          opt.chi_psi_power * dphi_d(a,i) * dphi_d(b,i);
+        Ddphi_dd(a,b,i) = ddphi_ab;
+      }
+      for(int c = 0; c < NDIM; ++c) {
+        ILOOP1(i) {
+          Ddphi_dd(a,b,i) -= Gamma_udd(c,a,b,i)*dphi_d(c,i);
+        }
+      }
+    }
+        // -----------------------------------------------------------------------------------
+    // Curvature contribution from conformal factor
+    //
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b) {
+      ILOOP1(i) {
+        Rphi_dd(a,b,i) = 4.*dphi_d(a,i)*dphi_d(b,i) - 2.*Ddphi_dd(a,b,i);
+      }
+      for(int c = 0; c < NDIM; ++c)
+      for(int d = 0; d < NDIM; ++d) {
+        ILOOP1(i) {
+          Rphi_dd(a,b,i) -= 2.*z4c.g_dd(a,b,k,j,i) * g_uu(c,d,i)*(Ddphi_dd(c,d,i) +
+              2.*dphi_d(c,i)*dphi_d(d,i));
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Trace of the matter stress tensor
+    //
+    S.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = 0; b < NDIM; ++b) {
+      ILOOP1(i) {
+        S(i) += oopsi4(i) * g_uu(a,b,i) * mat.S_dd(a,b,k,j,i);
+      }
+    }
+
+    // -----------------------------------------------------------------------------------
+    // 2nd covariant derivative of the lapse
+    //
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = 0; b < NDIM; ++b) {
+      ILOOP1(i) {
+        Ddalpha_dd(a,b,i) = ddalpha_dd(a,b,i)
+                          - 2.*(dphi_d(a,i)*dalpha_d(b,i) + dphi_d(b,i)*dalpha_d(a,i));
+      }
+      for(int c = 0; c < NDIM; ++c) {
+        ILOOP1(i) {
+          Ddalpha_dd(a,b,i) -= Gamma_udd(c,a,b,i)*dalpha_d(c,i);
+        }
+        for(int d = 0; d < NDIM; ++d) {
+          ILOOP1(i) {
+            Ddalpha_dd(a,b,i) += 2.*z4c.g_dd(a,b,k,j,i) * g_uu(c,d,i) * dphi_d(c,i) * dalpha_d(d,i);
+          }
+        }
+      }
+    }
+
+    Ddalpha.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = 0; b < NDIM; ++b) {
+      ILOOP1(i) {
+        Ddalpha(i) += oopsi4(i) * g_uu(a,b,i) * Ddalpha_dd(a,b,i);
+      }
+    }
+  
+    // RHS asseble goes here
+    SPACETIMELOOP2(mu, nu) {
+      Real *At_rhs = &rhs(b, At(flatten(mu, nu), k, j);
+         parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ib.e,
+         [&](const int i) {
+             At_rhs[i] = /* some nonsense */;
+         });
+    }
+  };
+
+  return TaskStatus::complete;
+}
