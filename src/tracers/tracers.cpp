@@ -10,14 +10,11 @@
 
 namespace tracers {
 
-
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("tracers");
   const bool active = pin->GetBoolean("physics", "tracers");
   physics->AddParam<bool>("active", active);
-  // Better way to do this? I leave the tracer swarm defined even if we are not
-  // doing tracers as it simplifies the pgen initialization.
-  // if (!active) return physics;
+  if (!active) return physics;
 
   Params &params = physics->AllParams();
 
@@ -41,14 +38,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddSwarmValue("rho", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("temperature", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("ye", swarm_name, real_swarmvalue_metadata);
-  //physics->AddSwarmValue("entropy", swarm_name, real_swarmvalue_metadata);
+  // physics->AddSwarmValue("entropy", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("energy", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("vel_x", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("vel_y", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("vel_z", swarm_name, real_swarmvalue_metadata);
-  //physics->AddSwarmValue("B_x", swarm_name, real_swarmvalue_metadata);
-  //physics->AddSwarmValue("B_y", swarm_name, real_swarmvalue_metadata);
-  //physics->AddSwarmValue("B_z", swarm_name, real_swarmvalue_metadata);
+  // physics->AddSwarmValue("B_x", swarm_name, real_swarmvalue_metadata);
+  // physics->AddSwarmValue("B_y", swarm_name, real_swarmvalue_metadata);
+  // physics->AddSwarmValue("B_z", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("lorentz", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("lapse", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("shift_x", swarm_name, real_swarmvalue_metadata);
@@ -57,7 +54,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddSwarmValue("mass", swarm_name, real_swarmvalue_metadata);
 
   physics->PostFillDerivedBlock = FillTracers;
-  
+
   return physics;
 } // Initialize
 
@@ -135,7 +132,7 @@ void FillTracers(MeshBlockData<Real> *rc) {
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("tracers");
   auto eos = pmb->packages.Get("eos")->Param<EOS>("d.EOS");
-  //auto eos = pmb->packages.Get("eos");
+  // auto eos = pmb->packages.Get("eos");
 
   // pull swarm vars
   auto &x = swarm->Get<Real>("x").Get();
@@ -144,13 +141,13 @@ void FillTracers(MeshBlockData<Real> *rc) {
   auto &v1 = swarm->Get<Real>("vel_x").Get();
   auto &v2 = swarm->Get<Real>("vel_y").Get();
   auto &v3 = swarm->Get<Real>("vel_z").Get();
-  //auto &B1 = swarm->Get<Real>("B_x").Get();
-  //auto &B2 = swarm->Get<Real>("B_y").Get();
-  //auto &B3 = swarm->Get<Real>("B_z").Get();
+  // auto &B1 = swarm->Get<Real>("B_x").Get();
+  // auto &B2 = swarm->Get<Real>("B_y").Get();
+  // auto &B3 = swarm->Get<Real>("B_z").Get();
   auto &s_rho = swarm->Get<Real>("rho").Get();
   auto &s_temperature = swarm->Get<Real>("temperature").Get();
   auto &s_ye = swarm->Get<Real>("ye").Get();
-  //auto &s_entropy = swarm->Get<Real>("entropy").Get();
+  // auto &s_entropy = swarm->Get<Real>("entropy").Get();
   auto &s_energy = swarm->Get<Real>("energy").Get();
   auto &s_lorentz = swarm->Get<Real>("lorentz").Get();
   auto &s_lapse = swarm->Get<Real>("lapse").Get();
@@ -158,10 +155,10 @@ void FillTracers(MeshBlockData<Real> *rc) {
   auto &shift_y = swarm->Get<Real>("shift_y").Get();
   auto &shift_z = swarm->Get<Real>("shift_z").Get();
 
-
   auto swarm_d = swarm->GetDeviceContext();
 
-  const std::vector<std::string> vars = {p::density, p::temperature, p::velocity, p::energy};
+  const std::vector<std::string> vars = {p::density, p::temperature, p::velocity,
+                                         p::energy};
 
   PackIndexMap imap;
   auto pack = rc->PackVariables(vars, imap);
@@ -195,9 +192,9 @@ void FillTracers(MeshBlockData<Real> *rc) {
           const Real Wvel_X1 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo);
           const Real Wvel_X2 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo + 1);
           const Real Wvel_X3 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_hi);
-          //const Real B_X1 = LCInterp::Do(0, x(n), y(n), z(n), pack, pB_lo);
-          //const Real B_X2 = LCInterp::Do(0, x(n), y(n), z(n), pack, pB_lo + 1);
-          //const Real B_X3 = LCInterp::Do(0, x(n), y(n), z(n), pack, pB_hi);
+          // const Real B_X1 = LCInterp::Do(0, x(n), y(n), z(n), pack, pB_lo);
+          // const Real B_X2 = LCInterp::Do(0, x(n), y(n), z(n), pack, pB_lo + 1);
+          // const Real B_X3 = LCInterp::Do(0, x(n), y(n), z(n), pack, pB_hi);
           const Real rho = LCInterp::Do(0, x(n), y(n), z(n), pack, prho);
           const Real temperature = LCInterp::Do(0, x(n), y(n), z(n), pack, ptemp);
           const Real energy = LCInterp::Do(0, x(n), y(n), z(n), pack, penergy);
@@ -206,21 +203,22 @@ void FillTracers(MeshBlockData<Real> *rc) {
           const Real vel_X1 = Wvel_X1 / W;
           const Real vel_X2 = Wvel_X2 / W;
           const Real vel_X3 = Wvel_X3 / W;
-          //Real ye;
-          //if (pye > 0){
-          //  ye = LCInterp::Do(0, x(n), y(n), z(n), pack, pye);
-          //} else {
-          //  ye = 0.0;
-         // }
-          //Real lambda[2] = {ye, 0.0};
-          //const Real entropy = eos.EntropyFromDensityTemperature(rho, temperature, lambda);
+          // Real ye;
+          // if (pye > 0){
+          //   ye = LCInterp::Do(0, x(n), y(n), z(n), pack, pye);
+          // } else {
+          //   ye = 0.0;
+          // }
+          // Real lambda[2] = {ye, 0.0};
+          // const Real entropy = eos.EntropyFromDensityTemperature(rho, temperature,
+          // lambda);
 
           // store
           s_rho(n) = rho;
           s_temperature(n) = temperature;
-          //s_ye(n) = ye;
+          // s_ye(n) = ye;
           s_energy(n) = energy;
-          //s_entropy(n) = entropy;
+          // s_entropy(n) = entropy;
           v1(n) = vel_X1;
           v2(n) = vel_X3;
           v3(n) = vel_X2;
@@ -229,9 +227,9 @@ void FillTracers(MeshBlockData<Real> *rc) {
           shift_z(n) = shift[2];
           s_lapse(n) = lapse;
           s_lorentz(n) = W;
-          //B1(n) = B_X1;
-          //B2(n) = B_X2;
-          //B3(n) = B_X3;
+          // B1(n) = B_X1;
+          // B2(n) = B_X2;
+          // B3(n) = B_X3;
 
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
@@ -239,6 +237,5 @@ void FillTracers(MeshBlockData<Real> *rc) {
       });
 
 } // FillTracers
-
 
 } // namespace tracers
