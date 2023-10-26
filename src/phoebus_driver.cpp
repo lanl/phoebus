@@ -333,7 +333,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
       geom_src = geom_src | eddington;
     }
-
   }
 
   // Extra per-step user work
@@ -567,38 +566,34 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   }
 
   // First order operator split tracer advection
-  if (stage == integrator->nstages) { 
-    if (tracers_active) {
-      const std::string swarmName = "tracers";
-      TaskRegion &sync_region_tr = tc.AddRegion(1);
-      {
-        for (int i = 0; i < blocks.size(); i++) {
-          auto &tl = sync_region_tr[0];
-          auto &pmb = blocks[i];
-          auto &sc = pmb->swarm_data.Get();
-          auto reset_comms =
-              tl.AddTask(none, &SwarmContainer::ResetCommunication, sc.get());
-        }
-      }
-
-      TaskRegion &async_region_tr = tc.AddRegion(blocks.size());
-      for (int n = 0; n < blocks.size(); n++) {
-        auto &tl = async_region_tr[n];
-        auto &pmb = blocks[n];
+  if (stage == integrator->nstages && tracers_active) {
+    const std::string swarmName = "tracers";
+    TaskRegion &sync_region_tr = tc.AddRegion(1);
+    {
+      for (int i = 0; i < blocks.size(); i++) {
+        auto &tl = sync_region_tr[0];
+        auto &pmb = blocks[i];
         auto &sc = pmb->swarm_data.Get();
-        auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
-        auto tracerAdvect =
-            tl.AddTask(none, tracers::AdvectTracers, sc0.get(), dt);
-        auto tracerPurge = 
-            tl.AddTask(tracerAdvect, fixup::PurgeParticles, sc0.get(), swarmName);
-
-        auto send = tl.AddTask(tracerPurge, &SwarmContainer::Send, sc.get(),
-                               BoundaryCommSubset::all);
-
-        auto receive =
-            tl.AddTask(send, &SwarmContainer::Receive, sc.get(), BoundaryCommSubset::all);
-
+        auto reset_comms =
+            tl.AddTask(none, &SwarmContainer::ResetCommunication, sc.get());
       }
+    }
+
+    TaskRegion &async_region_tr = tc.AddRegion(blocks.size());
+    for (int n = 0; n < blocks.size(); n++) {
+      auto &tl = async_region_tr[n];
+      auto &pmb = blocks[n];
+      auto &sc = pmb->swarm_data.Get();
+      auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
+      auto tracerAdvect = tl.AddTask(none, tracers::AdvectTracers, sc0.get(), dt);
+      auto tracerPurge =
+          tl.AddTask(tracerAdvect, fixup::PurgeParticles, sc0.get(), swarmName);
+
+      auto send = tl.AddTask(tracerPurge, &SwarmContainer::Send, sc.get(),
+                             BoundaryCommSubset::all);
+
+      auto receive =
+          tl.AddTask(send, &SwarmContainer::Receive, sc.get(), BoundaryCommSubset::all);
     }
   }
 
