@@ -61,7 +61,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // Reductions
   const bool do_mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
-  if (params.hasKey("xh") && do_mhd) {
+  const bool do_hydro = pin->GetBoolean("physics", "hydro");
+  if (params.hasKey("xh") && do_mhd && do_hydro) {
     auto HstSum = parthenon::UserHistoryOperation::sum;
     using History::ReduceJetEnergyFlux;
     using History::ReduceJetMomentumFlux;
