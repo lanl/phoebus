@@ -56,7 +56,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddSwarmValue("shift_z", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("mass", swarm_name, real_swarmvalue_metadata);
 
-  //physics->PostFillDerivedBlock = FillTracers;
+  physics->PostFillDerivedBlock = FillTracers;
   
   return physics;
 } // Initialize
@@ -88,7 +88,7 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
   // update loop.
   const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
-      "Advect Tracers", 0, max_active_index, KOKKOS_LAMBDA(const int n) {
+      "Advect Tracers", 0, max_active_index - 1, KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
@@ -161,8 +161,6 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
   auto swarm_d = swarm->GetDeviceContext();
 
-  //const std::vector<std::string> vars = {p::density, p::temperature, p::ye, p::velocity, p::energy, 
-  //p::bfield};
   const std::vector<std::string> vars = {p::density, p::temperature, p::velocity, p::energy};
 
   PackIndexMap imap;
@@ -181,7 +179,7 @@ void FillTracers(MeshBlockData<Real> *rc) {
   // update loop.
   const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
-      "Fill Tracers", 0, max_active_index, KOKKOS_LAMBDA(const int n) {
+      "Fill Tracers", 0, max_active_index - 1, KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);

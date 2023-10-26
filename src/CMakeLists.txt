@@ -18,6 +18,7 @@ add_executable(phoebus
   fixup/fixup.hpp
   fixup/fixup.cpp
   fixup/fixup_c2p.cpp
+  fixup/fixup_particles.cpp
   fixup/fixup_radc2p.cpp
   fixup/fixup_src.cpp
   fixup/fixup_netfield.cpp

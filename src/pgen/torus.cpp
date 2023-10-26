@@ -137,14 +137,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto rad_pkg = pmb->packages.Get("radiation");
   bool do_rad = rad_pkg->Param<bool>("active");
 
-  auto tracer_pkg = pmb->packages.Get("tracers");
-  bool do_tracers = tracer_pkg->Param<bool>("active");
-  auto &sc = pmb->swarm_data.Get();
-  auto &swarm = pmb->swarm_data.Get()->Get("tracers");
-  auto rng_pool_tr =
-      tracer_pkg->Param<RNGPool>("rng_pool"); // Q: Have 2 pools. combine/share?
-  const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
-
   PackIndexMap imap;
   auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
                               fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
@@ -203,18 +195,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real &minx_i = pmb->coords.Xf<1>(ib.s);
   const Real &minx_j = pmb->coords.Xf<2>(jb.s);
   const Real &minx_k = pmb->coords.Xf<3>(kb.s);
-
-  const int n_tracers_block = (int)((num_tracers_total) / (nx_i + nx_j + nx_k));
-
-  // Q: Should this be in an if (do_tracers)? Or is defaulting num_tracers to 0
-  // sufficient?
-  ParArrayND<int> new_indices;
-  swarm->AddEmptyParticles(n_tracers_block, new_indices);
-
-  // Q: similar. Can we "Get" these if no tracers?
-  auto &x = swarm->Get<Real>("x").Get();
-  auto &y = swarm->Get<Real>("y").Get();
-  auto &z = swarm->Get<Real>("z").Get();
 
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<EOS>("d.EOS");
@@ -550,6 +530,8 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
   const Real rin = pin->GetOrAddReal("torus", "rin", 6.0);
   const Real rmax = pin->GetOrAddReal("torus", "rmax", 12.0);
   const Real a = pin->GetReal("geometry", "a");
+  const Real Rh = 1.0 + std::sqrt(1.0 - a * a);
+  const Real xh = std::log(Rh);
   const Real angular_mom = lfish_calc(rmax, a);
 
 
@@ -623,11 +605,12 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           Real r = tr.bl_radius(x1);
           Real th = tr.bl_theta(x1, x2);
 
+
           Real lnh = -1.0;
           Real hm1;
           Real uphi;
           if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
-          if (lnh > 0.0) {
+          if (lnh > 0.0 && x1 > xh) {
             indices(flatten(k-kb.s, j-jb.s, i-ib.s)) = n_cells_disk;
             n_cells_disk++;
           }   
@@ -649,7 +632,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           Real hm1;
           Real uphi;
           if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
-          if (lnh > 0.0) {
+          if (lnh > 0.0 && x1 > Rh) {
             int start_ind = indices(flatten(k-kb.s, j-jb.s, i-ib.s)) * num_tracers_cell;
             const Real &x_min = coords.Xf<1>(i);
             const Real &y_min = coords.Xf<2>(j);
