@@ -60,7 +60,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   geometry->AddField(geometric_variables::node_coords, gcoord_node);
 
   // Reductions
-  const bool do_mhd = pin->GetBoolean("fluid", "mhd");
+  const bool do_mhd = pin->GetorAddBoolean("fluid", "mhd", false);
   if (params.hasKey("xh") && do_mhd) {
     auto HstSum = parthenon::UserHistoryOperation::sum;
     using History::ReduceJetEnergyFlux;
