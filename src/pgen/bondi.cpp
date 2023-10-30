@@ -95,6 +95,8 @@ void bl_to_ks(const Real r, const Real a, Real *ucon_bl, Real *ucon_ks) {
   LinearAlgebra::SetZero(ucon_ks, NDFULL);
   SPACETIMELOOP2(mu, nu) { ucon_ks[mu] += trans[mu][nu] * ucon_bl[nu]; }
 }
+void ComputeBetas(Mesh *pmesh, const Real rho_min_bnorm, Real &beta_min_global,
+                  Real &beta_pmax);
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -113,8 +115,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap[fluid_prim::velocity].first;
   const int ivhi = imap[fluid_prim::velocity].second;
   const int ieng = imap[fluid_prim::energy].first;
-  const int ib_lo = imap[fluid_prim::bfield].first;
-  const int ib_hi = imap[fluid_prim::bfield].second;
+  const int iblo = imap[fluid_prim::bfield].first;
+  const int ibhi = imap[fluid_prim::bfield].second;
   const int iye = imap[fluid_prim::ye].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
@@ -132,6 +134,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
+  const Real b_rad = pin->GetOrAddReal("bondi", "b_radius", 10.);
   //const Real Rhor = pin->GetOrAddReal("bondi", "Rhor", 2.0);
 
   // Solution constants
@@ -297,10 +300,193 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy( v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), eos_lambda);
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature( v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) / v(iprs, k, j, i);
         }         
-            });
+      });
+    ParArrayND<Real> A("vector potential", jb.e + 1, ib.e + 1);
+  pmb->par_for(
+      "Phoebus::ProblemGenerator::Bondi2", jb.s + 1, jb.e, ib.s + 1, ib.e,
+      KOKKOS_LAMBDA(const int j, const int i) {
+        Real x1 = coords.Xc<1>(kb.s, j, i);
+        Real x2 = coords.Xc<2>(kb.s, j, i);
+        Real r = tr.bl_radius(x1);
+        Real sth = std::sin(tr.bl_theta(x1, x2));
+        A(j, i) = std::exp(1.0 - (b_rad*b_rad)/(r*r))*sth*sth;
+      });
 
+  // Initialize B field lines, to be normalized in PostInitializationModifier
+  if (ibhi > 0) {
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::Bondi3", kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
+        KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          // JMM: HARM/bhlight divides by gdet, not gamdet.
+          // This means the HARM primitives are smaller than the Phoebus
+          // primitives by a factor of alpha.
+          const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
+          v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
+                             (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gamdet);
+          v(iblo + 1, k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
+                                 (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gamdet);
+          v(ibhi, k, j, i) = 0.0;
+        });
+  }
+
+
+
+
+
+  
   fluid::PrimitiveToConserved(rc);
   fixup::ApplyFloors(rc);
 }
+
+
+void ProblemModifier(ParameterInput *pin) {
+  Real a = pin->GetReal("geometry", "a");
+  Real Rh = 1.0 + sqrt(1.0 - a*a);
+  Real xh = log(Rh);
+}
+
+
+
+
+void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+  //auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
+  //Real rhoflr = 0.0;
+  //Real epsflr;
+  //Real x1 = coords.Xc<1>(k, j, i);
+  //const Real x2 = coords.Xc<2>(k, j, i);
+  //const Real x3 = coords.Xc<3>(k, j, i);
+  //auto &coords = pmb->coords;
+  //floor.GetFloors(x1, x2, x3, rhoflr, epsflr);
+  const bool magnetized = pin->GetOrAddBoolean("bondi", "magnetized", true);
+  const Real beta_target = pin->GetOrAddReal("bondi", "target_beta", 100.);
+  const bool harm_style_beta =
+      pin->GetOrAddBoolean("bondi", "harm_beta_normalization", true);
+
+  Real beta_min, beta_pmax;
+  ComputeBetas(pmesh, 0.0001, beta_min, beta_pmax);
+  if (parthenon::Globals::my_rank == 0) {
+    printf("Bondi before normalization: beta_min, beta_pmax = %.14e %.14e\n", beta_min,
+           beta_pmax);
+  }
+  const Real beta_norm = harm_style_beta ? beta_pmax : beta_min;
+  const Real B_field_fac = magnetized ? std::sqrt(beta_norm / beta_target) : 0;
+  if (parthenon::Globals::my_rank == 0) {
+    printf("Bondi normalization factor = %.14e\n", B_field_fac);
+  }
+
+  for (auto &pmb : pmesh->block_list) {
+    auto &rc = pmb->meshblock_data.Get();
+    auto geom = Geometry::GetCoordinateSystem(rc.get());
+
+    auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+    auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+    auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+    PackIndexMap imap;
+    auto v = rc->PackVariables({fluid_prim::bfield}, imap);
+    const int iblo = imap[fluid_prim::bfield].first;
+    const int ibhi = imap[fluid_prim::bfield].second;
+
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          for (int ib = iblo; ib <= ibhi; ib++) {
+            v(ib, k, j, i) *= B_field_fac;
+          }
+        });
+
+    fluid::PrimitiveToConserved(rc.get());
+  }
+
+  Real beta_min_new, beta_pmax_new;
+  ComputeBetas(pmesh, 0.0001, beta_min_new, beta_pmax_new);
+  if (parthenon::Globals::my_rank == 0) {
+    printf("Bondi after normalization: beta_min, beta_pmax = %.14e %.14e\n", beta_min_new,
+           beta_pmax_new);
+  }
+}
+
+
+void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
+                  Real &beta_pmax) {
+  Real beta_min = std::numeric_limits<Real>::infinity();
+  Real press_max = -std::numeric_limits<Real>::infinity();
+  Real bsq_max = -std::numeric_limits<Real>::infinity();
+
+  for (auto &pmb : pmesh->block_list) {
+    auto &rc = pmb->meshblock_data.Get();
+    auto geom = Geometry::GetCoordinateSystem(rc.get());
+
+    auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+    auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+    auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+    PackIndexMap imap;
+    auto v =
+        rc->PackVariables({fluid_prim::density, fluid_prim::velocity, fluid_prim::bfield,
+                           fluid_prim::pressure, radmoment_prim::J},
+                          imap);
+
+    const int irho = imap[fluid_prim::density].first;
+    const int ivlo = imap[fluid_prim::velocity].first;
+    const int ivhi = imap[fluid_prim::velocity].second;
+    const int iblo = imap[fluid_prim::bfield].first;
+    const int ibhi = imap[fluid_prim::bfield].second;
+    const int iprs = imap[fluid_prim::pressure].first;
+
+    auto idx_J = imap.GetFlatIdx(radmoment_prim::J, false);
+
+    if (ibhi < 0) return;
+
+    Real beta_min_local;
+    pmb->par_reduce(
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm::beta_min", kb.s, kb.e, jb.s, jb.e,
+        ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
+          const Real bsq =
+              GetMagneticFieldSquared(CellLocation::Cent, k, j, i, geom, v, ivlo, iblo);
+          Real Ptot = v(iprs, k, j, i);
+          // TODO(BRR) multiple species
+          if (idx_J.IsValid()) {
+            int ispec = 0;
+            Ptot += 1. / 3. * v(idx_J(ispec), k, j, i);
+          }
+          const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
+          if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
+        },
+        Kokkos::Min<Real>(beta_min_local));
+    beta_min = std::min<Real>(beta_min_local, beta_min);
+
+    Real bsq_max_local;
+    pmb->par_reduce(
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm::bsq_max", kb.s, kb.e, jb.s, jb.e,
+        ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bsq_max) {
+          const Real bsq =
+              GetMagneticFieldSquared(CellLocation::Cent, k, j, i, geom, v, ivlo, iblo);
+          bsq_max = std::max(bsq, bsq_max);
+        },
+        Kokkos::Max<Real>(bsq_max_local));
+    bsq_max = std::max<Real>(bsq_max, bsq_max_local);
+
+    Real press_max_local;
+    pmb->par_reduce(
+        "Phoebus::ProblemGenerator::Torus::BFieldNorm::press_max", kb.s, kb.e, jb.s, jb.e,
+        ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i, Real &P_max) {
+          P_max = std::max(v(iprs, k, j, i), P_max);
+        },
+        Kokkos::Max<Real>(press_max_local));
+    press_max = std::max<Real>(press_max, press_max_local);
+  }
+
+  beta_min_global = reduction::Min(beta_min);
+  const Real bsq_max_global = reduction::Max(bsq_max);
+  const Real Pmax_global = reduction::Max(press_max);
+  beta_pmax = robust::ratio(Pmax_global, 0.5 * bsq_max_global);
+  return;
+}
+
+
 
 } // namespace bondi
