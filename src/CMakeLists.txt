@@ -156,13 +156,24 @@ target_include_directories(phoebus PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos"
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-opac"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../external/utils/herumi-fmath"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../external/utils/ports-of-call"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils/ports-of-call"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils/spiner"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils/variant/include"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-opac/utils"
 )
 
 target_compile_features(phoebus PUBLIC cxx_std_14)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "XL")
   target_compile_options(phoebus PUBLIC -std=c++1y -qxflag=disable__cplusplusOverride)
+endif()
+
+target_compile_definitions(phoebus PRIVATE PORTABILITY_STRATEGY_KOKKOS)
+if (PHOEBUS_ENABLE_HDF5)
+  target_compile_definitions(phoebus PRIVATE
+    SINGULARITY_USE_HDF
+    SPINER_USE_HDF
+  )
 endif()
 
 if (Kokkos_ENABLE_CUDA)
@@ -172,6 +183,9 @@ endif()
 # target_compile_options(phoebus PUBLIC -G -lineinfo)
 
 target_link_libraries(phoebus PRIVATE parthenon
-  singularity-eos::singularity-eos
-  singularity-opac::singularity-opac
+  # singularity-eos::singularity-eos
+  # singularity-opac::singularity-opac
 )
+if (PHOEBUS_ENABLE_HDF5)
+  target_link_libraries(phoebus PRIVATE hdf5::hdf5 hdf5::hdf5_hl)
+endif()
