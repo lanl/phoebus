@@ -121,5 +121,24 @@ hexp_br = 1000. # Initial break radius for hyperexponential coordinates
 <bondi>
 mdot = 1
 rs = 1187
-Rhor = 2.0
+#Rhor = 2.0
 
+<fixup>
+enable_floors = true
+enable_mhd_floors = true
+enable_ceilings = true
+enable_flux_fixup = true
+enable_c2p_fixup = true
+floor_type = ExpX1RhoSie
+rho0_floor = 1.0e-8
+sie0_floor = 1.0e-3
+rho_exp_floor = -2.0
+sie_exp_floor = -1.0
+ceiling_type = ConstantGamSie
+sie0_ceiling = 1.0
+gam0_ceiling = 10.0
+enable_ox1_fmks_inflow_check = true
+enable_phi_enforcement = false
+enforced_phi = 1.
+enforced_phi_timescale = 500.
+enforced_phi_cadence = 1.

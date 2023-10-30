@@ -29,7 +29,7 @@
 
 namespace bondi {
 
-using namespace radiation;
+  //using namespace radiation;
 using Microphysics::Opacities;
 using Microphysics::EOS::EOS;
 
@@ -132,7 +132,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
-  const Real Rhor = pin->GetOrAddReal("bondi", "Rhor", 2.0);
+  //const Real Rhor = pin->GetOrAddReal("bondi", "Rhor", 2.0);
 
   // Solution constants
   const Real uc = std::sqrt(1.0 / (2. * rs));
@@ -152,6 +152,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const Real a = pin->GetReal("geometry", "a");
   auto bl = Geometry::BoyerLindquist(a);
+  const Real Rhor = 1.0 + sqrt(1.0 - a);
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -208,16 +209,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 	bl.ContravariantShift(0.0, r, th, x3, bl_shift);
 	bl.SpacetimeMetric(0.0, r, th, x3, gcov);
 
-	if (r>20){
+	if (r>10){
 	if (vz!=0){
 	   printf("Bondi-Hoyle with v_inf = %.3e\n", vz);
-	if (r<=25){
-	ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));}
-	else {
+	   //if (r<=25){
+	   //ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));}
+	   //else {
 	  ucon_bl[1] = lf*(1/(std::sqrt(gcov[1][1])) * vz * cth - bl_shift[0]/bl_lapse);// -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
 	  ucon_bl[2] = lf*(1/(std::sqrt(gcov[2][2])) * -vz * sth - bl_shift[1]/bl_lapse);
 	  //ucon_bl[3] = lf*(-1/(std::sqrt(gcov[3][3])) * vx * sph - bl_shift[2]/bl_lapse);
-	}}
+	}//}
 	else{
 	  //printf("Stationary Bondi accretion \n");
 	   ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
