@@ -547,7 +547,123 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
         Ddalpha(i) += oopsi4(i) * g_uu(a,b,i) * Ddalpha_dd(a,b,i);
       }
     }
-  
+
+    // -----------------------------------------------------------------------------------
+    // Contractions of A_ab, inverse, and derivatives
+    //
+    AA_dd.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b)
+    for(int c = 0; c < NDIM; ++c)
+    for(int d = 0; d < NDIM; ++d) {
+      ILOOP1(i) {
+        AA_dd(a,b,i) += g_uu(c,d,i) * z4c.A_dd(a,c,k,j,i) * z4c.A_dd(d,b,k,j,i);
+      }
+    }
+    AA.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = 0; b < NDIM; ++b) {
+      ILOOP1(i) {
+        AA(i) += g_uu(a,b,i) * AA_dd(a,b,i);
+      }
+    }
+    A_uu.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b)
+    for(int c = 0; c < NDIM; ++c)
+    for(int d = 0; d < NDIM; ++d) {
+      ILOOP1(i) {
+        A_uu(a,b,i) += g_uu(a,c,i) * g_uu(b,d,i) * z4c.A_dd(c,d,k,j,i);
+      }
+    }
+    DA_u.ZeroClear();
+    for(int a = 0; a < NDIM; ++a) {
+      for(int b = 0; b < NDIM; ++b) {
+        ILOOP1(i) {
+          DA_u(a,i) -= (3./2.) * A_uu(a,b,i) * dchi_d(b,i) / chi_guarded(i);
+          DA_u(a,i) -= (1./3.) * g_uu(a,b,i) * (2.*dKhat_d(b,i) + dTheta_d(b,i));
+        }
+      }
+      for(int b = 0; b < NDIM; ++b)
+      for(int c = 0; c < NDIM; ++c) {
+        ILOOP1(i) {
+          DA_u(a,i) += Gamma_udd(a,b,c,i) * A_uu(b,c,i);
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Ricci scalar
+    //
+    R.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = 0; b < NDIM; ++b) {
+      ILOOP1(i) {
+        R(i) += oopsi4(i) * g_uu(a,b,i) * (R_dd(a,b,i) + Rphi_dd(a,b,i));
+      }
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Hamiltonian constraint
+    //
+    ILOOP1(i) {
+      Ht(i) = R(i) + (2./3.)*SQR(K(i)) - AA(i);
+    }
+
+    // -----------------------------------------------------------------------------------
+    // Finalize advective (Lie) derivatives
+    //
+    // Shift vector contractions
+    dbeta.ZeroClear();
+    for(int a = 0; a < NDIM; ++a) {
+      ILOOP1(i) {
+        dbeta(i) += dbeta_du(a,a,i);
+      }
+    }
+    ddbeta_d.ZeroClear();
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = 0; b < NDIM; ++b) {
+      ILOOP1(i) {
+        ddbeta_d(a,i) += (1./3.) * ddbeta_ddu(a,b,b,i);
+      }
+    }
+    // Finalize Lchi
+    ILOOP1(i) {
+      Lchi(i) += (1./6.) * opt.chi_psi_power * chi_guarded(i) * dbeta(i);
+    }
+    // Finalize LGam_u (note that this is not a real Lie derivative)
+    for(int a = 0; a < NDIM; ++a) {
+      ILOOP1(i) {
+        LGam_u(a,i) += (2./3.) * Gamma_u(a,i) * dbeta(i);
+      }
+      for(int b = 0; b < NDIM; ++b) {
+        ILOOP1(i) {
+          LGam_u(a,i) += g_uu(a,b,i) * ddbeta_d(b,i) - Gamma_u(b,i) * dbeta_du(b,a,i);
+        }
+        for(int c = 0; c < NDIM; ++c) {
+          ILOOP1(i) {
+            LGam_u(a,i) += g_uu(b,c,i) * ddbeta_ddu(b,c,a,i);
+          }
+        }
+      }
+    }
+    // Finalize Lg_dd and LA_dd
+    for(int a = 0; a < NDIM; ++a)
+    for(int b = a; b < NDIM; ++b) {
+      ILOOP1(i) {
+        Lg_dd(a,b,i) -= (2./3.) * z4c.g_dd(a,b,k,j,i) * dbeta(i);
+        LA_dd(a,b,i) -= (2./3.) * z4c.A_dd(a,b,k,j,i) * dbeta(i);
+      }
+      for(int c = 0; c < NDIM; ++c) {
+        ILOOP1(i) {
+          Lg_dd(a,b,i) += dbeta_du(a,c,i) * z4c.g_dd(b,c,k,j,i);
+          LA_dd(a,b,i) += dbeta_du(b,c,i) * z4c.A_dd(a,c,k,j,i);
+          Lg_dd(a,b,i) += dbeta_du(b,c,i) * z4c.g_dd(a,c,k,j,i);
+          LA_dd(a,b,i) += dbeta_du(a,c,i) * z4c.A_dd(b,c,k,j,i);
+        }
+      }
+    }
+
     // RHS asseble goes here
     SPACETIMELOOP2(mu, nu) {
       Real *At_rhs = &rhs(b, At(flatten(mu, nu), k, j);
