@@ -116,7 +116,7 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
       }
     }
 
-    Gamma_udd.ZeroClear();
+    //Gamma_udd.ZeroClear();
     for(int c = 0; c < NDIM; ++c)
     for(int a = 0; a < NDIM; ++a)
     for(int b = a; b < NDIM; ++b)
@@ -126,7 +126,7 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
       }
     }
 
-    Gamma_u.ZeroClear();
+    //Gamma_u.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b)
     for(int c = 0; c < NDIM; ++c) {
@@ -138,8 +138,8 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
     // -----------------------------------------------------------------------------------
     // Ricci tensor and Ricci scalar
     //
-    R.ZeroClear();
-    R_dd.ZeroClear();
+    //R.ZeroClear();
+    //R_dd.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = a; b < NDIM; ++b) {
       for(int c = 0; c < NDIM; ++c)
@@ -166,8 +166,8 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
     // -----------------------------------------------------------------------------------
     // Extrinsic curvature: traces and derivatives
     //
-    K.ZeroClear();
-    K_ud.ZeroClear();
+    //K.ZeroClear();
+    //K_ud.ZeroClear();
     for(int a = 0; a < NDIM; ++a) {
       for(int b = a; b < NDIM; ++b) {
         for(int c = 0; c < NDIM; ++c) {
@@ -181,7 +181,7 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
       }
     }
     // K^a_b K^b_a
-    KK.ZeroClear();
+    //KK.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b) {
       ILOOP1(i) {
@@ -202,7 +202,7 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
         }
       }
     }
-    DK_udd.ZeroClear();
+    //DK_udd.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b)
     for(int c = b; c < NDIM; ++c)
@@ -222,7 +222,7 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
     }
     // Momentum constraint (contravariant)
     //
-    M_u.ZeroClear();
+    //M_u.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b) {
       ILOOP1(i) {
@@ -353,10 +353,10 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
     // Advective derivatives
     //
     // Scalars
-    Lalpha.ZeroClear();
-    Lchi.ZeroClear();
-    LKhat.ZeroClear();
-    LTheta.ZeroClear();
+    //Lalpha.ZeroClear();
+    //Lchi.ZeroClear();
+    //LKhat.ZeroClear();
+    //LTheta.ZeroClear();
     for(int a = 0; a < NDIM; ++a) {
       ILOOP1(i) {
         Lalpha(i) += FD.Lx(a, z4c.beta_u(a,k,j,i), z4c.alpha(k,j,i));
@@ -366,8 +366,8 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
       }
     }
     // Vectors
-    Lbeta_u.ZeroClear();
-    LGam_u.ZeroClear();
+    //Lbeta_u.ZeroClear();
+    //LGam_u.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b) {
       ILOOP1(i) {
@@ -376,8 +376,8 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
       }
     }
     // Tensors
-    Lg_dd.ZeroClear();
-    LA_dd.ZeroClear();
+    //Lg_dd.ZeroClear();
+    //LA_dd.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = a; b < NDIM; ++b)
     for(int c = 0; c < NDIM; ++c) {
@@ -416,7 +416,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
         Gamma_ddd(c,a,b,i) = 0.5*(dg_ddd(a,b,c,i) + dg_ddd(b,a,c,i) - dg_ddd(c,a,b,i));
       }
     }
-    Gamma_udd.ZeroClear();
+    //Gamma_udd.ZeroClear();
     for(int c = 0; c < NDIM; ++c)
     for(int a = 0; a < NDIM; ++a)
     for(int b = a; b < NDIM; ++b)
@@ -426,7 +426,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
       }
     }
     // Gamma's computed from the conformal metric (not evolved)
-    Gamma_u.ZeroClear();
+    //Gamma_u.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b)
     for(int c = 0; c < NDIM; ++c) {
@@ -437,7 +437,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
     // -----------------------------------------------------------------------------------
     // Curvature of conformal metric
     //
-    R_dd.ZeroClear();
+    //R_dd.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = a; b < NDIM; ++b) {
       for(int c = 0; c < NDIM; ++c) {
@@ -511,7 +511,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
     // -----------------------------------------------------------------------------------
     // Trace of the matter stress tensor
     //
-    S.ZeroClear();
+    //S.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b) {
       ILOOP1(i) {
@@ -540,7 +540,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
       }
     }
 
-    Ddalpha.ZeroClear();
+    //Ddalpha.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b) {
       ILOOP1(i) {
@@ -551,7 +551,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
     // -----------------------------------------------------------------------------------
     // Contractions of A_ab, inverse, and derivatives
     //
-    AA_dd.ZeroClear();
+    //AA_dd.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = a; b < NDIM; ++b)
     for(int c = 0; c < NDIM; ++c)
@@ -560,14 +560,14 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
         AA_dd(a,b,i) += g_uu(c,d,i) * z4c.A_dd(a,c,k,j,i) * z4c.A_dd(d,b,k,j,i);
       }
     }
-    AA.ZeroClear();
+    //AA.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b) {
       ILOOP1(i) {
         AA(i) += g_uu(a,b,i) * AA_dd(a,b,i);
       }
     }
-    A_uu.ZeroClear();
+    //A_uu.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = a; b < NDIM; ++b)
     for(int c = 0; c < NDIM; ++c)
@@ -576,7 +576,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
         A_uu(a,b,i) += g_uu(a,c,i) * g_uu(b,d,i) * z4c.A_dd(c,d,k,j,i);
       }
     }
-    DA_u.ZeroClear();
+    //DA_u.ZeroClear();
     for(int a = 0; a < NDIM; ++a) {
       for(int b = 0; b < NDIM; ++b) {
         ILOOP1(i) {
@@ -595,7 +595,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
     // -----------------------------------------------------------------------------------
     // Ricci scalar
     //
-    R.ZeroClear();
+    //R.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b) {
       ILOOP1(i) {
@@ -614,13 +614,13 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
     // Finalize advective (Lie) derivatives
     //
     // Shift vector contractions
-    dbeta.ZeroClear();
+    //dbeta.ZeroClear();
     for(int a = 0; a < NDIM; ++a) {
       ILOOP1(i) {
         dbeta(i) += dbeta_du(a,a,i);
       }
     }
-    ddbeta_d.ZeroClear();
+    //ddbeta_d.ZeroClear();
     for(int a = 0; a < NDIM; ++a)
     for(int b = 0; b < NDIM; ++b) {
       ILOOP1(i) {
