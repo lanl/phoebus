@@ -47,7 +47,7 @@ Author : Hyun Lim
     static std::string name() { return #ns "." #varname; }                               \
   }
 
-namespace z4c { // fix consistencty with namespace everywhere
+namespace z4c { //TODO: check consistencty with namespace everywhere
   namespace constraint{
   VARIABLE(z4c.c, H); // Hamiltoninan constraint
   VARIABLE(z4c.c, M); // Momentum constraint

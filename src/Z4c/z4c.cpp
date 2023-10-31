@@ -40,6 +40,7 @@ Author : Hyun Lim
 // Phoebus
 #ifndef PHOEBUS_IN_UNIT_TESTS
 #include "geometry/geometry.hpp"
+#include "geometry/geometry.hpp"
 #endif // PHOEBUS_UNIT_TESTS
 
 #include "geometry/geometry_utils.hpp"
