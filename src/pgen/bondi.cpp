@@ -166,6 +166,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real Rhor = 1.0 + sqrt(1.0 - a);
 
   const Real b_rad = pin->GetOrAddReal("bondi", "b_radius", 10.);
+  const Real b_fact = pin->GetOrAddReal("bondi", "b_factor", 0.00156);
   const Real r_circ = pin->GetOrAddReal("bondi", "r_circ", 0.0);
   const Real r_cut = pin->GetOrAddReal("bondi", "r_cut", 10.0);
 
@@ -295,9 +296,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // This means the HARM primitives are smaller than the Phoebus
           // primitives by a factor of alpha.
           const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-          v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
+          v(iblo, k, j, i) = -b_fact*(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
                              (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gamdet);
-          v(iblo + 1, k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
+          v(iblo + 1, k, j, i) = b_fact*(A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
                                  (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gamdet);
           v(ibhi, k, j, i) = 0.0;
         });
@@ -312,63 +313,57 @@ void ProblemModifier(ParameterInput *pin) {
 }
 
 void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
-  //auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
-  //Real rhoflr = 0.0;
-  //Real epsflr;
-  //Real x1 = coords.Xc<1>(k, j, i);
-  //const Real x2 = coords.Xc<2>(k, j, i);
-  //const Real x3 = coords.Xc<3>(k, j, i);
-  //auto &coords = pmb->coords;
-  //floor.GetFloors(x1, x2, x3, rhoflr, epsflr);
-  const bool magnetized = pin->GetOrAddBoolean("bondi", "magnetized", true);
-  const Real beta_target = pin->GetOrAddReal("bondi", "target_beta", 100.);
-  const bool harm_style_beta =
+  const bool b_norm = pin->GetOrAddBoolean("bondi", "b_norm", false);
+  if (b_norm) {
+    const bool magnetized = pin->GetOrAddBoolean("bondi", "magnetized", true);
+    const Real beta_target = pin->GetOrAddReal("bondi", "target_beta", 100.);
+    const bool harm_style_beta =
       pin->GetOrAddBoolean("bondi", "harm_beta_normalization", true);
 
-  Real beta_min, beta_pmax;
-  ComputeBetas(pmesh, 0.0001, beta_min, beta_pmax);
-  if (parthenon::Globals::my_rank == 0) {
-    printf("Bondi before normalization: beta_min, beta_pmax = %.14e %.14e\n", beta_min,
-           beta_pmax);
-  }
-  const Real beta_norm = harm_style_beta ? beta_pmax : beta_min;
-  const Real B_field_fac = magnetized ? std::sqrt(beta_norm / beta_target) : 0;
-  if (parthenon::Globals::my_rank == 0) {
-    printf("Bondi normalization factor = %.14e\n", B_field_fac);
-  }
+    Real beta_min, beta_pmax;
+    ComputeBetas(pmesh, 0.0001, beta_min, beta_pmax);
+    if (parthenon::Globals::my_rank == 0) {
+      printf("Bondi before normalization: beta_min, beta_pmax = %.14e %.14e\n", beta_min,
+             beta_pmax);
+    }
+    const Real beta_norm = harm_style_beta ? beta_pmax : beta_min;
+    const Real B_field_fac = magnetized ? std::sqrt(beta_norm / beta_target) : 0;
+    if (parthenon::Globals::my_rank == 0) {
+      printf("Bondi normalization factor = %.14e\n", B_field_fac);
+    }
 
-  for (auto &pmb : pmesh->block_list) {
-    auto &rc = pmb->meshblock_data.Get();
-    auto geom = Geometry::GetCoordinateSystem(rc.get());
+    for (auto &pmb : pmesh->block_list) {
+      auto &rc = pmb->meshblock_data.Get();
+      auto geom = Geometry::GetCoordinateSystem(rc.get());
 
-    auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+      auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+      auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+      auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-    PackIndexMap imap;
-    auto v = rc->PackVariables({fluid_prim::bfield}, imap);
-    const int iblo = imap[fluid_prim::bfield].first;
-    const int ibhi = imap[fluid_prim::bfield].second;
+      PackIndexMap imap;
+      auto v = rc->PackVariables({fluid_prim::bfield}, imap);
+      const int iblo = imap[fluid_prim::bfield].first;
+      const int ibhi = imap[fluid_prim::bfield].second;
 
-    pmb->par_for(
-        "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
-        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          for (int ib = iblo; ib <= ibhi; ib++) {
-            v(ib, k, j, i) *= B_field_fac;
-          }
-        });
+      pmb->par_for(
+          "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
+          ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            for (int ib = iblo; ib <= ibhi; ib++) {
+              v(ib, k, j, i) *= B_field_fac;
+            }
+          });
 
-    fluid::PrimitiveToConserved(rc.get());
-  }
+      fluid::PrimitiveToConserved(rc.get());
+    }
 
-  Real beta_min_new, beta_pmax_new;
-  ComputeBetas(pmesh, 0.0001, beta_min_new, beta_pmax_new);
-  if (parthenon::Globals::my_rank == 0) {
-    printf("Bondi after normalization: beta_min, beta_pmax = %.14e %.14e\n", beta_min_new,
-           beta_pmax_new);
+    Real beta_min_new, beta_pmax_new;
+    ComputeBetas(pmesh, 0.0001, beta_min_new, beta_pmax_new);
+    if (parthenon::Globals::my_rank == 0) {
+      printf("Bondi after normalization: beta_min, beta_pmax = %.14e %.14e\n", beta_min_new,
+             beta_pmax_new);
+    }
   }
 }
-
 
 void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
                   Real &beta_pmax) {

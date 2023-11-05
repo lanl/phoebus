@@ -125,8 +125,10 @@ r_circ = 0.0
 r_cut = 10.0
 target_beta = 100.
 b_radius = 10.
+b_fact = 0.00156
 harm_beta_normalization = true
 magnetized = true
+b_nrom = false
 jitter = 0.01
 
 <fixup>
