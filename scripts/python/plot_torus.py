@@ -95,8 +95,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
             xplot[b, :, :],
             yplot[b, :, :],
             ldensity[b, 0, :, :].transpose(),
-            vmin=-10,
-            vmax=-4,
+            vmin=-14,
+            vmax=-7,
             cmap=cmap_uniform,
         )
     div = make_axes_locatable(ax)
@@ -284,8 +284,8 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
                 xplot[b, :, :],
                 yplot[b, :, :],
                 lenergy[b, 0, :, :].transpose(),
-                vmin=-10,
-                vmax=-5,
+                vmin=-13,
+                vmax=-8,
                 cmap=cmap_uniform,
             )
         div = make_axes_locatable(ax)
@@ -350,7 +350,7 @@ if __name__ == "__main__":
         "--numax", type=float, default=1.0e2, help="Maximum frequency (Hz)"
     )
     parser.add_argument(
-        "--rlim", type=float, default=200.0, help="Maximum radius to plot"
+        "--rlim", type=float, default=500.0, help="Maximum radius to plot"
     )
     parser.add_argument(
         "--nnu", type=int, default=100, help="Number of frequency support points"

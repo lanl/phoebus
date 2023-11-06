@@ -134,7 +134,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
-  const Real b_rad = pin->GetOrAddReal("bondi", "b_radius", 10.);
+  const Real bz = pin->GetOrAddReal("bondi", "b_z", 10.);
   //const Real Rhor = pin->GetOrAddReal("bondi", "Rhor", 2.0);
 
   // Solution constants
@@ -169,6 +169,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real smooth = gpkg->Param<Real>("smooth");
   auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
+  if (vz!=0){
+           printf("***********Bondi-Hoyle with v_inf = %.3e************\n", vz);
+  }
   pmb->par_for(
       "Phoebus::ProblemGenerator::Bondi", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -214,7 +217,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
 	if (r>10){
 	if (vz!=0){
-	   printf("Bondi-Hoyle with v_inf = %.3e\n", vz);
+	  //printf("Bondi-Hoyle with v_inf = %.3e\n", vz);
 	   //if (r<=25){
 	   //ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));}
 	   //else {
@@ -309,7 +312,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real x2 = coords.Xc<2>(kb.s, j, i);
         Real r = tr.bl_radius(x1);
         Real sth = std::sin(tr.bl_theta(x1, x2));
-        A(j, i) = std::exp(1.0 - (b_rad*b_rad)/(r*r))*sth*sth;
+        A(j, i) = bz*r*sth;
       });
 
   // Initialize B field lines, to be normalized in PostInitializationModifier
@@ -388,7 +391,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     const int ibhi = imap[fluid_prim::bfield].second;
 
     pmb->par_for(
-        "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
+        "Phoebus::ProblemGenerator::Bondi::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           for (int ib = iblo; ib <= ibhi; ib++) {
             v(ib, k, j, i) *= B_field_fac;
@@ -440,7 +443,7 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
 
     Real beta_min_local;
     pmb->par_reduce(
-        "Phoebus::ProblemGenerator::Torus::BFieldNorm::beta_min", kb.s, kb.e, jb.s, jb.e,
+        "Phoebus::ProblemGenerator::Bondi::BFieldNorm::beta_min", kb.s, kb.e, jb.s, jb.e,
         ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
           const Real bsq =
@@ -459,7 +462,7 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
 
     Real bsq_max_local;
     pmb->par_reduce(
-        "Phoebus::ProblemGenerator::Torus::BFieldNorm::bsq_max", kb.s, kb.e, jb.s, jb.e,
+        "Phoebus::ProblemGenerator::Bondi::BFieldNorm::bsq_max", kb.s, kb.e, jb.s, jb.e,
         ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bsq_max) {
           const Real bsq =
@@ -471,7 +474,7 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
 
     Real press_max_local;
     pmb->par_reduce(
-        "Phoebus::ProblemGenerator::Torus::BFieldNorm::press_max", kb.s, kb.e, jb.s, jb.e,
+        "Phoebus::ProblemGenerator::Bondi::BFieldNorm::press_max", kb.s, kb.e, jb.s, jb.e,
         ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &P_max) {
           P_max = std::max(v(iprs, k, j, i), P_max);

@@ -108,10 +108,10 @@ c2p_max_iter = 100
 c2p_tol = 1.e-8
 Ye = false
 mhd = true
-vz = 0
+vz = 0.1
 
 <geometry>
-a = 0.9
+a = 0
 
 <coordinates>
 derefine_poles = false
@@ -121,11 +121,11 @@ hexp_br = 1000. # Initial break radius for hyperexponential coordinates
 <bondi>
 mdot = 1
 rs = 1187
-harm_beta_normalization = true
+harm_beta_normalization = false
 target_beta = 10.
 magnetized = true
 #Rhor = 2.0
-b_radius = 10
+b_z = 0.0001
 
 <fixup>
 enable_floors = true
