@@ -175,7 +175,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
     singularity::StellarCollapse eos_sc =
         eos.GetUnmodifiedObject().get<singularity::StellarCollapse>();
     const parthenon::AllReduce<bool> *pdo_gain_reducer =
-        rad->MutableParam < parthenon::AllReduce<bool>("do_gain_reducer");
+        rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
     const bool do_gain = pdo_gain_reducer->val;
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
