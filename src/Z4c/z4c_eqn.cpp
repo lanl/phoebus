@@ -63,7 +63,7 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
 });
 
 
-  ILOOP2(k,j) {
+  ILOOP2(md, scratch_szie, scratch_level,b, k, j) {
     // -----------------------------------------------------------------------------------
     // derivatives
     //
@@ -261,7 +261,7 @@ parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace()
     ILOOP1(i) {
       con.C(k,j,i) = SQR(con.H(k,j,i)) + con.M(k,j,i) + SQR(z4c.Theta(k,j,i)) + 4.0*con.Z(k,j,i);
     }
-  }
+  }); //end of ILOOP2 //TODO: check
 }
 
 TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
@@ -270,7 +270,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
   auto rhs = desc.GetPack(md_rhs);
 
   // in loop...
-  ILOOP2(md_state, size, level, b, k, j) {
+  ILOOP2(md_state, scratch_size, scratch_level, b, k, j) {
         // -----------------------------------------------------------------------------------
     // 1st derivatives
     //
@@ -672,7 +672,7 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
              At_rhs[i] = /* some nonsense */;
          });
     }
-  };
+  })//end of ILOOP2 //TODO: check;
 
   return TaskStatus::complete;
 }

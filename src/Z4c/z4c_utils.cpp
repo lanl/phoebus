@@ -84,19 +84,47 @@ std::uniform_real_distribution<double> distribution(-1.,1.);
   ((pmy_block->block_size.nx3 > 1) ? (NGHOST) : (0))
 
 // 2D loop over k and j in the interior of the block
+#if 0
 #define ILOOP2(k,j)                                                           \
   for(int k = IX_KL; k <= IX_KU; ++k)                         \
   for(int j = IX_JL; j <= IX_JU; ++j)
+#endif
+
+#define ILOOP2(md, scratch_size, scratch_level, b, k, j) \
+  const auto kb = md->GetBoundsK(parthenon::IndexDomain::interior); \
+  const auto jb = md->GetBoundsJ(parthenon::IndexDomain::interior); \
+  const auto ib = md->GetBoundsI(parthenon::IndexDomain::interior); \
+   parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace(), \
+       scratch_size, scratch_level, \
+       0, nblocks-1, kb.s, kb.e,  \
+   KOKKOS_LAMBDA(parthenon::team_member_t member, const int b, const int k, const int j) {\
 
 // 2D loop over k and j on the whole block
+#if 0
 #define GLOOP2(k,j)                                                           \
   for(int k = IX_KL - GSIZEK; k <= IX_KU + GSIZEK; ++k)       \
   for(int j = IX_JL - GSIZEJ; j <= IX_JU + GSIZEJ; ++j)
+#endif
+
+#define ILOOP2(md, scratch_size, scratch_level, b, k, j) \
+  const auto kb = md->GetBoundsK(parthenon::IndexDomain::entire); \
+  const auto jb = md->GetBoundsJ(parthenon::IndexDomain::entire); \
+  const auto ib = md->GetBoundsI(parthenon::IndexDomain::entire); \
+   parthenon::par_for_outer(DEFAULT_OUTER_LOOP_PATTERN, "loop name", DevExecSpace(), \
+       scratch_size, scratch_level, \
+       0, nblocks-1, kb.s, kb.e,  \
+   KOKKOS_LAMBDA(parthenon::team_member_t member, const int b, const int k, const int j) {\
 
 // 1D loop over i in the interior of the block
+#if 0
 #define ILOOP1(i)                                                             \
   _Pragma("omp simd")                                                         \
   for(int i = IX_IL; i <= IX_IU; ++i)
+#endif
+
+#define ILOOP1(member, i) \
+   parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ibe, [&](const int i)
+
 
 // 1D loop over i on the whole block
 #define GLOOP1(i)                                                             \
