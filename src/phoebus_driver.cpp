@@ -685,7 +685,7 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
     parthenon::AllReduce<bool> *pdo_gain_reducer;
     bool do_lightbulb = rad->Param<bool>("do_lightbulb");
     if (do_lightbulb) {
-      pdo_gain_reducer = rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
+      pdo_gain_reducer = rad->MutableParam<parthenon::AllReduce<bool>("do_gain_reducer");
     }
     TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
     for (int ib = 0; ib < num_independent_task_lists; ib++) {
