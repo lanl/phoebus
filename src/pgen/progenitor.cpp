@@ -115,17 +115,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         if (is_monopole_sph) {
           r = std::abs(x1);
         } else { // Cartesian
-          r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
-          transform(x1, x2, x3, C, c2s, s2c);
-        }
+	  r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
+	  transform(x1, x2, x3, C, c2s, s2c);
+	 }
 
         Real lambda[2];
         if (iye > 0) {
           v(iye, k, j, i) = Ye_dev.interpToReal(r);
           lambda[0] = v(iye, k, j, i);
         }
-
-        const Real u = phoebus::energy_from_rho_P(eos, mass_density_dev.interpToReal(r),
+	const Real u = phoebus::energy_from_rho_P(eos, mass_density_dev.interpToReal(r),
                                                   pressure_dev.interpToReal(r), emin,
                                                   emax, lambda[0]);
         const Real sie = u / mass_density_dev.interpToReal(r);
