@@ -166,10 +166,10 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
 
   // Light Bulb with Liebendorfer model
   const bool is_monopole_cart =
-    (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
+      (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
   const bool is_monopole_sph =
-    (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
-  
+      (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
+
   auto &coords = pmb->coords;
   using Transformation_t = Geometry::SphericalToCartesian;
   auto const &geom_pkg = pmb->packages.Get("geometry");
@@ -189,14 +189,14 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
         DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
         kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
-	  const Real x1 = coords.Xc<1>(k, j, i);
+          const Real x1 = coords.Xc<1>(k, j, i);
           const Real x2 = coords.Xc<2>(k, j, i);
           const Real x3 = coords.Xc<3>(k, j, i);
           Real Cart[3];
           Real s2c[3][3], c2s[3][3];
           Real r;
 
-          if (is_monopole_sph){
+          if (is_monopole_sph) {
             r = std::abs(x1);
           } else {
             r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
