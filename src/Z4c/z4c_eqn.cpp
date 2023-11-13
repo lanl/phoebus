@@ -666,10 +666,17 @@ TaskStatus ComputeRHS(MeshData<Real> *md_state, MeshData<Real> *md_rhs) {
 
     // RHS asseble goes here
     SPACETIMELOOP2(mu, nu) {
-      Real *At_rhs = &rhs(b, At(flatten(mu, nu), k, j);
+      Real *A_rhs = &rhs(b, A(flatten(mu, nu), k, j);
          parthenon::par_for_inner(DEFAULT_INNER_LOOP_PATTERN, member, ib.s, ib.e,
          [&](const int i) {
-             At_rhs[i] = /* some nonsense */;
+             A_rhs[i] = 0.;
+	     Khat_rhs[i]=0.;
+	     chi_rhs[i]=0.;
+	     Theta_rhs[i]=0.;
+	     Gam_rhs[i]=0.;
+	     alpha_rhs[i]=0.;
+	     beta_rhs[i]=0.;
+
          });
     }
   })//end of ILOOP2 //TODO: check;
