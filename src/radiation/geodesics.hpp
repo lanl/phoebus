@@ -39,7 +39,35 @@ KOKKOS_INLINE_FUNCTION
 void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1,
                 Real &Kcov2, Real &Kcov3, Real &Kcon0,
                 const Geometry::CoordSysMeshBlock &geom, Real source[4]) {
-  SPACETIMELOOP(mu) { source[mu] = 0.; }
+  Real Kcov[NDFULL] = {Kcov0, Kcov1, Kcov2, Kcov3};
+  Real Xm[NDFULL], Xp[NDFULL];
+  Real Gconm[NDFULL][NDFULL], Gconp[NDFULL][NDFULL];
+  Real dG;
+
+  constexpr Real DELTA = 1.0e-6;
+
+  // TODO(BLB) extend later to exploit spacetime symmetries. Template on geometry?
+  SPACETIMELOOP(mu) {
+    source[mu] = 0.;
+    Xp[0] = X0;
+    Xp[1] = X1;
+    Xp[2] = X2;
+    Xp[3] = X3;
+    SPACETIMELOOP(nu) { Xm[nu] = Xp[nu]; }
+
+    Xm[mu] -= DELTA;
+    Xp[mu] += DELTA;
+
+    geom.SpacetimeMetricInverse(Xm[0], Xm[1], Xm[2], Xm[3], Gconm);
+    geom.SpacetimeMetricInverse(Xp[0], Xp[1], Xp[2], Xp[3], Gconp);
+
+    SPACETIMELOOP2(nu, kap) {
+      dG = (Gconp[nu][kap] - Gconm[nu][kap]) / (Xp[mu] - Xm[mu]);
+      source[mu] += Kcov[nu] * Kcov[kap] * dG;
+    }
+
+    source[mu] *= -1.0 / (2.0 * Kcon0);
+  }
 }
 
 KOKKOS_INLINE_FUNCTION
