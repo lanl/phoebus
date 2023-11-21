@@ -47,8 +47,7 @@ TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc) {
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CalcTau", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real rho =
-            v(prho, k, j, i) * density_conversion_factor; // Density in CGS
+        const Real rho = v(prho, k, j, i) * density_conversion_factor; // Density in CGS
         const Real lRho = std::log10(rho);
         // Calculate tau
         constexpr Real xl1 = LightBulb::HeatAndCool::XL1;
@@ -199,9 +198,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
         kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
           const Real r = std::abs(coords.Xc<1>(k, j, i)); // TODO(MG) coord transform game
-          const Real rho =
-              v(prho, k, j, i) * density_conversion_factor; // Density in CGS
-          const Real cdensity = v(crho, k, j, i);                     // conserved density
+          const Real rho = v(prho, k, j, i) * density_conversion_factor; // Density in CGS
+          const Real cdensity = v(crho, k, j, i); // conserved density
           Real Gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
           Real Ucon[4];
@@ -260,17 +258,15 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
           Real lambda[2];
           lambda[0] = Ye;
           eos_sc.MassFractionsFromDensityTemperature(
-              rho, v(ptemp, k, j, i) * temperature_conversion_factor, Xa, Xh, Xn,
-              Xp, Abar, Zbar, lambda);
+              rho, v(ptemp, k, j, i) * temperature_conversion_factor, Xa, Xh, Xn, Xp,
+              Abar, Zbar, lambda);
           heat = do_gain * (Xn + Xp) * hfac * std::exp(-tau) *
                  pow((rnorm / (r * length_conversion_factor)), 2);
-          cool =
-              (Xn + Xp) * cfac * std::exp(-tau) *
-              pow((v(ptemp, k, j, i) * temperature_conversion_factor / Tnorm), 6);
+          cool = (Xn + Xp) * cfac * std::exp(-tau) *
+                 pow((v(ptemp, k, j, i) * temperature_conversion_factor / Tnorm), 6);
 
-          Real CGSToCodeFact = energy_conversion_factor /
-                               mass_conversion_factor /
-                               time_conversion_factor;
+          Real CGSToCodeFact =
+              energy_conversion_factor / mass_conversion_factor / time_conversion_factor;
 
           Real tempr = 1 / 30.76 / 9e20;
           Real H = heat * CGSToCodeFact;
@@ -283,10 +279,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             // detg included above
             Kokkos::atomic_add(&(v(mu, k, j, i)), -Gcov_coord[mu - Gcov_lo]);
           }
-          v(GcovHeat, k, j, i) =
-              v(prho, k, j, i) * density_conversion_factor * heat;
-          v(GcovCool, k, j, i) =
-              v(prho, k, j, i) * density_conversion_factor * cool;
+          v(GcovHeat, k, j, i) = v(prho, k, j, i) * density_conversion_factor * heat;
+          v(GcovCool, k, j, i) = v(prho, k, j, i) * density_conversion_factor * cool;
           Kokkos::atomic_add(&(v(Gye, k, j, i)), Jye);
         });
 #else
