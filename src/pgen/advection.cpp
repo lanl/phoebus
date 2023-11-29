@@ -59,7 +59,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
-  //auto geom = Geometry::GetCoordinateSystem(rc);
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   pmb->par_for(
