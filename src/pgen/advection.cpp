@@ -59,6 +59,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
+  //auto geom = Geometry::GetCoordinateSystem(rc);
+  auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::advection", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -68,6 +70,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real y = (ndim > 1 && shapedim > 1) ? coords.Xc<2>(j) : 0;
         Real z = (ndim > 2 && shapedim > 2) ? coords.Xc<3>(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
+
+        Real gcov[4][4];
+        geom.SpacetimeMetric(0.0, x, y, z, gcov);
 
         if (iye > 0) {
           v(iye, k, j, i) = (r * r <= rin * rin) ? 1.0 : 0.0;
@@ -87,7 +92,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                            v(iprs, k, j, i);
         Real vsq = 0.;
         const Real vcon[3] = {vx, vy, vz};
-        SPACELOOP2(ii, jj) { vsq += vcon[ii] * vcon[jj]; }
+        SPACELOOP2(ii, jj) { vsq += gcov[ii + 1][jj + 1] * vcon[ii] * vcon[jj]; }
         const Real W = 1. / sqrt(1. - vsq);
 
         v(ivlo + 0, k, j, i) = W * vx;
