@@ -584,10 +584,10 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto &tl = async_region_tr[n];
       auto &pmb = blocks[n];
       auto &sc = pmb->swarm_data.Get();
-      auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
-      auto tracerAdvect = tl.AddTask(none, tracers::AdvectTracers, sc0.get(), dt);
+      auto &mbd0 = pmb->meshblock_data.Get(stage_name[stage]);
+      auto tracerAdvect = tl.AddTask(none, tracers::AdvectTracers, mbd0.get(), dt);
       auto tracerPurge =
-          tl.AddTask(tracerAdvect, fixup::PurgeParticles, sc0.get(), swarmName);
+          tl.AddTask(tracerAdvect, fixup::PurgeParticles, mbd0.get(), swarmName);
 
       auto send = tl.AddTask(tracerPurge, &SwarmContainer::Send, sc.get(),
                              BoundaryCommSubset::all);
