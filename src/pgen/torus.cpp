@@ -587,7 +587,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
       /* lambda to flatten (k, j, i) -> n */
       auto flatten = KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        return (i + (ib.e - ib.s + 1) * (j + (jb.s - jb.e + 1) * k));
+        return (i + (ib.e - ib.s + 1) * (j + (jb.e - jb.s + 1) * k));
       };
 
       // TODO (BLB): better way to construct & access indices array?
@@ -632,7 +632,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             Real hm1;
             Real uphi;
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
-            if (lnh > 0.0 && x1 > Rh) {
+            if (lnh > 0.0 && x1 > xh) {
               int start_ind =
                   indices(flatten(k - kb.s, j - jb.s, i - ib.s)) * num_tracers_cell;
               const Real &x_min = coords.Xf<1>(i);
@@ -653,6 +653,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
                         n; // n_tracer * gid + n
               }
             }
+            rng_pool.free_state(rng_gen);
           });
     }
 
