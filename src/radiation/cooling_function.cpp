@@ -156,12 +156,15 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
                         rad->Param<bool>("do_nu_electron_anti"),
                         rad->Param<bool>("do_nu_heavy")};
 
+  // Code to CGS
   const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
   const Real temperature_conversion_factor = unit_conv.GetTemperatureCodeToCGS();
   const Real length_conversion_factor = unit_conv.GetLengthCodeToCGS();
-  const Real energy_conversion_factor = unit_conv.GetEnergyCodeToCGS();
-  const Real mass_conversion_factor = unit_conv.GetMassCodeToCGS();
-  const Real time_conversion_factor = unit_conv.GetTimeCodeToCGS();
+
+  // CGS to code
+  const Real energy_conversion_factor = unit_conv.GetEnergyCGSToCode();
+  const Real mass_conversion_factor = unit_conv.GetMassCGSToCode();
+  const Real time_conversion_factor = unit_conv.GetTimeCGSToCode();
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
@@ -186,12 +189,16 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
     const parthenon::AllReduce<bool> *pdo_gain_reducer =
         rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
     const bool do_gain = pdo_gain_reducer->val;
+
+    // Code to CGS
     const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
     const Real temperature_conversion_factor = unit_conv.GetTemperatureCodeToCGS();
     const Real length_conversion_factor = unit_conv.GetLengthCodeToCGS();
-    const Real energy_conversion_factor = unit_conv.GetEnergyCodeToCGS();
-    const Real mass_conversion_factor = unit_conv.GetMassCodeToCGS();
-    const Real time_conversion_factor = unit_conv.GetTimeCodeToCGS();
+
+    // CGS to code
+    const Real energy_conversion_factor = unit_conv.GetEnergyCGSToCode();
+    const Real mass_conversion_factor = unit_conv.GetMassCGSToCode();
+    const Real time_conversion_factor = unit_conv.GetTimeCGSToCode();
 
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
