@@ -103,7 +103,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(ivlo + d, k, j, i) = v_pert * 2.0 * (rng_gen.drand() - 0.5);
         v(ivlo, k, j, i) += vel;
         Real vsq = 0.;
-        SPACELOOP2(ii, jj) { vsq += gcov[ii + 1][jj + 1] * v(ivlo + ii, k, j, i) * v(ivlo + jj, k, j, i); }
+        SPACELOOP2(ii, jj) {
+          vsq += gcov[ii + 1][jj + 1] * v(ivlo + ii, k, j, i) * v(ivlo + jj, k, j, i);
+        }
         const Real W = 1. / sqrt(1. - vsq);
         SPACELOOP(ii) { v(ivlo + ii, k, j, i) *= W; }
         if (ib_hi > 0) {
