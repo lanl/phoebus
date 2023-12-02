@@ -247,7 +247,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         Real vsq = 0.;
-        SPACELOOP2(ii, jj) { vsq += v(ivlo + ii, k, j, i) * v(ivlo + jj, k, j, i); }
+        SPACELOOP(ii) { vsq += v(ivlo + ii, k, j, i) * v(ivlo + ii, k, j, i); }
         Real Gamma = sqrt(1. + vsq);
 
         if (is_snake || is_inchworm || is_boosted_minkowski) {

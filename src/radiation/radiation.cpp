@@ -319,6 +319,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   if (method == "monte_carlo" || method == "mocmc") {
+    // reducers
+    AllReduce<Real> dNtot;
+    AllReduce<std::vector<Real>> particle_resolution;
+    AllReduce<int> particles_outstanding;
+    physics->AddParam<>("particle_resolution", particle_resolution, true);
+    physics->AddParam<>("particles_outstanding", particles_outstanding, true);
+    physics->AddParam<>("dNtot", dNtot, true);
+
     // Initialize random number generator pool
     int rng_seed = pin->GetOrAddInteger("radiation", "rng_seed", 238947);
     physics->AddParam<>("rng_seed", rng_seed);
