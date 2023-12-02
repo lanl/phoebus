@@ -318,6 +318,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         HstSum, ReduceMom, "total X" + std::to_string(d + 1) + " momentum"));
   }
 
+  AllReduce<std::vector<Real>> net_field_totals;
+  AllReduce<std::vector<Real>> net_field_totals_2;
+  physics->AddParam<>("net_field_totals", net_field_totals, true);
+  physics->AddParam<>("net_field_totals_2", net_field_totals_2, true);
+
   params.Add(parthenon::hist_param_key, hst_vars);
 
   // Fill Derived and Estimate Timestep
