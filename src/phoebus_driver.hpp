@@ -41,7 +41,6 @@ class PhoebusDriver : public EvolutionDriver {
   std::unique_ptr<parthenon::LowStorageIntegrator> integrator;
   const bool is_restart_;
   Real dt_init, dt_init_fact;
-
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);

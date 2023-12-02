@@ -341,7 +341,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       fluid->MutableParam<AllReduce<std::vector<Real>>>("net_field_totals");
   AllReduce<std::vector<Real>> *net_field_totals_2 =
       fluid->MutableParam<AllReduce<std::vector<Real>>>("net_field_totals_2");
-  net_field_totals->val.resize(2); 
+  net_field_totals->val.resize(2);
   net_field_totals_2->val.resize(2);
   for (int i = 0; i < 2; i++) {
     net_field_totals->val[i] = 0.;
