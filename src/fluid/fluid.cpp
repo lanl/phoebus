@@ -233,6 +233,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(c::ye, mcons_scalar);
   }
 
+  AllReduce<std::vector<Real>> net_field_totals;
+  AllReduce<std::vector<Real>> net_field_totals_2;
+  physics->AddParam<>("net_field_totals", net_field_totals, true);
+  physics->AddParam<>("net_field_totals_2", net_field_totals_2, true);
+
   // If fluid is not active, still don't add reconstruction variables
   if (!active) return physics;
 
