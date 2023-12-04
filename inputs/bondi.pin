@@ -14,15 +14,15 @@
 problem = bondi
 ix1_bc = outflow
 ox1_bc = outflow
-ix2_bc = reflect
-ox2_bc = reflect
+ix2_bc = outflow 
+ox2_bc = outflow
 
 <parthenon/job>
 problem_id  = bondi       # problem ID: basename of output filenames
 
 <parthenon/output0>
 file_type = rst
-dt = 1000.0
+dt = 10000.0
 
 <parthenon/output1>
 variables = p.density,  &
@@ -43,11 +43,11 @@ variables = p.density,  &
 	    temperature
 
 file_type   = hdf5      # Tabular data dump
-dt          = 20.0      # time increment between outputs
+dt          = 10.0      # time increment between outputs
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 100000.0     # time limit
+tlim        = 2500.0     # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -57,19 +57,19 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 256           # Number of zones in X1-direction
+nx1         = 96           # Number of zones in X1-direction
 x1min       = 0.59          # minimum value of X1
 x1max       = 10             # maximum value of X1
 ix1_bc      = user          # Inner-X1 boundary condition flag
 ox1_bc      = user          # Outer-X1 boundary condition flag
 
-nx2         = 256            # Number of zones in X2-direction
+nx2         = 96            # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
-x2max       = 1 #3.14159265359 #1 # maximum value of X2. Pi
+x2max       = 1 #1 # maximum value of X2. Pi
 ix2_bc      = user          # Inner-X2 boundary condition flag
 ox2_bc      = user          # Outer-X2 boundary condition flag
 
-nx3         = 1             # Number of zones in X3-direction
+nx3         = 16             # Number of zones in X3-direction
 x3min       = 0             # minimum value of X3
 x3max       = 6.28318530718 # maximum value of X3. 2*pi
 ix3_bc      = periodic      # Inner-X3 boundary condition flag
@@ -78,7 +78,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 #<parthenon/meshblock>
-#nx1 = 512
+#nx1 = 1
 #nx2 = 1
 #nx3 = 1
 
@@ -108,21 +108,23 @@ c2p_max_iter = 100
 c2p_tol = 1.e-8
 Ye = false
 mhd = true
-vz = 0.1
+vz = 0
+vx = 0.1
+vy = 0
 
 <geometry>
-a = 0
+a = 0.9
 
 <coordinates>
 derefine_poles = false
 r_outer = 10000
-hexp_br = 1000. # Initial break radius for hyperexponential coordinates
+hexp_br = 500. # Initial break radius for hyperexponential coordinates
 
 <bondi>
 mdot = 1
 rs = 1187
-harm_beta_normalization = false
-target_beta = 10.
+harm_beta_normalization = true
+target_beta = 100.
 magnetized = true
 #Rhor = 2.0
 b_z = 0.0001

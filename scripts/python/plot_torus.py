@@ -121,22 +121,29 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     fig.colorbar(im, cax=cax, orientation="vertical")
     ax.set_title(r"$\Gamma-1$")
 
-    
-    vsq = np.log10(dfile.Getvsq())
+
+    vpcon = dfile.GetVpCon()
+    Gamma = dfile.GetGamma()
+    #vz = 1/Gamma[:,0,:,:] * (vpcon[:,0,0,:,:].transpose()*np.cos(thblock[:,1:,1:]) - vpcon[:,1,0,:,:].transpose()*np.sin(thblock[:,1:,1:]))
+    vz = np.log10(np.sqrt((vpcon[:,0,0,:,:]**2+vpcon[:,1,0,:,:]**2)))
+    print(vpcon[:,0,0,:,:].transpose()*np.cos(thblock[:,1:,1:]) - vpcon[:,1,0,:,:].transpose()*np.sin(thblock[:,1:,1:]))
+    vsq = np.log10(np.sqrt(np.clip(dfile.Getvsq(), 1.0e-20, None)))
     for b in range(nblocks):
         im = ax.pcolormesh(
             xplot[b, :, :],
             yplot[b, :, :],
             vsq[b, 0, :, :].transpose(),
-            vmin=-6,
-            vmax=1,
+            #vz[b,:,:].transpose(),
+            vmin=-10,
+            vmax=0,
             cmap=cmap_uniform,
         )
     div = make_axes_locatable(ax)
     cax = div.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(im, cax=cax, orientation="vertical")
-    ax.set_title(r"v$^{2}$")
-       
+    #ax.set_title(r"v$^{2}$")
+    ax.set_title(r"vy")
+    
     ucon = dfile.Getucon()
     Gamma = dfile.GetGamma()
     vpcon = dfile.GetVpCon()
@@ -279,18 +286,21 @@ def plot_frame(ifname, fname, savefig, geomfile=None, rlim=40, coords="cartesian
     else:
         ax = axes[1, 0]
         lenergy = np.log10(np.clip(dfile.Get("p.energy", flatten=False), 1.0e-20, None))
+
+        Pm = np.clip(dfile.GetPm(), 1.0e-20, 1.0e20)
         for b in range(nblocks):
             im = ax.pcolormesh(
                 xplot[b, :, :],
                 yplot[b, :, :],
-                lenergy[b, 0, :, :].transpose(),
-                vmin=-13,
-                vmax=-8,
+                np.log10(lenergy[b, 0, :,:].transpose()),
+                vmin=-10,
+                vmax=-5,
                 cmap=cmap_uniform,
             )
         div = make_axes_locatable(ax)
         cax = div.append_axes("right", size="5%", pad=0.05)
         fig.colorbar(im, cax=cax, orientation="vertical")
+        #ax.set_title(r"$Pm$")
         ax.set_title(r"$\log_{10}~u$")
 
         ax = axes[1, 1]

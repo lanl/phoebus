@@ -169,6 +169,9 @@ class phoedf(phdf.phdf):
         self.P = None
         self.vsq = None
 
+    def Getgcov(self):
+        return self.gcov
+    
     def GetLapse(self):
         return self.alpha
 

@@ -121,6 +121,21 @@ def plot_frame_from_phoedf(
     ldensity = np.log10(dfile.GetRho())
 
     density = dfile.Get("p.density", flatten=False)
+    vpcon = dfile.GetVpCon()
+    gcov = dfile.Getgcov()
+    v1 = vpcon[:,0,...].transpose(0,3,2,1)
+    v2 = vpcon[:,1,...].transpose(0,3,2,1)
+    v3 = vpcon[:,2,...].transpose(0,3,2,1)
+    g11 = gcov[:,1,1,...].transpose(0,3,2,1)
+    g22 = gcov[:,2,2,...].transpose(0,3,2,1)
+    g33 = gcov[:,3,3,...].transpose(0,3,2,1)
+    print(v1.shape)
+    print(g11.shape)
+    print(xplot[0,:,:,0].shape)
+    print(ldensity.transpose().shape)
+
+    vx = np.sqrt(g11)*np.sin(thblock[:,:-1,:-1,:-1])*np.cos(phiblock[:,:-1,:-1,:-1])*v1 + np.sqrt(g22)*np.cos(thblock[:,:-1,:-1,:-1])*np.cos(phiblock[:,:-1,:-1,:-1])*v2 - np.sqrt(g33)*np.sin(thblock[:,:-1,:-1,:-1])*v3
+    print(vx.shape)
     #J = dfile.Get("r.p.J", flatten=False)
     # print(f'density min: {density.min()} max: {density.max()}')
     # if J is not None:
@@ -161,25 +176,25 @@ def plot_frame_from_phoedf(
         im = ax.pcolormesh(
             xplot[b, :, :, k],
             yplot[b, :, :, k],
-            ltemp[b, k, :, :].transpose(),
-            vmin=-4,
-            vmax=-1,
+            vx[b, :, :, k],
+            vmin=0,
+            vmax=0.3,
             cmap=cmap_uniform,
         )
         if ndim == 3:
             im = ax.pcolormesh(
                 xplot[b, :, :, k + nz // 2],
                 yplot[b, :, :, k + nz // 2],
-                ltemp[b, k + nz // 2, :, :].transpose(),
-                vmin=-4,
-                vmax=-1,
+                vx[b, :, :, k + nz // 2],
+                vmin=0,
+                vmax=0.3,
                 cmap=cmap_uniform,
             )
 
     div = make_axes_locatable(ax)
     cax = div.append_axes("right", size="5%", pad=0.05)
     fig.colorbar(im, cax=cax, orientation="vertical")
-    ax.set_title(r"$T$")
+    ax.set_title(r"$v$")
 
     if rad_active:
 

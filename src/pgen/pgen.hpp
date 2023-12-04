@@ -60,7 +60,7 @@ using namespace parthenon::package::prelude;
 #define FOREACH_POSTINIT_MODIFIER                                                        \
   POSTINIT_MODIFIER(phoebus)                                                             \
   POSTINIT_MODIFIER(torus)                                                               \
-  
+  POSTINIT_MODIFIER(bondi)                                                               \
 
 /*
 // DO NOT TOUCH THE MACROS BELOW

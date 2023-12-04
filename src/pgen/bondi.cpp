@@ -129,12 +129,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real gam = pin->GetReal("eos", "Gamma");
   const Real Cv = pin->GetReal("eos", "Cv");
   const Real vz = pin->GetReal("fluid", "vz");
+  const Real vx = pin->GetReal("fluid", "vx");
+  const Real vy = pin->GetReal("fluid", "vy");
   const Real n = 1.0 / (gam - 1.0);
   PARTHENON_REQUIRE_THROWS(std::fabs(n - Cv) < 1.e-12, "Bondi requires Cv = 1/(Gamma-1)");
   PARTHENON_REQUIRE_THROWS(std::fabs(gam - 1.4) < 1.e-12, "Bondi requires gamma = 1.4");
   const Real mdot = pin->GetOrAddReal("bondi", "mdot", 1.0);
   const Real rs = pin->GetOrAddReal("bondi", "rs", 8.0);
-  const Real bz = pin->GetOrAddReal("bondi", "b_z", 10.);
+  const Real bz = pin->GetOrAddReal("bondi", "b_z", 0.0001);
   //const Real Rhor = pin->GetOrAddReal("bondi", "Rhor", 2.0);
 
   // Solution constants
@@ -169,9 +171,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   Real smooth = gpkg->Param<Real>("smooth");
   auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
-  if (vz!=0){
-           printf("***********Bondi-Hoyle with v_inf = %.3e************\n", vz);
+  if ( vx!=0 || vz!=0){
+    printf("***********Bondi-Hoyle with vz_inf = %.3e, vx_inf = %.3e************\n", vz,vx);
   }
+  PARTHENON_REQUIRE(std::sqrt(vx*vx+vz*vz) < 1, "sum of velocities larger than c, reduce vz or vx");
   pmb->par_for(
       "Phoebus::ProblemGenerator::Bondi", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -211,19 +214,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 	Real gcov[4][4];
 	Real bl_lapse = bl.Lapse(0.0, r, th, x3);
 	Real bl_shift[3];
-	Real lf = 1/(std::sqrt(1-vz*vz));
+	Real lf = 1/(std::sqrt(1-vz*vz-vx*vx-vy*vy));
 	bl.ContravariantShift(0.0, r, th, x3, bl_shift);
 	bl.SpacetimeMetric(0.0, r, th, x3, gcov);
 
-	if (r>10){
-	if (vz!=0){
+	if (r>20){
+	if (vz!=0 || vx!=0 || vy!=0){
 	  //printf("Bondi-Hoyle with v_inf = %.3e\n", vz);
 	   //if (r<=25){
 	   //ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));}
 	   //else {
-	  ucon_bl[1] = lf*(1/(std::sqrt(gcov[1][1])) * vz * cth - bl_shift[0]/bl_lapse);// -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
-	  ucon_bl[2] = lf*(1/(std::sqrt(gcov[2][2])) * -vz * sth - bl_shift[1]/bl_lapse);
-	  //ucon_bl[3] = lf*(-1/(std::sqrt(gcov[3][3])) * vx * sph - bl_shift[2]/bl_lapse);
+	  ucon_bl[1] = lf*(1/(std::sqrt(gcov[1][1])) * vz * cth + 1/(std::sqrt(gcov[1][1])) * vx * sth * cph  + 1/(std::sqrt(gcov[1][1])) * vy * sth * sph  - bl_shift[0]/bl_lapse);// -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
+	  ucon_bl[2] = lf*(1/(std::sqrt(gcov[2][2])) * -vz * sth + 1/(std::sqrt(gcov[2][2])) * vx * cth * cph + 1/(std::sqrt(gcov[2][2])) * vy * cth * sph  - bl_shift[1]/bl_lapse);
+	  ucon_bl[3] = lf*(1/(std::sqrt(gcov[3][3])) * vy * cph - 1/(std::sqrt(gcov[3][3])) * vx * sph);// - bl_shift[2]/bl_lapse);
 	}//}
 	else{
 	  //printf("Stationary Bondi accretion \n");
@@ -297,9 +300,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           for (int d = 0; d < 3; d++) {
             v(ivlo + d, k, j, i) = 0.0;
           }
-          v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
+          //v(itmp, k, j, i) = 0.00001*get_bondi_temp(r, n, C1, C2, Tc, rs);
           v(irho, k, j, i) = rhoflr;
 	  v(ieng, k, j, i) = v(ieng, k, j, i) / v(irho, k, j, i) < epsflr ? v(irho, k, j, i) * epsflr : v(ieng, k, j, i);
+	  v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs); //eos.TemperatureFromDensityInternalEnergy(v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), eos_lambda);
           v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy( v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), eos_lambda);
           v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature( v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) / v(iprs, k, j, i);
         }         
