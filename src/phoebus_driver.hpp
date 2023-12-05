@@ -41,13 +41,6 @@ class PhoebusDriver : public EvolutionDriver {
   std::unique_ptr<parthenon::LowStorageIntegrator> integrator;
   const bool is_restart_;
   Real dt_init, dt_init_fact;
-
-  AllReduce<Real> dNtot;
-  AllReduce<std::vector<Real>> particle_resolution;
-  AllReduce<int> particles_outstanding;
-
-  AllReduce<std::vector<Real>> net_field_totals;
-  AllReduce<std::vector<Real>> net_field_totals_2;
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
