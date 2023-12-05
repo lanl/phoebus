@@ -335,11 +335,17 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   // Extra per-step user work
   TaskRegion &sync_region_5 = tc.AddRegion(num_partitions);
   int sync_region_5_dep_id;
-  net_field_totals.val.resize(2); // Mdot, Phi
-  net_field_totals_2.val.resize(2);
+
+  // Mdot, Phi
+  AllReduce<std::vector<Real>> *net_field_totals =
+      fluid->MutableParam<AllReduce<std::vector<Real>>>("net_field_totals");
+  AllReduce<std::vector<Real>> *net_field_totals_2 =
+      fluid->MutableParam<AllReduce<std::vector<Real>>>("net_field_totals_2");
+  net_field_totals->val.resize(2);
+  net_field_totals_2->val.resize(2);
   for (int i = 0; i < 2; i++) {
-    net_field_totals.val[i] = 0.;
-    net_field_totals_2.val[i] = 0.;
+    net_field_totals->val[i] = 0.;
+    net_field_totals_2->val[i] = 0.;
   }
   for (int i = 0; i < num_partitions; i++) {
     sync_region_5_dep_id = 0;
@@ -352,17 +358,17 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     // Evaluate current Mdot, Phi
     auto sum_mdot_1 = tl.AddTask(none, fixup::SumMdotPhiForNetFieldScaling, md.get(), t,
-                                 stage, &(net_field_totals.val));
+                                 stage, &(net_field_totals->val));
 
     sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, sum_mdot_1);
     sync_region_5_dep_id++;
 
     TaskID start_reduce_1 = (i == 0 ? tl.AddTask(sum_mdot_1, fixup::NetFieldStartReduce,
-                                                 md.get(), t, stage, &net_field_totals)
+                                                 md.get(), t, stage, net_field_totals)
                                     : none);
     // Test the reduction until it completes
     TaskID finish_reduce_1 = tl.AddTask(start_reduce_1, fixup::NetFieldCheckReduce,
-                                        md.get(), t, stage, &net_field_totals);
+                                        md.get(), t, stage, net_field_totals);
     sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, finish_reduce_1);
     sync_region_5_dep_id++;
 
@@ -371,16 +377,16 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     // Evaluate Mdot, Phi (only Phi changes) after modifying B field
     auto sum_mdot_2 = tl.AddTask(mod_net, fixup::SumMdotPhiForNetFieldScaling, md.get(),
-                                 t, stage, &(net_field_totals_2.val));
+                                 t, stage, &(net_field_totals_2->val));
     sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, sum_mdot_2);
     sync_region_5_dep_id++;
 
     TaskID start_reduce_2 = (i == 0 ? tl.AddTask(sum_mdot_2, fixup::NetFieldStartReduce,
-                                                 md.get(), t, stage, &net_field_totals_2)
+                                                 md.get(), t, stage, net_field_totals_2)
                                     : none);
     // Test the reduction until it completes
     TaskID finish_reduce_2 = tl.AddTask(start_reduce_2, fixup::NetFieldCheckReduce,
-                                        md.get(), t, stage, &net_field_totals_2);
+                                        md.get(), t, stage, net_field_totals_2);
     sync_region_5.AddRegionalDependencies(sync_region_5_dep_id, i, finish_reduce_2);
     sync_region_5_dep_id++;
 
@@ -390,7 +396,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
     auto set_scale =
         tl.AddTask(mod_net_2, fixup::UpdateNetFieldScaleControls, md.get(), t, dt, stage,
-                   &(net_field_totals.val), &(net_field_totals_2.val));
+                   &(net_field_totals->val), &(net_field_totals_2->val));
 
     // End tuning region that only evaluates occasionally and on first stage
 
@@ -596,26 +602,28 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
 
     if (rad_mocmc_active && stage == integrator->nstages) {
-      particle_resolution.val.resize(1); // total
+      AllReduce<std::vector<Real>> *particle_resolution =
+          rad->MutableParam<AllReduce<std::vector<Real>>>("particle_resolution");
+      particle_resolution->val.resize(1); // total
       // for (int i = 0; i < particle_resolution.val.size(); i++) {
-      particle_resolution.val[i] = 0.;
+      particle_resolution->val[i] = 0.;
       //}
       int reg_dep_id = 0;
       // auto &tl = async_region_3[0];
 
       auto update_count = tl.AddTask(none, radiation::MOCMCUpdateParticleCount, pmesh,
-                                     &particle_resolution.val);
+                                     &particle_resolution->val);
 
       async_region_3.AddRegionalDependencies(reg_dep_id, 0, update_count);
       reg_dep_id++;
 
       auto start_count_reduce =
           tl.AddTask(update_count, &AllReduce<std::vector<Real>>::StartReduce,
-                     &particle_resolution, MPI_SUM);
+                     particle_resolution, MPI_SUM);
 
       auto finish_count_reduce =
           tl.AddTask(start_count_reduce, &AllReduce<std::vector<Real>>::CheckReduce,
-                     &particle_resolution);
+                     particle_resolution);
       async_region_3.AddRegionalDependencies(reg_dep_id, 0, finish_count_reduce);
       reg_dep_id++;
 
@@ -629,7 +637,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                                    << std::endl;
                                          return TaskStatus::complete;
                                        },
-                                       &particle_resolution.val)
+                                       &particle_resolution->val)
                                  : none);
     }
 
@@ -914,27 +922,30 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
      **/
     TaskRegion &tuning_region = tc.AddRegion(1);
     {
-      particle_resolution.val.resize(4); // made, absorbed, scattered, total
+      auto rad = pmesh->packages.Get("radiation");
+      AllReduce<std::vector<Real>> *particle_resolution =
+          rad->MutableParam<AllReduce<std::vector<Real>>>("particle_resolution");
+      particle_resolution->val.resize(4); // made, absorbed, scattered, total
       for (int i = 0; i < 4; i++) {
-        particle_resolution.val[i] = 0.;
+        particle_resolution->val[i] = 0.;
       }
       int reg_dep_id = 0;
       auto &tl = tuning_region[0];
 
       auto update_resolution =
           tl.AddTask(none, radiation::MonteCarloUpdateParticleResolution, pmesh,
-                     &particle_resolution.val);
+                     &particle_resolution->val);
 
       tuning_region.AddRegionalDependencies(reg_dep_id, 0, update_resolution);
       reg_dep_id++;
 
       auto start_resolution_reduce =
           tl.AddTask(update_resolution, &AllReduce<std::vector<Real>>::StartReduce,
-                     &particle_resolution, MPI_SUM);
+                     particle_resolution, MPI_SUM);
 
       auto finish_resolution_reduce =
           tl.AddTask(start_resolution_reduce, &AllReduce<std::vector<Real>>::CheckReduce,
-                     &particle_resolution);
+                     particle_resolution);
       tuning_region.AddRegionalDependencies(reg_dep_id, 0, finish_resolution_reduce);
       reg_dep_id++;
 
@@ -949,12 +960,12 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
                                  << " total = " << (*res)[3] << std::endl;
                        return TaskStatus::complete;
                      },
-                     &particle_resolution.val)
+                     &particle_resolution->val)
                : none);
 
       auto update_tuning =
           tl.AddTask(finish_resolution_reduce, radiation::MonteCarloUpdateTuning, pmesh,
-                     &particle_resolution.val, t0, dt);
+                     &particle_resolution->val, t0, dt);
     }
 
     status = tc.Execute();
