@@ -62,8 +62,8 @@ using c2p_mesh_type = c2p_type<MeshData<Real>>;
 #if SET_FLUX_SRC_DIAGS
 template <class T>
 TaskStatus CopyFluxDivergence(T *rc) {
-  auto pmb = rc->GetParentPointer();
-  auto &fluid = pmb->packages.Get("fluid");
+  Mesh *pm = rc->GetMeshPointer();
+  auto &fluid = pm->packages.Get("fluid");
   const Params &params = fluid->AllParams();
   if (!params.Get<bool>("active")) return TaskStatus::complete;
 
@@ -85,7 +85,7 @@ TaskStatus CopyFluxDivergence(T *rc) {
   auto diag = rc->PackVariables(diag_vars, imap_diag);
   auto idx_r_divf = imap_diag.GetFlatIdx(diagnostic_variables::r_divf, false);
 
-  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
   int num_species = 0;
   if (idx_E.IsValid()) {
     num_species = rad->Param<int>("num_species");

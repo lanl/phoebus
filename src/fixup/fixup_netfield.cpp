@@ -38,7 +38,7 @@ namespace fixup {
 
 TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t, const int stage,
                                         std::vector<Real> *sums) {
-  auto *pm = md->GetParentPointer();
+  Mesh *pm = md->GetMeshPointer();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
 
   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
@@ -64,7 +64,7 @@ TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t, const 
 
 TaskStatus NetFieldStartReduce(MeshData<Real> *md, const Real t, const int stage,
                                AllReduce<std::vector<Real>> *net_field_totals) {
-  auto *pm = md->GetParentPointer();
+  Mesh *pm = md->GetMeshPointer();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
 
   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
@@ -88,7 +88,7 @@ TaskStatus NetFieldCheckReduce(MeshData<Real> *md, const Real t, const int stage
     return TaskStatus::complete;
   }
 
-  auto *pm = md->GetParentPointer();
+  Mesh *pm = md->GetMeshPointer();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
 
   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
@@ -112,7 +112,7 @@ TaskStatus UpdateNetFieldScaleControls(MeshData<Real> *md, const Real t, const R
   if (stage != 1) {
     return TaskStatus::complete;
   }
-  auto *pm = md->GetParentPointer();
+  Mesh *pm = md->GetMeshPointer();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
 
   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
@@ -158,7 +158,7 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
   if (stage != 1 && fiducial) {
     return TaskStatus::complete;
   }
-  auto *pm = md->GetParentPointer();
+  Mesh *pm = md->GetMeshPointer();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
 
   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");

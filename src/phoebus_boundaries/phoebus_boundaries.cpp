@@ -80,7 +80,7 @@ void GenericBC(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   // needed because our conserved variables are densitized
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
-  auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
+  auto &fluid = rc->GetMeshPointer()->packages.Get("fluid");
   const bool rescale = fluid->Param<std::string>("bc_vars") == "conserved";
 
   // Do the thing
@@ -113,7 +113,7 @@ void GenericBC(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
-  std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
+  auto pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
@@ -125,7 +125,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   // auto nb1 = IndexRange{0, 0};
   auto domain = IndexDomain::inner_x1;
 
-  auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
+  auto &fluid = rc->GetMeshPointer()->packages.Get("fluid");
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
 
   if (bc_vars == "conserved") {
@@ -147,7 +147,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
-  std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
+  auto pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
@@ -158,7 +158,7 @@ void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto domain = IndexDomain::inner_x2;
   const int j0 = bounds.GetBoundsJ(IndexDomain::interior).s;
 
-  auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
+  auto &fluid = rc->GetMeshPointer()->packages.Get("fluid");
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
   PARTHENON_REQUIRE(bc_vars == "primitive", "Polar X2 reflecting BCs not supported");
 
@@ -180,7 +180,7 @@ void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
-  std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
+  auto pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
@@ -191,7 +191,7 @@ void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto domain = IndexDomain::outer_x2;
   const int j0 = bounds.GetBoundsJ(IndexDomain::interior).e;
 
-  auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
+  auto &fluid = rc->GetMeshPointer()->packages.Get("fluid");
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
   PARTHENON_REQUIRE(bc_vars == "primitive", "Polar X2 reflecting BCs not supported");
 
@@ -214,7 +214,7 @@ void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 }
 
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
-  std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
+  auto pmb = rc->GetBlockPointer();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
@@ -230,8 +230,8 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   const int pv_lo = imap[fluid_prim::velocity].first;
   auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
 
-  auto &fluid = rc->GetParentPointer()->packages.Get("fluid");
-  auto &rad = rc->GetParentPointer()->packages.Get("radiation");
+  auto &fluid = rc->GetMeshPointer()->packages.Get("fluid");
+  auto &rad = rc->GetMeshPointer()->packages.Get("radiation");
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
   const int num_species = rad->Param<bool>("active") ? rad->Param<int>("num_species") : 0;
 
@@ -307,9 +307,9 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     }
   }
 
-  auto &pkg = rc->GetParentPointer()->packages.Get("fluid");
-  auto &pkg_rad = rc->GetParentPointer()->packages.Get("radiation");
-  auto &pkg_fix = rc->GetParentPointer()->packages.Get("fixup");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("fluid");
+  auto &pkg_rad = rc->GetMeshPointer()->packages.Get("radiation");
+  auto &pkg_fix = rc->GetMeshPointer()->packages.Get("fixup");
   std::string bc_vars = pkg->Param<std::string>("bc_vars");
 
   // Apply inflow check to ox1 for BH problem at simulation BC only
@@ -330,7 +330,7 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     }
 
     // Inflow check and then p2c
-    std::shared_ptr<MeshBlock> pmb = rc->GetBlockPointer();
+    auto pmb = rc->GetBlockPointer();
     auto geom = Geometry::GetCoordinateSystem(rc.get());
 
     // TODO(BRR) Is this always true?

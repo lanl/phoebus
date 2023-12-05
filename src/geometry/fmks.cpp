@@ -93,7 +93,7 @@ void SetGeometry<FMKSMesh>(MeshData<Real> *rc) {}
 
 template <>
 FMKSMeshBlock GetCoordinateSystem<FMKSMeshBlock>(MeshBlockData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real dxfd = pkg->Param<Real>("dxfd");
@@ -102,7 +102,7 @@ FMKSMeshBlock GetCoordinateSystem<FMKSMeshBlock>(MeshBlockData<Real> *rc) {
 }
 template <>
 FMKSMesh GetCoordinateSystem<FMKSMesh>(MeshData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real dxfd = pkg->Param<Real>("dxfd");

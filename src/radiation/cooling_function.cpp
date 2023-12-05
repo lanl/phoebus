@@ -26,21 +26,21 @@ TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
-  auto *pmb = rc->GetParentPointer().get();
+  Mesh *pmesh = rc->GetMeshPointer();
 
-  std::vector<std::string> vars({p::density, iv::tau});
+  std::vector<std::string> vars({p::density::name(), iv::tau});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int prho = imap[p::density].first;
+  const int prho = imap[p::density::name()].first;
   const int ptau = imap[iv::tau].first;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto &unit_conv =
-      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
+      pmesh->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CalcTau", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -76,7 +76,7 @@ TaskStatus CheckDoGain(MeshBlockData<Real> *rc, bool *do_gain_global) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
-  auto *pmb = rc->GetParentPointer().get();
+  Mesh *pmesh = rc->GetMeshPointer();
 
   std::vector<std::string> vars({iv::tau});
 
@@ -84,14 +84,14 @@ TaskStatus CheckDoGain(MeshBlockData<Real> *rc, bool *do_gain_global) {
   auto v = rc->PackVariables(vars, imap);
   const int ptau = imap[iv::tau].first;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto &unit_conv =
-      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
-  auto rad = pmb->packages.Get("radiation").get();
-  auto opac = pmb->packages.Get("opacity").get();
+      pmesh->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
+  auto rad = pmesh->packages.Get("radiation").get();
+  auto opac = pmesh->packages.Get("opacity").get();
 
   int do_gain_local = 0;
   bool do_gain;
@@ -111,16 +111,16 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
 
-  std::vector<std::string> vars({c::density, p::density, p::velocity, p::temperature,
-                                 p::ye, c::energy, iv::Gcov, iv::GcovHeat, iv::GcovCool,
-                                 iv::Gye, iv::tau, p::energy});
+  std::vector<std::string> vars({c::density, p::density::name(), p::velocity,
+                                 p::temperature, p::ye, c::energy, iv::Gcov, iv::GcovHeat,
+                                 iv::GcovCool, iv::Gye, iv::tau, p::energy});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int crho = imap[c::density].first;
-  const int prho = imap[p::density].first;
+  const int prho = imap[p::density::name()].first;
   const int pvlo = imap[p::velocity].first;
   const int pvhi = imap[p::velocity].second;
   const int ptemp = imap[p::temperature].first;
@@ -133,9 +133,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   const int GcovHeat = imap[iv::GcovHeat].first;
   const int GcovCool = imap[iv::GcovCool].first;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");

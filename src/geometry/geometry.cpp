@@ -109,7 +109,7 @@ CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc) {
 
 void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin) {
   MeshBlockData<Real> *rc = pmb->meshblock_data.Get().get();
-  auto *pparent = rc->GetParentPointer().get();
+  Mesh *pparent = rc->GetMeshPointer();
   StateDescriptor *pkg = pparent->packages.Get("geometry").get();
   bool do_defaults = pkg->AllParams().Get("do_defaults", true);
   auto system = GetCoordinateSystem(rc);
@@ -119,7 +119,7 @@ void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin) {
 
 template <>
 TaskStatus UpdateGeometry<MeshBlockData<Real>>(MeshBlockData<Real> *rc) {
-  auto *pparent = rc->GetParentPointer().get();
+  Mesh *pparent = rc->GetMeshPointer();
   StateDescriptor *pkg = pparent->packages.Get("geometry").get();
   bool update_coords = pkg->AllParams().Get("update_coords", false);
   auto system = GetCoordinateSystem(rc);
@@ -130,7 +130,7 @@ TaskStatus UpdateGeometry<MeshBlockData<Real>>(MeshBlockData<Real> *rc) {
 
 template <>
 TaskStatus UpdateGeometry<MeshData<Real>>(MeshData<Real> *rc) {
-  auto *pparent = rc->GetParentPointer();
+  Mesh *pparent = rc->GetMeshPointer();
   StateDescriptor *pkg = pparent->packages.Get("geometry").get();
   bool update_coords = pkg->AllParams().Get("update_coords", false);
   auto system = GetCoordinateSystem(rc);
