@@ -138,13 +138,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   bool do_rad = rad_pkg->Param<bool>("active");
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
+  auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity,
                               fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
                               fluid_prim::pressure, fluid_prim::temperature,
                               fluid_prim::gamma1, radmoment_prim::J, radmoment_prim::H},
                              imap);
 
-  const int irho = imap[fluid_prim::density].first;
+  const int irho = imap[fluid_prim::density::name()].first;
   const int ivlo = imap[fluid_prim::velocity].first;
   const int ivhi = imap[fluid_prim::velocity].second;
   const int ieng = imap[fluid_prim::energy].first;
@@ -679,11 +679,11 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
 
     PackIndexMap imap;
     auto v =
-        rc->PackVariables({fluid_prim::density, fluid_prim::velocity, fluid_prim::bfield,
-                           fluid_prim::pressure, radmoment_prim::J},
+        rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity,
+                           fluid_prim::bfield, fluid_prim::pressure, radmoment_prim::J},
                           imap);
 
-    const int irho = imap[fluid_prim::density].first;
+    const int irho = imap[fluid_prim::density::name()].first;
     const int ivlo = imap[fluid_prim::velocity].first;
     const int ivhi = imap[fluid_prim::velocity].second;
     const int iblo = imap[fluid_prim::bfield].first;

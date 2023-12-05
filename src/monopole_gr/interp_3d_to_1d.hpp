@@ -67,7 +67,7 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   using namespace impl;
 
   // Available in both mesh and meshblock
-  auto pparent = rc->GetParentPointer();
+  Mesh *pparent = rc->GetMeshPointer();
   std::shared_ptr<StateDescriptor> const &pkg = pparent->packages.Get("monopole_gr");
   auto &params = pkg->AllParams();
 

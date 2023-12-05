@@ -204,7 +204,7 @@ template <class T, class CLOSURE>
 TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   PARTHENON_REQUIRE(USE_VALENCIA, "Covariant MHD formulation not supported!");
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
@@ -217,10 +217,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace c = fluid_cons;
   namespace p = fluid_prim;
   std::vector<std::string> vars{
-      c::density,  c::energy,  c::momentum,    c::ye,     cr::E, cr::F,
-      c::bfield,   p::density, p::temperature, p::energy, p::ye, p::velocity,
-      p::pressure, p::gamma1,  p::bfield,      pr::J,     pr::H, ir::kappaJ,
-      ir::kappaH,  ir::JBB,    ir::tilPi};
+      c::density, c::energy,   c::momentum,        c::ye,          cr::E,
+      cr::F,      c::bfield,   p::density::name(), p::temperature, p::energy,
+      p::ye,      p::velocity, p::pressure,        p::gamma1,      p::bfield,
+      pr::J,      pr::H,       ir::kappaJ,         ir::kappaH,     ir::JBB,
+      ir::tilPi};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -235,7 +236,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_tilPi = imap.GetFlatIdx(ir::tilPi, false);
   auto pv = imap.GetFlatIdx(p::velocity);
 
-  int prho = imap[p::density].first;
+  int prho = imap[p::density::name()].first;
   int peng = imap[p::energy].first;
   int pT = imap[p::temperature].first;
   int pprs = imap[p::pressure].first;
@@ -964,7 +965,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 }
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
-  auto *pm = rc->GetParentPointer().get();
+  Mesh *pm = rc->GetMeshPointer();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
   using settings =

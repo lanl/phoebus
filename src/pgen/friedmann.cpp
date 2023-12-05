@@ -36,11 +36,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(
-      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
-       fluid_prim::ye, fluid_prim::pressure, fluid_prim::temperature, fluid_prim::gamma1},
-      imap);
-  const int irho = imap[fluid_prim::density].first;
+  auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity,
+                              fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
+                              fluid_prim::pressure, fluid_prim::temperature,
+                              fluid_prim::gamma1},
+                             imap);
+  const int irho = imap[fluid_prim::density::name()].first;
   const int ivlo = imap[fluid_prim::velocity].first;
   const int ieng = imap[fluid_prim::energy].first;
   const int iye = imap[fluid_prim::ye].second;

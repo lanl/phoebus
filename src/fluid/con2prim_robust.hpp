@@ -228,8 +228,8 @@ class ConToPrim {
             const Real floor_scale_fac, const bool fail_on_floors,
             const bool fail_on_ceilings)
       : bounds(bnds), var(rc->PackVariables(Vars(), imap)),
-        prho(imap[fluid_prim::density].first), crho(imap[fluid_cons::density].first),
-        pvel_lo(imap[fluid_prim::velocity].first),
+        prho(imap[fluid_prim::density::name()].first),
+        crho(imap[fluid_cons::density].first), pvel_lo(imap[fluid_prim::velocity].first),
         pvel_hi(imap[fluid_prim::velocity].second),
         cmom_lo(imap[fluid_cons::momentum].first),
         cmom_hi(imap[fluid_cons::momentum].second), peng(imap[fluid_prim::energy].first),
@@ -247,7 +247,7 @@ class ConToPrim {
 
   std::vector<std::string> Vars() {
     return std::vector<std::string>(
-        {fluid_prim::density, fluid_cons::density, fluid_prim::velocity,
+        {fluid_prim::density::name(), fluid_cons::density, fluid_prim::velocity,
          fluid_cons::momentum, fluid_prim::energy, fluid_cons::energy, fluid_prim::bfield,
          fluid_cons::bfield, fluid_prim::ye, fluid_cons::ye, fluid_prim::pressure,
          fluid_prim::temperature, internal_variables::cell_signal_speed,

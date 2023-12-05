@@ -49,17 +49,17 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   namespace ir = radmoment_internal;
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  Mesh *pmesh = rc->GetMeshPointer();
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
-  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
+  StateDescriptor *fluid_pkg = pmesh->packages.Get("fluid").get();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
+  StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
 
-  const std::vector<std::string> vars({p::density,
+  const std::vector<std::string> vars({p::density::name(),
                                        c::density,
                                        p::velocity,
                                        c::momentum,
@@ -85,7 +85,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
-  const int prho = imap[p::density].first;
+  const int prho = imap[p::density::name()].first;
   const int crho = imap[c::density].first;
   const int pvel_lo = imap[p::velocity].first;
   const int pvel_hi = imap[p::velocity].second;
@@ -134,9 +134,9 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         },
         Kokkos::Sum<int>(nfail_total));
     printf("total nfail: %i\n", nfail_total);
-    IndexRange ibi = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jbi = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kbi = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+    IndexRange ibi = rc->GetBoundsI(IndexDomain::interior);
+    IndexRange jbi = rc->GetBoundsJ(IndexDomain::interior);
+    IndexRange kbi = rc->GetBoundsK(IndexDomain::interior);
     nfail_total = 0;
     parthenon::par_reduce(
         parthenon::loop_pattern_mdrange_tag, "Rad ConToPrim::Solve fixup failures",
@@ -150,13 +150,13 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
     printf("total interior nfail: %i\n", nfail_total);
   }
 
-  const int ndim = pmb->pmy_mesh->ndim;
+  const int ndim = pmesh->ndim;
 
   auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
-  Coordinates_t coords = rc->GetParentPointer().get()->coords;
+  Coordinates_t coords = rc->GetParentPointer()->coords;
 
   auto fluid_c2p_failure_strategy =
       fix_pkg->Param<FAILURE_STRATEGY>("fluid_c2p_failure_strategy");
@@ -356,9 +356,9 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc) {
-  auto *pm = rc->GetParentPointer().get();
-  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
-  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+  Mesh *pmesh = rc->GetMeshPointer();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
   const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
   std::string method;
   if (enable_rad_floors) {

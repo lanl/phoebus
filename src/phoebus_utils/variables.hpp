@@ -14,8 +14,27 @@
 #ifndef PHOEBUS_UTILS_VARIABLES_HPP_
 #define PHOEBUS_UTILS_VARIABLES_HPP_
 
+#include <parthenon/package.hpp>
+
+#define VARIABLE(ns, varname)                                                            \
+  struct varname : public parthenon::variable_names::base_t<false> {                     \
+    template <class... Ts>                                                               \
+    KOKKOS_INLINE_FUNCTION varname(Ts &&...args)                                         \
+        : parthenon::variable_names::base_t<false>(std::forward<Ts>(args)...) {}         \
+    static std::string name() { return #ns "." #varname; }                               \
+  }
+
+#define VARIABLE_NONS(varname)                                                           \
+  struct varname : public parthenon::variable_names::base_t<false> {                     \
+    template <class... Ts>                                                               \
+    KOKKOS_INLINE_FUNCTION varname(Ts &&...args)                                         \
+        : parthenon::variable_names::base_t<false>(std::forward<Ts>(args)...) {}         \
+    static std::string name() { return #varname; }                                       \
+  }
+
 namespace fluid_prim {
-constexpr char density[] = "p.density";
+VARIABLE(p, density);
+// constexpr char density[] = "p.density";
 constexpr char velocity[] = "p.velocity";
 constexpr char energy[] = "p.energy";
 constexpr char bfield[] = "p.bfield";

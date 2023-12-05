@@ -54,7 +54,7 @@ get_nsamp_per_zone(const int &k, const int &j, const int &i,
 template <class T>
 void MOCMCInitSamples(T *rc) {
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -81,14 +81,15 @@ void MOCMCInitSamples(T *rc) {
   const auto opac = opac_pkg->template Param<Opacities>("opacities");
   StateDescriptor *eos = pmb->packages.Get("eos").get();
 
-  std::vector<std::string> variables{pr::J,           pr::H,  pf::density, pf::velocity,
-                                     pf::temperature, pf::ye, im::dnsamp};
+  std::vector<std::string> variables{pr::J,        pr::H,           pf::density::name(),
+                                     pf::velocity, pf::temperature, pf::ye,
+                                     im::dnsamp};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
   auto pJ = imap.GetFlatIdx(pr::J);
   auto pH = imap.GetFlatIdx(pr::H);
-  auto pdens = imap[pf::density].first;
+  auto pdens = imap[pf::density::name()].first;
   auto pv = imap.GetFlatIdx(fluid_prim::velocity);
   auto pT = imap[pf::temperature].first;
   auto pye = imap[pf::ye].first;
@@ -232,7 +233,7 @@ void MOCMCInitSamples(T *rc) {
 
 template <class T>
 TaskStatus MOCMCSampleBoundaries(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -347,7 +348,7 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
 
 template <class T>
 TaskStatus MOCMCReconstruction(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -462,7 +463,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
 template <class T>
 TaskStatus MOCMCTransport(T *rc, const Real dt) {
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
 
@@ -503,7 +504,7 @@ template <class T>
 TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   // Assume particles are already sorted from MOCMCReconstruction call!
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -521,7 +522,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const auto eos_d = eos->template Param<EOS>("d.EOS");
 
   std::vector<std::string> variables{
-      cr::E,      cr::F,        pr::J,           pr::H,    pf::density,
+      cr::E,      cr::F,        pr::J,           pr::H,    pf::density::name(),
       pf::energy, pf::velocity, pf::temperature, pf::ye,   ir::tilPi,
       ir::kappaH, im::dnsamp,   im::Inu0,        im::Inu1, im::jinvs};
   if (update_fluid) {
@@ -534,7 +535,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
   const auto pJ = imap.GetFlatIdx(pr::J);
   const auto pH = imap.GetFlatIdx(pr::H);
-  const auto pdens = imap[pf::density].first;
+  const auto pdens = imap[pf::density::name()].first;
   const auto peng = imap[pf::energy].first;
   const auto pv = imap.GetFlatIdx(fluid_prim::velocity);
   const auto pT = imap[pf::temperature].first;
@@ -784,7 +785,7 @@ TaskStatus MOCMCEddington(T *rc) {
   // Assume list is sorted!
   namespace ir = radmoment_internal;
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();

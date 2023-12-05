@@ -288,15 +288,15 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   namespace cr = radmoment_cons;
   namespace ir = radmoment_internal;
   namespace impl = internal_variables;
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(domain);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(domain);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(domain);
+  auto *pmesh = rc->GetMeshPointer();
+  IndexRange ib = rc->GetBoundsI(domain);
+  IndexRange jb = rc->GetBoundsJ(domain);
+  IndexRange kb = rc->GetBoundsK(domain);
 
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
-  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
+  StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
+  StateDescriptor *fluid_pkg = pmesh->packages.Get("fluid").get();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
 
   bool rad_active = rad_pkg->Param<bool>("active");
 
@@ -307,14 +307,14 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   if (!enable_floors) return TaskStatus::complete;
 
   const std::vector<std::string> vars(
-      {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
-       p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
-       impl::cell_signal_speed, impl::fail, ir::tilPi});
+      {p::density::name(), c::density, p::velocity, c::momentum, p::energy, c::energy,
+       p::bfield, p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H,
+       cr::E, cr::F, impl::cell_signal_speed, impl::fail, ir::tilPi});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
-  const int prho = imap[p::density].first;
+  const int prho = imap[p::density::name()].first;
   const int crho = imap[c::density].first;
   const int pvel_lo = imap[p::velocity].first;
   const int pvel_hi = imap[p::velocity].second;
@@ -352,7 +352,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                                                 c2p_floor_scale_fac, c2p_fail_on_floors,
                                                 c2p_fail_on_ceilings);
 
-  Coordinates_t coords = rc->GetParentPointer().get()->coords;
+  Coordinates_t coords = rc->GetParentPointer()->coords;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
@@ -673,7 +673,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
 template <typename T>
 TaskStatus ApplyFloors(T *rc) {
-  auto *pm = rc->GetParentPointer().get();
+  auto *pm = rc->GetMeshPointer();
   StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
   const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
@@ -706,7 +706,7 @@ template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   using parthenon::BoundaryFace;
   using parthenon::BoundaryFlag;
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &fixup_pkg = pmb->packages.Get("fixup");
   if (!fixup_pkg->Param<bool>("enable_flux_fixup")) return TaskStatus::complete;
 
@@ -723,9 +723,9 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   }
   auto moments_active = rad->Param<bool>("moments_active");
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   const int ndim = pmb->pmy_mesh->ndim;
   namespace p = fluid_prim;

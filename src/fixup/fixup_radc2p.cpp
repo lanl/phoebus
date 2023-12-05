@@ -50,14 +50,14 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
 
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  Mesh *pmesh = rc->GetMeshPointer();
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
+  StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
 
   bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
   bool update_rad = rad_pkg->Param<bool>("active");
@@ -93,9 +93,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
         },
         Kokkos::Sum<int>(nfail_total));
     printf("total rad nfail: %i\n", nfail_total);
-    IndexRange ibi = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jbi = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kbi = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+    IndexRange ibi = rc->GetBoundsI(IndexDomain::interior);
+    IndexRange jbi = rc->GetBoundsJ(IndexDomain::interior);
+    IndexRange kbi = rc->GetBoundsK(IndexDomain::interior);
     nfail_total = 0;
     parthenon::par_reduce(
         parthenon::loop_pattern_mdrange_tag, "Rad ConToPrim::Solve fixup failures",
@@ -112,10 +112,10 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
-  Coordinates_t coords = rc->GetParentPointer().get()->coords;
+  Coordinates_t coords = rc->GetParentPointer()->coords;
 
   const int nspec = idx_E.DimSize(1);
-  const int ndim = pmb->pmy_mesh->ndim;
+  const int ndim = pmesh->ndim;
 
   auto rad_c2p_failure_strategy =
       fix_pkg->Param<FAILURE_STRATEGY>("rad_c2p_failure_strategy");
@@ -223,9 +223,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
 
 template <typename T>
 TaskStatus RadConservedToPrimitiveFixup(T *rc) {
-  auto *pm = rc->GetParentPointer().get();
-  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
-  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+  Mesh *pmesh = rc->GetMeshPointer();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
   const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
   std::string method;
   if (enable_rad_floors) {

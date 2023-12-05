@@ -55,7 +55,7 @@ void Initialize<CFLRWMeshBlock>(ParameterInput *pin, StateDescriptor *geometry) 
 
 template <>
 FLRWMeshBlock GetCoordinateSystem<FLRWMeshBlock>(MeshBlockData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a0 = pkg->Param<Real>("a0");
   Real dadt = pkg->Param<Real>("dadt");
@@ -65,7 +65,7 @@ FLRWMeshBlock GetCoordinateSystem<FLRWMeshBlock>(MeshBlockData<Real> *rc) {
 
 template <>
 FLRWMesh GetCoordinateSystem<FLRWMesh>(MeshData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a0 = pkg->Param<Real>("a0");
   Real dadt = pkg->Param<Real>("dadt");
