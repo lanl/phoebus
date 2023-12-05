@@ -189,9 +189,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     ndim = 2;
 
   // add the primitive variables
-  physics->AddField<p::density>(mprim_scalar);
-  physics->AddField<p::velocity>(mprim_threev);
-  physics->AddField(p::energy::name(), mprim_scalar);
+  physics->AddField(p::density, mprim_scalar);
+  physics->AddField(p::velocity, mprim_threev);
+  physics->AddField(p::energy, mprim_scalar);
   if (mhd) {
     physics->AddField(p::bfield, mprim_threev);
     if (ndim == 2) {
@@ -539,7 +539,6 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   auto *pmb = rc->GetParentPointer().get();
-  auto &resolved_pkgs = pkb->resolved_packages.get();
   auto &fluid = pmb->packages.Get("fluid");
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_sources"))
     return TaskStatus::complete;
@@ -548,19 +547,16 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-
-  using namespace c = fluid_cons;
-  using namespace diag = diagnostic_variables;
+  std::vector<std::string> vars({fluid_cons::momentum, fluid_cons::energy});
 #if SET_FLUX_SRC_DIAGS
-  static auto desc =
-    parthenon::MakePackDescriptor<c::momentum, c::energy,
-                                  diag::src_terms>(resolved_pkgs);
-#else
-  static auto desc =
-    parthenon::MakePackDescriptor<c::momentum, c::energy>(
-          resolved_pkgs);  
+  vars.push_back(diagnostic_variables::src_terms);
 #endif
-  auto src = desc.GetPack(rc);
+  PackIndexMap imap;
+  auto src = rc_src->PackVariables(vars, imap);
+  const int cmom_lo = imap[fluid_cons::momentum].first;
+  const int cmom_hi = imap[fluid_cons::momentum].second;
+  const int ceng = imap[fluid_cons::energy].first;
+  const int idiag = imap[diagnostic_variables::src_terms].first;
 
   auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -580,7 +576,7 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           SPACETIMELOOP2(m, n) {
             src_mom += Tmunu[m][n] * (dg[n][l + 1][m] - gam[l + 1][n][m]);
           }
-          src(fluid_cons::momentum(l), k, j, i) = gdet * src_mom;
+          src(cmom_lo + l, k, j, i) = gdet * src_mom;
         }
 
         // energy source term
@@ -610,21 +606,21 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           for (int m = 0; m < ND; m++) {
             Ta += Tmunu[m][0] * da[m];
           }
-          src(fluid_cons::energy(), k, j, i) = gdet * alpha * (Ta - TGam);
+          src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
 #else
                          SPACETIMELOOP2(mu, nu) {
                            TGam += Tmunu[mu][nu] * gam[nu][0][mu];
                          }
-                         src(fluid_cons::energy(), k, j, i) = gdet * TGam;
+                         src(ceng, k, j, i) = gdet * TGam;
 #endif // USE_VALENCIA
         }
 
 #if SET_FLUX_SRC_DIAGS
-        src(diag::src_terms(0), k, j, i) = 0.0;
-        src(diag::src_terms(1), k, j, i) = src(c::momentum(0), k, j, i);
-        src(diag::src_terms(2), k, j, i) = src(c::momentum(1), k, j, i);
-        src(diag::src_terms(3), k, j, i) = src(c::momentum(2), k, j, i);
-        src(diag::src_terms(4), k, j, i) = src(c::energy(), k, j, i);
+        src(idiag, k, j, i) = 0.0;
+        src(idiag + 1, k, j, i) = src(cmom_lo, k, j, i);
+        src(idiag + 2, k, j, i) = src(cmom_lo + 1, k, j, i);
+        src(idiag + 3, k, j, i) = src(cmom_lo + 2, k, j, i);
+        src(idiag + 4, k, j, i) = src(ceng, k, j, i);
 #endif
       });
 
