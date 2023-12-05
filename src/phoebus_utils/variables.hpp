@@ -14,106 +14,86 @@
 #ifndef PHOEBUS_UTILS_VARIABLES_HPP_
 #define PHOEBUS_UTILS_VARIABLES_HPP_
 
-#include <parthenon/package.hpp>
-
-#define VARIABLE(ns, varname)                                                            \
-  struct varname : public parthenon::variable_names::base_t<false> {                     \
-    template <class... Ts>                                                               \
-    KOKKOS_INLINE_FUNCTION varname(Ts &&...args)                                         \
-        : parthenon::variable_names::base_t<false>(std::forward<Ts>(args)...) {}         \
-    static std::string name() { return #ns "." #varname; }                               \
-  }
-
-#define VARIABLE_NONS(varname)                                                           \
-  struct varname : public parthenon::variable_names::base_t<false> {                     \
-    template <class... Ts>                                                               \
-    KOKKOS_INLINE_FUNCTION varname(Ts &&...args)                                         \
-        : parthenon::variable_names::base_t<false>(std::forward<Ts>(args)...) {}         \
-    static std::string name() { return #varname; }                                       \
-  }
-
 namespace fluid_prim {
-VARIABLE(p, density);
-VARIABLE(p, velocity);
-VARIABLE(p, energy);
-VARIABLE(p, bfield);
-VARIABLE(p, ye);
-VARIABLE_NONS(pressure);
-VARAIBLE_NONS(temperature);
-VARIABLE_NONS(gamma1);
+constexpr char density[] = "p.density";
+constexpr char velocity[] = "p.velocity";
+constexpr char energy[] = "p.energy";
+constexpr char bfield[] = "p.bfield";
+constexpr char ye[] = "p.ye";
+constexpr char pressure[] = "pressure";
+constexpr char temperature[] = "temperature";
+constexpr char gamma1[] = "gamma1";
 } // namespace fluid_prim
 
 namespace fluid_cons {
-VARIABLE(c, density);
-VARIABLE(c, momentum);
-VARIABLE(c, energy);
-VARIABLE(c, bfield);
-VARIABLE(c, ye);
+constexpr char density[] = "c.density";
+constexpr char momentum[] = "c.momentum";
+constexpr char energy[] = "c.energy";
+constexpr char bfield[] = "c.bfield";
+constexpr char ye[] = "c.ye";
 } // namespace fluid_cons
 
 namespace radmoment_prim {
-VARIABLE(r, p.J);
-VARIABLE(r, p.H);
+constexpr char J[] = "r.p.J";
+constexpr char H[] = "r.p.H";
 } // namespace radmoment_prim
 
 namespace radmoment_cons {
-VARIABLE(r, c.E);
-VARIABLE(r, c.F);
+constexpr char E[] = "r.c.E";
+constexpr char F[] = "r.c.F";
 } // namespace radmoment_cons
 
 namespace radmoment_internal {
-VARIABLE(r, i.xi);
-VARIABLE(r, i.phi);
-VARIABLE(r, i.ql);
-VARIABLE(r, i.qr);
-VARIABLE(r, i.ql_v);
-VARIABLE(r, i.qr_v);
-VARIABLE(r, i.dJ);
-VARIABLE(r, i.kappaJ);
-VARIABLE(r, i.kappaH);
-VARIABLE(r, i.JBB);
-VARIABLE(r, i.tilPi);
-VARIABLE(r, i.kappaH_mean);
-VARIABLE(r, i.c2p_fail);
-VARIABLE(r, i.src_fail);
+constexpr char xi[] = "r.i.xi";
+constexpr char phi[] = "r.i.phi";
+constexpr char ql[] = "r.i.ql";
+constexpr char qr[] = "r.i.qr";
+constexpr char ql_v[] = "r.i.ql_v";
+constexpr char qr_v[] = "r.i.qr_v";
+constexpr char dJ[] = "r.i.dJ";
+constexpr char kappaJ[] = "r.i.kappaJ";
+constexpr char kappaH[] = "r.i.kappaH";
+constexpr char JBB[] = "r.i.JBB";
+constexpr char tilPi[] = "r.i.tilPi";
+constexpr char kappaH_mean[] = "r.i.kappaH_mean";
+constexpr char c2pfail[] = "r.i.c2p_fail";
+constexpr char srcfail[] = "r.i.src_fail";
 } // namespace radmoment_internal
 
 namespace mocmc_internal {
-VARIABLE(mocmc, i.dnsamp);
-VARIABLE(mocmc, i.inu0);
-VARIABLE(mocmc, i.inu1);
-VARIABLE(mocmc, i.jinvs);
+constexpr char dnsamp[] = "mocmc.i.dnsamp";
+constexpr char Inu0[] = "mocmc.i.inu0";
+constexpr char Inu1[] = "mocmc.i.inu1";
+constexpr char jinvs[] = "mocmc.i.jinvs";
 } // namespace mocmc_internal
 
 namespace internal_variables {
-VARIABLE_NONS(face_signal_speed);
-VARIABLE_NONS(cell_signal_speed);
-VARIABLE_NONS(emf);
-VARIABLE_NONS(c2p_scratch);
-VARIABLE_NONS(ql);
-VARIABLE_NONS(qr);
-VARIABLE_NONS(fail);
-VARIABLE_NONS(Gcov);
-VARIABLE_NONS(Gye);
-VARIABLE_NONS(c2p_mu);
-VARIABLE_NONS(light_bulb_tau);
-VARIABLE_NONS(GcovHeat);
-VARIABLE_NONS(GcovCool);
+constexpr char face_signal_speed[] = "face_signal_speed";
+constexpr char cell_signal_speed[] = "cell_signal_speed";
+constexpr char emf[] = "emf";
+constexpr char c2p_scratch[] = "c2p_scratch";
+constexpr char ql[] = "ql";
+constexpr char qr[] = "qr";
+constexpr char fail[] = "fail";
+constexpr char Gcov[] = "Gcov";
+constexpr char Gye[] = "Gye";
+constexpr char c2p_mu[] = "c2p_mu";
+constexpr char tau[] = "light_bulb_tau";
+constexpr char GcovHeat[] = "GcovHeat";
+constexpr char GcovCool[] = "GcovCool";
 } // namespace internal_variables
 
 namespace geometric_variables {
-VARIABLE(g, c.coord);
-VARIABLE(g, n.coord);
+constexpr char cell_coords[] = "g.c.coord";
+constexpr char node_coords[] = "g.n.coord";
 } // namespace geometric_variables
 
 namespace diagnostic_variables {
-VARIABLE_NONS(divb);
-VARIABLE_NONS(flux_divergence);
-VARIABLE_NONS(src_terms);
-VARIABLE(r, flux_divergence);
-VARIABLE(r, src_terms);
+constexpr char divb[] = "divb";
+constexpr char divf[] = "flux_divergence";
+constexpr char src_terms[] = "src_terms";
+constexpr char r_divf[] = "r.flux_divergence";
+constexpr char r_src_terms[] = "r.src_terms";
 } // namespace diagnostic_variables
-
-#undef VARIABLE
 
 #endif // PHOEBUS_UTILS_VARIABLES_HPP_
