@@ -224,11 +224,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
                                 cr::F,
                                 c::bfield::name(),
                                 p::density::name(),
-                                p::temperature,
+                                p::temperature::name(),
                                 p::energy::name(),
                                 p::ye::name(),
                                 p::velocity::name(),
-                                p::pressure,
+                                p::pressure::name(),
                                 p::gamma1,
                                 p::bfield::name(),
                                 pr::J,
@@ -253,8 +253,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   int prho = imap[p::density::name()].first;
   int peng = imap[p::energy::name()].first;
-  int pT = imap[p::temperature].first;
-  int pprs = imap[p::pressure].first;
+  int pT = imap[p::temperature::name()].first;
+  int pprs = imap[p::pressure::name()].first;
   int pgm1 = imap[p::gamma1].first;
   int pYe = imap[p::ye::name()].first;
   int pb_lo = imap[p::bfield::name()].first;

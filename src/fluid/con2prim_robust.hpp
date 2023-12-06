@@ -241,8 +241,9 @@ class ConToPrim {
         cb_lo(imap[fluid_cons::bfield::name()].first),
         cb_hi(imap[fluid_cons::bfield::name()].second),
         pye(imap[fluid_prim::ye::name()].second),
-        cye(imap[fluid_cons::ye::name()].second), prs(imap[fluid_prim::pressure].first),
-        tmp(imap[fluid_prim::temperature].first),
+        cye(imap[fluid_cons::ye::name()].second),
+        prs(imap[fluid_prim::pressure::name()].first),
+        tmp(imap[fluid_prim::temperature::name()].first),
         sig_lo(imap[internal_variables::cell_signal_speed].first),
         sig_hi(imap[internal_variables::cell_signal_speed].second),
         gm1(imap[fluid_prim::gamma1].first),
@@ -256,9 +257,9 @@ class ConToPrim {
          fluid_prim::velocity::name(), fluid_cons::momentum::name(),
          fluid_prim::energy::name(), fluid_cons::energy::name(),
          fluid_prim::bfield::name(), fluid_cons::bfield::name(), fluid_prim::ye::name(),
-         fluid_cons::ye::name(), fluid_prim::pressure, fluid_prim::temperature,
-         internal_variables::cell_signal_speed, fluid_prim::gamma1,
-         internal_variables::c2p_mu});
+         fluid_cons::ye::name(), fluid_prim::pressure::name(),
+         fluid_prim::temperature::name(), internal_variables::cell_signal_speed,
+         fluid_prim::gamma1, internal_variables::c2p_mu});
   }
 
   template <typename CoordinateSystem, class... Args>

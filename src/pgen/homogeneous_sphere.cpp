@@ -29,10 +29,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables(
-      std::vector<std::string>({radmoment_prim::J, radmoment_prim::H,
-                                fluid_prim::density::name(), fluid_prim::temperature,
-                                fluid_prim::velocity::name(), radmoment_internal::xi,
-                                radmoment_internal::phi}),
+      std::vector<std::string>(
+          {radmoment_prim::J, radmoment_prim::H, fluid_prim::density::name(),
+           fluid_prim::temperature::name(), fluid_prim::velocity::name(),
+           radmoment_internal::xi, radmoment_internal::phi}),
       imap);
 
   auto idJ = imap.GetFlatIdx(radmoment_prim::J);
@@ -41,7 +41,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto ixi = imap.GetFlatIdx(radmoment_internal::xi);
   auto iphi = imap.GetFlatIdx(radmoment_internal::phi);
   const int prho = imap[fluid_prim::density::name()].first;
-  const int pT = imap[fluid_prim::temperature].first;
+  const int pT = imap[fluid_prim::temperature::name()].first;
 
   const auto specB = idJ.GetBounds(1);
   const Real sphere_rad = pin->GetOrAddReal("homogeneous_sphere", "radius", 1.0);

@@ -81,9 +81,13 @@ void MOCMCInitSamples(T *rc) {
   const auto opac = opac_pkg->template Param<Opacities>("opacities");
   StateDescriptor *eos = pmb->packages.Get("eos").get();
 
-  std::vector<std::string> variables{
-      pr::J,           pr::H,          pf::density::name(), pf::velocity::name(),
-      pf::temperature, pf::ye::name(), im::dnsamp};
+  std::vector<std::string> variables{pr::J,
+                                     pr::H,
+                                     pf::density::name(),
+                                     pf::velocity::name(),
+                                     pf::temperature::name(),
+                                     pf::ye::name(),
+                                     im::dnsamp};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -91,7 +95,7 @@ void MOCMCInitSamples(T *rc) {
   auto pH = imap.GetFlatIdx(pr::H);
   auto pdens = imap[pf::density::name()].first;
   auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
-  auto pT = imap[pf::temperature].first;
+  auto pT = imap[pf::temperature::name()].first;
   auto pye = imap[pf::ye::name()].first;
   auto dn = imap[im::dnsamp].first;
 
@@ -528,7 +532,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                                      pf::density::name(),
                                      pf::energy::name(),
                                      pf::velocity::name(),
-                                     pf::temperature,
+                                     pf::temperature::name(),
                                      pf::ye::name(),
                                      ir::tilPi,
                                      ir::kappaH,
@@ -549,7 +553,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const auto pdens = imap[pf::density::name()].first;
   const auto peng = imap[pf::energy::name()].first;
   const auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
-  const auto pT = imap[pf::temperature].first;
+  const auto pT = imap[pf::temperature::name()].first;
   const auto pye = imap[pf::ye::name()].first;
   const auto Inu0 = imap.GetFlatIdx(im::Inu0);
   const auto Inu1 = imap.GetFlatIdx(im::Inu1);

@@ -201,8 +201,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     }
     physics->AddField(diag::divb, mprim_scalar);
   }
-  physics->AddField(p::pressure, mprim_scalar);
-  physics->AddField(p::temperature, mprim_scalar);
+  physics->AddField(p::pressure::name(), mprim_scalar);
+  physics->AddField(p::temperature::name(), mprim_scalar);
   physics->AddField(p::gamma1, mprim_scalar);
   if (ye) {
     physics->AddField(p::ye::name(), mprim_scalar);
@@ -269,7 +269,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) riemann::FluxState::FluxVars(c::ye::name());
 
   // add some extra fields for reconstruction
-  rvars = std::vector<std::string>({p::pressure, p::gamma1});
+  rvars = std::vector<std::string>({p::pressure::name(), p::gamma1});
   riemann::FluxState::ReconVars(rvars);
 
   auto recon_vars = riemann::FluxState::ReconVars();
@@ -355,7 +355,8 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   const std::vector<std::string> vars(
       {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
        p::energy::name(), c::energy::name(), p::bfield::name(), c::bfield::name(),
-       p::ye::name(), c::ye::name(), p::pressure, p::gamma1, impl::cell_signal_speed});
+       p::ye::name(), c::ye::name(), p::pressure::name(), p::gamma1,
+       impl::cell_signal_speed});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -368,7 +369,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   const int cmom_hi = imap[c::momentum::name()].second;
   const int peng = imap[p::energy::name()].first;
   const int ceng = imap[c::energy::name()].first;
-  const int prs = imap[p::pressure].first;
+  const int prs = imap[p::pressure::name()].first;
   const int gm1 = imap[p::gamma1].first;
   const int pb_lo = imap[p::bfield::name()].first;
   const int pb_hi = imap[p::bfield::name()].second;

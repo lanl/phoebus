@@ -68,8 +68,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
                                        p::bfield::name(),
                                        p::ye::name(),
                                        c::ye::name(),
-                                       p::pressure,
-                                       p::temperature,
+                                       p::pressure::name(),
+                                       p::temperature::name(),
                                        p::gamma1,
                                        impl::cell_signal_speed,
                                        impl::fail,
@@ -93,8 +93,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   const int cmom_hi = imap[c::momentum::name()].second;
   const int peng = imap[p::energy::name()].first;
   const int ceng = imap[c::energy::name()].first;
-  const int prs = imap[p::pressure].first;
-  const int tmp = imap[p::temperature].first;
+  const int prs = imap[p::pressure::name()].first;
+  const int tmp = imap[p::temperature::name()].first;
   const int gm1 = imap[p::gamma1].first;
   const int slo = imap[impl::cell_signal_speed].first;
   const int shi = imap[impl::cell_signal_speed].second;

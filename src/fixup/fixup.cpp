@@ -309,8 +309,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   const std::vector<std::string> vars(
       {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
        p::energy::name(), c::energy::name(), p::bfield::name(), p::ye::name(),
-       c::ye::name(), p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
-       impl::cell_signal_speed, impl::fail, ir::tilPi});
+       c::ye::name(), p::pressure::name(), p::temperature::name(), p::gamma1, pr::J,
+       pr::H, cr::E, cr::F, impl::cell_signal_speed, impl::fail, ir::tilPi});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -323,8 +323,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   const int cmom_hi = imap[c::momentum::name()].second;
   const int peng = imap[p::energy::name()].first;
   const int ceng = imap[c::energy::name()].first;
-  const int prs = imap[p::pressure].first;
-  const int tmp = imap[p::temperature].first;
+  const int prs = imap[p::pressure::name()].first;
+  const int tmp = imap[p::temperature::name()].first;
   const int gm1 = imap[p::gamma1].first;
   const int slo = imap[impl::cell_signal_speed].first;
   const int shi = imap[impl::cell_signal_speed].second;

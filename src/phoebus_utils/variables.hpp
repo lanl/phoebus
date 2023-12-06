@@ -38,8 +38,8 @@ VARIABLE(p, velocity);
 VARIABLE(p, energy);
 VARIABLE(p, bfield);
 VARIABLE(p, ye);
-constexpr char pressure[] = "pressure";
-constexpr char temperature[] = "temperature";
+VARIABLE_NONS(pressure);
+VARIABLE_NONS(temperature);
 constexpr char gamma1[] = "gamma1";
 } // namespace fluid_prim
 

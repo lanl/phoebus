@@ -944,16 +944,20 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{
-      p::density::name(), p::temperature, p::ye::name(), p::velocity::name(),
-      ir::kappaJ,         ir::kappaH,     ir::JBB};
+  std::vector<std::string> vars{p::density::name(),
+                                p::temperature::name(),
+                                p::ye::name(),
+                                p::velocity::name(),
+                                ir::kappaJ,
+                                ir::kappaH,
+                                ir::JBB};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   auto pv = imap.GetFlatIdx(p::velocity::name());
 
   int prho = imap[p::density::name()].first;
-  int pT = imap[p::temperature].first;
+  int pT = imap[p::temperature::name()].first;
   int pYe = imap[p::ye::name()].first;
 
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
