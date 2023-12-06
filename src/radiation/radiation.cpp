@@ -544,11 +544,11 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace c = fluid_cons;
   namespace iv = internal_variables;
 
-  std::vector<std::string> vars({c::density, c::energy::name(), c::momentum::name(),
-                                 c::ye::name(), iv::Gcov, iv::Gye});
+  std::vector<std::string> vars({c::density::name(), c::energy::name(),
+                                 c::momentum::name(), c::ye::name(), iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int crho = imap[c::density].first;
+  const int crho = imap[c::density::name()].first;
   const int ceng = imap[c::energy::name()].first;
   const int cmom_lo = imap[c::momentum::name()].first;
   const int cmom_hi = imap[c::momentum::name()].second;

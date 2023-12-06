@@ -216,7 +216,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{c::density,
+  std::vector<std::string> vars{c::density::name(),
                                 c::energy::name(),
                                 c::momentum::name(),
                                 c::ye::name(),
@@ -260,7 +260,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   int pb_lo = imap[p::bfield::name()].first;
   int cb_lo = imap[c::bfield::name()].first;
 
-  int crho = imap[c::density].first;
+  int crho = imap[c::density::name()].first;
   int ceng = imap[c::energy::name()].first;
   int cmom_lo = imap[c::momentum::name()].first;
   int cmom_hi = imap[c::momentum::name()].second;
