@@ -219,14 +219,14 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   std::vector<std::string> vars{c::density,
                                 c::energy::name(),
                                 c::momentum,
-                                c::ye,
+                                c::ye::name(),
                                 cr::E,
                                 cr::F,
                                 c::bfield::name(),
                                 p::density::name(),
                                 p::temperature,
                                 p::energy::name(),
-                                p::ye,
+                                p::ye::name(),
                                 p::velocity::name(),
                                 p::pressure,
                                 p::gamma1,
@@ -256,7 +256,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   int pT = imap[p::temperature].first;
   int pprs = imap[p::pressure].first;
   int pgm1 = imap[p::gamma1].first;
-  int pYe = imap[p::ye].first;
+  int pYe = imap[p::ye::name()].first;
   int pb_lo = imap[p::bfield::name()].first;
   int cb_lo = imap[c::bfield::name()].first;
 
@@ -264,7 +264,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   int ceng = imap[c::energy::name()].first;
   int cmom_lo = imap[c::momentum].first;
   int cmom_hi = imap[c::momentum].second;
-  int cye = imap[c::ye].first;
+  int cye = imap[c::ye::name()].first;
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);

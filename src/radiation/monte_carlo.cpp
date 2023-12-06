@@ -54,10 +54,10 @@ void ComputeTotalEmissivity(Mesh *pmesh) {
 
     namespace p = fluid_prim;
     PackIndexMap imap;
-    auto v = rc->PackVariables({p::density::name(), p::temperature, p::ye}, imap);
+    auto v = rc->PackVariables({p::density::name(), p::temperature, p::ye::name()}, imap);
     const int prho = imap[p::density::name()].first;
     const int ptemp = imap[p::temperature].first;
-    const int pye = imap[p::ye].first;
+    const int pye = imap[p::ye::name()].first;
 
     Real Jtot_b = 0.0; // per block
     // into par_for
@@ -150,12 +150,12 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
 
-  std::vector<std::string> vars({p::density::name(), p::temperature, p::ye,
+  std::vector<std::string> vars({p::density::name(), p::temperature, p::ye::name(),
                                  p::velocity::name(), "dNdlnu_max", "dNdlnu", "dN", "Ns",
                                  iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int pye = imap[p::ye].first;
+  const int pye = imap[p::ye::name()].first;
   const int pdens = imap[p::density::name()].first;
   const int ptemp = imap[p::temperature].first;
   const int pvlo = imap[p::velocity::name()].first;
@@ -456,12 +456,12 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
 
-  std::vector<std::string> vars({p::density::name(), p::ye, p::velocity::name(),
+  std::vector<std::string> vars({p::density::name(), p::ye::name(), p::velocity::name(),
                                  p::temperature, iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int prho = imap[p::density::name()].first;
-  const int iye = imap[p::ye].first;
+  const int iye = imap[p::ye::name()].first;
   const int ivlo = imap[p::velocity::name()].first;
   const int ivhi = imap[p::velocity::name()].second;
   const int itemp = imap[p::temperature].first;

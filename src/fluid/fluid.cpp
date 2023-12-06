@@ -205,7 +205,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::temperature, mprim_scalar);
   physics->AddField(p::gamma1, mprim_scalar);
   if (ye) {
-    physics->AddField(p::ye, mprim_scalar);
+    physics->AddField(p::ye::name(), mprim_scalar);
   }
   if (pin->GetOrAddString("fluid", "c2p_method", "robust") == "robust") {
     physics->AddField(impl::c2p_mu, mprim_scalar);
@@ -230,7 +230,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(c::bfield::name(), mcons_threev);
   }
   if (ye) {
-    physics->AddField(c::ye, mcons_scalar);
+    physics->AddField(c::ye::name(), mcons_scalar);
   }
 
   AllReduce<std::vector<Real>> net_field_totals;
@@ -260,12 +260,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       {p::density::name(), p::velocity::name(), p::energy::name()});
   riemann::FluxState::ReconVars(rvars);
   if (mhd) riemann::FluxState::ReconVars(p::bfield::name());
-  if (ye) riemann::FluxState::ReconVars(p::ye);
+  if (ye) riemann::FluxState::ReconVars(p::ye::name());
 
   std::vector<std::string> fvars({c::density, c::momentum, c::energy::name()});
   riemann::FluxState::FluxVars(fvars);
   if (mhd) riemann::FluxState::FluxVars(c::bfield::name());
-  if (ye) riemann::FluxState::FluxVars(c::ye);
+  if (ye) riemann::FluxState::FluxVars(c::ye::name());
 
   // add some extra fields for reconstruction
   rvars = std::vector<std::string>({p::pressure, p::gamma1});
@@ -352,8 +352,8 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 
   const std::vector<std::string> vars(
       {p::density::name(), c::density, p::velocity::name(), c::momentum,
-       p::energy::name(), c::energy::name(), p::bfield::name(), c::bfield::name(), p::ye,
-       c::ye, p::pressure, p::gamma1, impl::cell_signal_speed});
+       p::energy::name(), c::energy::name(), p::bfield::name(), c::bfield::name(),
+       p::ye::name(), c::ye::name(), p::pressure, p::gamma1, impl::cell_signal_speed});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -372,8 +372,8 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   const int pb_hi = imap[p::bfield::name()].second;
   const int cb_lo = imap[c::bfield::name()].first;
   const int cb_hi = imap[c::bfield::name()].second;
-  const int pye = imap[p::ye].second; // -1 if not present
-  const int cye = imap[c::ye].second;
+  const int pye = imap[p::ye::name()].second; // -1 if not present
+  const int cye = imap[c::ye::name()].second;
   const int sig_lo = imap[impl::cell_signal_speed].first;
   const int sig_hi = imap[impl::cell_signal_speed].second;
 

@@ -63,15 +63,16 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   bool update_rad = rad_pkg->Param<bool>("active");
   if (!enable_c2p_fixup || !update_rad) return TaskStatus::complete;
 
-  const std::vector<std::string> vars({p::velocity::name(), p::ye, c::ye, pr::J, pr::H,
-                                       cr::E, cr::F, ir::tilPi, ir::c2pfail, impl::fail});
+  const std::vector<std::string> vars({p::velocity::name(), p::ye::name(), c::ye::name(),
+                                       pr::J, pr::H, cr::E, cr::F, ir::tilPi, ir::c2pfail,
+                                       impl::fail});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
   auto idx_pvel = imap.GetFlatIdx(p::velocity::name());
-  int pye = imap[p::ye].second; // negative if not present
-  int cye = imap[c::ye].second;
+  int pye = imap[p::ye::name()].second; // negative if not present
+  int cye = imap[c::ye::name()].second;
   auto idx_J = imap.GetFlatIdx(pr::J, false);
   auto idx_H = imap.GetFlatIdx(pr::H, false);
   auto idx_E = imap.GetFlatIdx(cr::E, false);

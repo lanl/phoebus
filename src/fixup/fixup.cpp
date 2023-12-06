@@ -308,9 +308,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
   const std::vector<std::string> vars(
       {p::density::name(), c::density, p::velocity::name(), c::momentum,
-       p::energy::name(), c::energy::name(), p::bfield::name(), p::ye, c::ye, p::pressure,
-       p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F, impl::cell_signal_speed,
-       impl::fail, ir::tilPi});
+       p::energy::name(), c::energy::name(), p::bfield::name(), p::ye::name(),
+       c::ye::name(), p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
+       impl::cell_signal_speed, impl::fail, ir::tilPi});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -330,8 +330,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   const int shi = imap[impl::cell_signal_speed].second;
   const int pb_lo = imap[p::bfield::name()].first;
   const int pb_hi = imap[p::bfield::name()].second;
-  int pye = imap[p::ye].second; // negative if not present
-  int cye = imap[c::ye].second;
+  int pye = imap[p::ye::name()].second; // negative if not present
+  int cye = imap[c::ye::name()].second;
   auto idx_J = imap.GetFlatIdx(pr::J, false);
   auto idx_H = imap.GetFlatIdx(pr::H, false);
   auto idx_E = imap.GetFlatIdx(cr::E, false);
