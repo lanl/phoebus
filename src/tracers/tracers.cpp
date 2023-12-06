@@ -1,4 +1,15 @@
-// preamble.
+// © 2021-2023. Triad National Security, LLC. All rights reserved.
+// This program was produced under U.S. Government contract
+// 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
+// is operated by Triad National Security, LLC for the U.S.
+// Department of Energy/National Nuclear Security Administration. All
+// rights in the program are reserved by Triad National Security, LLC,
+// and the U.S. Department of Energy/National Nuclear Security
+// Administration. The Government is granted for itself and others
+// acting on its behalf a nonexclusive, paid-up, irrevocable worldwide
+// license in this material to reproduce, prepare derivative works,
+// distribute copies to the public, perform publicly and display
+// publicly, and to permit others to do so.
 
 #include "tracers.hpp"
 #include "geometry/geometry.hpp"
@@ -9,6 +20,7 @@
 #include "phoebus_utils/variables.hpp"
 
 namespace tracers {
+using namespace parthenon::package::prelude;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("tracers");
@@ -94,7 +106,7 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
   // update loop.
   const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
-      "Advect Tracers", 0, max_active_index - 0, KOKKOS_LAMBDA(const int n) {
+      "Advect Tracers", 0, max_active_index, KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
@@ -159,9 +171,9 @@ void FillTracers(MeshBlockData<Real> *rc) {
   auto &v1 = swarm->Get<Real>("vel_x").Get();
   auto &v2 = swarm->Get<Real>("vel_y").Get();
   auto &v3 = swarm->Get<Real>("vel_z").Get();
-  decltype(x) B1 = x;
-  decltype(x) B2 = x;
-  decltype(x) B3 = x;
+  auto B1 = v1.Get();
+  auto B2 = v1.Get();
+  auto B3 = v1.Get();
   if (mhd) {
     B1 = swarm->Get<Real>("B_x").Get();
     B2 = swarm->Get<Real>("B_y").Get();
@@ -205,7 +217,7 @@ void FillTracers(MeshBlockData<Real> *rc) {
   // update loop.
   const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
-      "Fill Tracers", 0, max_active_index - 0, KOKKOS_LAMBDA(const int n) {
+      "Fill Tracers", 0, max_active_index, KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
