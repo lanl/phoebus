@@ -104,7 +104,7 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   // but I may want these quantities in a future
   // iteration, so I ask for them here.
   std::vector<std::string> vars(
-      {fluid_cons::density, fluid_cons::energy::name(), fluid_cons::momentum});
+      {fluid_cons::density, fluid_cons::energy::name(), fluid_cons::momentum::name()});
   // PackIndexMap imap;
   auto pack = rc->PackVariables(vars);
 

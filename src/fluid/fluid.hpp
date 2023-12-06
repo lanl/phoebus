@@ -68,14 +68,14 @@ TaskStatus CopyFluxDivergence(T *rc) {
   if (!params.Get<bool>("active")) return TaskStatus::complete;
 
   std::vector<std::string> vars(
-      {fluid_cons::density, fluid_cons::momentum, fluid_cons::energy::name()});
+      {fluid_cons::density, fluid_cons::momentum::name(), fluid_cons::energy::name()});
   vars.push_back(radmoment_cons::E);
   vars.push_back(radmoment_cons::F);
   PackIndexMap imap;
   auto divf = rc->PackVariables(vars, imap);
   const int crho = imap[fluid_cons::density].first;
-  const int cmom_lo = imap[fluid_cons::momentum].first;
-  const int cmom_hi = imap[fluid_cons::momentum].second;
+  const int cmom_lo = imap[fluid_cons::momentum::name()].first;
+  const int cmom_hi = imap[fluid_cons::momentum::name()].second;
   const int ceng = imap[fluid_cons::energy::name()].first;
   auto idx_E = imap.GetFlatIdx(radmoment_cons::E, false);
   auto idx_F = imap.GetFlatIdx(radmoment_cons::F, false);

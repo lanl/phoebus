@@ -135,8 +135,8 @@ class ConToPrim {
         crho(imap[fluid_cons::density].first),
         pvel_lo(imap[fluid_prim::velocity::name()].first),
         pvel_hi(imap[fluid_prim::velocity::name()].second),
-        cmom_lo(imap[fluid_cons::momentum].first),
-        cmom_hi(imap[fluid_cons::momentum].second),
+        cmom_lo(imap[fluid_cons::momentum::name()].first),
+        cmom_hi(imap[fluid_cons::momentum::name()].second),
         peng(imap[fluid_prim::energy::name()].first),
         ceng(imap[fluid_cons::energy::name()].first),
         pb_lo(imap[fluid_prim::bfield::name()].first),
@@ -155,9 +155,10 @@ class ConToPrim {
   std::vector<std::string> Vars() {
     return std::vector<std::string>(
         {fluid_prim::density::name(), fluid_cons::density, fluid_prim::velocity::name(),
-         fluid_cons::momentum, fluid_prim::energy::name(), fluid_cons::energy::name(),
-         fluid_prim::bfield::name(), fluid_cons::bfield::name(), fluid_prim::ye::name(),
-         fluid_cons::ye::name(), fluid_prim::pressure, fluid_prim::temperature,
+         fluid_cons::momentum::name(), fluid_prim::energy::name(),
+         fluid_cons::energy::name(), fluid_prim::bfield::name(),
+         fluid_cons::bfield::name(), fluid_prim::ye::name(), fluid_cons::ye::name(),
+         fluid_prim::pressure, fluid_prim::temperature,
          internal_variables::cell_signal_speed, fluid_prim::gamma1,
          internal_variables::c2p_scratch});
   }

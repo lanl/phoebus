@@ -218,7 +218,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace p = fluid_prim;
   std::vector<std::string> vars{c::density,
                                 c::energy::name(),
-                                c::momentum,
+                                c::momentum::name(),
                                 c::ye::name(),
                                 cr::E,
                                 cr::F,
@@ -262,8 +262,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 
   int crho = imap[c::density].first;
   int ceng = imap[c::energy::name()].first;
-  int cmom_lo = imap[c::momentum].first;
-  int cmom_hi = imap[c::momentum].second;
+  int cmom_lo = imap[c::momentum::name()].first;
+  int cmom_hi = imap[c::momentum::name()].second;
   int cye = imap[c::ye::name()].first;
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
