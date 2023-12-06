@@ -308,7 +308,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
   const std::vector<std::string> vars(
       {p::density::name(), c::density, p::velocity::name(), c::momentum,
-       p::energy::name(), c::energy::name(), p::bfield, p::ye, c::ye, p::pressure,
+       p::energy::name(), c::energy::name(), p::bfield::name(), p::ye, c::ye, p::pressure,
        p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F, impl::cell_signal_speed,
        impl::fail, ir::tilPi});
 
@@ -328,8 +328,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   const int gm1 = imap[p::gamma1].first;
   const int slo = imap[impl::cell_signal_speed].first;
   const int shi = imap[impl::cell_signal_speed].second;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
   int pye = imap[p::ye].second; // negative if not present
   int cye = imap[c::ye].second;
   auto idx_J = imap.GetFlatIdx(pr::J, false);
@@ -815,14 +815,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ix2_bc == "polar") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>(
-              {c::density, c::energy::name(), c::momentum, c::bfield, cr::E, cr::F}),
-          std::vector<std::string>(
-              {c::density, c::energy::name(), c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy::name(), c::momentum,
+                                    c::bfield::name(), cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy::name(), c::momentum,
+                                    c::bfield::name(), cr::E, cr::F}),
           imap);
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy::name()].first;
-      auto idx_cb = imap.GetFlatIdx(c::bfield, false);
+      auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
       auto idx_cmom = imap.GetFlatIdx(c::momentum);
       auto idx_E = imap.GetFlatIdx(cr::E, false);
       auto idx_F = imap.GetFlatIdx(cr::F, false);
@@ -858,7 +858,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           imap);
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy::name()].first;
-      auto idx_cb = imap.GetFlatIdx(c::bfield, false);
+      auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
       auto idx_cmom = imap.GetFlatIdx(c::momentum);
       auto idx_E = imap.GetFlatIdx(cr::E, false);
       auto idx_F = imap.GetFlatIdx(cr::F, false);
@@ -895,14 +895,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ox2_bc == "polar") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>(
-              {c::density, c::energy::name(), c::momentum, c::bfield, cr::E, cr::F}),
-          std::vector<std::string>(
-              {c::density, c::energy::name(), c::momentum, c::bfield, cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy::name(), c::momentum,
+                                    c::bfield::name(), cr::E, cr::F}),
+          std::vector<std::string>({c::density, c::energy::name(), c::momentum,
+                                    c::bfield::name(), cr::E, cr::F}),
           imap);
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy::name()].first;
-      auto idx_cb = imap.GetFlatIdx(c::bfield, false);
+      auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
       auto idx_cmom = imap.GetFlatIdx(c::momentum);
       auto idx_E = imap.GetFlatIdx(cr::E, false);
       auto idx_F = imap.GetFlatIdx(cr::F, false);
@@ -939,7 +939,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
       const auto crho = imap[c::density].first;
       const auto cener = imap[c::energy::name()].first;
       auto idx_cmom = imap.GetFlatIdx(c::momentum);
-      auto idx_cb = imap.GetFlatIdx(c::bfield, false);
+      auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
       auto idx_E = imap.GetFlatIdx(cr::E, false);
       auto idx_F = imap.GetFlatIdx(cr::F, false);
       parthenon::par_for(

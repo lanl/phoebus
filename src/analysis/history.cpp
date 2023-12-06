@@ -79,7 +79,7 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
 
   namespace p = fluid_prim;
   const std::vector<std::string> vars(
-      {p::density::name(), p::bfield, p::velocity::name()});
+      {p::density::name(), p::bfield::name(), p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
@@ -87,8 +87,8 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
   const int prho = imap[p::density::name()].first;
   const int pvel_lo = imap[p::velocity::name()].first;
   const int pvel_hi = imap[p::velocity::name()].second;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
@@ -139,7 +139,7 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
 
   namespace p = fluid_prim;
   const std::vector<std::string> vars(
-      {p::density::name(), p::bfield, p::velocity::name()});
+      {p::density::name(), p::bfield::name(), p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
@@ -147,8 +147,8 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
   const int prho = imap[p::density::name()].first;
   const int pvel_lo = imap[p::velocity::name()].first;
   const int pvel_hi = imap[p::velocity::name()].second;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
@@ -198,12 +198,12 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace c = fluid_cons;
-  const std::vector<std::string> vars({c::bfield});
+  const std::vector<std::string> vars({c::bfield::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
 
-  const int cb_lo = imap[c::bfield].first;
+  const int cb_lo = imap[c::bfield::name()].first;
 
   auto geom = Geometry::GetCoordinateSystem(md);
 

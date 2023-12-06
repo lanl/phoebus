@@ -193,7 +193,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::velocity::name(), mprim_threev);
   physics->AddField(p::energy::name(), mprim_scalar);
   if (mhd) {
-    physics->AddField(p::bfield, mprim_threev);
+    physics->AddField(p::bfield::name(), mprim_threev);
     if (ndim == 2) {
       physics->AddField(impl::emf, mprim_scalar);
     } else if (ndim == 3) {
@@ -227,7 +227,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(c::momentum, mcons_threev);
   physics->AddField(c::energy::name(), mcons_scalar);
   if (mhd) {
-    physics->AddField(c::bfield, mcons_threev);
+    physics->AddField(c::bfield::name(), mcons_threev);
   }
   if (ye) {
     physics->AddField(c::ye, mcons_scalar);
@@ -259,12 +259,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::vector<std::string> rvars(
       {p::density::name(), p::velocity::name(), p::energy::name()});
   riemann::FluxState::ReconVars(rvars);
-  if (mhd) riemann::FluxState::ReconVars(p::bfield);
+  if (mhd) riemann::FluxState::ReconVars(p::bfield::name());
   if (ye) riemann::FluxState::ReconVars(p::ye);
 
   std::vector<std::string> fvars({c::density, c::momentum, c::energy::name()});
   riemann::FluxState::FluxVars(fvars);
-  if (mhd) riemann::FluxState::FluxVars(c::bfield);
+  if (mhd) riemann::FluxState::FluxVars(c::bfield::name());
   if (ye) riemann::FluxState::FluxVars(c::ye);
 
   // add some extra fields for reconstruction
@@ -352,8 +352,8 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 
   const std::vector<std::string> vars(
       {p::density::name(), c::density, p::velocity::name(), c::momentum,
-       p::energy::name(), c::energy::name(), p::bfield, c::bfield, p::ye, c::ye,
-       p::pressure, p::gamma1, impl::cell_signal_speed});
+       p::energy::name(), c::energy::name(), p::bfield::name(), c::bfield::name(), p::ye,
+       c::ye, p::pressure, p::gamma1, impl::cell_signal_speed});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -368,10 +368,10 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   const int ceng = imap[c::energy::name()].first;
   const int prs = imap[p::pressure].first;
   const int gm1 = imap[p::gamma1].first;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
-  const int cb_lo = imap[c::bfield].first;
-  const int cb_hi = imap[c::bfield].second;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
+  const int cb_lo = imap[c::bfield::name()].first;
+  const int cb_hi = imap[c::bfield::name()].second;
   const int pye = imap[p::ye].second; // -1 if not present
   const int cye = imap[c::ye].second;
   const int sig_lo = imap[impl::cell_signal_speed].first;
@@ -763,9 +763,9 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  auto f1 = rc->Get(fluid_cons::bfield).flux[X1DIR];
-  auto f2 = rc->Get(fluid_cons::bfield).flux[X2DIR];
-  auto f3 = rc->Get(fluid_cons::bfield).flux[X3DIR];
+  auto f1 = rc->Get(fluid_cons::bfield::name()).flux[X1DIR];
+  auto f2 = rc->Get(fluid_cons::bfield::name()).flux[X2DIR];
+  auto f3 = rc->Get(fluid_cons::bfield::name()).flux[X3DIR];
   auto emf = rc->Get(internal_variables::emf).data;
 
   if (ndim == 2) {
@@ -824,7 +824,7 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
 
   // This is the problem for doing things with meshblock packs
   auto coords = pmb->coords;
-  auto b = rc->Get(fluid_cons::bfield).data;
+  auto b = rc->Get(fluid_cons::bfield::name()).data;
   auto divb = rc->Get(diagnostic_variables::divb).data;
   if (ndim == 2) {
     // todo(jcd): these are supposed to be node centered, and this misses the

@@ -140,8 +140,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PackIndexMap imap;
   auto v =
       rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield, fluid_prim::ye,
-                         fluid_prim::pressure, fluid_prim::temperature,
+                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
+                         fluid_prim::ye, fluid_prim::pressure, fluid_prim::temperature,
                          fluid_prim::gamma1, radmoment_prim::J, radmoment_prim::H},
                         imap);
 
@@ -149,8 +149,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap[fluid_prim::velocity::name()].first;
   const int ivhi = imap[fluid_prim::velocity::name()].second;
   const int ieng = imap[fluid_prim::energy::name()].first;
-  const int iblo = imap[fluid_prim::bfield].first;
-  const int ibhi = imap[fluid_prim::bfield].second;
+  const int iblo = imap[fluid_prim::bfield::name()].first;
+  const int ibhi = imap[fluid_prim::bfield::name()].second;
   const int iye = imap[fluid_prim::ye].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
@@ -541,9 +541,9 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    auto v = rc->PackVariables({fluid_prim::bfield}, imap);
-    const int iblo = imap[fluid_prim::bfield].first;
-    const int ibhi = imap[fluid_prim::bfield].second;
+    auto v = rc->PackVariables({fluid_prim::bfield::name()}, imap);
+    const int iblo = imap[fluid_prim::bfield::name()].first;
+    const int ibhi = imap[fluid_prim::bfield::name()].second;
 
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
@@ -679,16 +679,16 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    auto v =
-        rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                           fluid_prim::bfield, fluid_prim::pressure, radmoment_prim::J},
-                          imap);
+    auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
+                                fluid_prim::bfield::name(), fluid_prim::pressure,
+                                radmoment_prim::J},
+                               imap);
 
     const int irho = imap[fluid_prim::density::name()].first;
     const int ivlo = imap[fluid_prim::velocity::name()].first;
     const int ivhi = imap[fluid_prim::velocity::name()].second;
-    const int iblo = imap[fluid_prim::bfield].first;
-    const int ibhi = imap[fluid_prim::bfield].second;
+    const int iblo = imap[fluid_prim::bfield::name()].first;
+    const int ibhi = imap[fluid_prim::bfield::name()].second;
     const int iprs = imap[fluid_prim::pressure].first;
 
     auto idx_J = imap.GetFlatIdx(radmoment_prim::J, false);
