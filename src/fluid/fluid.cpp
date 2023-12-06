@@ -223,7 +223,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(impl::fail, mprim_scalar);
 
   // add the conserved variables
-  physics->AddField(c::density, mcons_scalar);
+  physics->AddField(c::density::name(), mcons_scalar);
   physics->AddField(c::momentum::name(), mcons_threev);
   physics->AddField(c::energy::name(), mcons_scalar);
   if (mhd) {
@@ -262,7 +262,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (mhd) riemann::FluxState::ReconVars(p::bfield::name());
   if (ye) riemann::FluxState::ReconVars(p::ye::name());
 
-  std::vector<std::string> fvars({c::density, c::momentum::name(), c::energy::name()});
+  std::vector<std::string> fvars(
+      {c::density::name(), c::momentum::name(), c::energy::name()});
   riemann::FluxState::FluxVars(fvars);
   if (mhd) riemann::FluxState::FluxVars(c::bfield::name());
   if (ye) riemann::FluxState::FluxVars(c::ye::name());
@@ -308,7 +309,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   parthenon::HstVar_list hst_vars = {};
 
   auto ReduceMass = [](MeshData<Real> *md) {
-    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::density, 0);
+    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::density::name(), 0);
   };
   auto ReduceEn = [](MeshData<Real> *md) {
     return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::energy::name(), 0);
@@ -352,7 +353,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   auto *pmb = rc->GetParentPointer();
 
   const std::vector<std::string> vars(
-      {p::density::name(), c::density, p::velocity::name(), c::momentum::name(),
+      {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
        p::energy::name(), c::energy::name(), p::bfield::name(), c::bfield::name(),
        p::ye::name(), c::ye::name(), p::pressure, p::gamma1, impl::cell_signal_speed});
 
@@ -360,7 +361,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   auto v = rc->PackVariables(vars, imap);
 
   const int prho = imap[p::density::name()].first;
-  const int crho = imap[c::density].first;
+  const int crho = imap[c::density::name()].first;
   const int pvel_lo = imap[p::velocity::name()].first;
   const int pvel_hi = imap[p::velocity::name()].second;
   const int cmom_lo = imap[c::momentum::name()].first;

@@ -60,7 +60,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
 
   const std::vector<std::string> vars({p::density::name(),
-                                       c::density,
+                                       c::density::name(),
                                        p::velocity::name(),
                                        c::momentum::name(),
                                        p::energy::name(),
@@ -86,7 +86,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   auto v = rc->PackVariables(vars, imap);
 
   const int prho = imap[p::density::name()].first;
-  const int crho = imap[c::density].first;
+  const int crho = imap[c::density::name()].first;
   const int pvel_lo = imap[p::velocity::name()].first;
   const int pvel_hi = imap[p::velocity::name()].second;
   const int cmom_lo = imap[c::momentum::name()].first;
