@@ -11,6 +11,7 @@
 # publicly and display publicly, and to permit others to do so.
 
 
+
 <phoebus>
 problem = homologous
 ix1_bc = reflect
@@ -39,13 +40,6 @@ variables = p.density,  &
             g.c.dg, &
             g.c.dalpha, &
             flux_divergence, &
-            monopole_gr::a, &
-            monopole_gr::Krr, &
-            monopole_gr::alpha, &
-            monopole_gr::rho_ADM, &
-            monopole_gr::j_ADM, &
-            monopole_gr::TrcS_ADM, &
-            monopole_gr::Srr_ADM, &
             src_terms
 
 file_type   = hdf5      # Tabular data dump
@@ -67,7 +61,7 @@ nghost = 4
 #refinement = adaptive
 numlevel = 3
 
-nx1         = 500        # Number of zones in X1-direction
+nx1         = 10000        # Number of zones in X1-direction
 x1min       = 0       # minimum value of X1
 x1max       =  0.10086475522209183         # maximum value of X1
 ix1_bc      = user        # Inner-X1 boundary condition flag
@@ -88,7 +82,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 500
+nx1 = 2500
 nx2 = 1
 nx3 = 1
 
@@ -96,7 +90,6 @@ nx3 = 1
 field = c.c.bulk.rho
 method = derivative_order_1
 max_level = 3
-
 
 <eos>
 type = IdealGas
@@ -117,7 +110,6 @@ recon = weno5
 c2p_max_iter = 1000
 Ye = false
 
-
 <fixup>
 enable_floors = true
 enable_ceilings = true
@@ -125,15 +117,14 @@ enable_flux_fixup = true
 enable_c2p_fixup = true
 floor_type = ConstantRhoSie
 rho0_floor = 1.0e-5
-sie0_floor =   3.982563941315319e-05
+sie0_floor =   3.982563941315319e-07
 ceiling_type = ConstantGamSie
 sie0_ceiling = 10.0;
 gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
-allocate_on_grid = true
-npoints = 501
+npoints = 10001
 rout = 0.10086475522209183
 # Disables time derivatives. Runs only at initialization
 force_static = false
@@ -151,4 +142,4 @@ dtwarn_eps = 1e-5
 
 <progenitor>
 enabled=true
-tablepath=converted_ADM_homologouscollapse10000.dat   ### NEED TO CHANGE ONCE WE WILL ADD DATA DIRECTORY
+tablepath=../Data/converted_ADM_homologouscollapse10000.dat 

@@ -57,27 +57,30 @@ int main(int argc, char *argv[]) {
   Boundaries::ProcessBoundaryConditions(pman);
 
   // call ParthenonInit to set up the mesh
+  /* scope the driver so that its destructors are called before MPI/Kokkos Finalize */
+  /* Not necessary,as is, but safer. */
   pman.ParthenonInitPackagesAndMesh();
+  {
 
-  // call post-initialization
-  if (!pman.IsRestart()) {
-    phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get());
-  }
+    // call post-initialization
+    if (!pman.IsRestart()) {
+      phoebus::PostInitializationModifier(pman.pinput.get(), pman.pmesh.get());
+    }
 
-  // Initialize the driver
-  phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(), pman.pmesh.get(),
-                                pman.IsRestart());
+    // Initialize the driver
+    phoebus::PhoebusDriver driver(pman.pinput.get(), pman.app_input.get(),
+                                  pman.pmesh.get(), pman.IsRestart());
 
-  // Communicate ghost buffers before executing
-  driver.PostInitializationCommunication();
+    // Communicate ghost buffers before executing
+    driver.PostInitializationCommunication();
 
-  // This line actually runs the simulation
-  auto driver_status = driver.Execute();
+    // This line actually runs the simulation
+    auto driver_status = driver.Execute();
 
 #if CON2PRIM_STATISTICS
-  con2prim_statistics::Stats::report();
+    con2prim_statistics::Stats::report();
 #endif
-
+  }
   // call MPI_Finalize and Kokkos::finalize if necessary
   pman.ParthenonFinalize();
 
