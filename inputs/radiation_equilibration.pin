@@ -84,7 +84,7 @@ hydro = true
 he = false
 3t = false
 rad = true
-tracers = true
+tracers = false
 
 <fluid>
 xorder = 2
@@ -111,6 +111,3 @@ gray_kappa = 0.2
 
 <radiation_equilibration>
 J = 0.2
-
-<Tracers>
-num_tracers = 100

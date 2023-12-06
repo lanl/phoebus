@@ -91,7 +91,7 @@ hydro = false
 he = false
 3t = false
 rad = true
-tracers = true
+tracers = false
 
 <fluid>
 xorder = 2
@@ -129,6 +129,3 @@ vx = 0.3
 width = 0.0333
 tau = 1.e3
 boost_profile = true
-
-<Tracers>
-num_tracers = 100
