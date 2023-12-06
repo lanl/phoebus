@@ -138,12 +138,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   bool do_rad = rad_pkg->Param<bool>("active");
 
   PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                         fluid_prim::ye, fluid_prim::pressure, fluid_prim::temperature,
-                         fluid_prim::gamma1, radmoment_prim::J, radmoment_prim::H},
-                        imap);
+  auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
+                              fluid_prim::energy::name(), fluid_prim::bfield::name(),
+                              fluid_prim::ye::name(), fluid_prim::pressure,
+                              fluid_prim::temperature, fluid_prim::gamma1,
+                              radmoment_prim::J, radmoment_prim::H},
+                             imap);
 
   const int irho = imap[fluid_prim::density::name()].first;
   const int ivlo = imap[fluid_prim::velocity::name()].first;
@@ -151,7 +151,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ieng = imap[fluid_prim::energy::name()].first;
   const int iblo = imap[fluid_prim::bfield::name()].first;
   const int ibhi = imap[fluid_prim::bfield::name()].second;
-  const int iye = imap[fluid_prim::ye].second;
+  const int iye = imap[fluid_prim::ye::name()].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
   const int igm1 = imap[fluid_prim::gamma1].first;

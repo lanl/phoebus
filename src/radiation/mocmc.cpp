@@ -82,8 +82,8 @@ void MOCMCInitSamples(T *rc) {
   StateDescriptor *eos = pmb->packages.Get("eos").get();
 
   std::vector<std::string> variables{
-      pr::J,           pr::H,  pf::density::name(), pf::velocity::name(),
-      pf::temperature, pf::ye, im::dnsamp};
+      pr::J,           pr::H,          pf::density::name(), pf::velocity::name(),
+      pf::temperature, pf::ye::name(), im::dnsamp};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -92,7 +92,7 @@ void MOCMCInitSamples(T *rc) {
   auto pdens = imap[pf::density::name()].first;
   auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
   auto pT = imap[pf::temperature].first;
-  auto pye = imap[pf::ye].first;
+  auto pye = imap[pf::ye::name()].first;
   auto dn = imap[im::dnsamp].first;
 
   const int nblock = v.GetDim(5);
@@ -529,7 +529,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                                      pf::energy::name(),
                                      pf::velocity::name(),
                                      pf::temperature,
-                                     pf::ye,
+                                     pf::ye::name(),
                                      ir::tilPi,
                                      ir::kappaH,
                                      im::dnsamp,
@@ -539,7 +539,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   if (update_fluid) {
     variables.push_back(cf::energy::name());
     variables.push_back(cf::momentum);
-    variables.push_back(cf::ye);
+    variables.push_back(cf::ye::name());
   }
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
@@ -550,7 +550,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const auto peng = imap[pf::energy::name()].first;
   const auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
   const auto pT = imap[pf::temperature].first;
-  const auto pye = imap[pf::ye].first;
+  const auto pye = imap[pf::ye::name()].first;
   const auto Inu0 = imap.GetFlatIdx(im::Inu0);
   const auto Inu1 = imap.GetFlatIdx(im::Inu1);
   const auto ijinvs = imap.GetFlatIdx(im::jinvs);
@@ -562,7 +562,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   if (update_fluid) {
     ceng = imap[cf::energy::name()].first;
     cmom_lo = imap[cf::momentum].first;
-    cye = imap[cf::ye].first;
+    cye = imap[cf::ye::name()].first;
   }
 
   const auto &ncov = swarm->template Get<Real>("ncov").Get();

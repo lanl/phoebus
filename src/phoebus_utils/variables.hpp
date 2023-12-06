@@ -37,7 +37,7 @@ VARIABLE(p, density);
 VARIABLE(p, velocity);
 VARIABLE(p, energy);
 VARIABLE(p, bfield);
-constexpr char ye[] = "p.ye";
+VARIABLE(p, ye);
 constexpr char pressure[] = "pressure";
 constexpr char temperature[] = "temperature";
 constexpr char gamma1[] = "gamma1";
@@ -48,7 +48,7 @@ constexpr char density[] = "c.density";
 constexpr char momentum[] = "c.momentum";
 VARIABLE(c, energy);
 VARIABLE(c, bfield);
-constexpr char ye[] = "c.ye";
+VARIABLE(c, ye);
 } // namespace fluid_cons
 
 namespace radmoment_prim {

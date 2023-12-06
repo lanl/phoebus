@@ -76,9 +76,9 @@ TaskStatus SourceFixupImpl(T *rc) {
 
   const std::vector<std::string> vars(
       {p::density::name(), c::density, p::velocity::name(), c::momentum,
-       p::energy::name(), c::energy::name(), p::bfield::name(), p::ye, c::ye, p::pressure,
-       p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F, impl::cell_signal_speed,
-       ir::srcfail, ir::tilPi});
+       p::energy::name(), c::energy::name(), p::bfield::name(), p::ye::name(),
+       c::ye::name(), p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
+       impl::cell_signal_speed, ir::srcfail, ir::tilPi});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -94,8 +94,8 @@ TaskStatus SourceFixupImpl(T *rc) {
   const int gm1 = imap[p::gamma1].first;
   const int slo = imap[impl::cell_signal_speed].first;
   const int shi = imap[impl::cell_signal_speed].second;
-  int pye = imap[p::ye].second;
-  int cye = imap[c::ye].second;
+  int pye = imap[p::ye::name()].second;
+  int cye = imap[c::ye::name()].second;
   const int pb_lo = imap[p::bfield::name()].first;
   const int pb_hi = imap[p::bfield::name()].second;
   auto idx_J = imap.GetFlatIdx(pr::J);

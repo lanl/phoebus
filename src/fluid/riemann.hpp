@@ -222,12 +222,14 @@ class FluxState {
         pvel_lo(imap[fluid_prim::velocity::name()].first),
         peng(imap[fluid_prim::energy::name()].first),
         pb_lo(imap[fluid_prim::bfield::name()].first),
-        pb_hi(imap[fluid_prim::bfield::name()].second), pye(imap[fluid_prim::ye].second),
-        prs(imap[fluid_prim::pressure].first), gm1(imap[fluid_prim::gamma1].first),
-        crho(imap[fluid_cons::density].first), cmom_lo(imap[fluid_cons::momentum].first),
+        pb_hi(imap[fluid_prim::bfield::name()].second),
+        pye(imap[fluid_prim::ye::name()].second), prs(imap[fluid_prim::pressure].first),
+        gm1(imap[fluid_prim::gamma1].first), crho(imap[fluid_cons::density].first),
+        cmom_lo(imap[fluid_cons::momentum].first),
         ceng(imap[fluid_cons::energy::name()].first),
         cb_lo(imap[fluid_cons::bfield::name()].first),
-        cb_hi(imap[fluid_cons::bfield::name()].second), cye(imap[fluid_cons::ye].first),
+        cb_hi(imap[fluid_cons::bfield::name()].second),
+        cye(imap[fluid_cons::ye::name()].first),
         ncons(5 + (pb_hi - pb_lo + 1) + (cye > 0)) {
     PARTHENON_REQUIRE_THROWS(
         ncons <= NCONS_MAX,

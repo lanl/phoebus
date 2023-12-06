@@ -945,7 +945,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   namespace c = fluid_cons;
   namespace p = fluid_prim;
   std::vector<std::string> vars{
-      p::density::name(), p::temperature, p::ye,  p::velocity::name(),
+      p::density::name(), p::temperature, p::ye::name(), p::velocity::name(),
       ir::kappaJ,         ir::kappaH,     ir::JBB};
 
   PackIndexMap imap;
@@ -954,7 +954,7 @@ TaskStatus MomentCalculateOpacities(T *rc) {
 
   int prho = imap[p::density::name()].first;
   int pT = imap[p::temperature].first;
-  int pYe = imap[p::ye].first;
+  int pYe = imap[p::ye::name()].first;
 
   auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
