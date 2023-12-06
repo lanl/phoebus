@@ -31,14 +31,14 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({p::density::name(), p::velocity::name(), p::energy, p::ye,
-                              p::pressure, p::temperature, p::gamma1},
+  auto v = rc->PackVariables({p::density::name(), p::velocity::name(), p::energy::name(),
+                              p::ye, p::pressure, p::temperature, p::gamma1},
                              imap);
 
   const int irho = imap[p::density::name()].first;
   const int ivlo = imap[p::velocity::name()].first;
   const int ivhi = imap[p::velocity::name()].second;
-  const int ieng = imap[p::energy].first;
+  const int ieng = imap[p::energy::name()].first;
   const int iye = imap[p::ye].first;
   const int iprs = imap[p::pressure].first;
   const int itmp = imap[p::temperature].first;

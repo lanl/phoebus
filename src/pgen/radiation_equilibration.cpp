@@ -34,8 +34,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto v = rc->PackVariables(
       {radmoment_prim::J, radmoment_prim::H, radmoment_internal::xi,
        radmoment_internal::phi, fluid_prim::density::name(), fluid_prim::temperature,
-       fluid_prim::pressure, fluid_prim::gamma1, fluid_prim::energy, fluid_prim::ye,
-       fluid_prim::velocity::name()},
+       fluid_prim::pressure, fluid_prim::gamma1, fluid_prim::energy::name(),
+       fluid_prim::ye, fluid_prim::velocity::name()},
       imap);
 
   auto idJ = imap.GetFlatIdx(radmoment_prim::J);
@@ -47,7 +47,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iT = imap[fluid_prim::temperature].first;
   const int iP = imap[fluid_prim::pressure].first;
   const int igm1 = imap[fluid_prim::gamma1].first;
-  const int ieng = imap[fluid_prim::energy].first;
+  const int ieng = imap[fluid_prim::energy::name()].first;
   const int pye = imap[fluid_prim::ye].first;
   auto idv = imap.GetFlatIdx(fluid_prim::velocity::name());
 

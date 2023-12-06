@@ -526,7 +526,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                                      pr::J,
                                      pr::H,
                                      pf::density::name(),
-                                     pf::energy,
+                                     pf::energy::name(),
                                      pf::velocity::name(),
                                      pf::temperature,
                                      pf::ye,
@@ -537,7 +537,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                                      im::Inu1,
                                      im::jinvs};
   if (update_fluid) {
-    variables.push_back(cf::energy);
+    variables.push_back(cf::energy::name());
     variables.push_back(cf::momentum);
     variables.push_back(cf::ye);
   }
@@ -547,7 +547,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const auto pJ = imap.GetFlatIdx(pr::J);
   const auto pH = imap.GetFlatIdx(pr::H);
   const auto pdens = imap[pf::density::name()].first;
-  const auto peng = imap[pf::energy].first;
+  const auto peng = imap[pf::energy::name()].first;
   const auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
   const auto pT = imap[pf::temperature].first;
   const auto pye = imap[pf::ye].first;
@@ -560,7 +560,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   int ceng(-1), cmom_lo(-1), cye(-1);
   if (update_fluid) {
-    ceng = imap[cf::energy].first;
+    ceng = imap[cf::energy::name()].first;
     cmom_lo = imap[cf::momentum].first;
     cye = imap[cf::ye].first;
   }

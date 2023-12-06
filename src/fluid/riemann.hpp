@@ -220,13 +220,14 @@ class FluxState {
             "bounds")),
         prho(imap[fluid_prim::density::name()].first),
         pvel_lo(imap[fluid_prim::velocity::name()].first),
-        peng(imap[fluid_prim::energy].first), pb_lo(imap[fluid_prim::bfield].first),
-        pb_hi(imap[fluid_prim::bfield].second), pye(imap[fluid_prim::ye].second),
-        prs(imap[fluid_prim::pressure].first), gm1(imap[fluid_prim::gamma1].first),
-        crho(imap[fluid_cons::density].first), cmom_lo(imap[fluid_cons::momentum].first),
-        ceng(imap[fluid_cons::energy].first), cb_lo(imap[fluid_cons::bfield].first),
-        cb_hi(imap[fluid_cons::bfield].second), cye(imap[fluid_cons::ye].first),
-        ncons(5 + (pb_hi - pb_lo + 1) + (cye > 0)) {
+        peng(imap[fluid_prim::energy::name()].first),
+        pb_lo(imap[fluid_prim::bfield].first), pb_hi(imap[fluid_prim::bfield].second),
+        pye(imap[fluid_prim::ye].second), prs(imap[fluid_prim::pressure].first),
+        gm1(imap[fluid_prim::gamma1].first), crho(imap[fluid_cons::density].first),
+        cmom_lo(imap[fluid_cons::momentum].first),
+        ceng(imap[fluid_cons::energy::name()].first),
+        cb_lo(imap[fluid_cons::bfield].first), cb_hi(imap[fluid_cons::bfield].second),
+        cye(imap[fluid_cons::ye].first), ncons(5 + (pb_hi - pb_lo + 1) + (cye > 0)) {
     PARTHENON_REQUIRE_THROWS(
         ncons <= NCONS_MAX,
         "ncons exceeds NCONS_MAX.  Reconfigure to increase NCONS_MAX.");

@@ -136,12 +136,13 @@ class ConToPrim {
         pvel_lo(imap[fluid_prim::velocity::name()].first),
         pvel_hi(imap[fluid_prim::velocity::name()].second),
         cmom_lo(imap[fluid_cons::momentum].first),
-        cmom_hi(imap[fluid_cons::momentum].second), peng(imap[fluid_prim::energy].first),
-        ceng(imap[fluid_cons::energy].first), pb_lo(imap[fluid_prim::bfield].first),
-        pb_hi(imap[fluid_prim::bfield].second), cb_lo(imap[fluid_cons::bfield].first),
-        cb_hi(imap[fluid_cons::bfield].second), pye(imap[fluid_prim::ye].second),
-        cye(imap[fluid_cons::ye].second), prs(imap[fluid_prim::pressure].first),
-        tmp(imap[fluid_prim::temperature].first),
+        cmom_hi(imap[fluid_cons::momentum].second),
+        peng(imap[fluid_prim::energy::name()].first),
+        ceng(imap[fluid_cons::energy::name()].first),
+        pb_lo(imap[fluid_prim::bfield].first), pb_hi(imap[fluid_prim::bfield].second),
+        cb_lo(imap[fluid_cons::bfield].first), cb_hi(imap[fluid_cons::bfield].second),
+        pye(imap[fluid_prim::ye].second), cye(imap[fluid_cons::ye].second),
+        prs(imap[fluid_prim::pressure].first), tmp(imap[fluid_prim::temperature].first),
         sig_lo(imap[internal_variables::cell_signal_speed].first),
         sig_hi(imap[internal_variables::cell_signal_speed].second),
         gm1(imap[fluid_prim::gamma1].first),
@@ -151,10 +152,11 @@ class ConToPrim {
   std::vector<std::string> Vars() {
     return std::vector<std::string>(
         {fluid_prim::density::name(), fluid_cons::density, fluid_prim::velocity::name(),
-         fluid_cons::momentum, fluid_prim::energy, fluid_cons::energy, fluid_prim::bfield,
-         fluid_cons::bfield, fluid_prim::ye, fluid_cons::ye, fluid_prim::pressure,
-         fluid_prim::temperature, internal_variables::cell_signal_speed,
-         fluid_prim::gamma1, internal_variables::c2p_scratch});
+         fluid_cons::momentum, fluid_prim::energy::name(), fluid_cons::energy::name(),
+         fluid_prim::bfield, fluid_cons::bfield, fluid_prim::ye, fluid_cons::ye,
+         fluid_prim::pressure, fluid_prim::temperature,
+         internal_variables::cell_signal_speed, fluid_prim::gamma1,
+         internal_variables::c2p_scratch});
   }
 
   template <typename CoordinateSystem, class... Args>

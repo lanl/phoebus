@@ -28,7 +28,7 @@
 namespace fluid {
 
 const std::vector<std::string> TMUNU_VARS = {
-    fluid_prim::density::name(), fluid_prim::velocity::name(), fluid_prim::energy,
+    fluid_prim::density::name(), fluid_prim::velocity::name(), fluid_prim::energy::name(),
     fluid_prim::pressure, fluid_prim::bfield};
 // Indices are upstairs
 template <typename CoordinateSystem, typename Pack>
@@ -48,7 +48,7 @@ class StressEnergyTensorCon {
 
     ir_ = imap[fluid_prim::density::name()].first;
     iv_ = imap[fluid_prim::velocity::name()].first;
-    iu_ = imap[fluid_prim::energy].first;
+    iu_ = imap[fluid_prim::energy::name()].first;
     ip_ = imap[fluid_prim::pressure].first;
     ib_ = imap[fluid_prim::bfield].first;
   }
