@@ -64,9 +64,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddSwarmValue("shift_z", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("mass", swarm_name, real_swarmvalue_metadata);
 
-  const bool mhd =  pin->GetOrAddBoolean("fluid", "mhd", false);
+  const bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
 
-  if (mhd){
+  if (mhd) {
     physics->AddSwarmValue("B_x", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("B_y", swarm_name, real_swarmvalue_metadata);
     physics->AddSwarmValue("B_z", swarm_name, real_swarmvalue_metadata);
@@ -131,14 +131,14 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
           const Real rhs1 = (lapse * vel_X1 - shift[0]) * dt;
           const Real rhs2 = (lapse * vel_X2 - shift[1]) * dt;
           Real rhs3 = 0.0;
-          if (ndim > 2){
+          if (ndim > 2) {
             rhs3 = (lapse * vel_X3 - shift[2]) * dt;
           }
 
           x(n) += rhs1;
           y(n) += rhs2;
           z(n) += rhs3;
-          
+
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
         }
@@ -194,8 +194,8 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
   auto swarm_d = swarm->GetDeviceContext();
 
-  std::vector<std::string> vars = {p::density, p::temperature, p::velocity,
-                                   p::energy, p::pressure};
+  std::vector<std::string> vars = {p::density, p::temperature, p::velocity, p::energy,
+                                   p::pressure};
   if (mhd) {
     vars.push_back(p::bfield);
   }
@@ -259,8 +259,8 @@ void FillTracers(MeshBlockData<Real> *rc) {
           } else {
             ye = 0.0;
           }
-          const Real entropy = eos.EntropyFromDensityTemperature(rho, temperature,
-          lambda);
+          const Real entropy =
+              eos.EntropyFromDensityTemperature(rho, temperature, lambda);
 
           // store
           s_rho(n) = rho;
