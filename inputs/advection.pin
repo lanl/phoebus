@@ -83,6 +83,8 @@ Cv = 1.0
 
 <physics>
 hydro = true
+rad = false
+tracers = false
 
 <fluid>
 xorder = 2
@@ -93,8 +95,8 @@ c2p_max_iter = 100
 Ye = true
 
 <advection>
-rho = 1
-u = 1
+rho = 1.0
+u = 1.0
 vx = 0.5
 vy = 0.5
 vz = 0.5
