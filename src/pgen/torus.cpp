@@ -140,8 +140,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PackIndexMap imap;
   auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
                               fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                              fluid_prim::ye::name(), fluid_prim::pressure,
-                              fluid_prim::temperature, fluid_prim::gamma1,
+                              fluid_prim::ye::name(), fluid_prim::pressure::name(),
+                              fluid_prim::temperature::name(), fluid_prim::gamma1,
                               radmoment_prim::J, radmoment_prim::H},
                              imap);
 
@@ -152,8 +152,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int iblo = imap[fluid_prim::bfield::name()].first;
   const int ibhi = imap[fluid_prim::bfield::name()].second;
   const int iye = imap[fluid_prim::ye::name()].second;
-  const int iprs = imap[fluid_prim::pressure].first;
-  const int itmp = imap[fluid_prim::temperature].first;
+  const int iprs = imap[fluid_prim::pressure::name()].first;
+  const int itmp = imap[fluid_prim::temperature::name()].first;
   const int igm1 = imap[fluid_prim::gamma1].first;
 
   auto iJ = imap.GetFlatIdx(radmoment_prim::J, false);
@@ -680,7 +680,7 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
 
     PackIndexMap imap;
     auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                                fluid_prim::bfield::name(), fluid_prim::pressure,
+                                fluid_prim::bfield::name(), fluid_prim::pressure::name(),
                                 radmoment_prim::J},
                                imap);
 
@@ -689,7 +689,7 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
     const int ivhi = imap[fluid_prim::velocity::name()].second;
     const int iblo = imap[fluid_prim::bfield::name()].first;
     const int ibhi = imap[fluid_prim::bfield::name()].second;
-    const int iprs = imap[fluid_prim::pressure].first;
+    const int iprs = imap[fluid_prim::pressure::name()].first;
 
     auto idx_J = imap.GetFlatIdx(radmoment_prim::J, false);
 
