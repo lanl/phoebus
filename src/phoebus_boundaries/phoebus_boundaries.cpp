@@ -162,7 +162,7 @@ void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
   PARTHENON_REQUIRE(bc_vars == "primitive", "Polar X2 reflecting BCs not supported");
 
-  const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity, false);
+  const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity::name(), false);
   const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield, false);
 
   pmb->par_for_bndry(
@@ -195,7 +195,7 @@ void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
   PARTHENON_REQUIRE(bc_vars == "primitive", "Polar X2 reflecting BCs not supported");
 
-  const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity, false);
+  const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity::name(), false);
   const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield, false);
 
   const std::string label = "PolarOuterX2Prim";
@@ -227,7 +227,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
   auto domain = IndexDomain::outer_x1;
 
-  const int pv_lo = imap[fluid_prim::velocity].first;
+  const int pv_lo = imap[fluid_prim::velocity::name()].first;
   auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
 
   auto &fluid = rc->GetMeshPointer()->packages.Get("fluid");
@@ -337,11 +337,11 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     const bool coarse = false;
 
     PackIndexMap imap;
-    std::vector<std::string> vars{fluid_prim::velocity, radmoment_prim::H};
+    std::vector<std::string> vars{fluid_prim::velocity::name(), radmoment_prim::H};
     auto q = rc->PackVariables(vars, imap, coarse);
     auto nb1 = IndexRange{0, 0};
 
-    const int pv_lo = imap[fluid_prim::velocity].first;
+    const int pv_lo = imap[fluid_prim::velocity::name()].first;
     auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
 
     const int num_species =

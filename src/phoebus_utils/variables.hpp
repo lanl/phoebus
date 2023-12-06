@@ -34,7 +34,7 @@
 
 namespace fluid_prim {
 VARIABLE(p, density);
-// constexpr char density[] = "p.density";
+VARIABLE(p, velocity);
 constexpr char velocity[] = "p.velocity";
 constexpr char energy[] = "p.energy";
 constexpr char bfield[] = "p.bfield";

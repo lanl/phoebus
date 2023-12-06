@@ -132,8 +132,9 @@ class ConToPrim {
   ConToPrim(Data_t *rc, PackIndexMap imap, const Real tol, const int max_iterations)
       : var(rc->PackVariables(Vars(), imap)),
         prho(imap[fluid_prim::density::name()].first),
-        crho(imap[fluid_cons::density].first), pvel_lo(imap[fluid_prim::velocity].first),
-        pvel_hi(imap[fluid_prim::velocity].second),
+        crho(imap[fluid_cons::density].first),
+        pvel_lo(imap[fluid_prim::velocity::name()].first),
+        pvel_hi(imap[fluid_prim::velocity::name()].second),
         cmom_lo(imap[fluid_cons::momentum].first),
         cmom_hi(imap[fluid_cons::momentum].second), peng(imap[fluid_prim::energy].first),
         ceng(imap[fluid_cons::energy].first), pb_lo(imap[fluid_prim::bfield].first),
@@ -149,7 +150,7 @@ class ConToPrim {
 
   std::vector<std::string> Vars() {
     return std::vector<std::string>(
-        {fluid_prim::density::name(), fluid_cons::density, fluid_prim::velocity,
+        {fluid_prim::density::name(), fluid_cons::density, fluid_prim::velocity::name(),
          fluid_cons::momentum, fluid_prim::energy, fluid_cons::energy, fluid_prim::bfield,
          fluid_cons::bfield, fluid_prim::ye, fluid_cons::ye, fluid_prim::pressure,
          fluid_prim::temperature, internal_variables::cell_signal_speed,

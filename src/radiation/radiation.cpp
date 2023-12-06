@@ -579,9 +579,9 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   // Note that this is still used for the cooling function even though that option
   // contains no transport. This is useful for consistency between methods.
   auto pmb = rc->GetBlockPointer();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -591,9 +591,9 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   PackIndexMap imap;
-  std::vector<std::string> vars{ir::kappaH, p::velocity};
+  std::vector<std::string> vars{ir::kappaH, p::velocity::name()};
   auto v = rc->PackVariables(vars, imap);
-  auto idx_v = imap.GetFlatIdx(p::velocity);
+  auto idx_v = imap.GetFlatIdx(p::velocity::name());
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH, false);
 
   auto num_species = rad->Param<int>("num_species");
