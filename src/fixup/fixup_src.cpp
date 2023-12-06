@@ -75,7 +75,7 @@ TaskStatus SourceFixupImpl(T *rc) {
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   const std::vector<std::string> vars(
-      {p::density::name(), c::density, p::velocity::name(), c::momentum,
+      {p::density::name(), c::density, p::velocity::name(), c::momentum::name(),
        p::energy::name(), c::energy::name(), p::bfield::name(), p::ye::name(),
        c::ye::name(), p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
        impl::cell_signal_speed, ir::srcfail, ir::tilPi});
@@ -86,7 +86,7 @@ TaskStatus SourceFixupImpl(T *rc) {
   const int prho = imap[p::density::name()].first;
   const int crho = imap[c::density].first;
   auto idx_pvel = imap.GetFlatIdx(p::velocity::name());
-  auto idx_cmom = imap.GetFlatIdx(c::momentum);
+  auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
   const int peng = imap[p::energy::name()].first;
   const int ceng = imap[c::energy::name()].first;
   const int prs = imap[p::pressure].first;

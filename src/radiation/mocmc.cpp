@@ -538,7 +538,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                                      im::jinvs};
   if (update_fluid) {
     variables.push_back(cf::energy::name());
-    variables.push_back(cf::momentum);
+    variables.push_back(cf::momentum::name());
     variables.push_back(cf::ye::name());
   }
   PackIndexMap imap;
@@ -561,7 +561,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   int ceng(-1), cmom_lo(-1), cye(-1);
   if (update_fluid) {
     ceng = imap[cf::energy::name()].first;
-    cmom_lo = imap[cf::momentum].first;
+    cmom_lo = imap[cf::momentum::name()].first;
     cye = imap[cf::ye::name()].first;
   }
 

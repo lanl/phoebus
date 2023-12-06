@@ -198,7 +198,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   std::vector<std::string> src_names;
   std::vector<std::string> src_w_diag;
   if (fluid_active) {
-    src_names.push_back(fluid_cons::momentum);
+    src_names.push_back(fluid_cons::momentum::name());
     src_names.push_back(fluid_cons::energy::name());
   }
   if (rad_moments_active) {

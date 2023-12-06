@@ -224,7 +224,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // add the conserved variables
   physics->AddField(c::density, mcons_scalar);
-  physics->AddField(c::momentum, mcons_threev);
+  physics->AddField(c::momentum::name(), mcons_threev);
   physics->AddField(c::energy::name(), mcons_scalar);
   if (mhd) {
     physics->AddField(c::bfield::name(), mcons_threev);
@@ -262,7 +262,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (mhd) riemann::FluxState::ReconVars(p::bfield::name());
   if (ye) riemann::FluxState::ReconVars(p::ye::name());
 
-  std::vector<std::string> fvars({c::density, c::momentum, c::energy::name()});
+  std::vector<std::string> fvars({c::density, c::momentum::name(), c::energy::name()});
   riemann::FluxState::FluxVars(fvars);
   if (mhd) riemann::FluxState::FluxVars(c::bfield::name());
   if (ye) riemann::FluxState::FluxVars(c::ye::name());
@@ -318,7 +318,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   for (int d = 0; d < 3; ++d) {
     auto ReduceMom = [d](MeshData<Real> *md) {
-      return History::ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::momentum, d);
+      return History::ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::momentum::name(),
+                                                      d);
     };
     hst_vars.emplace_back(HistoryOutputVar(
         HstSum, ReduceMom, "total X" + std::to_string(d + 1) + " momentum"));
@@ -351,7 +352,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   auto *pmb = rc->GetParentPointer();
 
   const std::vector<std::string> vars(
-      {p::density::name(), c::density, p::velocity::name(), c::momentum,
+      {p::density::name(), c::density, p::velocity::name(), c::momentum::name(),
        p::energy::name(), c::energy::name(), p::bfield::name(), c::bfield::name(),
        p::ye::name(), c::ye::name(), p::pressure, p::gamma1, impl::cell_signal_speed});
 
@@ -362,8 +363,8 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   const int crho = imap[c::density].first;
   const int pvel_lo = imap[p::velocity::name()].first;
   const int pvel_hi = imap[p::velocity::name()].second;
-  const int cmom_lo = imap[c::momentum].first;
-  const int cmom_hi = imap[c::momentum].second;
+  const int cmom_lo = imap[c::momentum::name()].first;
+  const int cmom_hi = imap[c::momentum::name()].second;
   const int peng = imap[p::energy::name()].first;
   const int ceng = imap[c::energy::name()].first;
   const int prs = imap[p::pressure].first;
@@ -554,14 +555,15 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> vars({fluid_cons::momentum, fluid_cons::energy::name()});
+  std::vector<std::string> vars(
+      {fluid_cons::momentum::name(), fluid_cons::energy::name()});
 #if SET_FLUX_SRC_DIAGS
   vars.push_back(diagnostic_variables::src_terms);
 #endif
   PackIndexMap imap;
   auto src = rc_src->PackVariables(vars, imap);
-  const int cmom_lo = imap[fluid_cons::momentum].first;
-  const int cmom_hi = imap[fluid_cons::momentum].second;
+  const int cmom_lo = imap[fluid_cons::momentum::name()].first;
+  const int cmom_hi = imap[fluid_cons::momentum::name()].second;
   const int ceng = imap[fluid_cons::energy::name()].first;
   const int idiag = imap[diagnostic_variables::src_terms].first;
 

@@ -45,7 +45,7 @@ constexpr char gamma1[] = "gamma1";
 
 namespace fluid_cons {
 constexpr char density[] = "c.density";
-constexpr char momentum[] = "c.momentum";
+VARIABLE(c, momentum);
 VARIABLE(c, energy);
 VARIABLE(c, bfield);
 VARIABLE(c, ye);
