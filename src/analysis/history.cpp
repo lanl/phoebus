@@ -78,7 +78,8 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density::name(), p::bfield, p::velocity::name()});
+  const std::vector<std::string> vars(
+      {p::density::name(), p::bfield, p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
@@ -137,7 +138,8 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density::name(), p::bfield, p::velocity::name()});
+  const std::vector<std::string> vars(
+      {p::density::name(), p::bfield, p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);

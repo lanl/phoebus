@@ -41,7 +41,7 @@ TEST_CASE("Coordinates in spherical geometry", "[MonopoleGR]") {
   GIVEN("A parthenon coords object tuned to spherical geometry") {
     // TODO(JMM): This test is more of a sanity check than anything
     ParameterInput pin;
-    RegionSize rs({0, 0, 0}, {100, M_PI, 2*M_PI}, {1, 1, 1}, {10, 1, 1});
+    RegionSize rs({0, 0, 0}, {100, M_PI, 2 * M_PI}, {1, 1, 1}, {10, 1, 1});
     const Real dr_true = (rs.xmax(X1DIR) - rs.xmin(X1DIR)) / (rs.nx(X1DIR));
     const Real dth_true = (rs.xmax(X2DIR) - rs.xmin(X2DIR)) / (rs.nx(X2DIR));
     const Real dph_true = (rs.xmax(X3DIR) - rs.xmin(X3DIR)) / (rs.nx(X3DIR));
