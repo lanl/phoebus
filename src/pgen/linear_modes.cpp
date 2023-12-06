@@ -45,7 +45,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PackIndexMap imap;
   std::vector<std::string> vars(
       {fluid_prim::density::name(), fluid_prim::velocity::name(),
-       fluid_prim::energy::name(), fluid_prim::bfield, fluid_prim::pressure,
+       fluid_prim::energy::name(), fluid_prim::bfield::name(), fluid_prim::pressure,
        fluid_prim::temperature, fluid_prim::gamma1, fluid_prim::ye});
   auto v = rc->PackVariables(vars, imap);
 
@@ -53,8 +53,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap[fluid_prim::velocity::name()].first;
   const int ivhi = imap[fluid_prim::velocity::name()].second;
   const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield].first;
-  const int ib_hi = imap[fluid_prim::bfield].second;
+  const int ib_lo = imap[fluid_prim::bfield::name()].first;
+  const int ib_hi = imap[fluid_prim::bfield::name()].second;
   const int iprs = imap[fluid_prim::pressure].first;
   const int itmp = imap[fluid_prim::temperature].first;
   const int igm1 = imap[fluid_prim::gamma1].first;

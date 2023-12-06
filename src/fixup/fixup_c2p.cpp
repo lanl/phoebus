@@ -65,7 +65,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
                                        c::momentum,
                                        p::energy::name(),
                                        c::energy::name(),
-                                       p::bfield,
+                                       p::bfield::name(),
                                        p::ye,
                                        c::ye,
                                        p::pressure,
@@ -98,8 +98,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   const int gm1 = imap[p::gamma1].first;
   const int slo = imap[impl::cell_signal_speed].first;
   const int shi = imap[impl::cell_signal_speed].second;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
   int pye = imap[p::ye].second; // negative if not present
   int cye = imap[c::ye].second;
 

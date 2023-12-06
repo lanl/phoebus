@@ -174,12 +174,12 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
 
     namespace p = fluid_prim;
     namespace c = fluid_cons;
-    const std::vector<std::string> vars({p::bfield, c::bfield});
+    const std::vector<std::string> vars({p::bfield::name(), c::bfield::name()});
     PackIndexMap imap;
     auto pack = md->PackVariables(vars, imap);
 
-    const int pblo = imap[p::bfield].first;
-    const int cblo = imap[c::bfield].first;
+    const int pblo = imap[p::bfield::name()].first;
+    const int cblo = imap[c::bfield::name()].first;
 
     const auto ib = md->GetBoundsI(IndexDomain::interior);
     const auto jb = md->GetBoundsJ(IndexDomain::interior);

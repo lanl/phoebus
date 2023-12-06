@@ -36,7 +36,7 @@ namespace fluid_prim {
 VARIABLE(p, density);
 VARIABLE(p, velocity);
 VARIABLE(p, energy);
-constexpr char bfield[] = "p.bfield";
+VARIABLE(p, bfield);
 constexpr char ye[] = "p.ye";
 constexpr char pressure[] = "pressure";
 constexpr char temperature[] = "temperature";
@@ -47,7 +47,7 @@ namespace fluid_cons {
 constexpr char density[] = "c.density";
 constexpr char momentum[] = "c.momentum";
 VARIABLE(c, energy);
-constexpr char bfield[] = "c.bfield";
+VARIABLE(c, bfield);
 constexpr char ye[] = "c.ye";
 } // namespace fluid_cons
 

@@ -37,7 +37,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                              fluid_prim::energy::name(), fluid_prim::bfield,
+                              fluid_prim::energy::name(), fluid_prim::bfield::name(),
                               fluid_prim::ye, fluid_prim::pressure,
                               fluid_prim::temperature, fluid_prim::gamma1},
                              imap);

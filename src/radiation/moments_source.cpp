@@ -216,16 +216,26 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{c::density,     c::energy::name(),
-                                c::momentum,    c::ye,
-                                cr::E,          cr::F,
-                                c::bfield,      p::density::name(),
-                                p::temperature, p::energy::name(),
-                                p::ye,          p::velocity::name(),
-                                p::pressure,    p::gamma1,
-                                p::bfield,      pr::J,
-                                pr::H,          ir::kappaJ,
-                                ir::kappaH,     ir::JBB,
+  std::vector<std::string> vars{c::density,
+                                c::energy::name(),
+                                c::momentum,
+                                c::ye,
+                                cr::E,
+                                cr::F,
+                                c::bfield::name(),
+                                p::density::name(),
+                                p::temperature,
+                                p::energy::name(),
+                                p::ye,
+                                p::velocity::name(),
+                                p::pressure,
+                                p::gamma1,
+                                p::bfield::name(),
+                                pr::J,
+                                pr::H,
+                                ir::kappaJ,
+                                ir::kappaH,
+                                ir::JBB,
                                 ir::tilPi};
 
   PackIndexMap imap;
@@ -247,8 +257,8 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   int pprs = imap[p::pressure].first;
   int pgm1 = imap[p::gamma1].first;
   int pYe = imap[p::ye].first;
-  int pb_lo = imap[p::bfield].first;
-  int cb_lo = imap[c::bfield].first;
+  int pb_lo = imap[p::bfield::name()].first;
+  int cb_lo = imap[c::bfield::name()].first;
 
   int crho = imap[c::density].first;
   int ceng = imap[c::energy::name()].first;

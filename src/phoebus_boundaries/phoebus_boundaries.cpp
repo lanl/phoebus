@@ -163,7 +163,7 @@ void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   PARTHENON_REQUIRE(bc_vars == "primitive", "Polar X2 reflecting BCs not supported");
 
   const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity::name(), false);
-  const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield, false);
+  const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield::name(), false);
 
   pmb->par_for_bndry(
       "PolarInnerX2Prim", nb, domain, CC, coarse,
@@ -196,7 +196,7 @@ void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   PARTHENON_REQUIRE(bc_vars == "primitive", "Polar X2 reflecting BCs not supported");
 
   const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity::name(), false);
-  const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield, false);
+  const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield::name(), false);
 
   const std::string label = "PolarOuterX2Prim";
   pmb->par_for_bndry(

@@ -236,10 +236,12 @@ class ConToPrim {
         cmom_hi(imap[fluid_cons::momentum].second),
         peng(imap[fluid_prim::energy::name()].first),
         ceng(imap[fluid_cons::energy::name()].first),
-        pb_lo(imap[fluid_prim::bfield].first), pb_hi(imap[fluid_prim::bfield].second),
-        cb_lo(imap[fluid_cons::bfield].first), cb_hi(imap[fluid_cons::bfield].second),
-        pye(imap[fluid_prim::ye].second), cye(imap[fluid_cons::ye].second),
-        prs(imap[fluid_prim::pressure].first), tmp(imap[fluid_prim::temperature].first),
+        pb_lo(imap[fluid_prim::bfield::name()].first),
+        pb_hi(imap[fluid_prim::bfield::name()].second),
+        cb_lo(imap[fluid_cons::bfield::name()].first),
+        cb_hi(imap[fluid_cons::bfield::name()].second), pye(imap[fluid_prim::ye].second),
+        cye(imap[fluid_cons::ye].second), prs(imap[fluid_prim::pressure].first),
+        tmp(imap[fluid_prim::temperature].first),
         sig_lo(imap[internal_variables::cell_signal_speed].first),
         sig_hi(imap[internal_variables::cell_signal_speed].second),
         gm1(imap[fluid_prim::gamma1].first),
@@ -251,8 +253,8 @@ class ConToPrim {
     return std::vector<std::string>(
         {fluid_prim::density::name(), fluid_cons::density, fluid_prim::velocity::name(),
          fluid_cons::momentum, fluid_prim::energy::name(), fluid_cons::energy::name(),
-         fluid_prim::bfield, fluid_cons::bfield, fluid_prim::ye, fluid_cons::ye,
-         fluid_prim::pressure, fluid_prim::temperature,
+         fluid_prim::bfield::name(), fluid_cons::bfield::name(), fluid_prim::ye,
+         fluid_cons::ye, fluid_prim::pressure, fluid_prim::temperature,
          internal_variables::cell_signal_speed, fluid_prim::gamma1,
          internal_variables::c2p_mu});
   }
