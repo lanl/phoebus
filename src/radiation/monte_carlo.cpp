@@ -150,15 +150,16 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
 
-  std::vector<std::string> vars({p::density::name(), p::temperature, p::ye, p::velocity,
-                                 "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
+  std::vector<std::string> vars({p::density::name(), p::temperature, p::ye,
+                                 p::velocity::name(), "dNdlnu_max", "dNdlnu", "dN", "Ns",
+                                 iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int pye = imap[p::ye].first;
   const int pdens = imap[p::density::name()].first;
   const int ptemp = imap[p::temperature].first;
-  const int pvlo = imap[p::velocity].first;
-  const int pvhi = imap[p::velocity].second;
+  const int pvlo = imap[p::velocity::name()].first;
+  const int pvhi = imap[p::velocity::name()].second;
   const int idNdlnu = imap["dNdlnu"].first;
   const int idNdlnu_max = imap["dNdlnu_max"].first;
   const int idN = imap["dN"].first;
@@ -455,14 +456,14 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
 
-  std::vector<std::string> vars(
-      {p::density::name(), p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});
+  std::vector<std::string> vars({p::density::name(), p::ye, p::velocity::name(),
+                                 p::temperature, iv::Gcov, iv::Gye});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int prho = imap[p::density::name()].first;
   const int iye = imap[p::ye].first;
-  const int ivlo = imap[p::velocity].first;
-  const int ivhi = imap[p::velocity].second;
+  const int ivlo = imap[p::velocity::name()].first;
+  const int ivhi = imap[p::velocity::name()].second;
   const int itemp = imap[p::temperature].first;
   const int iGcov_lo = imap[iv::Gcov].first;
   const int iGcov_hi = imap[iv::Gcov].second;

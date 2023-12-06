@@ -71,7 +71,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
 
   std::vector<std::string> variables{
-      cr::E,  cr::F,   pr::J,       pr::H,    fluid_prim::velocity,
+      cr::E,  cr::F,   pr::J,       pr::H,    fluid_prim::velocity::name(),
       ir::xi, ir::phi, ir::c2pfail, ir::tilPi};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
@@ -80,7 +80,7 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   auto pJ = imap.GetFlatIdx(pr::J);
   auto cF = imap.GetFlatIdx(cr::F);
   auto pH = imap.GetFlatIdx(pr::H);
-  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
+  auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
   auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(2);
@@ -198,7 +198,8 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   IndexRange jb = rc->GetBoundsJ(domain);
   IndexRange kb = rc->GetBoundsK(domain);
 
-  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity};
+  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H,
+                                     fluid_prim::velocity::name()};
   if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
     variables.push_back(ir::tilPi);
   }
@@ -209,7 +210,7 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   auto pJ = imap.GetFlatIdx(pr::J);
   auto cF = imap.GetFlatIdx(cr::F);
   auto pH = imap.GetFlatIdx(pr::H);
-  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
+  auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
   auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
 
   auto specB = cE.GetBounds(1);
@@ -321,7 +322,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   ParArrayND<Real> ql_v = rc->Get(ir::ql_v).data;
   ParArrayND<Real> qr_v = rc->Get(ir::qr_v).data;
   VariablePack<Real> v_vel =
-      rc->PackVariables(std::vector<std::string>{fluid_prim::velocity});
+      rc->PackVariables(std::vector<std::string>{fluid_prim::velocity::name()});
   auto qIdx = imap_ql.GetFlatIdx(ir::ql);
 
   const int nspec = qIdx.DimSize(1);

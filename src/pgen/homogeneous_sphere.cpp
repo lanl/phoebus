@@ -31,13 +31,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto v = rc->PackVariables(
       std::vector<std::string>({radmoment_prim::J, radmoment_prim::H,
                                 fluid_prim::density::name(), fluid_prim::temperature,
-                                fluid_prim::velocity, radmoment_internal::xi,
+                                fluid_prim::velocity::name(), radmoment_internal::xi,
                                 radmoment_internal::phi}),
       imap);
 
   auto idJ = imap.GetFlatIdx(radmoment_prim::J);
   auto idH = imap.GetFlatIdx(radmoment_prim::H);
-  auto idv = imap.GetFlatIdx(fluid_prim::velocity);
+  auto idv = imap.GetFlatIdx(fluid_prim::velocity::name());
   auto ixi = imap.GetFlatIdx(radmoment_internal::xi);
   auto iphi = imap.GetFlatIdx(radmoment_internal::phi);
   const int prho = imap[fluid_prim::density::name()].first;

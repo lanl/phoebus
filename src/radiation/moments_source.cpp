@@ -217,10 +217,11 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace c = fluid_cons;
   namespace p = fluid_prim;
   std::vector<std::string> vars{
-      c::density, c::energy,   c::momentum,        c::ye,          cr::E,
-      cr::F,      c::bfield,   p::density::name(), p::temperature, p::energy,
-      p::ye,      p::velocity, p::pressure,        p::gamma1,      p::bfield,
-      pr::J,      pr::H,       ir::kappaJ,         ir::kappaH,     ir::JBB,
+      c::density,     c::energy,  c::momentum, c::ye,
+      cr::E,          cr::F,      c::bfield,   p::density::name(),
+      p::temperature, p::energy,  p::ye,       p::velocity::name(),
+      p::pressure,    p::gamma1,  p::bfield,   pr::J,
+      pr::H,          ir::kappaJ, ir::kappaH,  ir::JBB,
       ir::tilPi};
 
   PackIndexMap imap;
@@ -234,7 +235,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
   auto idx_JBB = imap.GetFlatIdx(ir::JBB);
   auto idx_tilPi = imap.GetFlatIdx(ir::tilPi, false);
-  auto pv = imap.GetFlatIdx(p::velocity);
+  auto pv = imap.GetFlatIdx(p::velocity::name());
 
   int prho = imap[p::density::name()].first;
   int peng = imap[p::energy].first;

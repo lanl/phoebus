@@ -61,7 +61,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
   const std::vector<std::string> vars({p::density::name(),
                                        c::density,
-                                       p::velocity,
+                                       p::velocity::name(),
                                        c::momentum,
                                        p::energy,
                                        c::energy,
@@ -87,8 +87,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
   const int prho = imap[p::density::name()].first;
   const int crho = imap[c::density].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
   const int cmom_lo = imap[c::momentum].first;
   const int cmom_hi = imap[c::momentum].second;
   const int peng = imap[p::energy].first;

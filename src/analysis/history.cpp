@@ -29,14 +29,14 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density::name(), p::velocity});
+  const std::vector<std::string> vars({p::density::name(), p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
 
   const int prho = imap[p::density::name()].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
@@ -78,14 +78,14 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density::name(), p::bfield, p::velocity});
+  const std::vector<std::string> vars({p::density::name(), p::bfield, p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
 
   const int prho = imap[p::density::name()].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
   const int pb_lo = imap[p::bfield].first;
   const int pb_hi = imap[p::bfield].second;
 
@@ -137,14 +137,14 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density::name(), p::bfield, p::velocity});
+  const std::vector<std::string> vars({p::density::name(), p::bfield, p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
 
   const int prho = imap[p::density::name()].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
   const int pb_lo = imap[p::bfield].first;
   const int pb_hi = imap[p::bfield].second;
 

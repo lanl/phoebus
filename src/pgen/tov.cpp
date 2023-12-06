@@ -71,15 +71,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity,
+  auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
                               fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
                               fluid_prim::pressure, fluid_prim::temperature,
                               fluid_prim::gamma1},
                              imap);
 
   const int irho = imap[fluid_prim::density::name()].first;
-  const int ivlo = imap[fluid_prim::velocity].first;
-  const int ivhi = imap[fluid_prim::velocity].second;
+  const int ivlo = imap[fluid_prim::velocity::name()].first;
+  const int ivhi = imap[fluid_prim::velocity::name()].second;
   const int ieng = imap[fluid_prim::energy].first;
   const int iblo = imap[fluid_prim::bfield].first;
   const int ibhi = imap[fluid_prim::bfield].second;

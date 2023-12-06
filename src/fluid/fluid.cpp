@@ -190,7 +190,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // add the primitive variables
   physics->template AddField<p::density>(mprim_scalar);
-  physics->AddField(p::velocity, mprim_threev);
+  physics->AddField(p::velocity::name(), mprim_threev);
   physics->AddField(p::energy, mprim_scalar);
   if (mhd) {
     physics->AddField(p::bfield, mprim_threev);
@@ -256,7 +256,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // set up the arrays for left and right states
   // add the base state for reconstruction/fluxes
-  std::vector<std::string> rvars({p::density::name(), p::velocity, p::energy});
+  std::vector<std::string> rvars({p::density::name(), p::velocity::name(), p::energy});
   riemann::FluxState::ReconVars(rvars);
   if (mhd) riemann::FluxState::ReconVars(p::bfield);
   if (ye) riemann::FluxState::ReconVars(p::ye);
@@ -349,18 +349,18 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   namespace impl = internal_variables;
   auto *pmb = rc->GetParentPointer();
 
-  const std::vector<std::string> vars({p::density::name(), c::density, p::velocity,
-                                       c::momentum, p::energy, c::energy, p::bfield,
-                                       c::bfield, p::ye, c::ye, p::pressure, p::gamma1,
-                                       impl::cell_signal_speed});
+  const std::vector<std::string> vars({p::density::name(), c::density,
+                                       p::velocity::name(), c::momentum, p::energy,
+                                       c::energy, p::bfield, c::bfield, p::ye, c::ye,
+                                       p::pressure, p::gamma1, impl::cell_signal_speed});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
   const int prho = imap[p::density::name()].first;
   const int crho = imap[c::density].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
   const int cmom_lo = imap[c::momentum].first;
   const int cmom_hi = imap[c::momentum].second;
   const int peng = imap[p::energy].first;
