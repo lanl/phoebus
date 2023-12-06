@@ -63,8 +63,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
                                        c::density,
                                        p::velocity::name(),
                                        c::momentum,
-                                       p::energy,
-                                       c::energy,
+                                       p::energy::name(),
+                                       c::energy::name(),
                                        p::bfield,
                                        p::ye,
                                        c::ye,
@@ -91,8 +91,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   const int pvel_hi = imap[p::velocity::name()].second;
   const int cmom_lo = imap[c::momentum].first;
   const int cmom_hi = imap[c::momentum].second;
-  const int peng = imap[p::energy].first;
-  const int ceng = imap[c::energy].first;
+  const int peng = imap[p::energy::name()].first;
+  const int ceng = imap[c::energy::name()].first;
   const int prs = imap[p::pressure].first;
   const int tmp = imap[p::temperature].first;
   const int gm1 = imap[p::gamma1].first;

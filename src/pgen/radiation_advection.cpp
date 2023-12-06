@@ -30,7 +30,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto v = rc->PackVariables(
       std::vector<std::string>({radmoment_prim::J, radmoment_prim::H,
                                 fluid_prim::density::name(), fluid_prim::temperature,
-                                fluid_prim::energy, fluid_prim::velocity::name(),
+                                fluid_prim::energy::name(), fluid_prim::velocity::name(),
                                 radmoment_internal::xi, radmoment_internal::phi}),
       imap);
 
@@ -41,7 +41,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto iphi = imap.GetFlatIdx(radmoment_internal::phi);
   const int prho = imap[fluid_prim::density::name()].first;
   const int pT = imap[fluid_prim::temperature].first;
-  const int peng = imap[fluid_prim::energy].first;
+  const int peng = imap[fluid_prim::energy::name()].first;
 
   Params &phoebus_params = pmb->packages.Get("phoebus")->AllParams();
 

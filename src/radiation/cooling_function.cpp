@@ -114,8 +114,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   auto *pmb = rc->GetParentPointer();
 
   std::vector<std::string> vars({c::density, p::density::name(), p::velocity::name(),
-                                 p::temperature, p::ye, c::energy, iv::Gcov, iv::GcovHeat,
-                                 iv::GcovCool, iv::Gye, iv::tau, p::energy});
+                                 p::temperature, p::ye, c::energy::name(), iv::Gcov,
+                                 iv::GcovHeat, iv::GcovCool, iv::Gye, iv::tau,
+                                 p::energy::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -125,7 +126,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   const int pvhi = imap[p::velocity::name()].second;
   const int ptemp = imap[p::temperature].first;
   const int pye = imap[p::ye].first;
-  const int penergy = imap[p::energy].first;
+  const int penergy = imap[p::energy::name()].first;
   const int Gcov_lo = imap[iv::Gcov].first;
   const int Gcov_hi = imap[iv::Gcov].second;
   const int Gye = imap[iv::Gye].first;
