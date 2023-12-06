@@ -774,7 +774,8 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   namespace ir = radmoment_internal;
   namespace p = fluid_prim;
   PackIndexMap imap;
-  std::vector<std::string> vars{cr::E, cr::F, pr::J, pr::H, p::velocity, ir::tilPi};
+  std::vector<std::string> vars{cr::E,    cr::F, pr::J, pr::H, p::velocity::name(),
+                                ir::tilPi};
   vars.push_back(diagnostic_variables::r_src_terms);
 #if SET_FLUX_SRC_DIAGS
   vars.push_back(diagnostic_variables::r_src_terms);
@@ -784,7 +785,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   auto idx_F = imap.GetFlatIdx(cr::F);
   auto idx_J = imap.GetFlatIdx(pr::J);
   auto idx_H = imap.GetFlatIdx(pr::H);
-  auto pv = imap.GetFlatIdx(p::velocity);
+  auto pv = imap.GetFlatIdx(p::velocity::name());
   auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
   auto idx_diag = imap.GetFlatIdx(diagnostic_variables::r_src_terms, false);
 
@@ -943,12 +944,13 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{p::density::name(), p::temperature, p::ye,  p::velocity,
-                                ir::kappaJ,         ir::kappaH,     ir::JBB};
+  std::vector<std::string> vars{
+      p::density::name(), p::temperature, p::ye,  p::velocity::name(),
+      ir::kappaJ,         ir::kappaH,     ir::JBB};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  auto pv = imap.GetFlatIdx(p::velocity);
+  auto pv = imap.GetFlatIdx(p::velocity::name());
 
   int prho = imap[p::density::name()].first;
   int pT = imap[p::temperature].first;
