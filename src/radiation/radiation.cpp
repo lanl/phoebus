@@ -43,10 +43,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   std::vector<int> four_vec(1, 4);
   Metadata mfourforce = Metadata({Metadata::Cell, Metadata::OneCopy}, four_vec);
-  physics->AddField(iv::Gcov, mfourforce);
+  physics->AddField(iv::Gcov::name(), mfourforce);
 
   Metadata mscalar = Metadata({Metadata::Cell, Metadata::OneCopy});
-  physics->AddField(iv::Gye, mscalar);
+  physics->AddField(iv::Gye::name(), mscalar);
 
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
@@ -123,8 +123,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("do_lightbulb", do_lightbulb);
     params.Add("lum", lum);
     if (do_lightbulb) {
-      physics->AddField(iv::GcovHeat, mscalar);
-      physics->AddField(iv::GcovCool, mscalar);
+      physics->AddField(iv::GcovHeat::name(), mscalar);
+      physics->AddField(iv::GcovCool::name(), mscalar);
       std::string eos_type = pin->GetString("eos", "type");
 #ifdef SPINER_USE_HDF
       if (eos_type != singularity::StellarCollapse::EosType()) {
@@ -134,7 +134,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       PARTHENON_THROW("Lightbulb only supported with HDF5 support");
 #endif // SPINER_USE_HDF
       Metadata m({Metadata::Cell, Metadata::OneCopy});
-      physics->AddField(iv::tau, m);
+      physics->AddField(iv::tau::name(), m);
       parthenon::AllReduce<bool> do_gain_reducer;
       bool always_gain = pin->GetOrAddBoolean("radiation", "always_gain", false);
       do_gain_reducer.val = always_gain;
@@ -214,10 +214,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
     std::vector<int> Inu_size{num_species, nu_bins};
     Metadata mInu = Metadata({Metadata::Cell, Metadata::OneCopy}, Inu_size);
-    physics->AddField(mocmc_internal::Inu0, mInu);
-    physics->AddField(mocmc_internal::Inu1, mInu);
-    physics->AddField(mocmc_internal::jinvs, mInu);
-    physics->AddField(iv::Gye, mscalar);
+    physics->AddField(mocmc_internal::Inu0::name(), mInu);
+    physics->AddField(mocmc_internal::Inu1::name(), mInu);
+    physics->AddField(mocmc_internal::jinvs::name(), mInu);
+    physics->AddField(iv::Gye::name(), mscalar);
 
     Real num_total = 0.;
     params.Add("num_total", num_total, true);
@@ -454,15 +454,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                   Metadata::Intensive, Metadata::WithFluxes, Metadata::FillGhost},
                  std::vector<int>{num_species});
 
-    physics->AddField(c::E, mspecies_scalar_cons);
-    physics->AddField(c::F, mspecies_three_vector_cons);
+    physics->AddField(c::E::name(), mspecies_scalar_cons);
+    physics->AddField(c::F::name(), mspecies_three_vector_cons);
 
-    physics->AddField(p::J, mspecies_scalar);
-    physics->AddField(p::H, mspecies_three_vector);
+    physics->AddField(p::J::name(), mspecies_scalar);
+    physics->AddField(p::H::name(), mspecies_three_vector);
 
     // Fields for saving guesses for NR iteration in the radiation Con2Prim type solve
-    physics->AddField(i::xi, mspecies_scalar);
-    physics->AddField(i::phi, mspecies_scalar);
+    physics->AddField(i::xi::name(), mspecies_scalar);
+    physics->AddField(i::phi::name(), mspecies_scalar);
 
     // Fields for cell edge reconstruction
     /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense
@@ -475,29 +475,29 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                                std::vector<int>{num_species, nrecon, ndim});
     Metadata mrecon_v = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                  std::vector<int>{3, ndim});
-    physics->AddField(i::ql, mrecon);
-    physics->AddField(i::qr, mrecon);
-    physics->AddField(i::ql_v, mrecon_v);
-    physics->AddField(i::qr_v, mrecon_v);
+    physics->AddField(i::ql::name(), mrecon);
+    physics->AddField(i::qr::name(), mrecon);
+    physics->AddField(i::ql_v::name(), mrecon_v);
+    physics->AddField(i::qr_v::name(), mrecon_v);
 
     // Add variable for calculating gradients of rest frame energy density
     Metadata mdJ = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                             std::vector<int>{num_species, ndim, ndim});
-    physics->AddField(i::dJ, mdJ);
+    physics->AddField(i::dJ::name(), mdJ);
 
     // Add variables for source functions
     Metadata mSourceVar = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                                    std::vector<int>{num_species});
-    physics->AddField(i::kappaJ, mSourceVar);
-    physics->AddField(i::kappaH, mSourceVar);
-    physics->AddField(i::JBB, mSourceVar);
+    physics->AddField(i::kappaJ::name(), mSourceVar);
+    physics->AddField(i::kappaH::name(), mSourceVar);
+    physics->AddField(i::JBB::name(), mSourceVar);
 
     // this fail flag should really be an enum or something
     // but parthenon doesn't yet support that kind of thing
     Metadata m_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
                                   Metadata::Intensive, Metadata::FillGhost});
-    physics->AddField(i::c2pfail, m_scalar);
-    physics->AddField(i::srcfail, m_scalar);
+    physics->AddField(i::c2pfail::name(), m_scalar);
+    physics->AddField(i::srcfail::name(), m_scalar);
 
     // Make Eddington tensor an independent quantity for MOCMC to supply
     if (method == "mocmc") {
@@ -505,8 +505,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
           {Metadata::Cell, Metadata::Derived, Metadata::OneCopy, Metadata::FillGhost},
           std::vector<int>{num_species, 3, 3});
 
-      physics->AddField(i::tilPi, mspecies_three_tensor);
-      physics->AddField(mocmc_internal::dnsamp, mscalar);
+      physics->AddField(i::tilPi::name(), mspecies_three_tensor);
+      physics->AddField(mocmc_internal::dnsamp::name(), mscalar);
     }
 
 #if SET_FLUX_SRC_DIAGS
@@ -515,12 +515,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                               Metadata::Derived, Metadata::OneCopy},
                              std::vector<int>{num_species, 4});
-    physics->AddField(diagnostic_variables::r_divf, mdiv);
+    physics->AddField(diagnostic_variables::r_divf::name(), mdiv);
     Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                                Metadata::Derived, Metadata::OneCopy},
                               std::vector<int>{num_species, 4});
-    physics->AddField(diagnostic_variables::r_src_terms, mdiag);
-    printf("name: %s\n", diagnostic_variables::r_src_terms);
+    physics->AddField(diagnostic_variables::r_src_terms::name(), mdiag);
+    printf("name: %s\n", diagnostic_variables::r_src_terms::name());
     printf("Added fields!\n");
 #endif
 
@@ -545,7 +545,8 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   namespace iv = internal_variables;
 
   std::vector<std::string> vars({c::density::name(), c::energy::name(),
-                                 c::momentum::name(), c::ye::name(), iv::Gcov, iv::Gye});
+                                 c::momentum::name(), c::ye::name(), iv::Gcov::name(),
+                                 iv::Gye::name()});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int crho = imap[c::density::name()].first;
@@ -553,9 +554,9 @@ TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
   const int cmom_lo = imap[c::momentum::name()].first;
   const int cmom_hi = imap[c::momentum::name()].second;
   const int cye = imap[c::ye::name()].first;
-  const int Gcov_lo = imap[iv::Gcov].first;
-  const int Gcov_hi = imap[iv::Gcov].second;
-  const int Gye = imap[iv::Gye].first;
+  const int Gcov_lo = imap[iv::Gcov::name()].first;
+  const int Gcov_hi = imap[iv::Gcov::name()].second;
+  const int Gye = imap[iv::Gye::name()].first;
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
@@ -591,10 +592,10 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   PackIndexMap imap;
-  std::vector<std::string> vars{ir::kappaH, p::velocity::name()};
+  std::vector<std::string> vars{ir::kappaH::name(), p::velocity::name()};
   auto v = rc->PackVariables(vars, imap);
   auto idx_v = imap.GetFlatIdx(p::velocity::name());
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH, false);
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name(), false);
 
   auto num_species = rad->Param<int>("num_species");
 

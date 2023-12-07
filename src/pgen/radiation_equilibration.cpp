@@ -32,21 +32,22 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables(
-      {radmoment_prim::J, radmoment_prim::H, radmoment_internal::xi,
-       radmoment_internal::phi, fluid_prim::density::name(),
-       fluid_prim::temperature::name(), fluid_prim::pressure::name(), fluid_prim::gamma1,
+      {radmoment_prim::J::name(), radmoment_prim::H::name(),
+       radmoment_internal::xi::name(), radmoment_internal::phi::name(),
+       fluid_prim::density::name(), fluid_prim::temperature::name(),
+       fluid_prim::pressure::name(), fluid_prim::gamma1::name(),
        fluid_prim::energy::name(), fluid_prim::ye::name(), fluid_prim::velocity::name()},
       imap);
 
-  auto idJ = imap.GetFlatIdx(radmoment_prim::J);
-  auto idH = imap.GetFlatIdx(radmoment_prim::H);
-  auto ixi = imap.GetFlatIdx(radmoment_internal::xi);
-  auto iphi = imap.GetFlatIdx(radmoment_internal::phi);
+  auto idJ = imap.GetFlatIdx(radmoment_prim::J::name());
+  auto idH = imap.GetFlatIdx(radmoment_prim::H::name());
+  auto ixi = imap.GetFlatIdx(radmoment_internal::xi::name());
+  auto iphi = imap.GetFlatIdx(radmoment_internal::phi::name());
 
   const int iRho = imap[fluid_prim::density::name()].first;
   const int iT = imap[fluid_prim::temperature::name()].first;
   const int iP = imap[fluid_prim::pressure::name()].first;
-  const int igm1 = imap[fluid_prim::gamma1].first;
+  const int igm1 = imap[fluid_prim::gamma1::name()].first;
   const int ieng = imap[fluid_prim::energy::name()].first;
   const int pye = imap[fluid_prim::ye::name()].first;
   auto idv = imap.GetFlatIdx(fluid_prim::velocity::name());

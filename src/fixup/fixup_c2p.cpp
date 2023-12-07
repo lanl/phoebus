@@ -70,17 +70,17 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
                                        c::ye::name(),
                                        p::pressure::name(),
                                        p::temperature::name(),
-                                       p::gamma1,
-                                       impl::cell_signal_speed,
-                                       impl::fail,
-                                       ir::c2pfail,
-                                       ir::tilPi,
-                                       pr::J,
-                                       pr::H,
-                                       cr::E,
-                                       cr::F,
-                                       ir::xi,
-                                       ir::phi});
+                                       p::gamma1::name(),
+                                       impl::cell_signal_speed::name(),
+                                       impl::fail::name(),
+                                       ir::c2pfail::name(),
+                                       ir::tilPi::name(),
+                                       pr::J::name(),
+                                       pr::H::name(),
+                                       cr::E::name(),
+                                       cr::F::name(),
+                                       ir::xi::name(),
+                                       ir::phi::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -95,24 +95,24 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   const int ceng = imap[c::energy::name()].first;
   const int prs = imap[p::pressure::name()].first;
   const int tmp = imap[p::temperature::name()].first;
-  const int gm1 = imap[p::gamma1].first;
-  const int slo = imap[impl::cell_signal_speed].first;
-  const int shi = imap[impl::cell_signal_speed].second;
+  const int gm1 = imap[p::gamma1::name()].first;
+  const int slo = imap[impl::cell_signal_speed::name()].first;
+  const int shi = imap[impl::cell_signal_speed::name()].second;
   const int pb_lo = imap[p::bfield::name()].first;
   const int pb_hi = imap[p::bfield::name()].second;
   int pye = imap[p::ye::name()].second; // negative if not present
   int cye = imap[c::ye::name()].second;
 
-  int ifail = imap[impl::fail].first;
-  int irfail = imap[ir::c2pfail].first;
+  int ifail = imap[impl::fail::name()].first;
+  int irfail = imap[ir::c2pfail::name()].first;
 
-  auto idx_E = imap.GetFlatIdx(cr::E, false);
-  auto idx_F = imap.GetFlatIdx(cr::F, false);
-  auto idx_J = imap.GetFlatIdx(pr::J, false);
-  auto idx_H = imap.GetFlatIdx(pr::H, false);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
-  auto iXi = imap.GetFlatIdx(ir::xi, false);
-  auto iPhi = imap.GetFlatIdx(ir::phi, false);
+  auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+  auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
+  auto idx_J = imap.GetFlatIdx(pr::J::name(), false);
+  auto idx_H = imap.GetFlatIdx(pr::H::name(), false);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
+  auto iXi = imap.GetFlatIdx(ir::xi::name(), false);
+  auto iPhi = imap.GetFlatIdx(ir::phi::name(), false);
 
   const bool rad_active = rad_pkg->Param<bool>("active");
   const int num_species = rad_active ? rad_pkg->Param<int>("num_species") : 0;

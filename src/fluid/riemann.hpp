@@ -225,7 +225,7 @@ class FluxState {
         pb_hi(imap[fluid_prim::bfield::name()].second),
         pye(imap[fluid_prim::ye::name()].second),
         prs(imap[fluid_prim::pressure::name()].first),
-        gm1(imap[fluid_prim::gamma1].first),
+        gm1(imap[fluid_prim::gamma1::name()].first),
         crho(imap[fluid_cons::density::name()].first),
         cmom_lo(imap[fluid_cons::momentum::name()].first),
         ceng(imap[fluid_cons::energy::name()].first),

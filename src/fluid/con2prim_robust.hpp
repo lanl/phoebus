@@ -244,10 +244,10 @@ class ConToPrim {
         cye(imap[fluid_cons::ye::name()].second),
         prs(imap[fluid_prim::pressure::name()].first),
         tmp(imap[fluid_prim::temperature::name()].first),
-        sig_lo(imap[internal_variables::cell_signal_speed].first),
-        sig_hi(imap[internal_variables::cell_signal_speed].second),
-        gm1(imap[fluid_prim::gamma1].first),
-        c2p_mu(imap[internal_variables::c2p_mu].first), rel_tolerance(tol),
+        sig_lo(imap[internal_variables::cell_signal_speed::name()].first),
+        sig_hi(imap[internal_variables::cell_signal_speed::name()].second),
+        gm1(imap[fluid_prim::gamma1::name()].first),
+        c2p_mu(imap[internal_variables::c2p_mu::name()].first), rel_tolerance(tol),
         max_iter(max_iterations), h0sq_(1.0), floor_scale_fac_(floor_scale_fac),
         fail_on_floors_(fail_on_floors), fail_on_ceilings_(fail_on_ceilings) {}
 
@@ -258,8 +258,8 @@ class ConToPrim {
          fluid_prim::energy::name(), fluid_cons::energy::name(),
          fluid_prim::bfield::name(), fluid_cons::bfield::name(), fluid_prim::ye::name(),
          fluid_cons::ye::name(), fluid_prim::pressure::name(),
-         fluid_prim::temperature::name(), internal_variables::cell_signal_speed,
-         fluid_prim::gamma1, internal_variables::c2p_mu});
+         fluid_prim::temperature::name(), internal_variables::cell_signal_speed::name(),
+         fluid_prim::gamma1::name(), internal_variables::c2p_mu::name()});
   }
 
   template <typename CoordinateSystem, class... Args>

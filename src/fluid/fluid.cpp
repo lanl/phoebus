@@ -195,20 +195,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (mhd) {
     physics->AddField(p::bfield::name(), mprim_threev);
     if (ndim == 2) {
-      physics->AddField(impl::emf, mprim_scalar);
+      physics->AddField(impl::emf::name(), mprim_scalar);
     } else if (ndim == 3) {
-      physics->AddField(impl::emf, mprim_threev);
+      physics->AddField(impl::emf::name(), mprim_threev);
     }
-    physics->AddField(diag::divb, mprim_scalar);
+    physics->AddField(diag::divb::name(), mprim_scalar);
   }
   physics->AddField(p::pressure::name(), mprim_scalar);
   physics->AddField(p::temperature::name(), mprim_scalar);
-  physics->AddField(p::gamma1, mprim_scalar);
+  physics->AddField(p::gamma1::name(), mprim_scalar);
   if (ye) {
     physics->AddField(p::ye::name(), mprim_scalar);
   }
   if (pin->GetOrAddString("fluid", "c2p_method", "robust") == "robust") {
-    physics->AddField(impl::c2p_mu, mprim_scalar);
+    physics->AddField(impl::c2p_mu::name(), mprim_scalar);
   }
   // Just want constant primitive fields around to serve as
   // background if we are not evolving the fluid, don't need
@@ -220,7 +220,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
-  physics->AddField(impl::fail, mprim_scalar);
+  physics->AddField(impl::fail::name(), mprim_scalar);
 
   // add the conserved variables
   physics->AddField(c::density::name(), mcons_scalar);
@@ -247,11 +247,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                             Metadata::Derived, Metadata::OneCopy},
                            five_vec);
-  physics->AddField(diag::divf, mdiv);
+  physics->AddField(diag::divf::name(), mdiv);
   Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                              Metadata::Derived, Metadata::OneCopy},
                             five_vec);
-  physics->AddField(diag::src_terms, mdiag);
+  physics->AddField(diag::src_terms::name(), mdiag);
 #endif
 
   // set up the arrays for left and right states
@@ -269,7 +269,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (ye) riemann::FluxState::FluxVars(c::ye::name());
 
   // add some extra fields for reconstruction
-  rvars = std::vector<std::string>({p::pressure::name(), p::gamma1});
+  rvars = std::vector<std::string>({p::pressure::name(), p::gamma1::name()});
   riemann::FluxState::ReconVars(rvars);
 
   auto recon_vars = riemann::FluxState::ReconVars();
@@ -287,19 +287,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::vector<int> recon_shape({nrecon, ndim});
   Metadata mrecon =
       Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, recon_shape);
-  physics->AddField(impl::ql, mrecon);
-  physics->AddField(impl::qr, mrecon);
+  physics->AddField(impl::ql::name(), mrecon);
+  physics->AddField(impl::qr::name(), mrecon);
 
   std::vector<int> signal_shape(1, ndim);
   Metadata msignal =
       Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, signal_shape);
-  physics->AddField(impl::face_signal_speed, msignal);
-  physics->AddField(impl::cell_signal_speed, msignal);
+  physics->AddField(impl::face_signal_speed::name(), msignal);
+  physics->AddField(impl::cell_signal_speed::name(), msignal);
 
   std::vector<int> c2p_scratch_size(1, 5);
   Metadata c2p_meta =
       Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, c2p_scratch_size);
-  physics->AddField(impl::c2p_scratch, c2p_meta);
+  physics->AddField(impl::c2p_scratch::name(), c2p_meta);
 
   // Reductions
   // By default compute integrated value of scalar conserved vars
@@ -355,8 +355,8 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   const std::vector<std::string> vars(
       {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
        p::energy::name(), c::energy::name(), p::bfield::name(), c::bfield::name(),
-       p::ye::name(), c::ye::name(), p::pressure::name(), p::gamma1,
-       impl::cell_signal_speed});
+       p::ye::name(), c::ye::name(), p::pressure::name(), p::gamma1::name(),
+       impl::cell_signal_speed::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -370,15 +370,15 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   const int peng = imap[p::energy::name()].first;
   const int ceng = imap[c::energy::name()].first;
   const int prs = imap[p::pressure::name()].first;
-  const int gm1 = imap[p::gamma1].first;
+  const int gm1 = imap[p::gamma1::name()].first;
   const int pb_lo = imap[p::bfield::name()].first;
   const int pb_hi = imap[p::bfield::name()].second;
   const int cb_lo = imap[c::bfield::name()].first;
   const int cb_hi = imap[c::bfield::name()].second;
   const int pye = imap[p::ye::name()].second; // -1 if not present
   const int cye = imap[c::ye::name()].second;
-  const int sig_lo = imap[impl::cell_signal_speed].first;
-  const int sig_hi = imap[impl::cell_signal_speed].second;
+  const int sig_lo = imap[impl::cell_signal_speed::name()].first;
+  const int sig_hi = imap[impl::cell_signal_speed::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto coords = pmb->coords;
@@ -482,7 +482,7 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   auto coords = pmb->coords;
 
   // TODO(JCD): move the setting of this into the solver so we can call this on MeshData
-  auto fail = rc->Get(internal_variables::fail).data;
+  auto fail = rc->Get(internal_variables::fail::name()).data;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0, invert.NumBlocks() - 1,
@@ -514,7 +514,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
   auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto fail = rc->Get(internal_variables::fail).data;
+  auto fail = rc->Get(internal_variables::fail::name()).data;
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
   // if we can combine them, we can get rid of the mesh sized scratch array
@@ -560,14 +560,14 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   std::vector<std::string> vars(
       {fluid_cons::momentum::name(), fluid_cons::energy::name()});
 #if SET_FLUX_SRC_DIAGS
-  vars.push_back(diagnostic_variables::src_terms);
+  vars.push_back(diagnostic_variables::src_terms::name());
 #endif
   PackIndexMap imap;
   auto src = rc_src->PackVariables(vars, imap);
   const int cmom_lo = imap[fluid_cons::momentum::name()].first;
   const int cmom_hi = imap[fluid_cons::momentum::name()].second;
   const int ceng = imap[fluid_cons::energy::name()].first;
-  const int idiag = imap[diagnostic_variables::src_terms].first;
+  const int idiag = imap[diagnostic_variables::src_terms::name()].first;
 
   auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -646,7 +646,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
     return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
-  auto sig = rc->Get(internal_variables::face_signal_speed).data;
+  auto sig = rc->Get(internal_variables::face_signal_speed::name()).data;
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
@@ -770,7 +770,7 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
   auto f1 = rc->Get(fluid_cons::bfield::name()).flux[X1DIR];
   auto f2 = rc->Get(fluid_cons::bfield::name()).flux[X2DIR];
   auto f3 = rc->Get(fluid_cons::bfield::name()).flux[X3DIR];
-  auto emf = rc->Get(internal_variables::emf).data;
+  auto emf = rc->Get(internal_variables::emf::name()).data;
 
   if (ndim == 2) {
     parthenon::par_for(
@@ -829,7 +829,7 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
   // This is the problem for doing things with meshblock packs
   auto coords = pmb->coords;
   auto b = rc->Get(fluid_cons::bfield::name()).data;
-  auto divb = rc->Get(diagnostic_variables::divb).data;
+  auto divb = rc->Get(diagnostic_variables::divb::name()).data;
   if (ndim == 2) {
     // todo(jcd): these are supposed to be node centered, and this misses the
     // high boundaries
@@ -883,9 +883,9 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
   auto &pars = pmb->packages.Get("fluid")->AllParams();
   Real min_dt;
-  auto csig = rc->Get(internal_variables::cell_signal_speed).data;
+  auto csig = rc->Get(internal_variables::cell_signal_speed::name()).data;
   if (pars.hasKey("has_face_speeds")) {
-    auto fsig = rc->Get(internal_variables::face_signal_speed).data;
+    auto fsig = rc->Get(internal_variables::face_signal_speed::name()).data;
     pmb->par_reduce(
         "Hydro::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {

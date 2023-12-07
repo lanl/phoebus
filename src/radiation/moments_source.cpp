@@ -216,46 +216,33 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{c::density::name(),
-                                c::energy::name(),
-                                c::momentum::name(),
-                                c::ye::name(),
-                                cr::E,
-                                cr::F,
-                                c::bfield::name(),
-                                p::density::name(),
-                                p::temperature::name(),
-                                p::energy::name(),
-                                p::ye::name(),
-                                p::velocity::name(),
-                                p::pressure::name(),
-                                p::gamma1,
-                                p::bfield::name(),
-                                pr::J,
-                                pr::H,
-                                ir::kappaJ,
-                                ir::kappaH,
-                                ir::JBB,
-                                ir::tilPi};
+  std::vector<std::string> vars{
+      c::density::name(),  c::energy::name(),  c::momentum::name(),
+      c::ye::name(),       cr::E::name(),      cr::F::name(),
+      c::bfield::name(),   p::density::name(), p::temperature::name(),
+      p::energy::name(),   p::ye::name(),      p::velocity::name(),
+      p::pressure::name(), p::gamma1::name(),  p::bfield::name(),
+      pr::J::name(),       pr::H::name(),      ir::kappaJ::name(),
+      ir::kappaH::name(),  ir::JBB::name(),    ir::tilPi::name()};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  auto idx_E = imap.GetFlatIdx(cr::E);
-  auto idx_F = imap.GetFlatIdx(cr::F);
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_H = imap.GetFlatIdx(pr::H);
+  auto idx_E = imap.GetFlatIdx(cr::E::name());
+  auto idx_F = imap.GetFlatIdx(cr::F::name());
+  auto idx_J = imap.GetFlatIdx(pr::J::name());
+  auto idx_H = imap.GetFlatIdx(pr::H::name());
 
-  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
-  auto idx_JBB = imap.GetFlatIdx(ir::JBB);
-  auto idx_tilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ::name());
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name());
+  auto idx_JBB = imap.GetFlatIdx(ir::JBB::name());
+  auto idx_tilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
   auto pv = imap.GetFlatIdx(p::velocity::name());
 
   int prho = imap[p::density::name()].first;
   int peng = imap[p::energy::name()].first;
   int pT = imap[p::temperature::name()].first;
   int pprs = imap[p::pressure::name()].first;
-  int pgm1 = imap[p::gamma1].first;
+  int pgm1 = imap[p::gamma1::name()].first;
   int pYe = imap[p::ye::name()].first;
   int pb_lo = imap[p::bfield::name()].first;
   int cb_lo = imap[c::bfield::name()].first;

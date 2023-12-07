@@ -309,8 +309,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   const std::vector<std::string> vars(
       {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
        p::energy::name(), c::energy::name(), p::bfield::name(), p::ye::name(),
-       c::ye::name(), p::pressure::name(), p::temperature::name(), p::gamma1, pr::J,
-       pr::H, cr::E, cr::F, impl::cell_signal_speed, impl::fail, ir::tilPi});
+       c::ye::name(), p::pressure::name(), p::temperature::name(), p::gamma1::name(),
+       pr::J::name(), pr::H::name(), cr::E::name(), cr::F::name(),
+       impl::cell_signal_speed::name(), impl::fail::name(), ir::tilPi::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -325,18 +326,18 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   const int ceng = imap[c::energy::name()].first;
   const int prs = imap[p::pressure::name()].first;
   const int tmp = imap[p::temperature::name()].first;
-  const int gm1 = imap[p::gamma1].first;
-  const int slo = imap[impl::cell_signal_speed].first;
-  const int shi = imap[impl::cell_signal_speed].second;
+  const int gm1 = imap[p::gamma1::name()].first;
+  const int slo = imap[impl::cell_signal_speed::name()].first;
+  const int shi = imap[impl::cell_signal_speed::name()].second;
   const int pb_lo = imap[p::bfield::name()].first;
   const int pb_hi = imap[p::bfield::name()].second;
   int pye = imap[p::ye::name()].second; // negative if not present
   int cye = imap[c::ye::name()].second;
-  auto idx_J = imap.GetFlatIdx(pr::J, false);
-  auto idx_H = imap.GetFlatIdx(pr::H, false);
-  auto idx_E = imap.GetFlatIdx(cr::E, false);
-  auto idx_F = imap.GetFlatIdx(cr::F, false);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_J = imap.GetFlatIdx(pr::J::name(), false);
+  auto idx_H = imap.GetFlatIdx(pr::H::name(), false);
+  auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+  auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
 
   const int num_species = enable_rad_floors ? rad_pkg->Param<int>("num_species") : 0;
 
@@ -749,11 +750,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ix1_bc == "reflect") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density::name(), c::energy::name(), cr::E}),
-          std::vector<std::string>({c::density::name(), c::energy::name(), cr::E}), imap);
+          std::vector<std::string>(
+              {c::density::name(), c::energy::name(), cr::E::name()}),
+          std::vector<std::string>(
+              {c::density::name(), c::energy::name(), cr::E::name()}),
+          imap);
       const auto crho = imap[c::density::name()].first;
       const auto cener = imap[c::energy::name()].first;
-      auto idx_E = imap.GetFlatIdx(cr::E, false);
+      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -782,11 +786,14 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ox1_bc == "reflect") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density::name(), c::energy::name(), cr::E}),
-          std::vector<std::string>({c::density::name(), c::energy::name(), cr::E}), imap);
+          std::vector<std::string>(
+              {c::density::name(), c::energy::name(), cr::E::name()}),
+          std::vector<std::string>(
+              {c::density::name(), c::energy::name(), cr::E::name()}),
+          imap);
       const auto crho = imap[c::density::name()].first;
       const auto cener = imap[c::energy::name()].first;
-      auto idx_E = imap.GetFlatIdx(cr::E, false);
+      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.e + 1, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -819,18 +826,18 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
           std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), c::bfield::name(), cr::E,
-                                    cr::F}),
+                                    c::momentum::name(), c::bfield::name(), cr::E::name(),
+                                    cr::F::name()}),
           std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), c::bfield::name(), cr::E,
-                                    cr::F}),
+                                    c::momentum::name(), c::bfield::name(), cr::E::name(),
+                                    cr::F::name()}),
           imap);
       const auto crho = imap[c::density::name()].first;
       const auto cener = imap[c::energy::name()].first;
       auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
       auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
-      auto idx_E = imap.GetFlatIdx(cr::E, false);
-      auto idx_F = imap.GetFlatIdx(cr::F, false);
+      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -856,17 +863,17 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ix2_bc == "reflect") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), c::momentum::name(), cr::E, cr::F}),
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), c::momentum::name(), cr::E, cr::F}),
+          std::vector<std::string>({c::density::name(), c::energy::name(),
+                                    c::momentum::name(), cr::E::name(), cr::F::name()}),
+          std::vector<std::string>({c::density::name(), c::energy::name(),
+                                    c::momentum::name(), cr::E::name(), cr::F::name()}),
           imap);
       const auto crho = imap[c::density::name()].first;
       const auto cener = imap[c::energy::name()].first;
       auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
       auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
-      auto idx_E = imap.GetFlatIdx(cr::E, false);
-      auto idx_F = imap.GetFlatIdx(cr::F, false);
+      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -902,18 +909,18 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
           std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), c::bfield::name(), cr::E,
-                                    cr::F}),
+                                    c::momentum::name(), c::bfield::name(), cr::E::name(),
+                                    cr::F::name()}),
           std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), c::bfield::name(), cr::E,
-                                    cr::F}),
+                                    c::momentum::name(), c::bfield::name(), cr::E::name(),
+                                    cr::F::name()}),
           imap);
       const auto crho = imap[c::density::name()].first;
       const auto cener = imap[c::energy::name()].first;
       auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
       auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
-      auto idx_E = imap.GetFlatIdx(cr::E, false);
-      auto idx_F = imap.GetFlatIdx(cr::F, false);
+      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e + 1,
           jb.e + 1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -939,17 +946,17 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     } else if (ox2_bc == "reflect") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), c::momentum::name(), cr::E, cr::F}),
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), c::momentum::name(), cr::E, cr::F}),
+          std::vector<std::string>({c::density::name(), c::energy::name(),
+                                    c::momentum::name(), cr::E::name(), cr::F::name()}),
+          std::vector<std::string>({c::density::name(), c::energy::name(),
+                                    c::momentum::name(), cr::E::name(), cr::F::name()}),
           imap);
       const auto crho = imap[c::density::name()].first;
       const auto cener = imap[c::energy::name()].first;
       auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
       auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
-      auto idx_E = imap.GetFlatIdx(cr::E, false);
-      auto idx_F = imap.GetFlatIdx(cr::F, false);
+      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e + 1,
           jb.e + 1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -986,11 +993,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   } else if (pmb->boundary_flag[BoundaryFace::inner_x3] == BoundaryFlag::reflect) {
     PackIndexMap imap;
     auto v = rc->PackVariablesAndFluxes(
-        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E}),
-        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E}), imap);
+        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
+        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
+        imap);
     const auto crho = imap[c::density::name()].first;
     const auto cener = imap[c::energy::name()].first;
-    auto idx_E = imap.GetFlatIdx(cr::E, false);
+    auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.s, kb.s, jb.s, jb.e,
         ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -1017,11 +1025,12 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   } else if (pmb->boundary_flag[BoundaryFace::outer_x3] == BoundaryFlag::reflect) {
     PackIndexMap imap;
     auto v = rc->PackVariablesAndFluxes(
-        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E}),
-        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E}), imap);
+        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
+        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
+        imap);
     const auto crho = imap[c::density::name()].first;
     const auto cener = imap[c::energy::name()].first;
-    auto idx_E = imap.GetFlatIdx(cr::E, false);
+    auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.e + 1, kb.e + 1, jb.s,
         jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {

@@ -147,10 +147,10 @@ class ConToPrim {
         cye(imap[fluid_cons::ye::name()].second),
         prs(imap[fluid_prim::pressure::name()].first),
         tmp(imap[fluid_prim::temperature::name()].first),
-        sig_lo(imap[internal_variables::cell_signal_speed].first),
-        sig_hi(imap[internal_variables::cell_signal_speed].second),
-        gm1(imap[fluid_prim::gamma1].first),
-        scr_lo(imap[internal_variables::c2p_scratch].first), rel_tolerance(tol),
+        sig_lo(imap[internal_variables::cell_signal_speed::name()].first),
+        sig_hi(imap[internal_variables::cell_signal_speed::name()].second),
+        gm1(imap[fluid_prim::gamma1::name()].first),
+        scr_lo(imap[internal_variables::c2p_scratch::name()].first), rel_tolerance(tol),
         max_iter(max_iterations) {}
 
   std::vector<std::string> Vars() {
@@ -160,8 +160,8 @@ class ConToPrim {
          fluid_prim::energy::name(), fluid_cons::energy::name(),
          fluid_prim::bfield::name(), fluid_cons::bfield::name(), fluid_prim::ye::name(),
          fluid_cons::ye::name(), fluid_prim::pressure::name(),
-         fluid_prim::temperature::name(), internal_variables::cell_signal_speed,
-         fluid_prim::gamma1, internal_variables::c2p_scratch});
+         fluid_prim::temperature::name(), internal_variables::cell_signal_speed::name(),
+         fluid_prim::gamma1::name(), internal_variables::c2p_scratch::name()});
   }
 
   template <typename CoordinateSystem, class... Args>

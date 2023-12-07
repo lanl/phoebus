@@ -70,21 +70,21 @@ TaskStatus CopyFluxDivergence(T *rc) {
   std::vector<std::string> vars({fluid_cons::density::name(),
                                  fluid_cons::momentum::name(),
                                  fluid_cons::energy::name()});
-  vars.push_back(radmoment_cons::E);
-  vars.push_back(radmoment_cons::F);
+  vars.push_back(radmoment_cons::E::name());
+  vars.push_back(radmoment_cons::F::name());
   PackIndexMap imap;
   auto divf = rc->PackVariables(vars, imap);
   const int crho = imap[fluid_cons::density::name()].first;
   const int cmom_lo = imap[fluid_cons::momentum::name()].first;
   const int cmom_hi = imap[fluid_cons::momentum::name()].second;
   const int ceng = imap[fluid_cons::energy::name()].first;
-  auto idx_E = imap.GetFlatIdx(radmoment_cons::E, false);
-  auto idx_F = imap.GetFlatIdx(radmoment_cons::F, false);
+  auto idx_E = imap.GetFlatIdx(radmoment_cons::E::name(), false);
+  auto idx_F = imap.GetFlatIdx(radmoment_cons::F::name(), false);
   std::vector<std::string> diag_vars(
-      {diagnostic_variables::divf, diagnostic_variables::r_divf});
+      {diagnostic_variables::divf::name(), diagnostic_variables::r_divf::name()});
   PackIndexMap imap_diag;
   auto diag = rc->PackVariables(diag_vars, imap_diag);
-  auto idx_r_divf = imap_diag.GetFlatIdx(diagnostic_variables::r_divf, false);
+  auto idx_r_divf = imap_diag.GetFlatIdx(diagnostic_variables::r_divf::name(), false);
 
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   int num_species = 0;

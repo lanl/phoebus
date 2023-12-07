@@ -70,25 +70,31 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
   IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
 
-  std::vector<std::string> variables{
-      cr::E,  cr::F,   pr::J,       pr::H,    fluid_prim::velocity::name(),
-      ir::xi, ir::phi, ir::c2pfail, ir::tilPi};
+  std::vector<std::string> variables{cr::E::name(),
+                                     cr::F::name(),
+                                     pr::J::name(),
+                                     pr::H::name(),
+                                     fluid_prim::velocity::name(),
+                                     ir::xi::name(),
+                                     ir::phi::name(),
+                                     ir::c2pfail::name(),
+                                     ir::tilPi::name()};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  auto cE = imap.GetFlatIdx(cr::E);
-  auto pJ = imap.GetFlatIdx(pr::J);
-  auto cF = imap.GetFlatIdx(cr::F);
-  auto pH = imap.GetFlatIdx(pr::H);
+  auto cE = imap.GetFlatIdx(cr::E::name());
+  auto pJ = imap.GetFlatIdx(pr::J::name());
+  auto cF = imap.GetFlatIdx(cr::F::name());
+  auto pH = imap.GetFlatIdx(pr::H::name());
   auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(2);
 
-  auto iXi = imap.GetFlatIdx(ir::xi);
-  auto iPhi = imap.GetFlatIdx(ir::phi);
+  auto iXi = imap.GetFlatIdx(ir::xi::name());
+  auto iPhi = imap.GetFlatIdx(ir::phi::name());
 
-  auto ifail = imap[ir::c2pfail].first;
+  auto ifail = imap[ir::c2pfail::name()].first;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   const Real pi = acos(-1);
@@ -198,20 +204,20 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   IndexRange jb = rc->GetBoundsJ(domain);
   IndexRange kb = rc->GetBoundsK(domain);
 
-  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H,
-                                     fluid_prim::velocity::name()};
+  std::vector<std::string> variables{cr::E::name(), cr::F::name(), pr::J::name(),
+                                     pr::H::name(), fluid_prim::velocity::name()};
   if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    variables.push_back(ir::tilPi);
+    variables.push_back(ir::tilPi::name());
   }
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  auto cE = imap.GetFlatIdx(cr::E);
-  auto pJ = imap.GetFlatIdx(pr::J);
-  auto cF = imap.GetFlatIdx(cr::F);
-  auto pH = imap.GetFlatIdx(pr::H);
+  auto cE = imap.GetFlatIdx(cr::E::name());
+  auto pJ = imap.GetFlatIdx(pr::J::name());
+  auto cF = imap.GetFlatIdx(cr::F::name());
+  auto pH = imap.GetFlatIdx(pr::H::name());
   auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
 
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(2);
@@ -309,21 +315,21 @@ TaskStatus ReconstructEdgeStates(T *rc) {
 
   PackIndexMap imap_ql, imap_qr, imap;
   VariablePack<Real> ql_base =
-      rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
+      rc->PackVariables(std::vector<std::string>{ir::ql::name()}, imap_ql);
   VariablePack<Real> qr_base =
-      rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
-  std::vector<std::string> variables = {pr::J, pr::H, ir::tilPi};
-  variables.push_back(ir::dJ);
+      rc->PackVariables(std::vector<std::string>{ir::qr::name()}, imap_qr);
+  std::vector<std::string> variables = {pr::J::name(), pr::H::name(), ir::tilPi::name()};
+  variables.push_back(ir::dJ::name());
   VariablePack<Real> v = rc->PackVariables(variables, imap);
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_dJ = imap.GetFlatIdx(ir::dJ);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_J = imap.GetFlatIdx(pr::J::name());
+  auto idx_dJ = imap.GetFlatIdx(ir::dJ::name());
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
 
-  ParArrayND<Real> ql_v = rc->Get(ir::ql_v).data;
-  ParArrayND<Real> qr_v = rc->Get(ir::qr_v).data;
+  ParArrayND<Real> ql_v = rc->Get(ir::ql_v::name()).data;
+  ParArrayND<Real> qr_v = rc->Get(ir::qr_v::name()).data;
   VariablePack<Real> v_vel =
       rc->PackVariables(std::vector<std::string>{fluid_prim::velocity::name()});
-  auto qIdx = imap_ql.GetFlatIdx(ir::ql);
+  auto qIdx = imap_ql.GetFlatIdx(ir::ql::name());
 
   const int nspec = qIdx.DimSize(1);
   int nrecon = 4 * nspec;
@@ -331,7 +337,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
     nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
   }
 
-  const int offset = imap_ql[ir::ql].first;
+  const int offset = imap_ql[ir::ql::name()].first;
 
   const int nblock = ql_base.GetDim(5);
   const int ndim = pmb->pmy_mesh->ndim;
@@ -508,20 +514,21 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   namespace ir = radmoment_internal;
 
   PackIndexMap imap_ql, imap_qr, imap;
-  std::vector<std::string> vars{ir::ql, ir::qr, ir::ql_v, ir::qr_v, ir::dJ, ir::kappaH};
-  std::vector<std::string> flxs{cr::E, cr::F};
+  std::vector<std::string> vars{ir::ql::name(),   ir::qr::name(), ir::ql_v::name(),
+                                ir::qr_v::name(), ir::dJ::name(), ir::kappaH::name()};
+  std::vector<std::string> flxs{cr::E::name(), cr::F::name()};
 
   auto v = rc->PackVariablesAndFluxes(vars, flxs, imap);
 
-  auto idx_qlv = imap.GetFlatIdx(ir::ql_v);
-  auto idx_qrv = imap.GetFlatIdx(ir::qr_v);
-  auto idx_ql = imap.GetFlatIdx(ir::ql);
-  auto idx_qr = imap.GetFlatIdx(ir::qr);
-  auto idx_dJ = imap.GetFlatIdx(ir::dJ);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
+  auto idx_qlv = imap.GetFlatIdx(ir::ql_v::name());
+  auto idx_qrv = imap.GetFlatIdx(ir::qr_v::name());
+  auto idx_ql = imap.GetFlatIdx(ir::ql::name());
+  auto idx_qr = imap.GetFlatIdx(ir::qr::name());
+  auto idx_dJ = imap.GetFlatIdx(ir::dJ::name());
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name());
 
-  auto idx_Ff = imap.GetFlatIdx(cr::F);
-  auto idx_Ef = imap.GetFlatIdx(cr::E);
+  auto idx_Ff = imap.GetFlatIdx(cr::F::name());
+  auto idx_Ef = imap.GetFlatIdx(cr::E::name());
 
   auto num_species = rad_pkg->Param<int>("num_species");
 
@@ -774,26 +781,26 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   namespace ir = radmoment_internal;
   namespace p = fluid_prim;
   PackIndexMap imap;
-  std::vector<std::string> vars{cr::E,    cr::F, pr::J, pr::H, p::velocity::name(),
-                                ir::tilPi};
-  vars.push_back(diagnostic_variables::r_src_terms);
+  std::vector<std::string> vars{cr::E::name(), cr::F::name(),       pr::J::name(),
+                                pr::H::name(), p::velocity::name(), ir::tilPi::name()};
+  vars.push_back(diagnostic_variables::r_src_terms::name());
 #if SET_FLUX_SRC_DIAGS
-  vars.push_back(diagnostic_variables::r_src_terms);
+  vars.push_back(diagnostic_variables::r_src_terms::name());
 #endif
   auto v = rc->PackVariables(vars, imap);
-  auto idx_E = imap.GetFlatIdx(cr::E);
-  auto idx_F = imap.GetFlatIdx(cr::F);
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_H = imap.GetFlatIdx(pr::H);
+  auto idx_E = imap.GetFlatIdx(cr::E::name());
+  auto idx_F = imap.GetFlatIdx(cr::F::name());
+  auto idx_J = imap.GetFlatIdx(pr::J::name());
+  auto idx_H = imap.GetFlatIdx(pr::H::name());
   auto pv = imap.GetFlatIdx(p::velocity::name());
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
-  auto idx_diag = imap.GetFlatIdx(diagnostic_variables::r_src_terms, false);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
+  auto idx_diag = imap.GetFlatIdx(diagnostic_variables::r_src_terms::name(), false);
 
   PackIndexMap imap_src;
-  std::vector<std::string> vars_src{cr::E, cr::F};
+  std::vector<std::string> vars_src{cr::E::name(), cr::F::name()};
   auto v_src = rc_src->PackVariables(vars_src, imap_src);
-  auto idx_E_src = imap_src.GetFlatIdx(cr::E);
-  auto idx_F_src = imap_src.GetFlatIdx(cr::F);
+  auto idx_E_src = imap_src.GetFlatIdx(cr::E::name());
+  auto idx_F_src = imap_src.GetFlatIdx(cr::F::name());
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
@@ -944,13 +951,9 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{p::density::name(),
-                                p::temperature::name(),
-                                p::ye::name(),
-                                p::velocity::name(),
-                                ir::kappaJ,
-                                ir::kappaH,
-                                ir::JBB};
+  std::vector<std::string> vars{
+      p::density::name(), p::temperature::name(), p::ye::name(),  p::velocity::name(),
+      ir::kappaJ::name(), ir::kappaH::name(),     ir::JBB::name()};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -960,9 +963,9 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   int pT = imap[p::temperature::name()].first;
   int pYe = imap[p::ye::name()].first;
 
-  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
-  auto idx_JBB = imap.GetFlatIdx(ir::JBB);
+  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ::name());
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name());
+  auto idx_JBB = imap.GetFlatIdx(ir::JBB::name());
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);

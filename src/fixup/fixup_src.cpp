@@ -77,8 +77,9 @@ TaskStatus SourceFixupImpl(T *rc) {
   const std::vector<std::string> vars(
       {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
        p::energy::name(), c::energy::name(), p::bfield::name(), p::ye::name(),
-       c::ye::name(), p::pressure::name(), p::temperature::name(), p::gamma1, pr::J,
-       pr::H, cr::E, cr::F, impl::cell_signal_speed, ir::srcfail, ir::tilPi});
+       c::ye::name(), p::pressure::name(), p::temperature::name(), p::gamma1::name(),
+       pr::J::name(), pr::H::name(), cr::E::name(), cr::F::name(),
+       impl::cell_signal_speed::name(), ir::srcfail::name(), ir::tilPi::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -91,19 +92,19 @@ TaskStatus SourceFixupImpl(T *rc) {
   const int ceng = imap[c::energy::name()].first;
   const int prs = imap[p::pressure::name()].first;
   const int tmp = imap[p::temperature::name()].first;
-  const int gm1 = imap[p::gamma1].first;
-  const int slo = imap[impl::cell_signal_speed].first;
-  const int shi = imap[impl::cell_signal_speed].second;
+  const int gm1 = imap[p::gamma1::name()].first;
+  const int slo = imap[impl::cell_signal_speed::name()].first;
+  const int shi = imap[impl::cell_signal_speed::name()].second;
   int pye = imap[p::ye::name()].second;
   int cye = imap[c::ye::name()].second;
   const int pb_lo = imap[p::bfield::name()].first;
   const int pb_hi = imap[p::bfield::name()].second;
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_H = imap.GetFlatIdx(pr::H);
-  auto idx_E = imap.GetFlatIdx(cr::E);
-  auto idx_F = imap.GetFlatIdx(cr::F);
-  int ifail = imap[ir::srcfail].first;
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_J = imap.GetFlatIdx(pr::J::name());
+  auto idx_H = imap.GetFlatIdx(pr::H::name());
+  auto idx_E = imap.GetFlatIdx(cr::E::name());
+  auto idx_F = imap.GetFlatIdx(cr::F::name());
+  int ifail = imap[ir::srcfail::name()].first;
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
 
   bool report_source_fails = fix_pkg->Param<bool>("report_source_fails");
   if (report_source_fails) {

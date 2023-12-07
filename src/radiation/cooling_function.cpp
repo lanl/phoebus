@@ -28,12 +28,12 @@ TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc) {
   namespace iv = internal_variables;
   Mesh *pmesh = rc->GetMeshPointer();
 
-  std::vector<std::string> vars({p::density::name(), iv::tau});
+  std::vector<std::string> vars({p::density::name(), iv::tau::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int prho = imap[p::density::name()].first;
-  const int ptau = imap[iv::tau].first;
+  const int ptau = imap[iv::tau::name()].first;
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
@@ -78,11 +78,11 @@ TaskStatus CheckDoGain(MeshBlockData<Real> *rc, bool *do_gain_global) {
   namespace iv = internal_variables;
   Mesh *pmesh = rc->GetMeshPointer();
 
-  std::vector<std::string> vars({iv::tau});
+  std::vector<std::string> vars({iv::tau::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int ptau = imap[iv::tau].first;
+  const int ptau = imap[iv::tau::name()].first;
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
@@ -115,8 +115,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
 
   std::vector<std::string> vars({c::density::name(), p::density::name(),
                                  p::velocity::name(), p::temperature::name(),
-                                 p::ye::name(), c::energy::name(), iv::Gcov, iv::GcovHeat,
-                                 iv::GcovCool, iv::Gye, iv::tau, p::energy::name()});
+                                 p::ye::name(), c::energy::name(), iv::Gcov::name(),
+                                 iv::GcovHeat::name(), iv::GcovCool::name(),
+                                 iv::Gye::name(), iv::tau::name(), p::energy::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -127,12 +128,12 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   const int ptemp = imap[p::temperature::name()].first;
   const int pye = imap[p::ye::name()].first;
   const int penergy = imap[p::energy::name()].first;
-  const int Gcov_lo = imap[iv::Gcov].first;
-  const int Gcov_hi = imap[iv::Gcov].second;
-  const int Gye = imap[iv::Gye].first;
-  const int ptau = imap[iv::tau].first;
-  const int GcovHeat = imap[iv::GcovHeat].first;
-  const int GcovCool = imap[iv::GcovCool].first;
+  const int Gcov_lo = imap[iv::Gcov::name()].first;
+  const int Gcov_hi = imap[iv::Gcov::name()].second;
+  const int Gye = imap[iv::Gye::name()].first;
+  const int ptau = imap[iv::tau::name()].first;
+  const int GcovHeat = imap[iv::GcovHeat::name()].first;
+  const int GcovCool = imap[iv::GcovCool::name()].first;
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
