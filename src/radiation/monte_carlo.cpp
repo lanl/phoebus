@@ -151,9 +151,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
 
-  std::vector<std::string> vars({p::density::name(), p::temperature::name(),
-                                 p::ye::name(), p::velocity::name(), "dNdlnu_max",
-                                 "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
+  std::vector<std::string> vars(
+      {p::density::name(), p::temperature::name(), p::ye::name(), p::velocity::name(),
+       "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov::name(), iv::Gye::name()});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int pye = imap[p::ye::name()].first;
@@ -165,9 +165,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int idNdlnu_max = imap["dNdlnu_max"].first;
   const int idN = imap["dN"].first;
   const int iNs = imap["Ns"].first;
-  const int Gcov_lo = imap[iv::Gcov].first;
-  const int Gcov_hi = imap[iv::Gcov].second;
-  const int Gye = imap[iv::Gye].first;
+  const int Gcov_lo = imap[iv::Gcov::name()].first;
+  const int Gcov_hi = imap[iv::Gcov::name()].second;
+  const int Gye = imap[iv::Gye::name()].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
   Real wgtC = rad->Param<Real>("wgtC");
@@ -458,7 +458,8 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real mp_code = code_constants.mp;
 
   std::vector<std::string> vars({p::density::name(), p::ye::name(), p::velocity::name(),
-                                 p::temperature::name(), iv::Gcov, iv::Gye});
+                                 p::temperature::name(), iv::Gcov::name(),
+                                 iv::Gye::name()});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
   const int prho = imap[p::density::name()].first;
@@ -466,9 +467,9 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const int ivlo = imap[p::velocity::name()].first;
   const int ivhi = imap[p::velocity::name()].second;
   const int itemp = imap[p::temperature::name()].first;
-  const int iGcov_lo = imap[iv::Gcov].first;
-  const int iGcov_hi = imap[iv::Gcov].second;
-  const int iGye = imap[iv::Gye].first;
+  const int iGcov_lo = imap[iv::Gcov::name()].first;
+  const int iGcov_hi = imap[iv::Gcov::name()].second;
+  const int iGye = imap[iv::Gye::name()].first;
 
   ParArray1D<Real> num_interactions("Number interactions", 2);
 

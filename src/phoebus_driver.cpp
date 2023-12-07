@@ -202,12 +202,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     src_names.push_back(fluid_cons::energy::name());
   }
   if (rad_moments_active) {
-    src_names.push_back(radmoment_cons::E);
-    src_names.push_back(radmoment_cons::F);
+    src_names.push_back(radmoment_cons::E::name());
+    src_names.push_back(radmoment_cons::F::name());
   }
   src_w_diag = src_names;
 #if SET_FLUX_SRC_DIAGS
-  if (fluid_active) src_w_diag.push_back(diagnostic_variables::src_terms);
+  if (fluid_active) src_w_diag.push_back(diagnostic_variables::src_terms::name());
 #endif
 
   using MonoMatRed_t = AllReduce<MonopoleGR::Matter_host_t>;

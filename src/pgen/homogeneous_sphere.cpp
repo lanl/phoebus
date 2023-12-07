@@ -28,18 +28,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(
-      std::vector<std::string>(
-          {radmoment_prim::J, radmoment_prim::H, fluid_prim::density::name(),
-           fluid_prim::temperature::name(), fluid_prim::velocity::name(),
-           radmoment_internal::xi, radmoment_internal::phi}),
-      imap);
+  auto v =
+      rc->PackVariables(std::vector<std::string>(
+                            {radmoment_prim::J::name(), radmoment_prim::H::name(),
+                             fluid_prim::density::name(), fluid_prim::temperature::name(),
+                             fluid_prim::velocity::name(), radmoment_internal::xi::name(),
+                             radmoment_internal::phi::name()}),
+                        imap);
 
-  auto idJ = imap.GetFlatIdx(radmoment_prim::J);
-  auto idH = imap.GetFlatIdx(radmoment_prim::H);
+  auto idJ = imap.GetFlatIdx(radmoment_prim::J::name());
+  auto idH = imap.GetFlatIdx(radmoment_prim::H::name());
   auto idv = imap.GetFlatIdx(fluid_prim::velocity::name());
-  auto ixi = imap.GetFlatIdx(radmoment_internal::xi);
-  auto iphi = imap.GetFlatIdx(radmoment_internal::phi);
+  auto ixi = imap.GetFlatIdx(radmoment_internal::xi::name());
+  auto iphi = imap.GetFlatIdx(radmoment_internal::phi::name());
   const int prho = imap[fluid_prim::density::name()].first;
   const int pT = imap[fluid_prim::temperature::name()].first;
 

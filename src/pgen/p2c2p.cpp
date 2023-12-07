@@ -73,11 +73,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                              fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                              fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                              fluid_prim::temperature::name(), fluid_prim::gamma1},
-                             imap);
+  auto v =
+      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
+                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
+                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
+                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
+                        imap);
 
   const int irho = imap[fluid_prim::density::name()].first;
   const int ivlo = imap[fluid_prim::velocity::name()].first;
@@ -87,7 +88,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ib_hi = imap[fluid_prim::bfield::name()].second;
   const int iprs = imap[fluid_prim::pressure::name()].first;
   const int itmp = imap[fluid_prim::temperature::name()].first;
-  const int igm1 = imap[fluid_prim::gamma1].first;
+  const int igm1 = imap[fluid_prim::gamma1::name()].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);

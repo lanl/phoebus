@@ -228,7 +228,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto domain = IndexDomain::outer_x1;
 
   const int pv_lo = imap[fluid_prim::velocity::name()].first;
-  auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
+  auto idx_H = imap.GetFlatIdx(radmoment_prim::H::name(), false);
 
   auto &fluid = rc->GetMeshPointer()->packages.Get("fluid");
   auto &rad = rc->GetMeshPointer()->packages.Get("radiation");
@@ -337,12 +337,13 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     const bool coarse = false;
 
     PackIndexMap imap;
-    std::vector<std::string> vars{fluid_prim::velocity::name(), radmoment_prim::H};
+    std::vector<std::string> vars{fluid_prim::velocity::name(),
+                                  radmoment_prim::H::name()};
     auto q = rc->PackVariables(vars, imap, coarse);
     auto nb1 = IndexRange{0, 0};
 
     const int pv_lo = imap[fluid_prim::velocity::name()].first;
-    auto idx_H = imap.GetFlatIdx(radmoment_prim::H, false);
+    auto idx_H = imap.GetFlatIdx(radmoment_prim::H::name(), false);
 
     const int num_species =
         pkg_rad->Param<bool>("active") ? pkg_rad->Param<int>("num_species") : 0;

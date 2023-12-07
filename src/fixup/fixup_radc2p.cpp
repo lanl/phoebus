@@ -64,8 +64,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   if (!enable_c2p_fixup || !update_rad) return TaskStatus::complete;
 
   const std::vector<std::string> vars({p::velocity::name(), p::ye::name(), c::ye::name(),
-                                       pr::J, pr::H, cr::E, cr::F, ir::tilPi, ir::c2pfail,
-                                       impl::fail});
+                                       pr::J::name(), pr::H::name(), cr::E::name(),
+                                       cr::F::name(), ir::tilPi::name(),
+                                       ir::c2pfail::name(), impl::fail::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
@@ -73,13 +74,13 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   auto idx_pvel = imap.GetFlatIdx(p::velocity::name());
   int pye = imap[p::ye::name()].second; // negative if not present
   int cye = imap[c::ye::name()].second;
-  auto idx_J = imap.GetFlatIdx(pr::J, false);
-  auto idx_H = imap.GetFlatIdx(pr::H, false);
-  auto idx_E = imap.GetFlatIdx(cr::E, false);
-  auto idx_F = imap.GetFlatIdx(cr::F, false);
-  int ifluidfail = imap[impl::fail].first;
-  int iradfail = imap[ir::c2pfail].first;
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_J = imap.GetFlatIdx(pr::J::name(), false);
+  auto idx_H = imap.GetFlatIdx(pr::H::name(), false);
+  auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+  auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
+  int ifluidfail = imap[impl::fail::name()].first;
+  int iradfail = imap[ir::c2pfail::name()].first;
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
 
   bool report_c2p_fails = fix_pkg->Param<bool>("report_c2p_fails");
   if (report_c2p_fails) {
