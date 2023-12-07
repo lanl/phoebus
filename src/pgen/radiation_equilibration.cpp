@@ -58,34 +58,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  auto tracer_pkg = pmb->packages.Get("tracers");
-  bool do_tracers = tracer_pkg->Param<bool>("active");
-  auto &sc = pmb->swarm_data.Get();
-  auto &swarm = pmb->swarm_data.Get()->Get("tracers");
-  auto rng_pool_tr = tracer_pkg->Param<RNGPool>("rng_pool");
-  const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
-
-  const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
-  const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
-  const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
-  const Real &x_min = pmb->coords.Xf<1>(ib.s);
-  const Real &y_min = pmb->coords.Xf<2>(jb.s);
-  const Real &z_min = pmb->coords.Xf<3>(kb.s);
-  const Real &x_max = pmb->coords.Xf<1>(ib.e + 1);
-  const Real &y_max = pmb->coords.Xf<2>(jb.e + 1);
-  const Real &z_max = pmb->coords.Xf<3>(kb.e + 1);
-
-  // const int n_tracers_block = (int)((num_tracers_total) / (nx_i * nx_j * nx_k));
-  const int n_tracers_block = num_tracers_total;
-  auto swarm_d = swarm->GetDeviceContext();
-
-  ParArrayND<int> new_indices;
-  swarm->AddEmptyParticles(n_tracers_block, new_indices);
-
-  auto &x = swarm->Get<Real>("x").Get();
-  auto &y = swarm->Get<Real>("y").Get();
-  auto &z = swarm->Get<Real>("z").Get();
-
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   const auto opac =
       pmb->packages.Get("opacity")->template Param<Microphysics::Opacities>("opacities");
@@ -127,20 +99,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               opac.EnergyDensityFromTemperature(Tr0, dev_species[ispec]);
         }
       });
-  if (do_tracers) {
-    pmb->par_for(
-        "CreateTracers", 0, n_tracers_block - 1, KOKKOS_LAMBDA(const int n) {
-          auto rng_gen = rng_pool_tr.get_state();
-
-          // No rejection sampling at the moment.
-          // Perhaps this can be improved in the future.
-          x(n) = x_min + rng_gen.drand() * (x_max - x_min);
-          y(n) = y_min + rng_gen.drand() * (y_max - y_min);
-          z(n) = z_min + rng_gen.drand() * (z_max - z_min);
-
-          rng_pool_tr.free_state(rng_gen);
-        }); // Create Tracers
-  }
 
   // Initialize samples
   auto radpkg = pmb->packages.Get("radiation");
