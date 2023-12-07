@@ -532,8 +532,8 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   return TaskStatus::complete;
 }
 
-TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
-                                     MeshBlockData<Real> *rc_src) {
+TaskStatus CalculateFluidSourceTerms(MeshData<Real> *rc,
+                                     MeshData<Real> *rc_src) {
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   using phoebus::MakePackDescriptor;
