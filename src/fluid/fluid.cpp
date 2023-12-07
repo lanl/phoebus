@@ -28,6 +28,7 @@
 #include "tmunu.hpp"
 
 #include <globals.hpp>
+#include <interface/sparse_pack.hpp>
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
@@ -350,43 +351,30 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
+  using parthenon::MakePackDescriptor;
+
   auto *pmb = rc->GetParentPointer();
+  auto &resolved_pkgs = pmb->resolved_packages;
 
-  const std::vector<std::string> vars(
-      {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
-       p::energy::name(), c::energy::name(), p::bfield::name(), c::bfield::name(),
-       p::ye::name(), c::ye::name(), p::pressure::name(), p::gamma1::name(),
-       impl::cell_signal_speed::name()});
+  static auto desc =
+      MakePackDescriptor<p::density, c::density, p::velocity, c::momentum, p::energy,
+                         c::energy, p::bfield, c::bfield, p::ye, c::ye, p::pressure,
+                         p::gamma1, impl::cell_signal_speed>(resolved_pkgs.get());
+  auto v = desc.GetPack(rc);
 
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-
-  const int prho = imap[p::density::name()].first;
-  const int crho = imap[c::density::name()].first;
-  const int pvel_lo = imap[p::velocity::name()].first;
-  const int pvel_hi = imap[p::velocity::name()].second;
-  const int cmom_lo = imap[c::momentum::name()].first;
-  const int cmom_hi = imap[c::momentum::name()].second;
-  const int peng = imap[p::energy::name()].first;
-  const int ceng = imap[c::energy::name()].first;
-  const int prs = imap[p::pressure::name()].first;
-  const int gm1 = imap[p::gamma1::name()].first;
-  const int pb_lo = imap[p::bfield::name()].first;
-  const int pb_hi = imap[p::bfield::name()].second;
-  const int cb_lo = imap[c::bfield::name()].first;
-  const int cb_hi = imap[c::bfield::name()].second;
-  const int pye = imap[p::ye::name()].second; // -1 if not present
-  const int cye = imap[c::ye::name()].second;
-  const int sig_lo = imap[impl::cell_signal_speed::name()].first;
-  const int sig_hi = imap[impl::cell_signal_speed::name()].second;
+  // We need these to check whether or not these variables are present
+  // in the pack. They are -1 if not present.
+  const int pb_hi = v.GetUpperBoundHost(0, p::bfield());
+  const int pye = v.GetUpperBoundHost(0, p::ye());
 
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto coords = pmb->coords;
+  const int nblocks = v.GetNBlocks();
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
+      DEFAULT_LOOP_PATTERN, "PrimToCons", DevExecSpace(), 0, nblocks - 1, kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        auto &coords = v.GetCoordinates(b);
         Real gcov4[4][4];
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov4);
         Real gcon[3][3];
@@ -397,43 +385,43 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
         geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
 
         Real S[3];
-        const Real vel[] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                            v(b, pvel_hi, k, j, i)};
+        const Real vel[] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
+                            v(b, p::velocity(2), k, j, i)};
         Real bcons[3];
         Real bp[3] = {0.0, 0.0, 0.0};
         if (pb_hi > 0) {
-          bp[0] = v(b, pb_lo, k, j, i);
-          bp[1] = v(b, pb_lo + 1, k, j, i);
-          bp[2] = v(b, pb_hi, k, j, i);
+          for (int d = 0; d < 3; ++d) {
+            bp[d] = v(b, p::bfield(d), k, j, i);
+          }
         }
         Real ye_cons;
         Real ye_prim = 0.0;
         if (pye > 0) {
-          ye_prim = v(b, pye, k, j, i);
+          ye_prim = v(b, p::ye(), k, j, i);
         }
 
         Real sig[3];
-        prim2con::p2c(v(b, prho, k, j, i), vel, bp, v(b, peng, k, j, i), ye_prim,
-                      v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov4, gcon, shift, lapse,
-                      gdet, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i), ye_cons,
-                      sig);
+        prim2con::p2c(v(b, p::density(), k, j, i), vel, bp, v(b, p::energy(), k, j, i),
+                      ye_prim, v(b, p::pressure(), k, j, i), v(b, p::gamma1(), k, j, i),
+                      gcov4, gcon, shift, lapse, gdet, v(b, c::density(), k, j, i), S,
+                      bcons, v(b, c::energy(), k, j, i), ye_cons, sig);
 
-        v(b, cmom_lo, k, j, i) = S[0];
-        v(b, cmom_lo + 1, k, j, i) = S[1];
-        v(b, cmom_hi, k, j, i) = S[2];
+        for (int d = 0; d < 3; ++d) {
+          v(b, c::momentum(d), k, j, i) = S[d];
+        }
 
         if (pb_hi > 0) {
-          v(b, cb_lo, k, j, i) = bcons[0];
-          v(b, cb_lo + 1, k, j, i) = bcons[1];
-          v(b, cb_hi, k, j, i) = bcons[2];
+          for (int d = 0; d < 3; ++d) {
+            v(b, c::bfield(d), k, j, i) = bcons[d];
+          }
         }
 
         if (pye > 0) {
-          v(b, cye, k, j, i) = ye_cons;
+          v(b, c::ye(), k, j, i) = ye_cons;
         }
 
-        for (int m = sig_lo; m <= sig_hi; m++) {
-          v(b, m, k, j, i) = sig[m - sig_lo];
+        for (int d = 0; d < 3; d++) {
+          v(b, impl::cell_signal_speed(d), k, j, i) = sig[d];
         }
       });
 
