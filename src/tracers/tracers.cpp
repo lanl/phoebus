@@ -24,7 +24,7 @@ using namespace parthenon::package::prelude;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("tracers");
-  const bool active = pin->GetBoolean("physics", "tracers");
+  const bool active = pin->GetOrAddBoolean("physics", "tracers", false);
   physics->AddParam<bool>("active", active);
   if (!active) return physics;
 
