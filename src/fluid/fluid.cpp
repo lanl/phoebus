@@ -536,6 +536,10 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src) {
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
+  using phoebus::MakePackDescriptor;
+  namespace c = fluid_cons;
+  namespace diag = diagnostic_variables;
+
   Mesh *pmesh = rc->GetMeshPointer();
   auto &fluid = pmesh->packages.Get("fluid");
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_sources"))
@@ -545,37 +549,35 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> vars(
-      {fluid_cons::momentum::name(), fluid_cons::energy::name()});
+  static auto desc = MakePackDescriptor<c::momentum, c::energy
 #if SET_FLUX_SRC_DIAGS
-  vars.push_back(diagnostic_variables::src_terms::name());
+                                        ,
+                                        diag::src_terms
 #endif
-  PackIndexMap imap;
-  auto src = rc_src->PackVariables(vars, imap);
-  const int cmom_lo = imap[fluid_cons::momentum::name()].first;
-  const int cmom_hi = imap[fluid_cons::momentum::name()].second;
-  const int ceng = imap[fluid_cons::energy::name()].first;
-  const int idiag = imap[diagnostic_variables::src_terms::name()].first;
-
+                                        >(rc);
+  auto src = desc.GetPack(rc_src);
   auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
+  const int nblocks = src.GetNBlocks();
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
-      ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "TmunuSourceTerms", DevExecSpace(), 0, nblocks - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         Real Tmunu[ND][ND], dg[ND][ND][ND], gam[ND][ND][ND];
-        tmunu(Tmunu, k, j, i);
-        Real gdet = geom.DetG(CellLocation::Cent, k, j, i);
+        tmunu(Tmunu, b, k, j, i);
+        Real gdet = geom.DetG(CellLocation::Cent, b, k, j, i);
 
-        geom.MetricDerivative(CellLocation::Cent, k, j, i, dg);
+        geom.MetricDerivative(CellLocation::Cent, b, k, j, i, dg);
         Geometry::Utils::SetConnectionCoeffFromMetricDerivs(dg, gam);
+
         // momentum source terms
         SPACELOOP(l) {
           Real src_mom = 0.0;
           SPACETIMELOOP2(m, n) {
             src_mom += Tmunu[m][n] * (dg[n][l + 1][m] - gam[l + 1][n][m]);
           }
-          src(cmom_lo + l, k, j, i) = gdet * src_mom;
+          src(b, c::momentum(l), k, j, i) = gdet * src_mom;
         }
 
         // energy source term
@@ -583,10 +585,10 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           Real TGam = 0.0;
 #if USE_VALENCIA
           // TODO(jcd): maybe use the lapse and shift here instead of gcon
-          const Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          const Real alpha = geom.Lapse(CellLocation::Cent, b, k, j, i);
           const Real inv_alpha2 = robust::ratio(1, alpha * alpha);
           Real shift[NS];
-          geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
+          geom.ContravariantShift(CellLocation::Cent, b, k, j, i, shift);
           Real gcon0[4] = {-inv_alpha2, inv_alpha2 * shift[0], inv_alpha2 * shift[1],
                            inv_alpha2 * shift[2]};
           for (int m = 0; m < ND; m++) {
@@ -601,25 +603,23 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
           Real Ta = 0.0;
           Real da[ND];
           // Real *da = &gam[1][0][0];
-          geom.GradLnAlpha(CellLocation::Cent, k, j, i, da);
+          geom.GradLnAlpha(CellLocation::Cent, b, k, j, i, da);
           for (int m = 0; m < ND; m++) {
             Ta += Tmunu[m][0] * da[m];
           }
-          src(ceng, k, j, i) = gdet * alpha * (Ta - TGam);
+          src(b, c::energy(), k, j, i) = gdet * alpha * (Ta - TGam);
 #else
-                         SPACETIMELOOP2(mu, nu) {
-                           TGam += Tmunu[mu][nu] * gam[nu][0][mu];
-                         }
-                         src(ceng, k, j, i) = gdet * TGam;
+          SPACETIMELOOP2(mu, nu) { TGam += Tmunu[mu][nu] * gam[nu][0][mu]; }
+          src(b, c::energy(), k, j, i) = gdet * TGam;
 #endif // USE_VALENCIA
         }
 
 #if SET_FLUX_SRC_DIAGS
-        src(idiag, k, j, i) = 0.0;
-        src(idiag + 1, k, j, i) = src(cmom_lo, k, j, i);
-        src(idiag + 2, k, j, i) = src(cmom_lo + 1, k, j, i);
-        src(idiag + 3, k, j, i) = src(cmom_lo + 2, k, j, i);
-        src(idiag + 4, k, j, i) = src(ceng, k, j, i);
+        src(diag::src_terms(0), b, k, j, i) = 0.0;
+        src(diag::src_terms(1), b, k, j, i) = src(c::momentum(0), k, j, i);
+        src(diag::src_terms(2), b, k, j, i) = src(c::momentum(1), k, j, i);
+        src(diag::src_terms(3), b, k, j, i) = src(c::momentum(2), k, j, i);
+        src(diag::src_terms(4), b, k, j, i) = src(c::energy(), k, j, i);
 #endif
       });
 
