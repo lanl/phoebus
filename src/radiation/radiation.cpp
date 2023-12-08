@@ -51,7 +51,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::string method = pin->GetString("radiation", "method");
   params.Add("method", method);
 
-  std::set<std::string> known_methods = {"cooling_function", "moment_m1",
+  std::set<std::string> known_methods = {"cooling_function", "moment_m1", "janka_lightbulb",
                                          "moment_eddington", "monte_carlo", "mocmc"};
   if (!known_methods.count(method)) {
     std::stringstream msg;
@@ -141,6 +141,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       params.Add("do_gain_reducer", do_gain_reducer, true);
       params.Add("always_gain", always_gain);
     }
+  }
+
+  if (method == "janka_lightbulb") {
+    const Real Tnue = pin->GetOrAddReal("radiation", "Tnue", 4.0); // MeV
+    params.Add("Tnue", Tnue);
   }
 
   if (method == "mocmc") {
