@@ -30,7 +30,10 @@ def addPath():
 
 def read(filename, nGhost=0):
     """ Read the parthenon hdf file """
-    from phdf import phdf
+    try:
+        from parthenon_tools.phdf import phdf
+    except ModuleNotFoundError:
+        from phdf import phdf
 
     f = phdf(filename)
     return f
