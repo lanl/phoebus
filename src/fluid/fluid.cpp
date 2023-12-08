@@ -353,8 +353,9 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   namespace impl = internal_variables;
   using parthenon::MakePackDescriptor;
 
-  auto *pmb = rc->GetParentPointer();
-  auto &resolved_pkgs = pmb->resolved_packages;
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
 
   static auto desc =
       MakePackDescriptor<p::density, c::density, p::velocity, c::momentum, p::energy,
@@ -420,7 +421,7 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
           v(b, c::ye(), k, j, i) = ye_cons;
         }
 
-        for (int d = 0; d < 3; d++) {
+        for (int d = 0; d < ndim; d++) {
           v(b, impl::cell_signal_speed(d), k, j, i) = sig[d];
         }
       });
