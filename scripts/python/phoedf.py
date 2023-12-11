@@ -398,7 +398,7 @@ class phoedf(phdf.phdf):
 
         return self.Gamma
 
-    def GetVpCon(self):
+    def GetVpcon(self):
         if self.vpcon is None:
             self.vpcon = np.clip(
                 self.Get("p.velocity", flatten=False), -1.0e100, 1.0e100
@@ -406,6 +406,10 @@ class phoedf(phdf.phdf):
             assert self.vpcon is not None
 
         return self.vpcon
+
+    # Backwards compatibility TODO(BRR) remove?
+    def GetVpCon(self):
+        return self.GetVpcon()
 
     def Getucon(self):
         if self.ucon is None:

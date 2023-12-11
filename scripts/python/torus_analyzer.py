@@ -53,7 +53,7 @@ def process_file(in_filename, fig_folder, log_folder, avg_folder):
         and os.path.exists(log_filename)
         and os.path.exists(fig_filename)
     ):
-        print("  Output already exists! Skipping...")
+        print(f"Output for {os.path.basename(in_filename)} already exists! Skipping...")
         return
 
     # Load data

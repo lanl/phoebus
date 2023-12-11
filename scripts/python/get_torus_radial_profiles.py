@@ -17,8 +17,8 @@ import argparse
 import numpy as np
 import sys
 import os
-import phoebus_utils
 from phoedf import phoedf
+from multiprocessing import Pool
 
 def get_torus_radial_profiles(dfile):
 
@@ -34,6 +34,9 @@ def get_torus_radial_profiles(dfile):
     x1Min = min(np.array(dfile.BlockBounds)[:,0])
     dx1_profile = min(dfile.Dx1)
     Nx1_profile = round((x1Max - x1Min) / dx1_profile)
+    r = np.zeros(Nx1_profile)
+    for i in range(Nx1_profile):
+        r[i] = x1Min + (0.5 + i) * dx1_profile
 
     # Simulation state
     rho = dfile.GetRho()
@@ -110,6 +113,7 @@ def get_torus_radial_profiles(dfile):
 
     beta = Pg_sadw / Pm_sadw
 
+    profiles['r'] = r
     profiles['Volume'] = Volume
     profiles['Mass'] = Mass
     profiles['F_M'] = F_M_in + F_M_out
@@ -125,21 +129,71 @@ def get_torus_radial_profiles(dfile):
 
     return profiles
 
+def write_torus_radial_profiles(profiles, in_filename, out_filename):
+    with open(out_filename, "w") as profile_file:
+        for key in profiles.keys():
+            profile_file.write(key + "\n")
+            for i in range(len(profiles[key])):
+                profile_file.write(str(profiles[key][i]) + " ")
+            profile_file.write("\n")
+
+    return out_filename
+
+def process_file(filename, overwrite):
+
+    out_filename = filename[:-5] + '.profile'
+
+    if not overwrite and os.path.exists(out_filename):
+        print(f"{os.path.basename(out_filename)} already exists! Skipping...")
+        return
+
+    print(f"Opening file {os.path.basename(filename)}... ")
+    dfile = phoedf(filename)
+    print(f"File {os.path.basename(filename)} opened.")
+
+    profiles = get_torus_radial_profiles(dfile)
+    print(f"Created profiles for file {os.path.basename(filename)}")
+
+    out_filename = write_torus_radial_profiles(profiles, in_filename, out_filename)
+    print(f"Wrote profiles to file {os.path.basename(out_filename)}")
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Get radial profiles from torus dump")
     parser.add_argument(
         "filenames", type=str, nargs="+", help="Files to derive radial profiles for"
     )
+    parser.add_argument(
+        "--nproc", type=int, default=1, help="Number of processes to use"
+    )
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Whether to overwrite existing outputs"
+    )
     args = parser.parse_args()
 
     print("Phoebus GRMHD analysis script for generating radial profiles from dumps")
     print(f"  Number of files: {len(args.filenames)}")
 
-    for filename in args.filenames:
-        print(f"Opening file {os.path.basename(filename)}... ")
-        dfile = phoedf(filename)
-        print(f"File {os.path.basename(filename)} opened.")
+    p = Pool(processes=args.nproc)
+    from itertools import repeat
+    p.starmap(
+        process_file,
+        zip(args.filenames, repeat(args.overwrite))
+    )
 
-        profiles = get_torus_radial_profiles(dfile)
+    #with multiprocessing.Pool(processes = args.nproc) as pool:
+    #    results = pool.map(process_file, args.filenames)
+
+
+
+    #for filename in args.filenames:
+    #    print(f"Opening file {os.path.basename(filename)}... ")
+    #    dfile = phoedf(filename)
+    #    print(f"File {os.path.basename(filename)} opened.")
+
+    #    profiles = get_torus_radial_profiles(dfile)
+    #    print(f"Created profiles for file {os.path.basename(filename)}")
+
+    #    out_filename = write_torus_radial_profiles(profiles, filename)
+    #    print(f"Wrote profiles to file {os.path.basename(out_name)}")
 
