@@ -202,8 +202,8 @@ KOKKOS_INLINE_FUNCTION int SymSize() {
 namespace impl {
 template <typename Data, typename System>
 void SetGeometryDefault(Data *rc, const System &system) {
-  std::vector<std::string> coord_names = {geometric_variables::cell_coords,
-                                          geometric_variables::node_coords};
+  std::vector<std::string> coord_names = {geometric_variables::cell_coords::name(),
+                                          geometric_variables::node_coords::name()};
   PackIndexMap imap;
   auto pack = rc->PackVariables(coord_names, imap);
   PARTHENON_REQUIRE(imap["g.c.coord"].second >= 0, "g.c.coord exists");

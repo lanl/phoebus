@@ -31,18 +31,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(
-      {p::density, p::velocity, p::energy, p::ye, p::pressure, p::temperature, p::gamma1},
-      imap);
+  auto v = rc->PackVariables({p::density::name(), p::velocity::name(), p::energy::name(),
+                              p::ye::name(), p::pressure::name(), p::temperature::name(),
+                              p::gamma1::name()},
+                             imap);
 
-  const int irho = imap[p::density].first;
-  const int ivlo = imap[p::velocity].first;
-  const int ivhi = imap[p::velocity].second;
-  const int ieng = imap[p::energy].first;
-  const int iye = imap[p::ye].second;
-  const int iprs = imap[p::pressure].first;
-  const int itmp = imap[p::temperature].first;
-  const int igm1 = imap[p::gamma1].first;
+  const int irho = imap[p::density::name()].first;
+  const int ivlo = imap[p::velocity::name()].first;
+  const int ivhi = imap[p::velocity::name()].second;
+  const int ieng = imap[p::energy::name()].first;
+  const int iye = imap[p::ye::name()].second;
+  const int iprs = imap[p::pressure::name()].first;
+  const int itmp = imap[p::temperature::name()].first;
+  const int igm1 = imap[p::gamma1::name()].first;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
