@@ -34,9 +34,10 @@ def get_torus_radial_profiles(dfile):
     x1Min = min(np.array(dfile.BlockBounds)[:,0])
     dx1_profile = min(dfile.Dx1)
     Nx1_profile = round((x1Max - x1Min) / dx1_profile)
-    r = np.zeros(Nx1_profile)
+    x1 = np.zeros(Nx1_profile)
     for i in range(Nx1_profile):
-        r[i] = x1Min + (0.5 + i) * dx1_profile
+        x1[i] = x1Min + (0.5 + i) * dx1_profile
+    r = np.exp(x1)
 
     # Simulation state
     rho = dfile.GetRho()
@@ -113,6 +114,7 @@ def get_torus_radial_profiles(dfile):
 
     beta = Pg_sadw / Pm_sadw
 
+    profiles['x1'] = x1
     profiles['r'] = r
     profiles['Volume'] = Volume
     profiles['Mass'] = Mass
@@ -129,7 +131,7 @@ def get_torus_radial_profiles(dfile):
 
     return profiles
 
-def write_torus_radial_profiles(profiles, in_filename, out_filename):
+def write_torus_radial_profiles(profiles, out_filename):
     with open(out_filename, "w") as profile_file:
         for key in profiles.keys():
             profile_file.write(key + "\n")
@@ -137,24 +139,22 @@ def write_torus_radial_profiles(profiles, in_filename, out_filename):
                 profile_file.write(str(profiles[key][i]) + " ")
             profile_file.write("\n")
 
-    return out_filename
+def process_file(in_filename, overwrite):
 
-def process_file(filename, overwrite):
-
-    out_filename = filename[:-5] + '.profile'
+    out_filename = in_filename[:-5] + '.profile'
 
     if not overwrite and os.path.exists(out_filename):
         print(f"{os.path.basename(out_filename)} already exists! Skipping...")
         return
 
-    print(f"Opening file {os.path.basename(filename)}... ")
-    dfile = phoedf(filename)
-    print(f"File {os.path.basename(filename)} opened.")
+    print(f"Opening file {os.path.basename(in_filename)}... ")
+    dfile = phoedf(in_filename)
+    print(f"File {os.path.basename(in_filename)} opened.")
 
     profiles = get_torus_radial_profiles(dfile)
-    print(f"Created profiles for file {os.path.basename(filename)}")
+    print(f"Created profiles for file {os.path.basename(in_filename)}")
 
-    out_filename = write_torus_radial_profiles(profiles, in_filename, out_filename)
+    write_torus_radial_profiles(profiles, out_filename)
     print(f"Wrote profiles to file {os.path.basename(out_filename)}")
 
 if __name__ == "__main__":
@@ -180,20 +180,3 @@ if __name__ == "__main__":
         process_file,
         zip(args.filenames, repeat(args.overwrite))
     )
-
-    #with multiprocessing.Pool(processes = args.nproc) as pool:
-    #    results = pool.map(process_file, args.filenames)
-
-
-
-    #for filename in args.filenames:
-    #    print(f"Opening file {os.path.basename(filename)}... ")
-    #    dfile = phoedf(filename)
-    #    print(f"File {os.path.basename(filename)} opened.")
-
-    #    profiles = get_torus_radial_profiles(dfile)
-    #    print(f"Created profiles for file {os.path.basename(filename)}")
-
-    #    out_filename = write_torus_radial_profiles(profiles, filename)
-    #    print(f"Wrote profiles to file {os.path.basename(out_name)}")
-
