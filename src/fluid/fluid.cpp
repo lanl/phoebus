@@ -189,26 +189,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     ndim = 2;
 
   // add the primitive variables
-  physics->AddField(p::density, mprim_scalar);
-  physics->AddField(p::velocity, mprim_threev);
-  physics->AddField(p::energy, mprim_scalar);
+  physics->template AddField<p::density>(mprim_scalar);
+  physics->AddField(p::velocity::name(), mprim_threev);
+  physics->AddField(p::energy::name(), mprim_scalar);
   if (mhd) {
-    physics->AddField(p::bfield, mprim_threev);
+    physics->AddField(p::bfield::name(), mprim_threev);
     if (ndim == 2) {
-      physics->AddField(impl::emf, mprim_scalar);
+      physics->AddField(impl::emf::name(), mprim_scalar);
     } else if (ndim == 3) {
-      physics->AddField(impl::emf, mprim_threev);
+      physics->AddField(impl::emf::name(), mprim_threev);
     }
-    physics->AddField(diag::divb, mprim_scalar);
+    physics->AddField(diag::divb::name(), mprim_scalar);
   }
-  physics->AddField(p::pressure, mprim_scalar);
-  physics->AddField(p::temperature, mprim_scalar);
-  physics->AddField(p::gamma1, mprim_scalar);
+  physics->AddField(p::pressure::name(), mprim_scalar);
+  physics->AddField(p::temperature::name(), mprim_scalar);
+  physics->AddField(p::gamma1::name(), mprim_scalar);
   if (ye) {
-    physics->AddField(p::ye, mprim_scalar);
+    physics->AddField(p::ye::name(), mprim_scalar);
   }
   if (pin->GetOrAddString("fluid", "c2p_method", "robust") == "robust") {
-    physics->AddField(impl::c2p_mu, mprim_scalar);
+    physics->AddField(impl::c2p_mu::name(), mprim_scalar);
   }
   // Just want constant primitive fields around to serve as
   // background if we are not evolving the fluid, don't need
@@ -220,17 +220,17 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // this fail flag should really be an enum or something
   // but parthenon doesn't yet support that kind of thing
-  physics->AddField(impl::fail, mprim_scalar);
+  physics->AddField(impl::fail::name(), mprim_scalar);
 
   // add the conserved variables
-  physics->AddField(c::density, mcons_scalar);
-  physics->AddField(c::momentum, mcons_threev);
-  physics->AddField(c::energy, mcons_scalar);
+  physics->AddField(c::density::name(), mcons_scalar);
+  physics->AddField(c::momentum::name(), mcons_threev);
+  physics->AddField(c::energy::name(), mcons_scalar);
   if (mhd) {
-    physics->AddField(c::bfield, mcons_threev);
+    physics->AddField(c::bfield::name(), mcons_threev);
   }
   if (ye) {
-    physics->AddField(c::ye, mcons_scalar);
+    physics->AddField(c::ye::name(), mcons_scalar);
   }
 
   AllReduce<std::vector<Real>> net_field_totals;
@@ -247,27 +247,29 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata mdiv = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                             Metadata::Derived, Metadata::OneCopy},
                            five_vec);
-  physics->AddField(diag::divf, mdiv);
+  physics->AddField(diag::divf::name(), mdiv);
   Metadata mdiag = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector,
                              Metadata::Derived, Metadata::OneCopy},
                             five_vec);
-  physics->AddField(diag::src_terms, mdiag);
+  physics->AddField(diag::src_terms::name(), mdiag);
 #endif
 
   // set up the arrays for left and right states
   // add the base state for reconstruction/fluxes
-  std::vector<std::string> rvars({p::density, p::velocity, p::energy});
+  std::vector<std::string> rvars(
+      {p::density::name(), p::velocity::name(), p::energy::name()});
   riemann::FluxState::ReconVars(rvars);
-  if (mhd) riemann::FluxState::ReconVars(p::bfield);
-  if (ye) riemann::FluxState::ReconVars(p::ye);
+  if (mhd) riemann::FluxState::ReconVars(p::bfield::name());
+  if (ye) riemann::FluxState::ReconVars(p::ye::name());
 
-  std::vector<std::string> fvars({c::density, c::momentum, c::energy});
+  std::vector<std::string> fvars(
+      {c::density::name(), c::momentum::name(), c::energy::name()});
   riemann::FluxState::FluxVars(fvars);
-  if (mhd) riemann::FluxState::FluxVars(c::bfield);
-  if (ye) riemann::FluxState::FluxVars(c::ye);
+  if (mhd) riemann::FluxState::FluxVars(c::bfield::name());
+  if (ye) riemann::FluxState::FluxVars(c::ye::name());
 
   // add some extra fields for reconstruction
-  rvars = std::vector<std::string>({p::pressure, p::gamma1});
+  rvars = std::vector<std::string>({p::pressure::name(), p::gamma1::name()});
   riemann::FluxState::ReconVars(rvars);
 
   auto recon_vars = riemann::FluxState::ReconVars();
@@ -285,19 +287,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   std::vector<int> recon_shape({nrecon, ndim});
   Metadata mrecon =
       Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, recon_shape);
-  physics->AddField(impl::ql, mrecon);
-  physics->AddField(impl::qr, mrecon);
+  physics->AddField(impl::ql::name(), mrecon);
+  physics->AddField(impl::qr::name(), mrecon);
 
   std::vector<int> signal_shape(1, ndim);
   Metadata msignal =
       Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, signal_shape);
-  physics->AddField(impl::face_signal_speed, msignal);
-  physics->AddField(impl::cell_signal_speed, msignal);
+  physics->AddField(impl::face_signal_speed::name(), msignal);
+  physics->AddField(impl::cell_signal_speed::name(), msignal);
 
   std::vector<int> c2p_scratch_size(1, 5);
   Metadata c2p_meta =
       Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, c2p_scratch_size);
-  physics->AddField(impl::c2p_scratch, c2p_meta);
+  physics->AddField(impl::c2p_scratch::name(), c2p_meta);
 
   // Reductions
   // By default compute integrated value of scalar conserved vars
@@ -307,17 +309,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   parthenon::HstVar_list hst_vars = {};
 
   auto ReduceMass = [](MeshData<Real> *md) {
-    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::density, 0);
+    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::density::name(), 0);
   };
   auto ReduceEn = [](MeshData<Real> *md) {
-    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::energy, 0);
+    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::energy::name(), 0);
   };
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceMass, "total baryon number"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceEn, "total conserved energy tau"));
 
   for (int d = 0; d < 3; ++d) {
     auto ReduceMom = [d](MeshData<Real> *md) {
-      return History::ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::momentum, d);
+      return History::ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::momentum::name(),
+                                                      d);
     };
     hst_vars.emplace_back(HistoryOutputVar(
         HstSum, ReduceMom, "total X" + std::to_string(d + 1) + " momentum"));
@@ -334,7 +337,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 // template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
@@ -347,33 +350,35 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace impl = internal_variables;
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
 
   const std::vector<std::string> vars(
-      {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
-       c::bfield, p::ye, c::ye, p::pressure, p::gamma1, impl::cell_signal_speed});
+      {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
+       p::energy::name(), c::energy::name(), p::bfield::name(), c::bfield::name(),
+       p::ye::name(), c::ye::name(), p::pressure::name(), p::gamma1::name(),
+       impl::cell_signal_speed::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
-  const int prho = imap[p::density].first;
-  const int crho = imap[c::density].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
-  const int cmom_lo = imap[c::momentum].first;
-  const int cmom_hi = imap[c::momentum].second;
-  const int peng = imap[p::energy].first;
-  const int ceng = imap[c::energy].first;
-  const int prs = imap[p::pressure].first;
-  const int gm1 = imap[p::gamma1].first;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
-  const int cb_lo = imap[c::bfield].first;
-  const int cb_hi = imap[c::bfield].second;
-  const int pye = imap[p::ye].second; // -1 if not present
-  const int cye = imap[c::ye].second;
-  const int sig_lo = imap[impl::cell_signal_speed].first;
-  const int sig_hi = imap[impl::cell_signal_speed].second;
+  const int prho = imap[p::density::name()].first;
+  const int crho = imap[c::density::name()].first;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
+  const int cmom_lo = imap[c::momentum::name()].first;
+  const int cmom_hi = imap[c::momentum::name()].second;
+  const int peng = imap[p::energy::name()].first;
+  const int ceng = imap[c::energy::name()].first;
+  const int prs = imap[p::pressure::name()].first;
+  const int gm1 = imap[p::gamma1::name()].first;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
+  const int cb_lo = imap[c::bfield::name()].first;
+  const int cb_hi = imap[c::bfield::name()].second;
+  const int pye = imap[p::ye::name()].second; // -1 if not present
+  const int cye = imap[c::ye::name()].second;
+  const int sig_lo = imap[impl::cell_signal_speed::name()].first;
+  const int sig_hi = imap[impl::cell_signal_speed::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto coords = pmb->coords;
@@ -438,25 +443,25 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 template <typename T>
 TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRange &ib, const IndexRange &jb,
                                       const IndexRange &kb) {
-  auto *pmb = rc->GetParentPointer().get();
-  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  Mesh *pm = rc->GetMeshPointer();
+  StateDescriptor *pkg = pm->packages.Get("fluid").get();
   auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
   return c2p(rc, ib, jb, kb);
 }
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
   return ConservedToPrimitiveRegion(rc, ib, jb, kb);
 }
 
 template <typename T>
 TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRange &jb,
                                       const IndexRange &kb) {
-  auto *pmb = rc->GetParentPointer().get();
+  // TODO(JMM): This one will not work with meshblock packs
+  auto *pmb = rc->GetParentPointer();
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
@@ -477,7 +482,7 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   auto coords = pmb->coords;
 
   // TODO(JCD): move the setting of this into the solver so we can call this on MeshData
-  auto fail = rc->Get(internal_variables::fail).data;
+  auto fail = rc->Get(internal_variables::fail::name()).data;
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0, invert.NumBlocks() - 1,
@@ -496,20 +501,20 @@ template <typename T>
 TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexRange &jb,
                                        const IndexRange &kb) {
   using namespace con2prim;
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmesh = rc->GetMeshPointer();
 
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
   auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
 
-  StateDescriptor *pkg = pmb->packages.Get("fluid").get();
+  StateDescriptor *pkg = pmesh->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = pkg->Param<int>("c2p_max_iter");
   auto invert = con2prim::ConToPrimSetup(rc, c2p_tol, c2p_max_iter);
 
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
   auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto fail = rc->Get(internal_variables::fail).data;
+  auto fail = rc->Get(internal_variables::fail::name()).data;
 
   // breaking con2prim into 3 kernels seems more performant.  WHY?
   // if we can combine them, we can get rid of the mesh sized scratch array
@@ -543,25 +548,26 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
                                      MeshBlockData<Real> *rc_src) {
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
-  auto *pmb = rc->GetParentPointer().get();
-  auto &fluid = pmb->packages.Get("fluid");
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &fluid = pmesh->packages.Get("fluid");
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_sources"))
     return TaskStatus::complete;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> vars({fluid_cons::momentum, fluid_cons::energy});
+  std::vector<std::string> vars(
+      {fluid_cons::momentum::name(), fluid_cons::energy::name()});
 #if SET_FLUX_SRC_DIAGS
-  vars.push_back(diagnostic_variables::src_terms);
+  vars.push_back(diagnostic_variables::src_terms::name());
 #endif
   PackIndexMap imap;
   auto src = rc_src->PackVariables(vars, imap);
-  const int cmom_lo = imap[fluid_cons::momentum].first;
-  const int cmom_hi = imap[fluid_cons::momentum].second;
-  const int ceng = imap[fluid_cons::energy].first;
-  const int idiag = imap[diagnostic_variables::src_terms].first;
+  const int cmom_lo = imap[fluid_cons::momentum::name()].first;
+  const int cmom_hi = imap[fluid_cons::momentum::name()].second;
+  const int ceng = imap[fluid_cons::energy::name()].first;
+  const int idiag = imap[diagnostic_variables::src_terms::name()].first;
 
   auto tmunu = BuildStressEnergyTensor(rc);
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -634,24 +640,25 @@ TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
 
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   using namespace PhoebusReconstruction;
-  auto *pmb = rc->GetParentPointer().get();
-  auto &fluid = pmb->packages.Get("fluid");
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &fluid = pmesh->packages.Get("fluid");
   if (!fluid->Param<bool>("active") || fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
 
   auto flux = riemann::FluxState(rc);
-  auto sig = rc->Get(internal_variables::face_signal_speed).data;
+  auto sig = rc->Get(internal_variables::face_signal_speed::name()).data;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  const int ndim = pmb->pmy_mesh->ndim;
+  const int ndim = pmesh->ndim;
   const int dk = (ndim == 3 ? 1 : 0);
   const int dj = (ndim > 1 ? 1 : 0);
   const int nrecon = flux.ql.GetDim(4) - 1;
-  auto rt = pmb->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>("Recon");
-  auto st = pmb->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
+  auto rt =
+      pmesh->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>("Recon");
+  auto st = pmesh->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
   parthenon::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "Reconstruct", DevExecSpace(), 0, 0, 0, nrecon,
@@ -727,9 +734,9 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 
 #define FLUX(method)                                                                     \
   parthenon::par_for(                                                                    \
-      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(), X1DIR,                    \
-      pmb->pmy_mesh->ndim, kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj, ib.s - 1,         \
-      ib.e + 1, KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {      \
+      DEFAULT_LOOP_PATTERN, "CalculateFluxes", DevExecSpace(), X1DIR, ndim, kb.s - dk,   \
+      kb.e + dk, jb.s - dj, jb.e + dj, ib.s - 1, ib.e + 1,                               \
+      KOKKOS_LAMBDA(const int d, const int k, const int j, const int i) {                \
         sig(d - 1, k, j, i) = method(flux, d, k, j, i);                                  \
       });
   switch (st) {
@@ -748,22 +755,22 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 }
 
 TaskStatus FluxCT(MeshBlockData<Real> *rc) {
-  auto *pmb = rc->GetParentPointer().get();
-  auto &fluid = pmb->packages.Get("fluid");
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &fluid = pmesh->packages.Get("fluid");
   if (!fluid->Param<bool>("mhd") || !fluid->Param<bool>("active") ||
       fluid->Param<bool>("zero_fluxes"))
     return TaskStatus::complete;
 
-  const int ndim = pmb->pmy_mesh->ndim;
+  const int ndim = pmesh->ndim;
   if (ndim == 1) return TaskStatus::complete;
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  auto f1 = rc->Get(fluid_cons::bfield).flux[X1DIR];
-  auto f2 = rc->Get(fluid_cons::bfield).flux[X2DIR];
-  auto f3 = rc->Get(fluid_cons::bfield).flux[X3DIR];
-  auto emf = rc->Get(internal_variables::emf).data;
+  auto f1 = rc->Get(fluid_cons::bfield::name()).flux[X1DIR];
+  auto f2 = rc->Get(fluid_cons::bfield::name()).flux[X2DIR];
+  auto f3 = rc->Get(fluid_cons::bfield::name()).flux[X3DIR];
+  auto emf = rc->Get(internal_variables::emf::name()).data;
 
   if (ndim == 2) {
     parthenon::par_for(
@@ -810,18 +817,19 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
 }
 
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
-  auto pmb = rc->GetBlockPointer();
+  auto *pmb = rc->GetParentPointer();
   if (!pmb->packages.Get("fluid")->Param<bool>("active")) return TaskStatus::complete;
   if (!pmb->packages.Get("fluid")->Param<bool>("mhd")) return TaskStatus::complete;
 
   const int ndim = pmb->pmy_mesh->ndim;
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
+  // This is the problem for doing things with meshblock packs
   auto coords = pmb->coords;
-  auto b = rc->Get(fluid_cons::bfield).data;
-  auto divb = rc->Get(diagnostic_variables::divb).data;
+  auto b = rc->Get(fluid_cons::bfield::name()).data;
+  auto divb = rc->Get(diagnostic_variables::divb::name()).data;
   if (ndim == 2) {
     // todo(jcd): these are supposed to be node centered, and this misses the
     // high boundaries
@@ -866,18 +874,18 @@ TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
   auto pmb = rc->GetBlockPointer();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto &coords = pmb->coords;
   const int ndim = pmb->pmy_mesh->ndim;
 
   auto &pars = pmb->packages.Get("fluid")->AllParams();
   Real min_dt;
-  auto csig = rc->Get(internal_variables::cell_signal_speed).data;
+  auto csig = rc->Get(internal_variables::cell_signal_speed::name()).data;
   if (pars.hasKey("has_face_speeds")) {
-    auto fsig = rc->Get(internal_variables::face_signal_speed).data;
+    auto fsig = rc->Get(internal_variables::face_signal_speed::name()).data;
     pmb->par_reduce(
         "Hydro::EstimateTimestep::1", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &lmin_dt) {

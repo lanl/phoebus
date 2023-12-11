@@ -12,6 +12,7 @@
 // publicly, and to permit others to do so.
 
 #include "geodesics.hpp"
+#include "phoebus_utils/grid_utils.hpp"
 #include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/robust.hpp"
 #include "radiation.hpp"
@@ -53,10 +54,11 @@ void ComputeTotalEmissivity(Mesh *pmesh) {
 
     namespace p = fluid_prim;
     PackIndexMap imap;
-    auto v = rc->PackVariables({p::density, p::temperature, p::ye}, imap);
-    const int prho = imap[p::density].first;
-    const int ptemp = imap[p::temperature].first;
-    const int pye = imap[p::ye].first;
+    auto v = rc->PackVariables(
+        {p::density::name(), p::temperature::name(), p::ye::name()}, imap);
+    const int prho = imap[p::density::name()].first;
+    const int ptemp = imap[p::temperature::name()].first;
+    const int pye = imap[p::ye::name()].first;
 
     Real Jtot_b = 0.0; // per block
     // into par_for
@@ -89,8 +91,7 @@ void SetWeight(Mesh *pmesh) {
   const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
 
-  const Real sim_vol =
-      pmesh->mesh_size.x1max * pmesh->mesh_size.x2max * pmesh->mesh_size.x3max;
+  const Real sim_vol = PhoebusUtils::GetRegionVolume(pmesh->mesh_size);
   const Real h_code = code_constants.h;
   const Real dNtot = rad->Param<Real>("tune_emission") /
                      (std::pow(sim_vol, 1. / 3.) * 1.0); // Note: may need a dt term here?
@@ -150,22 +151,23 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
 
-  std::vector<std::string> vars({p::density, p::temperature, p::ye, p::velocity,
-                                 "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov, iv::Gye});
+  std::vector<std::string> vars(
+      {p::density::name(), p::temperature::name(), p::ye::name(), p::velocity::name(),
+       "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov::name(), iv::Gye::name()});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int pye = imap[p::ye].first;
-  const int pdens = imap[p::density].first;
-  const int ptemp = imap[p::temperature].first;
-  const int pvlo = imap[p::velocity].first;
-  const int pvhi = imap[p::velocity].second;
+  const int pye = imap[p::ye::name()].first;
+  const int pdens = imap[p::density::name()].first;
+  const int ptemp = imap[p::temperature::name()].first;
+  const int pvlo = imap[p::velocity::name()].first;
+  const int pvhi = imap[p::velocity::name()].second;
   const int idNdlnu = imap["dNdlnu"].first;
   const int idNdlnu_max = imap["dNdlnu_max"].first;
   const int idN = imap["dN"].first;
   const int iNs = imap["Ns"].first;
-  const int Gcov_lo = imap[iv::Gcov].first;
-  const int Gcov_hi = imap[iv::Gcov].second;
-  const int Gye = imap[iv::Gye].first;
+  const int Gcov_lo = imap[iv::Gcov::name()].first;
+  const int Gcov_hi = imap[iv::Gcov::name()].second;
+  const int Gye = imap[iv::Gye::name()].first;
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
   Real wgtC = rad->Param<Real>("wgtC");
@@ -455,18 +457,19 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
 
-  std::vector<std::string> vars(
-      {p::density, p::ye, p::velocity, p::temperature, iv::Gcov, iv::Gye});
+  std::vector<std::string> vars({p::density::name(), p::ye::name(), p::velocity::name(),
+                                 p::temperature::name(), iv::Gcov::name(),
+                                 iv::Gye::name()});
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int prho = imap[p::density].first;
-  const int iye = imap[p::ye].first;
-  const int ivlo = imap[p::velocity].first;
-  const int ivhi = imap[p::velocity].second;
-  const int itemp = imap[p::temperature].first;
-  const int iGcov_lo = imap[iv::Gcov].first;
-  const int iGcov_hi = imap[iv::Gcov].second;
-  const int iGye = imap[iv::Gye].first;
+  const int prho = imap[p::density::name()].first;
+  const int iye = imap[p::ye::name()].first;
+  const int ivlo = imap[p::velocity::name()].first;
+  const int ivhi = imap[p::velocity::name()].second;
+  const int itemp = imap[p::temperature::name()].first;
+  const int iGcov_lo = imap[iv::Gcov::name()].first;
+  const int iGcov_hi = imap[iv::Gcov::name()].second;
+  const int iGye = imap[iv::Gye::name()].first;
 
   ParArray1D<Real> num_interactions("Number interactions", 2);
 
@@ -585,8 +588,7 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
   const auto t_tune_scattering = rad->Param<Real>("t_tune_scattering");
   const auto dt_tune_scattering = rad->Param<Real>("dt_tune_scattering");
   const auto num_particles = rad->Param<int>("num_particles");
-  const Real sim_vol =
-      pmesh->mesh_size.x1max * pmesh->mesh_size.x2max * pmesh->mesh_size.x3max;
+  const Real sim_vol = PhoebusUtils::GetRegionVolume(pmesh->mesh_size);
 
   if (tuning == "static") {
     // Do nothing

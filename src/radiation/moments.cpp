@@ -63,32 +63,38 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
 
-  auto *pm = rc->GetParentPointer().get();
-  StateDescriptor *rad = pm->packages.Get("radiation").get();
+  Mesh *pmesh = rc->GetMeshPointer();
+  StateDescriptor *rad = pmesh->packages.Get("radiation").get();
 
-  IndexRange ib = pm->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pm->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pm->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
 
-  std::vector<std::string> variables{
-      cr::E,  cr::F,   pr::J,       pr::H,    fluid_prim::velocity,
-      ir::xi, ir::phi, ir::c2pfail, ir::tilPi};
+  std::vector<std::string> variables{cr::E::name(),
+                                     cr::F::name(),
+                                     pr::J::name(),
+                                     pr::H::name(),
+                                     fluid_prim::velocity::name(),
+                                     ir::xi::name(),
+                                     ir::phi::name(),
+                                     ir::c2pfail::name(),
+                                     ir::tilPi::name()};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  auto cE = imap.GetFlatIdx(cr::E);
-  auto pJ = imap.GetFlatIdx(pr::J);
-  auto cF = imap.GetFlatIdx(cr::F);
-  auto pH = imap.GetFlatIdx(pr::H);
-  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto cE = imap.GetFlatIdx(cr::E::name());
+  auto pJ = imap.GetFlatIdx(pr::J::name());
+  auto cF = imap.GetFlatIdx(cr::F::name());
+  auto pH = imap.GetFlatIdx(pr::H::name());
+  auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(2);
 
-  auto iXi = imap.GetFlatIdx(ir::xi);
-  auto iPhi = imap.GetFlatIdx(ir::phi);
+  auto iXi = imap.GetFlatIdx(ir::xi::name());
+  auto iPhi = imap.GetFlatIdx(ir::phi::name());
 
-  auto ifail = imap[ir::c2pfail].first;
+  auto ifail = imap[ir::c2pfail::name()].first;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   const Real pi = acos(-1);
@@ -168,7 +174,7 @@ template <class T>
 // TODO(BRR) add domain so we can do this only over interior if we are using prims as
 // boundary data?
 TaskStatus MomentCon2Prim(T *rc) {
-  auto *pm = rc->GetParentPointer().get();
+  Mesh *pm = rc->GetMeshPointer();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
 
@@ -194,25 +200,24 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
 
-  auto *pm = rc->GetParentPointer().get();
+  IndexRange ib = rc->GetBoundsI(domain);
+  IndexRange jb = rc->GetBoundsJ(domain);
+  IndexRange kb = rc->GetBoundsK(domain);
 
-  IndexRange ib = pm->cellbounds.GetBoundsI(domain);
-  IndexRange jb = pm->cellbounds.GetBoundsJ(domain);
-  IndexRange kb = pm->cellbounds.GetBoundsK(domain);
-
-  std::vector<std::string> variables{cr::E, cr::F, pr::J, pr::H, fluid_prim::velocity};
+  std::vector<std::string> variables{cr::E::name(), cr::F::name(), pr::J::name(),
+                                     pr::H::name(), fluid_prim::velocity::name()};
   if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    variables.push_back(ir::tilPi);
+    variables.push_back(ir::tilPi::name());
   }
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  auto cE = imap.GetFlatIdx(cr::E);
-  auto pJ = imap.GetFlatIdx(pr::J);
-  auto cF = imap.GetFlatIdx(cr::F);
-  auto pH = imap.GetFlatIdx(pr::H);
-  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto cE = imap.GetFlatIdx(cr::E::name());
+  auto pJ = imap.GetFlatIdx(pr::J::name());
+  auto cF = imap.GetFlatIdx(cr::F::name());
+  auto pH = imap.GetFlatIdx(pr::H::name());
+  auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
 
   auto specB = cE.GetBounds(1);
   auto dirB = pH.GetBounds(2);
@@ -268,7 +273,7 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
 
 template <class T>
 TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
-  auto *pm = rc->GetParentPointer().get();
+  Mesh *pm = rc->GetMeshPointer();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
   using settings =
@@ -292,7 +297,7 @@ template <class T>
 TaskStatus ReconstructEdgeStates(T *rc) {
   using namespace PhoebusReconstruction;
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
   auto rt = rad_pkg->Param<ReconType>("Recon");
 
@@ -310,21 +315,21 @@ TaskStatus ReconstructEdgeStates(T *rc) {
 
   PackIndexMap imap_ql, imap_qr, imap;
   VariablePack<Real> ql_base =
-      rc->PackVariables(std::vector<std::string>{ir::ql}, imap_ql);
+      rc->PackVariables(std::vector<std::string>{ir::ql::name()}, imap_ql);
   VariablePack<Real> qr_base =
-      rc->PackVariables(std::vector<std::string>{ir::qr}, imap_qr);
-  std::vector<std::string> variables = {pr::J, pr::H, ir::tilPi};
-  variables.push_back(ir::dJ);
+      rc->PackVariables(std::vector<std::string>{ir::qr::name()}, imap_qr);
+  std::vector<std::string> variables = {pr::J::name(), pr::H::name(), ir::tilPi::name()};
+  variables.push_back(ir::dJ::name());
   VariablePack<Real> v = rc->PackVariables(variables, imap);
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_dJ = imap.GetFlatIdx(ir::dJ);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_J = imap.GetFlatIdx(pr::J::name());
+  auto idx_dJ = imap.GetFlatIdx(ir::dJ::name());
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
 
-  ParArrayND<Real> ql_v = rc->Get(ir::ql_v).data;
-  ParArrayND<Real> qr_v = rc->Get(ir::qr_v).data;
+  ParArrayND<Real> ql_v = rc->Get(ir::ql_v::name()).data;
+  ParArrayND<Real> qr_v = rc->Get(ir::qr_v::name()).data;
   VariablePack<Real> v_vel =
-      rc->PackVariables(std::vector<std::string>{fluid_prim::velocity});
-  auto qIdx = imap_ql.GetFlatIdx(ir::ql);
+      rc->PackVariables(std::vector<std::string>{fluid_prim::velocity::name()});
+  auto qIdx = imap_ql.GetFlatIdx(ir::ql::name());
 
   const int nspec = qIdx.DimSize(1);
   int nrecon = 4 * nspec;
@@ -332,7 +337,7 @@ TaskStatus ReconstructEdgeStates(T *rc) {
     nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
   }
 
-  const int offset = imap_ql[ir::ql].first;
+  const int offset = imap_ql[ir::ql::name()].first;
 
   const int nblock = ql_base.GetDim(5);
   const int ndim = pmb->pmy_mesh->ndim;
@@ -491,7 +496,7 @@ template TaskStatus ReconstructEdgeStates<MeshBlockData<Real>>(MeshBlockData<Rea
 // index
 template <class T, class CLOSURE>
 TaskStatus CalculateFluxesImpl(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
 
@@ -509,20 +514,21 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   namespace ir = radmoment_internal;
 
   PackIndexMap imap_ql, imap_qr, imap;
-  std::vector<std::string> vars{ir::ql, ir::qr, ir::ql_v, ir::qr_v, ir::dJ, ir::kappaH};
-  std::vector<std::string> flxs{cr::E, cr::F};
+  std::vector<std::string> vars{ir::ql::name(),   ir::qr::name(), ir::ql_v::name(),
+                                ir::qr_v::name(), ir::dJ::name(), ir::kappaH::name()};
+  std::vector<std::string> flxs{cr::E::name(), cr::F::name()};
 
   auto v = rc->PackVariablesAndFluxes(vars, flxs, imap);
 
-  auto idx_qlv = imap.GetFlatIdx(ir::ql_v);
-  auto idx_qrv = imap.GetFlatIdx(ir::qr_v);
-  auto idx_ql = imap.GetFlatIdx(ir::ql);
-  auto idx_qr = imap.GetFlatIdx(ir::qr);
-  auto idx_dJ = imap.GetFlatIdx(ir::dJ);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
+  auto idx_qlv = imap.GetFlatIdx(ir::ql_v::name());
+  auto idx_qrv = imap.GetFlatIdx(ir::qr_v::name());
+  auto idx_ql = imap.GetFlatIdx(ir::ql::name());
+  auto idx_qr = imap.GetFlatIdx(ir::qr::name());
+  auto idx_dJ = imap.GetFlatIdx(ir::dJ::name());
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name());
 
-  auto idx_Ff = imap.GetFlatIdx(cr::F);
-  auto idx_Ef = imap.GetFlatIdx(cr::E);
+  auto idx_Ff = imap.GetFlatIdx(cr::F::name());
+  auto idx_Ef = imap.GetFlatIdx(cr::E::name());
 
   auto num_species = rad_pkg->Param<int>("num_species");
 
@@ -748,7 +754,7 @@ TaskStatus CalculateFluxesImpl(T *rc) {
 
 template <class T>
 TaskStatus CalculateFluxes(T *rc) {
-  auto *pm = rc->GetParentPointer().get();
+  Mesh *pm = rc->GetMeshPointer();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
   using settings =
@@ -769,36 +775,36 @@ template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 template <class T, class CLOSURE>
 TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
   constexpr int ND = Geometry::NDFULL;
-  auto *pmb = rc->GetParentPointer().get();
 
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
   namespace p = fluid_prim;
   PackIndexMap imap;
-  std::vector<std::string> vars{cr::E, cr::F, pr::J, pr::H, p::velocity, ir::tilPi};
-  vars.push_back(diagnostic_variables::r_src_terms);
+  std::vector<std::string> vars{cr::E::name(), cr::F::name(),       pr::J::name(),
+                                pr::H::name(), p::velocity::name(), ir::tilPi::name()};
+  vars.push_back(diagnostic_variables::r_src_terms::name());
 #if SET_FLUX_SRC_DIAGS
-  vars.push_back(diagnostic_variables::r_src_terms);
+  vars.push_back(diagnostic_variables::r_src_terms::name());
 #endif
   auto v = rc->PackVariables(vars, imap);
-  auto idx_E = imap.GetFlatIdx(cr::E);
-  auto idx_F = imap.GetFlatIdx(cr::F);
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_H = imap.GetFlatIdx(pr::H);
-  auto pv = imap.GetFlatIdx(p::velocity);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
-  auto idx_diag = imap.GetFlatIdx(diagnostic_variables::r_src_terms, false);
+  auto idx_E = imap.GetFlatIdx(cr::E::name());
+  auto idx_F = imap.GetFlatIdx(cr::F::name());
+  auto idx_J = imap.GetFlatIdx(pr::J::name());
+  auto idx_H = imap.GetFlatIdx(pr::H::name());
+  auto pv = imap.GetFlatIdx(p::velocity::name());
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
+  auto idx_diag = imap.GetFlatIdx(diagnostic_variables::r_src_terms::name(), false);
 
   PackIndexMap imap_src;
-  std::vector<std::string> vars_src{cr::E, cr::F};
+  std::vector<std::string> vars_src{cr::E::name(), cr::F::name()};
   auto v_src = rc_src->PackVariables(vars_src, imap_src);
-  auto idx_E_src = imap_src.GetFlatIdx(cr::E);
-  auto idx_F_src = imap_src.GetFlatIdx(cr::F);
+  auto idx_E_src = imap_src.GetFlatIdx(cr::E::name());
+  auto idx_F_src = imap_src.GetFlatIdx(cr::F::name());
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   // Get the background geometry
   auto geom = Geometry::GetCoordinateSystem(rc);
@@ -908,7 +914,7 @@ TaskStatus CalculateGeometricSourceImpl(T *rc, T *rc_src) {
 
 template <class T>
 TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
-  auto *pm = rc->GetParentPointer().get();
+  Mesh *pm = rc->GetMeshPointer();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
   using settings =
@@ -929,10 +935,10 @@ template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<
 
 template <class T>
 TaskStatus MomentCalculateOpacities(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
+  Mesh *pm = rc->GetMeshPointer();
 
-  StateDescriptor *opac = pmb->packages.Get("opacity").get();
-  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  StateDescriptor *opac = pm->packages.Get("opacity").get();
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
 
   const bool rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
   if (rad_mocmc_active) {
@@ -945,24 +951,25 @@ TaskStatus MomentCalculateOpacities(T *rc) {
   namespace ir = radmoment_internal;
   namespace c = fluid_cons;
   namespace p = fluid_prim;
-  std::vector<std::string> vars{p::density, p::temperature, p::ye,  p::velocity,
-                                ir::kappaJ, ir::kappaH,     ir::JBB};
+  std::vector<std::string> vars{
+      p::density::name(), p::temperature::name(), p::ye::name(),  p::velocity::name(),
+      ir::kappaJ::name(), ir::kappaH::name(),     ir::JBB::name()};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  auto pv = imap.GetFlatIdx(p::velocity);
+  auto pv = imap.GetFlatIdx(p::velocity::name());
 
-  int prho = imap[p::density].first;
-  int pT = imap[p::temperature].first;
-  int pYe = imap[p::ye].first;
+  int prho = imap[p::density::name()].first;
+  int pT = imap[p::temperature::name()].first;
+  int pYe = imap[p::ye::name()].first;
 
-  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
-  auto idx_JBB = imap.GetFlatIdx(ir::JBB);
+  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ::name());
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name());
+  auto idx_JBB = imap.GetFlatIdx(ir::JBB::name());
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
 
   // Get the device opacity object
   const auto &opacities = opac->Param<Opacities>("opacities");

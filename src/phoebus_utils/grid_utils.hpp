@@ -55,4 +55,16 @@ KOKKOS_FORCEINLINE_FUNCTION Real GetXv(const int i, const int dir,
 
 } // namespace Coordinates
 
+namespace PhoebusUtils {
+inline Real GetRegionVolume(const parthenon::RegionSize &reg) {
+  using parthenon::CoordinateDirection;
+  Real vol = 1;
+  for (int d = X1DIR; d <= X3DIR; ++d) {
+    CoordinateDirection dir = static_cast<CoordinateDirection>(d);
+    vol *= (reg.xmax(dir) - reg.xmin(dir));
+  }
+  return vol;
+}
+} // namespace PhoebusUtils
+
 #endif // PHOEBUS_UTILS_GRID_UTILS_HPP_

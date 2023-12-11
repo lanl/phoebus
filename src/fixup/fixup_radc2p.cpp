@@ -50,35 +50,37 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
 
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  Mesh *pmesh = rc->GetMeshPointer();
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
+  StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
 
   bool enable_c2p_fixup = fix_pkg->Param<bool>("enable_c2p_fixup");
   bool update_rad = rad_pkg->Param<bool>("active");
   if (!enable_c2p_fixup || !update_rad) return TaskStatus::complete;
 
-  const std::vector<std::string> vars({p::velocity, p::ye, c::ye, pr::J, pr::H, cr::E,
-                                       cr::F, ir::tilPi, ir::c2pfail, impl::fail});
+  const std::vector<std::string> vars({p::velocity::name(), p::ye::name(), c::ye::name(),
+                                       pr::J::name(), pr::H::name(), cr::E::name(),
+                                       cr::F::name(), ir::tilPi::name(),
+                                       ir::c2pfail::name(), impl::fail::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
-  auto idx_pvel = imap.GetFlatIdx(p::velocity);
-  int pye = imap[p::ye].second; // negative if not present
-  int cye = imap[c::ye].second;
-  auto idx_J = imap.GetFlatIdx(pr::J, false);
-  auto idx_H = imap.GetFlatIdx(pr::H, false);
-  auto idx_E = imap.GetFlatIdx(cr::E, false);
-  auto idx_F = imap.GetFlatIdx(cr::F, false);
-  int ifluidfail = imap[impl::fail].first;
-  int iradfail = imap[ir::c2pfail].first;
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  auto idx_pvel = imap.GetFlatIdx(p::velocity::name());
+  int pye = imap[p::ye::name()].second; // negative if not present
+  int cye = imap[c::ye::name()].second;
+  auto idx_J = imap.GetFlatIdx(pr::J::name(), false);
+  auto idx_H = imap.GetFlatIdx(pr::H::name(), false);
+  auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+  auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
+  int ifluidfail = imap[impl::fail::name()].first;
+  int iradfail = imap[ir::c2pfail::name()].first;
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
 
   bool report_c2p_fails = fix_pkg->Param<bool>("report_c2p_fails");
   if (report_c2p_fails) {
@@ -93,9 +95,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
         },
         Kokkos::Sum<int>(nfail_total));
     printf("total rad nfail: %i\n", nfail_total);
-    IndexRange ibi = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jbi = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kbi = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+    IndexRange ibi = rc->GetBoundsI(IndexDomain::interior);
+    IndexRange jbi = rc->GetBoundsJ(IndexDomain::interior);
+    IndexRange kbi = rc->GetBoundsK(IndexDomain::interior);
     nfail_total = 0;
     parthenon::par_reduce(
         parthenon::loop_pattern_mdrange_tag, "Rad ConToPrim::Solve fixup failures",
@@ -112,10 +114,10 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
-  Coordinates_t coords = rc->GetParentPointer().get()->coords;
+  Coordinates_t coords = rc->GetParentPointer()->coords;
 
   const int nspec = idx_E.DimSize(1);
-  const int ndim = pmb->pmy_mesh->ndim;
+  const int ndim = pmesh->ndim;
 
   auto rad_c2p_failure_strategy =
       fix_pkg->Param<FAILURE_STRATEGY>("rad_c2p_failure_strategy");
@@ -223,9 +225,9 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
 
 template <typename T>
 TaskStatus RadConservedToPrimitiveFixup(T *rc) {
-  auto *pm = rc->GetParentPointer().get();
-  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
-  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+  Mesh *pmesh = rc->GetMeshPointer();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
   const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
   std::string method;
   if (enable_rad_floors) {
