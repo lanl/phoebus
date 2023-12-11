@@ -62,8 +62,9 @@ class phoedf(phdf.phdf):
             self.Dx2[b] = (bounds[3] - bounds[2])/self.MeshBlockSize[1]
             self.Dx3[b] = (bounds[5] - bounds[4])/self.MeshBlockSize[2]
 
-        assert self.MaxLevel == 0, "phoedf does not currently support mesh refinement!"
+        assert self.MaxLevel == 0, "phoedf and its derivatives do not currently support mesh refinement!"
 
+        # Common array dimensions
         self.ScalarField = [self.NumBlocks, self.Nx3, self.Nx2, self.Nx1]
         self.ThreeVectorField = [self.NumBlocks, 3, self.Nx3, self.Nx2, self.Nx1]
         self.FourVectorField = [self.NumBlocks, 4, self.Nx3, self.Nx2, self.Nx1]
@@ -173,7 +174,9 @@ class phoedf(phdf.phdf):
         self.tau = None
         self.Tg = None
         self.ucon = None
+        self.ucov = None
         self.bcon = None
+        self.bcov = None
         self.J = None
         self.Hcov = None
         self.E = None
@@ -252,6 +255,17 @@ class phoedf(phdf.phdf):
                 ) / Gamma
 
         return self.bcon
+
+    def Getbcov(self):
+        if self.bcov is None:
+            self.bcov = np.zeros(self.FourVectorField)
+
+            bcon = self.Getbcon()
+
+            for mu in range(4):
+                self.bcov[:,:,:,:,:] = self.gcov[:,0,:,:,:,:] * bcon[:,:,:,:,:]
+
+        return self.bcov
 
     def GetEOS(self):
         return eos_type_dict[self.eos_type](self.Params)
@@ -410,6 +424,17 @@ class phoedf(phdf.phdf):
                 )
 
         return self.ucon
+
+    def Getucov(self):
+        if self.ucov is None:
+            self.ucov = np.zeros(self.FourVectorField)
+
+            ucon = self.Getucon()
+
+            for mu in range(4):
+                self.ucov[:,:,:,:,:] = self.gcov[:,0,:,:,:,:] * ucon[:,:,:,:,:]
+
+        return self.ucov
 
     def GetXi(self):
         if not self.RadiationActive:

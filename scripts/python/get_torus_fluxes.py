@@ -43,9 +43,10 @@ def get_torus_fluxes(dfile):
     bsq = dfile.GetPm() * 2
     sigma = bsq / rho
 
-    E = dfile.GetE()
-    F = dfile.GetF()
-    P = dfile.GetP()
+    if dfile.RadiationActive:
+        E = dfile.GetE()
+        F = dfile.GetF()
+        P = dfile.GetP()
 
     Nx1 = dfile.MeshBlockSize[0]
     Nx2 = dfile.MeshBlockSize[1]
