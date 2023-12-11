@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# © 2022. Triad National Security, LLC. All rights reserved.  This
+# © 2022-2023. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract
 # 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 # is operated by Triad National Security, LLC for the U.S.  Department
@@ -38,7 +38,7 @@ from plot_torus_3d import plot_frame_from_phoedf
 
 
 def process_file(in_filename, fig_folder, log_folder, avg_folder):
-    print(f"Processing {in_filename}")
+    print(f"Processing {os.path.basename(in_filename)}")
 
     log_filename = (
         os.path.join(log_folder, in_filename.split(os.sep)[-1]).rstrip(".phdf") + ".log"
@@ -53,6 +53,7 @@ def process_file(in_filename, fig_folder, log_folder, avg_folder):
         and os.path.exists(log_filename)
         and os.path.exists(fig_filename)
     ):
+        print("  Output already exists! Skipping...")
         return
 
     # Load data
@@ -141,6 +142,16 @@ if __name__ == "__main__":
 
     base_filename = args.problem_name + "*.phdf"
     filenames = np.sort(glob.glob(os.path.join(args.directory, base_filename)))
+
+    print("Phoebus GRMHD analysis script for generating derived quantities from dumps")
+    print(f"  Directory:           {args.directory}")
+    print(f"  Number of files:     {len(filenames)}")
+    print(f"  Generating figures:  {not args.no_figs}")
+    print(f"  Generating logs:     {not args.no_logs}")
+    print(f"  Generating averages: {not args.no_avgs}")
+    print(f"  Serial?              {args.serial}")
+    print(f"  Overwrite?           {args.overwrite}")
+    print("")
 
     fig_folder = os.path.join(args.directory, "figures")
     log_folder = os.path.join(args.directory, "logs")

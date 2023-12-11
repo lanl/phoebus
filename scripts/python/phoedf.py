@@ -53,6 +53,17 @@ class phoedf(phdf.phdf):
         self.Nx2 = self.MeshBlockSize[1]
         self.Nx3 = self.MeshBlockSize[2]
 
+        self.Dx1 = np.zeros([self.NumBlocks])
+        self.Dx2 = np.zeros([self.NumBlocks])
+        self.Dx3 = np.zeros([self.NumBlocks])
+        for b in range(self.NumBlocks):
+            bounds = self.BlockBounds[b]
+            self.Dx1[b] = (bounds[1] - bounds[0])/self.MeshBlockSize[0]
+            self.Dx2[b] = (bounds[3] - bounds[2])/self.MeshBlockSize[1]
+            self.Dx3[b] = (bounds[5] - bounds[4])/self.MeshBlockSize[2]
+
+        assert self.MaxLevel == 0, "phoedf does not currently support mesh refinement!"
+
         self.ScalarField = [self.NumBlocks, self.Nx3, self.Nx2, self.Nx1]
         self.ThreeVectorField = [self.NumBlocks, 3, self.Nx3, self.Nx2, self.Nx1]
         self.FourVectorField = [self.NumBlocks, 4, self.Nx3, self.Nx2, self.Nx1]
@@ -106,6 +117,8 @@ class phoedf(phdf.phdf):
         else:
             kstart = None
             kend = None
+        kstart = None
+        kend = None
 
         # Unroll gcov for convenience
         for mu in range(4):
@@ -399,6 +412,9 @@ class phoedf(phdf.phdf):
         return self.ucon
 
     def GetXi(self):
+        if not self.RadiationActive:
+            return None
+
         if self.xi is None:
             self.xi = np.zeros(
                 [self.NumBlocks, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1]
@@ -425,6 +441,9 @@ class phoedf(phdf.phdf):
         return self.xi
 
     def GetE(self):
+        if not self.RadiationActive:
+            return None
+
         if self.E is None:
             self.E = np.zeros(
                 [self.NumBlocks, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1]
@@ -452,6 +471,9 @@ class phoedf(phdf.phdf):
         return self.E
 
     def GetF(self):
+        if not self.RadiationActive:
+            return None
+
         if self.F is None:
             self.F = np.zeros(
                 [self.NumBlocks, 3, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1]
@@ -492,6 +514,9 @@ class phoedf(phdf.phdf):
         return self.F
 
     def GetP(self):
+        if not self.RadiationActive:
+            return None
+
         if self.P is None:
             self.P = np.zeros(
                 [self.NumBlocks, 3, 3, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1]
@@ -574,6 +599,9 @@ class phoedf(phdf.phdf):
         return Tmunu_concov
 
     def GetRmunu_concon(self, b, k, j, i):
+        if not self.RadiationActive:
+            return None
+
         Rmunu = np.zeros([4, 4, self.NumSpecies])
 
         ncon = np.zeros(4)
@@ -603,6 +631,9 @@ class phoedf(phdf.phdf):
         return Rmunu
 
     def GetRmunu_concov(self, b, k, j, i):
+        if not self.RadiationActive:
+            return None
+
         Rmunu_concon = self.GetRmunu_concon(b, k, j, i)
 
         gcov = self.gcov[b, :, :, k, j, i]
@@ -619,4 +650,4 @@ class phoedf(phdf.phdf):
 
     def GetMdotEddington(self, eff=0.1):
         Mbh = self.LengthCodeToCGS * cgs["CL"] ** 2 / cgs["GNEWT"]
-        return 1.4e18 * Mbh / cgs["MSOLAR"]  # Nominal eff = 0.1
+        return 1.4e19 * eff * Mbh / cgs["MSOLAR"]
