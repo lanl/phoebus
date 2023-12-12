@@ -1,4 +1,4 @@
-# © 2022. Triad National Security, LLC. All rights reserved.  This
+# © 2022-2023. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract
 # 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 # is operated by Triad National Security, LLC for the U.S.  Department
@@ -18,13 +18,10 @@ sys.path.insert(
     "../../external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/",
 )
 import phdf
-
 # from parthenon_tools import phdf
-
 from phoebus_constants import *
 from phoebus_eos import *
 from phoebus_opacities import *
-
 
 # ---------------------------------------------------------------------------- #
 # Phoebus-specific derived class from Parthenon's phdf datafile reader
@@ -34,6 +31,8 @@ from phoebus_opacities import *
 class phoedf(phdf.phdf):
     def __init__(self, filename, geomfile=None, clip=True):
         super().__init__(filename)
+
+        self.clip = clip
 
         try:
             self.eos_type = self.Params["eos/type"].decode()
@@ -305,7 +304,8 @@ class phoedf(phdf.phdf):
 
                 self.tau[b, :, :, :] = kappaH[b, :, :, :] * dX
 
-            self.tau = np.clip(self.tau, 1.0e-100, 1.0e100)
+            if clip:
+                self.tau = np.clip(self.tau, 1.0e-100, 1.0e100)
 
         return self.tau
 
@@ -326,7 +326,8 @@ class phoedf(phdf.phdf):
                 / self.EnergyDensityCodeToCGS
             )
 
-            self.Pg = np.clip(self.Pg, 1.0e-100, 1.0e100)
+            if self.clip:
+                self.Pg = np.clip(self.Pg, 1.0e-100, 1.0e100)
 
         return self.Pg
 
@@ -348,7 +349,8 @@ class phoedf(phdf.phdf):
                 / self.TemperatureCodeToCGS
             )
 
-            self.Tg = np.clip(self.Tg, 1.0e-100, 1.0e100)
+            if self.clip:
+                self.Tg = np.clip(self.Tg, 1.0e-100, 1.0e100)
 
         return self.Tg
 
@@ -370,7 +372,8 @@ class phoedf(phdf.phdf):
                     )
 
             self.Pm = bsq / 2.0
-            self.Pm = np.clip(self.Pm, 1.0e-100, 1.0e100)
+            if self.clip:
+                self.Pm = np.clip(self.Pm, 1.0e-100, 1.0e100)
 
         return self.Pm
 
@@ -382,7 +385,8 @@ class phoedf(phdf.phdf):
             for ispec in range(self.NumSpecies):
                 self.Pr[:, :, :, :] += 1.0 / 3.0 * J[:, ispec, :, :, :]
 
-            self.Pr = np.clip(self.Pr, 1.0e-100, 1.0e100)
+            if self.clip:
+                self.Pr = np.clip(self.Pr, 1.0e-100, 1.0e100)
 
         return self.Pr
 
@@ -415,10 +419,10 @@ class phoedf(phdf.phdf):
 
     def GetVpcon(self):
         if self.vpcon is None:
-            self.vpcon = np.clip(
-                self.Get("p.velocity", flatten=False), -1.0e100, 1.0e100
-            )
+            self.vpcon = self.Get("p.velocity", flatten=False)
             assert self.vpcon is not None
+            if self.clip:
+                self.vpcon = np.clip(self.vpcon, -1.0e100, 1.0e100)
 
         return self.vpcon
 
@@ -480,7 +484,8 @@ class phoedf(phdf.phdf):
                 self.xi[:, ispec, :, :, :] -= vdH * vdH
             self.xi = np.sqrt(self.xi)
 
-            self.xi = np.clip(self.xi, 1.0e-100, 1.0)
+            if self.clip:
+                self.xi = np.clip(self.xi, 1.0e-100, 1.0)
 
         return self.xi
 
