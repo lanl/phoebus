@@ -175,7 +175,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("Phoebus GRMHD analysis script for generating radial profiles from dumps")
-    print(f"  Number of files: {len(args.filenames)}")
+    print(f"  Number of files:      {len(args.filenames)}")
+    print(f"  Number of processors: {args.nproc}")
+    print(f"  Overwrite?            {args.overwrite}")
 
     p = Pool(processes=args.nproc)
     from itertools import repeat
