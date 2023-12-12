@@ -234,7 +234,7 @@ class phoedf(phdf.phdf):
 
             Bcon = self.GetBcon()
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             ucon = self.Getucon()
             gcov = self.gcov
             alpha = self.alpha
@@ -394,7 +394,7 @@ class phoedf(phdf.phdf):
         if self.Gamma is None:
             self.Gamma = np.zeros(self.ScalarField)
 
-            vpcon = self.GetVpCon()
+            vpcon = self.Getvpcon()
             for ii in range(3):
                 for jj in range(3):
                     self.Gamma[:, :, :, :] += (
@@ -406,18 +406,18 @@ class phoedf(phdf.phdf):
 
         return self.Gamma
 
-    def GetVpcov(self):
+    def Getvpcov(self):
         if self.vpcov is None:
             self.vpcov = np.zeros(self.ThreeVectorField)
 
-            vpcon = self.GetVpCon()
+            vpcon = self.Getvpcon()
             for ii in range(3):
                 for jj in range(3):
                     vpcov[:,ii,:,:,:] += self.gcov[:, ii + 1,jj + 1,:,:,:]*vpcon[:,jj,:,:,:]
 
         return self.vpcov
 
-    def GetVpcon(self):
+    def Getvpcon(self):
         if self.vpcon is None:
             self.vpcon = self.Get("p.velocity", flatten=False)
             assert self.vpcon is not None
@@ -428,13 +428,13 @@ class phoedf(phdf.phdf):
 
     # Backwards compatibility TODO(BRR) remove?
     def GetVpCon(self):
-        return self.GetVpcon()
+        return self.Getvpcon()
 
     def Getucon(self):
         if self.ucon is None:
             self.ucon = np.zeros(self.FourVectorField)
 
-            vpcon = self.GetVpCon()
+            vpcon = self.Getvpcon()
             Gamma = self.GetGamma()
 
             self.ucon[:, 0, :, :, :] = Gamma[:, :, :, :] / self.alpha[:, :, :, :]
@@ -470,7 +470,7 @@ class phoedf(phdf.phdf):
 
             Hcov = self.GetHcov() / self.GetJ()[:, np.newaxis, :, :, :]
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             for ispec in range(self.NumSpecies):
                 vdH = np.zeros(self.ScalarField)
                 for ii in range(3):
@@ -499,7 +499,7 @@ class phoedf(phdf.phdf):
             )
 
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             J = self.GetJ()
             Hcov = self.GetHcov()
 
@@ -529,7 +529,7 @@ class phoedf(phdf.phdf):
             )
 
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             J = self.GetJ()
             Hcov = self.GetHcov()
             gammacon = self.gammacon
@@ -572,7 +572,7 @@ class phoedf(phdf.phdf):
             )
 
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             J = self.GetJ()
             Hcov = self.GetHcov()
             gammacon = self.gammacon

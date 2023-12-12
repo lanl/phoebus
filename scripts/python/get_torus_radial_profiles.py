@@ -45,8 +45,8 @@ def get_torus_radial_profiles(dfile):
     Pg = dfile.GetPg()
     ucon = dfile.Getucon()
     ucov = dfile.Getucov()
-    vpcon = dfile.GetVpcon()
-    vpcov = dfile.GetVpcov()
+    vpcon = dfile.Getvpcon()
+    vpcov = dfile.Getvpcov()
     bsq = dfile.GetPm() * 2
     sigma = bsq / rho
     alpha = dfile.alpha
