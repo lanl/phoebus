@@ -28,8 +28,11 @@ from phoebus_opacities import *
 
 # ---------------------------------------------------------------------------- #
 # Phoebus-specific derived class from Parthenon's phdf datafile reader
+#
+# geomfile : optional geometry file to read many files more efficiently
+# clip     : Whether to restrict output variables to the range [-1e100, 1e100]
 class phoedf(phdf.phdf):
-    def __init__(self, filename, geomfile=None):
+    def __init__(self, filename, geomfile=None, clip=True):
         super().__init__(filename)
 
         try:
@@ -173,6 +176,7 @@ class phoedf(phdf.phdf):
         self.Pr = None
         self.tau = None
         self.Tg = None
+        self.vpcov = None
         self.ucon = None
         self.ucov = None
         self.bcon = None
@@ -397,6 +401,17 @@ class phoedf(phdf.phdf):
             self.Gamma = np.sqrt(1.0 + self.Gamma)
 
         return self.Gamma
+
+    def GetVpcov(self):
+        if self.vpcov is None:
+            self.vpcov = np.zeros(self.ThreeVectorField)
+
+            vpcon = self.GetVpCon()
+            for ii in range(3):
+                for jj in range(3):
+                    vpcov[:,ii,:,:,:] += self.gcov[:, ii + 1,jj + 1,:,:,:]*vpcon[:,jj,:,:,:]
+
+        return self.vpcov
 
     def GetVpcon(self):
         if self.vpcon is None:

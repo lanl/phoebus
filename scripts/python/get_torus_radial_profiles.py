@@ -46,6 +46,7 @@ def get_torus_radial_profiles(dfile):
     ucon = dfile.Getucon()
     ucov = dfile.Getucov()
     vpcon = dfile.GetVpcon()
+    vpcov = dfile.GetVpcov()
     bsq = dfile.GetPm() * 2
     sigma = bsq / rho
     alpha = dfile.alpha
@@ -54,7 +55,6 @@ def get_torus_radial_profiles(dfile):
     # Initialize profiles
     Volume = np.zeros(Nx1_profile) # For volume averages
     Mass = np.zeros(Nx1_profile) # For density-weighted volume averages
-    #Mdot = np.zeros(Nx1_profile) # Total accretion rate
     F_M_in = np.zeros(Nx1_profile) # Inflow mass flux
     F_M_out = np.zeros(Nx1_profile) # Outflow mass flux
     F_Eg = np.zeros(Nx1_profile) # Gas (MHD) energy flux
@@ -65,7 +65,8 @@ def get_torus_radial_profiles(dfile):
     JetP_m = np.zeros(Nx1_profile) # MHD jet power (sigma > 1)
     JetP_g = np.zeros(Nx1_profile) # hydro jet power (sigma > 1)
     beta = np.zeros(Nx1_profile) # Plasma beta
-    vr = np.zeros(Nx1_profile) # SADW radial velocity
+    vconr = np.zeros(Nx1_profile) # SADW contravariant radial three-velocity
+    vcovr = np.zeros(Nx1_profile) # SADW covariant radial three-velocity
     # TODO(BRR) Precalculate some azimuthal averages like <u u_g> for Bernoulli. Store
     # these 2D arrays as well?
 
@@ -110,7 +111,8 @@ def get_torus_radial_profiles(dfile):
                             JetP_m[ip] += dA[b,k,j,i]*Tmunu_concov[1,0]
                             JetP_g[ip] += dA[b,k,j,i]*rho[b,k,j,i]*ucon[b,1,k,j,i]
 
-                vr[ip] += np.sum(dV[b,:,:,i] * vpcon[b,0,:,:,i] / Gamma[b,:,:,i])
+                vconr[ip] += np.sum(dV[b,:,:,i]*rho[b,:,:,i] * vpcon[b,0,:,:,i] / Gamma[b,:,:,i])
+                vcovr[ip] += np.sum(dV[b,:,:,i]*rho[b,:,:,i] * vpcov[b,0,:,:,i] / Gamma[b,:,:,i])
 
     beta = Pg_sadw / Pm_sadw
 
@@ -127,7 +129,8 @@ def get_torus_radial_profiles(dfile):
     profiles['beta'] = beta
     profiles['JetP_m'] = JetP_m
     profiles['JetP_g'] = JetP_g
-    profiles['vr'] = vr
+    profiles['vconr'] = vconr / Mass
+    profiles['vcovr'] = vcovr / Mass
 
     return profiles
 
