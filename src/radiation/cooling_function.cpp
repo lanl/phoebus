@@ -192,16 +192,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
         rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
     const bool do_gain = pdo_gain_reducer->val;
 
-    // Code to CGS
-    const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
-    const Real temperature_conversion_factor = unit_conv.GetTemperatureCodeToCGS();
-    const Real length_conversion_factor = unit_conv.GetLengthCodeToCGS();
-
-    // CGS to code
-    const Real energy_conversion_factor = unit_conv.GetEnergyCGSToCode();
-    const Real mass_conversion_factor = unit_conv.GetMassCGSToCode();
-    const Real time_conversion_factor = unit_conv.GetTimeCGSToCode();
-
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
         kb.e, jb.s, jb.e, ib.s, ib.e,
