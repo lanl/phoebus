@@ -13,12 +13,12 @@
 # distribute copies to the public, perform publicly and display
 # publicly, and to permit others to do so.
 
+# This file was generated in part by OpenAI's GPT-4.
+
 import argparse
 import numpy as np
 import sys
 import os
-from phoedf import phoedf
-from multiprocessing import Pool
 
 if __name__ == "__main__":
 
@@ -54,7 +54,11 @@ if __name__ == "__main__":
         print(f"Processing file {base_filename}")
 
         # Overly specific way to get time
-        nfile = int(base_filename[11:19])
+        try:
+            nfile = int(base_filename[11:19])
+        except ValueError:
+            print(f"  Can't extract dumpfile index; skipping!")
+            continue
         tfile = args.dt_sim * nfile
 
         avg_idx = int(tfile / args.dt)
