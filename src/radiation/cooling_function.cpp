@@ -39,7 +39,8 @@ TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc) {
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  auto &unit_conv = params.Get<phoebus::UnitConversions>("unit_conv");
+  auto &unit_conv =
+      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
 
   pmesh->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
