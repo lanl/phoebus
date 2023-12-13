@@ -228,30 +228,38 @@ class ConToPrim {
             const Real floor_scale_fac, const bool fail_on_floors,
             const bool fail_on_ceilings)
       : bounds(bnds), var(rc->PackVariables(Vars(), imap)),
-        prho(imap[fluid_prim::density].first), crho(imap[fluid_cons::density].first),
-        pvel_lo(imap[fluid_prim::velocity].first),
-        pvel_hi(imap[fluid_prim::velocity].second),
-        cmom_lo(imap[fluid_cons::momentum].first),
-        cmom_hi(imap[fluid_cons::momentum].second), peng(imap[fluid_prim::energy].first),
-        ceng(imap[fluid_cons::energy].first), pb_lo(imap[fluid_prim::bfield].first),
-        pb_hi(imap[fluid_prim::bfield].second), cb_lo(imap[fluid_cons::bfield].first),
-        cb_hi(imap[fluid_cons::bfield].second), pye(imap[fluid_prim::ye].second),
-        cye(imap[fluid_cons::ye].second), prs(imap[fluid_prim::pressure].first),
-        tmp(imap[fluid_prim::temperature].first),
-        sig_lo(imap[internal_variables::cell_signal_speed].first),
-        sig_hi(imap[internal_variables::cell_signal_speed].second),
-        gm1(imap[fluid_prim::gamma1].first),
-        c2p_mu(imap[internal_variables::c2p_mu].first), rel_tolerance(tol),
+        prho(imap[fluid_prim::density::name()].first),
+        crho(imap[fluid_cons::density::name()].first),
+        pvel_lo(imap[fluid_prim::velocity::name()].first),
+        pvel_hi(imap[fluid_prim::velocity::name()].second),
+        cmom_lo(imap[fluid_cons::momentum::name()].first),
+        cmom_hi(imap[fluid_cons::momentum::name()].second),
+        peng(imap[fluid_prim::energy::name()].first),
+        ceng(imap[fluid_cons::energy::name()].first),
+        pb_lo(imap[fluid_prim::bfield::name()].first),
+        pb_hi(imap[fluid_prim::bfield::name()].second),
+        cb_lo(imap[fluid_cons::bfield::name()].first),
+        cb_hi(imap[fluid_cons::bfield::name()].second),
+        pye(imap[fluid_prim::ye::name()].second),
+        cye(imap[fluid_cons::ye::name()].second),
+        prs(imap[fluid_prim::pressure::name()].first),
+        tmp(imap[fluid_prim::temperature::name()].first),
+        sig_lo(imap[internal_variables::cell_signal_speed::name()].first),
+        sig_hi(imap[internal_variables::cell_signal_speed::name()].second),
+        gm1(imap[fluid_prim::gamma1::name()].first),
+        c2p_mu(imap[internal_variables::c2p_mu::name()].first), rel_tolerance(tol),
         max_iter(max_iterations), h0sq_(1.0), floor_scale_fac_(floor_scale_fac),
         fail_on_floors_(fail_on_floors), fail_on_ceilings_(fail_on_ceilings) {}
 
   std::vector<std::string> Vars() {
     return std::vector<std::string>(
-        {fluid_prim::density, fluid_cons::density, fluid_prim::velocity,
-         fluid_cons::momentum, fluid_prim::energy, fluid_cons::energy, fluid_prim::bfield,
-         fluid_cons::bfield, fluid_prim::ye, fluid_cons::ye, fluid_prim::pressure,
-         fluid_prim::temperature, internal_variables::cell_signal_speed,
-         fluid_prim::gamma1, internal_variables::c2p_mu});
+        {fluid_prim::density::name(), fluid_cons::density::name(),
+         fluid_prim::velocity::name(), fluid_cons::momentum::name(),
+         fluid_prim::energy::name(), fluid_cons::energy::name(),
+         fluid_prim::bfield::name(), fluid_cons::bfield::name(), fluid_prim::ye::name(),
+         fluid_cons::ye::name(), fluid_prim::pressure::name(),
+         fluid_prim::temperature::name(), internal_variables::cell_signal_speed::name(),
+         fluid_prim::gamma1::name(), internal_variables::c2p_mu::name()});
   }
 
   template <typename CoordinateSystem, class... Args>

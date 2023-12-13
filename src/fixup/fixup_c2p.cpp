@@ -49,70 +49,70 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   namespace ir = radmoment_internal;
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  Mesh *pmesh = rc->GetMeshPointer();
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
-  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
+  StateDescriptor *fluid_pkg = pmesh->packages.Get("fluid").get();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
+  StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
 
-  const std::vector<std::string> vars({p::density,
-                                       c::density,
-                                       p::velocity,
-                                       c::momentum,
-                                       p::energy,
-                                       c::energy,
-                                       p::bfield,
-                                       p::ye,
-                                       c::ye,
-                                       p::pressure,
-                                       p::temperature,
-                                       p::gamma1,
-                                       impl::cell_signal_speed,
-                                       impl::fail,
-                                       ir::c2pfail,
-                                       ir::tilPi,
-                                       pr::J,
-                                       pr::H,
-                                       cr::E,
-                                       cr::F,
-                                       ir::xi,
-                                       ir::phi});
+  const std::vector<std::string> vars({p::density::name(),
+                                       c::density::name(),
+                                       p::velocity::name(),
+                                       c::momentum::name(),
+                                       p::energy::name(),
+                                       c::energy::name(),
+                                       p::bfield::name(),
+                                       p::ye::name(),
+                                       c::ye::name(),
+                                       p::pressure::name(),
+                                       p::temperature::name(),
+                                       p::gamma1::name(),
+                                       impl::cell_signal_speed::name(),
+                                       impl::fail::name(),
+                                       ir::c2pfail::name(),
+                                       ir::tilPi::name(),
+                                       pr::J::name(),
+                                       pr::H::name(),
+                                       cr::E::name(),
+                                       cr::F::name(),
+                                       ir::xi::name(),
+                                       ir::phi::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
-  const int prho = imap[p::density].first;
-  const int crho = imap[c::density].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
-  const int cmom_lo = imap[c::momentum].first;
-  const int cmom_hi = imap[c::momentum].second;
-  const int peng = imap[p::energy].first;
-  const int ceng = imap[c::energy].first;
-  const int prs = imap[p::pressure].first;
-  const int tmp = imap[p::temperature].first;
-  const int gm1 = imap[p::gamma1].first;
-  const int slo = imap[impl::cell_signal_speed].first;
-  const int shi = imap[impl::cell_signal_speed].second;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
-  int pye = imap[p::ye].second; // negative if not present
-  int cye = imap[c::ye].second;
+  const int prho = imap[p::density::name()].first;
+  const int crho = imap[c::density::name()].first;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
+  const int cmom_lo = imap[c::momentum::name()].first;
+  const int cmom_hi = imap[c::momentum::name()].second;
+  const int peng = imap[p::energy::name()].first;
+  const int ceng = imap[c::energy::name()].first;
+  const int prs = imap[p::pressure::name()].first;
+  const int tmp = imap[p::temperature::name()].first;
+  const int gm1 = imap[p::gamma1::name()].first;
+  const int slo = imap[impl::cell_signal_speed::name()].first;
+  const int shi = imap[impl::cell_signal_speed::name()].second;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
+  int pye = imap[p::ye::name()].second; // negative if not present
+  int cye = imap[c::ye::name()].second;
 
-  int ifail = imap[impl::fail].first;
-  int irfail = imap[ir::c2pfail].first;
+  int ifail = imap[impl::fail::name()].first;
+  int irfail = imap[ir::c2pfail::name()].first;
 
-  auto idx_E = imap.GetFlatIdx(cr::E, false);
-  auto idx_F = imap.GetFlatIdx(cr::F, false);
-  auto idx_J = imap.GetFlatIdx(pr::J, false);
-  auto idx_H = imap.GetFlatIdx(pr::H, false);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
-  auto iXi = imap.GetFlatIdx(ir::xi, false);
-  auto iPhi = imap.GetFlatIdx(ir::phi, false);
+  auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+  auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
+  auto idx_J = imap.GetFlatIdx(pr::J::name(), false);
+  auto idx_H = imap.GetFlatIdx(pr::H::name(), false);
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
+  auto iXi = imap.GetFlatIdx(ir::xi::name(), false);
+  auto iPhi = imap.GetFlatIdx(ir::phi::name(), false);
 
   const bool rad_active = rad_pkg->Param<bool>("active");
   const int num_species = rad_active ? rad_pkg->Param<int>("num_species") : 0;
@@ -134,9 +134,9 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         },
         Kokkos::Sum<int>(nfail_total));
     printf("total nfail: %i\n", nfail_total);
-    IndexRange ibi = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-    IndexRange jbi = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-    IndexRange kbi = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+    IndexRange ibi = rc->GetBoundsI(IndexDomain::interior);
+    IndexRange jbi = rc->GetBoundsJ(IndexDomain::interior);
+    IndexRange kbi = rc->GetBoundsK(IndexDomain::interior);
     nfail_total = 0;
     parthenon::par_reduce(
         parthenon::loop_pattern_mdrange_tag, "Rad ConToPrim::Solve fixup failures",
@@ -150,13 +150,13 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
     printf("total interior nfail: %i\n", nfail_total);
   }
 
-  const int ndim = pmb->pmy_mesh->ndim;
+  const int ndim = pmesh->ndim;
 
   auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
-  Coordinates_t coords = rc->GetParentPointer().get()->coords;
+  Coordinates_t coords = rc->GetParentPointer()->coords;
 
   auto fluid_c2p_failure_strategy =
       fix_pkg->Param<FAILURE_STRATEGY>("fluid_c2p_failure_strategy");
@@ -356,9 +356,9 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
 template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc) {
-  auto *pm = rc->GetParentPointer().get();
-  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
-  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+  Mesh *pmesh = rc->GetMeshPointer();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
   const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
   std::string method;
   if (enable_rad_floors) {

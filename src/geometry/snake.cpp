@@ -54,7 +54,7 @@ void SetGeometry<SnakeMesh>(MeshData<Real> *rc) {}
 
 template <>
 SnakeMeshBlock GetCoordinateSystem<SnakeMeshBlock>(MeshBlockData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real k = pkg->Param<Real>("k");
@@ -64,7 +64,7 @@ SnakeMeshBlock GetCoordinateSystem<SnakeMeshBlock>(MeshBlockData<Real> *rc) {
 }
 template <>
 SnakeMesh GetCoordinateSystem<SnakeMesh>(MeshData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real k = pkg->Param<Real>("k");

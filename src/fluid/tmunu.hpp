@@ -27,9 +27,9 @@
 
 namespace fluid {
 
-const std::vector<std::string> TMUNU_VARS = {fluid_prim::density, fluid_prim::velocity,
-                                             fluid_prim::energy, fluid_prim::pressure,
-                                             fluid_prim::bfield};
+const std::vector<std::string> TMUNU_VARS = {
+    fluid_prim::density::name(), fluid_prim::velocity::name(), fluid_prim::energy::name(),
+    fluid_prim::pressure::name(), fluid_prim::bfield::name()};
 // Indices are upstairs
 template <typename CoordinateSystem, typename Pack>
 class StressEnergyTensorCon {
@@ -46,11 +46,11 @@ class StressEnergyTensorCon {
     pack_ = rc->PackVariables(TMUNU_VARS, imap);
     system_ = Geometry::GetCoordinateSystem(rc);
 
-    ir_ = imap[fluid_prim::density].first;
-    iv_ = imap[fluid_prim::velocity].first;
-    iu_ = imap[fluid_prim::energy].first;
-    ip_ = imap[fluid_prim::pressure].first;
-    ib_ = imap[fluid_prim::bfield].first;
+    ir_ = imap[fluid_prim::density::name()].first;
+    iv_ = imap[fluid_prim::velocity::name()].first;
+    iu_ = imap[fluid_prim::energy::name()].first;
+    ip_ = imap[fluid_prim::pressure::name()].first;
+    ib_ = imap[fluid_prim::bfield::name()].first;
   }
 
   // TODO(JMM): Assumes cell centers. If that needs to change, this

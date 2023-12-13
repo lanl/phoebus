@@ -67,7 +67,7 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   using namespace impl;
 
   // Available in both mesh and meshblock
-  auto pparent = rc->GetParentPointer();
+  Mesh *pparent = rc->GetMeshPointer();
   std::shared_ptr<StateDescriptor> const &pkg = pparent->packages.Get("monopole_gr");
   auto &params = pkg->AllParams();
 
@@ -103,8 +103,8 @@ TaskStatus InterpolateMatterTo1D(Data *rc) {
   // I just need the pack for the coords object,
   // but I may want these quantities in a future
   // iteration, so I ask for them here.
-  std::vector<std::string> vars(
-      {fluid_cons::density, fluid_cons::energy, fluid_cons::momentum});
+  std::vector<std::string> vars({fluid_cons::density::name(), fluid_cons::energy::name(),
+                                 fluid_cons::momentum::name()});
   // PackIndexMap imap;
   auto pack = rc->PackVariables(vars);
 

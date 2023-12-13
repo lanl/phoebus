@@ -575,7 +575,7 @@ void InitializeCachedCoordinateSystem(ParameterInput *pin, StateDescriptor *geom
 template <typename System>
 CachedOverMeshBlock<System> GetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
   auto system = GetCoordinateSystem<System>(rc);
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   bool axisymmetric = pkg->Param<bool>("axisymmetric");
   bool time_dependent = pkg->Param<bool>("time_dependent");
   return CachedOverMeshBlock<System>(rc, system, axisymmetric, time_dependent);
@@ -583,7 +583,7 @@ CachedOverMeshBlock<System> GetCachedCoordinateSystem(MeshBlockData<Real> *rc) {
 template <typename System>
 CachedOverMesh<System> GetCachedCoordinateSystem(MeshData<Real> *rc) {
   auto system = GetCoordinateSystem<System>(rc);
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   bool axisymmetric = pkg->Param<bool>("axisymmetric");
   bool time_dependent = pkg->Param<bool>("time_dependent");
   return CachedOverMesh<System>(rc, system, axisymmetric, time_dependent);
@@ -591,7 +591,7 @@ CachedOverMesh<System> GetCachedCoordinateSystem(MeshData<Real> *rc) {
 
 template <typename System, typename Data>
 void SetCachedCoordinateSystem(Data *rc) {
-  auto pparent = rc->GetParentPointer();
+  Mesh *pparent = rc->GetMeshPointer();
   auto system = GetCoordinateSystem<System>(rc);
 
   auto &pkg = pparent->packages.Get("geometry");

@@ -53,7 +53,7 @@ void Initialize<CBoostedMinkowskiMeshBlock>(ParameterInput *pin,
 template <>
 BoostedMinkowskiMeshBlock
 GetCoordinateSystem<BoostedMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real vx = pkg->Param<Real>("vx");
   Real vy = pkg->Param<Real>("vy");
@@ -63,7 +63,7 @@ GetCoordinateSystem<BoostedMinkowskiMeshBlock>(MeshBlockData<Real> *rc) {
 
 template <>
 BoostedMinkowskiMesh GetCoordinateSystem<BoostedMinkowskiMesh>(MeshData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real vx = pkg->Param<Real>("vx");
   Real vy = pkg->Param<Real>("vy");

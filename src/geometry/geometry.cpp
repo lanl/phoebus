@@ -56,8 +56,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // TODO(JMM): Make this actual node-centered data when available
   std::vector<int> node_shape = {dims.nx1 + 1, dims.nx2 + 1, dims.nx3 + 1, 4};
   Metadata gcoord_node = Metadata({Metadata::Derived, Metadata::OneCopy}, node_shape);
-  geometry->AddField(geometric_variables::cell_coords, gcoord_cell);
-  geometry->AddField(geometric_variables::node_coords, gcoord_node);
+  geometry->AddField(geometric_variables::cell_coords::name(), gcoord_cell);
+  geometry->AddField(geometric_variables::node_coords::name(), gcoord_node);
 
   // Reductions
   const bool do_mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
@@ -109,7 +109,7 @@ CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc) {
 
 void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin) {
   MeshBlockData<Real> *rc = pmb->meshblock_data.Get().get();
-  auto *pparent = rc->GetParentPointer().get();
+  Mesh *pparent = rc->GetMeshPointer();
   StateDescriptor *pkg = pparent->packages.Get("geometry").get();
   bool do_defaults = pkg->AllParams().Get("do_defaults", true);
   auto system = GetCoordinateSystem(rc);
@@ -119,7 +119,7 @@ void SetGeometryBlock(MeshBlock *pmb, ParameterInput *pin) {
 
 template <>
 TaskStatus UpdateGeometry<MeshBlockData<Real>>(MeshBlockData<Real> *rc) {
-  auto *pparent = rc->GetParentPointer().get();
+  Mesh *pparent = rc->GetMeshPointer();
   StateDescriptor *pkg = pparent->packages.Get("geometry").get();
   bool update_coords = pkg->AllParams().Get("update_coords", false);
   auto system = GetCoordinateSystem(rc);
@@ -130,7 +130,7 @@ TaskStatus UpdateGeometry<MeshBlockData<Real>>(MeshBlockData<Real> *rc) {
 
 template <>
 TaskStatus UpdateGeometry<MeshData<Real>>(MeshData<Real> *rc) {
-  auto *pparent = rc->GetParentPointer();
+  Mesh *pparent = rc->GetMeshPointer();
   StateDescriptor *pkg = pparent->packages.Get("geometry").get();
   bool update_coords = pkg->AllParams().Get("update_coords", false);
   auto system = GetCoordinateSystem(rc);
