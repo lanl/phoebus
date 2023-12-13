@@ -99,6 +99,7 @@ add_executable(phoebus
   pgen/shock_tube.cpp
   pgen/thin_cooling.cpp
   pgen/sedov.cpp
+  pgen/standing_accretion_shock.cpp
   pgen/torus.cpp
   pgen/tov.cpp
 

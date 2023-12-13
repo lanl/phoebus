@@ -126,7 +126,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(iye, k, j, i) = Ye_dev.interpToReal(r);
           lambda[0] = v(iye, k, j, i);
         }
-
         const Real u = phoebus::energy_from_rho_P(eos, mass_density_dev.interpToReal(r),
                                                   pressure_dev.interpToReal(r), emin,
                                                   emax, lambda[0]);

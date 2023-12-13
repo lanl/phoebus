@@ -1,0 +1,145 @@
+# © 2021. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract 89233218CNA000001
+# for Los Alamos National Laboratory (LANL), which is operated by Triad
+# National Security, LLC for the U.S.  Department of Energy/National
+# Nuclear Security Administration. All rights in the program are
+# reserved by Triad National Security, LLC, and the U.S. Department of
+# Energy/National Nuclear Security Administration. The Government is
+# granted for itself and others acting on its behalf a nonexclusive,
+# paid-up, irrevocable worldwide license in this material to reproduce,
+# prepare derivative works, distribute copies to the public, perform
+# publicly and display publicly, and to permit others to do so.
+
+<phoebus>
+problem = standing_accretion_shock
+ix1_bc = reflect
+ox1_bc = outflow
+ix2_bc = reflect
+ox2_bc = reflect
+
+<parthenon/job>
+problem_id  = standing_accretion_shock       # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = p.density,  &
+	    c.density,  &
+            p.velocity, &
+	    c.momentum, &
+            p.energy,   &
+            c.energy,   &
+            pressure,	&
+            cs,         &
+            temperature,&
+            p.ye,       &
+            g.c.coord,  &
+            g.n.coord,  &
+	    flux_divergence, &
+	    src_terms
+
+
+file_type   = hdf5      # Tabular data dump
+dt          = 100       # time increment between outputs
+
+<parthenon/time>
+nlim        = -1        # cycle limit
+tlim        = 10000      # time limit
+integrator  = rk2       # time integration algorithm
+ncycle_out  = 100       # interval for stdout summary info
+dt_init_fact = 1.e-8
+
+<parthenon/mesh>
+nghost = 4
+#refinement = adaptive
+#numlevel = 3
+
+nx1         = 512           # Number of zones in X1-direction
+x1min       = 30            # minimum value of X1 | rPNS | x1min = ln R (code units), R = 60 (km) => R = 31.2492 (code units) => x1min = 3.44199
+x1max       = 230           # maximum value of X1 | rmax | x1max => 472.5 (km)
+ix1_bc      = user          # Inner-X1 boundary condition flag
+ox1_bc      = user          # Outer-X1 boundary condition flag
+
+nx2         = 1             # Number of zones in X2-direction
+x2min       = 0             # minimum value of X2
+x2max       = 3.14159265359 #3.14159265359 #1 # maximum value of X2. Pi for BL
+ix2_bc      = user          # Inner-X2 boundary condition flag
+ox2_bc      = user          # Outer-X2 boundary condition flag
+
+nx3         = 1             # Number of zones in X3-direction
+x3min       = 0             # minimum value of X3
+x3max       = 6.28318530718 # maximum value of X3. 2*pi
+ix3_bc      = periodic      # Inner-X3 boundary condition flag
+ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
+
+num_threads = 1         # maximum number of OMP threads
+
+#<parthenon/meshblock>
+#nx1 = 512
+#nx2 = 1
+#nx3 = 1
+
+<parthenon/refinement0>
+field = c.c.bulk.rho
+method = derivative_order_1
+max_level = 1
+
+#<eos>
+#type = IdealGas
+#Gamma = 1.33
+#Cv = 3.0  
+
+<eos>
+type = StellarCollapse
+filename = /usr/projects/w22_stars/EoS/Hempel_SFHoEOS_rho222_temp180_ye60_version_1.1_20120817.h5
+use_sp5 = false
+
+<fixup>
+enable_floors = false
+enable_mhd_floors = false
+enable_ceilings = false
+enable_flux_fixup = false
+enable_c2p_fixup = true
+floor_type = ConstantRhoSie
+rho0_floor = 1.e-12
+sie0_floor = 1.e-6
+ceiling_type = ConstantGamSie
+gam0_ceiling = 100.0
+sie_ceiling = 1e-2
+
+<physics>
+hydro = true
+he = false
+3t = false
+rad = true
+
+<fluid>
+xorder = 2
+cfl = 0.6
+riemann = llf
+recon = weno5
+c2p_method = robust
+c2p_max_iter = 1000
+c2p_tol = 1.e-8
+Ye = true
+mhd = false
+
+<geometry>
+a = 0
+
+<units>
+scale_free = false
+geom_mass_msun = 1.3           #   canonical M=1.3Msun NS sets our length scale of L = G M / c^2 = 1.93 km
+fluid_density_cgs = 3.599e17   # 1.e9     # gives mass = 7.07e24 g
+
+<standing_accretion_shock>
+Mdot = 0.2             # Msun / sec
+rShock = 200           # km
+target_mach = -100      # target Mach number for upstream flow in preshock region 
+model_filename = 1d_initial_conditions_radice_10k.txt
+
+<radiation>
+method=cooling_function
+do_liebendorfer=false
+do_lightbulb=true
+lum=2.5
+do_gain_reducer=false
+always_gain=false
