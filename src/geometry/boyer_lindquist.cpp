@@ -47,7 +47,7 @@ void SetGeometry<BoyerLindquistMesh>(MeshData<Real> *rc) {}
 template <>
 BoyerLindquistMeshBlock
 GetCoordinateSystem<BoyerLindquistMeshBlock>(MeshBlockData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real dxfd = pkg->Param<Real>("dxfd");
@@ -55,7 +55,7 @@ GetCoordinateSystem<BoyerLindquistMeshBlock>(MeshBlockData<Real> *rc) {
 }
 template <>
 BoyerLindquistMesh GetCoordinateSystem<BoyerLindquistMesh>(MeshData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real dxfd = pkg->Param<Real>("dxfd");

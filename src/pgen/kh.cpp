@@ -26,21 +26,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(
-      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
-       fluid_prim::ye, fluid_prim::pressure, fluid_prim::temperature, fluid_prim::gamma1},
-      imap);
+  auto v =
+      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
+                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
+                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
+                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
+                        imap);
 
-  const int irho = imap[fluid_prim::density].first;
-  const int ivlo = imap[fluid_prim::velocity].first;
-  const int ivhi = imap[fluid_prim::velocity].second;
-  const int ieng = imap[fluid_prim::energy].first;
-  const int ib_lo = imap[fluid_prim::bfield].first;
-  const int ib_hi = imap[fluid_prim::bfield].second;
-  const int iye = imap[fluid_prim::ye].second;
-  const int iprs = imap[fluid_prim::pressure].first;
-  const int itmp = imap[fluid_prim::temperature].first;
-  const int igm1 = imap[fluid_prim::gamma1].first;
+  const int irho = imap[fluid_prim::density::name()].first;
+  const int ivlo = imap[fluid_prim::velocity::name()].first;
+  const int ivhi = imap[fluid_prim::velocity::name()].second;
+  const int ieng = imap[fluid_prim::energy::name()].first;
+  const int ib_lo = imap[fluid_prim::bfield::name()].first;
+  const int ib_hi = imap[fluid_prim::bfield::name()].second;
+  const int iye = imap[fluid_prim::ye::name()].second;
+  const int iprs = imap[fluid_prim::pressure::name()].first;
+  const int itmp = imap[fluid_prim::temperature::name()].first;
+  const int igm1 = imap[fluid_prim::gamma1::name()].first;
 
   const Real rho0 = pin->GetOrAddReal("kelvin_helmholtz", "rho0", 1.0);
   const Real rho1 = pin->GetOrAddReal("kelvin_helmholtz", "rho1", 1.0);
@@ -66,6 +68,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto emin = pmb->packages.Get("eos")->Param<Real>("sie_min");
   auto emax = pmb->packages.Get("eos")->Param<Real>("sie_max");
 
+  auto geom = Geometry::GetCoordinateSystem(rc.get());
+
   RNGPool rng_pool(pin->GetOrAddInteger("kelvin_helmholtz", "seed", 37));
 
   pmb->par_for(
@@ -77,6 +81,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real rho = y < 0.25 ? rho1 : rho0;
         const Real P = y < 0.25 ? P1 : P0;
         const Real vel = y < 0.25 ? v1 : v0;
+
+        Real gcov[4][4];
+        geom.SpacetimeMetric(0.0, x, y, 0.0, gcov);
 
         Real eos_lambda[2];
         if (iye > 0) {
@@ -98,7 +105,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(ivlo + d, k, j, i) = v_pert * 2.0 * (rng_gen.drand() - 0.5);
         v(ivlo, k, j, i) += vel;
         Real vsq = 0.;
-        SPACELOOP2(ii, jj) { vsq += v(ivlo + ii, k, j, i) * v(ivlo + jj, k, j, i); }
+        SPACELOOP2(ii, jj) {
+          vsq += gcov[ii + 1][jj + 1] * v(ivlo + ii, k, j, i) * v(ivlo + jj, k, j, i);
+        }
         const Real W = 1. / sqrt(1. - vsq);
         SPACELOOP(ii) { v(ivlo + ii, k, j, i) *= W; }
         if (ib_hi > 0) {

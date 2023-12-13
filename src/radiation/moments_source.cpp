@@ -204,7 +204,7 @@ template <class T, class CLOSURE>
 TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   PARTHENON_REQUIRE(USE_VALENCIA, "Covariant MHD formulation not supported!");
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   StateDescriptor *fluid_pkg = pmb->packages.Get("fluid").get();
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
@@ -217,38 +217,41 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
   namespace c = fluid_cons;
   namespace p = fluid_prim;
   std::vector<std::string> vars{
-      c::density,  c::energy,  c::momentum,    c::ye,     cr::E, cr::F,
-      c::bfield,   p::density, p::temperature, p::energy, p::ye, p::velocity,
-      p::pressure, p::gamma1,  p::bfield,      pr::J,     pr::H, ir::kappaJ,
-      ir::kappaH,  ir::JBB,    ir::tilPi};
+      c::density::name(),  c::energy::name(),  c::momentum::name(),
+      c::ye::name(),       cr::E::name(),      cr::F::name(),
+      c::bfield::name(),   p::density::name(), p::temperature::name(),
+      p::energy::name(),   p::ye::name(),      p::velocity::name(),
+      p::pressure::name(), p::gamma1::name(),  p::bfield::name(),
+      pr::J::name(),       pr::H::name(),      ir::kappaJ::name(),
+      ir::kappaH::name(),  ir::JBB::name(),    ir::tilPi::name()};
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  auto idx_E = imap.GetFlatIdx(cr::E);
-  auto idx_F = imap.GetFlatIdx(cr::F);
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_H = imap.GetFlatIdx(pr::H);
+  auto idx_E = imap.GetFlatIdx(cr::E::name());
+  auto idx_F = imap.GetFlatIdx(cr::F::name());
+  auto idx_J = imap.GetFlatIdx(pr::J::name());
+  auto idx_H = imap.GetFlatIdx(pr::H::name());
 
-  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
-  auto idx_JBB = imap.GetFlatIdx(ir::JBB);
-  auto idx_tilPi = imap.GetFlatIdx(ir::tilPi, false);
-  auto pv = imap.GetFlatIdx(p::velocity);
+  auto idx_kappaJ = imap.GetFlatIdx(ir::kappaJ::name());
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name());
+  auto idx_JBB = imap.GetFlatIdx(ir::JBB::name());
+  auto idx_tilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
+  auto pv = imap.GetFlatIdx(p::velocity::name());
 
-  int prho = imap[p::density].first;
-  int peng = imap[p::energy].first;
-  int pT = imap[p::temperature].first;
-  int pprs = imap[p::pressure].first;
-  int pgm1 = imap[p::gamma1].first;
-  int pYe = imap[p::ye].first;
-  int pb_lo = imap[p::bfield].first;
-  int cb_lo = imap[c::bfield].first;
+  int prho = imap[p::density::name()].first;
+  int peng = imap[p::energy::name()].first;
+  int pT = imap[p::temperature::name()].first;
+  int pprs = imap[p::pressure::name()].first;
+  int pgm1 = imap[p::gamma1::name()].first;
+  int pYe = imap[p::ye::name()].first;
+  int pb_lo = imap[p::bfield::name()].first;
+  int cb_lo = imap[c::bfield::name()].first;
 
-  int crho = imap[c::density].first;
-  int ceng = imap[c::energy].first;
-  int cmom_lo = imap[c::momentum].first;
-  int cmom_hi = imap[c::momentum].second;
-  int cye = imap[c::ye].first;
+  int crho = imap[c::density::name()].first;
+  int ceng = imap[c::energy::name()].first;
+  int cmom_lo = imap[c::momentum::name()].first;
+  int cmom_hi = imap[c::momentum::name()].second;
+  int cye = imap[c::ye::name()].first;
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
@@ -964,7 +967,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
 }
 template <class T>
 TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
-  auto *pm = rc->GetParentPointer().get();
+  Mesh *pm = rc->GetMeshPointer();
   StateDescriptor *rad = pm->packages.Get("radiation").get();
   auto method = rad->Param<std::string>("method");
   using settings =

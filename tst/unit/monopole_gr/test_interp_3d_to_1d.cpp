@@ -41,19 +41,10 @@ TEST_CASE("Coordinates in spherical geometry", "[MonopoleGR]") {
   GIVEN("A parthenon coords object tuned to spherical geometry") {
     // TODO(JMM): This test is more of a sanity check than anything
     ParameterInput pin;
-    RegionSize rs;
-    rs.x1min = 0;
-    rs.x1max = 100;
-    rs.x2min = 0;
-    rs.x2max = M_PI;
-    rs.x3min = 0;
-    rs.x3max = 2 * M_PI;
-    rs.nx1 = 10;
-    rs.nx2 = 1;
-    rs.nx3 = 1;
-    const Real dr_true = (rs.x1max - rs.x1min) / (rs.nx1);
-    const Real dth_true = (rs.x2max - rs.x2min) / (rs.nx2);
-    const Real dph_true = (rs.x3max - rs.x3min) / (rs.nx3);
+    RegionSize rs({0, 0, 0}, {100, M_PI, 2 * M_PI}, {1, 1, 1}, {10, 1, 1});
+    const Real dr_true = (rs.xmax(X1DIR) - rs.xmin(X1DIR)) / (rs.nx(X1DIR));
+    const Real dth_true = (rs.xmax(X2DIR) - rs.xmin(X2DIR)) / (rs.nx(X2DIR));
+    const Real dph_true = (rs.xmax(X3DIR) - rs.xmin(X3DIR)) / (rs.nx(X3DIR));
     Coordinates_t coords(rs, &pin);
     WHEN("We loop through the grid") {
       int nwrong = 0;
@@ -61,7 +52,7 @@ TEST_CASE("Coordinates in spherical geometry", "[MonopoleGR]") {
       const int j = 0;
       parthenon::par_reduce(
           parthenon::loop_pattern_flatrange_tag, "check coords values",
-          parthenon::DevExecSpace(), 0, rs.nx1 - 1,
+          parthenon::DevExecSpace(), 0, rs.nx(X1DIR) - 1,
           KOKKOS_LAMBDA(const int i, int &nw) {
             Real r, th, ph, dr, dth, dph, dv;
             MonopoleGR::Interp3DTo1D::GetCoordsAndDerivsSph(k, j, i, coords, r, th, ph,

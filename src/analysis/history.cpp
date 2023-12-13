@@ -24,19 +24,19 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
-  auto pmb = md->GetParentPointer();
-  auto &pars = pmb->packages.Get("geometry")->AllParams();
+  Mesh *pmesh = md->GetMeshPointer();
+  auto &pars = pmesh->packages.Get("geometry")->AllParams();
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density, p::velocity});
+  const std::vector<std::string> vars({p::density::name(), p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
 
-  const int prho = imap[p::density].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
+  const int prho = imap[p::density::name()].first;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
@@ -73,25 +73,26 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
-  auto pmb = md->GetParentPointer();
-  auto &pars = pmb->packages.Get("geometry")->AllParams();
+  Mesh *pmesh = md->GetMeshPointer();
+  auto &pars = pmesh->packages.Get("geometry")->AllParams();
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density, p::bfield, p::velocity});
+  const std::vector<std::string> vars(
+      {p::density::name(), p::bfield::name(), p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
 
-  const int prho = imap[p::density].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
+  const int prho = imap[p::density::name()].first;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
-  const Real sigma_cutoff = pmb->packages.Get("fluid")->Param<Real>("sigma_cutoff");
+  const Real sigma_cutoff = pmesh->packages.Get("fluid")->Param<Real>("sigma_cutoff");
 
   Real result = 0.0;
   parthenon::par_reduce(
@@ -132,25 +133,26 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
-  auto pmb = md->GetParentPointer();
-  auto &pars = pmb->packages.Get("geometry")->AllParams();
+  Mesh *pmesh = md->GetMeshPointer();
+  auto &pars = pmesh->packages.Get("geometry")->AllParams();
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density, p::bfield, p::velocity});
+  const std::vector<std::string> vars(
+      {p::density::name(), p::bfield::name(), p::velocity::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
 
-  const int prho = imap[p::density].first;
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
+  const int prho = imap[p::density::name()].first;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
-  const Real sigma_cutoff = pmb->packages.Get("fluid")->Param<Real>("sigma_cutoff");
+  const Real sigma_cutoff = pmesh->packages.Get("fluid")->Param<Real>("sigma_cutoff");
 
   Real result = 0.0;
   parthenon::par_reduce(
@@ -191,17 +193,17 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
-  auto pmb = md->GetParentPointer();
-  auto &pars = pmb->packages.Get("geometry")->AllParams();
+  Mesh *pmesh = md->GetMeshPointer();
+  auto &pars = pmesh->packages.Get("geometry")->AllParams();
   const Real xh = pars.Get<Real>("xh");
 
   namespace c = fluid_cons;
-  const std::vector<std::string> vars({c::bfield});
+  const std::vector<std::string> vars({c::bfield::name()});
 
   PackIndexMap imap;
   auto pack = md->PackVariables(vars, imap);
 
-  const int cb_lo = imap[c::bfield].first;
+  const int cb_lo = imap[c::bfield::name()].first;
 
   auto geom = Geometry::GetCoordinateSystem(md);
 

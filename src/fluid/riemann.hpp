@@ -215,19 +215,23 @@ class FluxState {
       : v(rc->PackVariablesAndFluxes(ReconVars(), FluxVars(), imap)),
         ql(rc->Get("ql").data), qr(rc->Get("qr").data),
         geom(Geometry::GetCoordinateSystem(rc)),
-        coords(rc->GetParentPointer().get()->coords),
-        bounds(rc->GetParentPointer()
-                   .get()
-                   ->packages.Get("fixup")
-                   .get()
-                   ->Param<fixup::Bounds>("bounds")),
-        prho(imap[fluid_prim::density].first), pvel_lo(imap[fluid_prim::velocity].first),
-        peng(imap[fluid_prim::energy].first), pb_lo(imap[fluid_prim::bfield].first),
-        pb_hi(imap[fluid_prim::bfield].second), pye(imap[fluid_prim::ye].second),
-        prs(imap[fluid_prim::pressure].first), gm1(imap[fluid_prim::gamma1].first),
-        crho(imap[fluid_cons::density].first), cmom_lo(imap[fluid_cons::momentum].first),
-        ceng(imap[fluid_cons::energy].first), cb_lo(imap[fluid_cons::bfield].first),
-        cb_hi(imap[fluid_cons::bfield].second), cye(imap[fluid_cons::ye].first),
+        coords(rc->GetParentPointer()->coords), // problem for packs
+        bounds(rc->GetParentPointer()->packages.Get("fixup").get()->Param<fixup::Bounds>(
+            "bounds")),
+        prho(imap[fluid_prim::density::name()].first),
+        pvel_lo(imap[fluid_prim::velocity::name()].first),
+        peng(imap[fluid_prim::energy::name()].first),
+        pb_lo(imap[fluid_prim::bfield::name()].first),
+        pb_hi(imap[fluid_prim::bfield::name()].second),
+        pye(imap[fluid_prim::ye::name()].second),
+        prs(imap[fluid_prim::pressure::name()].first),
+        gm1(imap[fluid_prim::gamma1::name()].first),
+        crho(imap[fluid_cons::density::name()].first),
+        cmom_lo(imap[fluid_cons::momentum::name()].first),
+        ceng(imap[fluid_cons::energy::name()].first),
+        cb_lo(imap[fluid_cons::bfield::name()].first),
+        cb_hi(imap[fluid_cons::bfield::name()].second),
+        cye(imap[fluid_cons::ye::name()].first),
         ncons(5 + (pb_hi - pb_lo + 1) + (cye > 0)) {
     PARTHENON_REQUIRE_THROWS(
         ncons <= NCONS_MAX,

@@ -97,8 +97,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // We request that Ye and temperature exist, but do not provide them.
     Metadata m = Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Derived,
                            Metadata::OneCopy, Metadata::Requires});
-    pkg->AddField(fluid_prim::ye, m);
-    pkg->AddField(fluid_prim::temperature, m);
+    pkg->AddField(fluid_prim::ye::name(), m);
+    pkg->AddField(fluid_prim::temperature::name(), m);
 
     const std::string filename = pin->GetString(block_name, "filename");
     const bool use_sp5 = pin->GetOrAddBoolean(block_name, "use_sp5", true);

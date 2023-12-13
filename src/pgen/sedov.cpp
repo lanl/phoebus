@@ -31,21 +31,23 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(
-      {fluid_prim::density, fluid_prim::velocity, fluid_prim::energy, fluid_prim::bfield,
-       fluid_prim::ye, fluid_prim::pressure, fluid_prim::temperature, fluid_prim::gamma1},
-      imap);
+  auto v =
+      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
+                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
+                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
+                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
+                        imap);
 
-  const int irho = imap[fluid_prim::density].first;
-  const int ivlo = imap[fluid_prim::velocity].first;
-  const int ivhi = imap[fluid_prim::velocity].second;
-  const int ieng = imap[fluid_prim::energy].first;
-  const int ib_lo = imap[fluid_prim::bfield].first;
-  const int ib_hi = imap[fluid_prim::bfield].second;
-  const int iye = imap[fluid_prim::ye].second;
-  const int iprs = imap[fluid_prim::pressure].first;
-  const int itmp = imap[fluid_prim::temperature].first;
-  const int igm1 = imap[fluid_prim::gamma1].first;
+  const int irho = imap[fluid_prim::density::name()].first;
+  const int ivlo = imap[fluid_prim::velocity::name()].first;
+  const int ivhi = imap[fluid_prim::velocity::name()].second;
+  const int ieng = imap[fluid_prim::energy::name()].first;
+  const int ib_lo = imap[fluid_prim::bfield::name()].first;
+  const int ib_hi = imap[fluid_prim::bfield::name()].second;
+  const int iye = imap[fluid_prim::ye::name()].second;
+  const int iprs = imap[fluid_prim::pressure::name()].first;
+  const int itmp = imap[fluid_prim::temperature::name()].first;
+  const int igm1 = imap[fluid_prim::gamma1::name()].first;
 
   const Real rhoa = pin->GetOrAddReal("sedov", "rho_ambient", 1.0);
   const Real rinner = pin->GetOrAddReal("sedov", "rinner", 0.01);
