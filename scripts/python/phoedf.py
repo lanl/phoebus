@@ -413,7 +413,7 @@ class phoedf(phdf.phdf):
             vpcon = self.Getvpcon()
             for ii in range(3):
                 for jj in range(3):
-                    vpcov[:,ii,:,:,:] += self.gcov[:, ii + 1,jj + 1,:,:,:]*vpcon[:,jj,:,:,:]
+                    self.vpcov[:,ii,:,:,:] += self.gcov[:, ii + 1,jj + 1,:,:,:]*vpcon[:,jj,:,:,:]
 
         return self.vpcov
 

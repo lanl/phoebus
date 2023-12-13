@@ -116,6 +116,7 @@ def get_torus_radial_profiles(dfile):
 
     beta = Pg_sadw / Pm_sadw
 
+    # TODO(BRR) Include dump time
     profiles['x1'] = x1
     profiles['r'] = r
     profiles['Volume'] = Volume
