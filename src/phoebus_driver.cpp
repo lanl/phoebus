@@ -253,30 +253,36 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   TaskRegion &sync_region_1 = tc.AddRegion(num_partitions);
   for (int ib = 0; ib < num_partitions; ++ib) {
     auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
+    // pull out the container we'll use to get fluxes and/or compute RHSs
     auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
+    // pull out a container we'll use to store dU/dt.
+    // This is just -flux_divergence in this example
     auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
+    // pull out a container for the geometric source terms
+    auto &gsrc = pmesh->mesh_data.GetOrAdd("geometric source terms", ib);
     auto &tl = sync_region_1[ib];
 
     tl.AddTask(none, parthenon::StartReceiveBoundBufs<any>, sc1);
     if (pmesh->multilevel) {
       tl.AddTask(none, parthenon::StartReceiveFluxCorrections, sc0);
     }
+    TaskID geom_src(0);
+    if (fluid_active) {
+      auto hydro_geom_src =
+          tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
+      geom_src = geom_src | hydro_geom_src;
+    }
   }
 
+  // Goal: make async regions go away
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
     auto &tl = async_region_1[ib];
 
-    // pull out the container we'll use to get fluxes and/or compute RHSs
     auto &sc0 = pmb->meshblock_data.Get(stage_name[stage - 1]);
-    // pull out a container we'll use to store dU/dt.
-    // This is just -flux_divergence in this example
     auto &dudt = pmb->meshblock_data.Get("dUdt");
-    // pull out the container that will hold the updated state
-    // effectively, sc1 = sc0 + dudt*dt
     auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
-    // pull out a container for the geometric source terms
     auto &gsrc = pmb->meshblock_data.Get("geometric source terms");
 
     TaskID geom_src(0);
@@ -285,10 +291,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (fluid_active) {
       auto hydro_flux = tl.AddTask(none, fluid::CalculateFluxes, sc0.get());
       auto hydro_flux_ct = tl.AddTask(hydro_flux, fluid::FluxCT, sc0.get());
-      auto hydro_geom_src =
-          tl.AddTask(none, fluid::CalculateFluidSourceTerms, sc0.get(), gsrc.get());
       sndrcv_flux_depend = sndrcv_flux_depend | hydro_flux_ct;
-      geom_src = geom_src | hydro_geom_src;
     }
 
     if (rad_moments_active) {

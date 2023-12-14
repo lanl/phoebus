@@ -14,6 +14,7 @@
 #ifndef PHOEBUS_UTILS_VARIABLES_HPP_
 #define PHOEBUS_UTILS_VARIABLES_HPP_
 
+#include <interface/sparse_pack.hpp>
 #include <parthenon/package.hpp>
 
 #define VARIABLE(ns, varname)                                                            \
@@ -122,5 +123,14 @@ VARIABLE_NONS(src_terms);
 VARIABLE_CUSTOM(r_divf, r.flux_divergence);
 VARIABLE_CUSTOM(r_src_terms, r.src_terms);
 } // namespace diagnostic_variables
+
+namespace phoebus {
+template <typename Data, typename... Ts>
+auto MakePackDescriptor(Data *rc) {
+  parthenon::Mesh *pm = rc->GetMeshPointer();
+  parthenon::StateDescriptor *resolved_pkgs = pm->resolved_packages.get();
+  return parthenon::MakePackDescriptor<Ts...>(resolved_pkgs);
+}
+} // namespace phoebus
 
 #endif // PHOEBUS_UTILS_VARIABLES_HPP_
