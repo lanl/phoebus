@@ -282,7 +282,7 @@ for n, N in enumerate(res):
     dump = phdf.phdf(dumps[-1])
     tf_soln = mode["tf"]
     t = dump.Time
-    if (np.fabs(t - tf_soln) / tf_soln) > 0.05:
+    if not args.use_initial and (np.fabs(t - tf_soln) / tf_soln) > 0.05:
         print("Mismatch in expected solution times!")
         print("  Code: ", t)
         print("  Soln: ", tf_soln)

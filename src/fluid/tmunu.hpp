@@ -19,6 +19,9 @@
 #include <utility>
 #include <vector>
 
+#include <interface/sparse_pack.hpp>
+#include <parthenon/package.hpp>
+
 #include "geometry/geometry.hpp"
 #include "phoebus_utils/cell_locations.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
@@ -26,12 +29,10 @@
 #include "phoebus_utils/variables.hpp"
 
 namespace fluid {
+using namespace parthenon::package::prelude;
 
-const std::vector<std::string> TMUNU_VARS = {
-    fluid_prim::density::name(), fluid_prim::velocity::name(), fluid_prim::energy::name(),
-    fluid_prim::pressure::name(), fluid_prim::bfield::name()};
 // Indices are upstairs
-template <typename CoordinateSystem, typename Pack>
+template <typename CoordinateSystem>
 class StressEnergyTensorCon {
  public:
   // TODO(JMM): Should these be moved out of Geometry?
@@ -42,15 +43,18 @@ class StressEnergyTensorCon {
 
   template <typename Data>
   StressEnergyTensorCon(Data *rc) {
-    PackIndexMap imap;
-    pack_ = rc->PackVariables(TMUNU_VARS, imap);
+    namespace p = fluid_prim;
+    using phoebus::MakePackDescriptor;
+    static auto desc =
+        MakePackDescriptor<p::density, p::velocity, p::energy, p::pressure, p::bfield>(
+            rc);
+    pack_ = desc.GetPack(rc);
     system_ = Geometry::GetCoordinateSystem(rc);
-
-    ir_ = imap[fluid_prim::density::name()].first;
-    iv_ = imap[fluid_prim::velocity::name()].first;
-    iu_ = imap[fluid_prim::energy::name()].first;
-    ip_ = imap[fluid_prim::pressure::name()].first;
-    ib_ = imap[fluid_prim::bfield::name()].first;
+    ir_ = pack_.GetLowerBoundHost(0, p::density());
+    iv_ = pack_.GetLowerBoundHost(0, p::velocity());
+    iu_ = pack_.GetLowerBoundHost(0, p::energy());
+    ip_ = pack_.GetLowerBoundHost(0, p::pressure());
+    ib_ = pack_.GetLowerBoundHost(0, p::bfield());
   }
 
   // TODO(JMM): Assumes cell centers. If that needs to change, this
@@ -80,7 +84,7 @@ class StressEnergyTensorCon {
   }
   KOKKOS_FORCEINLINE_FUNCTION
   Real GetVar_(int v, const int k, const int j, const int i) const {
-    return pack_(v, k, j, i);
+    return pack_(0, v, k, j, i);
   }
 
   template <typename... Args>
@@ -125,15 +129,15 @@ class StressEnergyTensorCon {
     bsq = Bsq * iW * iW + Bdotv * Bdotv;
   }
 
-  Pack pack_;
+  parthenon::SparsePack<fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
+                        fluid_prim::pressure, fluid_prim::bfield>
+      pack_;
   CoordinateSystem system_;
   int ir_, iv_, iu_, ip_, ib_;
 };
 
-using TmunuMesh =
-    StressEnergyTensorCon<Geometry::CoordSysMesh, MeshBlockPack<VariablePack<Real>>>;
-using TmunuMeshBlock =
-    StressEnergyTensorCon<Geometry::CoordSysMeshBlock, VariablePack<Real>>;
+using TmunuMesh = StressEnergyTensorCon<Geometry::CoordSysMesh>;
+using TmunuMeshBlock = StressEnergyTensorCon<Geometry::CoordSysMeshBlock>;
 
 TmunuMesh BuildStressEnergyTensor(MeshData<Real> *rc);
 TmunuMeshBlock BuildStressEnergyTensor(MeshBlockData<Real> *rc);
