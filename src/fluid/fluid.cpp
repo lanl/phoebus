@@ -365,8 +365,8 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
 
   // We need these to check whether or not these variables are present
   // in the pack. They are -1 if not present.
-  const int pb_hi = v.GetUpperBoundHost(0, p::bfield());
-  const int pye = v.GetUpperBoundHost(0, p::ye());
+  const int contains_b = v.ContainsHost(0, p::bfield());
+  const int contains_ye = v.ContainsHost(0, p::ye());
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   const int nblocks = v.GetNBlocks();
@@ -390,14 +390,14 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
                             v(b, p::velocity(2), k, j, i)};
         Real bcons[3];
         Real bp[3] = {0.0, 0.0, 0.0};
-        if (pb_hi > 0) {
+        if (contains_b) {
           for (int d = 0; d < 3; ++d) {
             bp[d] = v(b, p::bfield(d), k, j, i);
           }
         }
         Real ye_cons;
         Real ye_prim = 0.0;
-        if (pye > 0) {
+        if (contains_ye) {
           ye_prim = v(b, p::ye(), k, j, i);
         }
 
@@ -411,13 +411,13 @@ TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange 
           v(b, c::momentum(d), k, j, i) = S[d];
         }
 
-        if (pb_hi > 0) {
+        if (contains_b) {
           for (int d = 0; d < 3; ++d) {
             v(b, c::bfield(d), k, j, i) = bcons[d];
           }
         }
 
-        if (pye > 0) {
+        if (contains_ye) {
           v(b, c::ye(), k, j, i) = ye_cons;
         }
 
@@ -533,8 +533,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   return TaskStatus::complete;
 }
 
-TaskStatus CalculateFluidSourceTerms(MeshData<Real> *rc,
-                                     MeshData<Real> *rc_src) {
+TaskStatus CalculateFluidSourceTerms(MeshData<Real> *rc, MeshData<Real> *rc_src) {
   constexpr int ND = Geometry::NDFULL;
   constexpr int NS = Geometry::NDSPACE;
   using phoebus::MakePackDescriptor;
