@@ -46,6 +46,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--log", action="store_true", help="Whether to use logarithmic y axis"
     )
+    # TODO(BRR) add geometric scaling with time averaging window
     args = parser.parse_args()
 
     with open(args.filename, 'rb') as handle:
@@ -54,8 +55,10 @@ if __name__ == "__main__":
     fig, ax = plt.subplots(1,1)
 
     for n, avg_key in enumerate(tavgs.keys()):
+        if n == len(tavgs.keys()) - 1:
+          continue
         col = cm.get_cmap("Spectral")(n / len(tavgs.keys()))
-        ax.plot(tavgs[avg_key]['r'], tavgs[avg_key][args.key], label=str(tavgs[avg_key]['tmin']), color=col)
+        #ax.plot(tavgs[avg_key]['r'], tavgs[avg_key][args.key], label=str(tavgs[avg_key]['tmin']), color=col)
         if args.log:
             ax.plot(tavgs[avg_key]['r'], -tavgs[avg_key][args.key], linestyle='--', color=col)
     ax.legend(loc=2)

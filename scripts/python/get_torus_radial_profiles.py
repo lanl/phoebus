@@ -58,8 +58,14 @@ def get_torus_radial_profiles(dfile):
     F_M_in = np.zeros(Nx1_profile) # Inflow mass flux
     F_M_out = np.zeros(Nx1_profile) # Outflow mass flux
     F_Eg = np.zeros(Nx1_profile) # Gas (MHD) energy flux
+    F_Eg_out = np.zeros(Nx1_profile) # Outward MHD energy flux
+    F_Eg_in = np.zeros(Nx1_profile) # Inward MHD energy flux
     F_Pg = np.zeros(Nx1_profile) # Gas radial momentum flux
+    F_Pg_out = np.zeros(Nx1_profile) # Outward gas radial momentum flux
+    F_Pg_in = np.zeros(Nx1_profile) # Inward gas radial momentum flux
     F_Lg = np.zeros(Nx1_profile) # Gas angular momentum flux
+    F_Lg_out = np.zeros(Nx1_profile) # Outward gas angular momentum flux
+    F_Lg_in = np.zeros(Nx1_profile) # Inward gas angular momentum flux
     Pg_sadw = np.zeros(Nx1_profile) # SADW gas pressure
     Pm_sadw = np.zeros(Nx1_profile) # SADW magnetic pressure
     JetP_m = np.zeros(Nx1_profile) # MHD jet power (sigma > 1)
@@ -67,6 +73,8 @@ def get_torus_radial_profiles(dfile):
     beta = np.zeros(Nx1_profile) # Plasma beta
     vconr = np.zeros(Nx1_profile) # SADW contravariant radial three-velocity
     vcovr = np.zeros(Nx1_profile) # SADW covariant radial three-velocity
+    vconr_out = np.zeros(Nx1_profile) # SADW v^r for outflow
+    vconr_in = np.zeros(Nx1_profile) # SADW v^r for inflow
     # TODO(BRR) Precalculate some azimuthal averages like <u u_g> for Bernoulli. Store
     # these 2D arrays as well?
 
@@ -105,8 +113,16 @@ def get_torus_radial_profiles(dfile):
                         F_Lg[ip] += dA[b,k,j,i] * Tmunu_concov[1, 3]
                         if Be[k,j] > 0:
                             F_M_out[ip] += dA[b,k,j,i]*rho[b,k,j,i]*ucon[b,1,k,j,i]
+                            F_Eg_out[ip] += dA[b,k,j,i] * Tmunu_concov[1, 0]
+                            F_Pg_out[ip] += dA[b,k,j,i] * Tmunu_concov[1, 1]
+                            F_Lg_out[ip] += dA[b,k,j,i] * Tmunu_concov[1, 3]
+                            vconr_out[ip] += dV[b,k,j,i]*rho[b,k,j,i]*vpcon[b,0,k,j,i]/Gamma[b,k,j,i]
                         else:
                             F_M_in[ip] += dA[b,k,j,i]*rho[b,k,j,i]*ucon[b,1,k,j,i]
+                            F_Eg_in[ip] += dA[b,k,j,i] * Tmunu_concov[1, 0]
+                            F_Pg_in[ip] += dA[b,k,j,i] * Tmunu_concov[1, 1]
+                            F_Lg_in[ip] += dA[b,k,j,i] * Tmunu_concov[1, 3]
+                            vconr_in[ip] += dV[b,k,j,i]*rho[b,k,j,i]*vpcon[b,0,k,j,i]/Gamma[b,k,j,i]
                         if sigma[b,k,j,i] > 1.:
                             JetP_m[ip] += dA[b,k,j,i]*Tmunu_concov[1,0]
                             JetP_g[ip] += dA[b,k,j,i]*rho[b,k,j,i]*ucon[b,1,k,j,i]
@@ -127,11 +143,19 @@ def get_torus_radial_profiles(dfile):
     profiles['F_Eg'] = F_Eg
     profiles['F_Pg'] = F_Pg
     profiles['F_Lg'] = F_Lg
+    profiles['F_Eg_out'] = F_Eg_out
+    profiles['F_Pg_out'] = F_Pg_out
+    profiles['F_Lg_out'] = F_Lg_out
+    profiles['F_Eg_in'] = F_Eg_in
+    profiles['F_Pg_in'] = F_Pg_in
+    profiles['F_Lg_in'] = F_Lg_in
     profiles['beta'] = beta
     profiles['JetP_m'] = JetP_m
     profiles['JetP_g'] = JetP_g
     profiles['vconr'] = vconr / Mass
     profiles['vcovr'] = vcovr / Mass
+    profiles['vconr_out'] = vconr_out / Mass
+    profiles['vconr_in'] = vconr_in / Mass
 
     return profiles
 
