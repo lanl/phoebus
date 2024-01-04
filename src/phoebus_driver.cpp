@@ -699,8 +699,9 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
       pdo_gain_reducer = rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
     }
     // creating a new sync region for light bulb functions
+    const int num_partitions = pmesh->DefaultNumPartitions();
     TaskRegion &sync_region_lb = tc.AddRegion(num_partitions);
-    for (int ib = 0; ib < mun_partiotions; ++ib) {
+    for (int ib = 0; ib < num_partiotions; ++ib) {
       auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
       auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
       auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
