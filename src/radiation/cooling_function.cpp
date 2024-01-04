@@ -75,22 +75,25 @@ TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
   return TaskStatus::complete;
 }
 
-TaskStatus CheckDoGain(MeshBlockData<Real> *rc, bool *do_gain_global) {
+TaskStatus CheckDoGain(MeshData<Real> *rc, bool *do_gain_global) {
   if (*do_gain_global) {
     return TaskStatus::complete;
   }
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
+  using parthenon::MakePackescriptor;
   Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
 
-  std::vector<std::string> vars({iv::tau::name()});
+  static auto desc = MakePackDescriptor<p::density, iv::tau>(resolved_pkgs.get());
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-  const int ptau = imap[iv::tau::name()].first;
+  auto v = rc->desc.GetPack(rc);
+  const int nblocks = v.GetNblocks()
 
-  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+                          IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
@@ -102,10 +105,10 @@ TaskStatus CheckDoGain(MeshBlockData<Real> *rc, bool *do_gain_global) {
   int do_gain_local = 0;
   bool do_gain;
   parthenon::par_reduce(
-      parthenon::loop_pattern_mdrange_tag, "calc_do_gain", DevExecSpace(), kb.s, kb.e,
-      jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i, int &do_gain) {
-        do_gain = do_gain + (v(ptau, k, j, i) > 1.e2);
+      parthenon::loop_pattern_mdrange_tag, "calc_do_gain", DevExecSpace(), 0,
+      nblocks - 1 kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &do_gain) {
+        do_gain = do_gain + (v(b, iv::tau, k, j, i) > 1.e2);
       },
       Kokkos::Sum<int>(do_gain_local));
   do_gain = do_gain_local;

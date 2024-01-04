@@ -698,11 +698,11 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
     if (do_lightbulb) {
       pdo_gain_reducer = rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
     }
-    //creating a new sync region for light bulb functions
+    // creating a new sync region for light bulb functions
     TaskRegion &sync_region_lb = tc.AddRegion(num_partitions);
-    for (int ib = 0; ib < mun_partiotions; ++ib){
+    for (int ib = 0; ib < mun_partiotions; ++ib) {
       auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
-      auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage-1], ib);
+      auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
       auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
       auto &tl = sync_region_lb[ib];
       auto finish_gain_reducer = none;
@@ -719,9 +719,8 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
             tl.AddTask(start_gain_reducer, &parthenon::AllReduce<bool>::CheckReduce,
                        pdo_gain_reducer);
         int reg_dep_id = 0;
-      
-    }
-   
+      }
+
       auto calculate_four_force =
           tl.AddTask(finish_gain_reducer, radiation::CoolingFunctionCalculateFourForce,
                      sc0.get(), dt);
