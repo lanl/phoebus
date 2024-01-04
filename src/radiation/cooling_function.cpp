@@ -34,7 +34,6 @@ TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
 
   static auto desc = MakePackDescriptor<p::density, iv::tau>(resolved_pkgs.get());
 
-
   PackIndexMap imap;
   auto v = rc->desc.GetPack(rc);
 
@@ -42,15 +41,17 @@ TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  const int nblocks=v.GetNBlocks();
-  
+  const int nblocks = v.GetNBlocks();
+
   auto &unit_conv =
       pmesh->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CalcTau", DevExecSpace(), 0, nblocks-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "CalcTau", DevExecSpace(), 0, nblocks - 1, kb.s, kb.e, jb.s,
+      jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        const Real rho = v(b, p::density, k, j, i) * density_conversion_factor; // Density in CGS
+        const Real rho =
+            v(b, p::density, k, j, i) * density_conversion_factor; // Density in CGS
         const Real lRho = std::log10(rho);
         // Calculate tau
         constexpr Real xl1 = LightBulb::HeatAndCool::XL1;
