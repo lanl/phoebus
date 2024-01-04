@@ -35,7 +35,7 @@ TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
   static auto desc = MakePackDescriptor<p::density, iv::tau>(resolved_pkgs.get());
 
   PackIndexMap imap;
-  auto v = rc->desc.GetPack(rc);
+  auto v = desc.GetPack(rc);
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
@@ -90,7 +90,7 @@ TaskStatus CheckDoGain(MeshData<Real> *rc, bool *do_gain_global) {
   static auto desc = MakePackDescriptor<iv::tau>(resolved_pkgs.get());
 
   PackIndexMap imap;
-  auto v = rc->desc.GetPack(rc);
+  auto v = desc.GetPack(rc);
   const int nblocks = v.GetNblocks()
 
                           IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
