@@ -91,9 +91,9 @@ TaskStatus CheckDoGain(MeshData<Real> *rc, bool *do_gain_global) {
 
   PackIndexMap imap;
   auto v = desc.GetPack(rc);
-  const int nblocks = v.GetNBlocks()
+  const int nblocks = v.GetNBlocks();
 
-                          IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
