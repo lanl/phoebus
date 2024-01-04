@@ -27,7 +27,7 @@ TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
-  using parthenon::MakePackescriptor;
+  using parthenon::MakePackDescriptor;
   Mesh *pmesh = rc->GetMeshPointer();
   auto &resolved_pkgs = pmesh->resolved_packages;
   const int ndim = pmesh->ndim;
@@ -82,7 +82,7 @@ TaskStatus CheckDoGain(MeshData<Real> *rc, bool *do_gain_global) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
-  using parthenon::MakePackescriptor;
+  using parthenon::MakePackDescriptor;
   Mesh *pmesh = rc->GetMeshPointer();
   auto &resolved_pkgs = pmesh->resolved_packages;
   const int ndim = pmesh->ndim;
