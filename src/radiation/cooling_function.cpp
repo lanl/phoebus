@@ -51,7 +51,7 @@ TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
       jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         const Real rho =
-            v(b, p::density, k, j, i) * density_conversion_factor; // Density in CGS
+            v(b, p::density(), k, j, i) * density_conversion_factor; // Density in CGS
         const Real lRho = std::log10(rho);
         // Calculate tau
         constexpr Real xl1 = LightBulb::HeatAndCool::XL1;
@@ -70,7 +70,7 @@ TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
         } else {
           tau = std::pow(10, (yl3 - yl2) / (xl3 - xl2) * (lRho - xl2) + yl2);
         }
-        v(b, iv::tau, k, j, i) = tau;
+        v(b, iv::tau(), k, j, i) = tau;
       });
   return TaskStatus::complete;
 }
@@ -87,7 +87,7 @@ TaskStatus CheckDoGain(MeshData<Real> *rc, bool *do_gain_global) {
   auto &resolved_pkgs = pmesh->resolved_packages;
   const int ndim = pmesh->ndim;
 
-  static auto desc = MakePackDescriptor<p::density, iv::tau>(resolved_pkgs.get());
+  static auto desc = MakePackDescriptor<iv::tau>(resolved_pkgs.get());
 
   PackIndexMap imap;
   auto v = rc->desc.GetPack(rc);
@@ -108,7 +108,7 @@ TaskStatus CheckDoGain(MeshData<Real> *rc, bool *do_gain_global) {
       parthenon::loop_pattern_mdrange_tag, "calc_do_gain", DevExecSpace(), 0,
       nblocks - 1 kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &do_gain) {
-        do_gain = do_gain + (v(b, iv::tau, k, j, i) > 1.e2);
+        do_gain = do_gain + (v(b, iv::tau(), k, j, i) > 1.e2);
       },
       Kokkos::Sum<int>(do_gain_local));
   do_gain = do_gain_local;
