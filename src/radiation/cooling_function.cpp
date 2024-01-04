@@ -16,36 +16,41 @@
 #include "phoebus_utils/variables.hpp"
 #include "radiation.hpp"
 #include <algorithm>
+#include <interface/sparse_pack.hpp>
 
 namespace radiation {
 
 using Microphysics::Opacities;
 using Microphysics::RadiationType;
 
-TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc) {
+TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
+  using parthenon::MakePackescriptor;
   Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
 
-  std::vector<std::string> vars({p::density::name(), iv::tau::name()});
+  static auto desc = MakePackDescriptor<p::density, iv::tau>(resolved_pkgs.get());
+
 
   PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-  const int prho = imap[p::density::name()].first;
-  const int ptau = imap[iv::tau::name()].first;
+  auto v = rc->desc.GetPack(rc);
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
+  const int nblocks=v.GetNBlocks();
+  
   auto &unit_conv =
       pmesh->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "CalcTau", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real rho = v(prho, k, j, i) * density_conversion_factor; // Density in CGS
+      DEFAULT_LOOP_PATTERN, "CalcTau", DevExecSpace(), 0, nblocks-1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        const Real rho = v(b, p::density, k, j, i) * density_conversion_factor; // Density in CGS
         const Real lRho = std::log10(rho);
         // Calculate tau
         constexpr Real xl1 = LightBulb::HeatAndCool::XL1;
@@ -64,7 +69,7 @@ TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc) {
         } else {
           tau = std::pow(10, (yl3 - yl2) / (xl3 - xl2) * (lRho - xl2) + yl2);
         }
-        v(ptau, k, j, i) = tau;
+        v(b, iv::tau, k, j, i) = tau;
       });
   return TaskStatus::complete;
 }
