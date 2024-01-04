@@ -105,8 +105,8 @@ TaskStatus CheckDoGain(MeshData<Real> *rc, bool *do_gain_global) {
   int do_gain_local = 0;
   bool do_gain;
   parthenon::par_reduce(
-      parthenon::loop_pattern_mdrange_tag, "calc_do_gain", DevExecSpace(), 0,
-      nblocks - 1 kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      parthenon::loop_pattern_mdrange_tag, "calc_do_gain", DevExecSpace(), 0, nblocks - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &do_gain) {
         do_gain = do_gain + (v(b, iv::tau(), k, j, i) > 1.e2);
       },
