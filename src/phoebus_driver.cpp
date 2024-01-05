@@ -703,8 +703,7 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
     TaskRegion &sync_region_lb = tc.AddRegion(num_partitions);
     for (int ib = 0; ib < num_partitions; ++ib) {
       auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
-      auto &sc0 = pmesh->mesh_data.GetOrAdd(stage_name[stage - 1], ib);
-      auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
+      auto &sc0 = pmesh->mesh_data.GetOrAdd("base", ib);
       auto &tl = sync_region_lb[ib];
       auto finish_gain_reducer = none;
       if (do_lightbulb) {
