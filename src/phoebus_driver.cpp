@@ -720,7 +720,12 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
                        pdo_gain_reducer);
         int reg_dep_id = 0;
       }
-
+    }
+    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
+    for (int ib = 0; ib < num_independent_task_lists; ib++) {
+      auto pmb = blocks[ib].get();
+      auto &tl = async_region[ib];
+      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
       auto calculate_four_force =
           tl.AddTask(finish_gain_reducer, radiation::CoolingFunctionCalculateFourForce,
                      sc0.get(), dt);
