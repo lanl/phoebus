@@ -538,37 +538,36 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   return physics;
 }
 
-TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const double dt) {
+TaskStatus ApplyRadiationFourForce(MeshData<Real> *rc, const double dt) {
   PARTHENON_REQUIRE(USE_VALENCIA, "Covariant GRMHD formulation not supported!");
-
   namespace c = fluid_cons;
   namespace iv = internal_variables;
+  using parthenon::MakePackDescriptor;
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
 
-  std::vector<std::string> vars({c::density::name(), c::energy::name(),
-                                 c::momentum::name(), c::ye::name(), iv::Gcov::name(),
-                                 iv::Gye::name()});
+  static auto desc =
+      MakePackDescriptor<c::density, c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye>(
+          resolved_pkgs.get());
+
   PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-  const int crho = imap[c::density::name()].first;
-  const int ceng = imap[c::energy::name()].first;
-  const int cmom_lo = imap[c::momentum::name()].first;
-  const int cmom_hi = imap[c::momentum::name()].second;
-  const int cye = imap[c::ye::name()].first;
-  const int Gcov_lo = imap[iv::Gcov::name()].first;
-  const int Gcov_hi = imap[iv::Gcov::name()].second;
-  const int Gye = imap[iv::Gye::name()].first;
+  auto v = desc.GetPack(rc);
+  const int nblocks = v.GetNBlocks();
+
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        v(ceng, k, j, i) -= v(Gcov_lo, k, j, i) * dt;
-        v(cmom_lo, k, j, i) += v(Gcov_lo + 1, k, j, i) * dt;
-        v(cmom_lo + 1, k, j, i) += v(Gcov_lo + 2, k, j, i) * dt;
-        v(cmom_lo + 2, k, j, i) += v(Gcov_lo + 3, k, j, i) * dt;
-        v(cye, k, j, i) += v(Gye, k, j, i) * dt;
+      DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), 0, nblocks - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        v(ceng, k, j, i) -= v(b, iv::Gcov(0), k, j, i) * dt;
+        v(cmom_lo, k, j, i) += v(b, iv::Gcov(0) + 1, k, j, i) * dt;
+        v(cmom_lo + 1, k, j, i) += v(b, iv::Gcov(0) + 2, k, j, i) * dt;
+        v(cmom_lo + 2, k, j, i) += v(b, iv::Gcov(0) + 3, k, j, i) * dt;
+        v(cye, k, j, i) += v(b, iv::Gye(), k, j, i) * dt;
       });
   return TaskStatus::complete;
 }
