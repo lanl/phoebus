@@ -1,0 +1,151 @@
+# © 2021. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract 89233218CNA000001
+# for Los Alamos National Laboratory (LANL), which is operated by Triad
+# National Security, LLC for the U.S.  Department of Energy/National
+# Nuclear Security Administration. All rights in the program are
+# reserved by Triad National Security, LLC, and the U.S. Department of
+# Energy/National Nuclear Security Administration. The Government is
+# granted for itself and others acting on its behalf a nonexclusive,
+# paid-up, irrevocable worldwide license in this material to reproduce,
+# prepare derivative works, distribute copies to the public, perform
+# publicly and display publicly, and to permit others to do so.
+
+<phoebus>
+problem = mmsacc
+ix1_bc = outflow
+ox1_bc = outflow
+ix2_bc = reflect
+ox2_bc = reflect
+
+<parthenon/job>
+problem_id  = mmsacc       # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = p.density,       &
+            c.density,       &
+            p.velocity,      &
+            c.momentum,      &
+            p.energy,        &
+            c.energy,        &
+            pressure,        &
+            g.c.coord,       &
+            g.f1.coord,      &
+            g.f2.coord,      &
+            g.f3.coord,      &
+            g.n.coord,       &
+            g.c.detgam,      &
+            g.c.bcon,        &
+            g.c.alpha,       &
+            g.c.gcov,        &
+            src_terms,       &
+            flux_divergence, &
+            p.bfield
+
+file_type   = hdf5      # Tabular data dump
+dt          = 10.0      # time increment between outputs
+
+<parthenon/output2>
+file_type   = hst       # History data dump
+dt          = 0.1       # Time increment between outputs
+
+<parthenon/time>
+nlim        = -1        # cycle limit
+tlim        = 10000.0     # time limit
+integrator  = rk2       # time integration algorithm
+ncycle_out  = 1         # interval for stdout summary info
+dt_init_fact = 1.e-6
+
+<parthenon/mesh>
+nghost = 4
+refinement = adaptive
+numlevel = 3
+
+nx1         = 256           # Number of zones in X1-direction
+x1min       = 0.59          # minimum value of X1
+x1max       = 10             # maximum value of X1
+ix1_bc      = user          # Inner-X1 boundary condition flag
+ox1_bc      = user          # Outer-X1 boundary condition flag
+
+nx2         = 64             # Number of zones in X2-direction
+x2min       = 0             # minimum value of X2
+x2max       = 1 #3.14159265359 #1 # maximum value of X2. Pi
+ix2_bc      = user          # Inner-X2 boundary condition flag
+ox2_bc      = user          # Outer-X2 boundary condition flag
+
+nx3         = 128             # Number of zones in X3-direction
+x3min       = 0             # minimum value of X3
+x3max       = 6.28318530718 # maximum value of X3. 2*pi
+ix3_bc      = periodic      # Inner-X3 boundary condition flag
+ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
+
+num_threads = 1         # maximum number of OMP threads
+
+<parthenon/meshblock>
+nx1 = 256
+nx2 = 32
+nx3 = 64
+
+<parthenon/refinement0>
+field = c.c.bulk.rho
+method = derivative_order_1
+max_level = 3
+
+<eos>
+type = IdealGas
+Gamma = 1.4
+Cv = 2.5
+
+<physics>
+hydro = true
+he = false
+3t = false
+rad = false
+
+<fluid>
+cfl = 0.8
+riemann = llf
+recon = linear
+c2p_method = robust
+c2p_max_iter = 100
+c2p_tol = 1.e-8
+Ye = false
+mhd = true
+
+<geometry>
+a = 0.9375
+
+<coordinates>
+derefine_poles = false
+
+<mmsacc>
+mdot = 1
+cs0 = 0.01
+psi = 0.0
+r_cut = 10.0
+target_beta = 100.
+b_radius = 10.
+b_fact = 0.00156
+harm_beta_normalization = true
+magnetized = true
+b_nrom = false
+jitter = 0.01
+
+<fixup>
+enable_floors = true
+enable_mhd_floors = true
+enable_ceilings = true
+enable_flux_fixup = true
+enable_c2p_fixup = true
+floor_type = ExpX1RhoSie
+rho0_floor = 1.0e-8
+sie0_floor = 1.0e-3
+rho_exp_floor = -2.0
+sie_exp_floor = -1.0
+ceiling_type = ConstantGamSie
+sie0_ceiling = 1.0
+gam0_ceiling = 10.0
+enable_ox1_fmks_inflow_check = true
+enable_phi_enforcement = false
+enforced_phi = 1.
+enforced_phi_timescale = 500.
+enforced_phi_cadence = 1.

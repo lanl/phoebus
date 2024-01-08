@@ -40,6 +40,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(sedov)                                                                         \
   PROBLEM(blandford_mckee)                                                               \
   PROBLEM(bondi)                                                                         \
+  PROBLEM(mmsacc)                                                                        \
   PROBLEM(radiation_advection)                                                           \
   PROBLEM(radiation_equilibration)                                                       \
   PROBLEM(rotor)                                                                         \
@@ -59,7 +60,8 @@ using namespace parthenon::package::prelude;
 // the name here
 #define FOREACH_POSTINIT_MODIFIER                                                        \
   POSTINIT_MODIFIER(phoebus)                                                             \
-  POSTINIT_MODIFIER(bondi)                                                             \
+  POSTINIT_MODIFIER(bondi)                                                               \
+  POSTINIT_MODIFIER(mmsacc)                                                              \
   POSTINIT_MODIFIER(torus)
 
 /*
