@@ -563,11 +563,11 @@ TaskStatus ApplyRadiationFourForce(MeshData<Real> *rc, const double dt) {
       DEFAULT_LOOP_PATTERN, "ApplyRadiationFourForce", DevExecSpace(), 0, nblocks - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        v(ceng, k, j, i) -= v(b, iv::Gcov(0), k, j, i) * dt;
-        v(cmom_lo, k, j, i) += v(b, iv::Gcov(0) + 1, k, j, i) * dt;
-        v(cmom_lo + 1, k, j, i) += v(b, iv::Gcov(0) + 2, k, j, i) * dt;
-        v(cmom_lo + 2, k, j, i) += v(b, iv::Gcov(0) + 3, k, j, i) * dt;
-        v(cye, k, j, i) += v(b, iv::Gye(), k, j, i) * dt;
+        v(b, c::engergy(), k, j, i) -= v(b, iv::Gcov(0), k, j, i) * dt;
+        v(b, c::momentum(0), k, j, i) += v(b, iv::Gcov(0) + 1, k, j, i) * dt;
+        v(b, c::momentum(0) + 1, k, j, i) += v(b, iv::Gcov(0) + 2, k, j, i) * dt;
+        v(b, c::momentum(0) + 2, k, j, i) += v(b, iv::Gcov(0) + 3, k, j, i) * dt;
+        v(b, c::ye(), k, j, i) += v(b, iv::Gye(), k, j, i) * dt;
       });
   return TaskStatus::complete;
 }
