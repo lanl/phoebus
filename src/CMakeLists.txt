@@ -84,6 +84,7 @@ add_executable(phoebus
   pgen/advection.cpp
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
+  pgen/mmsacc.cpp
   pgen/check_cached_geom.cpp
   pgen/friedmann.cpp
   pgen/homogeneous_sphere.cpp

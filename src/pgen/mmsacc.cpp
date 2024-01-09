@@ -101,13 +101,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   RNGPool rng_pool(seed);
 
   // Solution constants
-  const Real uc = std::sqrt(1.0 / (2. * rs));
-  const Real Vc = -std::sqrt(std::pow(uc, 2) / (1. - 3. * std::pow(uc, 2)));
-  const Real Tc = -n * std::pow(Vc, 2) / ((n + 1.) * (n * std::pow(Vc, 2) - 1.));
-  const Real C1 = uc * std::pow(rs, 2) * std::pow(Tc, n);
-  const Real C2 =
-      std::pow(1. + (1. + n) * Tc, 2) *
-      (1. - 2. / rs + std::pow(C1, 2) / (std::pow(rs, 4) * std::pow(Tc, 2 * n)));
+  //const Real uc = std::sqrt(1.0 / (2. * rs));
+  //const Real Vc = -std::sqrt(std::pow(uc, 2) / (1. - 3. * std::pow(uc, 2)));
+  //const Real Tc = -n * std::pow(Vc, 2) / ((n + 1.) * (n * std::pow(Vc, 2) - 1.));
+  //const Real C1 = uc * std::pow(rs, 2) * std::pow(Tc, n);
+  //const Real C2 =
+  //    std::pow(1. + (1. + n) * Tc, 2) *
+  //    (1. - 2. / rs + std::pow(C1, 2) / (std::pow(rs, 4) * std::pow(Tc, 2 * n)));
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -231,8 +231,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // get vector potential
   ParArrayND<Real> A("vector potential", 3, kb.e+1, jb.e + 1, ib.e + 1);
   pmb->par_for(
-      "Phoebus::ProblemGenerator::MMSACC2", jb.s + 1, jb.e, ib.s + 1, ib.e,
-      KOKKOS_LAMBDA(const int j, const int i) {
+      "Phoebus::ProblemGenerator::MMSACC2", kb.s+1, kb.e, jb.s + 1, jb.e, ib.s + 1, ib.e,
+      KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real x1 = coords.Xc<1>(k, j, i);
         Real x2 = coords.Xc<2>(k, j, i);
         Real x3 = coords.Xc<3>(k, j, i);
@@ -265,11 +265,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           v(iblo  , k, j, i) = ( (A(2,k,j+1,i)+A(2,k+1,j+1,i)+A(2,k,j+1,i+1)+A(2,k+1,j+1,i+1)) - (A(2,k,j,i)+A(2,k+1,j,i)+A(2,k,j,i+1)+A(2,k+1,j,i+1)) )/dx2;
           v(iblo  , k, j, i) -=( (A(1,k+1,j,i)+A(1,k+1,j+1,i)+A(1,k+1,j,i+1)+A(1,k+1,j+1,i+1)) - (A(1,k,j,i)+A(1,k,j+1,i)+A(1,k,j,i+1)+A(1,k,j+1,i+1)) )/dx3;
 
-          v(ilbo+1, k, j, i) = ( (A(0,k+1,j,i)+A(0,k+1,j+1,i)+A(0,k+1,j,i+1)+A(0,k+1,j+1,i+1)) - (A(0,k,j,i)+A(0,k,j+1,i)+A(0,k,j,i+1)+A(0,k,j+1,i+1)) )/dx3;
-          v(ilbo+1, k, j, i) -=( (A(2,k,j,i+1)+A(2,k+1,j,i+1)+A(2,k,j+1,i+1)+A(2,k+1,j+1,i+1)) - (A(2,k,j,i)+A(2,k+1,j,i)+A(2,k,j+1,i)+A(2,k+1,j+1,i)) )/dx1;
+          v(iblo+1, k, j, i) = ( (A(0,k+1,j,i)+A(0,k+1,j+1,i)+A(0,k+1,j,i+1)+A(0,k+1,j+1,i+1)) - (A(0,k,j,i)+A(0,k,j+1,i)+A(0,k,j,i+1)+A(0,k,j+1,i+1)) )/dx3;
+          v(iblo+1, k, j, i) -=( (A(2,k,j,i+1)+A(2,k+1,j,i+1)+A(2,k,j+1,i+1)+A(2,k+1,j+1,i+1)) - (A(2,k,j,i)+A(2,k+1,j,i)+A(2,k,j+1,i)+A(2,k+1,j+1,i)) )/dx1;
 
-          v(ilbo+2, k, j, i) = ( (A(0,k,j+1,i)+A(0,k,j+1,i+1)+A(0,k+1,j+1,i)+A(0,k+1,j+1,i+1)) - (A(0,k,j,i)+A(0,k,j,i+1)+A(0,k+1,j,i)+A(0,k+1,j,i+1)) )/dx2;
-          v(ilbo+2, k, j, i) -=( (A(1,k,j,i+1)+A(1,k,j+1,i+1)+A(1,k+1,j,i+1)+A(1,k+1,j+1,i+1)) - (A(1,k,j,i)+A(1,k,j+1,i)+A(1,k+1,j,i)+A(1,k+1,j+1,i)) )/dx1;
+          v(iblo+2, k, j, i) = ( (A(0,k,j+1,i)+A(0,k,j+1,i+1)+A(0,k+1,j+1,i)+A(0,k+1,j+1,i+1)) - (A(0,k,j,i)+A(0,k,j,i+1)+A(0,k+1,j,i)+A(0,k+1,j,i+1)) )/dx2;
+          v(iblo+2, k, j, i) -=( (A(1,k,j,i+1)+A(1,k,j+1,i+1)+A(1,k+1,j,i+1)+A(1,k+1,j+1,i+1)) - (A(1,k,j,i)+A(1,k,j+1,i)+A(1,k+1,j,i)+A(1,k+1,j+1,i)) )/dx1;
 
         });
   }
