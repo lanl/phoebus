@@ -138,8 +138,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  const int nblocks = v.GetNBlocks();
-
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   auto rad = pmb->packages.Get("radiation").get();
@@ -172,7 +170,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
       nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         // Initialize five-force to zero
-        for (int mu = iv::Gcov(0); mu <= iv::Gcov(0) + 3; mu++) {
+        for (int mu = iv::Gcov(0); mu <= iv::Gcov(3); mu++) {
           v(b, mu, k, j, i) = 0.;
         }
         v(b, iv::Gye(), k, j, i) = 0.;
@@ -203,8 +201,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
           Real Gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
           Real Ucon[4];
-          Real vel[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(0) + 1, k, j, i),
-                         v(b, p::velocity(0) + 2, k, j, i)};
+          Real vel[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
+                         v(b, p::velocity(2), k, j, i)};
           GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
           Geometry::Tetrads Tetrads(Ucon, Gcov);
           Real Jye = 0.0;
@@ -303,9 +301,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
               Real Gcov[4][4];
               geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
               Real Ucon[4];
-              Real vel[3] = {v(b, p::velocity(0), k, j, i),
-                             v(b, p::velocity(0) + 1, k, j, i),
-                             v(b, p::velocity(0) + 2, k, j, i)};
+              Real vel[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
+                             v(b, p::velocity(2), k, j, i)};
               GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
               Geometry::Tetrads Tetrads(Ucon, Gcov);
 
@@ -322,9 +319,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
               Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
               Real detG = geom.DetG(CellLocation::Cent, k, j, i);
 
-              for (int mu = iv::Gcov(0); mu <= iv::Gcov(0) + 3; mu++) {
+              for (int mu = iv::Gcov(0); mu <= iv::Gcov(3); mu++) {
                 Kokkos::atomic_add(&(v(b, mu, k, j, i)),
-                                   -detG * Gcov_coord[mu - Gcov_lo]);
+                                   -detG * Gcov_coord[mu - iv::Gcov(0)]);
               }
               Kokkos::atomic_add(&(v(b, iv::Gye, k, j, i)), -LeptonSign(s) * detG * Jye);
             });
