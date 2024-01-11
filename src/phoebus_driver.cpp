@@ -719,18 +719,13 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
             tl.AddTask(start_gain_reducer, &parthenon::AllReduce<bool>::CheckReduce,
                        pdo_gain_reducer);
         int reg_dep_id = 0;
+        sync_region.AddRegionalDependencies(reg_dep_id++, ib, finish_gain_reducer);
       }
       auto calculate_four_force =
           tl.AddTask(finish_gain_reducer, radiation::CoolingFunctionCalculateFourForce,
                      sc0.get(), dt);
       auto apply_four_force = tl.AddTask(
           calculate_four_force, radiation::ApplyRadiationFourForce, sc0.get(), dt);
-    }
-    TaskRegion &async_region = tc.AddRegion(num_independent_task_lists);
-    for (int ib = 0; ib < num_independent_task_lists; ib++) {
-      auto pmb = blocks[ib].get();
-      auto &tl = async_region[ib];
-      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
     }
   } else if (rad_method == "monte_carlo") {
     return MonteCarloStep();

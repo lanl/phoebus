@@ -198,11 +198,11 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
               v(b, p::density(), k, j, i) * density_conversion_factor; // Density in CGS
           const Real cdensity = v(b, c::density(), k, j, i); // conserved density
           Real Gcov[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
+          geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, Gcov);
           Real Ucon[4];
           Real vel[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
                          v(b, p::velocity(2), k, j, i)};
-          GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
+          GetFourVelocity(vel, geom, CellLocation::Cent, b, k, j, i, Ucon);
           Geometry::Tetrads Tetrads(Ucon, Gcov);
           Real Jye = 0.0;
           Real J;
@@ -299,11 +299,11 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
             nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
             KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
               Real Gcov[4][4];
-              geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
+              geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, Gcov);
               Real Ucon[4];
               Real vel[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
                              v(b, p::velocity(2), k, j, i)};
-              GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
+              GetFourVelocity(vel, geom, CellLocation::Cent, b, k, j, i, Ucon);
               Geometry::Tetrads Tetrads(Ucon, Gcov);
 
               const Real Ye = v(b, p::ye(), k, j, i);
@@ -317,7 +317,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
               Real Gcov_tetrad[4] = {-J, 0., 0., 0.};
               Real Gcov_coord[4];
               Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
-              Real detG = geom.DetG(CellLocation::Cent, k, j, i);
+              Real detG = geom.DetG(CellLocation::Cent, b, k, j, i);
 
               for (int mu = iv::Gcov(0); mu <= iv::Gcov(3); mu++) {
                 Kokkos::atomic_add(&(v(b, mu, k, j, i)),
