@@ -130,9 +130,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
       MakePackDescriptor<c::density, p::density, p::velocity, p::temperature, p::ye,
                          c::energy, iv::Gcov, iv::GcovHeat, iv::GcovCool, iv::Gye,
                          iv::tau, p::energy>(resolved_pkgs.get());
-  const int nblocks = v.GetNBlocks();
-
   auto v = desc.GetPack(rc);
+  const int nblocks = v.GetNBlocks();
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
@@ -193,8 +192,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
         DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), 0,
         nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-          auto &coords = v.GetCoordinates(b) const Real r =
-              std::abs(coords.Xc<1>(k, j, i));
+          auto &coords = v.GetCoordinates(b);
+          const Real r = std::abs(coords.Xc<1>(k, j, i));
           const Real rho =
               v(b, p::density(), k, j, i) * density_conversion_factor; // Density in CGS
           const Real cdensity = v(b, c::density(), k, j, i); // conserved density
@@ -261,9 +260,10 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
               Xh, Xn, Xp, Abar, Zbar, lambda);
           heat = do_gain * (Xn + Xp) * hfac * std::exp(-tau) *
                  pow((rnorm / (r * length_conversion_factor)), 2);
-          cool =
-              (Xn + Xp) * cfac * std::exp(-tau) *
-              pow((v(b, p::temp(), k, j, i) * temperature_conversion_factor / Tnorm), 6);
+          cool = (Xn + Xp) * cfac * std::exp(-tau) *
+                 pow((v(b, p::temperature(), k, j, i) * temperature_conversion_factor /
+                      Tnorm),
+                     6);
 
           Real CGSToCodeFact =
               energy_conversion_factor / mass_conversion_factor / time_conversion_factor;
@@ -275,13 +275,13 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
           Real Gcov_tetrad[4] = {J, 0., 0., 0.}; // minus sign included above
           Real Gcov_coord[4];
           Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
-          for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
+          for (int mu = iv::Gcov(0); mu <= iv::Gcov(3); mu++) {
             // detg included above
             Kokkos::atomic_add(&(v(b, mu, k, j, i)), -Gcov_coord[mu - iv::Gcov(0)]);
           }
-          v(GcovHeat, k, j, i) =
+          v(b, iv::GcovHeat(), k, j, i) =
               v(b, p::density(), k, j, i) * density_conversion_factor * heat;
-          v(GcovCool, k, j, i) =
+          v(b, iv::GcovCool(), k, j, i) =
               v(b, p::density(), k, j, i) * density_conversion_factor * cool;
           Kokkos::atomic_add(&(v(b, iv::Gye(), k, j, i)), Jye);
         });
@@ -323,7 +323,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
                 Kokkos::atomic_add(&(v(b, mu, k, j, i)),
                                    -detG * Gcov_coord[mu - iv::Gcov(0)]);
               }
-              Kokkos::atomic_add(&(v(b, iv::Gye, k, j, i)), -LeptonSign(s) * detG * Jye);
+              Kokkos::atomic_add(&(v(b, iv::Gye(), k, j, i)),
+                                 -LeptonSign(s) * detG * Jye);
             });
       }
     }
