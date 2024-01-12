@@ -277,7 +277,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
           Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
           for (int mu = 0; mu <= 3; mu++) {
             // detg included above
-            Kokkos::atomic_add(&(v(b, iv::Gcov(mu), k, j, i)), -Gcov_coord[iv::Gcov(mu)]);
+            Kokkos::atomic_add(&(v(b, iv::Gcov(mu), k, j, i)), -Gcov_coord[mu]);
           }
           v(b, iv::GcovHeat(), k, j, i) =
               v(b, p::density(), k, j, i) * density_conversion_factor * heat;
@@ -321,7 +321,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
 
               for (int mu = 0; mu <= 3; mu++) {
                 Kokkos::atomic_add(&(v(b, iv::Gcov(mu), k, j, i)),
-                                   -detG * Gcov_coord[iv::Gcov(mu)]);
+                                   -detG * Gcov_coord[mu]);
               }
               Kokkos::atomic_add(&(v(b, iv::Gye(), k, j, i)),
                                  -LeptonSign(s) * detG * Jye);
