@@ -982,7 +982,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
     for (int ib = 0; ib < num_partitions; ++ib) {
       auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
       auto &sc0 = pmesh->mesh_data.GetOrAdd("base", ib);
-      auto &tl = sync_region_lb[ib];
+      auto &tl = sync_region[ib];
       auto apply_four_force =
           tl.AddTask(none, radiation::ApplyRadiationFourForce, sc0.get(), dt);
     }

@@ -70,13 +70,21 @@ GetLorentzFactor(const Real vcon[Geometry::NDSPACE],
  *
  * RETURN - Lorentz factor in normal observer frame
  */
+template <typename CoordinateSystem_t>
 KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(const Real vcon[Geometry::NDSPACE],
-                                             const Geometry::CoordSysMeshBlock &system,
+                                             const CoordinateSystem_t &system,
+                                             CellLocation loc, const int b, const int k,
+                                             const int j, const int i) {
+  Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
+  system.Metric(loc, b, k, j, i, gamma);
+  return GetLorentzFactor(vcon, gamma);
+}
+template <typename CoordinateSystem_t>
+KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(const Real vcon[Geometry::NDSPACE],
+                                             const CoordinateSystem_t &system,
                                              CellLocation loc, const int k, const int j,
                                              const int i) {
-  Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
-  system.Metric(loc, k, j, i, gamma);
-  return GetLorentzFactor(vcon, gamma);
+  return GetLorentzFactor(vcon, system, loc, 0, k, j, i);
 }
 
 /*
