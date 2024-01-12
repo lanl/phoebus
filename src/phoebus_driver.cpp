@@ -719,7 +719,7 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
             tl.AddTask(start_gain_reducer, &parthenon::AllReduce<bool>::CheckReduce,
                        pdo_gain_reducer);
         int reg_dep_id = 0;
-        sync_region.AddRegionalDependencies(reg_dep_id++, ib, finish_gain_reducer);
+        sync_region_lb.AddRegionalDependencies(reg_dep_id++, ib, finish_gain_reducer);
       }
       auto calculate_four_force =
           tl.AddTask(finish_gain_reducer, radiation::CoolingFunctionCalculateFourForce,
@@ -977,12 +977,12 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
 
   // Finalization calls
   {
-    TaskCollection tc;
-    TaskRegion &async_region1 = tc.AddRegion(num_task_lists_executed_independently);
-    for (int ib = 0; ib < num_task_lists_executed_independently; ib++) {
-      auto pmb = blocks[ib].get();
-      auto &tl = async_region1[ib];
-      auto &sc0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
+    const int num_partitions = pmesh->DefaultNumPartitions();
+    TaskRegion &sync_region = tc.AddRegion(num_partitions);
+    for (int ib = 0; ib < num_partitions; ++ib) {
+      auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
+      auto &sc0 = pmesh->mesh_data.GetOrAdd("base", ib);
+      auto &tl = sync_region_lb[ib];
       auto apply_four_force =
           tl.AddTask(none, radiation::ApplyRadiationFourForce, sc0.get(), dt);
     }
