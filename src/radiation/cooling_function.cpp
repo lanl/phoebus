@@ -169,8 +169,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
       nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         // Initialize five-force to zero
-        for (int mu = iv::Gcov(0); mu <= iv::Gcov(3); mu++) {
-          v(b, mu, k, j, i) = 0.;
+        for (int mu = 0; mu <= 3; mu++) {
+          v(b, iv::Gcov(mu), k, j, i) = 0.;
         }
         v(b, iv::Gye(), k, j, i) = 0.;
       });
@@ -275,9 +275,10 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
           Real Gcov_tetrad[4] = {J, 0., 0., 0.}; // minus sign included above
           Real Gcov_coord[4];
           Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
-          for (int mu = iv::Gcov(0); mu <= iv::Gcov(3); mu++) {
+          for (int mu = 0; mu <= 3; mu++) {
             // detg included above
-            Kokkos::atomic_add(&(v(b, mu, k, j, i)), -Gcov_coord[mu - iv::Gcov(0)]);
+            Kokkos::atomic_add(&(v(b, iv::Gcov(mu), k, j, i)),
+                               -Gcov_coord[iv::Gcov(mu) - iv::Gcov(0)]);
           }
           v(b, iv::GcovHeat(), k, j, i) =
               v(b, p::density(), k, j, i) * density_conversion_factor * heat;
@@ -319,9 +320,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
               Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
               Real detG = geom.DetG(CellLocation::Cent, b, k, j, i);
 
-              for (int mu = iv::Gcov(0); mu <= iv::Gcov(3); mu++) {
-                Kokkos::atomic_add(&(v(b, mu, k, j, i)),
-                                   -detG * Gcov_coord[mu - iv::Gcov(0)]);
+              for (int mu = 0; mu <= 3; mu++) {
+                Kokkos::atomic_add(&(v(b, iv::Gcov(mu), k, j, i)),
+                                   -detG * Gcov_coord[iv::Gcov(mu) - iv::Gcov(0)]);
               }
               Kokkos::atomic_add(&(v(b, iv::Gye(), k, j, i)),
                                  -LeptonSign(s) * detG * Jye);
