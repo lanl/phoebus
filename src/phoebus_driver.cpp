@@ -746,6 +746,8 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
   packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
   packages.Add(Progenitor::Initialize(pin.get()));
+  // [WIP] : hook into phoebus infra for z4c implementation
+  packages.Add(z4c::Initialize(pin.get()));
 
   // TODO(JMM): I need to do this before problem generators get
   // called. For now I'm hacking this in here. But in the long term,
