@@ -567,7 +567,9 @@ TaskStatus ApplyRadiationFourForce(MeshData<Real> *rc, const double dt) {
         v(b, c::momentum(0), k, j, i) += v(b, iv::Gcov(1), k, j, i) * dt;
         v(b, c::momentum(1), k, j, i) += v(b, iv::Gcov(2), k, j, i) * dt;
         v(b, c::momentum(2), k, j, i) += v(b, iv::Gcov(3), k, j, i) * dt;
-        v(b, c::ye(), k, j, i) += v(b, iv::Gye(), k, j, i) * dt;
+       if (v.Contains(b, c::ye())) {
+         v(b, c::ye(), k, j, i) += v(b, iv::Gye(), k, j, i) * dt;
+       }
       });
   return TaskStatus::complete;
 }
