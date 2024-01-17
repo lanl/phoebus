@@ -91,14 +91,14 @@ typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
-TaskStatus ApplyRadiationFourForce(MeshBlockData<Real> *rc, const Real dt);
+TaskStatus ApplyRadiationFourForce(MeshData<Real> *rc, const Real dt);
 
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
 // Cooling function tasks
-TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const Real dt);
-TaskStatus CheckDoGain(MeshBlockData<Real> *rc, bool *do_gain_global);
-TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc);
+TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const Real dt);
+TaskStatus CheckDoGain(MeshData<Real> *rc, bool *do_gain_global);
+TaskStatus LightBulbCalcTau(MeshData<Real> *rc);
 
 // Monte Carlo tasks
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
