@@ -70,13 +70,21 @@ GetLorentzFactor(const Real vcon[Geometry::NDSPACE],
  *
  * RETURN - Lorentz factor in normal observer frame
  */
+template <typename CoordinateSystem_t>
 KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(const Real vcon[Geometry::NDSPACE],
-                                             const Geometry::CoordSysMeshBlock &system,
+                                             const CoordinateSystem_t &system,
+                                             CellLocation loc, const int b, const int k,
+                                             const int j, const int i) {
+  Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
+  system.Metric(loc, b, k, j, i, gamma);
+  return GetLorentzFactor(vcon, gamma);
+}
+template <typename CoordinateSystem_t>
+KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(const Real vcon[Geometry::NDSPACE],
+                                             const CoordinateSystem_t &system,
                                              CellLocation loc, const int k, const int j,
                                              const int i) {
-  Real gamma[Geometry::NDSPACE][Geometry::NDSPACE];
-  system.Metric(loc, k, j, i, gamma);
-  return GetLorentzFactor(vcon, gamma);
+  return GetLorentzFactor(vcon, system, loc, 0, k, j, i);
 }
 
 /*
@@ -90,18 +98,26 @@ KOKKOS_INLINE_FUNCTION Real GetLorentzFactor(const Real vcon[Geometry::NDSPACE],
  * PARAM[IN] - i - X1 index of meshblock cell
  * PARAM[OUT] - u - Coordinate frame contravariant four-velocity
  */
-KOKKOS_INLINE_FUNCTION void GetFourVelocity(const Real v[3],
-                                            const Geometry::CoordSysMeshBlock &system,
-                                            CellLocation loc, const int k, const int j,
-                                            const int i, Real u[Geometry::NDFULL]) {
+template <typename CoordinateSystem_t>
+KOKKOS_INLINE_FUNCTION void
+GetFourVelocity(const Real v[3], const CoordinateSystem_t &system, CellLocation loc,
+                const int b, const int k, const int j, const int i,
+                Real u[Geometry::NDFULL]) {
   Real beta[Geometry::NDSPACE];
-  Real W = GetLorentzFactor(v, system, loc, k, j, i);
-  Real alpha = system.Lapse(loc, k, j, i);
-  system.ContravariantShift(loc, k, j, i, beta);
+  Real W = GetLorentzFactor(v, system, loc, b, k, j, i);
+  Real alpha = system.Lapse(loc, b, k, j, i);
+  system.ContravariantShift(loc, b, k, j, i, beta);
   u[0] = robust::ratio(W, std::abs(alpha));
   for (int l = 1; l < Geometry::NDFULL; ++l) {
     u[l] = v[l - 1] - u[0] * beta[l - 1];
   }
+}
+
+template <typename CoordinateSystem_t>
+KOKKOS_INLINE_FUNCTION void
+GetFourVelocity(const Real v[3], const CoordinateSystem_t &system, CellLocation loc,
+                const int k, const int j, const int i, Real u[Geometry::NDFULL]) {
+  GetFourVelocity(v, system, loc, 0, k, j, i, u);
 }
 
 /*
