@@ -616,7 +616,8 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    std::vector<std::string> vars = {fluid_prim::bfield::name(), fluid_prim::density::name()};
+    std::vector<std::string> vars = {fluid_prim::bfield::name(),
+                                     fluid_prim::density::name()};
     auto v = rc->PackVariables(vars, imap);
     const int iblo = imap[fluid_prim::bfield::name()].first;
     const int ibhi = imap[fluid_prim::bfield::name()].second;
@@ -684,7 +685,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
               auto rng_gen = rng_pool.get_state();
 
               z(n) = z_min + rng_gen.drand() * (z_max - z_min); // X3 trivial
-              id(n) = num_tracers_total * gid + n; // n_tracers * gid + n
+              id(n) = num_tracers_total * gid + n;              // n_tracers * gid + n
 
               Real lnh = -1.0;
               Real uphi;
