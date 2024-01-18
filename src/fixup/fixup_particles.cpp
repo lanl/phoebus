@@ -37,7 +37,7 @@ TaskStatus PurgeParticles(MeshBlockData<Real> *rc, const std::string swarmName) 
 
   /* only do this when FMKS is used. */
   if constexpr (std::is_same<PHOEBUS_GEOMETRY, Geometry::FMKS>::value) {
-    auto *pmb = rc->GetParentPointer().get();
+    auto *pmb = rc->GetParentPointer();
     auto &swarm = pmb->swarm_data.Get()->Get(swarmName);
 
     auto &x = swarm->Get<Real>("x").Get();
@@ -54,7 +54,6 @@ TaskStatus PurgeParticles(MeshBlockData<Real> *rc, const std::string swarmName) 
     pmb->par_for(
         "fixup::PurgeParticles", 0, max_active_index - 1, KOKKOS_LAMBDA(const int n) {
           if (swarm_d.IsActive(n)) {
-            int k, j, i;
 
             if (x(n) <= xh) {
               swarm_d.MarkParticleForRemoval(n);

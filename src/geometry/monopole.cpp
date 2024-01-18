@@ -67,7 +67,7 @@ void SetGeometry<MplCartMesh>(MeshData<Real> *rc) {}
 
 template <>
 MplSphMeshBlock GetCoordinateSystem<MplSphMeshBlock>(MeshBlockData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("monopole_gr");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("monopole_gr");
   auto &params = pkg->AllParams();
   auto enabled = params.Get<bool>("enable_monopole_gr");
   PARTHENON_REQUIRE_THROWS(enabled, "MonopoleGR must be enabled for this metric");
@@ -82,7 +82,7 @@ MplSphMeshBlock GetCoordinateSystem<MplSphMeshBlock>(MeshBlockData<Real> *rc) {
 }
 template <>
 MplSphMesh GetCoordinateSystem<MplSphMesh>(MeshData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("monopole_gr");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("monopole_gr");
   auto &params = pkg->AllParams();
   auto enabled = params.Get<bool>("enable_monopole_gr");
   PARTHENON_REQUIRE_THROWS(enabled, "MonopoleGR must be enabled for this metric");
@@ -98,7 +98,7 @@ MplSphMesh GetCoordinateSystem<MplSphMesh>(MeshData<Real> *rc) {
 
 template <>
 MplCartMeshBlock GetCoordinateSystem<MplCartMeshBlock>(MeshBlockData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("monopole_gr");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("monopole_gr");
   auto &params = pkg->AllParams();
   auto enabled = params.Get<bool>("enable_monopole_gr");
   PARTHENON_REQUIRE_THROWS(enabled, "MonopoleGR must be enabled for this metric");
@@ -110,7 +110,7 @@ MplCartMeshBlock GetCoordinateSystem<MplCartMeshBlock>(MeshBlockData<Real> *rc) 
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
 
-  auto &geom_pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &geom_pkg = rc->GetMeshPointer()->packages.Get("geometry");
   Real dxfd = geom_pkg->Param<Real>("dxfd");
   auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
 
@@ -119,7 +119,7 @@ MplCartMeshBlock GetCoordinateSystem<MplCartMeshBlock>(MeshBlockData<Real> *rc) 
 }
 template <>
 MplCartMesh GetCoordinateSystem<MplCartMesh>(MeshData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("monopole_gr");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("monopole_gr");
   auto &params = pkg->AllParams();
   auto enabled = params.Get<bool>("enable_monopole_gr");
   PARTHENON_REQUIRE_THROWS(enabled, "MonopoleGR must be enabled for this metric");
@@ -131,7 +131,7 @@ MplCartMesh GetCoordinateSystem<MplCartMesh>(MeshData<Real> *rc) {
   auto rgrid = params.Get<MonopoleGR::Radius>("radius");
   auto indexer = GetIndexer(rc);
 
-  auto &geom_pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &geom_pkg = rc->GetMeshPointer()->packages.Get("geometry");
   Real dxfd = geom_pkg->Param<Real>("dxfd");
   auto transformation = GetTransformation<SphericalToCartesian>(pkg.get());
 

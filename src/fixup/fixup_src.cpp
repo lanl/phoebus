@@ -55,14 +55,14 @@ TaskStatus SourceFixupImpl(T *rc) {
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
   namespace ir = radmoment_internal;
-  auto *pmb = rc->GetParentPointer().get();
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  Mesh *pmesh = rc->GetMeshPointer();
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  StateDescriptor *rad_pkg = pmb->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
+  StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
   if (!rad_pkg->Param<bool>("active")) {
     return TaskStatus::complete;
   }
@@ -75,34 +75,36 @@ TaskStatus SourceFixupImpl(T *rc) {
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
   const std::vector<std::string> vars(
-      {p::density, c::density, p::velocity, c::momentum, p::energy, c::energy, p::bfield,
-       p::ye, c::ye, p::pressure, p::temperature, p::gamma1, pr::J, pr::H, cr::E, cr::F,
-       impl::cell_signal_speed, ir::srcfail, ir::tilPi});
+      {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
+       p::energy::name(), c::energy::name(), p::bfield::name(), p::ye::name(),
+       c::ye::name(), p::pressure::name(), p::temperature::name(), p::gamma1::name(),
+       pr::J::name(), pr::H::name(), cr::E::name(), cr::F::name(),
+       impl::cell_signal_speed::name(), ir::srcfail::name(), ir::tilPi::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
 
-  const int prho = imap[p::density].first;
-  const int crho = imap[c::density].first;
-  auto idx_pvel = imap.GetFlatIdx(p::velocity);
-  auto idx_cmom = imap.GetFlatIdx(c::momentum);
-  const int peng = imap[p::energy].first;
-  const int ceng = imap[c::energy].first;
-  const int prs = imap[p::pressure].first;
-  const int tmp = imap[p::temperature].first;
-  const int gm1 = imap[p::gamma1].first;
-  const int slo = imap[impl::cell_signal_speed].first;
-  const int shi = imap[impl::cell_signal_speed].second;
-  int pye = imap[p::ye].second;
-  int cye = imap[c::ye].second;
-  const int pb_lo = imap[p::bfield].first;
-  const int pb_hi = imap[p::bfield].second;
-  auto idx_J = imap.GetFlatIdx(pr::J);
-  auto idx_H = imap.GetFlatIdx(pr::H);
-  auto idx_E = imap.GetFlatIdx(cr::E);
-  auto idx_F = imap.GetFlatIdx(cr::F);
-  int ifail = imap[ir::srcfail].first;
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi, false);
+  const int prho = imap[p::density::name()].first;
+  const int crho = imap[c::density::name()].first;
+  auto idx_pvel = imap.GetFlatIdx(p::velocity::name());
+  auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
+  const int peng = imap[p::energy::name()].first;
+  const int ceng = imap[c::energy::name()].first;
+  const int prs = imap[p::pressure::name()].first;
+  const int tmp = imap[p::temperature::name()].first;
+  const int gm1 = imap[p::gamma1::name()].first;
+  const int slo = imap[impl::cell_signal_speed::name()].first;
+  const int shi = imap[impl::cell_signal_speed::name()].second;
+  int pye = imap[p::ye::name()].second;
+  int cye = imap[c::ye::name()].second;
+  const int pb_lo = imap[p::bfield::name()].first;
+  const int pb_hi = imap[p::bfield::name()].second;
+  auto idx_J = imap.GetFlatIdx(pr::J::name());
+  auto idx_H = imap.GetFlatIdx(pr::H::name());
+  auto idx_E = imap.GetFlatIdx(cr::E::name());
+  auto idx_F = imap.GetFlatIdx(cr::F::name());
+  int ifail = imap[ir::srcfail::name()].first;
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
 
   bool report_source_fails = fix_pkg->Param<bool>("report_source_fails");
   if (report_source_fails) {
@@ -119,17 +121,17 @@ TaskStatus SourceFixupImpl(T *rc) {
     printf("total source nfail: %i\n", nfail_total);
   }
 
-  const int ndim = pmb->pmy_mesh->ndim;
+  const int ndim = pmesh->ndim;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
-  Coordinates_t coords = rc->GetParentPointer().get()->coords;
+  Coordinates_t coords = rc->GetParentPointer()->coords;
 
   auto num_species = rad_pkg->Param<int>("num_species");
 
   // TODO(BRR) make this less ugly
-  IndexRange ibe = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
-  IndexRange jbe = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
-  IndexRange kbe = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  IndexRange ibe = rc->GetBoundsI(IndexDomain::entire);
+  IndexRange jbe = rc->GetBoundsJ(IndexDomain::entire);
+  IndexRange kbe = rc->GetBoundsK(IndexDomain::entire);
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "Source fail initialization", DevExecSpace(), 0,
       v.GetDim(5) - 1, kbe.s, kbe.e, jbe.s, jbe.e, ibe.s, ibe.e,
@@ -323,9 +325,9 @@ TaskStatus SourceFixupImpl(T *rc) {
 
 template <typename T>
 TaskStatus SourceFixup(T *rc) {
-  auto *pm = rc->GetParentPointer().get();
-  StateDescriptor *rad_pkg = pm->packages.Get("radiation").get();
-  StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+  Mesh *pmesh = rc->GetMeshPointer();
+  StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
+  StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
   const bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
   std::string method;
   if (enable_rad_floors) {

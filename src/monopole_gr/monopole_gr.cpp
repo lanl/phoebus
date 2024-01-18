@@ -242,12 +242,12 @@ Real EstimateTimeStep(StateDescriptor *pkg) {
 
 // Could template this but whatever. I'd only save like 4 lines.
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
-  auto pmb = rc->GetParentPointer();
-  StateDescriptor *pkg = pmb->packages.Get("monopole_gr").get();
+  Mesh *pmesh = rc->GetMeshPointer();
+  StateDescriptor *pkg = pmesh->packages.Get("monopole_gr").get();
   return EstimateTimeStep(pkg);
 }
 Real EstimateTimeStepMesh(MeshData<Real> *rc) {
-  auto pmesh = rc->GetParentPointer();
+  Mesh *pmesh = rc->GetMeshPointer();
   StateDescriptor *pkg = pmesh->packages.Get("monopole_gr").get();
   return EstimateTimeStep(pkg);
 }
@@ -666,7 +666,7 @@ void DumpHypersurface(const std::string &filename, Matter_host_t &matter,
 #ifndef PHOEBUS_IN_UNIT_TESTS
 template <typename T>
 TaskStatus InterpMetricToGrid(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   StateDescriptor *pkg = pmb->packages.Get("monopole_gr").get();
   auto &params = pkg->AllParams();
 
@@ -681,9 +681,9 @@ TaskStatus InterpMetricToGrid(T *rc) {
   const bool is_monopole_sph =
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
   parthenon::Coordinates_t coords = pmb->coords;
 
   using Transformation_t = Geometry::SphericalToCartesian;

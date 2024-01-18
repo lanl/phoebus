@@ -81,7 +81,7 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
   using namespace LCInterp;
   namespace p = fluid_prim;
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("tracers");
 
@@ -93,13 +93,13 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
 
   auto swarm_d = swarm->GetDeviceContext();
 
-  const std::vector<std::string> vars = {p::velocity};
+  const std::vector<std::string> vars = {p::velocity::name()};
 
   PackIndexMap imap;
   auto pack = rc->PackVariables(vars, imap);
 
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -156,7 +156,7 @@ void FillTracers(MeshBlockData<Real> *rc) {
   using namespace LCInterp;
   namespace p = fluid_prim;
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto fluid = pmb->packages.Get("fluid");
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("tracers");
@@ -194,24 +194,24 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
   auto swarm_d = swarm->GetDeviceContext();
 
-  std::vector<std::string> vars = {p::density, p::temperature, p::velocity, p::energy,
-                                   p::pressure};
+  std::vector<std::string> vars = {p::density::name(), p::temperature::name(), p::velocity::name(), p::energy::name(),
+                                   p::pressure::name()};
   if (mhd) {
-    vars.push_back(p::bfield);
+    vars.push_back(p::bfield::name());
   }
 
   PackIndexMap imap;
   auto pack = rc->PackVariables(vars, imap);
 
-  const int pvel_lo = imap[p::velocity].first;
-  const int pvel_hi = imap[p::velocity].second;
-  const int pB_lo = imap[p::bfield].first;
-  const int pB_hi = imap[p::bfield].second;
-  const int prho = imap[p::density].first;
-  const int ptemp = imap[p::temperature].first;
-  const int pye = imap[p::ye].second;
-  const int penergy = imap[p::energy].first;
-  const int ppres = imap[p::pressure].first;
+  const int pvel_lo = imap[p::velocity::name()].first;
+  const int pvel_hi = imap[p::velocity::name()].second;
+  const int pB_lo = imap[p::bfield::name()].first;
+  const int pB_hi = imap[p::bfield::name()].second;
+  const int prho = imap[p::density::name()].first;
+  const int ptemp = imap[p::temperature::name()].first;
+  const int pye = imap[p::ye::name()].second;
+  const int penergy = imap[p::energy::name()].first;
+  const int ppres = imap[p::pressure::name()].first;
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   // update loop.

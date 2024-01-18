@@ -138,25 +138,26 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   bool do_rad = rad_pkg->Param<bool>("active");
 
   PackIndexMap imap;
-  auto v = rc->PackVariables({fluid_prim::density, fluid_prim::velocity,
-                              fluid_prim::energy, fluid_prim::bfield, fluid_prim::ye,
-                              fluid_prim::pressure, fluid_prim::temperature,
-                              fluid_prim::gamma1, radmoment_prim::J, radmoment_prim::H},
+  auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
+                              fluid_prim::energy::name(), fluid_prim::bfield::name(),
+                              fluid_prim::ye::name(), fluid_prim::pressure::name(),
+                              fluid_prim::temperature::name(), fluid_prim::gamma1::name(),
+                              radmoment_prim::J::name(), radmoment_prim::H::name()},
                              imap);
 
-  const int irho = imap[fluid_prim::density].first;
-  const int ivlo = imap[fluid_prim::velocity].first;
-  const int ivhi = imap[fluid_prim::velocity].second;
-  const int ieng = imap[fluid_prim::energy].first;
-  const int iblo = imap[fluid_prim::bfield].first;
-  const int ibhi = imap[fluid_prim::bfield].second;
-  const int iye = imap[fluid_prim::ye].second;
-  const int iprs = imap[fluid_prim::pressure].first;
-  const int itmp = imap[fluid_prim::temperature].first;
-  const int igm1 = imap[fluid_prim::gamma1].first;
+  const int irho = imap[fluid_prim::density::name()].first;
+  const int ivlo = imap[fluid_prim::velocity::name()].first;
+  const int ivhi = imap[fluid_prim::velocity::name()].second;
+  const int ieng = imap[fluid_prim::energy::name()].first;
+  const int iblo = imap[fluid_prim::bfield::name()].first;
+  const int ibhi = imap[fluid_prim::bfield::name()].second;
+  const int iye = imap[fluid_prim::ye::name()].second;
+  const int iprs = imap[fluid_prim::pressure::name()].first;
+  const int itmp = imap[fluid_prim::temperature::name()].first;
+  const int igm1 = imap[fluid_prim::gamma1::name()].first;
 
-  auto iJ = imap.GetFlatIdx(radmoment_prim::J, false);
-  auto iH = imap.GetFlatIdx(radmoment_prim::H, false);
+  auto iJ = imap.GetFlatIdx(radmoment_prim::J::name(), false);
+  auto iH = imap.GetFlatIdx(radmoment_prim::H::name(), false);
   const auto specB = iJ.IsValid() ? iJ.GetBounds(1) : parthenon::IndexRange();
 
   // this only works with ideal gases
@@ -615,11 +616,11 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    std::vector<std::string> vars = {fluid_prim::bfield, fluid_prim::density};
+    std::vector<std::string> vars = {fluid_prim::bfield::name(), fluid_prim::density::name()};
     auto v = rc->PackVariables(vars, imap);
-    const int iblo = imap[fluid_prim::bfield].first;
-    const int ibhi = imap[fluid_prim::bfield].second;
-    const int irho = imap[fluid_prim::density].first;
+    const int iblo = imap[fluid_prim::bfield::name()].first;
+    const int ibhi = imap[fluid_prim::bfield::name()].second;
+    const int irho = imap[fluid_prim::density::name()].first;
 
     auto tracer_pkg = pmb->packages.Get("tracers");
     bool do_tracers = tracer_pkg->Param<bool>("active");
@@ -651,7 +652,6 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             Real th = tr.bl_theta(x1, x2);
 
             Real lnh = -1.0;
-            Real hm1;
             Real uphi;
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
             if (lnh > 0.0 && x1 > xh) {
@@ -675,6 +675,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
       swarm->SortParticlesByCell();
       auto swarm_d = swarm->GetDeviceContext();
 
+      const int gid = pmb->gid;
       const int max_active_index = swarm->GetMaxActiveIndex();
       pmb->par_for(
           "ProblemGenerator::Torus::DistributeTracers", 0, max_active_index,
@@ -683,9 +684,9 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
               auto rng_gen = rng_pool.get_state();
 
               z(n) = z_min + rng_gen.drand() * (z_max - z_min); // X3 trivial
+              id(n) = num_tracers_total * gid + n; // n_tracers * gid + n
 
               Real lnh = -1.0;
-              Real hm1;
               Real uphi;
               // Rejection sample X1, X2 to be in disk
               while (lnh < 0.0 && x(n) < xh) {
@@ -695,7 +696,6 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
                 Real th = tr.bl_theta(x(n), y(n));
                 if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
               }
-              id(n) = num_tracers_total * pmb->gid + n; // n_tracers * gid + n
 
               bool on_current_mesh_block = true;
               swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
@@ -852,19 +852,19 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    auto v =
-        rc->PackVariables({fluid_prim::density, fluid_prim::velocity, fluid_prim::bfield,
-                           fluid_prim::pressure, radmoment_prim::J},
-                          imap);
+    auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
+                                fluid_prim::bfield::name(), fluid_prim::pressure::name(),
+                                radmoment_prim::J::name()},
+                               imap);
 
-    const int irho = imap[fluid_prim::density].first;
-    const int ivlo = imap[fluid_prim::velocity].first;
-    const int ivhi = imap[fluid_prim::velocity].second;
-    const int iblo = imap[fluid_prim::bfield].first;
-    const int ibhi = imap[fluid_prim::bfield].second;
-    const int iprs = imap[fluid_prim::pressure].first;
+    const int irho = imap[fluid_prim::density::name()].first;
+    const int ivlo = imap[fluid_prim::velocity::name()].first;
+    const int ivhi = imap[fluid_prim::velocity::name()].second;
+    const int iblo = imap[fluid_prim::bfield::name()].first;
+    const int ibhi = imap[fluid_prim::bfield::name()].second;
+    const int iprs = imap[fluid_prim::pressure::name()].first;
 
-    auto idx_J = imap.GetFlatIdx(radmoment_prim::J, false);
+    auto idx_J = imap.GetFlatIdx(radmoment_prim::J::name(), false);
 
     if (ibhi < 0) return;
 
