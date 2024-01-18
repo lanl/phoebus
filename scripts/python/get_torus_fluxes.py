@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# © 2022. Triad National Security, LLC. All rights reserved.  This
+# © 2022-2023. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract
 # 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 # is operated by Triad National Security, LLC for the U.S.  Department
@@ -30,7 +30,6 @@ from phoebus_constants import cgs, scalefree
 import phoebus_utils
 from phoedf import phoedf
 
-
 def get_torus_fluxes(dfile):
 
     fluxes = {}
@@ -44,9 +43,10 @@ def get_torus_fluxes(dfile):
     bsq = dfile.GetPm() * 2
     sigma = bsq / rho
 
-    E = dfile.GetE()
-    F = dfile.GetF()
-    P = dfile.GetP()
+    if dfile.RadiationActive:
+        E = dfile.GetE()
+        F = dfile.GetF()
+        P = dfile.GetP()
 
     Nx1 = dfile.MeshBlockSize[0]
     Nx2 = dfile.MeshBlockSize[1]
@@ -72,10 +72,8 @@ def get_torus_fluxes(dfile):
     Pjm = 0.0
     Pjr = 0.0
     for b in range(dfile.NumBlocks):
-        blockBounds = dfile.BlockBounds[b]
-
-        dx2 = (blockBounds[3] - blockBounds[2]) / dfile.MeshBlockSize[1]
-        dx3 = (blockBounds[5] - blockBounds[4]) / dfile.MeshBlockSize[2]
+        dx2 = dfile.Dx2[b]
+        dx3 = dfile.Dx3[b]
 
         # Block contains event horizon
         if blockBounds[0] < xh and blockBounds[1] > xh:
@@ -94,25 +92,26 @@ def get_torus_fluxes(dfile):
                     Eg_in += -dx2 * dx3 * gdet[b, k, j, i_eh] * Tmunu_concov[1, 0]
                     Lg_in += dx2 * dx3 * gdet[b, k, j, i_eh] * Tmunu_concov[1, 3]
 
-            for j in range(Nx2):
-                for k in range(Nx3):
-                    Rmunu_concov = dfile.GetRmunu_concov(b, k, j, i_eh)
-                    for ispec in range(dfile.NumSpecies):
-                        Er_in += (
-                            -dx2 * dx3 * gdet[b, k, j, i_eh] * Rmunu_concov[1, 0, ispec]
-                        )
-                        Lr_in += (
-                            dx2 * dx3 * gdet[b, k, j, i_eh] * Rmunu_concov[1, 3, ispec]
-                        )
+            if dfile.RadiationActive:
+                for j in range(Nx2):
+                    for k in range(Nx3):
+                        Rmunu_concov = dfile.GetRmunu_concov(b, k, j, i_eh)
+                        for ispec in range(dfile.NumSpecies):
+                            Er_in += (
+                                -dx2 * dx3 * gdet[b, k, j, i_eh] * Rmunu_concov[1, 0, ispec]
+                            )
+                            Lr_in += (
+                                dx2 * dx3 * gdet[b, k, j, i_eh] * Rmunu_concov[1, 3, ispec]
+                            )
 
-            for j in range(Nx2):
-                for k in range(Nx3):
-                    Phi += (
-                        dx2
-                        * dx3
-                        * gdet[b, k, j, i_eh]
-                        * np.fabs(Bcon[b, 0, k, j, i_eh] / alpha[b, k, j, i_eh])
-                    )
+                for j in range(Nx2):
+                    for k in range(Nx3):
+                        Phi += (
+                            dx2
+                            * dx3
+                            * gdet[b, k, j, i_eh]
+                            * np.fabs(Bcon[b, 0, k, j, i_eh] / alpha[b, k, j, i_eh])
+                        )
 
         if blockBounds[0] < 1.6 and blockBounds[1] > 1.6:
             # Nx1 // 2 is kind of cheating...
@@ -121,7 +120,6 @@ def get_torus_fluxes(dfile):
                 for k in range(Nx3):
                     if sigma[b, k, j, i] > 1.0:
                         Tmunu_concov = dfile.GetTmunu_concov(b, k, j, i)
-                        Rmunu_concov = dfile.GetRmunu_concov(b, k, j, i)
                         Pj -= dx2 * dx3 * gdet[b, k, j, i] * Tmunu_concov[1, 0]
                         Pjm -= (
                             dx2
@@ -130,10 +128,12 @@ def get_torus_fluxes(dfile):
                             * rho[b, k, j, i]
                             * ucon[b, 1, k, j, i]
                         )
-                        for ispec in range(dfile.NumSpecies):
-                            Pjr -= (
-                                dx2 * dx3 * gdet[b, k, j, i] * Rmunu_concov[1, 0, ispec]
-                            )
+                        if dfile.RadiationActive:
+                            Rmunu_concov = dfile.GetRmunu_concov(b, k, j, i)
+                            for ispec in range(dfile.NumSpecies):
+                                Pjr -= (
+                                    dx2 * dx3 * gdet[b, k, j, i] * Rmunu_concov[1, 0, ispec]
+                                )
 
         # Block contains outer boundary
         if np.fabs(blockBounds[1] - x1max) / x1max < 1.0e-10:
@@ -147,16 +147,17 @@ def get_torus_fluxes(dfile):
                     Eg_out += -dx2 * dx3 * gdet[b, k, j, -1] * Tmunu_concov[1, 0]
                     Lg_out += dx2 * dx3 * gdet[b, k, j, -1] * Tmunu_concov[1, 3]
 
-            for j in range(Nx2):
-                for k in range(Nx3):
-                    Rmunu_concov = dfile.GetRmunu_concov(b, k, j, -1)
-                    for ispec in range(dfile.NumSpecies):
-                        Er_out += (
-                            -dx2 * dx3 * gdet[b, k, j, -1] * Rmunu_concov[1, 0, ispec]
-                        )
-                        Lr_out += (
-                            dx2 * dx3 * gdet[b, k, j, -1] * Rmunu_concov[1, 3, ispec]
-                        )
+            if dfile.RadiationActive:
+                for j in range(Nx2):
+                    for k in range(Nx3):
+                        Rmunu_concov = dfile.GetRmunu_concov(b, k, j, -1)
+                        for ispec in range(dfile.NumSpecies):
+                            Er_out += (
+                                -dx2 * dx3 * gdet[b, k, j, -1] * Rmunu_concov[1, 0, ispec]
+                            )
+                            Lr_out += (
+                                dx2 * dx3 * gdet[b, k, j, -1] * Rmunu_concov[1, 3, ispec]
+                            )
 
     fluxes["mdot_in"] = mdot_in
     fluxes["mdot_edd"] = (
@@ -191,14 +192,14 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Get fluxes from torus dump")
     parser.add_argument(
-        "files", type=str, nargs="+", help="Files to take a snapshot of"
+        "filenames", type=str, nargs="+", help="Files to derive fluxes for"
     )
     args = parser.parse_args()
 
     logfile = open("fluxes_logfile.txt", "a")
 
-    for n, fname in enumerate(args.files):
-        print(f"Opening file {fname}... ", end="")
+    for n, fname in enumerate(args.filenames):
+        print(f"Opening file {fname}... ", end="", flush=True)
         dfile = phoedf(fname)
         print("done")
 
