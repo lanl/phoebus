@@ -267,7 +267,7 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
           // bernoulli
           const Real h = 1.0 + energy + pressure / rho;
-          const Real bernoulli = - (W / lapse) * h - 1.0;
+          const Real bernoulli = -(W / lapse) * h - 1.0;
 
           // store
           s_rho(n) = rho;
