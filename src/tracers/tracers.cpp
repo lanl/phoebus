@@ -63,6 +63,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddSwarmValue("shift_y", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("shift_z", swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue("mass", swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue("bernoulli", swarm_name, real_swarmvalue_metadata);
 
   const bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
 
@@ -191,6 +192,7 @@ void FillTracers(MeshBlockData<Real> *rc) {
   auto &s_shift_z = swarm->Get<Real>("shift_z").Get();
   auto &s_detgamma = swarm->Get<Real>("detgamma").Get();
   auto &s_pressure = swarm->Get<Real>("pressure").Get();
+  auto &s_bernoulli = swarm->Get<Real>("bernoulli").Get();
 
   auto swarm_d = swarm->GetDeviceContext();
 
@@ -263,6 +265,10 @@ void FillTracers(MeshBlockData<Real> *rc) {
           const Real entropy =
               eos.EntropyFromDensityTemperature(rho, temperature, lambda);
 
+          // bernoulli
+          const Real h = 1.0 + energy + pressure / rho;
+          const Real bernoulli = - (W / lapse) * h - 1.0;
+
           // store
           s_rho(n) = rho;
           s_temperature(n) = temperature;
@@ -279,6 +285,7 @@ void FillTracers(MeshBlockData<Real> *rc) {
           s_lorentz(n) = W;
           s_detgamma(n) = gdet;
           s_pressure(n) = pressure;
+          s_bernoulli(n) = bernoulli;
           if (mhd) {
             B1(n) = B_X1;
             B2(n) = B_X2;
