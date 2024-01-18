@@ -45,14 +45,14 @@ void SetGeometry<SphericalKSMesh>(MeshData<Real> *rc) {}
 
 template <>
 SphericalKSMeshBlock GetCoordinateSystem<SphericalKSMeshBlock>(MeshBlockData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   return SphericalKSMeshBlock(indexer, a);
 }
 template <>
 SphericalKSMesh GetCoordinateSystem<SphericalKSMesh>(MeshData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   return SphericalKSMesh(indexer, a);

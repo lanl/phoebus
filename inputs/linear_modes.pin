@@ -23,6 +23,8 @@ variables = p.density,  &
             p.energy,   &
             p.bfield,   &
 	          pressure,	  &
+                  g.n.coord, &
+                  g.c.coord, &
 	          cs
 
 file_type   = hdf5      # Tabular data dump
@@ -63,9 +65,9 @@ num_threads = 1         # maximum number of OMP threads
 <phoebus/mesh>
 #bc_vars = primitive
 
-# <parthenon/meshblock>
-# nx1 = 128
-# nx2 = 128
+<parthenon/meshblock>
+nx1 = 64
+nx2 = 64
 # nx3 = 1
 
 <parthenon/refinement0>

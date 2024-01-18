@@ -48,7 +48,7 @@ void SetGeometry<InchwormMesh>(MeshData<Real> *rc) {}
 
 template <>
 InchwormMeshBlock GetCoordinateSystem<InchwormMeshBlock>(MeshBlockData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real k = pkg->Param<Real>("k");
@@ -56,7 +56,7 @@ InchwormMeshBlock GetCoordinateSystem<InchwormMeshBlock>(MeshBlockData<Real> *rc
 }
 template <>
 InchwormMesh GetCoordinateSystem<InchwormMesh>(MeshData<Real> *rc) {
-  auto &pkg = rc->GetParentPointer()->packages.Get("geometry");
+  auto &pkg = rc->GetMeshPointer()->packages.Get("geometry");
   auto indexer = GetIndexer(rc);
   Real a = pkg->Param<Real>("a");
   Real k = pkg->Param<Real>("k");

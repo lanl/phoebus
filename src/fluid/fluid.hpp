@@ -43,8 +43,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
 template <typename T>
 TaskStatus ConservedToPrimitiveVanDerHolst(T *rc, const IndexRange &ib,
                                            const IndexRange &jb, const IndexRange &kb);
-TaskStatus CalculateFluidSourceTerms(MeshBlockData<Real> *rc,
-                                     MeshBlockData<Real> *rc_src);
+TaskStatus CalculateFluidSourceTerms(MeshData<Real> *rc, MeshData<Real> *rc_src);
 TaskStatus CalculateFluxes(MeshBlockData<Real> *rc);
 TaskStatus FluxCT(MeshBlockData<Real> *rc);
 TaskStatus CalculateDivB(MeshBlockData<Real> *rc);
@@ -62,30 +61,31 @@ using c2p_mesh_type = c2p_type<MeshData<Real>>;
 #if SET_FLUX_SRC_DIAGS
 template <class T>
 TaskStatus CopyFluxDivergence(T *rc) {
-  auto pmb = rc->GetParentPointer();
-  auto &fluid = pmb->packages.Get("fluid");
+  Mesh *pm = rc->GetMeshPointer();
+  auto &fluid = pm->packages.Get("fluid");
   const Params &params = fluid->AllParams();
   if (!params.Get<bool>("active")) return TaskStatus::complete;
 
-  std::vector<std::string> vars(
-      {fluid_cons::density, fluid_cons::momentum, fluid_cons::energy});
-  vars.push_back(radmoment_cons::E);
-  vars.push_back(radmoment_cons::F);
+  std::vector<std::string> vars({fluid_cons::density::name(),
+                                 fluid_cons::momentum::name(),
+                                 fluid_cons::energy::name()});
+  vars.push_back(radmoment_cons::E::name());
+  vars.push_back(radmoment_cons::F::name());
   PackIndexMap imap;
   auto divf = rc->PackVariables(vars, imap);
-  const int crho = imap[fluid_cons::density].first;
-  const int cmom_lo = imap[fluid_cons::momentum].first;
-  const int cmom_hi = imap[fluid_cons::momentum].second;
-  const int ceng = imap[fluid_cons::energy].first;
-  auto idx_E = imap.GetFlatIdx(radmoment_cons::E, false);
-  auto idx_F = imap.GetFlatIdx(radmoment_cons::F, false);
+  const int crho = imap[fluid_cons::density::name()].first;
+  const int cmom_lo = imap[fluid_cons::momentum::name()].first;
+  const int cmom_hi = imap[fluid_cons::momentum::name()].second;
+  const int ceng = imap[fluid_cons::energy::name()].first;
+  auto idx_E = imap.GetFlatIdx(radmoment_cons::E::name(), false);
+  auto idx_F = imap.GetFlatIdx(radmoment_cons::F::name(), false);
   std::vector<std::string> diag_vars(
-      {diagnostic_variables::divf, diagnostic_variables::r_divf});
+      {diagnostic_variables::divf::name(), diagnostic_variables::r_divf::name()});
   PackIndexMap imap_diag;
   auto diag = rc->PackVariables(diag_vars, imap_diag);
-  auto idx_r_divf = imap_diag.GetFlatIdx(diagnostic_variables::r_divf, false);
+  auto idx_r_divf = imap_diag.GetFlatIdx(diagnostic_variables::r_divf::name(), false);
 
-  StateDescriptor *rad = pmb->packages.Get("radiation").get();
+  StateDescriptor *rad = pm->packages.Get("radiation").get();
   int num_species = 0;
   if (idx_E.IsValid()) {
     num_species = rad->Param<int>("num_species");

@@ -26,26 +26,26 @@ TaskStatus LightBulbCalcTau(MeshBlockData<Real> *rc) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
-  auto *pmb = rc->GetParentPointer().get();
+  Mesh *pmesh = rc->GetMeshPointer();
 
-  std::vector<std::string> vars({p::density, iv::tau});
+  std::vector<std::string> vars({p::density::name(), iv::tau::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int prho = imap[p::density].first;
-  const int ptau = imap[iv::tau].first;
+  const int prho = imap[p::density::name()].first;
+  const int ptau = imap[iv::tau::name()].first;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto &unit_conv =
-      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
+      pmesh->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
+  const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CalcTau", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        const Real rho =
-            v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS(); // Density in CGS
+        const Real rho = v(prho, k, j, i) * density_conversion_factor; // Density in CGS
         const Real lRho = std::log10(rho);
         // Calculate tau
         constexpr Real xl1 = LightBulb::HeatAndCool::XL1;
@@ -76,22 +76,22 @@ TaskStatus CheckDoGain(MeshBlockData<Real> *rc, bool *do_gain_global) {
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
-  auto *pmb = rc->GetParentPointer().get();
+  Mesh *pmesh = rc->GetMeshPointer();
 
-  std::vector<std::string> vars({iv::tau});
+  std::vector<std::string> vars({iv::tau::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int ptau = imap[iv::tau].first;
+  const int ptau = imap[iv::tau::name()].first;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto &unit_conv =
-      pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
-  auto rad = pmb->packages.Get("radiation").get();
-  auto opac = pmb->packages.Get("opacity").get();
+      pmesh->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
+  auto rad = pmesh->packages.Get("radiation").get();
+  auto opac = pmesh->packages.Get("opacity").get();
 
   int do_gain_local = 0;
   bool do_gain;
@@ -111,31 +111,33 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
 
-  std::vector<std::string> vars({c::density, p::density, p::velocity, p::temperature,
-                                 p::ye, c::energy, iv::Gcov, iv::GcovHeat, iv::GcovCool,
-                                 iv::Gye, iv::tau, p::energy});
+  std::vector<std::string> vars({c::density::name(), p::density::name(),
+                                 p::velocity::name(), p::temperature::name(),
+                                 p::ye::name(), c::energy::name(), iv::Gcov::name(),
+                                 iv::GcovHeat::name(), iv::GcovCool::name(),
+                                 iv::Gye::name(), iv::tau::name(), p::energy::name()});
 
   PackIndexMap imap;
   auto v = rc->PackVariables(vars, imap);
-  const int crho = imap[c::density].first;
-  const int prho = imap[p::density].first;
-  const int pvlo = imap[p::velocity].first;
-  const int pvhi = imap[p::velocity].second;
-  const int ptemp = imap[p::temperature].first;
-  const int pye = imap[p::ye].first;
-  const int penergy = imap[p::energy].first;
-  const int Gcov_lo = imap[iv::Gcov].first;
-  const int Gcov_hi = imap[iv::Gcov].second;
-  const int Gye = imap[iv::Gye].first;
-  const int ptau = imap[iv::tau].first;
-  const int GcovHeat = imap[iv::GcovHeat].first;
-  const int GcovCool = imap[iv::GcovCool].first;
+  const int crho = imap[c::density::name()].first;
+  const int prho = imap[p::density::name()].first;
+  const int pvlo = imap[p::velocity::name()].first;
+  const int pvhi = imap[p::velocity::name()].second;
+  const int ptemp = imap[p::temperature::name()].first;
+  const int pye = imap[p::ye::name()].first;
+  const int penergy = imap[p::energy::name()].first;
+  const int Gcov_lo = imap[iv::Gcov::name()].first;
+  const int Gcov_hi = imap[iv::Gcov::name()].second;
+  const int Gye = imap[iv::Gye::name()].first;
+  const int ptau = imap[iv::tau::name()].first;
+  const int GcovHeat = imap[iv::GcovHeat::name()].first;
+  const int GcovCool = imap[iv::GcovCool::name()].first;
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
@@ -153,6 +155,16 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
   bool do_species[3] = {rad->Param<bool>("do_nu_electron"),
                         rad->Param<bool>("do_nu_electron_anti"),
                         rad->Param<bool>("do_nu_heavy")};
+
+  // Code to CGS
+  const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
+  const Real temperature_conversion_factor = unit_conv.GetTemperatureCodeToCGS();
+  const Real length_conversion_factor = unit_conv.GetLengthCodeToCGS();
+
+  // CGS to code
+  const Real energy_conversion_factor = unit_conv.GetEnergyCGSToCode();
+  const Real mass_conversion_factor = unit_conv.GetMassCGSToCode();
+  const Real time_conversion_factor = unit_conv.GetTimeCGSToCode();
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
@@ -177,14 +189,14 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
     const parthenon::AllReduce<bool> *pdo_gain_reducer =
         rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
     const bool do_gain = pdo_gain_reducer->val;
+
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
         kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
           const Real r = std::abs(coords.Xc<1>(k, j, i)); // TODO(MG) coord transform game
-          const Real rho =
-              v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS(); // Density in CGS
-          const Real cdensity = v(crho, k, j, i);                     // conserved density
+          const Real rho = v(prho, k, j, i) * density_conversion_factor; // Density in CGS
+          const Real cdensity = v(crho, k, j, i); // conserved density
           Real Gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
           Real Ucon[4];
@@ -243,17 +255,15 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
           Real lambda[2];
           lambda[0] = Ye;
           eos_sc.MassFractionsFromDensityTemperature(
-              rho, v(ptemp, k, j, i) * unit_conv.GetTemperatureCodeToCGS(), Xa, Xh, Xn,
-              Xp, Abar, Zbar, lambda);
+              rho, v(ptemp, k, j, i) * temperature_conversion_factor, Xa, Xh, Xn, Xp,
+              Abar, Zbar, lambda);
           heat = do_gain * (Xn + Xp) * hfac * std::exp(-tau) *
-                 pow((rnorm / (r * unit_conv.GetLengthCodeToCGS())), 2);
-          cool =
-              (Xn + Xp) * cfac * std::exp(-tau) *
-              pow((v(ptemp, k, j, i) * unit_conv.GetTemperatureCodeToCGS() / Tnorm), 6);
+                 pow((rnorm / (r * length_conversion_factor)), 2);
+          cool = (Xn + Xp) * cfac * std::exp(-tau) *
+                 pow((v(ptemp, k, j, i) * temperature_conversion_factor / Tnorm), 6);
 
-          Real CGSToCodeFact = unit_conv.GetEnergyCGSToCode() /
-                               unit_conv.GetMassCGSToCode() /
-                               unit_conv.GetTimeCGSToCode();
+          Real CGSToCodeFact =
+              energy_conversion_factor / mass_conversion_factor / time_conversion_factor;
 
           Real tempr = 1 / 30.76 / 9e20;
           Real H = heat * CGSToCodeFact;
@@ -266,10 +276,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshBlockData<Real> *rc, const doub
             // detg included above
             Kokkos::atomic_add(&(v(mu, k, j, i)), -Gcov_coord[mu - Gcov_lo]);
           }
-          v(GcovHeat, k, j, i) =
-              v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS() * heat;
-          v(GcovCool, k, j, i) =
-              v(prho, k, j, i) * unit_conv.GetMassDensityCodeToCGS() * cool;
+          v(GcovHeat, k, j, i) = v(prho, k, j, i) * density_conversion_factor * heat;
+          v(GcovCool, k, j, i) = v(prho, k, j, i) * density_conversion_factor * cool;
           Kokkos::atomic_add(&(v(Gye, k, j, i)), Jye);
         });
 #else

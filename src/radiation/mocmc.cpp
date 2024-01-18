@@ -54,7 +54,7 @@ get_nsamp_per_zone(const int &k, const int &j, const int &i,
 template <class T>
 void MOCMCInitSamples(T *rc) {
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -81,18 +81,19 @@ void MOCMCInitSamples(T *rc) {
   const auto opac = opac_pkg->template Param<Opacities>("opacities");
   StateDescriptor *eos = pmb->packages.Get("eos").get();
 
-  std::vector<std::string> variables{pr::J,           pr::H,  pf::density, pf::velocity,
-                                     pf::temperature, pf::ye, im::dnsamp};
+  std::vector<std::string> variables{
+      pr::J::name(),           pr::H::name(),  pf::density::name(), pf::velocity::name(),
+      pf::temperature::name(), pf::ye::name(), im::dnsamp::name()};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  auto pJ = imap.GetFlatIdx(pr::J);
-  auto pH = imap.GetFlatIdx(pr::H);
-  auto pdens = imap[pf::density].first;
-  auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  auto pT = imap[pf::temperature].first;
-  auto pye = imap[pf::ye].first;
-  auto dn = imap[im::dnsamp].first;
+  auto pJ = imap.GetFlatIdx(pr::J::name());
+  auto pH = imap.GetFlatIdx(pr::H::name());
+  auto pdens = imap[pf::density::name()].first;
+  auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
+  auto pT = imap[pf::temperature::name()].first;
+  auto pye = imap[pf::ye::name()].first;
+  auto dn = imap[im::dnsamp::name()].first;
 
   const int nblock = v.GetDim(5);
   PARTHENON_REQUIRE_THROWS(nblock == 1, "Packing not currently supported for swarms");
@@ -133,7 +134,7 @@ void MOCMCInitSamples(T *rc) {
   // Calculate array of starting index for each zone to compute particles
   ParArrayND<int> starting_index("Starting index", nx_k, nx_j, nx_i);
   auto starting_index_h = starting_index.GetHostMirror();
-  auto dN = rc->Get(im::dnsamp).data;
+  auto dN = rc->Get(im::dnsamp::name()).data;
   auto dN_h = dN.GetHostMirrorAndCopy();
   int index = 0;
   for (int k = 0; k < nx_k; k++) {
@@ -232,7 +233,7 @@ void MOCMCInitSamples(T *rc) {
 
 template <class T>
 TaskStatus MOCMCSampleBoundaries(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -242,7 +243,8 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> variables{pr::J, pf::velocity, ir::tilPi};
+  std::vector<std::string> variables{pr::J::name(), pf::velocity::name(),
+                                     ir::tilPi::name()};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -259,9 +261,9 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   const auto &mu_hi = swarm->template Get<Real>("mu_hi").Get();
   const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
   const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
-  auto pv = imap.GetFlatIdx(pf::velocity);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi);
-  auto iJ = imap.GetFlatIdx(pr::J);
+  auto pv = imap.GetFlatIdx(pf::velocity::name());
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name());
+  auto iJ = imap.GetFlatIdx(pr::J::name());
 
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const int nu_bins = rad->Param<int>("nu_bins");
@@ -347,7 +349,7 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
 
 template <class T>
 TaskStatus MOCMCReconstruction(T *rc) {
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -357,7 +359,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-  std::vector<std::string> variables{pf::velocity, ir::tilPi};
+  std::vector<std::string> variables{pf::velocity::name(), ir::tilPi::name()};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -370,8 +372,8 @@ TaskStatus MOCMCReconstruction(T *rc) {
   const auto &mu_hi = swarm->template Get<Real>("mu_hi").Get();
   const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
   const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
-  auto pv = imap.GetFlatIdx(pf::velocity);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi);
+  auto pv = imap.GetFlatIdx(pf::velocity::name());
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name());
 
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const int nu_bins = rad->Param<int>("nu_bins");
@@ -462,7 +464,7 @@ TaskStatus MOCMCReconstruction(T *rc) {
 
 template <class T>
 TaskStatus MOCMCTransport(T *rc, const Real dt) {
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
 
@@ -503,7 +505,7 @@ template <class T>
 TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   // Assume particles are already sorted from MOCMCReconstruction call!
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -521,36 +523,38 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   const auto eos_d = eos->template Param<EOS>("d.EOS");
 
   std::vector<std::string> variables{
-      cr::E,      cr::F,        pr::J,           pr::H,    pf::density,
-      pf::energy, pf::velocity, pf::temperature, pf::ye,   ir::tilPi,
-      ir::kappaH, im::dnsamp,   im::Inu0,        im::Inu1, im::jinvs};
+      cr::E::name(),        cr::F::name(),           pr::J::name(),
+      pr::H::name(),        pf::density::name(),     pf::energy::name(),
+      pf::velocity::name(), pf::temperature::name(), pf::ye::name(),
+      ir::tilPi::name(),    ir::kappaH::name(),      im::dnsamp::name(),
+      im::Inu0::name(),     im::Inu1::name(),        im::jinvs::name()};
   if (update_fluid) {
-    variables.push_back(cf::energy);
-    variables.push_back(cf::momentum);
-    variables.push_back(cf::ye);
+    variables.push_back(cf::energy::name());
+    variables.push_back(cf::momentum::name());
+    variables.push_back(cf::ye::name());
   }
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  const auto pJ = imap.GetFlatIdx(pr::J);
-  const auto pH = imap.GetFlatIdx(pr::H);
-  const auto pdens = imap[pf::density].first;
-  const auto peng = imap[pf::energy].first;
-  const auto pv = imap.GetFlatIdx(fluid_prim::velocity);
-  const auto pT = imap[pf::temperature].first;
-  const auto pye = imap[pf::ye].first;
-  const auto Inu0 = imap.GetFlatIdx(im::Inu0);
-  const auto Inu1 = imap.GetFlatIdx(im::Inu1);
-  const auto ijinvs = imap.GetFlatIdx(im::jinvs);
-  const auto iTilPi = imap.GetFlatIdx(ir::tilPi);
-  auto idx_E = imap.GetFlatIdx(cr::E);
-  auto idx_F = imap.GetFlatIdx(cr::F);
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH);
+  const auto pJ = imap.GetFlatIdx(pr::J::name());
+  const auto pH = imap.GetFlatIdx(pr::H::name());
+  const auto pdens = imap[pf::density::name()].first;
+  const auto peng = imap[pf::energy::name()].first;
+  const auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
+  const auto pT = imap[pf::temperature::name()].first;
+  const auto pye = imap[pf::ye::name()].first;
+  const auto Inu0 = imap.GetFlatIdx(im::Inu0::name());
+  const auto Inu1 = imap.GetFlatIdx(im::Inu1::name());
+  const auto ijinvs = imap.GetFlatIdx(im::jinvs::name());
+  const auto iTilPi = imap.GetFlatIdx(ir::tilPi::name());
+  auto idx_E = imap.GetFlatIdx(cr::E::name());
+  auto idx_F = imap.GetFlatIdx(cr::F::name());
+  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name());
   int ceng(-1), cmom_lo(-1), cye(-1);
   if (update_fluid) {
-    ceng = imap[cf::energy].first;
-    cmom_lo = imap[cf::momentum].first;
-    cye = imap[cf::ye].first;
+    ceng = imap[cf::energy::name()].first;
+    cmom_lo = imap[cf::momentum::name()].first;
+    cye = imap[cf::ye::name()].first;
   }
 
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
@@ -784,7 +788,7 @@ TaskStatus MOCMCEddington(T *rc) {
   // Assume list is sorted!
   namespace ir = radmoment_internal;
 
-  auto *pmb = rc->GetParentPointer().get();
+  auto *pmb = rc->GetParentPointer();
   auto &sc = pmb->swarm_data.Get();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
@@ -795,7 +799,7 @@ TaskStatus MOCMCEddington(T *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  std::vector<std::string> variables{ir::tilPi, pf::velocity};
+  std::vector<std::string> variables{ir::tilPi::name(), pf::velocity::name()};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -805,8 +809,8 @@ TaskStatus MOCMCEddington(T *rc) {
   const auto &mu_hi = swarm->template Get<Real>("mu_hi").Get();
   const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
   const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi);
-  const auto pvel_lo = imap[pf::velocity].first;
+  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name());
+  const auto pvel_lo = imap[pf::velocity::name()].first;
 
   const int nu_bins = rad->Param<int>("nu_bins");
   const Real dlnu = rad->Param<Real>("dlnu");
