@@ -194,7 +194,8 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
   auto swarm_d = swarm->GetDeviceContext();
 
-  std::vector<std::string> vars = {p::density::name(), p::temperature::name(), p::velocity::name(), p::energy::name(),
+  std::vector<std::string> vars = {p::density::name(), p::temperature::name(),
+                                   p::velocity::name(), p::energy::name(),
                                    p::pressure::name()};
   if (mhd) {
     vars.push_back(p::bfield::name());
