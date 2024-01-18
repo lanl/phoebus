@@ -582,7 +582,6 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             Real th = tr.bl_theta(x1, x2);
 
             Real lnh = -1.0;
-            Real hm1;
             Real uphi;
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
             if (lnh > 0.0) {
