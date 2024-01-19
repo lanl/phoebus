@@ -49,71 +49,27 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   namespace ir = radmoment_internal;
   namespace pr = radmoment_prim;
   namespace cr = radmoment_cons;
+  using parthenon::MakePackDescriptor;
   Mesh *pmesh = rc->GetMeshPointer();
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
+  auto &resolved_pkg = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
+  static auto desc = MakePackDescriptor<p::density, c::density, p::velocity, c::momentum,
+       p::energy, c::energy, p::bfield, p::ye,
+       c::ye, p::pressure, p::temperature, p::gamma1,
+       pr::J, pr::H, cr::E, cr::F,
+    impl::cell_signal_speed, impl::fail, ir::tilPi, ir::c2pfail, ir::xi, ir::phi>(resolved_pkgs.get());
+  auto v = desc.GetPack();
+  const int nblocks = v.GetNBlocks();
 
   StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
   StateDescriptor *fluid_pkg = pmesh->packages.Get("fluid").get();
   StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
 
-  const std::vector<std::string> vars({p::density::name(),
-                                       c::density::name(),
-                                       p::velocity::name(),
-                                       c::momentum::name(),
-                                       p::energy::name(),
-                                       c::energy::name(),
-                                       p::bfield::name(),
-                                       p::ye::name(),
-                                       c::ye::name(),
-                                       p::pressure::name(),
-                                       p::temperature::name(),
-                                       p::gamma1::name(),
-                                       impl::cell_signal_speed::name(),
-                                       impl::fail::name(),
-                                       ir::c2pfail::name(),
-                                       ir::tilPi::name(),
-                                       pr::J::name(),
-                                       pr::H::name(),
-                                       cr::E::name(),
-                                       cr::F::name(),
-                                       ir::xi::name(),
-                                       ir::phi::name()});
-
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-
-  const int prho = imap[p::density::name()].first;
-  const int crho = imap[c::density::name()].first;
-  const int pvel_lo = imap[p::velocity::name()].first;
-  const int pvel_hi = imap[p::velocity::name()].second;
-  const int cmom_lo = imap[c::momentum::name()].first;
-  const int cmom_hi = imap[c::momentum::name()].second;
-  const int peng = imap[p::energy::name()].first;
-  const int ceng = imap[c::energy::name()].first;
-  const int prs = imap[p::pressure::name()].first;
-  const int tmp = imap[p::temperature::name()].first;
-  const int gm1 = imap[p::gamma1::name()].first;
-  const int slo = imap[impl::cell_signal_speed::name()].first;
-  const int shi = imap[impl::cell_signal_speed::name()].second;
-  const int pb_lo = imap[p::bfield::name()].first;
-  const int pb_hi = imap[p::bfield::name()].second;
-  int pye = imap[p::ye::name()].second; // negative if not present
-  int cye = imap[c::ye::name()].second;
-
-  int ifail = imap[impl::fail::name()].first;
-  int irfail = imap[ir::c2pfail::name()].first;
-
-  auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
-  auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
-  auto idx_J = imap.GetFlatIdx(pr::J::name(), false);
-  auto idx_H = imap.GetFlatIdx(pr::H::name(), false);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
-  auto iXi = imap.GetFlatIdx(ir::xi::name(), false);
-  auto iPhi = imap.GetFlatIdx(ir::phi::name(), false);
-
+  
   const bool rad_active = rad_pkg->Param<bool>("active");
   const int num_species = rad_active ? rad_pkg->Param<int>("num_species") : 0;
 
@@ -128,7 +84,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup failures",
         DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
-          if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
+          if (v(b, impl::fail(), k, j, i) == con2prim_robust::FailFlags::fail) {
             nf++;
           }
         },
@@ -142,7 +98,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         parthenon::loop_pattern_mdrange_tag, "Rad ConToPrim::Solve fixup failures",
         DevExecSpace(), 0, v.GetDim(5) - 1, kbi.s, kbi.e, jbi.s, jbi.e, ibi.s, ibi.e,
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
-          if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
+          if (v(b, impl::fail(), k, j, i) == con2prim_robust::FailFlags::fail) {
             nf++;
           }
         },
@@ -172,17 +128,17 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         Real eos_lambda[2]; // use last temp as initial guess
         eos_lambda[0] = 0.5;
-        eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
+        eos_lambda[1] = std::log10(v(b, p::temperature(), k, j, i));
 
         Real gamma_max, e_max;
         bounds.GetCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
                            coords.Xc<3>(k, j, i), gamma_max, e_max);
 
         if (c2p_failure_force_fixup_both && rad_active) {
-          if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail ||
-              v(b, irfail, k, j, i) == radiation::FailFlags::fail) {
-            v(b, ifail, k, j, i) = con2prim_robust::FailFlags::fail;
-            v(b, irfail, k, j, i) = radiation::FailFlags::fail;
+          if (v(b, impl::fail, k, j, i) == con2prim_robust::FailFlags::fail ||
+              v(b, ir::c2pfail(), k, j, i) == radiation::FailFlags::fail) {
+            v(b, impl::fail(), k, j, i) = con2prim_robust::FailFlags::fail;
+            v(b, ir::c2pfail(), k, j, i) = radiation::FailFlags::fail;
           }
         }
 
@@ -193,9 +149,9 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
         auto fail = [&](const int k, const int j, const int i) {
           if (c2p_failure_force_fixup_both) {
-            return v(b, ifail, k, j, i) * v(b, irfail, k, j, i);
+            return v(b, impl::fail(), k, j, i) * v(b, ir::c2pfail(), k, j, i);
           } else {
-            return v(b, ifail, k, j, i);
+            return v(b, impl::fail(), k, j, i);
           }
         };
         auto fixup = [&](const int iv, const Real inv_mask_sum) {
@@ -213,11 +169,11 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         };
         // When using IndexDomain::entire, can't stencil from e.g. i = 0 because 0 - 1 =
         // -1 is a segfault
-        if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail) {
+        if (v(b, impl::fail(), k, j, i) == con2prim_robust::FailFlags::fail) {
           Real num_valid = 0;
-          num_valid = v(b, ifail, k, j, i - 1) + v(b, ifail, k, j, i + 1);
-          if (ndim > 1) num_valid += v(b, ifail, k, j - 1, i) + v(b, ifail, k, j + 1, i);
-          if (ndim == 3) num_valid += v(b, ifail, k - 1, j, i) + v(b, ifail, k + 1, j, i);
+          num_valid = v(b, impl::fail(), k, j, i - 1) + v(b, impl::fail(), k, j, i + 1);
+          if (ndim > 1) num_valid += v(b, impl::fail(), k, j - 1, i) + v(b, impl::fail(), k, j + 1, i);
+          if (ndim == 3) num_valid += v(b, impl::fail(), k - 1, j, i) + v(b, impl::fail(), k + 1, j, i);
 
           // if (num_valid > 0.5 &&
           //    fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate && i > ib.s &&
@@ -225,32 +181,32 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
           if (num_valid > 0.5 &&
               fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate) {
             const Real norm = 1.0 / num_valid;
-            v(b, prho, k, j, i) = fixup(prho, norm);
-            for (int pv = pvel_lo; pv <= pvel_hi; pv++) {
-              v(b, pv, k, j, i) = fixup(pv, norm);
+            v(b, p::density(), k, j, i) = fixup(p::density(), norm);
+            for (int pv = 0; pv <= 2; pv++) {
+              v(b, p::velocity(pv), k, j, i) = fixup(p::velocity(pv), norm);
             }
-            v(b, peng, k, j, i) = fixup(peng, norm);
+            v(b, p::energy(), k, j, i) = fixup(p::energy(), norm);
 
-            if (pye > 0) v(b, pye, k, j, i) = fixup(pye, norm);
+            if (v.Contains(b,p::ye())) v(b, p::ye(), k, j, i) = fixup(p::ye(), norm);
 
-            v(b, prho, k, j, i) =
-                std::max<Real>(v(b, prho, k, j, i), 100. * robust::SMALL());
-            v(b, peng, k, j, i) =
-                std::max<Real>(v(b, peng, k, j, i), 100. * robust::SMALL());
+            v(b, p::density(), k, j, i) =
+	      std::max<Real>(v(b, p::density(), k, j, i), 100. * robust::SMALL());
+            v(b, p::energy(), k, j, i) =
+	      std::max<Real>(v(b, p::energy(), k, j, i), 100. * robust::SMALL());
           } else {
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
             // velocities to zero
 
-            v(b, prho, k, j, i) = 100. * robust::SMALL();
-            v(b, peng, k, j, i) = 100. * robust::SMALL();
+            v(b, p::density(), k, j, i) = 100. * robust::SMALL();
+            v(b, p::energy(), k, j, i) = 100. * robust::SMALL();
 
             // Safe value for ye
-            if (pye > 0) {
-              v(b, pye, k, j, i) = 0.5;
+            if (v.Contains(b,p::ye())) {
+              v(b, p::ye(), k, j, i) = 0.5;
             }
 
             // Zero primitive velocities
-            SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = 0.; }
+            SPACELOOP(ii) { v(b, p::velocity(ii), k, j, i) = 0.; }
           }
 
           const Real sdetgam = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -263,59 +219,59 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
           geom.MetricInverse(CellLocation::Cent, k, j, i, gcon);
 
           // Clamp velocity now (for rad inversion)
-          Real vpcon[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                           v(b, pvel_lo + 2, k, j, i)};
+          Real vpcon[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
+	    v(b, p::velocity(2), k, j, i)};
           Real W = phoebus::GetLorentzFactor(vpcon, gcov);
           if (W > gamma_max) {
             const Real rescale = std::sqrt(gamma_max * gamma_max - 1.) / (W * W - 1.);
             SPACELOOP(ii) { vpcon[ii] *= rescale; }
-            SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = vpcon[ii]; }
+            SPACELOOP(ii) { v(b, p::velocity(ii), k, j, i) = vpcon[ii]; }
             W = gamma_max;
           }
 
           // Update dependent primitives
-          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+          if (v.Contains(b,p::ye())) eos_lambda[0] = v(b, p::ye(), k, j, i);
+          v(b, p::temperature(), k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+										     v(b, p::density(), k, j, i), ratio(v(b, p::energy(), k, j, i), v(b, p::density, k, j, i)),
               eos_lambda);
-          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-          v(b, gm1, k, j, i) =
-              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
-                                                          v(b, tmp, k, j, i), eos_lambda),
-                    v(b, prs, k, j, i));
+          v(b, p::pressure(), k, j, i) = eos.PressureFromDensityTemperature(
+									    v(b, p::density(), k, j, i), v(b, p::temperature, k, j, i), eos_lambda);
+          v(b, p::gamma1(), k, j, i) =
+	    ratio(eos.BulkModulusFromDensityTemperature(v(b, p::density(), k, j, i),
+							v(b, p::temperature(), k, j, i), eos_lambda),
+		  v(b, p::pressure(), k, j, i));
 
           // Update conserved variables
 
           Real S[3];
           Real bcons[3];
           Real bp[3] = {0.0, 0.0, 0.0};
-          if (pb_hi > 0) {
-            bp[0] = v(b, pb_lo, k, j, i);
-            bp[1] = v(b, pb_lo + 1, k, j, i);
-            bp[2] = v(b, pb_hi, k, j, i);
+          if (v.Contains(b, p::bfield(2))) {
+            bp[0] = v(b, p::bfield(0), k, j, i);
+            bp[1] = v(b, p::bfield(1), k, j, i);
+            bp[2] = v(b, p::bfield(2), k, j, i);
           }
           Real ye_cons;
           Real ye_prim = 0.5;
-          if (pye > 0) {
-            ye_prim = v(b, pye, k, j, i);
+          if (v.Contains(b, p::ye())) {
+            ye_prim = v(b, p::ye(), k, j, i);
           }
           Real sig[3];
-          prim2con::p2c(v(b, prho, k, j, i), vpcon, bp, v(b, peng, k, j, i), ye_prim,
-                        v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gcon, beta, alpha,
-                        sdetgam, v(b, crho, k, j, i), S, bcons, v(b, ceng, k, j, i),
+          prim2con::p2c(v(b, p::density(), k, j, i), vpcon, bp, v(b, p::energy(), k, j, i), ye_prim,
+                        v(b, p::pressure(), k, j, i), v(b, p::gamma1(), k, j, i), gcov, gcon, beta, alpha,
+                        sdetgam, v(b, c::density(), k, j, i), S, bcons, v(b, c::energy(), k, j, i),
                         ye_cons, sig);
-          v(b, cmom_lo, k, j, i) = S[0];
-          v(b, cmom_lo + 1, k, j, i) = S[1];
-          v(b, cmom_hi, k, j, i) = S[2];
-          if (pye > 0) v(b, cye, k, j, i) = ye_cons;
-          for (int m = slo; m <= shi; m++) {
-            v(b, m, k, j, i) = sig[m - slo];
+          v(b, c::momentum(0), k, j, i) = S[0];
+          v(b, c::momentum(1), k, j, i) = S[1];
+          v(b, c::momentum(2), k, j, i) = S[2];
+          if (v.Contains(b, p::ye())) v(b, c::ye(), k, j, i) = ye_cons;
+          for (int m = 0; m <= 2; m++) {
+            v(b, impl::cell_signal_speed(m), k, j, i) = sig[m];
           }
 
-          if (irfail >= 0) {
+          if (v.Contains(b,ir::c2pfail())) {
             // If rad c2p failed, we'll fix that up subsequently
-            if (v(b, irfail, k, j, i) == radiation::FailFlags::success) {
+            if (v(b, ir::c2pfail(), k, j, i) == radiation::FailFlags::success) {
               for (int ispec = 0; ispec < num_species; ispec++) {
                 typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j,
                                                       i);
@@ -381,6 +337,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 }
 
 template TaskStatus
-ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+ConservedToPrimitiveFixup<MeshData<Real>>(MeshData<Real> *rc);
 
 } // namespace fixup
