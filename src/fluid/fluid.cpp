@@ -65,9 +65,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     std::string c2p_method = pin->GetOrAddString("fluid", "c2p_method", "robust");
     params.Add("c2p_method", c2p_method);
     if (c2p_method == "robust") {
-      params.Add("c2p_func", ConservedToPrimitiveRobust<MeshBlockData<Real>>);
+      params.Add("c2p_func", ConservedToPrimitiveRobust<MeshData<Real>>);
     } else if (c2p_method == "classic") {
-      params.Add("c2p_func", ConservedToPrimitiveClassic<MeshBlockData<Real>>);
+      params.Add("c2p_func", ConservedToPrimitiveClassic<MeshData<Real>>);
     } else {
       PARTHENON_THROW("Invalid c2p_method.");
     }
@@ -330,7 +330,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add(parthenon::hist_param_key, hst_vars);
 
   // Fill Derived and Estimate Timestep
-  physics->FillDerivedBlock = ConservedToPrimitive<MeshBlockData<Real>>;
+  physics->FillDerivedMesh = ConservedToPrimitive<MeshData<Real>>;
   physics->EstimateTimestepBlock = EstimateTimestepBlock;
 
   return physics;
@@ -451,6 +451,13 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
                                       const IndexRange &kb) {
   // TODO(JMM): This one will not work with meshblock packs
   auto *pmb = rc->GetParentPointer();
+  using parthenon::MakePackDescriptor;
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
+  static auto desc = MakePackDescriptor<>(resolved_pkgs.get());
+  auto v = desc.GetPack(rc);
+  const int nblocks = v.GetNBlocks();
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
@@ -468,15 +475,15 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto coords = pmb->coords;
 
   // TODO(JCD): move the setting of this into the solver so we can call this on MeshData
   auto fail = rc->Get(internal_variables::fail::name()).data;
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0, invert.NumBlocks() - 1,
-      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0, nblocks - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        auto coords = v.GetCoordinates(b);
         auto status = invert(geom, eos, coords, k, j, i);
         fail(k, j, i) = (status == con2prim_robust::ConToPrimStatus::success
                              ? con2prim_robust::FailFlags::success
@@ -491,6 +498,13 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
                                        const IndexRange &kb) {
   using namespace con2prim;
   auto *pmesh = rc->GetMeshPointer();
+  using parthenon::MakePackDescriptor;
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
+  static auto desc = MakePackDescriptor<>(resolved_pkgs.get());
+  auto v = desc.GetPack(rc);
+  const int nblocks = v.GetNBlocks();
 
   StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
   auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
@@ -510,22 +524,22 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   // TODO(JCD): revisit this.  don't think it's required anymore.  in fact the
   //            original performance thing was related to the loop being a reduce
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Setup", DevExecSpace(), 0, invert.NumBlocks() - 1,
-      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Setup", DevExecSpace(), 0, nblocks - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         invert.Setup(geom, k, j, i);
       });
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0, invert.NumBlocks() - 1,
-      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve", DevExecSpace(), 0, nblocks - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         auto status = invert(eos, k, j, i);
         fail(k, j, i) =
             (status == ConToPrimStatus::success ? FailFlags::success : FailFlags::fail);
       });
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Finalize", DevExecSpace(), 0,
-      invert.NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Finalize", DevExecSpace(), 0, nblocks - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         invert.Finalize(eos, geom, k, j, i);
       });

@@ -56,11 +56,12 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
   auto &resolved_pkg = pmesh->resolved_packages;
   const int ndim = pmesh->ndim;
-  static auto desc = MakePackDescriptor<p::density, c::density, p::velocity, c::momentum,
-       p::energy, c::energy, p::bfield, p::ye,
-       c::ye, p::pressure, p::temperature, p::gamma1,
-       pr::J, pr::H, cr::E, cr::F,
-    impl::cell_signal_speed, impl::fail, ir::tilPi, ir::c2pfail, ir::xi, ir::phi>(resolved_pkgs.get());
+  static auto desc =
+      MakePackDescriptor<p::density, c::density, p::velocity, c::momentum, p::energy,
+                         c::energy, p::bfield, p::ye, c::ye, p::pressure, p::temperature,
+                         p::gamma1, pr::J, pr::H, cr::E, cr::F, impl::cell_signal_speed,
+                         impl::fail, ir::tilPi, ir::c2pfail, ir::xi, ir::phi>(
+          resolved_pkgs.get());
   auto v = desc.GetPack();
   const int nblocks = v.GetNBlocks();
 
@@ -69,7 +70,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   StateDescriptor *rad_pkg = pmesh->packages.Get("radiation").get();
   StateDescriptor *eos_pkg = pmesh->packages.Get("eos").get();
 
-  
   const bool rad_active = rad_pkg->Param<bool>("active");
   const int num_species = rad_active ? rad_pkg->Param<int>("num_species") : 0;
 
@@ -82,7 +82,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
     int nfail_total;
     parthenon::par_reduce(
         parthenon::loop_pattern_mdrange_tag, "ConToPrim::Solve fixup failures",
-        DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        DevExecSpace(), 0, nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
           if (v(b, impl::fail(), k, j, i) == con2prim_robust::FailFlags::fail) {
             nf++;
@@ -96,7 +96,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
     nfail_total = 0;
     parthenon::par_reduce(
         parthenon::loop_pattern_mdrange_tag, "Rad ConToPrim::Solve fixup failures",
-        DevExecSpace(), 0, v.GetDim(5) - 1, kbi.s, kbi.e, jbi.s, jbi.e, ibi.s, ibi.e,
+        DevExecSpace(), 0, nblocks - 1, kbi.s, kbi.e, jbi.s, jbi.e, ibi.s, ibi.e,
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, int &nf) {
           if (v(b, impl::fail(), k, j, i) == con2prim_robust::FailFlags::fail) {
             nf++;
@@ -112,8 +112,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
 
-  Coordinates_t coords = rc->GetParentPointer()->coords;
-
   auto fluid_c2p_failure_strategy =
       fix_pkg->Param<FAILURE_STRATEGY>("fluid_c2p_failure_strategy");
   const auto c2p_failure_force_fixup_both =
@@ -123,9 +121,10 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
                     "As currently implemented this is a race condition!");
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, v.GetDim(5) - 1,
+      DEFAULT_LOOP_PATTERN, "ConToPrim::Solve fixup", DevExecSpace(), 0, nblocks - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        auto &coords = v.GetCoordinates(b);
         Real eos_lambda[2]; // use last temp as initial guess
         eos_lambda[0] = 0.5;
         eos_lambda[1] = std::log10(v(b, p::temperature(), k, j, i));
@@ -172,8 +171,12 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         if (v(b, impl::fail(), k, j, i) == con2prim_robust::FailFlags::fail) {
           Real num_valid = 0;
           num_valid = v(b, impl::fail(), k, j, i - 1) + v(b, impl::fail(), k, j, i + 1);
-          if (ndim > 1) num_valid += v(b, impl::fail(), k, j - 1, i) + v(b, impl::fail(), k, j + 1, i);
-          if (ndim == 3) num_valid += v(b, impl::fail(), k - 1, j, i) + v(b, impl::fail(), k + 1, j, i);
+          if (ndim > 1)
+            num_valid +=
+                v(b, impl::fail(), k, j - 1, i) + v(b, impl::fail(), k, j + 1, i);
+          if (ndim == 3)
+            num_valid +=
+                v(b, impl::fail(), k - 1, j, i) + v(b, impl::fail(), k + 1, j, i);
 
           // if (num_valid > 0.5 &&
           //    fluid_c2p_failure_strategy == FAILURE_STRATEGY::interpolate && i > ib.s &&
@@ -187,12 +190,12 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
             }
             v(b, p::energy(), k, j, i) = fixup(p::energy(), norm);
 
-            if (v.Contains(b,p::ye())) v(b, p::ye(), k, j, i) = fixup(p::ye(), norm);
+            if (v.Contains(b, p::ye())) v(b, p::ye(), k, j, i) = fixup(p::ye(), norm);
 
             v(b, p::density(), k, j, i) =
-	      std::max<Real>(v(b, p::density(), k, j, i), 100. * robust::SMALL());
+                std::max<Real>(v(b, p::density(), k, j, i), 100. * robust::SMALL());
             v(b, p::energy(), k, j, i) =
-	      std::max<Real>(v(b, p::energy(), k, j, i), 100. * robust::SMALL());
+                std::max<Real>(v(b, p::energy(), k, j, i), 100. * robust::SMALL());
           } else {
             // No valid neighbors; set fluid mass/energy to near-zero and set primitive
             // velocities to zero
@@ -201,7 +204,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
             v(b, p::energy(), k, j, i) = 100. * robust::SMALL();
 
             // Safe value for ye
-            if (v.Contains(b,p::ye())) {
+            if (v.Contains(b, p::ye())) {
               v(b, p::ye(), k, j, i) = 0.5;
             }
 
@@ -220,7 +223,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
           // Clamp velocity now (for rad inversion)
           Real vpcon[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
-	    v(b, p::velocity(2), k, j, i)};
+                           v(b, p::velocity(2), k, j, i)};
           Real W = phoebus::GetLorentzFactor(vpcon, gcov);
           if (W > gamma_max) {
             const Real rescale = std::sqrt(gamma_max * gamma_max - 1.) / (W * W - 1.);
@@ -230,16 +233,17 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
           }
 
           // Update dependent primitives
-          if (v.Contains(b,p::ye())) eos_lambda[0] = v(b, p::ye(), k, j, i);
+          if (v.Contains(b, p::ye())) eos_lambda[0] = v(b, p::ye(), k, j, i);
           v(b, p::temperature(), k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-										     v(b, p::density(), k, j, i), ratio(v(b, p::energy(), k, j, i), v(b, p::density, k, j, i)),
-              eos_lambda);
+              v(b, p::density(), k, j, i),
+              ratio(v(b, p::energy(), k, j, i), v(b, p::density, k, j, i)), eos_lambda);
           v(b, p::pressure(), k, j, i) = eos.PressureFromDensityTemperature(
-									    v(b, p::density(), k, j, i), v(b, p::temperature, k, j, i), eos_lambda);
+              v(b, p::density(), k, j, i), v(b, p::temperature, k, j, i), eos_lambda);
           v(b, p::gamma1(), k, j, i) =
-	    ratio(eos.BulkModulusFromDensityTemperature(v(b, p::density(), k, j, i),
-							v(b, p::temperature(), k, j, i), eos_lambda),
-		  v(b, p::pressure(), k, j, i));
+              ratio(eos.BulkModulusFromDensityTemperature(v(b, p::density(), k, j, i),
+                                                          v(b, p::temperature(), k, j, i),
+                                                          eos_lambda),
+                    v(b, p::pressure(), k, j, i));
 
           // Update conserved variables
 
@@ -257,9 +261,10 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
             ye_prim = v(b, p::ye(), k, j, i);
           }
           Real sig[3];
-          prim2con::p2c(v(b, p::density(), k, j, i), vpcon, bp, v(b, p::energy(), k, j, i), ye_prim,
-                        v(b, p::pressure(), k, j, i), v(b, p::gamma1(), k, j, i), gcov, gcon, beta, alpha,
-                        sdetgam, v(b, c::density(), k, j, i), S, bcons, v(b, c::energy(), k, j, i),
+          prim2con::p2c(v(b, p::density(), k, j, i), vpcon, bp,
+                        v(b, p::energy(), k, j, i), ye_prim, v(b, p::pressure(), k, j, i),
+                        v(b, p::gamma1(), k, j, i), gcov, gcon, beta, alpha, sdetgam,
+                        v(b, c::density(), k, j, i), S, bcons, v(b, c::energy(), k, j, i),
                         ye_cons, sig);
           v(b, c::momentum(0), k, j, i) = S[0];
           v(b, c::momentum(1), k, j, i) = S[1];
@@ -269,7 +274,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
             v(b, impl::cell_signal_speed(m), k, j, i) = sig[m];
           }
 
-          if (v.Contains(b,ir::c2pfail())) {
+          if (v.Contains(b, ir::c2pfail())) {
             // If rad c2p failed, we'll fix that up subsequently
             if (v(b, ir::c2pfail(), k, j, i) == radiation::FailFlags::success) {
               for (int ispec = 0; ispec < num_species; ispec++) {
@@ -278,15 +283,15 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
                 Vec con_v{vpcon[0] / W, vpcon[1] / W, vpcon[2] / W};
                 CLOSURE c(con_v, &g);
 
-                Real E = v(b, idx_E(ispec), k, j, i) / sdetgam;
+                Real E = v(b, cr::E(ispec), k, j, i) / sdetgam;
                 Vec cov_F;
-                SPACELOOP(ii) { cov_F(ii) = v(b, idx_F(ispec, ii), k, j, i) / sdetgam; }
+                SPACELOOP(ii) { cov_F(ii) = v(b, cr::F(ispec, ii), k, j, i) / sdetgam; }
                 Tens2 con_tilPi;
                 Real J;
                 Vec cov_H;
                 if (iTilPi.IsValid()) {
                   SPACELOOP2(ii, jj) {
-                    con_tilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                    con_tilPi(ii, jj) = v(b, ir::tilPi(ispec, ii, jj), k, j, i);
                   }
                 } else {
                   Real xi = 0.;
@@ -297,8 +302,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
                 c.Con2Prim(E, cov_F, con_tilPi, &J, &cov_H);
 
-                v(b, idx_J(ispec), k, j, i) = J;
-                SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J; }
+                v(b, pr::J(ispec), k, j, i) = J;
+                SPACELOOP(ii) { v(b, pr::H(ispec, ii), k, j, i) = cov_H(ii) / J; }
 
                 // Floors and ceilings will be applied subsequently by ApplyFloors task
               }
@@ -336,7 +341,6 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   return TaskStatus::fail;
 }
 
-template TaskStatus
-ConservedToPrimitiveFixup<MeshData<Real>>(MeshData<Real> *rc);
-
+template TaskStatus ConservedToPrimitiveFixup<MeshData<Real>>(MeshData<Real> *rc);
+x
 } // namespace fixup
