@@ -526,12 +526,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto fixup = tl.AddTask(fill_derived,
                             fixup::ConservedToPrimitiveFixup<MeshData<Real>>, sc1.get());
     auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshData<Real>>, sc1.get());
-    if (rad_moments_active) {
-      // Only apply floors because MomentFluidSource already ensured that a sensible state
-      // was returned
-      auto floors =
-          tl.AddTask(gas_rad_int, fixup::ApplyFloors<MeshData<Real>>, sc1.get());
-    }
   }
 
   TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);
@@ -562,6 +556,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
           tl.AddTask(floors, radiation::MomentFluidSource<MeshBlockData<Real>>, sc1.get(),
                      beta * dt, fluid_active);
       gas_rad_int = gas_rad_int | impl_update;
+    }
+    if (rad_moments_active) {
+      // Only apply floors because MomentFluidSource already ensured that a sensible state
+      // was returned
+      auto floors =
+          tl.AddTask(gas_rad_int, fixup::ApplyFloors<MeshData<Real>>, sc1.get());
     }
   }
 
