@@ -15,7 +15,6 @@
 #include "geometry/geometry.hpp"
 #include "geometry/geometry_utils.hpp"
 #include "phoebus_utils/cell_locations.hpp"
-#include "phoebus_utils/phoebus_interpolation.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include "phoebus_utils/variables.hpp"
 
@@ -79,7 +78,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 } // Initialize
 
 TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
-  using namespace LCInterp;
   namespace p = fluid_prim;
 
   auto *pmb = rc->GetParentPointer();
@@ -104,7 +102,7 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  // update loop.
+  // update loop. RK2
   const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
       "Advect Tracers", 0, max_active_index, KOKKOS_LAMBDA(const int n) {
@@ -112,33 +110,21 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
           int k, j, i;
           swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
 
-          // geom quantities
-          Real gcov4[4][4];
-          geom.SpacetimeMetric(0.0, x(n), y(n), z(n), gcov4);
-          Real lapse = geom.Lapse(0.0, x(n), y(n), z(n));
-          Real shift[3];
-          geom.ContravariantShift(0.0, x(n), y(n), z(n), shift);
+          Real rhs1, rhs2, rhs3;
 
-          // Get shift, W, lapse
-          const Real Wvel_X1 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo);
-          const Real Wvel_X2 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo + 1);
-          const Real Wvel_X3 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_hi);
-          const Real Wvel[] = {Wvel_X1, Wvel_X2, Wvel_X3};
-          const Real W = phoebus::GetLorentzFactor(Wvel, gcov4);
-          const Real vel_X1 = Wvel_X1 / W;
-          const Real vel_X2 = Wvel_X2 / W;
-          const Real vel_X3 = Wvel_X3 / W;
+          // predictor
+          tracers_rhs(pack, geom, pvel_lo, pvel_hi, ndim, dt, x(n), y(n), z(n), rhs1,
+                      rhs2, rhs3);
+          const Real kx = x(n) + 0.5 * dt * rhs1;
+          const Real ky = y(n) + 0.5 * dt * rhs2;
+          const Real kz = z(n) + 0.5 * dt * rhs3;
 
-          const Real rhs1 = (lapse * vel_X1 - shift[0]) * dt;
-          const Real rhs2 = (lapse * vel_X2 - shift[1]) * dt;
-          Real rhs3 = 0.0;
-          if (ndim > 2) {
-            rhs3 = (lapse * vel_X3 - shift[2]) * dt;
-          }
-
-          x(n) += rhs1;
-          y(n) += rhs2;
-          z(n) += rhs3;
+          // corrector
+          tracers_rhs(pack, geom, pvel_lo, pvel_hi, ndim, dt, kx, ky, kz, rhs1, rhs2,
+                      rhs3);
+          x(n) += rhs1 * dt;
+          y(n) += rhs2 * dt;
+          z(n) += rhs3 * dt;
 
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
