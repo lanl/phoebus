@@ -135,8 +135,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
     const int gid = pmb->gid;
     const int max_active_index = swarm->GetMaxActiveIndex();
-    std::printf("ma act %d %d %d %d\n", max_active_index, num_tracers_total, number_block,
-                nblocks);
     pmb->par_for(
         "ProblemGenerator::Torus::DistributeTracers", 0, max_active_index,
         KOKKOS_LAMBDA(const int n) {
