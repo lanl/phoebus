@@ -51,6 +51,7 @@ int main(int argc, char *argv[]) {
   pman.app_input->InitMeshBlockUserData = Geometry::SetGeometryBlock;
   // pman.app_input->UserWorkAfterLoop = phoebus::UserWorkAfterLoop;
   // pman.app_input->SetFillDerivedFunctions = phoebus::SetFillDerivedFunctions;
+  pman.app_input->MeshBlockUserWorkBeforeOutput = phoebus::UserWorkBeforeOutput;
 
   phoebus::ProblemModifier(pman.pinput.get());
 

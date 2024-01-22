@@ -1027,4 +1027,13 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
   return status;
 }
 
+/**
+ * Gets called before output.
+ * Currently: Fills tracers.
+ **/
+void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
+  auto &mbd = pmb->meshblock_data.Get();
+  tracers::FillTracers(mbd.get());
+}
+
 } // namespace phoebus
