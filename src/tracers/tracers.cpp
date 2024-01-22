@@ -72,8 +72,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue("B_z", swarm_name, real_swarmvalue_metadata);
   }
 
-  physics->PostFillDerivedBlock = FillTracers;
-
   return physics;
 } // Initialize
 
