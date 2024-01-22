@@ -689,7 +689,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
               Real lnh = -1.0;
               Real uphi;
               // Rejection sample X1, X2 to be in disk
-              while (lnh < 0.0 && x(n) < xh) {
+              while (lnh < 0.0) {
                 x(n) = x_min + rng_gen.drand() * (x_max - x_min);
                 y(n) = y_min + rng_gen.drand() * (y_max - y_min);
                 Real r = tr.bl_radius(x(n));
