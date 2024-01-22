@@ -135,7 +135,8 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
 /**
  * FillDerived function for tracers.
  * Registered Quantities (in addition to t, x, y, z):
- * rho, T, ye, vel, W_lorentz, pressure, lapse, shift, entropy, detgamma, B
+ * rho, T, ye, vel, energy, W_lorentz, pressure, 
+ * lapse, shift, entropy, detgamma, B, bernoulli
  **/
 void FillTracers(MeshBlockData<Real> *rc) {
   using namespace LCInterp;
