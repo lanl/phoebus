@@ -578,6 +578,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           KOKKOS_LAMBDA(const int k, const int j, const int i, Real &disk_vol) {
             const Real x1 = coords.Xc<1>(k, j, i);
             const Real x2 = coords.Xc<2>(k, j, i);
+            Real detgamma = geom.DetGamma(CellLocation::Cent, k, j, i);
             Real r = tr.bl_radius(x1);
             Real th = tr.bl_theta(x1, x2);
 
@@ -586,7 +587,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
             if (lnh > 0.0) {
               const Real vol = coords.CellVolume(k, j, i);
-              disk_vol += vol;
+              disk_vol += detgamma * vol;
             }
           },
           Kokkos::Sum<Real>(number_mesh));
@@ -648,6 +649,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
                         Real &number_block_reduce) {
             const Real x1 = coords.Xc<1>(k, j, i);
             const Real x2 = coords.Xc<2>(k, j, i);
+            Real detgamma = geom.DetGamma(CellLocation::Cent, k, j, i);
             Real r = tr.bl_radius(x1);
             Real th = tr.bl_theta(x1, x2);
 
@@ -656,7 +658,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
             if (lnh > 0.0 && x1 > xh) {
               const Real vol = coords.CellVolume(k, j, i);
-              number_block_reduce += vol;
+              number_block_reduce += detgamma * vol;
             }
           },
           Kokkos::Sum<Real>(number_block));
@@ -711,9 +713,10 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
             if (swarm_d.IsActive(n)) {
               int k, j, i;
               swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+              Real detgamma = geom.DetGamma(CellLocation::Cent, k, j, i);
               const Real vol = coords.CellVolume(k, j, i);
               const int num_tr_cell = swarm_d.GetParticleCountPerCell(k, j, i);
-              mass(n) = v(irho, k, j, i) * vol / num_tr_cell;
+              mass(n) = detgamma * v(irho, k, j, i) * vol / num_tr_cell;
             }
           });
     }
