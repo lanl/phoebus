@@ -11,6 +11,7 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+#include "axion_constants.hpp"
 #include "geometry/geometry.hpp"
 #include "light_bulb_constants.hpp"
 #include "phoebus_utils/variables.hpp"
@@ -164,6 +165,20 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
   const Real mass_conversion_factor = unit_conv.GetMassCGSToCode();
   const Real time_conversion_factor = unit_conv.GetTimeCGSToCode();
 
+  Real CGSToCodeFact =
+      energy_conversion_factor / mass_conversion_factor / time_conversion_factor;
+
+  // axion parameters in code units
+  const bool do_axion = rad->Param<bool>("do_axion");
+  const Real mN = Axion::mN * mass_conversion_factor;
+  const Real I_emissivity = rad->Param<Real>(
+      "axion_emissivity_integral"); // integral from 0 to infty of
+                                    // e^-x*x^4/(x^2+(\Gamma_sigma/2T)^2)*s(x)dx
+  const Real ga = rad->Param<Real>("axion_coupling");
+  const Real clight = Axion::c; // speed of light
+  const Real hbar = Axion::hbar;
+  const Real kboltz = Axion::kb; // Boltzmann constant
+
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), 0,
       nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -197,6 +212,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
           const Real rho =
               v(b, p::density(), k, j, i) * density_conversion_factor; // Density in CGS
           const Real cdensity = v(b, c::density(), k, j, i); // conserved density
+          const Real temperature =
+              v(b, p::temperature(), k, j, i) * temperature_conversion_factor;
           Real Gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, Gcov);
           Real Ucon[4];
@@ -220,7 +237,6 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
           constexpr Real Tnorm = 2.0 * MeVToCGS;
 
           Real Ye = v(b, p::ye(), k, j, i);
-
           if (do_liebendorfer) {
             constexpr Real Ye_beta = 0.27;
             constexpr Real Ye_floor = 0.05;
@@ -265,13 +281,22 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
                       Tnorm),
                      6);
 
-          Real CGSToCodeFact =
-              energy_conversion_factor / mass_conversion_factor / time_conversion_factor;
-
           Real tempr = 1 / 30.76 / 9e20;
           Real H = heat * CGSToCodeFact;
           Real C = cool * CGSToCodeFact;
-          J = cdensity * (H - C);                // looks like Cufe
+          if (do_axion) {
+            Real Gamma_sigma =
+                21.6 * (rho / 1E14) * sqrt(kboltz * temperature * mN * clight * clight);
+            double Jax = ga * ga / (16 * 3.14 * 3.14) / (mN * mN * mN) *
+                         (temperature * temperature * temperature) *
+                         (kboltz * kboltz * kboltz) * Gamma_sigma / hbar * I_emissivity /
+                         (clight * clight) * CGSToCodeFact;
+            std::cout << "Jax=" << Jax << std::endl;
+            std::cout << "rhoC=" << cdensity * C << std::endl;
+            J = cdensity * (H - C) - Jax;
+          } else {
+            J = cdensity * (H - C); // looks like Cufe
+          }
           Real Gcov_tetrad[4] = {J, 0., 0., 0.}; // minus sign included above
           Real Gcov_coord[4];
           Tetrads.TetradToCoordCov(Gcov_tetrad, Gcov_coord);
@@ -298,6 +323,11 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
             DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), 0,
             nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
             KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+              const Real rho = v(b, p::density(), k, j, i) *
+                               density_conversion_factor; // Density in CGS
+              const Real temperature =
+                  v(b, p::temperature(), k, j, i) * temperature_conversion_factor;
+
               Real Gcov[4][4];
               geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, Gcov);
               Real Ucon[4];
@@ -307,9 +337,21 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
               Geometry::Tetrads Tetrads(Ucon, Gcov);
 
               const Real Ye = v(b, p::ye(), k, j, i);
-
-              double J = d_opacity.Emissivity(v(b, p::density(), k, j, i),
-                                              v(b, p::temperature(), k, j, i), Ye, s);
+              double J;
+              if (do_axion) {
+                Real Gamma_sigma = 21.6 * (rho / 1E14) *
+                                   sqrt(kboltz * temperature * mN * clight * clight);
+                double Jax = ga * ga / (16 * 3.14 * 3.14) / (mN * mN * mN) *
+                             (temperature * temperature * temperature) *
+                             (kboltz * kboltz * kboltz) * Gamma_sigma / hbar *
+                             I_emissivity / (clight * clight) * CGSToCodeFact;
+                J = d_opacity.Emissivity(v(b, p::density(), k, j, i),
+                                         v(b, p::temperature(), k, j, i), Ye, s) +
+                    Jax;
+              } else {
+                J = d_opacity.Emissivity(v(b, p::density(), k, j, i),
+                                         v(b, p::temperature(), k, j, i), Ye, s);
+              }
               double Jye = mp_code * d_opacity.NumberEmissivity(
                                          v(b, p::density(), k, j, i),
                                          v(b, p::temperature(), k, j, i), Ye, s);

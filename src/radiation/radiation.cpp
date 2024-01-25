@@ -118,10 +118,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     const bool do_liebendorfer =
         pin->GetOrAddBoolean("radiation", "do_liebendorfer", false);
     bool do_lightbulb = pin->GetOrAddBoolean("radiation", "do_lightbulb", false);
+    bool do_axion = pin->GetOrAddBoolean("radiation", "do_axion", false);
     const Real lum = pin->GetOrAddReal("radiation", "lum", 4.0);
+    const Real axion_emissivity_integral = pin->GetOrAddReal(
+        "radiation", "axion_emissivity_integral",
+        3.59); // assumes analytic s(x)=sqrt(1+|x|*pi/4) from Raffelt's book
+    const Real axion_coupling = pin->GetOrAddReal("radiation", "axion_coupling", 1E-10);
     params.Add("do_liebendorfer", do_liebendorfer);
     params.Add("do_lightbulb", do_lightbulb);
     params.Add("lum", lum);
+    params.Add("do_axion", do_axion);
+    params.Add("axion_emissivity_integral", axion_emissivity_integral);
+    params.Add("axion_coupling", axion_coupling);
     if (do_lightbulb) {
       physics->AddField(iv::GcovHeat::name(), mscalar);
       physics->AddField(iv::GcovCool::name(), mscalar);
