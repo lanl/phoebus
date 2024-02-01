@@ -16,7 +16,7 @@
 
 namespace Axion {
 constexpr double mN = 1.6726E-24; // grams
-constexpr double c = 2.99792458E-10;
+constexpr double c = 2.99792458E10;
 constexpr double hbar = 1.0546E-27;
 constexpr double kb = 1.3807E-16;
 } // namespace Axion

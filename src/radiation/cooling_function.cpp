@@ -170,7 +170,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
 
   // axion parameters in code units
   const bool do_axion = rad->Param<bool>("do_axion");
-  const Real mN = Axion::mN * mass_conversion_factor;
+  const Real mN = Axion::mN;
   const Real I_emissivity = rad->Param<Real>(
       "axion_emissivity_integral"); // integral from 0 to infty of
                                     // e^-x*x^4/(x^2+(\Gamma_sigma/2T)^2)*s(x)dx
@@ -290,10 +290,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
             double Jax = ga * ga / (16 * 3.14 * 3.14) / (mN * mN * mN) *
                          (temperature * temperature * temperature) *
                          (kboltz * kboltz * kboltz) * Gamma_sigma / hbar * I_emissivity /
-                         (clight * clight) * CGSToCodeFact;
-            std::cout << "Jax=" << Jax << std::endl;
-            std::cout << "rhoC=" << cdensity * C << std::endl;
-            J = cdensity * (H - C) - Jax;
+	      (clight * clight*clight*clight)* CGSToCodeFact;
+	    J = cdensity * (H - C) - Jax;
           } else {
             J = cdensity * (H - C); // looks like Cufe
           }
