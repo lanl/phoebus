@@ -17,6 +17,8 @@
 #include <interface/sparse_pack.hpp>
 #include <parthenon/package.hpp>
 
+using parthenon::variable_names::ANYDIM;
+
 #define VARIABLE(ns, varname)                                                            \
   struct varname : public parthenon::variable_names::base_t<false> {                     \
     template <class... Ts>                                                               \
@@ -41,6 +43,13 @@
     static std::string name() { return #varstring; }                                     \
   }
 
+#define TENSOR_VARIABLE(ns, varname, ...)                                             \
+  struct varname : public base_t<false, __VA_ARGS__> {                                \
+    template <class... Ts>                                                            \
+    varname(Ts &&...args) : base_t<false, __VA_ARGS__>(std::forward<Ts>(args)...) {}  \
+    static std::string name() { return #ns "." #varname; }                            \
+  }
+
 namespace fluid_prim {
 VARIABLE(p, density);
 VARIABLE(p, velocity);
@@ -62,12 +71,12 @@ VARIABLE(c, ye);
 
 namespace radmoment_prim {
 VARIABLE(r.p, J);
-VARIABLE(r.p, H);
+  TENSOR_VARIABLE(r.p, H, ANYDIM, 3);
 } // namespace radmoment_prim
 
 namespace radmoment_cons {
 VARIABLE(r.c, E);
-VARIABLE(r.c, F);
+  TENSOR_VARIABLE(r.c, F, ANYDIM, 3);
 } // namespace radmoment_cons
 
 namespace radmoment_internal {
@@ -81,7 +90,7 @@ VARIABLE(r.i, dJ);
 VARIABLE(r.i, kappaJ);
 VARIABLE(r.i, kappaH);
 VARIABLE(r.i, JBB);
-VARIABLE(r.i, tilPi);
+TENSOR_VARIABLE(r.i, tilPi, ANYDIM, 3);
 VARIABLE(r.i, kappaH_mean);
 VARIABLE(r.i, c2pfail);
 VARIABLE(r.i, srcfail);
