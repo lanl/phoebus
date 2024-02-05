@@ -44,9 +44,9 @@ using parthenon::variable_names::ANYDIM;
   }
 
 #define TENSOR_VARIABLE(ns, varname, ...)                                             \
-  struct varname : public base_t<false, __VA_ARGS__> {                                \
+  struct varname : public parthenon::variable_names::base_t<false, __VA_ARGS__> { \
     template <class... Ts>                                                            \
-    varname(Ts &&...args) : base_t<false, __VA_ARGS__>(std::forward<Ts>(args)...) {}  \
+    KOKKOS_INLINE_FUNCTION varname(Ts &&...args) : parthenon::variable_names::base_t<false, __VA_ARGS__>(std::forward<Ts>(args)...) {} \
     static std::string name() { return #ns "." #varname; }                            \
   }
 

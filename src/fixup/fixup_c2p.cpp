@@ -54,7 +54,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
-  auto &resolved_pkg = pmesh->resolved_packages;
+  auto &resolved_pkgs = pmesh->resolved_packages;
   const int ndim = pmesh->ndim;
   static auto desc =
       MakePackDescriptor<p::density, c::density, p::velocity, c::momentum, p::energy,
@@ -106,8 +106,6 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
     printf("total interior nfail: %i\n", nfail_total);
   }
 
-  const int ndim = pmesh->ndim;
-
   auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto bounds = fix_pkg->Param<Bounds>("bounds");
@@ -134,7 +132,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
                            coords.Xc<3>(k, j, i), gamma_max, e_max);
 
         if (c2p_failure_force_fixup_both && rad_active) {
-          if (v(b, impl::fail, k, j, i) == con2prim_robust::FailFlags::fail ||
+          if (v(b, impl::fail(), k, j, i) == con2prim_robust::FailFlags::fail ||
               v(b, ir::c2pfail(), k, j, i) == radiation::FailFlags::fail) {
             v(b, impl::fail(), k, j, i) = con2prim_robust::FailFlags::fail;
             v(b, ir::c2pfail(), k, j, i) = radiation::FailFlags::fail;
@@ -236,9 +234,9 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
           if (v.Contains(b, p::ye())) eos_lambda[0] = v(b, p::ye(), k, j, i);
           v(b, p::temperature(), k, j, i) = eos.TemperatureFromDensityInternalEnergy(
               v(b, p::density(), k, j, i),
-              ratio(v(b, p::energy(), k, j, i), v(b, p::density, k, j, i)), eos_lambda);
+              ratio(v(b, p::energy(), k, j, i), v(b, p::density(), k, j, i)), eos_lambda);
           v(b, p::pressure(), k, j, i) = eos.PressureFromDensityTemperature(
-              v(b, p::density(), k, j, i), v(b, p::temperature, k, j, i), eos_lambda);
+									    v(b, p::density(), k, j, i), v(b, p::temperature(), k, j, i), eos_lambda);
           v(b, p::gamma1(), k, j, i) =
               ratio(eos.BulkModulusFromDensityTemperature(v(b, p::density(), k, j, i),
                                                           v(b, p::temperature(), k, j, i),
@@ -289,7 +287,7 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
                 Tens2 con_tilPi;
                 Real J;
                 Vec cov_H;
-                if (iTilPi.IsValid()) {
+                if (v.Contains(b, ir::tilPi())) {
                   SPACELOOP2(ii, jj) {
                     con_tilPi(ii, jj) = v(b, ir::tilPi(ispec, ii, jj), k, j, i);
                   }
@@ -342,5 +340,4 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 }
 
 template TaskStatus ConservedToPrimitiveFixup<MeshData<Real>>(MeshData<Real> *rc);
-x
 } // namespace fixup

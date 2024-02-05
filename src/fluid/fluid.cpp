@@ -499,7 +499,6 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   using namespace con2prim;
   auto *pmesh = rc->GetMeshPointer();
   using parthenon::MakePackDescriptor;
-  Mesh *pmesh = rc->GetMeshPointer();
   auto &resolved_pkgs = pmesh->resolved_packages;
   const int ndim = pmesh->ndim;
   static auto desc = MakePackDescriptor<>(resolved_pkgs.get());
