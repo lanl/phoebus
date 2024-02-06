@@ -31,6 +31,7 @@
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/radiation.hpp"
+#include <parthenon/package.hpp>
 
 using Microphysics::RadiationType;
 using Microphysics::EOS::EOS;
@@ -346,7 +347,7 @@ TaskStatus SourceFixup(T *rc) {
   } else if (method == "mocmc") {
     return SourceFixupImpl<T, radiation::ClosureMOCMC<settings>>(rc);
   }
-  return TaskStatus::fail;
+  return TaskStatus::complete;
 }
 
 template TaskStatus SourceFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);

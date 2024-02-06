@@ -189,7 +189,7 @@ TaskStatus MomentCon2Prim(T *rc) {
   } else {
     PARTHENON_FAIL("Radiation method unknown");
   }
-  return TaskStatus::fail;
+  return TaskStatus::complete;
 }
 // template TaskStatus MomentCon2Prim<MeshData<Real>>(MeshData<Real> *);
 template TaskStatus MomentCon2Prim<MeshBlockData<Real>>(MeshBlockData<Real> *);
@@ -287,7 +287,7 @@ TaskStatus MomentPrim2Con(T *rc, IndexDomain domain) {
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
-  return TaskStatus::fail;
+  return TaskStatus::complete;
 }
 
 template TaskStatus MomentPrim2Con<MeshBlockData<Real>>(MeshBlockData<Real> *,
@@ -768,7 +768,7 @@ TaskStatus CalculateFluxes(T *rc) {
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
-  return TaskStatus::fail;
+  return TaskStatus::complete;
 }
 template TaskStatus CalculateFluxes<MeshBlockData<Real>>(MeshBlockData<Real> *);
 
@@ -928,7 +928,7 @@ TaskStatus CalculateGeometricSource(T *rc, T *rc_src) {
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
-  return TaskStatus::fail;
+  return TaskStatus::complete;
 }
 template TaskStatus CalculateGeometricSource<MeshBlockData<Real>>(MeshBlockData<Real> *,
                                                                   MeshBlockData<Real> *);
