@@ -25,18 +25,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const int npoints = mydata[0].size();
 
   // DataBoxes for interpolation functions
-  Spiner::DataBox r(npoints);
-  Spiner::DataBox mass_density(npoints);
-  Spiner::DataBox temp(npoints);
-  Spiner::DataBox Ye(npoints);
-  Spiner::DataBox specific_internal_energy(npoints);
-  Spiner::DataBox velocity(npoints);
-  Spiner::DataBox pressure(npoints);
+  Spiner::DataBox<Real> r(npoints);
+  Spiner::DataBox<Real> mass_density(npoints);
+  Spiner::DataBox<Real> temp(npoints);
+  Spiner::DataBox<Real> Ye(npoints);
+  Spiner::DataBox<Real> specific_internal_energy(npoints);
+  Spiner::DataBox<Real> velocity(npoints);
+  Spiner::DataBox<Real> pressure(npoints);
 
-  Spiner::DataBox adm_density(npoints);
-  Spiner::DataBox adm_momentum(npoints);
-  Spiner::DataBox S_adm(npoints);
-  Spiner::DataBox Srr_adm(npoints);
+  Spiner::DataBox<Real> adm_density(npoints);
+  Spiner::DataBox<Real> adm_momentum(npoints);
+  Spiner::DataBox<Real> S_adm(npoints);
+  Spiner::DataBox<Real> Srr_adm(npoints);
 
   // Fill in the variables
   // Requires same grid for primitive and adm quantities in the input table

@@ -47,6 +47,7 @@ configure_file(../../../src/compile_constants.hpp.in generated/compile_constants
 target_link_libraries(geometry_unit_tests
   PRIVATE
   parthenon
+  singularity-eos::singularity-eos
   Catch2::Catch2
   Kokkos::kokkos)
 

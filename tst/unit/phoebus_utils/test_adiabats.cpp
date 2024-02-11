@@ -48,12 +48,12 @@ TEST_CASE("ADIABATS", "[compute_adiabats]") {
     const int nsamps = 180;
     Spiner::DataBox rho_d(Spiner::AllocationTarget::Device, nsamps);
     Spiner::DataBox temp_d(Spiner::AllocationTarget::Device, nsamps);
-    const Real lrho_min = eos.lRhoMin();
-    const Real lrho_max = eos.lRhoMax();
-    const Real rho_min = std::pow(10.0, lrho_min);
-    const Real rho_max = std::pow(10.0, lrho_max);
-    const Real T_min = std::pow(10.0, eos.lTMin());
-    const Real T_max = std::pow(10.0, eos.lTMax());
+    const Real rho_min = eos.rhoMin();
+    const Real rho_max = eos.rhoMax();
+    const Real lrho_min = std::log10(rho_min);
+    const Real lrho_max = std::log10(rho_max);
+    const Real T_min = eos.TMin();
+    const Real T_max = eos.TMax();
 
     const Real Ye = 0.1;
     const Real S0 = 20.0;

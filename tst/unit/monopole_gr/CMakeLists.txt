@@ -33,6 +33,7 @@ target_link_libraries(monopole_gr_unit_tests
   parthenon
   Catch2::Catch2
   Kokkos::kokkos
+  singularity-eos::singularity-eos
   )
 
 target_include_directories(monopole_gr_unit_tests PRIVATE
