@@ -72,7 +72,7 @@ enum Gradients {
 };
 
 // TODO(JMM): Do we want this?
-using Radius = Spiner::RegularGrid1D;
+using Radius = Spiner::RegularGrid1D<Real>;
 
 template <typename Array_t>
 PORTABLE_INLINE_FUNCTION Real Interpolate(const Real r, const Array_t &A,

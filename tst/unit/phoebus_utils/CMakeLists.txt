@@ -48,6 +48,7 @@ target_link_libraries(phoebus_utils_unit_tests
     parthenon
     Catch2::Catch2
     Kokkos::kokkos
+    singularity-eos::singularity-eos
     )
 if (PHOEBUS_ENABLE_HDF5)
   target_link_libraries(phoebus_utils_unit_tests PRIVATE hdf5::hdf5 hdf5::hdf5_hl )

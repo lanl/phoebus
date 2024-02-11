@@ -22,6 +22,8 @@
 #include "pgen/pgen.hpp"
 #include "progenitor/progenitordata.hpp"
 
+using DataBox = Spiner::DataBox<Real>;
+
 // Homologously collapsing star.
 namespace homologous {
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
@@ -67,15 +69,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   // Interpolated Initial Data
   auto progenitor_pkg = pmb->packages.Get("progenitor");
 
-  auto adm_density = progenitor_pkg->Param<Spiner::DataBox>("adm_density");
-  auto adm_momentum = progenitor_pkg->Param<Spiner::DataBox>("adm_momentum");
-  auto S_adm = progenitor_pkg->Param<Spiner::DataBox>("S_adm");
-  auto Srr_adm = progenitor_pkg->Param<Spiner::DataBox>("Srr_adm");
+  auto adm_density = progenitor_pkg->Param<DataBox>("adm_density");
+  auto adm_momentum = progenitor_pkg->Param<DataBox>("adm_momentum");
+  auto S_adm = progenitor_pkg->Param<DataBox>("S_adm");
+  auto Srr_adm = progenitor_pkg->Param<DataBox>("Srr_adm");
 
-  auto mass_density_dev = progenitor_pkg->Param<Spiner::DataBox>("mass_density_dev");
-  auto Ye_dev = progenitor_pkg->Param<Spiner::DataBox>("Ye_dev");
-  auto velocity_dev = progenitor_pkg->Param<Spiner::DataBox>("velocity_dev");
-  auto pressure_dev = progenitor_pkg->Param<Spiner::DataBox>("pressure_dev");
+  auto mass_density_dev = progenitor_pkg->Param<DataBox>("mass_density_dev");
+  auto Ye_dev = progenitor_pkg->Param<DataBox>("Ye_dev");
+  auto velocity_dev = progenitor_pkg->Param<DataBox>("velocity_dev");
+  auto pressure_dev = progenitor_pkg->Param<DataBox>("pressure_dev");
 
   // MonopoleGR
   static bool monopole_initialized = false;

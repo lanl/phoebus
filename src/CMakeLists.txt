@@ -154,6 +154,7 @@ configure_file(compile_constants.hpp.in generated/compile_constants.hpp @ONLY)
 target_include_directories(phoebus PRIVATE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
+  # JMM: Not needed, but can't hurt
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos"
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-opac"
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils"
@@ -183,7 +184,7 @@ endif()
 # target_compile_options(phoebus PUBLIC -G -lineinfo)
 
 target_link_libraries(phoebus PRIVATE parthenon
-  # singularity-eos::singularity-eos
+  singularity-eos::singularity-eos
   # singularity-opac::singularity-opac
 )
 if (PHOEBUS_ENABLE_HDF5)
