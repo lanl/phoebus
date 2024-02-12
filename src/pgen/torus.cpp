@@ -37,6 +37,7 @@
 typedef Kokkos::Random_XorShift64_Pool<> RNGPool;
 
 namespace torus {
+using DataBox = Spiner::DataBox<Real>;
 
 using pc = parthenon::constants::PhysicalConstants<parthenon::constants::CGS>;
 
@@ -78,8 +79,8 @@ class GasRadTemperatureResidual {
 class EnthalpyResidual {
  public:
   KOKKOS_FUNCTION
-  EnthalpyResidual(const Real hm1, const Spiner::DataBox T, const Real Ye,
-                   const Real h_min_sc, const EOS &eos)
+  EnthalpyResidual(const Real hm1, const DataBox T, const Real Ye, const Real h_min_sc,
+                   const EOS &eos)
       : hm1_(hm1), T_(T), Ye_(Ye), h_min_sc_(h_min_sc), eos_(eos) {}
 
   KOKKOS_INLINE_FUNCTION
@@ -90,7 +91,7 @@ class EnthalpyResidual {
 
  private:
   const Real hm1_;
-  const Spiner::DataBox T_;
+  const DataBox T_;
   const Real Ye_;
   const Real h_min_sc_;
   const EOS &eos_;
@@ -121,10 +122,9 @@ void ComputeBetas(Mesh *pmesh, const Real rho_min_bnorm, Real &beta_min_global,
                   Real &beta_pmax);
 KOKKOS_FUNCTION
 void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1,
-                          const Spiner::DataBox rho, const Spiner::DataBox temp,
-                          const Real Ye, const Real h_min_sc, const Real kappa,
-                          const Real gam, const Real Cv, const Real rho_rmax,
-                          Real &rho_out, Real &u_out);
+                          const DataBox rho, const DataBox temp, const Real Ye,
+                          const Real h_min_sc, const Real kappa, const Real gam,
+                          const Real Cv, const Real rho_rmax, Real &rho_out, Real &u_out);
 // ----------------------------------------------------------------------
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
@@ -239,8 +239,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   RNGPool rng_pool(seed);
 
-  Spiner::DataBox rho_h(nsamps);
-  Spiner::DataBox temp_h(nsamps);
+  DataBox rho_h(nsamps);
+  DataBox temp_h(nsamps);
 
   const Real rho_min = pmb->packages.Get("eos")->Param<Real>("rho_min");
   const Real rho_max = pmb->packages.Get("eos")->Param<Real>("rho_max");
@@ -622,10 +622,10 @@ Real log_enthalpy(const Real r, const Real th, const Real a, const Real rin, con
  **/
 KOKKOS_FUNCTION
 void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1,
-                          const Spiner::DataBox rho, const Spiner::DataBox temp,
-                          const Real Ye, const Real h_min_sc, const Real kappa,
-                          const Real gam, const Real Cv, const Real rho_rmax,
-                          Real &rho_out, Real &u_out) {
+                          const DataBox rho, const DataBox temp, const Real Ye,
+                          const Real h_min_sc, const Real kappa, const Real gam,
+                          const Real Cv, const Real rho_rmax, Real &rho_out,
+                          Real &u_out) {
   if (eos_type == IdealGas) { // Ideal Gas
     rho_out = std::pow(hm1 * (gam - 1.) / (kappa * gam), 1. / (gam - 1.));
     u_out = kappa * std::pow(rho_out, gam) / (gam - 1.) / rho_rmax;

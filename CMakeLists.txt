@@ -123,9 +123,13 @@ if(PHOEBUS_ENABLE_HDF5)
       "-DPHOEBUS_ENABLE_HDF5=OFF".)
   endif()
   set(SINGULARITY_USE_HDF5 ON CACHE BOOL "" FORCE)
+  set(SINGULARITY_USE_SPINER ON CACHE BOOL "" FORCE)
+  set(SINGULARITY_USE_SPINER_WITH_HDF5 ON CACHE BOOL "" FORCE)
   set(PARTHENON_DISABLE_HDF5 OFF CACHE BOOL "" FORCE)
 else()
   set(SINGULARITY_USE_HDF5 OFF CACHE BOOL "" FORCE)
+  set(SINGULARITY_USE_SPINER OFF CACHE BOOL "" FORCE)
+  set(SINGULARITY_USE_SPINER_WITH_HDF5 OFF CACHE BOOL "" FORCE)
   set(PARTHENON_DISABLE_HDF5 ON CACHE BOOL "" FORCE)
 endif()
 
@@ -159,7 +163,7 @@ add_subdirectory(external/parthenon parthenon)
 message("Configuring singularity")
 set(SINGULARITY_USE_KOKKOS ON CACHE BOOL "" FORCE)
 set(SINGULARITY_USE_FORTRAN OFF CACHE BOOL "" FORCE)
-set(SINGULARITY_SUBMODULE_MODE ON CACHE BOOL "" FORCE)
+set(SINGULARITY_FORCE_SUBMODULE_MODE ON CACHE BOOL "" FORCE)
 set(SINGULARITY_USE_KOKKOSKERNELS OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_BUILD_CLOSURE OFF CACHE BOOL "" FORCE)
 
@@ -167,15 +171,8 @@ set(SINGULARITY_BUILD_CLOSURE OFF CACHE BOOL "" FORCE)
 set(CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
 set(CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
 
-# singularity eos
-message(STATUS "Patching mpark::variant to support GPUs")
-execute_process(COMMAND patch -N -s -V never
-  ${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils/variant/include/mpark/variant.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-eos/utils/cuda_compatibility.patch
-)
-
 # message("Configuring singularity-eos")
-# add_subdirectory(external/singularity-eos singularity-eos)
+add_subdirectory(external/singularity-eos singularity-eos)
 
 # singularity opac
 # message("Configuring singularity-opac")

@@ -28,6 +28,7 @@
 namespace Adiabats {
 
 using Microphysics::EOS::EOS;
+using DataBox = Spiner::DataBox<Real>;
 
 template <typename EOS>
 inline void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
@@ -71,7 +72,7 @@ inline void GetRhoBounds(const EOS &eos, const Real rho_min, const Real rho_max,
 }
 
 // sample log rho
-inline void SampleRho(Spiner::DataBox lrho, const Real lrho_min, const Real lrho_max,
+inline void SampleRho(DataBox lrho, const Real lrho_min, const Real lrho_max,
                       const int n_samps) {
   const Real dlrho = (lrho_max - lrho_min) / n_samps;
 
@@ -84,9 +85,9 @@ inline void SampleRho(Spiner::DataBox lrho, const Real lrho_min, const Real lrho
  * Given Ye and a target entropy, compute density and temperature of constant entropy
  **/
 template <typename EOS>
-inline void ComputeAdiabats(Spiner::DataBox lrho, Spiner::DataBox temp, const EOS &eos,
-                            const Real Ye, const Real S0, const Real T_min,
-                            const Real T_max, const int n_samps) {
+inline void ComputeAdiabats(DataBox lrho, DataBox temp, const EOS &eos, const Real Ye,
+                            const Real S0, const Real T_min, const Real T_max,
+                            const int n_samps) {
 
   const Real guess0 = (T_max - T_min) / 2.0;
   const Real epsilon = std::numeric_limits<Real>::epsilon();
@@ -110,8 +111,8 @@ inline void ComputeAdiabats(Spiner::DataBox lrho, Spiner::DataBox temp, const EO
  * Find the minimum enthalpy along an adiabat as computed above
  **/
 template <typename EOS>
-inline Real MinEnthalpy(Spiner::DataBox lrho, Spiner::DataBox temp, const Real Ye,
-                        const EOS &eos, const int n_samps) {
+inline Real MinEnthalpy(DataBox lrho, DataBox temp, const Real Ye, const EOS &eos,
+                        const int n_samps) {
   Real min_enthalpy = 1e30;
   for (int i = 0; i < n_samps; i++) {
     const Real Rho = std::pow(10.0, lrho(i));
