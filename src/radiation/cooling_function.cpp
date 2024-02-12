@@ -32,7 +32,7 @@ TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
   Mesh *pmesh = rc->GetMeshPointer();
   auto &resolved_pkgs = pmesh->resolved_packages;
   const int ndim = pmesh->ndim;
-
+  
   static auto desc = MakePackDescriptor<p::density, iv::tau>(resolved_pkgs.get());
 
   PackIndexMap imap;
@@ -73,6 +73,7 @@ TaskStatus LightBulbCalcTau(MeshData<Real> *rc) {
         }
         v(b, iv::tau(), k, j, i) = tau;
       });
+  std::cout<<"tau="<<tau<<std::endl;
   return TaskStatus::complete;
 }
 
@@ -285,7 +286,7 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
           Real H = heat * CGSToCodeFact;
           Real C = cool * CGSToCodeFact;
           if (do_axion) {
-            Real Gamma_sigma =
+	    Real Gamma_sigma =
                 21.6 * (rho / 1E14) * sqrt(kboltz * temperature * mN * clight * clight);
             double Jax = ga * ga / (16 * 3.14 * 3.14) / (mN * mN * mN) *
                          (temperature * temperature * temperature) *
