@@ -30,7 +30,7 @@ namespace interpolation {
 
 using namespace parthenon::package::prelude;
 using parthenon::Coordinates_t;
-using Spiner::weights_t;
+using weights_t = Spiner::weights_t<Real>;
 
 /// Base class for providing interpolation methods on uniformly spaced data.
 /// Constructor is provided with spacing, number of support points, and desired

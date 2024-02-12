@@ -20,9 +20,6 @@
 // parthenon includes
 #include <parthenon/package.hpp>
 
-// singularity includes
-#include <singularity-eos/eos/eos.hpp>
-
 // phoebus includes
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
