@@ -190,6 +190,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
+  const int &nx_i = pmb->cellbounds.ncellsi(IndexDomain::interior);
+  const int &nx_j = pmb->cellbounds.ncellsj(IndexDomain::interior);
+  const int &nx_k = pmb->cellbounds.ncellsk(IndexDomain::interior);
+  const Real &minx_i = pmb->coords.Xf<1>(ib.s);
+  const Real &minx_j = pmb->coords.Xf<2>(jb.s);
+  const Real &minx_k = pmb->coords.Xf<3>(kb.s);
 
   auto coords = pmb->coords;
   auto eos = pmb->packages.Get("eos")->Param<EOS>("d.EOS");
@@ -411,10 +417,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               SPACELOOP(ii) { v(iH(ispec, 0), k, j, i) = 0.; }
             }
           }
-        }
+        } // do_rad
 
         rng_pool.free_state(rng_gen);
       });
+
   free(rho_h);
   free(rho_d);
   free(temp_h);
@@ -519,6 +526,12 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
   const bool harm_style_beta =
       pin->GetOrAddBoolean("torus", "harm_beta_normalization", true);
   const Real rho_min_bnorm = pin->GetOrAddReal("torus", "rho_min_bnorm", 1.e-4);
+  const Real rin = pin->GetOrAddReal("torus", "rin", 6.0);
+  const Real rmax = pin->GetOrAddReal("torus", "rmax", 12.0);
+  const Real a = pin->GetReal("geometry", "a");
+  const Real Rh = 1.0 + std::sqrt(1.0 - a * a);
+  const Real xh = std::log(Rh);
+  const Real angular_mom = lfish_calc(rmax, a);
 
   Real beta_min, beta_pmax;
   ComputeBetas(pmesh, rho_min_bnorm, beta_min, beta_pmax);
@@ -532,18 +545,181 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     printf("Torus normalization factor = %.14e\n", B_field_fac);
   }
 
+  // reduction: integrate over whole disk for tracers number
+  // Need this global quantity before setting up tracers
+  Real number_mesh = 0.0;
+  for (auto &pmb : pmesh->block_list) {
+    auto &rc = pmb->meshblock_data.Get();
+    auto tracer_pkg = pmb->packages.Get("tracers");
+    bool do_tracers = tracer_pkg->Param<bool>("active");
+
+    if (do_tracers) {
+      auto geom = Geometry::GetCoordinateSystem(rc.get());
+      auto coords = pmb->coords;
+
+      // set up transformation stuff
+      auto gpkg = pmb->packages.Get("geometry");
+      bool derefine_poles = gpkg->Param<bool>("derefine_poles");
+      Real h = gpkg->Param<Real>("h");
+      Real xt = gpkg->Param<Real>("xt");
+      Real alpha = gpkg->Param<Real>("alpha");
+      Real x0 = gpkg->Param<Real>("x0");
+      Real smooth = gpkg->Param<Real>("smooth");
+      auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
+
+      auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+      auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+      auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+
+      /* integrate f_atmosphere dV on blocks, with f_atmosphere = {0,1}, and MPI reduce */
+      pmb->par_reduce(
+          "Phoebus::ProblemGenerator::Torus::MeshTracerNumber", kb.s, kb.e, jb.s, jb.e,
+          ib.s, ib.e,
+          KOKKOS_LAMBDA(const int k, const int j, const int i, Real &disk_vol) {
+            const Real x1 = coords.Xc<1>(k, j, i);
+            const Real x2 = coords.Xc<2>(k, j, i);
+            Real detgamma = geom.DetGamma(CellLocation::Cent, k, j, i);
+            Real r = tr.bl_radius(x1);
+            Real th = tr.bl_theta(x1, x2);
+
+            Real lnh = -1.0;
+            Real uphi;
+            if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
+            if (lnh > 0.0) {
+              const Real vol = coords.CellVolume(k, j, i);
+              disk_vol += detgamma * vol;
+            }
+          },
+          Kokkos::Sum<Real>(number_mesh));
+      // MPI reduction
+      number_mesh = reduction::Sum(number_mesh);
+    }
+  }
+
   for (auto &pmb : pmesh->block_list) {
     auto &rc = pmb->meshblock_data.Get();
     auto geom = Geometry::GetCoordinateSystem(rc.get());
+    auto coords = pmb->coords;
+
+    // set up transformation stuff
+    auto gpkg = pmb->packages.Get("geometry");
+    bool derefine_poles = gpkg->Param<bool>("derefine_poles");
+    Real h = gpkg->Param<Real>("h");
+    Real xt = gpkg->Param<Real>("xt");
+    Real alpha = gpkg->Param<Real>("alpha");
+    Real x0 = gpkg->Param<Real>("x0");
+    Real smooth = gpkg->Param<Real>("smooth");
+    auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
     auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
     auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    auto v = rc->PackVariables({fluid_prim::bfield::name()}, imap);
+    std::vector<std::string> vars = {fluid_prim::bfield::name(),
+                                     fluid_prim::density::name()};
+    auto v = rc->PackVariables(vars, imap);
     const int iblo = imap[fluid_prim::bfield::name()].first;
     const int ibhi = imap[fluid_prim::bfield::name()].second;
+    const int irho = imap[fluid_prim::density::name()].first;
+
+    auto tracer_pkg = pmb->packages.Get("tracers");
+    bool do_tracers = tracer_pkg->Param<bool>("active");
+
+    // tracer initialization.
+    if (do_tracers) {
+      auto &sc = pmb->swarm_data.Get();
+      auto &swarm = pmb->swarm_data.Get()->Get("tracers");
+      auto rng_pool = tracer_pkg->Param<RNGPool>("rng_pool");
+      const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
+
+      const Real &x_min = pmb->coords.Xf<1>(ib.s);
+      const Real &y_min = pmb->coords.Xf<2>(jb.s);
+      const Real &z_min = pmb->coords.Xf<3>(kb.s);
+      const Real &x_max = pmb->coords.Xf<1>(ib.e + 1);
+      const Real &y_max = pmb->coords.Xf<2>(jb.e + 1);
+      const Real &z_max = pmb->coords.Xf<3>(kb.e + 1);
+
+      /* integrate f_atmosphere dV on block, with f_atmosphere = {0,1} */
+      Real number_block = 0.0;
+      pmb->par_reduce(
+          "Phoebus::ProblemGenerator::Torus::BlockTracerNumber", kb.s, kb.e, jb.s, jb.e,
+          ib.s, ib.e,
+          KOKKOS_LAMBDA(const int k, const int j, const int i,
+                        Real &number_block_reduce) {
+            const Real x1 = coords.Xc<1>(k, j, i);
+            const Real x2 = coords.Xc<2>(k, j, i);
+            Real detgamma = geom.DetGamma(CellLocation::Cent, k, j, i);
+            Real r = tr.bl_radius(x1);
+            Real th = tr.bl_theta(x1, x2);
+
+            Real lnh = -1.0;
+            Real uphi;
+            if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
+            if (lnh > 0.0 && x1 > xh) {
+              const Real vol = coords.CellVolume(k, j, i);
+              number_block_reduce += detgamma * vol;
+            }
+          },
+          Kokkos::Sum<Real>(number_block));
+
+      const int num_tracers = std::round(num_tracers_total * number_block / number_mesh);
+
+      ParArrayND<int> new_indices;
+      swarm->AddEmptyParticles(num_tracers, new_indices);
+
+      auto &x = swarm->Get<Real>("x").Get();
+      auto &y = swarm->Get<Real>("y").Get();
+      auto &z = swarm->Get<Real>("z").Get();
+      auto &mass = swarm->Get<Real>("mass").Get();
+      auto &id = swarm->Get<int>("id").Get();
+
+      swarm->SortParticlesByCell();
+      auto swarm_d = swarm->GetDeviceContext();
+
+      const int gid = pmb->gid;
+      const int max_active_index = swarm->GetMaxActiveIndex();
+      pmb->par_for(
+          "ProblemGenerator::Torus::DistributeTracers", 0, max_active_index,
+          KOKKOS_LAMBDA(const int n) {
+            if (swarm_d.IsActive(n)) {
+              auto rng_gen = rng_pool.get_state();
+
+              z(n) = z_min + rng_gen.drand() * (z_max - z_min); // X3 trivial
+              id(n) = num_tracers_total * gid + n;              // n_tracers * gid + n
+
+              Real lnh = -1.0;
+              Real uphi;
+              // Rejection sample X1, X2 to be in disk
+              while (lnh < 0.0) {
+                x(n) = x_min + rng_gen.drand() * (x_max - x_min);
+                y(n) = y_min + rng_gen.drand() * (y_max - y_min);
+                Real r = tr.bl_radius(x(n));
+                Real th = tr.bl_theta(x(n), y(n));
+                if (r > rin) lnh = log_enthalpy(r, th, a, rin, angular_mom, uphi);
+              }
+
+              bool on_current_mesh_block = true;
+              swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+              rng_pool.free_state(rng_gen);
+            }
+          });
+
+      // Now calculate the mass per tracer as mass(cell) / num_tracers_cell
+      // Separate kernel, as it requires knowing the particle count per cell
+      pmb->par_for(
+          "ProblemGenerator::Torus::DistributeTracers", 0, max_active_index,
+          KOKKOS_LAMBDA(const int n) {
+            if (swarm_d.IsActive(n)) {
+              int k, j, i;
+              swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+              Real detgamma = geom.DetGamma(CellLocation::Cent, k, j, i);
+              const Real vol = coords.CellVolume(k, j, i);
+              const int num_tr_cell = swarm_d.GetParticleCountPerCell(k, j, i);
+              mass(n) = detgamma * v(irho, k, j, i) * vol / num_tr_cell;
+            }
+          });
+    }
 
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,

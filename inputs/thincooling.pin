@@ -66,6 +66,7 @@ he = false
 3t = false
 rad = true
 mhd = false
+tracers = false
 
 <fluid>
 xorder = 2

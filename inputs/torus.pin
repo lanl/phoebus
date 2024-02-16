@@ -78,10 +78,10 @@ num_threads = 1         # maximum number of OMP threads
 pack_size = -1
 
 # Commenting out meshblock sizes makes the simulation 1 meshblock
-# <parthenon/meshblock>
-# nx1 = 128
-# nx2 = 128
-# nx3 = 1
+#<parthenon/meshblock>
+#nx1 = 128
+#nx2 = 128
+#nx3 = 1
 
 <parthenon/refinement0>
 field = c.c.bulk.rho
@@ -104,6 +104,7 @@ hydro = true
 he = false
 3t = false
 rad = false
+tracers = false
 
 <fluid>
 xorder = 2

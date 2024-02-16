@@ -39,6 +39,7 @@
 #include "progenitor/progenitordata.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
+#include "tracers/tracers.hpp"
 
 using namespace parthenon::driver::prelude;
 using parthenon::AllReduce;
@@ -166,10 +167,12 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
   auto rad = pmesh->packages.Get("radiation");
   auto fluid = pmesh->packages.Get("fluid");
+  auto tracers = pmesh->packages.Get("tracers");
   auto monopole = pmesh->packages.Get("monopole_gr");
   const auto rad_active = rad->Param<bool>("active");
   const auto rad_moments_active = rad->Param<bool>("moments_active");
   const auto fluid_active = fluid->Param<bool>("active");
+  const auto tracers_active = tracers->Param<bool>("active");
   bool rad_mocmc_active = false;
   if (rad_active) {
     rad_mocmc_active = (rad->Param<std::string>("method") == "mocmc");
@@ -571,6 +574,38 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     }
   }
 
+  // First order operator split tracer advection
+  if (stage == integrator->nstages && tracers_active) {
+    const std::string swarmName = "tracers";
+    TaskRegion &sync_region_tr = tc.AddRegion(1);
+    {
+      for (int i = 0; i < blocks.size(); i++) {
+        auto &tl = sync_region_tr[0];
+        auto &pmb = blocks[i];
+        auto &sc = pmb->swarm_data.Get();
+        auto reset_comms =
+            tl.AddTask(none, &SwarmContainer::ResetCommunication, sc.get());
+      }
+    }
+
+    TaskRegion &async_region_tr = tc.AddRegion(blocks.size());
+    for (int n = 0; n < blocks.size(); n++) {
+      auto &tl = async_region_tr[n];
+      auto &pmb = blocks[n];
+      auto &sc = pmb->swarm_data.Get();
+      auto &mbd0 = pmb->meshblock_data.Get(stage_name[stage]);
+      auto tracerAdvect = tl.AddTask(none, tracers::AdvectTracers, mbd0.get(), dt);
+      auto tracerPurge =
+          tl.AddTask(tracerAdvect, fixup::PurgeParticles, mbd0.get(), swarmName);
+
+      auto send = tl.AddTask(tracerPurge, &SwarmContainer::Send, sc.get(),
+                             BoundaryCommSubset::all);
+
+      auto receive =
+          tl.AddTask(send, &SwarmContainer::Receive, sc.get(), BoundaryCommSubset::all);
+    }
+  }
+
   // Communicate (after applying stencil-based fixup)
   TaskRegion &sync_region_4 = tc.AddRegion(num_partitions);
   for (int ip = 0; ip < num_partitions; ip++) {
@@ -745,6 +780,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(fixup::Initialize(pin.get()));
   packages.Add(MonopoleGR::Initialize(pin.get())); // Does nothing if not enabled
   packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
+  packages.Add(tracers::Initialize(pin.get()));
   packages.Add(Progenitor::Initialize(pin.get()));
 
   // TODO(JMM): I need to do this before problem generators get
@@ -989,6 +1025,19 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
   }
 
   return status;
+}
+
+/**
+ * Gets called before output.
+ * Currently: Fills tracers.
+ **/
+void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
+  auto tracer_pkg = pmb->packages.Get("tracers");
+  bool do_tracers = tracer_pkg->Param<bool>("active");
+  if (do_tracers) {
+    auto &mbd = pmb->meshblock_data.Get();
+    tracers::FillTracers(mbd.get());
+  }
 }
 
 } // namespace phoebus
