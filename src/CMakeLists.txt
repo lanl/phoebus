@@ -18,6 +18,7 @@ add_executable(phoebus
   fixup/fixup.hpp
   fixup/fixup.cpp
   fixup/fixup_c2p.cpp
+  fixup/fixup_particles.cpp
   fixup/fixup_radc2p.cpp
   fixup/fixup_src.cpp
   fixup/fixup_netfield.cpp
@@ -145,6 +146,9 @@ add_executable(phoebus
 
   tov/tov.hpp
   tov/tov.cpp
+
+  tracers/tracers.hpp
+  tracers/tracers.cpp
 )
 
 set(MAX_NUMBER_CONSERVED_VARS 9 CACHE INTEGER "Maximum number of conserved variables")

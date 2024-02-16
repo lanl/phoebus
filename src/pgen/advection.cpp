@@ -24,6 +24,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                     "Problem \"advection\" requires \"Minkowski\" geometry!");
 
   auto &rc = pmb->meshblock_data.Get();
+  auto tracer_pkg = pmb->packages.Get("tracers");
+  bool do_tracers = tracer_pkg->Param<bool>("active");
 
   PackIndexMap imap;
   auto v =
@@ -102,6 +104,59 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       });
 
   fluid::PrimitiveToConserved(rc.get());
+
+  /* tracer init section */
+  if (do_tracers) {
+    auto &sc = pmb->swarm_data.Get();
+    auto &swarm = pmb->swarm_data.Get()->Get("tracers");
+    auto rng_pool = tracer_pkg->Param<RNGPool>("rng_pool");
+
+    const Real &x_min = pmb->coords.Xf<1>(ib.s);
+    const Real &y_min = pmb->coords.Xf<2>(jb.s);
+    const Real &z_min = pmb->coords.Xf<3>(kb.s);
+    const Real &x_max = pmb->coords.Xf<1>(ib.e + 1);
+    const Real &y_max = pmb->coords.Xf<2>(jb.e + 1);
+    const Real &z_max = pmb->coords.Xf<3>(kb.e + 1);
+
+    // as for num_tracers on each block... will get too many on multiple blocks
+    // TODO: distribute amongst blocks.
+    const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
+    const int number_block = num_tracers_total;
+
+    ParArrayND<int> new_indices;
+    swarm->AddEmptyParticles(number_block, new_indices);
+
+    auto &x = swarm->Get<Real>("x").Get();
+    auto &y = swarm->Get<Real>("y").Get();
+    auto &z = swarm->Get<Real>("z").Get();
+    auto &id = swarm->Get<int>("id").Get();
+
+    auto swarm_d = swarm->GetDeviceContext();
+
+    const int gid = pmb->gid;
+    const int max_active_index = swarm->GetMaxActiveIndex();
+    pmb->par_for(
+        "ProblemGenerator::Torus::DistributeTracers", 0, max_active_index,
+        KOKKOS_LAMBDA(const int n) {
+          if (swarm_d.IsActive(n)) {
+            auto rng_gen = rng_pool.get_state();
+
+            // sample in ye ball
+            Real r2 = 1.0 + rin * rin; // init > rin^2
+            while (r2 > rin * rin) {
+              x(n) = x_min + rng_gen.drand() * (x_max - x_min);
+              y(n) = y_min + rng_gen.drand() * (y_max - y_min);
+              z(n) = z_min + rng_gen.drand() * (z_max - z_min);
+              r2 = x(n) * x(n) + y(n) * y(n) + z(n) * z(n);
+            }
+            id(n) = num_tracers_total * gid + n;
+
+            bool on_current_mesh_block = true;
+            swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+            rng_pool.free_state(rng_gen);
+          }
+        });
+  }
 }
 
 } // namespace advection

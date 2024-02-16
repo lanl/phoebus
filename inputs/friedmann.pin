@@ -79,6 +79,7 @@ Cv = 1.0
 <physics>
 hydro = true
 rad = false
+tracers = false
 
 <fluid>
 xorder = 2

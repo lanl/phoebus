@@ -108,6 +108,7 @@ hydro = true
 he = false
 3t = false
 rad = false
+tracers = false
 
 <fluid>
 mhd = true

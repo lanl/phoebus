@@ -40,6 +40,7 @@ template <typename T>
 TaskStatus ConservedToPrimitiveFixup(T *rc);
 template <typename T>
 TaskStatus SourceFixup(T *rc);
+TaskStatus PurgeParticles(MeshBlockData<Real> *rc, const std::string swarmName);
 TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t, const int stage,
                                         std::vector<Real> *sums);
 TaskStatus ModifyNetField(MeshData<Real> *, const Real t, const Real dt, const int stage,

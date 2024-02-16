@@ -76,6 +76,11 @@ field = c.c.bulk.rho
 method = derivative_order_1
 max_level = 3
 
+# Uses this one for Boosted Minkowski
+<coordinates>
+vx = - 0.3 
+vy = 0.0
+
 <eos>
 type = IdealGas
 Gamma = 1.6666666666666666667
@@ -86,6 +91,7 @@ hydro = false
 he = false
 3t = false
 rad = true
+tracers = false
 
 <fluid>
 xorder = 2
