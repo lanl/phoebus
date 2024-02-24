@@ -369,7 +369,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                     : none);
     // Test the reduction until it completes
     TaskID finish_reduce_1 =
-        tl.AddTask(TaskQualifier::local_sync, start_reduce_1, fixup::NetFieldCheckReduce,
+      tl.AddTask(TaskQualifier::local_sync | TaskQualifier::once_per_region, start_reduce_1, fixup::NetFieldCheckReduce,
                    md.get(), t, stage, net_field_totals);
 
     auto mod_net = tl.AddTask(finish_reduce_1, fixup::ModifyNetField, md.get(), t,
@@ -385,7 +385,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                     : none);
     // Test the reduction until it completes
     TaskID finish_reduce_2 =
-        tl.AddTask(TaskQualifier::local_sync, start_reduce_2, fixup::NetFieldCheckReduce,
+        tl.AddTask(TaskQualifier::local_sync | TaskQualifier::once_per_region, start_reduce_2, fixup::NetFieldCheckReduce,
                    md.get(), t, stage, net_field_totals_2);
 
     // Remove artificial contribution to net field
@@ -454,9 +454,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                                 MPI_SUM)
                    : none);
       auto finish_reduce_matter =
-          tl.AddTask(TaskQualifier::local_sync, start_reduce_matter,
+          tl.AddTask(TaskQualifier::local_sync | TaskQualifier::once_per_region, start_reduce_matter,
                      &MonoMatRed_t::CheckReduce, pmono_mat_red);
-      auto finish_reduce_vols = tl.AddTask(TaskQualifier::local_sync, start_reduce_vols,
+      auto finish_reduce_vols = tl.AddTask(TaskQualifier::local_sync | TaskQualifier::once_per_region, start_reduce_vols,
                                            &MonoVolRed_t::CheckReduce, pmono_vol_red);
       auto finish_mono_reds = finish_reduce_matter | finish_reduce_vols;
       auto divide_vols =
@@ -616,7 +616,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                      particle_resolution, MPI_SUM);
 
       auto finish_count_reduce =
-          tl.AddTask(TaskQualifier::local_sync, start_count_reduce,
+          tl.AddTask(TaskQualifier::local_sync | TaskQualifier::once_per_region, start_count_reduce,
                      &AllReduce<std::vector<Real>>::CheckReduce, particle_resolution);
 
       // Report particle count
@@ -704,7 +704,7 @@ TaskListStatus PhoebusDriver::RadiationPostStep() {
                                   pdo_gain_reducer, MPI_LOR)
                      : none);
         finish_gain_reducer =
-            tl.AddTask(TaskQualifier::local_sync, start_gain_reducer,
+            tl.AddTask(TaskQualifier::local_sync | TaskQualifier::once_per_region, start_gain_reducer,
                        &parthenon::AllReduce<bool>::CheckReduce, pdo_gain_reducer);
       }
       auto calculate_four_force =
@@ -931,7 +931,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
                      particle_resolution, MPI_SUM);
 
       auto finish_resolution_reduce =
-          tl.AddTask(TaskQualifier::local_sync, start_resolution_reduce,
+          tl.AddTask(TaskQualifier::local_sync | TaskQualifier::once_per_region, start_resolution_reduce,
                      &AllReduce<std::vector<Real>>::CheckReduce, particle_resolution);
 
       // Report tuning
