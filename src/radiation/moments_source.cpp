@@ -981,7 +981,7 @@ TaskStatus MomentFluidSource(T *rc, Real dt, bool update_fluid) {
   } else {
     PARTHENON_FAIL("Radiation method unknown!");
   }
-  return TaskStatus::fail;
+  return TaskStatus::complete;
 }
 template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *, Real,
                                                            bool);

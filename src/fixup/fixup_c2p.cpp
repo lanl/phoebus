@@ -31,6 +31,7 @@
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/radiation.hpp"
+#include <parthenon/package.hpp>
 
 using radiation::ClosureEquation;
 using radiation::ClosureSettings;
@@ -377,7 +378,7 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
   } else {
     return ConservedToPrimitiveFixupImpl<T, radiation::ClosureEdd<settings>>(rc);
   }
-  return TaskStatus::fail;
+  return TaskStatus::complete;
 }
 
 template TaskStatus
