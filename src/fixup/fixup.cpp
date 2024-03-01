@@ -33,6 +33,7 @@
 #include "radiation/closure_m1.hpp"
 #include "radiation/closure_mocmc.hpp"
 #include "radiation/radiation.hpp"
+#include <parthenon/package.hpp>
 
 using Microphysics::RadiationType;
 using Microphysics::EOS::EOS;
@@ -700,7 +701,7 @@ TaskStatus ApplyFloors(T *rc) {
                       "Rad floors not supported with cooling function/Monte Carlo!");
     return ApplyFloorsImpl<T, radiation::ClosureEdd<settings>>(rc);
   }
-  return TaskStatus::fail;
+  return TaskStatus::complete;
 }
 
 template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
