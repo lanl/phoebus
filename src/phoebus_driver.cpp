@@ -1041,8 +1041,8 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
 
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "UserWorkBeforeOutput::Entropy", DevExecSpace(), kb.s, kb.e,
-      jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "UserWorkBeforeOutput::H5", DevExecSpace(), kb.s, kb.e, jb.s,
+      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real lambda[2];
         lambda[0] = v(iye, k, j, i);
         const Real s = eos.EntropyFromDensityTemperature(v(irho, k, j, i),
