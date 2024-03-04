@@ -1044,7 +1044,9 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
       DEFAULT_LOOP_PATTERN, "UserWorkBeforeOutput::H5", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real lambda[2];
-        lambda[0] = v(iye, k, j, i);
+        if (iye > 0) {
+          lambda[0] = v(iye, k, j, i);
+        }
         const Real s = eos.EntropyFromDensityTemperature(v(irho, k, j, i),
                                                          v(itemp, k, j, i), lambda);
         v(is, k, j, i) = s;
