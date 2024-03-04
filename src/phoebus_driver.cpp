@@ -36,6 +36,7 @@
 #include "phoebus_driver.hpp"
 #include "phoebus_package.hpp"
 #include "phoebus_utils/robust.hpp"
+#include "phoebus_utils/variables.hpp"
 #include "progenitor/progenitordata.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
@@ -1019,6 +1020,39 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
 void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
   auto tracer_pkg = pmb->packages.Get("tracers");
   bool do_tracers = tracer_pkg->Param<bool>("active");
+  bool is_stellarcollapse = (pin->GetString("eos", "type") == "StellarCollapse");
+
+  if (is_stellarcollapse) {
+    namespace p = fluid_prim;
+    auto rc = pmb->meshblock_data.Get().get();
+    PackIndexMap imap;
+    auto v = rc->PackVariables(
+        {p::density::name(), p::ye::name(), p::temperature::name(), p::entropy::name()},
+        imap);
+
+    const int irho = imap[fluid_prim::density::name()].first;
+    const int iye = imap[fluid_prim::ye::name()].first;
+    const int itemp = imap[fluid_prim::temperature::name()].first;
+    const int is = imap[fluid_prim::entropy::name()].first;
+
+    IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+    IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+    IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
+
+    auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
+    singularity::StellarCollapse eos_sc =
+        eos.GetUnmodifiedObject().get<singularity::StellarCollapse>();
+    parthenon::par_for(
+        DEFAULT_LOOP_PATTERN, "CoolingFunctionCalculateFourForce", DevExecSpace(), kb.s,
+        kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          Real lambda[2];
+          lambda[0] = v(iye, k, j, i);
+          const Real s = eos_sc.EntropyFromDensityTemperature(v(irho, k, j, i),
+                                                              v(itemp, k, j, i), lambda);
+          v(is, k, j, i) = s;
+        });
+  }
   if (do_tracers) {
     auto &mbd = pmb->meshblock_data.Get();
     tracers::FillTracers(mbd.get());
