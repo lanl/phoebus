@@ -128,8 +128,7 @@ void MOCMCInitSamples(T *rc) {
       },
       Kokkos::Sum<int>(nsamp_tot));
 
-  ParArrayND<int> new_indices;
-  auto new_mask = swarm->AddEmptyParticles(nsamp_tot, new_indices);
+  auto new_mask = swarm->AddEmptyParticles(nsamp_tot);
 
   // Calculate array of starting index for each zone to compute particles
   ParArrayND<int> starting_index("Starting index", nx_k, nx_j, nx_i);
@@ -185,7 +184,7 @@ void MOCMCInitSamples(T *rc) {
         Geometry::Tetrads tetrads(ucon, trial, cov_g);
 
         for (int nsamp = 0; nsamp < static_cast<int>(v(b, dn, k, j, i)); nsamp++) {
-          const int n = new_indices(start_idx + nsamp);
+          const int n = new_mask.GetNewParticleIndex(start_idx + nsamp);
 
           // Create particles at zone centers
           x(n) = minx_i + (i - ib.s + rng_gen.drand()) * dx_i;
