@@ -1015,7 +1015,9 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
 
 /**
  * Gets called before output.
- * Currently: Fills tracers.
+ * Currently:
+ *  Fills Tracers
+ *  Computes entropy for output
  **/
 void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
   auto tracer_pkg = pmb->packages.Get("tracers");
@@ -1039,8 +1041,8 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
 
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "UserWorkBeforeOutput", DevExecSpace(), kb.s, kb.e, jb.s,
-      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "UserWorkBeforeOutput::Entropy", kb.s, kb.e, jb.s, jb.e, ib.s,
+      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
         Real lambda[2];
         lambda[0] = v(iye, k, j, i);
         const Real s = eos.EntropyFromDensityTemperature(v(irho, k, j, i),
