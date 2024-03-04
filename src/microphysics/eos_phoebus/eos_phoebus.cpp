@@ -142,9 +142,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Real press_unit = rho_unit * sie_unit;
 
     // TODO(JMM): To get around current limitations of
-    // singularity-eos, I just load the table and throw it away.  This
-    // will be resolved in a future version of singularity-eos.
-    // See issue #69.
     sie_min = eos_sc.sieMin() / sie_unit;
     sie_max = eos_sc.sieMax() / sie_unit;
     T_min = eos_sc.TMin() / T_unit;
