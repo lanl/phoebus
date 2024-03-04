@@ -49,6 +49,7 @@ VARIABLE(p, bfield);
 VARIABLE(p, ye);
 VARIABLE_NONS(pressure);
 VARIABLE_NONS(temperature);
+VARIABLE_NONS(entropy);
 VARIABLE_NONS(gamma1);
 } // namespace fluid_prim
 
