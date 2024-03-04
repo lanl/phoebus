@@ -101,6 +101,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     const bool use_sp5 = pin->GetOrAddBoolean(block_name, "use_sp5", true);
     const bool filter_bmod = pin->GetOrAddBoolean(block_name, "filter_bmod", true);
     const bool use_ye = pin->GetOrAddBoolean("fluid", "Ye", false);
+    bool save_sp5 = false;
+    if (!use_sp5) {
+      save_sp5 = pin->GetOrAddBoolean(block_name, "save_sp5", false);
+    }
+
     provides_entropy = true;
     PARTHENON_REQUIRE_THROWS(use_ye,
                              "\"StellarCollapse\" EOS requires that Ye be enabled!");
@@ -108,12 +113,22 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("filename", filename);
     params.Add("use_sp5", use_sp5);
     params.Add("filter_bmod", filter_bmod);
+    params.Add("save_sp5", save_sp5);
 
     EOS eos_host =
         UnitSystem<StellarCollapse>(StellarCollapse(filename, use_sp5, filter_bmod),
                                     eos_units_init::length_time_units_init_tag, time_unit,
                                     mass_unit, length_unit, temp_unit);
+    StellarCollapse eos_sc =
+        eos_host.GetUnmodifiedObject().get<singularity::StellarCollapse>();
     EOS eos_device = eos_host.GetOnDevice();
+
+    if (!use_sp5 && save_sp5) {
+      const std::string sp5_name =
+          pin->GetOrAddString(block_name, "sp5_save_name", "eos.sp5");
+      eos_sc.Save(sp5_name);
+      params.Add("sp5_save_name", sp5_name);
+    }
 
     params.Add("d.EOS", eos_device);
     params.Add("h.EOS", eos_host);
@@ -127,10 +142,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Real press_unit = rho_unit * sie_unit;
 
     // TODO(JMM): To get around current limitations of
-    // singularity-eos, I just load the table and throw it away.  This
-    // will be resolved in a future version of singularity-eos.
-    // See issue #69.
-    StellarCollapse eos_sc = StellarCollapse(filename, use_sp5, filter_bmod);
     sie_min = eos_sc.sieMin() / sie_unit;
     sie_max = eos_sc.sieMax() / sie_unit;
     T_min = eos_sc.TMin() / T_unit;
