@@ -665,8 +665,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
       const int num_tracers = std::round(num_tracers_total * number_block / number_mesh);
 
-      ParArrayND<int> new_indices;
-      swarm->AddEmptyParticles(num_tracers, new_indices);
+      auto new_particles_context = swarm->AddEmptyParticles(num_tracers);
 
       auto &x = swarm->Get<Real>("x").Get();
       auto &y = swarm->Get<Real>("y").Get();
@@ -678,7 +677,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
       auto swarm_d = swarm->GetDeviceContext();
 
       const int gid = pmb->gid;
-      const int max_active_index = swarm->GetMaxActiveIndex();
+      const int max_active_index = new_particles_context.GetNewParticlesMaxIndex();
       pmb->par_for(
           "ProblemGenerator::Torus::DistributeTracers", 0, max_active_index,
           KOKKOS_LAMBDA(const int n) {
