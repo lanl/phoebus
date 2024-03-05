@@ -402,7 +402,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           int dNs = v(iNs + sidx, k, j, i);
           // Loop over particles to create in this zone
           for (int n = 0; n < static_cast<int>(dNs); n++) {
-            const int m = new_particles_mask.GetNewParticleIndex(
+            const int m = new_particles_context.GetNewParticleIndex(
                 starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
             swarm_d.MarkParticleForRemoval(m);
           }
