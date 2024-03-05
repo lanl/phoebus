@@ -282,8 +282,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_emitted = rad->Param<Real>("num_emitted");
   rad->UpdateParam<Real>("num_emitted", num_emitted + Nstot);
 
-  ParArrayND<int> new_indices;
-  const auto new_particles_mask = swarm->AddEmptyParticles(Nstot, new_indices);
+  const auto new_particles_context = swarm->AddEmptyParticles(Nstot);
 
   auto &t = swarm->Get<Real>("t").Get();
   auto &x = swarm->Get<Real>("x").Get();
@@ -338,8 +337,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           // Loop over particles to create in this zone
           for (int n = 0; n < dNs; n++) {
-            const int m =
-                new_indices(starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
+            const int m = new_particles_context.GetNewParticleIndex(
+                starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
 
             // Set particle species
             swarm_species(m) = static_cast<int>(s);
@@ -403,8 +402,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           int dNs = v(iNs + sidx, k, j, i);
           // Loop over particles to create in this zone
           for (int n = 0; n < static_cast<int>(dNs); n++) {
-            const int m =
-                new_indices(starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
+            const int m = new_particles_context.GetNewParticleIndex(
+                starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
             swarm_d.MarkParticleForRemoval(m);
           }
         });
