@@ -123,8 +123,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
     const int number_block = num_tracers_total;
 
-    ParArrayND<int> new_indices;
-    swarm->AddEmptyParticles(number_block, new_indices);
+    auto new_particles_context = swarm->AddEmptyParticles(number_block);
 
     auto &x = swarm->Get<Real>("x").Get();
     auto &y = swarm->Get<Real>("y").Get();
@@ -134,7 +133,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
     auto swarm_d = swarm->GetDeviceContext();
 
     const int gid = pmb->gid;
-    const int max_active_index = swarm->GetMaxActiveIndex();
+    const int max_active_index = new_particles_context.GetNewParticlesMaxIndex();
     pmb->par_for(
         "ProblemGenerator::Torus::DistributeTracers", 0, max_active_index,
         KOKKOS_LAMBDA(const int n) {
