@@ -282,7 +282,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto num_emitted = rad->Param<Real>("num_emitted");
   rad->UpdateParam<Real>("num_emitted", num_emitted + Nstot);
 
-  const auto new_particles_mask = swarm->AddEmptyParticles(Nstot);
+  const auto new_particles_context = swarm->AddEmptyParticles(Nstot);
 
   auto &t = swarm->Get<Real>("t").Get();
   auto &x = swarm->Get<Real>("x").Get();
@@ -337,7 +337,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
           // Loop over particles to create in this zone
           for (int n = 0; n < dNs; n++) {
-            const int m = new_particles_mask.GetNewParticleIndex(
+            const int m = new_particles_context.GetNewParticleIndex(
                 starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
 
             // Set particle species
