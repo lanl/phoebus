@@ -1068,10 +1068,6 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
         Real gam1[3][3];
         Real gam2[3][3];
         Real gam3[3][3];
-        Real gam12[3][3];
-        Real gam13[3][3];
-        Real gam23[3][3];
-        Real gam123[3][3];
         const Real vp[3] = {v(0, p::velocity(0), k, j, i), v(0, p::velocity(1), k, j, i),
                             v(0, p::velocity(2), k, j, i)};
         const Real vp1[3] = {v(0, p::velocity(0), k, j, i - 1),
@@ -1080,141 +1076,48 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
         geom.Metric(CellLocation::Cent, 0, k, j, i, gam);
         geom.Metric(CellLocation::Cent, 0, k, j, i - 1, gam1);
         Real gdet = geom.DetGamma(CellLocation::Cent, 0, k, j, i);
+        Real igdet = robust::ratio(1., gdet);
+        Real lapse = geom.Lapse(CellLocation::Cent, 0, k, j, i);
+        Real lapse1 = geom.Lapse(CellLocation::Cent, 0, k, j, i - 1);
         const Real W = phoebus::GetLorentzFactor(vp, gam);
         const Real W1 = phoebus::GetLorentzFactor(vp1, gam1);
 
-        if (ndim == 1) {
-          divv = 1 / gdet *
-                 (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
-                      v(0, p::velocity(0), k, j, i) / W -
-                  geom.DetGamma(CellLocation::Cent, 0, k, j, i - 1) *
-                      v(0, p::velocity(0), k, j, i - 1) / W1) /
-                 coords.CellWidthFA(X1DIR, k, j, i);
-        }
+        divv = igdet *
+               (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
+                    v(0, p::velocity(0), k, j, i) * lapse / W -
+                geom.DetGamma(CellLocation::Cent, 0, k, j, i - 1) *
+                    v(0, p::velocity(0), k, j, i - 1) * lapse1 / W1) /
+               coords.CellWidthFA(X1DIR, k, j, i);
 
-        if (ndim == 2) {
+        if (ndim >= 2) {
           Real vp2[3] = {v(0, p::velocity(0), k, j - 1, i),
                          v(0, p::velocity(1), k, j - 1, i),
                          v(0, p::velocity(2), k, j - 1, i)};
-          Real vp12[3] = {v(0, p::velocity(0), k, j - 1, i - 1),
-                          v(0, p::velocity(1), k, j - 1, i - 1),
-                          v(0, p::velocity(2), k, j - 1, i - 1)};
           geom.Metric(CellLocation::Cent, 0, k, j - 1, i, gam2);
-          geom.Metric(CellLocation::Cent, 0, k, j - 1, i - 1, gam12);
           Real W2 = phoebus::GetLorentzFactor(vp2, gam2);
-          Real W12 = phoebus::GetLorentzFactor(vp12, gam12);
+          Real lapse2 = geom.Lapse(CellLocation::Cent, 0, k, j - 1, i);
 
-          divv = 1 / gdet *
-                     (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
-                          v(0, p::velocity(0), k, j, i) / W -
-                      geom.DetGamma(CellLocation::Cent, 0, k, j, i - 1) *
-                          v(0, p::velocity(0), k, j, i - 1) / W1 +
-                      geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i) *
-                          v(0, p::velocity(0), k, j - 1, i) / W2 -
-                      geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i - 1) *
-                          v(0, p::velocity(0), k, j - 1, i - 1) / W12) /
-                     coords.CellWidthFA(X1DIR, k, j, i) / 2
-
-                 + 1 / gdet *
-                       (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
-                            v(0, p::velocity(1), k, j, i) / W -
-                        geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i) *
-                            v(0, p::velocity(1), k, j - 1, i) / W2 +
-                        geom.DetGamma(CellLocation::Cent, 0, k, j, i - 1) *
-                            v(0, p::velocity(1), k, j, i - 1) / W1 -
-                        geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i - 1) *
-                            v(0, p::velocity(1), k, j - 1, i - 1) / W12) /
-                       coords.CellWidthFA(X2DIR, k, j, i) / 2;
+          divv += igdet *
+                  (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
+                       v(0, p::velocity(1), k, j, i) * lapse / W -
+                   geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i) *
+                       v(0, p::velocity(1), k, j - 1, i) * lapse2 / W2) /
+                  coords.CellWidthFA(X2DIR, k, j, i);
         }
 
-        if (ndim == 3) {
-          Real vp2[3] = {v(0, p::velocity(0), k, j - 1, i),
-                         v(0, p::velocity(1), k, j - 1, i),
-                         v(0, p::velocity(2), k, j - 1, i)};
+        if (ndim >= 3) {
           Real vp3[3] = {v(0, p::velocity(0), k - 1, j, i),
                          v(0, p::velocity(1), k - 1, j, i),
                          v(0, p::velocity(2), k - 1, j, i)};
-          Real vp12[3] = {v(0, p::velocity(0), k, j - 1, i - 1),
-                          v(0, p::velocity(1), k, j - 1, i - 1),
-                          v(0, p::velocity(2), k, j - 1, i - 1)};
-          geom.Metric(CellLocation::Cent, 0, k, j - 1, i, gam2);
-          geom.Metric(CellLocation::Cent, 0, k - 1, j, i, gam3);
-          geom.Metric(CellLocation::Cent, 0, k, j - 1, i - 1, gam12);
-          Real W2 = phoebus::GetLorentzFactor(vp2, gam2);
           Real W3 = phoebus::GetLorentzFactor(vp3, gam3);
-          Real W12 = phoebus::GetLorentzFactor(vp12, gam12);
-          Real vp13[3] = {v(0, p::velocity(0), k - 1, j, i - 1),
-                          v(0, p::velocity(1), k - 1, j, i - 1),
-                          v(0, p::velocity(2), k - 1, j, i - 1)};
-          Real vp23[3] = {v(0, p::velocity(0), k - 1, j - 1, i),
-                          v(0, p::velocity(1), k - 1, j - 1, i),
-                          v(0, p::velocity(2), k - 1, j - 1, i)};
-          Real vp123[3] = {v(0, p::velocity(0), k - 1, j - 1, i - 1),
-                           v(0, p::velocity(1), k - 1, j - 1, i - 1),
-                           v(0, p::velocity(2), k - 1, j - 1, i - 1)};
-          geom.Metric(CellLocation::Cent, 0, k, j - 1, i - 1, gam13);
-          geom.Metric(CellLocation::Cent, 0, k, j - 1, i - 1, gam23);
-          geom.Metric(CellLocation::Cent, 0, k, j - 1, i - 1, gam123);
-          Real W13 = phoebus::GetLorentzFactor(vp13, gam13);
-          Real W23 = phoebus::GetLorentzFactor(vp23, gam23);
-          Real W123 = phoebus::GetLorentzFactor(vp123, gam123);
+          Real lapse3 = geom.Lapse(CellLocation::Cent, 0, k - 1, j, i);
 
-          divv = 1 / gdet *
-                     (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
-                          v(0, p::velocity(0), k, j, i) / W -
-                      geom.DetGamma(CellLocation::Cent, 0, k, j, i - 1) *
-                          v(0, p::velocity(0), k, j, i - 1) / W1 +
-                      geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i) *
-                          v(0, p::velocity(0), k, j - 1, i) / W2 -
-                      geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i - 1) *
-                          v(0, p::velocity(0), k, j - 1, i - 1) / W12 +
-                      geom.DetGamma(CellLocation::Cent, 0, k - 1, j, i) *
-                          v(0, p::velocity(0), k - 1, j, i) / W3 -
-                      geom.DetGamma(CellLocation::Cent, 0, k - 1, j, i - 1) *
-                          v(0, p::velocity(0), k - 1, j, i - 1) / W13 +
-                      geom.DetGamma(CellLocation::Cent, 0, k - 1, j - 1, i) *
-                          v(0, p::velocity(0), k - 1, j - 1, i) / W23 -
-                      geom.DetGamma(CellLocation::Cent, 0, k - 1, j - 1, i - 1) *
-                          v(0, p::velocity(0), k - 1, j - 1, i - 1) / W123) /
-                     coords.CellWidthFA(X1DIR, k, j, i) / 4
-
-                 + 1 / gdet *
-                       (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
-                            v(0, p::velocity(1), k, j, i) / W -
-                        geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i) *
-                            v(0, p::velocity(1), k, j - 1, i) / W2 +
-                        geom.DetGamma(CellLocation::Cent, 0, k, j, i - 1) *
-                            v(0, p::velocity(1), k, j, i - 1) / W1 -
-                        geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i - 1) *
-                            v(0, p::velocity(1), k, j - 1, i - 1) / W12 +
-                        geom.DetGamma(CellLocation::Cent, 0, k - 1, j, i) *
-                            v(0, p::velocity(1), k - 1, j, i) / W3 -
-                        geom.DetGamma(CellLocation::Cent, 0, k - 1, j - 1, i) *
-                            v(0, p::velocity(1), k - 1, j - 1, i) / W23 +
-                        geom.DetGamma(CellLocation::Cent, 0, k - 1, j, i - 1) *
-                            v(0, p::velocity(1), k - 1, j, i - 1) / W13 -
-                        geom.DetGamma(CellLocation::Cent, 0, k - 1, j - 1, i - 1) *
-                            v(0, p::velocity(1), k - 1, j - 1, i - 1) / W123) /
-                       coords.CellWidthFA(X2DIR, k, j, i) / 4
-
-                 + 1 / gdet *
-                       (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
-                            v(0, p::velocity(2), k, j, i) / W -
-                        geom.DetGamma(CellLocation::Cent, 0, k - 1, j, i) *
-                            v(0, p::velocity(2), k - 1, j, i) / W3 +
-                        geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i) *
-                            v(0, p::velocity(2), k, j - 1, i) / W2 -
-                        geom.DetGamma(CellLocation::Cent, 0, k - 1, j - 1, i) *
-                            v(0, p::velocity(2), k - 1, j - 1, i) / W23 +
-                        geom.DetGamma(CellLocation::Cent, 0, k, j, i - 1) *
-                            v(0, p::velocity(2), k, j, i - 1) / W1 -
-                        geom.DetGamma(CellLocation::Cent, 0, k - 1, j, i - 1) *
-                            v(0, p::velocity(2), k - 1, j, i - 1) / W13 +
-                        geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i - 1) *
-                            v(0, p::velocity(2), k, j - 1, i - 1) / W12 -
-                        geom.DetGamma(CellLocation::Cent, 0, k - 1, j - 1, i - 1) *
-                            v(0, p::velocity(2), k - 1, j - 1, i - 1) / W123) /
-                       coords.CellWidthFA(X3DIR, k, j, i) / 4;
+          divv += igdet *
+                  (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
+                       v(0, p::velocity(2), k, j, i) * lapse / W -
+                   geom.DetGamma(CellLocation::Cent, 0, k - 1, j, i) *
+                       v(0, p::velocity(2), k - 1, j, i) * lapse3 / W3) /
+                  coords.CellWidthFA(X3DIR, k, j, i);
         }
 
         v(0, p::entropy(), k, j, i) = s;
