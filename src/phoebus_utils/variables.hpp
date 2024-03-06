@@ -50,6 +50,7 @@ VARIABLE(p, ye);
 VARIABLE_NONS(pressure);
 VARIABLE_NONS(temperature);
 VARIABLE_NONS(entropy);
+VARIABLE_NONS(cs);
 VARIABLE_NONS(gamma1);
 } // namespace fluid_prim
 
@@ -119,6 +120,7 @@ VARIABLE_CUSTOM(node_coords, g.n.coord);
 
 namespace diagnostic_variables {
 VARIABLE_NONS(divb);
+VARIABLE_NONS(ratio_divv_cs);
 VARIABLE_CUSTOM(divf, flux_divergence);
 VARIABLE_NONS(src_terms);
 VARIABLE_CUSTOM(r_divf, r.flux_divergence);

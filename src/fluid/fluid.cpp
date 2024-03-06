@@ -205,6 +205,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::pressure::name(), mprim_scalar);
   physics->AddField(p::temperature::name(), mprim_scalar);
   physics->AddField(p::entropy::name(), mprim_scalar);
+  physics->AddField(p::cs::name(), mprim_scalar);
+  physics->AddField(diag::ratio_divv_cs::name(), mprim_scalar);
   physics->AddField(p::gamma1::name(), mprim_scalar);
   if (ye) {
     physics->AddField(p::ye::name(), mprim_scalar);
