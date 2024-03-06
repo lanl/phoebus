@@ -36,13 +36,16 @@
 #include "phoebus_driver.hpp"
 #include "phoebus_package.hpp"
 #include "phoebus_utils/robust.hpp"
+#include "phoebus_utils/variables.hpp"
 #include "progenitor/progenitordata.hpp"
 #include "radiation/radiation.hpp"
 #include "tov/tov.hpp"
 #include "tracers/tracers.hpp"
+#include <interface/sparse_pack.hpp>
 
 using namespace parthenon::driver::prelude;
 using parthenon::AllReduce;
+using namespace Geometry;
 
 namespace phoebus {
 
@@ -1014,11 +1017,114 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
 
 /**
  * Gets called before output.
- * Currently: Fills tracers.
+ * Currently:
+ *  Fills Tracers
+ *  Computes entropy for output
  **/
 void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
   auto tracer_pkg = pmb->packages.Get("tracers");
   bool do_tracers = tracer_pkg->Param<bool>("active");
+
+  namespace p = fluid_prim;
+  namespace diag = diagnostic_variables;
+  auto rc = pmb->meshblock_data.Get().get();
+  using parthenon::MakePackDescriptor;
+  Mesh *pmesh = rc->GetMeshPointer();
+  const int ndim = pmesh->ndim;
+  auto &resolved_pkgs = pmesh->resolved_packages;
+
+  static auto desc =
+      MakePackDescriptor<p::velocity, p::density, p::ye, p::temperature, p::entropy,
+                         p::cs, diag::ratio_divv_cs>(resolved_pkgs.get());
+  auto v = desc.GetPack(rc);
+  auto coords = pmb->coords;
+
+  auto geom = Geometry::GetCoordinateSystem(rc);
+
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
+
+  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "UserWorkBeforeOutput::H5", DevExecSpace(), kb.s, kb.e, jb.s,
+      jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        Real lambda[2];
+        if (v.Contains(0, p::ye())) {
+          lambda[0] = v(0, p::ye(), k, j, i);
+        }
+        const Real s = eos.EntropyFromDensityTemperature(
+            v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda);
+        const Real p = eos.PressureFromDensityTemperature(
+            v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda);
+        const Real bmod = eos.BulkModulusFromDensityTemperature(
+            v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda);
+        const Real sie = eos.InternalEnergyFromDensityTemperature(
+            v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda);
+        const Real h = sie + p / v(0, p::density(), k, j, i) + 1;
+        const Real cs = std::sqrt(bmod / v(0, p::density(), k, j, i) / h);
+        Real divv;
+        Real gam[3][3];
+        Real gam1[3][3];
+        Real gam2[3][3];
+        Real gam3[3][3];
+        const Real vp[3] = {v(0, p::velocity(0), k, j, i), v(0, p::velocity(1), k, j, i),
+                            v(0, p::velocity(2), k, j, i)};
+        const Real vp1[3] = {v(0, p::velocity(0), k, j, i - 1),
+                             v(0, p::velocity(1), k, j, i - 1),
+                             v(0, p::velocity(2), k, j, i - 1)};
+        geom.Metric(CellLocation::Cent, 0, k, j, i, gam);
+        geom.Metric(CellLocation::Cent, 0, k, j, i - 1, gam1);
+        Real gdet = geom.DetGamma(CellLocation::Cent, 0, k, j, i);
+        Real igdet = robust::ratio(1., gdet);
+        Real lapse = geom.Lapse(CellLocation::Cent, 0, k, j, i);
+        Real lapse1 = geom.Lapse(CellLocation::Cent, 0, k, j, i - 1);
+        const Real W = phoebus::GetLorentzFactor(vp, gam);
+        const Real W1 = phoebus::GetLorentzFactor(vp1, gam1);
+
+        divv = igdet *
+               (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
+                    v(0, p::velocity(0), k, j, i) * lapse / W -
+                geom.DetGamma(CellLocation::Cent, 0, k, j, i - 1) *
+                    v(0, p::velocity(0), k, j, i - 1) * lapse1 / W1) /
+               coords.CellWidthFA(X1DIR, k, j, i);
+
+        if (ndim >= 2) {
+          Real vp2[3] = {v(0, p::velocity(0), k, j - 1, i),
+                         v(0, p::velocity(1), k, j - 1, i),
+                         v(0, p::velocity(2), k, j - 1, i)};
+          geom.Metric(CellLocation::Cent, 0, k, j - 1, i, gam2);
+          Real W2 = phoebus::GetLorentzFactor(vp2, gam2);
+          Real lapse2 = geom.Lapse(CellLocation::Cent, 0, k, j - 1, i);
+
+          divv += igdet *
+                  (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
+                       v(0, p::velocity(1), k, j, i) * lapse / W -
+                   geom.DetGamma(CellLocation::Cent, 0, k, j - 1, i) *
+                       v(0, p::velocity(1), k, j - 1, i) * lapse2 / W2) /
+                  coords.CellWidthFA(X2DIR, k, j, i);
+        }
+
+        if (ndim >= 3) {
+          Real vp3[3] = {v(0, p::velocity(0), k - 1, j, i),
+                         v(0, p::velocity(1), k - 1, j, i),
+                         v(0, p::velocity(2), k - 1, j, i)};
+          Real W3 = phoebus::GetLorentzFactor(vp3, gam3);
+          Real lapse3 = geom.Lapse(CellLocation::Cent, 0, k - 1, j, i);
+
+          divv += igdet *
+                  (geom.DetGamma(CellLocation::Cent, 0, k, j, i) *
+                       v(0, p::velocity(2), k, j, i) * lapse / W -
+                   geom.DetGamma(CellLocation::Cent, 0, k - 1, j, i) *
+                       v(0, p::velocity(2), k - 1, j, i) * lapse3 / W3) /
+                  coords.CellWidthFA(X3DIR, k, j, i);
+        }
+
+        v(0, p::entropy(), k, j, i) = s;
+        v(0, p::cs(), k, j, i) = cs;
+        v(0, diag::ratio_divv_cs(), k, j, i) = divv / cs;
+      });
+
   if (do_tracers) {
     auto &mbd = pmb->meshblock_data.Get();
     tracers::FillTracers(mbd.get());
