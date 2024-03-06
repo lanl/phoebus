@@ -1096,17 +1096,12 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
           Real vp2[3] = {v(0, p::velocity(0), k, j - 1, i),
                          v(0, p::velocity(1), k, j - 1, i),
                          v(0, p::velocity(2), k, j - 1, i)};
-          Real vp3[3] = {v(0, p::velocity(0), k - 1, j, i),
-                         v(0, p::velocity(1), k - 1, j, i),
-                         v(0, p::velocity(2), k - 1, j, i)};
           Real vp12[3] = {v(0, p::velocity(0), k, j - 1, i - 1),
                           v(0, p::velocity(1), k, j - 1, i - 1),
                           v(0, p::velocity(2), k, j - 1, i - 1)};
           geom.Metric(CellLocation::Cent, 0, k, j - 1, i, gam2);
-          geom.Metric(CellLocation::Cent, 0, k - 1, j, i, gam3);
           geom.Metric(CellLocation::Cent, 0, k, j - 1, i - 1, gam12);
           Real W2 = phoebus::GetLorentzFactor(vp2, gam2);
-          Real W3 = phoebus::GetLorentzFactor(vp3, gam3);
           Real W12 = phoebus::GetLorentzFactor(vp12, gam12);
 
           divv = 1 / gdet *
