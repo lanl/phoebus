@@ -321,6 +321,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceMass, "total baryon number"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceEn, "total conserved energy tau"));
 
+  auto CentralDensitySN = [](MeshData<Real> *md) {
+    Real rhoc = Hystory::ReduceCentralDensity(md);
+    return ReduceOneVar<Kokkos::Sum<Real>>(md, rhoc, 0);
+  };
+  hst_vars.emplace_back(HistoryOutputVar(HstSum, CentralDensitySN, "central density SN"));
+
   for (int d = 0; d < 3; ++d) {
     auto ReduceMom = [d](MeshData<Real> *md) {
       return History::ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::momentum::name(),

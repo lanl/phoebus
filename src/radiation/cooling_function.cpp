@@ -11,6 +11,7 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
+#include "analysis/history.hpp"
 #include "geometry/geometry.hpp"
 #include "light_bulb_constants.hpp"
 #include "phoebus_utils/variables.hpp"

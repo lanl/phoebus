@@ -235,4 +235,35 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
   return 0.5 * result; // 0.5 \int detg B^r dx2 dx3
 } // Phi
 
+Real ReduceCentralDensitySN(MeshData<Real> *md) {
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+  namespace p = fluid_prim;
+  auto *pmb = rc->GetParentPointer();
+  using parthenon::MakePackDescriptor;
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
+
+  static auto desc = MakePackDescriptor<p::density>(resolved_pkgs.get());
+  auto v = desc.GetPack(rc);
+  const int nblocks = v.GetNBlocks();
+
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "CentralDensity", DevExecSpace(), 0, nblocks - 1, kb.s, kb.e,
+      jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        const Real x = coords.Xc<1>(k, j, i);
+        const Real y = coords.Xc<2>(k, j, i);
+        const Real z = coords.Xc<3>(k, j, i);
+        const Real sigma = analysis->Param<Real>("sigma");
+        const Real pi = 3.14;
+        const Real rhoc = v(b, p::density(), k, j, i) *
+                          std::exp(-(x * x + y * y + z * z) / sigma / sigma) / pi /
+                          sigma; // sigma > 0
+      });
+  return rhoc;
+} // rhoc
+
 } // namespace History
