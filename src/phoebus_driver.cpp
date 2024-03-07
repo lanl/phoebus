@@ -25,6 +25,7 @@
 #include <utils/error_checking.hpp>
 
 // Local Includes
+#include "analysis/analysis.hpp"
 #include "compile_constants.hpp"
 #include "fixup/fixup.hpp"
 #include "fluid/fluid.hpp"
@@ -774,6 +775,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
   packages.Add(tracers::Initialize(pin.get()));
   packages.Add(Progenitor::Initialize(pin.get()));
+  packages.Add(analysis::Initialize(pin.get()));
 
   // TODO(JMM): I need to do this before problem generators get
   // called. For now I'm hacking this in here. But in the long term,
@@ -1069,9 +1071,11 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
         Real gam1[3][3];
         Real gam2[3][3];
         Real gam3[3][3];
+        auto analysis = pmb->packages.Get("analysis").get();
         const Real z = coords.Xc<3>(k, j, i);
-        const Real sigma = 2 * coords.CellWidthFA(X3DIR, k, j, i);
-        const Real s0 = s * std::exp(-z * z / sigma / sigma);
+        const Real sigma = analysis->Param<Real>("sigma");
+        const Real pi = 3.14;
+        const Real s0 = s * std::exp(-z * z / sigma / sigma) / pi / sigma; // sigma > 0
 
         const Real vp[3] = {v(0, p::velocity(0), k, j, i), v(0, p::velocity(1), k, j, i),
                             v(0, p::velocity(2), k, j, i)};
