@@ -121,6 +121,7 @@ VARIABLE_CUSTOM(node_coords, g.n.coord);
 namespace diagnostic_variables {
 VARIABLE_NONS(divb);
 VARIABLE_NONS(ratio_divv_cs);
+VARIABLE_NONS(entropy_z_0);
 VARIABLE_CUSTOM(divf, flux_divergence);
 VARIABLE_NONS(src_terms);
 VARIABLE_CUSTOM(r_divf, r.flux_divergence);

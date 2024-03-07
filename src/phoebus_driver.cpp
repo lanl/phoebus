@@ -25,6 +25,7 @@
 #include <utils/error_checking.hpp>
 
 // Local Includes
+#include "analysis/analysis.hpp"
 #include "compile_constants.hpp"
 #include "fixup/fixup.hpp"
 #include "fluid/fluid.hpp"
@@ -774,6 +775,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
   packages.Add(TOV::Initialize(pin.get()));        // Does nothing if not enabled.
   packages.Add(tracers::Initialize(pin.get()));
   packages.Add(Progenitor::Initialize(pin.get()));
+  packages.Add(analysis::Initialize(pin.get()));
 
   // TODO(JMM): I need to do this before problem generators get
   // called. For now I'm hacking this in here. But in the long term,
@@ -1035,7 +1037,8 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
 
   static auto desc =
       MakePackDescriptor<p::velocity, p::density, p::ye, p::temperature, p::entropy,
-                         p::cs, diag::ratio_divv_cs>(resolved_pkgs.get());
+                         p::cs, diag::ratio_divv_cs, diag::entropy_z_0>(
+          resolved_pkgs.get());
   auto v = desc.GetPack(rc);
   auto coords = pmb->coords;
 
@@ -1068,6 +1071,13 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
         Real gam1[3][3];
         Real gam2[3][3];
         Real gam3[3][3];
+        auto analysis = pmb->packages.Get("analysis").get();
+        const Real z = coords.Xc<3>(k, j, i);
+        const Real sigma = analysis->Param<Real>("sigma");
+        const Real pi = 3.14;
+        const Real s0 =
+            s * std::exp(-z * z / sigma / sigma) / std::sqrt(pi) / sigma; // sigma > 0
+
         const Real vp[3] = {v(0, p::velocity(0), k, j, i), v(0, p::velocity(1), k, j, i),
                             v(0, p::velocity(2), k, j, i)};
         const Real vp1[3] = {v(0, p::velocity(0), k, j, i - 1),
@@ -1123,6 +1133,7 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
         v(0, p::entropy(), k, j, i) = s;
         v(0, p::cs(), k, j, i) = cs;
         v(0, diag::ratio_divv_cs(), k, j, i) = divv / cs;
+        v(0, diag::entropy_z_0(), k, j, i) = s0;
       });
 
   if (do_tracers) {

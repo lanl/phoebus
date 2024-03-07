@@ -143,7 +143,8 @@ add_executable(phoebus
   analysis/history.hpp
   analysis/history_utils.hpp
   analysis/history.cpp
-
+  analysis/analysis.cpp
+  
   tov/tov.hpp
   tov/tov.cpp
 
