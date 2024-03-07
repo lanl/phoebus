@@ -1,5 +1,5 @@
-#include "phoebus_utils/variables.hpp"
 #include "analysis.hpp"
+#include "phoebus_utils/variables.hpp"
 
 namespace analysis{
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
@@ -9,5 +9,5 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("sigma", sigma);
 
   return analysis_pkg;
-} //initialize
-} //namespace analysis
+} // initialize
+} // namespace analysis
