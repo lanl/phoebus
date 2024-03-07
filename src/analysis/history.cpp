@@ -260,8 +260,8 @@ Real ReduceCentralDensitySN(MeshData<Real> *md) {
         const Real sigma = analysis->Param<Real>("sigma");
         const Real pi = 3.14;
         const Real rhoc = v(b, p::density(), k, j, i) *
-                          std::exp(-(x * x + y * y + z * z) / sigma / sigma) / pi /
-                          sigma; // sigma > 0
+                          std::exp(-(x * x + y * y + z * z) / sigma / sigma) /
+                          std::pow(std::sqrt(pi), 1.5) / std::pow(sigma, 3); // sigma > 0
       });
   return rhoc;
 } // rhoc
