@@ -1075,7 +1075,8 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
         const Real z = coords.Xc<3>(k, j, i);
         const Real sigma = analysis->Param<Real>("sigma");
         const Real pi = 3.14;
-        const Real s0 = s * std::exp(-z * z / sigma / sigma) / pi / sigma; // sigma > 0
+        const Real s0 =
+            s * std::exp(-z * z / sigma / sigma) / std::sqrt(pi) / sigma; // sigma > 0
 
         const Real vp[3] = {v(0, p::velocity(0), k, j, i), v(0, p::velocity(1), k, j, i),
                             v(0, p::velocity(2), k, j, i)};
