@@ -1035,7 +1035,8 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
 
   static auto desc =
       MakePackDescriptor<p::velocity, p::density, p::ye, p::temperature, p::entropy,
-                         p::cs, diag::ratio_divv_cs>(resolved_pkgs.get());
+                         p::cs, diag::ratio_divv_cs, diag::entropy_z_0>(
+          resolved_pkgs.get());
   auto v = desc.GetPack(rc);
   auto coords = pmb->coords;
 
@@ -1068,6 +1069,10 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
         Real gam1[3][3];
         Real gam2[3][3];
         Real gam3[3][3];
+        const Real z = coords.Xc<3>(k, j, i);
+        const Real sigma = 2 * coords.CellWidthFA(X3DIR, k, j, i);
+        const Real s0 = s * std::exp(-z * z / sigma / sigma);
+
         const Real vp[3] = {v(0, p::velocity(0), k, j, i), v(0, p::velocity(1), k, j, i),
                             v(0, p::velocity(2), k, j, i)};
         const Real vp1[3] = {v(0, p::velocity(0), k, j, i - 1),
@@ -1123,6 +1128,7 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
         v(0, p::entropy(), k, j, i) = s;
         v(0, p::cs(), k, j, i) = cs;
         v(0, diag::ratio_divv_cs(), k, j, i) = divv / cs;
+        v(0, diag::entropy_z_0(), k, j, i) = s0;
       });
 
   if (do_tracers) {
