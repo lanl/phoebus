@@ -115,19 +115,11 @@ void PhoebusDriver::PostInitializationCommunication() {
 
   const int num_partitions = pmesh->DefaultNumPartitions();
 
-  TaskRegion &async_region_1 = tc.AddRegion(blocks.size());
-  for (int ib = 0; ib < blocks.size(); ib++) {
-    auto pmb = blocks[ib].get();
-    auto &tl = async_region_1[ib];
-    auto &sc = pmb->meshblock_data.Get();
-    auto apply_floors =
-        tl.AddTask(none, fixup::ApplyFloors<MeshBlockData<Real>>, sc.get());
-  }
-
   TaskRegion &sync_region_1 = tc.AddRegion(num_partitions);
   for (int ib = 0; ib < num_partitions; ib++) {
     auto &md = pmesh->mesh_data.GetOrAdd("base", ib);
     auto &tl = sync_region_1[ib];
+    auto apply_floors = tl.AddTask(none, fixup::ApplyFloors<MeshData<Real>>, sc.get());
 
     const auto any = parthenon::BoundaryType::any;
     const auto local = parthenon::BoundaryType::local;
@@ -523,6 +515,19 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   }
 
   // Fix up flux failures
+  TaskRegion &sync_region_new = tc.AddRegion(num_partitions);
+  for (int ip = 0; ip < num_partitions; ip++) {
+    auto &tl = sync_region_new[ip];
+    auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ip);
+    // fill in derived fields
+    auto fill_derived =
+        tl.AddTask(none, parthenon::Update::FillDerived<MeshData<Real>>, sc1.get());
+
+    auto fixup = tl.AddTask(fill_derived,
+                            fixup::ConservedToPrimitiveFixup<MeshData<Real>>, sc1.get());
+    auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshData<Real>>, sc1.get());
+  }
+
   TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
@@ -535,18 +540,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
     using MDT = std::remove_pointer<decltype(sc1.get())>::type;
 
-    // fill in derived fields
-    auto fill_derived =
-        tl.AddTask(none, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
-
-    auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
-
     auto radfixup = tl.AddTask(
         fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
-
-    auto floors =
-        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
 
     TaskID gas_rad_int(0);
     if (rad_mocmc_active) {
@@ -562,12 +557,11 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
                      beta * dt, fluid_active);
       gas_rad_int = gas_rad_int | impl_update;
     }
-
     if (rad_moments_active) {
       // Only apply floors because MomentFluidSource already ensured that a sensible state
       // was returned
       auto floors =
-          tl.AddTask(gas_rad_int, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+          tl.AddTask(gas_rad_int, fixup::ApplyFloors<MeshData<Real>>, sc1.get());
     }
   }
 
