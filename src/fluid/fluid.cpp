@@ -311,6 +311,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Reductions
   // By default compute integrated value of scalar conserved vars
   auto HstSum = parthenon::UserHistoryOperation::sum;
+  auto HstMax = parthenon::UserHistoryOperation::max;
   using History::ReduceInGain;
   using History::ReduceOneVar;
   using parthenon::HistoryOutputVar;
@@ -322,7 +323,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto ReduceEn = [](MeshData<Real> *md) {
     return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::energy::name(), 0);
   };
-  auto CentralDensitySN = [](MeshData<Real> *md) {
+  auto MaxDensitySN = [](MeshData<Real> *md) {
     History::ReduceCentralDensitySN(md);
     return ReduceOneVar<Kokkos::Max<Real>>(md, diag::central_density::name(), 0);
   };
@@ -330,9 +331,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return ReduceInGain<Kokkos::Sum<Real, HostExecSpace>>(md, fluid_prim::density::name(),
                                                           0);
   };
+  auto Qgain = [](MeshData<Real> *md) {
+    return ReduceInGain<Kokkos::Sum<Real, HostExecSpace>>(
+               md, internal_variables::GcovHeat::name(), 0) -
+           ReduceInGain<Kokkos::Sum<Real, HostExecSpace>>(
+               md, internal_variables::GcovCool::name(), 0);
+  };
 
-  hst_vars.emplace_back(HistoryOutputVar(HstSum, CentralDensitySN, "central density SN"));
+  hst_vars.emplace_back(HistoryOutputVar(HstMax, MaxDensitySN, "maximum density SN"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, Mgain, "Mgain"));
+  hst_vars.emplace_back(HistoryOutputVar(HstSum, Qgain, "total net heat"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceMass, "total baryon number"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceEn, "total conserved energy tau"));
 
