@@ -207,7 +207,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::entropy::name(), mprim_scalar);
   physics->AddField(p::cs::name(), mprim_scalar);
   physics->AddField(diag::ratio_divv_cs::name(), mprim_scalar);
-  physics->AddField(diag::central_density::name(), mprim_scalar);
   physics->AddField(diag::localization_function::name(), mprim_scalar);
   physics->AddField(diag::entropy_z_0::name(), mprim_scalar);
   physics->AddField(p::gamma1::name(), mprim_scalar);
@@ -324,8 +323,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::energy::name(), 0);
   };
   auto MaxDensitySN = [](MeshData<Real> *md) {
-    History::ReduceCentralDensitySN(md);
-    return ReduceOneVar<Kokkos::Max<Real>>(md, diag::central_density::name(), 0);
+    return ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::density::name(), 0);
   };
   auto Mgain = [](MeshData<Real> *md) {
     return ReduceInGain<Kokkos::Sum<Real, HostExecSpace>>(md, fluid_prim::density::name(),
