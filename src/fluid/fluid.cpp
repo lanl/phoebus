@@ -311,11 +311,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Reductions
   // By default compute integrated value of scalar conserved vars
   auto HstSum = parthenon::UserHistoryOperation::sum;
-  using History::ReduceOneVar;
   using History::ReduceInGain;
+  using History::ReduceOneVar;
   using parthenon::HistoryOutputVar;
   parthenon::HstVar_list hst_vars = {};
-    
+
   auto ReduceMass = [](MeshData<Real> *md) {
     return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::density::name(), 0);
   };
@@ -324,20 +324,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   };
   auto CentralDensitySN = [](MeshData<Real> *md) {
     History::ReduceCentralDensitySN(md);
-    return ReduceOneVar<Kokkos::Sum<Real, HostExecSpace>>(md, diag::central_density::name(), 0);
-    
-  };
-  auto norm = [](MeshData<Real> *md) {
-    History::ReduceLocalizationFunction(md);
-    return ReduceOneVar<Kokkos::Sum<Real, HostExecSpace>>(md, diag::localization_function::name(), 0);
+    return ReduceOneVar<Kokkos::Max<Real>>(md, diag::central_density::name(), 0);
   };
   auto Mgain = [](MeshData<Real> *md) {
-    return ReduceInGain<Kokkos::Sum<Real, HostExecSpace>>(md, fluid_prim::density::name(), 0);
+    return ReduceInGain<Kokkos::Sum<Real, HostExecSpace>>(md, fluid_prim::density::name(),
+                                                          0);
   };
-  
 
   hst_vars.emplace_back(HistoryOutputVar(HstSum, CentralDensitySN, "central density SN"));
-  hst_vars.emplace_back(HistoryOutputVar(HstSum, norm, "Normalization"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, Mgain, "Mgain"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceMass, "total baryon number"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceEn, "total conserved energy tau"));
