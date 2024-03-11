@@ -123,7 +123,7 @@ VARIABLE_NONS(divb);
 VARIABLE_NONS(ratio_divv_cs);
 VARIABLE_NONS(entropy_z_0);
 VARIABLE_NONS(central_density);
-  VARIABLE_NONS(localization_function);
+VARIABLE_NONS(localization_function);
 VARIABLE_CUSTOM(divf, flux_divergence);
 VARIABLE_NONS(src_terms);
 VARIABLE_CUSTOM(r_divf, r.flux_divergence);
