@@ -238,45 +238,6 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
 
 // SN analysis
 
-void ReduceCentralDensitySN(MeshData<Real> *md) {
-  const auto ib = md->GetBoundsI(IndexDomain::interior);
-  const auto jb = md->GetBoundsJ(IndexDomain::interior);
-  const auto kb = md->GetBoundsK(IndexDomain::interior);
-  namespace p = fluid_prim;
-  namespace diag = diagnostic_variables;
-  using parthenon::MakePackDescriptor;
-  auto *pmb = md->GetParentPointer();
-  Mesh *pmesh = md->GetMeshPointer();
-  auto &resolved_pkgs = pmesh->resolved_packages;
-  const int ndim = pmesh->ndim;
-
-  static auto desc =
-      MakePackDescriptor<p::density, diag::central_density>(resolved_pkgs.get());
-  auto v = desc.GetPack(md);
-  const int nblocks = v.GetNBlocks();
-  auto geom = Geometry::GetCoordinateSystem(md);
-
-  parthenon::par_for(
-      parthenon::LoopPatternMDRange(), "Central Density for SN", DevExecSpace(), 0,
-      nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-        auto &coords = v.GetCoordinates(b);
-        auto analysis = pmb->packages.Get("analysis").get();
-        const Real x[3] = {coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
-                           coords.Xc<3>(k, j, i)};
-        const Real sigma = analysis->Param<Real>("sigma");
-        Real gam[3][3];
-        Real r2 = 0;
-        geom.Metric(CellLocation::Cent, 0, k, j, i, gam);
-        for (int n = 0; n < 3; ++n) {
-          for (int m = 0; m < 3; ++m) {
-            r2 += gam[n][m] * x[n] * x[m];
-          }
-        }
-        const Real rhoc = v(b, p::density(), k, j, i) * std::exp(-r2 / sigma / sigma);
-        v(b, diag::central_density(), k, j, i) = rhoc;
-      });
-}
 void ReduceLocalizationFunction(MeshData<Real> *md) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);

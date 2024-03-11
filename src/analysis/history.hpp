@@ -43,7 +43,6 @@ Real ReduceMassAccretionRate(MeshData<Real> *md);
 Real ReduceJetEnergyFlux(MeshData<Real> *md);
 Real ReduceJetMomentumFlux(MeshData<Real> *md);
 Real ReduceMagneticFluxPhi(MeshData<Real> *md);
-void ReduceCentralDensitySN(MeshData<Real> *md);
 void ReduceLocalizationFunction(MeshData<Real> *md);
 
 template <typename Reducer_t>
