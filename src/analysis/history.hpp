@@ -112,6 +112,7 @@ Real ReduceInGain(MeshData<Real> *md, const std::string &varname, int idx = 0) {
       std::is_same<Reducer_t, Kokkos::Sum<Real, HostExecSpace>>::value ||
       std::is_same<Reducer_t, Kokkos::Sum<Real, DevExecSpace>>::value ||
       std::is_same<Reducer_t, Kokkos::Sum<Real, Kokkos::DefaultExecutionSpace>>::value;
+  auto geom = Geometry::GetCoordinateSystem(md);
 
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Phoebus History for " + varname, DevExecSpace(),
@@ -120,10 +121,12 @@ Real ReduceInGain(MeshData<Real> *md, const std::string &varname, int idx = 0) {
         // join is a Kokkos construct
         // that automatically does the
         // reduction operation locally
+        Real gdet = geom.DetGamma(CellLocation::Cent, 0, k, j, i);
         bool is_netheat = (pack(b, iheat, k, j, i) - pack(b, icool, k, j, i) > 0);
         const auto &coords = pack.GetCoords(b);
         const Real vol = volume_weighting ? coords.CellVolume(k, j, i) : 1.0;
-        reducer.join(lresult, pack(b, ivar.first + idx, k, j, i) * vol * is_netheat);
+        reducer.join(lresult,
+                     pack(b, ivar.first + idx, k, j, i) * gdet * vol * is_netheat);
       },
       reducer);
   return result;
