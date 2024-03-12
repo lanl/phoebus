@@ -1,4 +1,4 @@
-# © 2021. Triad National Security, LLC. All rights reserved.  This
+# © 2021-2024. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
 # National Security, LLC for the U.S.  Department of Energy/National
@@ -13,57 +13,15 @@
 add_library(geometry_unit_tests OBJECT
   test_geometry.cpp
   test_tetrads.cpp
-
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/analysis/history.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/analysis/history.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/analytic_system.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/boyer_lindquist.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/boyer_lindquist.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/cached_system.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/flrw.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/flrw.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/fmks.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/fmks.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/geometry_defaults.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/geometry_utils.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/mckinney_gammie_ryan.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/mckinney_gammie_ryan.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/modified_system.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/minkowski.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/minkowski.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/snake.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/snake.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_kerr_schild.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_kerr_schild.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_minkowski.hpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/geometry/spherical_minkowski.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/phoebus_utils/phoebus_interpolation.hpp
 )
-
-# Super annoying but it had to be done.
-set(MAX_NUMBER_CONSERVED_VARS 9 CACHE STRING "Maximum number of conserved variables")
-configure_file(../../../src/compile_constants.hpp.in generated/compile_constants.hpp @ONLY)
 
 target_link_libraries(geometry_unit_tests
   PRIVATE
+  phoebuslib
   parthenon
   singularity-eos::singularity-eos
   Catch2::Catch2
   Kokkos::kokkos)
-
-target_include_directories(geometry_unit_tests PRIVATE
-  "${CMAKE_CURRENT_SOURCE_DIR}/../../../src"
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
-  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/ports-of-call"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/spiner"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/singularity-eos/utils/variant/include"
-  )
-
-target_compile_definitions(geometry_unit_tests PRIVATE
-  PORTABILITY_STRATEGY_KOKKOS)
 
 target_link_libraries(geometry_unit_tests PRIVATE Catch2::Catch2)
 target_sources(phoebus_unit_tests PRIVATE $<TARGET_OBJECTS:geometry_unit_tests>)
