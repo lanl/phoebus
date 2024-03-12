@@ -40,6 +40,12 @@ add_library(phoebus_utils_unit_tests OBJECT
   test_adiabats.cpp
 )
 
+target_include_directories(phoebus_utils_unit_tests PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../"
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
+  )
+
 target_link_libraries(phoebus_utils_unit_tests
   PRIVATE
     phoebuslib
