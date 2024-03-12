@@ -279,10 +279,8 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
             // detg included above
             Kokkos::atomic_add(&(v(b, iv::Gcov(mu), k, j, i)), -Gcov_coord[mu]);
           }
-          v(b, iv::GcovHeat(), k, j, i) =
-              v(b, p::density(), k, j, i) * density_conversion_factor * heat;
-          v(b, iv::GcovCool(), k, j, i) =
-              v(b, p::density(), k, j, i) * density_conversion_factor * cool;
+          v(b, iv::GcovHeat(), k, j, i) = cdensity * H;
+          v(b, iv::GcovCool(), k, j, i) = cdensity * C;
           Kokkos::atomic_add(&(v(b, iv::Gye(), k, j, i)), Jye);
         });
 #else

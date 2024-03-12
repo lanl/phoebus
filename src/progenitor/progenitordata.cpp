@@ -1,6 +1,7 @@
 #include <memory>
 #include <vector>
 
+#include "analysis/history.hpp"
 #include "ascii_reader.hpp"
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
@@ -106,6 +107,24 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("adm_momentum_dev", adm_momentum_dev);
   params.Add("S_adm_dev", S_adm_dev);
   params.Add("Srr_adm_dev", Srr_adm_dev);
+
+  // Reductions
+  auto HstSum = parthenon::UserHistoryOperation::sum;
+  auto HstMax = parthenon::UserHistoryOperation::max;
+  using History::ReduceInGain;
+  using History::ReduceOneVar;
+  using parthenon::HistoryOutputVar;
+  parthenon::HstVar_list hst_vars = {};
+  auto Mgain = [](MeshData<Real> *md) {
+    return ReduceInGain<class fluid_prim::density>(md, 0);
+  };
+  auto Qgain = [](MeshData<Real> *md) {
+    return ReduceInGain<class internal_variables::GcovHeat>(md, 0) -
+           ReduceInGain<class internal_variables::GcovCool>(md, 0);
+  };
+  hst_vars.emplace_back(HistoryOutputVar(HstSum, Mgain, "Mgain"));
+  hst_vars.emplace_back(HistoryOutputVar(HstSum, Qgain, "total net heat"));
+  params.Add(parthenon::hist_param_key, hst_vars);
 
   return progenitor_pkg;
 } // Initialize

@@ -84,50 +84,39 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
   return result;
 }
 
-template <typename Reducer_t>
-Real ReduceInGain(MeshData<Real> *md, const std::string &varname, int idx = 0) {
+template <typename Varname>
+Real ReduceInGain(MeshData<Real> *md, int idx = 0) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
-  PackIndexMap imap;
   namespace iv = internal_variables;
-  std::vector<std::string> vars = {varname, iv::GcovHeat::name(), iv::GcovCool::name()};
-  const auto pack = md->PackVariables(vars, imap);
-  const auto ivar = imap[varname];
-  const auto iheat = imap[iv::GcovHeat::name()].first;
-  const auto icool = imap[iv::GcovCool::name()].first;
-  auto *pmb = md->GetParentPointer();
-  PARTHENON_REQUIRE(ivar.first >= 0, "Var must exist");
-  PARTHENON_REQUIRE(ivar.second >= ivar.first + idx, "Var must exist");
+  using parthenon::MakePackDescriptor;
+  Mesh *pmesh = md->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
+  static auto desc =
+      MakePackDescriptor<Varname, iv::GcovHeat, iv::GcovCool>(resolved_pkgs.get());
+  auto v = desc.GetPack(md);
+  const int nblocks = v.GetNBlocks();
 
-  // We choose to apply volume weighting when using the sum reduction.
-  // This assumes that for "Sum" variables, the variable is densitized, meaning
-  // it already contains a factor of the measure: sqrt(det(gamma))
   Real result = 0.0;
-  Reducer_t reducer(result);
 
-  const bool volume_weighting =
-      std::is_same<Reducer_t, Kokkos::Sum<Real, HostExecSpace>>::value ||
-      std::is_same<Reducer_t, Kokkos::Sum<Real, DevExecSpace>>::value ||
-      std::is_same<Reducer_t, Kokkos::Sum<Real, Kokkos::DefaultExecutionSpace>>::value;
   auto geom = Geometry::GetCoordinateSystem(md);
 
   parthenon::par_reduce(
-      parthenon::LoopPatternMDRange(), "Phoebus History for " + varname, DevExecSpace(),
-      0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      parthenon::LoopPatternMDRange(),
+      "Phoebus History for integrals in gain region (SN)", DevExecSpace(), 0, nblocks - 1,
+      kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
-        // join is a Kokkos construct
-        // that automatically does the
-        // reduction operation locally
         Real gdet = geom.DetGamma(CellLocation::Cent, 0, k, j, i);
-        bool is_netheat = (pack(b, iheat, k, j, i) - pack(b, icool, k, j, i) > 0);
-        const auto &coords = pack.GetCoords(b);
-        const Real vol = volume_weighting ? coords.CellVolume(k, j, i) : 1.0;
-        reducer.join(lresult,
-                     pack(b, ivar.first + idx, k, j, i) * gdet * vol * is_netheat);
+        bool is_netheat =
+            (v(b, iv::GcovHeat(), k, j, i) - v(b, iv::GcovCool(), k, j, i) > 0);
+        const auto &coords = v.GetCoordinates(b);
+        const Real vol = coords.CellVolume(k, j, i);
+        lresult += gdet * vol * is_netheat * v(b, Varname(idx), k, j, i);
       },
-      reducer);
+      Kokkos::Sum<Real>(result));
   return result;
 }
 
