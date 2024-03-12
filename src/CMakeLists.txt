@@ -31,6 +31,7 @@ set (SRC_LIST
   fluid/con2prim_statistics.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
+  fluid/prim2con.hpp
   fluid/riemann.hpp
   fluid/tmunu.cpp
   fluid/tmunu.hpp
