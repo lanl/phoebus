@@ -15,6 +15,7 @@ include(Catch)
 add_executable(phoebus_unit_tests phoebus_unit_test_main.cpp)
 target_link_libraries(phoebus_unit_tests
   PRIVATE
+    phoebuslib
     parthenon
     Catch2::Catch2
     Kokkos::kokkos
