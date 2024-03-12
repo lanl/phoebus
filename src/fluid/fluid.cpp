@@ -450,6 +450,15 @@ TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRange &ib, const IndexRa
   auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
   return c2p(rc, ib, jb, kb);
 }
+// JMM: Must specialize function for both potential use cases so we
+// can keep it in this file.
+template TaskStatus ConservedToPrimitiveRegion<MeshData<Real>>(MeshData<Real> *rc,
+                                                               const IndexRange &ib,
+                                                               const IndexRange &jb,
+                                                               const IndexRange &kb);
+template TaskStatus ConservedToPrimitiveRegion<MeshBlockData<Real>>(
+    MeshBlockData<Real> *rc, const IndexRange &ib, const IndexRange &jb,
+    const IndexRange &kb);
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
