@@ -1,5 +1,5 @@
 #=========================================================================================
-# (C) (or copyright) 2021. Triad National Security, LLC. All rights reserved.
+# (C) (or copyright) 2021-2024. Triad National Security, LLC. All rights reserved.
 #
 # This program was produced under U.S. Government contract 89233218CNA000001 for Los
 # Alamos National Laboratory (LANL), which is operated by Triad National Security, LLC
@@ -11,9 +11,11 @@
 # the public, perform publicly and display publicly, and to permit others to do so.
 #=========================================================================================
 
-add_executable(phoebus
-  main.cpp # first
+set(MAX_NUMBER_CONSERVED_VARS 9 CACHE INTEGER "Maximum number of conserved variables")
 
+configure_file(compile_constants.hpp.in generated/compile_constants.hpp @ONLY)
+
+set (SRC_LIST
   # alphabetical
   fixup/fixup.hpp
   fixup/fixup.cpp
@@ -29,6 +31,7 @@ add_executable(phoebus
   fluid/con2prim_statistics.hpp
   fluid/fluid.cpp
   fluid/fluid.hpp
+  fluid/prim2con.hpp
   fluid/riemann.hpp
   fluid/tmunu.cpp
   fluid/tmunu.hpp
@@ -150,13 +153,15 @@ add_executable(phoebus
 
   tracers/tracers.hpp
   tracers/tracers.cpp
+
+  # Generated
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>/compile_constants.hpp
 )
 
-set(MAX_NUMBER_CONSERVED_VARS 9 CACHE INTEGER "Maximum number of conserved variables")
 
-configure_file(compile_constants.hpp.in generated/compile_constants.hpp @ONLY)
+add_library(phoebuslib ${SRC_LIST})
 
-target_include_directories(phoebus PRIVATE
+target_include_directories(phoebuslib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
   # JMM: Not needed, but can't hurt
@@ -169,29 +174,37 @@ target_include_directories(phoebus PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-opac/utils"
 )
 
-target_compile_features(phoebus PUBLIC cxx_std_14)
+target_compile_features(phoebuslib PUBLIC cxx_std_17)
+# TODO(JMM): Remove this since we're never going to run on XL again (I hope)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "XL")
-  target_compile_options(phoebus PUBLIC -std=c++1y -qxflag=disable__cplusplusOverride)
+  target_compile_options(phoebuslib PUBLIC -std=c++1y -qxflag=disable__cplusplusOverride)
 endif()
 
-target_compile_definitions(phoebus PRIVATE PORTABILITY_STRATEGY_KOKKOS)
+target_compile_definitions(phoebuslib PUBLIC PORTABILITY_STRATEGY_KOKKOS)
 if (PHOEBUS_ENABLE_HDF5)
-  target_compile_definitions(phoebus PRIVATE
+  target_compile_definitions(phoebuslib PUBLIC
     SINGULARITY_USE_HDF
     SPINER_USE_HDF
   )
 endif()
 
 if (Kokkos_ENABLE_CUDA)
-  target_compile_options(phoebus PUBLIC --expt-relaxed-constexpr)
+  target_compile_options(phoebuslib PUBLIC --expt-relaxed-constexpr)
 endif()
 
-# target_compile_options(phoebus PUBLIC -G -lineinfo)
-
-target_link_libraries(phoebus PRIVATE parthenon
+target_link_libraries(phoebuslib PUBLIC parthenon
   singularity-eos::singularity-eos
   # singularity-opac::singularity-opac
 )
 if (PHOEBUS_ENABLE_HDF5)
-  target_link_libraries(phoebus PRIVATE hdf5::hdf5 hdf5::hdf5_hl)
+  target_link_libraries(phoebuslib PUBLIC hdf5::hdf5 hdf5::hdf5_hl)
 endif()
+
+# Disable executable automatically for builds with downstream codes
+if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+   message(STATUS "Standalone mode. Adding Phoebus executable")
+   add_executable(phoebus main.cpp)
+   target_link_libraries(phoebus PRIVATE phoebuslib)
+endif()
+
+# target_compile_options(phoebus PUBLIC -G -lineinfo)

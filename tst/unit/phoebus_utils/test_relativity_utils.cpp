@@ -43,7 +43,8 @@ TEST_CASE("RELATIVITY", "[relativity_utils]") {
   GIVEN("A three-velocity and a coordinate system") {
     auto mb = GetDummyMeshBlock();
     auto rc = GetDummyMeshBlockData(mb);
-    auto system = GetCoordinateSystem(rc.get());
+    auto indexer = GetIndexer(rc.get());
+    auto system = MinkowskiMeshBlock(indexer);
     // Dummy grid position
     const CellLocation loc = CellLocation::Cent;
     const int k = 0;

@@ -1,4 +1,4 @@
-# © 2021. Triad National Security, LLC. All rights reserved.  This
+# © 2021-2024. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
 # National Security, LLC for the U.S.  Department of Energy/National
@@ -15,6 +15,7 @@ include(Catch)
 add_executable(phoebus_unit_tests phoebus_unit_test_main.cpp)
 target_link_libraries(phoebus_unit_tests
   PRIVATE
+    phoebuslib
     parthenon
     Catch2::Catch2
     Kokkos::kokkos
