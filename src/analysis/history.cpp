@@ -17,6 +17,7 @@
 #include "geometry/geometry_utils.hpp"
 #include "history_utils.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
+#include <interface/sparse_pack.hpp>
 
 namespace History {
 
@@ -237,7 +238,9 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
 } // Phi
 
 // SN analysis
-
+// ReduceLocalizationFunction is not used currently. However this function returns
+// normalization function that is used for localizing quantities at the center, or at some
+// particular case. For example SN diagnostics oftec computes quantities at 400 km.
 void ReduceLocalizationFunction(MeshData<Real> *md) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
@@ -274,8 +277,6 @@ void ReduceLocalizationFunction(MeshData<Real> *md) {
         v(b, diag::localization_function(), k, j, i) = std::exp(-r2 / sigma / sigma);
       });
 
-} // exp (this function returns normalization function that is used for localizing
-  // quantities at the center, or at some particular case. For example SN diagnostics
-  // oftec computes quantities at 400 km.)
+} // exp
 
 } // namespace History
