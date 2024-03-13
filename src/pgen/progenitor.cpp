@@ -16,18 +16,20 @@
 #include <string>
 #include <vector>
 
+#include "analysis/history.hpp"
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
 #include "progenitor/progenitordata.hpp"
+#include <parthenon/package.hpp>
+#include <utils/error_checking.hpp>
 
 using DataBox = Spiner::DataBox<Real>;
 
 // Homologously collapsing star.
 namespace homologous {
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
-  std::cout << "Entered into ProbGen" << std::endl;
   const bool is_monopole_cart =
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
   const bool is_monopole_sph =
