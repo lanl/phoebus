@@ -29,9 +29,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc);
 TaskStatus PrimitiveToConservedRegion(MeshBlockData<Real> *rc, const IndexRange &ib,
                                       const IndexRange &jb, const IndexRange &kb);
+// JMM: Not sure how the templated value here worked in the first
+// place. But proper solution is need to tell the linker it's
+// available elsewhere.
 template <typename T>
 TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRange &ib, const IndexRange &jb,
                                       const IndexRange &kb);
+extern template TaskStatus
+ConservedToPrimitiveRegion<MeshData<Real>>(MeshData<Real> *rc, const IndexRange &ib,
+                                           const IndexRange &jb, const IndexRange &kb);
+extern template TaskStatus ConservedToPrimitiveRegion<MeshBlockData<Real>>(
+    MeshBlockData<Real> *rc, const IndexRange &ib, const IndexRange &jb,
+    const IndexRange &kb);
+
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc);
 template <typename T>
