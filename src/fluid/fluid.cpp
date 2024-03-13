@@ -208,8 +208,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::entropy::name(), mprim_scalar);
   physics->AddField(p::cs::name(), mprim_scalar);
   physics->AddField(diag::ratio_divv_cs::name(), mprim_scalar);
-  // physics->AddField(diag::localization_function::name(), mprim_scalar);  // (MG)
-  // currently not in use, turn on when needed.
+  // physics->AddField(diag::localization_function::name(), mprim_scalar);
+  // (MG) currently not in use, turn on when needed.
   physics->AddField(diag::entropy_z_0::name(), mprim_scalar);
   physics->AddField(p::gamma1::name(), mprim_scalar);
   if (ye) {

@@ -98,6 +98,8 @@ Real ReduceInGain(MeshData<Real> *md, int idx = 0) {
   static auto desc =
       MakePackDescriptor<Varname, iv::GcovHeat, iv::GcovCool>(resolved_pkgs.get());
   auto v = desc.GetPack(md);
+  PARTHENON_REQUIRE_THROWS(v.ContainsHost(0, iv::GcovHeat(), iv::GcovCool()),
+                           "Must be doing SN simulation");
   const int nblocks = v.GetNBlocks();
 
   Real result = 0.0;
