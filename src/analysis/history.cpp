@@ -26,39 +26,35 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
+  namespace p = fluid_prim;
+  using parthenon::MakePackDescriptor;
   Mesh *pmesh = md->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc = MakePackDescriptor<p::density, p::velocity>(resolved_pkgs.get());
+  auto v = desc.GetPack(md);
+  const int nblocks = v.GetNBlocks();
+
   auto &pars = pmesh->packages.Get("geometry")->AllParams();
   const Real xh = pars.Get<Real>("xh");
-
-  namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density::name(), p::velocity::name()});
-
-  PackIndexMap imap;
-  auto pack = md->PackVariables(vars, imap);
-
-  const int prho = imap[p::density::name()].first;
-  const int pvel_lo = imap[p::velocity::name()].first;
-  const int pvel_hi = imap[p::velocity::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
   Real result = 0.0;
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Phoebus History for Mass Accretion Rate",
-      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DevExecSpace(), 0, nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
-        const auto &coords = pack.GetCoords(b);
+        const auto &coords = v.GetCoordinates(b);
         if (coords.Xf<1>(i) <= xh && xh < coords.Xf<1>(i + 1)) {
           const Real dx1 = coords.CellWidthFA(X1DIR, k, j, i);
           const Real dx2 = coords.CellWidthFA(X2DIR, k, j, i);
           const Real dx3 = coords.CellWidthFA(X3DIR, k, j, i);
 
           // interp to make sure we're getting the horizon correct
-          auto m = (CalcMassFlux(pack, geom, prho, pvel_lo, pvel_hi, b, k, j, i + 1) -
-                    CalcMassFlux(pack, geom, prho, pvel_lo, pvel_hi, b, k, j, i - 1)) /
+          auto m = (CalcMassFlux(md, geom, b, k, j, i + 1) -
+                    CalcMassFlux(md, geom, b, k, j, i - 1)) /
                    (2.0 * dx1);
-          auto flux = (CalcMassFlux(pack, geom, prho, pvel_lo, pvel_hi, b, k, j, i) +
-                       (xh - coords.Xc<1>(i)) * m) *
+          auto flux = (CalcMassFlux(md, geom, b, k, j, i) + (xh - coords.Xc<1>(i)) * m) *
                       dx2 * dx3;
 
           lresult += flux;
