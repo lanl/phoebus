@@ -151,7 +151,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     T_min = eos_sc.TMin() / T_unit;
     T_max = eos_sc.TMax() / T_unit;
     rho_min = eos_sc.rhoMin() / rho_unit;
-    std::printf("rho_min code = %e\n", rho_min);
     rho_max = eos_sc.rhoMax() / rho_unit;
     ye_min = eos_sc.YeMin();
     ye_max = eos_sc.YeMax();
