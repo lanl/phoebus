@@ -198,9 +198,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real &minx_k = pmb->coords.Xf<3>(kb.s);
 
   auto coords = pmb->coords;
-  auto eos = pmb->packages.Get("eos")->Param<EOS>("d.EOS");
+  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  auto eos = eos_pkg->Param<EOS>("d.EOS");
   auto eos_h = pmb->packages.Get("eos")->Param<EOS>("h.EOS");
   auto floor = pmb->packages.Get("fixup")->Param<fixup::Floors>("floor");
+  floor.SetEOSBnds(eos_pkg);
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
   S *= unit_conv.GetEntropyCGSToCode();

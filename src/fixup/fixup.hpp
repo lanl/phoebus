@@ -91,37 +91,60 @@ class Floors {
   KOKKOS_INLINE_FUNCTION
   void GetFloors(const Real x1, const Real x2, const Real x3, Real &rflr,
                  Real &sflr) const {
+    if (!eos_bnds_set_) {
+      PARTHENON_FAIL("EOS bounds not set in floors.");
+    }
+
     switch (floor_flag_) {
     case FloorFlag::ConstantRhoSie:
       rflr = r0_;
       sflr = s0_;
+      rflr = std::max(rflr, rho_min_eos_);
+      sflr = std::max(sflr, sie_min_eos_);
       break;
     case FloorFlag::ExpX1RhoSie:
       rflr = r0_ * std::exp(ralpha_ * x1);
       sflr = s0_ * std::exp(salpha_ * x1);
+      rflr = std::max(rflr, rho_min_eos_);
+      sflr = std::max(sflr, sie_min_eos_);
       break;
     case FloorFlag::ExpX1RhoU: {
       Real scratch = r0_ * std::exp(ralpha_ * x1);
       sflr = s0_ * std::exp(salpha_ * x1) / std::max(rflr, scratch);
       rflr = scratch;
+      rflr = std::max(rflr, rho_min_eos_);
+      sflr = std::max(sflr, sie_min_eos_);
     } break;
     case FloorFlag::X1RhoSie:
       rflr = r0_ * std::min(1.0, std::pow(x1, ralpha_));
       sflr = s0_ * std::min(1.0, std::pow(x1, salpha_));
+      rflr = std::max(rflr, rho_min_eos_);
+      sflr = std::max(sflr, sie_min_eos_);
       break;
     case FloorFlag::RRhoSie: {
       Real r = std::sqrt(x1 * x1 + x2 * x2 + x3 * x3);
       rflr = r0_ * std::min(1.0, std::pow(r, ralpha_));
       sflr = s0_ * std::min(1.0, std::pow(r, salpha_));
+      rflr = std::max(rflr, rho_min_eos_);
+      sflr = std::max(sflr, sie_min_eos_);
     } break;
     default:
       PARTHENON_FAIL("No valid floor set.");
     }
   }
 
+  void SetEOSBnds(StateDescriptor *eos_pkg) {
+    if (!eos_bnds_set_) {
+      rho_min_eos_ = eos_pkg->Param<Real>("rho_min");
+      sie_min_eos_ = eos_pkg->Param<Real>("sie_min");
+      eos_bnds_set_ = true;
+    }
+  }
+
  private:
-  Real r0_, s0_, ralpha_, salpha_;
+  Real r0_, s0_, ralpha_, salpha_, rho_min_eos_, sie_min_eos_;
   const FloorFlag floor_flag_;
+  bool eos_bnds_set_;
 };
 
 static struct ConstantJFloor {
@@ -173,19 +196,30 @@ class Ceilings {
   KOKKOS_INLINE_FUNCTION
   void GetCeilings(const Real x1, const Real x2, const Real x3, Real &gmax,
                    Real &smax) const {
+    if (!eos_bnds_set_) {
+      PARTHENON_FAIL("EOS bounds not set in ceilings.");
+    }
     switch (ceiling_flag_) {
     case 1:
       gmax = g0_;
-      smax = s0_;
+      smax = std::min(s0_, sie_max_eos_);
       break;
     default:
       PARTHENON_FAIL("No valid ceiling set.");
     }
   }
 
+  void SetEOSBnds(StateDescriptor *eos_pkg) {
+    if (!eos_bnds_set_) {
+      sie_max_eos_ = eos_pkg->Param<Real>("sie_max");
+      eos_bnds_set_ = true;
+    }
+  }
+
  private:
-  Real g0_, s0_;
+  Real g0_, s0_, sie_max_eos_;
   const int ceiling_flag_;
+  bool eos_bnds_set_;
 };
 
 static struct ConstantBsqRatCeiling {
@@ -257,12 +291,18 @@ class Bounds {
          const RadiationFloors &rfl, const RadiationCeilings &rcl)
       : floors_(fl), ceilings_(cl), mhd_ceilings_(mcl), radiation_floors_(rfl),
         radiation_ceilings_(rcl) {}
-  explicit Bounds(const Floors &fl)
+  explicit Bounds(Floors &fl)
       : floors_(fl), ceilings_(Ceilings()), mhd_ceilings_(MHDCeilings()),
         radiation_floors_(RadiationFloors()), radiation_ceilings_(RadiationCeilings()) {}
-  explicit Bounds(const Ceilings &cl)
+  explicit Bounds(Ceilings &cl)
       : floors_(Floors()), ceilings_(cl), mhd_ceilings_(MHDCeilings()),
         radiation_floors_(RadiationFloors()), radiation_ceilings_(RadiationCeilings()) {}
+
+  template <class... Args>
+  KOKKOS_INLINE_FUNCTION void SetEOSBnds(Args &&...args) {
+    floors_.SetEOSBnds(std::forward<Args>(args)...);
+    ceilings_.SetEOSBnds(std::forward<Args>(args)...);
+  }
 
   template <class... Args>
   KOKKOS_INLINE_FUNCTION void GetFloors(Args &&...args) const {
@@ -290,8 +330,8 @@ class Bounds {
   }
 
  private:
-  const Floors floors_;
-  const Ceilings ceilings_;
+  Floors floors_;
+  Ceilings ceilings_;
   const MHDCeilings mhd_ceilings_;
   const RadiationFloors radiation_floors_;
   const RadiationCeilings radiation_ceilings_;
