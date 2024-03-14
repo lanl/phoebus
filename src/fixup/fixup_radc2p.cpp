@@ -113,7 +113,7 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
   }
 
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto bounds = fix_pkg->Param<Bounds>("bounds");
+  Bounds *bounds = fix_pkg->MutableParam<Bounds>("bounds");
 
   Coordinates_t coords = rc->GetParentPointer()->coords;
 
@@ -129,8 +129,8 @@ TaskStatus RadConservedToPrimitiveFixupImpl(T *rc) {
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         Real xi_max;
         Real garbage;
-        bounds.GetRadiationCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
-                                    coords.Xc<3>(k, j, i), xi_max, garbage);
+        bounds->GetRadiationCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                                     coords.Xc<3>(k, j, i), xi_max, garbage);
 
         // It is assumed that the fluid is already fixed up
         auto fail = [&](const int k, const int j, const int i) {
