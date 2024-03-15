@@ -51,11 +51,12 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
           const Real dx3 = coords.CellWidthFA(X3DIR, k, j, i);
 
           // interp to make sure we're getting the horizon correct
-          auto m = (CalcMassFlux(md, geom, b, k, j, i + 1) -
-                    CalcMassFlux(md, geom, b, k, j, i - 1)) /
+          auto m = (CalcMassFlux(md, v, geom, b, k, j, i + 1) -
+                    CalcMassFlux(md, v, geom, b, k, j, i - 1)) /
                    (2.0 * dx1);
-          auto flux = (CalcMassFlux(md, geom, b, k, j, i) + (xh - coords.Xc<1>(i)) * m) *
-                      dx2 * dx3;
+          auto flux =
+              (CalcMassFlux(md, v, geom, b, k, j, i) + (xh - coords.Xc<1>(i)) * m) * dx2 *
+              dx3;
 
           lresult += flux;
         } else {

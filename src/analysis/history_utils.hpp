@@ -32,30 +32,30 @@ using namespace Geometry;
 
 namespace History {
 
-template <typename Geometry>
-KOKKOS_INLINE_FUNCTION Real CalcMassFlux(MeshData<Real> *md, Geometry &geom, const int b,
-                                         const int k, const int j, const int i) {
+template <typename Pack, typename Geometry>
+KOKKOS_INLINE_FUNCTION Real CalcMassFlux(MeshData<Real> *md, Pack &pack, Geometry &geom,
+                                         const int b, const int k, const int j,
+                                         const int i) {
   namespace p = fluid_prim;
   using parthenon::MakePackDescriptor;
   Mesh *pmesh = md->GetMeshPointer();
   auto &resolved_pkgs = pmesh->resolved_packages;
   static auto desc = MakePackDescriptor<p::density, p::velocity>(resolved_pkgs.get());
-  auto v = desc.GetPack(md);
 
   Real gdet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
   Real lapse = geom.Lapse(CellLocation::Cent, b, k, j, i);
   Real shift[3];
   geom.ContravariantShift(CellLocation::Cent, b, k, j, i, shift);
 
-  const Real vel[] = {v(b, p::velocity(), k, j, i), v(b, p::velocity(1), k, j, i),
-                      v(b, p::velocity(2), k, j, i)};
+  const Real vel[] = {pack(b, p::velocity(), k, j, i), pack(b, p::velocity(1), k, j, i),
+                      pack(b, p::velocity(2), k, j, i)};
 
   Real gcov4[4][4];
   geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, gcov4);
   const Real W = phoebus::GetLorentzFactor(vel, gcov4);
   const Real ucon = vel[0] - shift[0] * W / lapse;
 
-  return -lapse * gdet * v(b, p::density(), k, j, i) * ucon;
+  return -lapse * gdet * pack(b, p::density(), k, j, i) * ucon;
 }
 
 template <typename Pack, typename Geometry>
