@@ -62,6 +62,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Reductions
   const bool do_mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
   const bool do_hydro = pin->GetBoolean("physics", "hydro");
+  const Real xh = params.Get<Real>("xh");
+  const Real sigma_cutoff = pin->GetOrAddReal("fluid", "sigma_cutoff", 1.0);
   if (params.hasKey("xh") && do_mhd && do_hydro) {
     auto HstSum = parthenon::UserHistoryOperation::sum;
     using History::ReduceJetEnergyFlux;
@@ -71,20 +73,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     using parthenon::HistoryOutputVar;
     parthenon::HstVar_list hst_vars = {};
 
-    auto ReduceAccretionRate = [](MeshData<Real> *md) {
-      return ReduceMassAccretionRate(md);
+    auto ReduceAccretionRate = [xh](MeshData<Real> *md) {
+      return ReduceMassAccretionRate(md, xh);
     };
 
-    auto ComputeJetEnergyFlux = [](MeshData<Real> *md) {
-      return ReduceJetEnergyFlux(md);
+    auto ComputeJetEnergyFlux = [xh, sigma_cutoff](MeshData<Real> *md) {
+      return ReduceJetEnergyFlux(md, xh, sigma_cutoff);
     };
 
-    auto ComputeJetMomentumFlux = [](MeshData<Real> *md) {
-      return ReduceJetMomentumFlux(md);
+    auto ComputeJetMomentumFlux = [xh, sigma_cutoff](MeshData<Real> *md) {
+      return ReduceJetMomentumFlux(md, xh, sigma_cutoff);
     };
 
-    auto ComputeMagneticFluxPhi = [](MeshData<Real> *md) {
-      return ReduceMagneticFluxPhi(md);
+    auto ComputeMagneticFluxPhi = [xh](MeshData<Real> *md) {
+      return ReduceMagneticFluxPhi(md, xh);
     };
 
     hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceAccretionRate, "mdot"));

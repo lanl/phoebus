@@ -39,10 +39,10 @@ using namespace parthenon::package::prelude;
 
 namespace History {
 
-Real ReduceMassAccretionRate(MeshData<Real> *md);
-Real ReduceJetEnergyFlux(MeshData<Real> *md);
-Real ReduceJetMomentumFlux(MeshData<Real> *md);
-Real ReduceMagneticFluxPhi(MeshData<Real> *md);
+Real ReduceMassAccretionRate(MeshData<Real> *md, const Real xh);
+Real ReduceJetEnergyFlux(MeshData<Real> *md, const Real xh, const Real sigma_cutoff);
+Real ReduceJetMomentumFlux(MeshData<Real> *md, const Real xh, const Real sigma_cutoff);
+Real ReduceMagneticFluxPhi(MeshData<Real> *md, const Real xh);
 void ReduceLocalizationFunction(MeshData<Real> *md);
 
 template <typename Reducer_t>

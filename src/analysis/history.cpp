@@ -21,14 +21,10 @@
 
 namespace History {
 
-Real ReduceMassAccretionRate(MeshData<Real> *md) {
+Real ReduceMassAccretionRate(MeshData<Real> *md, const Real xh) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
-
-  Mesh *pmesh = md->GetMeshPointer();
-  auto &pars = pmesh->packages.Get("geometry")->AllParams();
-  const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
   const std::vector<std::string> vars({p::density::name(), p::velocity::name()});
@@ -70,14 +66,10 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
   return result;
 } // mass accretion
 
-Real ReduceJetEnergyFlux(MeshData<Real> *md) {
+Real ReduceJetEnergyFlux(MeshData<Real> *md, const Real xh, const Real sigma_cutoff) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
-
-  Mesh *pmesh = md->GetMeshPointer();
-  auto &pars = pmesh->packages.Get("geometry")->AllParams();
-  const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
   const std::vector<std::string> vars(
@@ -93,8 +85,6 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
   const int pb_hi = imap[p::bfield::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(md);
-
-  const Real sigma_cutoff = pmesh->packages.Get("fluid")->Param<Real>("sigma_cutoff");
 
   Real result = 0.0;
   parthenon::par_reduce(
@@ -130,14 +120,10 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
 
 } // JetEnergyFlux
 
-Real ReduceJetMomentumFlux(MeshData<Real> *md) {
+Real ReduceJetMomentumFlux(MeshData<Real> *md, const Real xh, const Real sigma_cutoff) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
-
-  Mesh *pmesh = md->GetMeshPointer();
-  auto &pars = pmesh->packages.Get("geometry")->AllParams();
-  const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
   const std::vector<std::string> vars(
@@ -153,8 +139,6 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
   const int pb_hi = imap[p::bfield::name()].second;
 
   auto geom = Geometry::GetCoordinateSystem(md);
-
-  const Real sigma_cutoff = pmesh->packages.Get("fluid")->Param<Real>("sigma_cutoff");
 
   Real result = 0.0;
   parthenon::par_reduce(
@@ -190,14 +174,10 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
 
 } // ReduceJetMomentumFlux
 
-Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
+Real ReduceMagneticFluxPhi(MeshData<Real> *md, const Real xh) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
-
-  Mesh *pmesh = md->GetMeshPointer();
-  auto &pars = pmesh->packages.Get("geometry")->AllParams();
-  const Real xh = pars.Get<Real>("xh");
 
   namespace c = fluid_cons;
   const std::vector<std::string> vars({c::bfield::name()});
@@ -235,7 +215,7 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
       },
       result);
   return 0.5 * result; // 0.5 \int detg B^r dx2 dx3
-} // Phi
+} // ReduceMagneticFluxPhi
 
 // SN analysis
 // ReduceLocalizationFunction is not used currently. However this function returns

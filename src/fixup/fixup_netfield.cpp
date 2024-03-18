@@ -40,6 +40,7 @@ TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t, const 
                                         std::vector<Real> *sums) {
   Mesh *pm = md->GetMeshPointer();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
+  const Real xh = pm->packages.Get("geometry")->Param<Real>("xh");
 
   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
 
@@ -50,8 +51,8 @@ TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t, const 
       const Real next_dphi_dt_update_time =
           fix_pkg->Param<Real>("next_dphi_dt_update_time");
       if (t >= next_dphi_dt_update_time && t >= enforced_phi_start_time) {
-        const Real Mdot = History::ReduceMassAccretionRate(md);
-        const Real Phi = History::ReduceMagneticFluxPhi(md);
+        const Real Mdot = History::ReduceMassAccretionRate(md, xh);
+        const Real Phi = History::ReduceMagneticFluxPhi(md, xh);
 
         (*sums)[0] += Mdot;
         (*sums)[1] += Phi;
