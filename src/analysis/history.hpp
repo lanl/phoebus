@@ -44,6 +44,7 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md);
 Real ReduceJetMomentumFlux(MeshData<Real> *md);
 Real ReduceMagneticFluxPhi(MeshData<Real> *md);
 void ReduceLocalizationFunction(MeshData<Real> *md);
+Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain);
 
 template <typename Reducer_t>
 Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
@@ -85,18 +86,20 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
 }
 
 template <typename Varname>
-Real ReduceInGain(MeshData<Real> *md, int idx = 0) {
+Real ReduceInGain(MeshData<Real> *md, bool is_conserved, int idx = 0) {
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
   namespace iv = internal_variables;
   using parthenon::MakePackDescriptor;
+  auto *pmb = md->GetParentPointer();
   Mesh *pmesh = md->GetMeshPointer();
   auto &resolved_pkgs = pmesh->resolved_packages;
   const int ndim = pmesh->ndim;
   static auto desc =
-      MakePackDescriptor<Varname, iv::GcovHeat, iv::GcovCool>(resolved_pkgs.get());
+      MakePackDescriptor<Varname, fluid_prim::entropy, iv::GcovHeat, iv::GcovCool>(
+          resolved_pkgs.get());
   auto v = desc.GetPack(md);
   PARTHENON_REQUIRE_THROWS(v.ContainsHost(0, iv::GcovHeat(), iv::GcovCool()),
                            "Must be doing SN simulation");
@@ -112,11 +115,20 @@ Real ReduceInGain(MeshData<Real> *md, int idx = 0) {
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         Real gdet = geom.DetGamma(CellLocation::Cent, 0, k, j, i);
-        bool is_netheat =
-            (v(b, iv::GcovHeat(), k, j, i) - v(b, iv::GcovCool(), k, j, i) > 0);
+        bool is_netheat = (v(b, iv::GcovHeat(), k, j, i) - v(b, iv::GcovCool(), k, j, i) >
+                           1.e-8); // checks that in the gain region
+        auto analysis = pmb->packages.Get("analysis").get();
+        const Real outside_pns_threshold = analysis->Param<Real>("outside_pns_threshold");
+        bool is_outside_pns = (v(b, fluid_prim::entropy(), k, j, i) >
+                               outside_pns_threshold); // checks that outside PNS
         const auto &coords = v.GetCoordinates(b);
         const Real vol = coords.CellVolume(k, j, i);
-        lresult += gdet * vol * is_netheat * v(b, Varname(idx), k, j, i);
+        if (is_conserved) {
+          lresult += vol * is_netheat * is_outside_pns * v(b, Varname(idx), k, j, i);
+        } else {
+          lresult +=
+              gdet * vol * is_netheat * is_outside_pns * v(b, Varname(idx), k, j, i);
+        }
       },
       Kokkos::Sum<Real>(result));
   return result;

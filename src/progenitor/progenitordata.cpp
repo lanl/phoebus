@@ -116,14 +116,25 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   using parthenon::HistoryOutputVar;
   parthenon::HstVar_list hst_vars = {};
   auto Mgain = [](MeshData<Real> *md) {
-    return ReduceInGain<class fluid_prim::density>(md, 0);
+    return ReduceInGain<class fluid_cons::density>(md, 1, 0);
   };
   auto Qgain = [](MeshData<Real> *md) {
-    return ReduceInGain<class internal_variables::GcovHeat>(md, 0) -
-           ReduceInGain<class internal_variables::GcovCool>(md, 0);
+    return ReduceInGain<class internal_variables::GcovHeat>(md, 0, 0) -
+           ReduceInGain<class internal_variables::GcovCool>(md, 0, 0);
+  };
+  auto Mdot400 = [](MeshData<Real> *md) {
+    Real rc = 0.04;
+    return History::CalculateMdot(md, rc, 0);
+  };
+
+  Real x1max = pin->GetReal("parthenon/mesh", "x1max");
+  auto Mdot_gain = [x1max](MeshData<Real> *md) {
+    return History::CalculateMdot(md, x1max, 1);
   };
   hst_vars.emplace_back(HistoryOutputVar(HstSum, Mgain, "Mgain"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, Qgain, "total net heat"));
+  hst_vars.emplace_back(HistoryOutputVar(HstSum, Mdot400, "Mdot at 400km"));
+  hst_vars.emplace_back(HistoryOutputVar(HstSum, Mdot_gain, "Mdot gain"));
   params.Add(parthenon::hist_param_key, hst_vars);
 
   return progenitor_pkg;
