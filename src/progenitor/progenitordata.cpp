@@ -90,11 +90,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                         2.42e-5); // corresponds to entropy > 3 kb/baryon
   Real inside_pns_threshold = pin->GetOrAddReal("progenitor", "inside_pns_threshold",
                                                 0.008); // corresponds to r < 80 km
+  Real net_heat_threshold = pin->GetOrAddReal("progenitor", "inside_pns_threshold",
+                                              1e-8); // corresponds to r < 80 km
   UnitConversions units(pin);
   Real LengthCGSToCode = units.GetLengthCGSToCode();
-  Real rc = 400e5 * LengthCGSToCode;
   auto mdot_radii = pin->GetOrAddVector("progenitor", "mdot_radii",
-                                        std::vector<Real>{rc}); // default 400km
+                                        std::vector<Real>{400}); // default 400km
 
   // Add Params
   params.Add("mass_density", mass_density);
@@ -123,6 +124,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("outside_pns_threshold", outside_pns_threshold);
   params.Add("inside_pns_threshold", inside_pns_threshold);
+  params.Add("net_heat_threshold", net_heat_threshold);
   params.Add("mdot_radii", mdot_radii);
 
   // Reductions
@@ -140,12 +142,12 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
            ReduceInGain<internal_variables::GcovCool>(md, 0, 0);
   };
   for (auto rc : mdot_radii) {
-    auto Mdot = [rc, LengthCGSToCode](MeshData<Real> *md) {
-      return History::CalculateMdot(md, rc, 0);
+    auto rc_code = rc * 1e5 * LengthCGSToCode;
+    auto Mdot = [rc_code](MeshData<Real> *md) {
+      return History::CalculateMdot(md, rc_code, 0);
     };
-    hst_vars.emplace_back(HistoryOutputVar(
-        HstSum, Mdot,
-        "Mdot at r = " + std::to_string(int(rc / LengthCGSToCode / 1.e5)) + "km"));
+    hst_vars.emplace_back(
+        HistoryOutputVar(HstSum, Mdot, "Mdot at r = " + std::to_string(int(rc)) + "km"));
   }
 
   Real x1max = pin->GetReal("parthenon/mesh", "x1max");
