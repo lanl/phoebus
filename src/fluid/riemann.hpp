@@ -83,7 +83,7 @@ class FluxState {
     const int dir = d - 1;
     Real rho_floor = q(dir, prho, k, j, i);
     Real sie_floor;
-    bounds->GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
+    bounds.GetFloors(g.X[1], g.X[2], g.X[3], rho_floor, sie_floor);
     const Real rho = std::max(q(dir, prho, k, j, i), rho_floor);
     Real vpcon[] = {q(dir, pvel_lo, k, j, i), q(dir, pvel_lo + 1, k, j, i),
                     q(dir, pvel_lo + 2, k, j, i)};
@@ -253,7 +253,7 @@ Real llf(const FluxState &fs, const int d, const int k, const int j, const int i
   CellLocation loc = DirectionToFaceID(d);
   FaceGeom g(fs.coords, fs.geom, loc, d, k, j, i);
   Real gam_max, sie_max;
-  fs.bounds->GetCeilings(g.X[1], g.X[2], g.X[3], gam_max, sie_max);
+  fs.bounds.GetCeilings(g.X[1], g.X[2], g.X[3], gam_max, sie_max);
   fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, sie_max, gam_max);
   fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, sie_max, gam_max);
 
@@ -275,7 +275,7 @@ Real hll(const FluxState &fs, const int d, const int k, const int j, const int i
   CellLocation loc = DirectionToFaceID(d);
   FaceGeom g(fs.coords, fs.geom, loc, d, k, j, i);
   Real gam_max, sie_max;
-  fs.bounds->GetCeilings(g.X[1], g.X[2], g.X[3], gam_max, sie_max);
+  fs.bounds.GetCeilings(g.X[1], g.X[2], g.X[3], gam_max, sie_max);
   fs.prim_to_flux(d, k, j, i, g, fs.ql, vml, vpl, Ul, Fl, sie_max, gam_max);
   fs.prim_to_flux(d, k, j, i, g, fs.qr, vmr, vpr, Ur, Fr, sie_max, gam_max);
 
