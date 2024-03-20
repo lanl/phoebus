@@ -110,6 +110,7 @@ Real ReduceInGain(MeshData<Real> *md, bool is_conserved, int idx = 0) {
   auto geom = Geometry::GetCoordinateSystem(md);
   auto progenitor = pmb->packages.Get("progenitor").get();
   const Real outside_pns_threshold = progenitor->Param<Real>("outside_pns_threshold");
+  const Real net_heat_threshold = progenitor->Param<Real>("net_heat_threshold");
 
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(),
@@ -117,8 +118,9 @@ Real ReduceInGain(MeshData<Real> *md, bool is_conserved, int idx = 0) {
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         Real gdet = geom.DetGamma(CellLocation::Cent, 0, k, j, i);
-        bool is_netheat = (v(b, iv::GcovHeat(), k, j, i) - v(b, iv::GcovCool(), k, j, i) >
-                           1.e-8); // checks that in the gain region
+        bool is_netheat =
+            ((v(b, iv::GcovHeat(), k, j, i) - v(b, iv::GcovCool(), k, j, i)) >
+             net_heat_threshold); // checks that in the gain region
         bool is_outside_pns = (v(b, fluid_prim::entropy(), k, j, i) >
                                outside_pns_threshold); // checks that outside PNS
         const auto &coords = v.GetCoordinates(b);

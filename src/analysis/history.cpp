@@ -309,6 +309,7 @@ Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain) {
   const bool do_gain = pdo_gain_reducer->val;
   auto progenitor = pmb->packages.Get("progenitor").get();
   const Real inside_pns_threshold = progenitor->Param<Real>("inside_pns_threshold");
+  const Real net_heat_threshold = progenitor->Param<Real>("net_heat_threshold");
 
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Calculates mass accretion rate (SN)",
@@ -322,9 +323,9 @@ Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain) {
         Real r = std::sqrt(C[1] * C[1] + C[2] * C[2] + C[3] * C[3]);
         if (r <= rc) {
           if (gain) {
-            bool is_netheat = (v(b, internal_variables::GcovHeat(), k, j, i) -
-                                   v(b, internal_variables::GcovCool(), k, j, i) >
-                               1.e-8); // checks that in the gain region
+            bool is_netheat = ((v(b, internal_variables::GcovHeat(), k, j, i) -
+                                v(b, internal_variables::GcovCool(), k, j, i)) >
+                               net_heat_threshold); // checks that in the gain region
             bool is_inside_pns = (r < inside_pns_threshold); // checks that inside PNS
             if (do_gain && (is_inside_pns || is_netheat)) {
 
