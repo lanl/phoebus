@@ -108,6 +108,8 @@ Real ReduceInGain(MeshData<Real> *md, bool is_conserved, int idx = 0) {
   Real result = 0.0;
 
   auto geom = Geometry::GetCoordinateSystem(md);
+  auto analysis = pmb->packages.Get("analysis").get();
+  const Real outside_pns_threshold = analysis->Param<Real>("outside_pns_threshold");
 
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(),
@@ -117,8 +119,6 @@ Real ReduceInGain(MeshData<Real> *md, bool is_conserved, int idx = 0) {
         Real gdet = geom.DetGamma(CellLocation::Cent, 0, k, j, i);
         bool is_netheat = (v(b, iv::GcovHeat(), k, j, i) - v(b, iv::GcovCool(), k, j, i) >
                            1.e-8); // checks that in the gain region
-        auto analysis = pmb->packages.Get("analysis").get();
-        const Real outside_pns_threshold = analysis->Param<Real>("outside_pns_threshold");
         bool is_outside_pns = (v(b, fluid_prim::entropy(), k, j, i) >
                                outside_pns_threshold); // checks that outside PNS
         const auto &coords = v.GetCoordinates(b);
@@ -132,6 +132,26 @@ Real ReduceInGain(MeshData<Real> *md, bool is_conserved, int idx = 0) {
       },
       Kokkos::Sum<Real>(result));
   return result;
+}
+
+using namespace parthenon::package::prelude;
+template <typename F>
+KOKKOS_INLINE_FUNCTION Real ComputeDivInPillbox(int ndim, int b, int k, int j, int i,
+                                                const parthenon::Coordinates_t &coords,
+                                                const F &f) {
+  Real div_mass_flux_integral;
+  div_mass_flux_integral =
+      (f(b, 1, k, j, i + 1) - f(b, 1, k, j, i)) * coords.FaceArea<X1DIR>(k, j, i);
+
+  if (ndim >= 2) {
+    div_mass_flux_integral +=
+        (f(b, 2, k, j + 1, i) - f(b, 2, k, j, i)) * coords.FaceArea<X2DIR>(k, j, i);
+  }
+  if (ndim >= 3) {
+    div_mass_flux_integral +=
+        (f(b, 3, k + 1, j, i) - f(b, 3, k, j, i)) * coords.FaceArea<X3DIR>(k, j, i);
+  }
+  return div_mass_flux_integral;
 }
 
 } // namespace History

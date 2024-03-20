@@ -1,6 +1,7 @@
 #include <memory>
 #include <vector>
 
+#include "analysis/analysis.hpp"
 #include "analysis/history.hpp"
 #include "ascii_reader.hpp"
 #include "geometry/geometry.hpp"
@@ -109,6 +110,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("Srr_adm_dev", Srr_adm_dev);
 
   // Reductions
+  const Real rc = pin->GetReal("analysis", "radius_cutoff_mdot");
   auto HstSum = parthenon::UserHistoryOperation::sum;
   auto HstMax = parthenon::UserHistoryOperation::max;
   using History::ReduceInGain;
@@ -116,16 +118,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   using parthenon::HistoryOutputVar;
   parthenon::HstVar_list hst_vars = {};
   auto Mgain = [](MeshData<Real> *md) {
-    return ReduceInGain<class fluid_cons::density>(md, 1, 0);
+    return ReduceInGain<fluid_cons::density>(md, 1, 0);
   };
   auto Qgain = [](MeshData<Real> *md) {
-    return ReduceInGain<class internal_variables::GcovHeat>(md, 0, 0) -
-           ReduceInGain<class internal_variables::GcovCool>(md, 0, 0);
+    return ReduceInGain<internal_variables::GcovHeat>(md, 0, 0) -
+           ReduceInGain<internal_variables::GcovCool>(md, 0, 0);
   };
-  auto Mdot400 = [](MeshData<Real> *md) {
-    Real rc = 0.04;
-    return History::CalculateMdot(md, rc, 0);
-  };
+  auto Mdot400 = [rc](MeshData<Real> *md) { return History::CalculateMdot(md, rc, 0); };
 
   Real x1max = pin->GetReal("parthenon/mesh", "x1max");
   auto Mdot_gain = [x1max](MeshData<Real> *md) {
