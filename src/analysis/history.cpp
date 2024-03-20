@@ -280,26 +280,6 @@ void ReduceLocalizationFunction(MeshData<Real> *md) {
 
 } // exp
 
-using namespace parthenon::package::prelude;
-template <typename F>
-KOKKOS_INLINE_FUNCTION Real ComputeDivInPillbox(int ndim, int b, int k, int j, int i,
-                                                const parthenon::Coordinates_t &coords,
-                                                const F &f) {
-  Real div_mass_flux_integral;
-  div_mass_flux_integral =
-      -(f(b, 1, k, j, i + 1) - f(b, 1, k, j, i)) * coords.FaceArea<X1DIR>(k, j, i);
-
-  if (ndim >= 2) {
-    div_mass_flux_integral +=
-        -(f(b, 2, k, j + 1, i) - f(b, 2, k, j, i)) * coords.FaceArea<X2DIR>(k, j, i);
-  }
-  if (ndim >= 3) {
-    div_mass_flux_integral +=
-        -(f(b, 3, k + 1, j, i) - f(b, 3, k, j, i)) * coords.FaceArea<X3DIR>(k, j, i);
-  }
-  return div_mass_flux_integral;
-}
-
 // This function calculates mass accretion rate which I defined as
 // Mdot=Int(dV*d/dx^i{detg*rho*U^i}) where detg is the determinant of four metric, U is
 // four-velocity, and dV=d^3x
@@ -323,10 +303,12 @@ Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain) {
   const int nblocks = v.GetNBlocks();
   auto geom = Geometry::GetCoordinateSystem(md);
   Real result = 0.0;
-  const bool is_monopole_cart =
-      (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
-  const bool is_monopole_sph =
-      (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleSph));
+  auto rad = pmb->packages.Get("radiation").get();
+  const parthenon::AllReduce<bool> *pdo_gain_reducer =
+      rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
+  const bool do_gain = pdo_gain_reducer->val;
+  auto analysis = pmb->packages.Get("analysis").get();
+  const Real inside_pns_threshold = analysis->Param<Real>("inside_pns_threshold");
 
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Calculates mass accretion rate (SN)",
@@ -340,20 +322,13 @@ Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain) {
         Real r = std::sqrt(C[1] * C[1] + C[2] * C[2] + C[3] * C[3]);
         if (r <= rc) {
           if (gain) {
-            auto rad = pmb->packages.Get("radiation").get();
-            const parthenon::AllReduce<bool> *pdo_gain_reducer =
-                rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
-            const bool do_gain = pdo_gain_reducer->val;
             bool is_netheat = (v(b, internal_variables::GcovHeat(), k, j, i) -
                                    v(b, internal_variables::GcovCool(), k, j, i) >
                                1.e-8); // checks that in the gain region
-            auto analysis = pmb->packages.Get("analysis").get();
-            const Real inside_pns_threshold =
-                analysis->Param<Real>("inside_pns_threshold");
             bool is_inside_pns = (r < inside_pns_threshold); // checks that inside PNS
             if (do_gain && (is_inside_pns || is_netheat)) {
 
-              lresult += ComputeDivInPillbox(
+              lresult += -ComputeDivInPillbox(
                   ndim, b, k, j, i, coords, [=](int b, int dir, int k, int j, int i) {
                     return v.flux(b, dir, c::density(), k, j, i);
                   });
@@ -362,10 +337,10 @@ Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain) {
             }
 
           } else {
-            lresult += ComputeDivInPillbox(ndim, b, k, j, i, coords,
-                                           [=](int b, int dir, int k, int j, int i) {
-                                             return v.flux(b, dir, c::density(), k, j, i);
-                                           });
+            lresult += -ComputeDivInPillbox(
+                ndim, b, k, j, i, coords, [=](int b, int dir, int k, int j, int i) {
+                  return v.flux(b, dir, c::density(), k, j, i);
+                });
           }
 
         } else {
