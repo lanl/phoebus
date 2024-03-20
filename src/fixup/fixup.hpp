@@ -290,7 +290,7 @@ class Bounds {
         radiation_floors_(RadiationFloors()), radiation_ceilings_(RadiationCeilings()) {}
 
   template <class... Args>
-  KOKKOS_INLINE_FUNCTION void SetEOSBnds(Args &&...args) {
+  void SetEOSBnds(Args &&...args) {
     floors_.SetEOSBnds(std::forward<Args>(args)...);
   }
 
