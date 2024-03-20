@@ -8,8 +8,8 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
+#include "phoebus_utils/unit_conversions.hpp"
 #include "progenitordata.hpp"
-
 namespace Progenitor {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
@@ -90,8 +90,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                         2.42e-5); // corresponds to entropy > 3 kb/baryon
   Real inside_pns_threshold = pin->GetOrAddReal("progenitor", "inside_pns_threshold",
                                                 0.008); // corresponds to r < 80 km
-  Real radius_cutoff_mdot =
-      pin->GetOrAddReal("progenitor", "radius_cutoff_mdot", 0.04); // default 400km
+  UnitConversions units(pin);
+  Real LengthCGSToCode = units.GetLengthCGSToCode();
+  Real rc = 400e5 * LengthCGSToCode;
+  auto mdot_radii = pin->GetOrAddVector("progenitor", "mdot_radii",
+                                        std::vector<Real>{rc}); // default 400km
 
   // Add Params
   params.Add("mass_density", mass_density);
@@ -120,7 +123,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   params.Add("outside_pns_threshold", outside_pns_threshold);
   params.Add("inside_pns_threshold", inside_pns_threshold);
-  params.Add("radius_cutoff_mdot", radius_cutoff_mdot);
+  params.Add("mdot_radii", mdot_radii);
 
   // Reductions
   auto HstSum = parthenon::UserHistoryOperation::sum;
@@ -136,9 +139,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return ReduceInGain<internal_variables::GcovHeat>(md, 0, 0) -
            ReduceInGain<internal_variables::GcovCool>(md, 0, 0);
   };
-  auto Mdot400 = [radius_cutoff_mdot](MeshData<Real> *md) {
-    return History::CalculateMdot(md, radius_cutoff_mdot, 0);
-  };
+  for (auto rc : mdot_radii) {
+    auto Mdot = [rc, LengthCGSToCode](MeshData<Real> *md) {
+      return History::CalculateMdot(md, rc, 0);
+    };
+    hst_vars.emplace_back(HistoryOutputVar(
+        HstSum, Mdot,
+        "Mdot at r = " + std::to_string(int(rc / LengthCGSToCode / 1.e5)) + "km"));
+  }
 
   Real x1max = pin->GetReal("parthenon/mesh", "x1max");
   auto Mdot_gain = [x1max](MeshData<Real> *md) {
@@ -146,7 +154,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   };
   hst_vars.emplace_back(HistoryOutputVar(HstSum, Mgain, "Mgain"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, Qgain, "total net heat"));
-  hst_vars.emplace_back(HistoryOutputVar(HstSum, Mdot400, "Mdot at 400km"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, Mdot_gain, "Mdot gain"));
   params.Add(parthenon::hist_param_key, hst_vars);
 
