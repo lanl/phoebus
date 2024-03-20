@@ -84,6 +84,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto S_adm_dev = S_adm.getOnDevice();
   auto Srr_adm_dev = Srr_adm.getOnDevice();
 
+  // Post-processing params
+  Real outside_pns_threshold =
+      pin->GetOrAddReal("progenitor", "outside_pns_threshold",
+                        2.42e-5); // corresponds to entropy > 3 kb/baryon
+  Real inside_pns_threshold = pin->GetOrAddReal("progenitor", "inside_pns_threshold",
+                                                0.008); // corresponds to r < 80 km
+  Real radius_cutoff_mdot =
+      pin->GetOrAddReal("progenitor", "radius_cutoff_mdot", 0.04); // default 400km
+
   // Add Params
   params.Add("mass_density", mass_density);
   params.Add("temp", temp);
@@ -109,8 +118,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("S_adm_dev", S_adm_dev);
   params.Add("Srr_adm_dev", Srr_adm_dev);
 
+  params.Add("outside_pns_threshold", outside_pns_threshold);
+  params.Add("inside_pns_threshold", inside_pns_threshold);
+  params.Add("radius_cutoff_mdot", radius_cutoff_mdot);
+
   // Reductions
-  const Real rc = pin->GetReal("analysis", "radius_cutoff_mdot");
   auto HstSum = parthenon::UserHistoryOperation::sum;
   auto HstMax = parthenon::UserHistoryOperation::max;
   using History::ReduceInGain;
@@ -124,7 +136,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     return ReduceInGain<internal_variables::GcovHeat>(md, 0, 0) -
            ReduceInGain<internal_variables::GcovCool>(md, 0, 0);
   };
-  auto Mdot400 = [rc](MeshData<Real> *md) { return History::CalculateMdot(md, rc, 0); };
+  auto Mdot400 = [radius_cutoff_mdot](MeshData<Real> *md) {
+    return History::CalculateMdot(md, radius_cutoff_mdot, 0);
+  };
 
   Real x1max = pin->GetReal("parthenon/mesh", "x1max");
   auto Mdot_gain = [x1max](MeshData<Real> *md) {
