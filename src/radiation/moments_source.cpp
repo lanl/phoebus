@@ -269,7 +269,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
     species_d[s] = species[s];
   }
 
-  Bounds *bounds = fix_pkg->MutableParam<fixup::Bounds>("bounds");
+  Bounds *pbounds = fix_pkg->MutableParam<fixup::Bounds>("bounds");
+  pbounds->SetEOSBnds(eos_pkg);
+  Bounds bounds = *pbounds;
 
   const parthenon::Coordinates_t &coords = pmb->coords;
 
@@ -315,7 +317,7 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
         // Bounds
         Real xi_max;
         Real tau_max;
-        bounds->GetRadiationCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+        bounds.GetRadiationCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
                                     coords.Xc<3>(k, j, i), xi_max, tau_max);
         const Real alpha_max = tau_max / (alpha * dt);
 

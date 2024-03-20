@@ -458,8 +458,9 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
   StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
-  fixup::Bounds *bounds = fix_pkg->MutableParam<fixup::Bounds>("bounds");
-  bounds->SetEOSBnds(eos_pkg);
+  fixup::Bounds *pbounds = fix_pkg->MutableParam<fixup::Bounds>("bounds");
+  pbounds->SetEOSBnds(eos_pkg);
+  fixup::Bounds bounds = *pbounds;
 
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
