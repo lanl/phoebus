@@ -205,7 +205,8 @@ class FluxState {
   const ParArrayND<Real> qr;
   const Geometry::CoordSysMeshBlock geom;
   const Coordinates_t coords;
-  fixup::Bounds *bounds;
+  fixup::Bounds *pbounds;
+  fixup::Bounds bounds;
 
  private:
   const int prho, pvel_lo, peng, pb_lo, pb_hi, pye, prs, gm1;
@@ -216,11 +217,11 @@ class FluxState {
         ql(rc->Get("ql").data), qr(rc->Get("qr").data),
         geom(Geometry::GetCoordinateSystem(rc)),
         coords(rc->GetParentPointer()->coords), // problem for packs
-        bounds(rc->GetParentPointer()
-                   ->packages.Get("fixup")
-                   .get()
-                   ->MutableParam<fixup::Bounds>("bounds")),
-        prho(imap[fluid_prim::density::name()].first),
+        pbounds(rc->GetParentPointer()
+                    ->packages.Get("fixup")
+                    .get()
+                    ->MutableParam<fixup::Bounds>("bounds")),
+        bounds(*pbounds), prho(imap[fluid_prim::density::name()].first),
         pvel_lo(imap[fluid_prim::velocity::name()].first),
         peng(imap[fluid_prim::energy::name()].first),
         pb_lo(imap[fluid_prim::bfield::name()].first),
