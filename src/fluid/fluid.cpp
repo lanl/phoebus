@@ -13,6 +13,7 @@
 
 #include "fluid.hpp"
 
+#include "analysis/analysis.hpp"
 #include "analysis/history.hpp"
 #include "con2prim.hpp"
 #include "con2prim_robust.hpp"
@@ -207,6 +208,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(p::entropy::name(), mprim_scalar);
   physics->AddField(p::cs::name(), mprim_scalar);
   physics->AddField(diag::ratio_divv_cs::name(), mprim_scalar);
+  // physics->AddField(diag::localization_function::name(), mprim_scalar);
+  // (MG) currently not in use, turn on when needed.
   physics->AddField(diag::entropy_z_0::name(), mprim_scalar);
   physics->AddField(p::gamma1::name(), mprim_scalar);
   if (ye) {
@@ -309,6 +312,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   // Reductions
   // By default compute integrated value of scalar conserved vars
   auto HstSum = parthenon::UserHistoryOperation::sum;
+  auto HstMax = parthenon::UserHistoryOperation::max;
+  using History::ReduceInGain;
   using History::ReduceOneVar;
   using parthenon::HistoryOutputVar;
   parthenon::HstVar_list hst_vars = {};
@@ -319,6 +324,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto ReduceEn = [](MeshData<Real> *md) {
     return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::energy::name(), 0);
   };
+  auto MaxDensity = [](MeshData<Real> *md) {
+    return ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::density::name(), 0);
+  };
+
+  hst_vars.emplace_back(HistoryOutputVar(HstMax, MaxDensity, "maximum density"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceMass, "total baryon number"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, ReduceEn, "total conserved energy tau"));
 
@@ -441,6 +451,15 @@ TaskStatus ConservedToPrimitiveRegion(T *rc, const IndexRange &ib, const IndexRa
   auto c2p = pkg->Param<c2p_type<T>>("c2p_func");
   return c2p(rc, ib, jb, kb);
 }
+// JMM: Must specialize function for both potential use cases so we
+// can keep it in this file.
+template TaskStatus ConservedToPrimitiveRegion<MeshData<Real>>(MeshData<Real> *rc,
+                                                               const IndexRange &ib,
+                                                               const IndexRange &jb,
+                                                               const IndexRange &kb);
+template TaskStatus ConservedToPrimitiveRegion<MeshBlockData<Real>>(
+    MeshBlockData<Real> *rc, const IndexRange &ib, const IndexRange &jb,
+    const IndexRange &kb);
 
 template <typename T>
 TaskStatus ConservedToPrimitive(T *rc) {
@@ -499,7 +518,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   auto *pmesh = rc->GetMeshPointer();
 
   StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
-  fixup::Bounds *bounds = fix_pkg->MutableParam<fixup::Bounds>("bounds");
+  fixup::Bounds *pbounds = fix_pkg->MutableParam<fixup::Bounds>("bounds");
 
   StateDescriptor *pkg = pmesh->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
