@@ -84,7 +84,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("d.EOS", eos_device);
     params.Add("h.EOS", eos_host);
 
-    // Can specify rho_min, etc, in <eos> 
+    // Can specify rho_min, etc, in <eos>
     rho_min = pin->GetOrAddReal("eos", "rho_min", 0.0);
     sie_min = pin->GetOrAddReal("eos", "sie_min", 0.0);
     lambda[2] = {0.};

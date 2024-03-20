@@ -48,15 +48,15 @@ class Residual {
   KOKKOS_FUNCTION
   Residual(const Real D, const Real q, const Real bsq, const Real bsq_rpsq,
            const Real rsq, const Real rbsq, const Real v0sq, const Real Ye,
-           const Microphysics::EOS::EOS &eos, const fixup::Bounds *bnds, const Real x1,
+           const Microphysics::EOS::EOS &eos, const fixup::Bounds &bnds, const Real x1,
            const Real x2, const Real x3, const Real floor_scale_fac)
       : D_(D), q_(q), bsq_(bsq), bsq_rpsq_(bsq_rpsq), rsq_(rsq), rbsq_(rbsq), v0sq_(v0sq),
         eos_(eos), bounds_(bnds), x1_(x1), x2_(x2), x3_(x3),
         floor_scale_fac_(floor_scale_fac) {
     lambda_[0] = Ye;
     Real garbage = 0.0;
-    bounds_->GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
-    bounds_->GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
+    bounds_.GetFloors(x1_, x2_, x3_, rho_floor_, garbage);
+    bounds_.GetCeilings(x1_, x2_, x3_, gam_max_, e_max_);
 
     rho_floor_ *= floor_scale_fac_;
   }
@@ -100,7 +100,7 @@ class Residual {
   Real ehat_mu(const Real mu, const Real qbar, const Real rbarsq, const Real vhatsq,
                const Real What) {
     Real rho = rhohat_mu(1.0 / What);
-    bounds_->GetFloors(x1_, x2_, x3_, rho, e_floor_);
+    bounds_.GetFloors(x1_, x2_, x3_, rho, e_floor_);
     e_floor_ *= floor_scale_fac_;
     const Real ehat_trial =
         What * (qbar - mu * rbarsq) + vhatsq * What * What / (1.0 + What);
@@ -164,7 +164,7 @@ class Residual {
  private:
   const Real D_, q_, bsq_, bsq_rpsq_, rsq_, rbsq_, v0sq_;
   const Microphysics::EOS::EOS &eos_;
-  const fixup::Bounds *bounds_;
+  const fixup::Bounds bounds_;
   const Real x1_, x2_, x3_;
   const Real floor_scale_fac_;
   Real lambda_[2];
@@ -224,7 +224,7 @@ struct CellGeom {
 template <typename Data_t, typename T>
 class ConToPrim {
  public:
-  ConToPrim(Data_t *rc, fixup::Bounds *bnds, const Real tol, const int max_iterations,
+  ConToPrim(Data_t *rc, fixup::Bounds bnds, const Real tol, const int max_iterations,
             const Real floor_scale_fac, const bool fail_on_floors,
             const bool fail_on_ceilings)
       : bounds(bnds), var(rc->PackVariables(Vars(), imap)),
@@ -278,7 +278,7 @@ class ConToPrim {
   int NumBlocks() { return var.GetDim(5); }
 
  private:
-  fixup::Bounds *bounds;
+  fixup::Bounds bounds;
   PackIndexMap imap;
   const T var;
   const int prho, crho;
@@ -306,11 +306,11 @@ class ConToPrim {
 
     Real rhoflr = 0.0;
     Real epsflr;
-    bounds->GetFloors(x1, x2, x3, rhoflr, epsflr);
+    bounds.GetFloors(x1, x2, x3, rhoflr, epsflr);
     rhoflr *= floor_scale_fac_;
     epsflr *= floor_scale_fac_;
     Real gam_max, eps_max;
-    bounds->GetCeilings(x1, x2, x3, gam_max, eps_max);
+    bounds.GetCeilings(x1, x2, x3, gam_max, eps_max);
 
     const Real D = v(crho) * igdet;
 #if USE_VALENCIA
@@ -456,7 +456,7 @@ class ConToPrim {
 using C2P_Block_t = ConToPrim<MeshBlockData<Real>, VariablePack<Real>>;
 using C2P_Mesh_t = ConToPrim<MeshData<Real>, MeshBlockPack<Real>>;
 
-inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, fixup::Bounds *bounds,
+inline C2P_Block_t ConToPrimSetup(MeshBlockData<Real> *rc, fixup::Bounds bounds,
                                   const Real tol, const int max_iter,
                                   const Real c2p_floor_scale_fac,
                                   const bool fail_on_floors,
