@@ -307,8 +307,8 @@ Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain) {
   const parthenon::AllReduce<bool> *pdo_gain_reducer =
       rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
   const bool do_gain = pdo_gain_reducer->val;
-  auto analysis = pmb->packages.Get("analysis").get();
-  const Real inside_pns_threshold = analysis->Param<Real>("inside_pns_threshold");
+  auto progenitor = pmb->packages.Get("progenitor").get();
+  const Real inside_pns_threshold = progenitor->Param<Real>("inside_pns_threshold");
 
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Calculates mass accretion rate (SN)",

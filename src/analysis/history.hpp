@@ -108,8 +108,8 @@ Real ReduceInGain(MeshData<Real> *md, bool is_conserved, int idx = 0) {
   Real result = 0.0;
 
   auto geom = Geometry::GetCoordinateSystem(md);
-  auto analysis = pmb->packages.Get("analysis").get();
-  const Real outside_pns_threshold = analysis->Param<Real>("outside_pns_threshold");
+  auto progenitor = pmb->packages.Get("progenitor").get();
+  const Real outside_pns_threshold = progenitor->Param<Real>("outside_pns_threshold");
 
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(),
