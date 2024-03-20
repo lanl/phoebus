@@ -155,7 +155,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
   auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-  Bounds *bounds = fix_pkg->MutableParam<Bounds>("bounds");
+  Bounds *pbounds = fix_pkg->MutableParam<Bounds>("bounds");
+  Bounds bounds = *pbounds;
 
   Coordinates_t coords = rc->GetParentPointer()->coords;
 
@@ -176,8 +177,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
         eos_lambda[1] = std::log10(v(b, tmp, k, j, i));
 
         Real gamma_max, e_max;
-        bounds->GetCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
-                            coords.Xc<3>(k, j, i), gamma_max, e_max);
+        bounds.GetCeilings(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
+                           coords.Xc<3>(k, j, i), gamma_max, e_max);
 
         if (c2p_failure_force_fixup_both && rad_active) {
           if (v(b, ifail, k, j, i) == con2prim_robust::FailFlags::fail ||
