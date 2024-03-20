@@ -1049,6 +1049,8 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
+  auto analysis = pmb->packages.Get("analysis").get();
+  const Real sigma = analysis->Param<Real>("sigma");
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "UserWorkBeforeOutput::H5", DevExecSpace(), kb.s, kb.e, jb.s,
       jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -1071,9 +1073,7 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
         Real gam1[3][3];
         Real gam2[3][3];
         Real gam3[3][3];
-        auto analysis = pmb->packages.Get("analysis").get();
         const Real z = coords.Xc<3>(k, j, i);
-        const Real sigma = analysis->Param<Real>("sigma");
         const Real pi = 3.14;
         const Real s0 =
             s * std::exp(-z * z / sigma / sigma) / std::sqrt(pi) / sigma; // sigma > 0
