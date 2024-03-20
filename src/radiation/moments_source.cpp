@@ -269,7 +269,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
     species_d[s] = species[s];
   }
 
-  auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
+  Bounds *pbounds = fix_pkg->MutableParam<fixup::Bounds>("bounds");
+  pbounds->SetEOSBnds(eos_pkg);
+  Bounds bounds = *pbounds;
 
   const parthenon::Coordinates_t &coords = pmb->coords;
 
