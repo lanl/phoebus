@@ -196,23 +196,14 @@ class Ceilings {
   KOKKOS_INLINE_FUNCTION
   void GetCeilings(const Real x1, const Real x2, const Real x3, Real &gmax,
                    Real &smax) const {
-    if (!eos_bnds_set_) {
-      PARTHENON_FAIL("EOS bounds not set in ceilings.");
-    }
+
     switch (ceiling_flag_) {
     case 1:
       gmax = g0_;
-      smax = std::min(s0_, sie_max_eos_);
+      smax = s0_;
       break;
     default:
       PARTHENON_FAIL("No valid ceiling set.");
-    }
-  }
-
-  void SetEOSBnds(StateDescriptor *eos_pkg) {
-    if (!eos_bnds_set_) {
-      sie_max_eos_ = eos_pkg->Param<Real>("sie_max");
-      eos_bnds_set_ = true;
     }
   }
 
@@ -301,7 +292,6 @@ class Bounds {
   template <class... Args>
   KOKKOS_INLINE_FUNCTION void SetEOSBnds(Args &&...args) {
     floors_.SetEOSBnds(std::forward<Args>(args)...);
-    ceilings_.SetEOSBnds(std::forward<Args>(args)...);
   }
 
   template <class... Args>
