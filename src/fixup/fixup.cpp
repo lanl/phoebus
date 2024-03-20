@@ -49,6 +49,7 @@ namespace fixup {
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto fix = std::make_shared<StateDescriptor>("fixup");
   Params &params = fix->AllParams();
+  auto mutable_param = parthenon::Params::Mutability::Mutable;
 
   const bool enable_mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
   const bool enable_rad = pin->GetOrAddBoolean("physics", "rad", false);
@@ -273,7 +274,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
              Bounds(params.Get<Floors>("floor"), params.Get<Ceilings>("ceiling"),
                     params.Get<MHDCeilings>("mhd_ceiling"),
                     params.Get<RadiationFloors>("rad_floor"),
-                    params.Get<RadiationCeilings>("rad_ceiling")));
+                    params.Get<RadiationCeilings>("rad_ceiling")),
+             mutable_param);
 
   return fix;
 }
@@ -306,6 +308,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   bool enable_rad_floors = fix_pkg->Param<bool>("enable_rad_floors");
 
   if (!enable_floors) return TaskStatus::complete;
+
+  const Real ye_min = eos_pkg->Param<Real>("ye_min");
+  const Real ye_max = eos_pkg->Param<Real>("ye_max");
 
   const std::vector<std::string> vars(
       {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
@@ -344,7 +349,13 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
   auto eos = eos_pkg->Param<EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto bounds = fix_pkg->Param<Bounds>("bounds");
+  Bounds *pbounds = fix_pkg->MutableParam<Bounds>("bounds");
+
+  // BLB: Setting EOS bnds for Ceilings/Floors here.
+  pbounds->SetEOSBnds(eos_pkg);
+
+  // copy bounds by value for kernel
+  Bounds bounds = *pbounds;
 
   const Real c2p_tol = fluid_pkg->Param<Real>("c2p_tol");
   const int c2p_max_iter = fluid_pkg->Param<int>("c2p_max_iter");
@@ -437,16 +448,18 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
         if (floor_applied) {
           Real vp_normalobs[3] = {0}; // Inject floors at rest in normal observer frame
-          Real ye_prim_default = 0.5;
-          eos_lambda[0] = ye_prim_default;
+          Real ye = 0.5;
+          if (pye > 0) {
+            ye = v(b, cye, k, j, i);
+          }
+          eos_lambda[0] = ye;
           Real dprs =
               eos.PressureFromDensityInternalEnergy(drho, ratio(du, drho), eos_lambda);
           Real dgm1 = ratio(
               eos.BulkModulusFromDensityInternalEnergy(drho, ratio(du, drho), eos_lambda),
               dprs);
-          prim2con::p2c(drho, vp_normalobs, bp, du, ye_prim_default, dprs, dgm1, gcov,
-                        gammacon, betacon, alpha, sdetgam, dcrho, dS, dBcons, dtau,
-                        dyecons);
+          prim2con::p2c(drho, vp_normalobs, bp, du, ye, dprs, dgm1, gcov, gammacon,
+                        betacon, alpha, sdetgam, dcrho, dS, dBcons, dtau, dyecons);
 
           // Update cons vars (not B field)
           v(b, crho, k, j, i) += dcrho;
@@ -464,7 +477,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = vp_normalobs[ii]; }
             v(b, peng, k, j, i) = du;
             if (pye > 0) {
-              v(b, pye, k, j, i) = ye_prim_default;
+              v(b, pye, k, j, i) = ye_min;
             }
 
             // Update auxiliary primitives
@@ -476,9 +489,9 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                 eos_lambda);
 
             // Update cons vars (not B field)
-            prim2con::p2c(drho, vp_normalobs, bp, du, ye_prim_default, dprs, dgm1, gcov,
-                          gammacon, betacon, alpha, sdetgam, v(b, crho, k, j, i), dS,
-                          dBcons, v(b, ceng, k, j, i), dyecons);
+            prim2con::p2c(drho, vp_normalobs, bp, du, ye, dprs, dgm1, gcov, gammacon,
+                          betacon, alpha, sdetgam, v(b, crho, k, j, i), dS, dBcons,
+                          v(b, ceng, k, j, i), dyecons);
             SPACELOOP(ii) { v(b, cmom_lo + ii, k, j, i) = dS[ii]; }
             if (pye > 0) {
               v(b, cye, k, j, i) = dyecons;

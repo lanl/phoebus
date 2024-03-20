@@ -155,7 +155,8 @@ TaskStatus ConservedToPrimitiveFixupImpl(T *rc) {
 
   auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto bounds = fix_pkg->Param<Bounds>("bounds");
+  Bounds *pbounds = fix_pkg->MutableParam<Bounds>("bounds");
+  Bounds bounds = *pbounds;
 
   Coordinates_t coords = rc->GetParentPointer()->coords;
 

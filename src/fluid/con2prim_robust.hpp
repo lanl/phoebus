@@ -164,7 +164,7 @@ class Residual {
  private:
   const Real D_, q_, bsq_, bsq_rpsq_, rsq_, rbsq_, v0sq_;
   const Microphysics::EOS::EOS &eos_;
-  const fixup::Bounds &bounds_;
+  const fixup::Bounds bounds_;
   const Real x1_, x2_, x3_;
   const Real floor_scale_fac_;
   Real lambda_[2];

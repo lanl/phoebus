@@ -63,6 +63,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real rho_max;
   Real sie_max;
   Real T_max;
+  Real ye_min;
+  Real ye_max;
 
   std::string eos_type = pin->GetString(block_name, std::string("type"));
   params.Add("type", eos_type);
@@ -82,13 +84,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("d.EOS", eos_device);
     params.Add("h.EOS", eos_host);
 
-    rho_min = pin->GetOrAddReal("fixup", "rho0_floor", 0.0);
-    sie_min = pin->GetOrAddReal("fixup", "sie0_floor", 0.0);
+    // Can specify rho_min, etc, in <eos>
+    rho_min = pin->GetOrAddReal("eos", "rho_min", 0.0);
+    sie_min = pin->GetOrAddReal("eos", "sie_min", 0.0);
     lambda[2] = {0.};
     T_min = eos_host.TemperatureFromDensityInternalEnergy(rho_min, sie_min, lambda);
-    rho_max = pin->GetOrAddReal("fixup", "rho0_ceiling", 1e18);
-    sie_max = pin->GetOrAddReal("fixup", "sie0_ceiling", 1e35);
+    rho_max = pin->GetOrAddReal("eos", "rho_max", 1e18);
+    sie_max = pin->GetOrAddReal("eos", "sie_max", 1e35);
     T_max = eos_host.TemperatureFromDensityInternalEnergy(rho_max, sie_max, lambda);
+    ye_min = 0.01;
+    ye_max = 1.0;
 #ifdef SPINER_USE_HDF
   } else if (eos_type == StellarCollapse::EosType()) {
     // We request that Ye and temperature exist, but do not provide them.
@@ -148,6 +153,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     T_max = eos_sc.TMax() / T_unit;
     rho_min = eos_sc.rhoMin() / rho_unit;
     rho_max = eos_sc.rhoMax() / rho_unit;
+    ye_min = eos_sc.YeMin();
+    ye_max = eos_sc.YeMax();
 #endif
   } else {
     std::stringstream error_mesg;
@@ -169,6 +176,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("T_max", T_max);
   params.Add("rho_min", rho_min);
   params.Add("rho_max", rho_max);
+  params.Add("ye_min", ye_min);
+  params.Add("ye_max", ye_max);
 
   return pkg;
 }

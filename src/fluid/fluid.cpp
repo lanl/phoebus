@@ -476,7 +476,10 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
   auto *pmb = rc->GetParentPointer();
 
   StateDescriptor *fix_pkg = pmb->packages.Get("fixup").get();
-  auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
+  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
+  fixup::Bounds *pbounds = fix_pkg->MutableParam<fixup::Bounds>("bounds");
+  pbounds->SetEOSBnds(eos_pkg);
+  fixup::Bounds bounds = *pbounds;
 
   StateDescriptor *pkg = pmb->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
@@ -488,7 +491,6 @@ TaskStatus ConservedToPrimitiveRobust(T *rc, const IndexRange &ib, const IndexRa
                                                 c2p_floor_scale_fac, c2p_fail_on_floors,
                                                 c2p_fail_on_ceilings);
 
-  StateDescriptor *eos_pkg = pmb->packages.Get("eos").get();
   auto eos = eos_pkg->Param<Microphysics::EOS::EOS>("d.EOS");
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto coords = pmb->coords;
@@ -516,7 +518,7 @@ TaskStatus ConservedToPrimitiveClassic(T *rc, const IndexRange &ib, const IndexR
   auto *pmesh = rc->GetMeshPointer();
 
   StateDescriptor *fix_pkg = pmesh->packages.Get("fixup").get();
-  auto bounds = fix_pkg->Param<fixup::Bounds>("bounds");
+  fixup::Bounds *pbounds = fix_pkg->MutableParam<fixup::Bounds>("bounds");
 
   StateDescriptor *pkg = pmesh->packages.Get("fluid").get();
   const Real c2p_tol = pkg->Param<Real>("c2p_tol");
