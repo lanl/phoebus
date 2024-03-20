@@ -208,9 +208,8 @@ class Ceilings {
   }
 
  private:
-  Real g0_, s0_, sie_max_eos_;
+  Real g0_, s0_;
   const int ceiling_flag_;
-  bool eos_bnds_set_;
 };
 
 static struct ConstantBsqRatCeiling {
