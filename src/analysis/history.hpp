@@ -123,6 +123,10 @@ Real ReduceInGain(MeshData<Real> *md, bool is_conserved, int idx = 0) {
              net_heat_threshold); // checks that in the gain region
         bool is_outside_pns = (v(b, fluid_prim::entropy(), k, j, i) >
                                outside_pns_threshold); // checks that outside PNS
+        std::cout << "is_outside_pns=" << is_outside_pns
+                  << "outside_pns_threshold=" << outside_pns_threshold << std::endl;
+        std::cout << "is_netheat=" << is_netheat
+                  << "net_heat_threshold=" << net_heat_threshold << std::endl;
         const auto &coords = v.GetCoordinates(b);
         const Real vol = coords.CellVolume(k, j, i);
         if (is_conserved) {
