@@ -18,6 +18,7 @@
 #include "history_utils.hpp"
 #include "phoebus_utils/relativity_utils.hpp"
 #include <interface/sparse_pack.hpp>
+#include <parthenon/package.hpp>
 
 namespace History {
 
@@ -278,5 +279,77 @@ void ReduceLocalizationFunction(MeshData<Real> *md) {
       });
 
 } // exp
+
+// This function calculates mass accretion rate which I defined as
+// Mdot=Int(dV*d/dx^i{detg*rho*U^i}) where detg is the determinant of four metric, U is
+// four-velocity, and dV=d^3x
+
+Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain) {
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+  namespace c = fluid_cons;
+  using parthenon::MakePackDescriptor;
+  auto *pmb = md->GetParentPointer();
+  Mesh *pmesh = md->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
+  using parthenon::PDOpt;
+  static auto desc = MakePackDescriptor<c::density, internal_variables::GcovHeat,
+                                        internal_variables::GcovCool>(
+      resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+  auto v = desc.GetPack(md);
+
+  const int nblocks = v.GetNBlocks();
+  auto geom = Geometry::GetCoordinateSystem(md);
+  Real result = 0.0;
+  auto rad = pmb->packages.Get("radiation").get();
+  const parthenon::AllReduce<bool> *pdo_gain_reducer =
+      rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
+  const bool do_gain = pdo_gain_reducer->val;
+  auto progenitor = pmb->packages.Get("progenitor").get();
+  const Real inside_pns_threshold = progenitor->Param<Real>("inside_pns_threshold");
+  const Real net_heat_threshold = progenitor->Param<Real>("net_heat_threshold");
+
+  parthenon::par_reduce(
+      parthenon::LoopPatternMDRange(), "Calculates mass accretion rate (SN)",
+      DevExecSpace(), 0, nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
+        const auto &coords = v.GetCoordinates(b);
+        const Real vol = coords.CellVolume(k, j, i);
+
+        Real C[NDFULL];
+        geom.Coords(CellLocation::Cent, b, k, j, i, C);
+        Real r = std::sqrt(C[1] * C[1] + C[2] * C[2] + C[3] * C[3]);
+        if (r <= rc) {
+          if (gain) {
+            bool is_netheat = ((v(b, internal_variables::GcovHeat(), k, j, i) -
+                                v(b, internal_variables::GcovCool(), k, j, i)) >
+                               net_heat_threshold); // checks that in the gain region
+            bool is_inside_pns = (r < inside_pns_threshold); // checks that inside PNS
+            if (do_gain && (is_inside_pns || is_netheat)) {
+
+              lresult += -ComputeDivInPillbox(
+                  ndim, b, k, j, i, coords, [=](int b, int dir, int k, int j, int i) {
+                    return v.flux(b, dir, c::density(), k, j, i);
+                  });
+            } else {
+              lresult += 0;
+            }
+
+          } else {
+            lresult += -ComputeDivInPillbox(
+                ndim, b, k, j, i, coords, [=](int b, int dir, int k, int j, int i) {
+                  return v.flux(b, dir, c::density(), k, j, i);
+                });
+          }
+
+        } else {
+          lresult += 0.0;
+        }
+      },
+      Kokkos::Sum<Real>(result));
+  return result;
+} // mdot
 
 } // namespace History
