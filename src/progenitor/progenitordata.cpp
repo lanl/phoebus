@@ -90,7 +90,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                         2.42e-5); // corresponds to entropy > 3 kb/baryon
   Real inside_pns_threshold = pin->GetOrAddReal("progenitor", "inside_pns_threshold",
                                                 0.008); // corresponds to r < 80 km
-  Real net_heat_threshold = pin->GetOrAddReal("progenitor", "inside_pns_threshold",
+  Real net_heat_threshold = pin->GetOrAddReal("progenitor", "net_heat_threshold",
                                               1e-8); // corresponds to r < 80 km
   UnitConversions units(pin);
   Real LengthCGSToCode = units.GetLengthCGSToCode();
