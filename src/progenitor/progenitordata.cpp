@@ -1,14 +1,15 @@
 #include <memory>
 #include <vector>
 
+#include "analysis/analysis.hpp"
 #include "analysis/history.hpp"
 #include "ascii_reader.hpp"
 #include "geometry/geometry.hpp"
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
+#include "phoebus_utils/unit_conversions.hpp"
 #include "progenitordata.hpp"
-
 namespace Progenitor {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
@@ -83,6 +84,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto S_adm_dev = S_adm.getOnDevice();
   auto Srr_adm_dev = Srr_adm.getOnDevice();
 
+  // Post-processing params
+  Real outside_pns_threshold =
+      pin->GetOrAddReal("progenitor", "outside_pns_threshold",
+                        2.42e-5); // corresponds to entropy > 3 kb/baryon
+  Real inside_pns_threshold = pin->GetOrAddReal("progenitor", "inside_pns_threshold",
+                                                0.008); // corresponds to r < 80 km
+  Real net_heat_threshold = pin->GetOrAddReal("progenitor", "net_heat_threshold",
+                                              1e-8); // corresponds to r < 80 km
+  UnitConversions units(pin);
+  Real LengthCGSToCode = units.GetLengthCGSToCode();
+  auto mdot_radii = pin->GetOrAddVector("progenitor", "mdot_radii",
+                                        std::vector<Real>{400}); // default 400km
+
   // Add Params
   params.Add("mass_density", mass_density);
   params.Add("temp", temp);
@@ -108,6 +122,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("S_adm_dev", S_adm_dev);
   params.Add("Srr_adm_dev", Srr_adm_dev);
 
+  params.Add("outside_pns_threshold", outside_pns_threshold);
+  params.Add("inside_pns_threshold", inside_pns_threshold);
+  params.Add("net_heat_threshold", net_heat_threshold);
+  params.Add("mdot_radii", mdot_radii);
+
   // Reductions
   auto HstSum = parthenon::UserHistoryOperation::sum;
   auto HstMax = parthenon::UserHistoryOperation::max;
@@ -116,14 +135,28 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   using parthenon::HistoryOutputVar;
   parthenon::HstVar_list hst_vars = {};
   auto Mgain = [](MeshData<Real> *md) {
-    return ReduceInGain<class fluid_prim::density>(md, 0);
+    return ReduceInGain<fluid_cons::density>(md, 1, 0);
   };
   auto Qgain = [](MeshData<Real> *md) {
-    return ReduceInGain<class internal_variables::GcovHeat>(md, 0) -
-           ReduceInGain<class internal_variables::GcovCool>(md, 0);
+    return ReduceInGain<internal_variables::GcovHeat>(md, 0, 0) -
+           ReduceInGain<internal_variables::GcovCool>(md, 0, 0);
+  };
+  for (auto rc : mdot_radii) {
+    auto rc_code = rc * 1e5 * LengthCGSToCode;
+    auto Mdot = [rc_code](MeshData<Real> *md) {
+      return History::CalculateMdot(md, rc_code, 0);
+    };
+    hst_vars.emplace_back(
+        HistoryOutputVar(HstSum, Mdot, "Mdot at r = " + std::to_string(int(rc)) + "km"));
+  }
+
+  Real x1max = pin->GetReal("parthenon/mesh", "x1max");
+  auto Mdot_gain = [x1max](MeshData<Real> *md) {
+    return History::CalculateMdot(md, x1max, 1);
   };
   hst_vars.emplace_back(HistoryOutputVar(HstSum, Mgain, "Mgain"));
   hst_vars.emplace_back(HistoryOutputVar(HstSum, Qgain, "total net heat"));
+  hst_vars.emplace_back(HistoryOutputVar(HstSum, Mdot_gain, "Mdot gain"));
   params.Add(parthenon::hist_param_key, hst_vars);
 
   return progenitor_pkg;
