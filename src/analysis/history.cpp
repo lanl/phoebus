@@ -318,7 +318,7 @@ Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain) {
         const auto &coords = v.GetCoordinates(b);
         const Real vol = coords.CellVolume(k, j, i);
 
-        Real C[NDFULL];
+        Real C[Geometry::NDFULL];
         geom.Coords(CellLocation::Cent, b, k, j, i, C);
         Real r = std::sqrt(C[1] * C[1] + C[2] * C[2] + C[3] * C[3]);
         if (r <= rc) {

@@ -12,6 +12,7 @@
 // publicly, and to permit others to do so.
 
 #include "geometry/geometry.hpp"
+#include "geometry/geometry_utils.hpp"
 #include "light_bulb_constants.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "radiation.hpp"
@@ -193,7 +194,9 @@ TaskStatus CoolingFunctionCalculateFourForce(MeshData<Real> *rc, const double dt
         nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
           auto &coords = v.GetCoordinates(b);
-          const Real r = std::abs(coords.Xc<1>(k, j, i));
+          Real A[Geometry::NDFULL];
+          geom.Coords(CellLocation::Cent, b, k, j, i, A);
+          Real r = std::sqrt(A[1] * A[1] + A[2] * A[2] + A[3] * A[3]);
           const Real rho =
               v(b, p::density(), k, j, i) * density_conversion_factor; // Density in CGS
           const Real cdensity = v(b, c::density(), k, j, i); // conserved density
