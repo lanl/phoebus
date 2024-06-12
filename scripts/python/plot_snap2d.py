@@ -70,7 +70,6 @@ def plot_dump(
     coordname = "g.n.coord"
     coord = data.Get(coordname, False)
     z = coord[:, 3, :, nG - 1 : -1 - nG, nG - 1 : -1 - nG]
-    print(np.shape(z))
     y = coord[:, 2, :, nG - 1 : -1 - nG, nG - 1 : -1 - nG]
     x = coord[:, 1, :, nG - 1 : -1 - nG, nG - 1 : -1 - nG]
 
