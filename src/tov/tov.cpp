@@ -190,7 +190,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     }
     //--DEBUG
     Real rhoadm = rho*(1+eps);
-    OutFile << r << ", " << rhoadm << std::endl;
+    OutFile << r << ", " << rho << ", " << eps << std::endl;
     //--DEBUG
     intrinsic_h(TOV::RHO0, i) = rho;
     intrinsic_h(TOV::EPS, i) = eps;
