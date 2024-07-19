@@ -171,8 +171,8 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   }
 
   //--DEBUG
-  std::ofstream OutFile("test.txt");
-  OutFile << "npoints =" << npoints << std::endl;
+  std::ofstream OutFile("tovintegrate.txt");
+  OutFile << "r, rho, eps, phi" << npoints << std::endl;
   //--DEBUG
   // second loop, to set density, specific energy, and matter state
   for (int i = 0; i < npoints; ++i) {
@@ -181,6 +181,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     Real rho, eps;
     //--DEBUG
     Real r = radius.x(i);
+    Real phi = state_h(TOV::PHI,i);
     //--DEBUG
     // needed for analytic solution. Bad for actual code.
     if (press <= 1.1 * Pmin) {
@@ -190,7 +191,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     }
     //--DEBUG
     Real rhoadm = rho*(1+eps);
-    OutFile << r << ", " << rho << ", " << eps << std::endl;
+    OutFile << r << ", " << rho << ", " << eps << ", " << phi << std::endl;
     //--DEBUG
     intrinsic_h(TOV::RHO0, i) = rho;
     intrinsic_h(TOV::EPS, i) = eps;
