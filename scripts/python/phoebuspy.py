@@ -7,6 +7,10 @@ from glob import glob
 class Dump1D:
     def __init__(self, filename):
         with h5py.File(filename, "r") as f:
+            #print(f.keys())
+            #print(f["Params"].attrs.keys())
+            #print(np.shape(f["Params"].attrs["monopole_gr/lapse_h"]))
+            #exit()
             self.varkeys = list(f.keys())[8:]
             #print(f["Locations"].keys())
             self.t = f["Info"].attrs["Time"]
@@ -24,7 +28,11 @@ class Dump1D:
             self.var = {}
             for key in self.varkeys:
                 self.var[key] = f[key][0,0,0,:]
-                
+
+            try:
+                self.var['monopole_gr/lapse_h'] = f["Params"].attrs['monopole_gr/lapse_h']
+            except:
+                pass
         return
 
 def Movie1D(data,varname='p.density',anax=None,anay=None,ylim=None,xlim=None):
