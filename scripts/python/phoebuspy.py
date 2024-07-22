@@ -9,7 +9,7 @@ class Dump1D:
         with h5py.File(filename, "r") as f:
             #print(f.keys())
             #print(f["Params"].attrs.keys())
-            #print(np.shape(f["Params"].attrs["monopole_gr/lapse_h"]))
+            #print(np.shape(f["Params"].attrs["monopole_gr/hypersurface_h"]))
             #exit()
             self.varkeys = list(f.keys())[8:]
             #print(f["Locations"].keys())
@@ -31,6 +31,12 @@ class Dump1D:
 
             try:
                 self.var['monopole_gr/lapse_h'] = f["Params"].attrs['monopole_gr/lapse_h']
+                self.var['monopole_gr/hypersurface_h']=f["Params"].attrs["monopole_gr/hypersurface_h"]
+
+                nxgr = np.size(self.var['monopole_gr/lapse_h'])
+                rout = f["Params"].attrs['monopole_gr/rout']
+                rin = f["Params"].attrs['monopole_gr/rin']
+                self.var['monopole_gr/radius'] = np.linspace(rin,rout,num=nxgr)
             except:
                 pass
         return
