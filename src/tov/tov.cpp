@@ -104,7 +104,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 }
 
 TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
-                        StateDescriptor *eospkg) {
+                        StateDescriptor *eospkg, ParameterInput *pin) {
   PARTHENON_REQUIRE_THROWS(tovpkg->label() == "tov", "Requires the tov package");
   PARTHENON_REQUIRE_THROWS(monopolepkg->label() == "monopole_gr",
                            "Requires the monopole_gr package");
@@ -129,14 +129,54 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   auto intrinsic_h = params.Get<TOV::State_host_t>("tov_intrinsic_h");
 
   // Currently only works with ideal gas.
+  using Microphysics::EOS::EOS;
   auto pc = params.Get<Real>("pc");
   auto s = params.Get<Real>("entropy");
   auto Pmin = params.Get<Real>("pmin");
-  auto gm1 = eospkg->Param<Real>("gm1");
-  const Real Gamma = gm1 + 1;
-  const Real K = PolytropeK(s, Gamma);
-  const Real dr = radius.dx();
+  auto eos_type = eospkg->Param<std::string>("type");
+  auto eos = eospkg->Param<EOS>("d.EOS");
+  auto eos_h = eospkg->Param<EOS>("h.EOS");
+  const int nsamps = pin->GetOrAddReal("eos", "nsamps_adiabat", 1);
+  //  auto unit_conv = phoebus::UnitConversions(pin);
+  
+  //const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
+  
+  
+  Real Gamma;
+  Real K;
 
+
+  /*  Real Ye;
+  using DataBox = Spiner::DataBox<Real>;
+  DataBox rho_h(nsamps);
+  DataBox temp_h(nsamps);
+  */
+  const Real dr = radius.dx();
+  if (eos_type == "IdealGas"){
+    auto gm1 = eospkg->Param<Real>("gm1");
+    Gamma = gm1 + 1;
+    K = PolytropeK(s, Gamma);
+  } 
+  /*else if (eos_type == "StellarCollapse"){
+    std::cout<<"entering in stellarcollapse"<<std::endl;
+    
+    Ye = 0.5;
+    const Real rho_min = eospkg->Param<Real>("rho_min");
+    const Real rho_max = eospkg->Param<Real>("rho_max");
+    const Real lrho_min = std::log10(rho_min);
+    const Real lrho_max = std::log10(rho_max);
+    const Real T_min = eospkg->Param<Real>("T_min");
+    const Real T_max = eospkg->Param<Real>("T_max");
+    Real lrho_min_adiabat, lrho_max_adiabat;
+    Adiabats::GetRhoBounds(eos_h, rho_min, rho_max, T_min, T_max, Ye, s, lrho_min_adiabat,
+                           lrho_max_adiabat);
+    Adiabats::SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
+    Adiabats::ComputeAdiabats(rho_h, temp_h, eos_h, Ye, s, T_min, T_max, nsamps);
+  }
+  
+  auto rho_d = rho_h.getOnDevice();
+  auto temp_d = temp_h.getOnDevice();
+  */
   state_h(TOV::M, 0) = 0;
   state_h(TOV::P, 0) = pc;
   state_h(TOV::PHI, 0) = std::log(alpha_h(0));
@@ -149,16 +189,27 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   // first loop, to solve for pressure
   for (int i = 0; i < npoints - 1; ++i) {
     Real r = radius.x(i);
+
 #pragma omp simd
     for (int v = 0; v < NTOV; ++v) {
       state[v] = state_h(v, i);
     }
-    TovRHS(r, state, K, Gamma, Pmin, rhs);
+    if (eos_type == "IdealGas"){
+      TovRHS(r, state, K, Gamma, Pmin, rhs);
+    }
+    else if (eos_type == "StellarCollapse"){
+      TovRHS_StellarCollapse(r, state, Pmin, rhs, s, nsamps, pin, eospkg);
+    }
 #pragma omp simd
     for (int v = 0; v < NTOV; ++v) {
       k1[v] = state[v] + 0.5 * dr * rhs[v];
     }
-    TovRHS(r, k1, K, Gamma, Pmin, rhs_k);
+    if (eos_type == "IdealGas"){
+      TovRHS(r, k1, K, Gamma, Pmin, rhs_k);
+    }
+    else if (eos_type == "StellarCollapse"){
+      TovRHS_StellarCollapse(r, k1, Pmin, rhs, s, nsamps, pin, eospkg);
+    }
 #pragma omp simd
     for (int v = 0; v < NTOV; ++v) {
       state_h(v, i + 1) = state_h(v, i) + dr * rhs_k[v];

@@ -802,7 +802,7 @@ parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin) {
     PARTHENON_THROW("MonopoleGR must be coupled with monopole metric");
   }
   if (enable_tov) {
-    TOV::IntegrateTov(tov_pkg.get(), monopole_pkg.get(), eos_pkg.get());
+    TOV::IntegrateTov(tov_pkg.get(), monopole_pkg.get(), eos_pkg.get(), pin.get());
   }
   if (enable_monopole) {
     MonopoleGR::MatterToHost(monopole_pkg.get(), false);
