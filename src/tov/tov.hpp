@@ -85,17 +85,10 @@ void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, const R
   out[TOV::PHI] = GetPhiRHS(r, rho_adm, m, P);
 }
 
-  
-KOKKOS_INLINE_FUNCTION
-void TovRHS_StellarCollapse(Real r, const Real in[NTOV], const Real Pmin,
-			    Real out[NTOV], Real s, Real nsamps, ParameterInput *pin, StateDescriptor *eospkg) {
-  Real m = in[TOV::M];
-  Real P = in[TOV::P];
-  // Real phi = in[TOV::PHI];
-  if (P < Pmin) P = 0;
 
+KOKKOS_INLINE_FUNCTION
+void AdiabatThermoFromP(const Real P, Real s, Real nsamps, ParameterInput *pin, StateDescriptor *eospkg, Real &rho, Real &eps){
   using Microphysics::EOS::EOS;
-  auto eos = eospkg->Param<EOS>("d.EOS");
   auto eos_h = eospkg->Param<EOS>("h.EOS");
 
   using DataBox = Spiner::DataBox<Real>;
@@ -112,7 +105,7 @@ void TovRHS_StellarCollapse(Real r, const Real in[NTOV], const Real Pmin,
   const Real T_min = eospkg->Param<Real>("T_min");                                                                         
   const Real T_max = eospkg->Param<Real>("T_max");
   Real lrho_min_adiabat, lrho_max_adiabat;
-  Adiabats::GetRhoBounds(eos, rho_min, rho_max, T_min, T_max, Ye, s, lrho_min_adiabat,
+  Adiabats::GetRhoBounds(eos_h, rho_min, rho_max, T_min, T_max, Ye, s, lrho_min_adiabat,
 			 lrho_max_adiabat);
   Adiabats::SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
   Adiabats::ComputeAdiabats(rho_h, temp_h, eos_h, Ye, s, T_min, T_max, nsamps);
@@ -123,25 +116,42 @@ void TovRHS_StellarCollapse(Real r, const Real in[NTOV], const Real Pmin,
   const Real density_conversion_factor = 6.6835442e-18;
   const Real press_conversion_factor = 1.3447284e+38;
 
-  auto target = [&](const Real rho) {
-    return eos.PressureFromDensityTemperature(rho, temp_h(std::log10(rho)), lambda) - P*press_conversion_factor;
+  auto target = [&](const Real rho_cgs) {
+      return eos_h.PressureFromDensityTemperature(rho_cgs, temp_h(std::log10(rho_cgs)), lambda) - P*press_conversion_factor;
     }; 
 
   const Real guess0 = (rho_max_adiabat-rho_min_adiabat)/2.0;
   const Real epsilon = std::numeric_limits<Real>::epsilon();
   const Real guess = guess0;
+  Real rho_adm;
   root_find::RootFind root_find;
-  Real rho = root_find.regula_falsi(target, rho_min, rho_max, epsilon * guess, guess);
-
-  Real rho_code = rho * density_conversion_factor;
-  Real temp_root = temp_h(std::log10(rho));
-  Real eps = eos.InternalEnergyFromDensityTemperature(rho, temp_root, lambda)/(press_conversion_factor*density_conversion_factor);
-  Real rho_adm = rho_code * (1 + eps);
+  Real rho_cgs = root_find.regula_falsi(target, rho_min, rho_max, epsilon * guess, guess);
+  rho = rho_cgs * density_conversion_factor;
+  Real temp_root = temp_h(std::log10(rho_cgs));
+  eps = eos_h.InternalEnergyFromDensityTemperature(rho_cgs, temp_root, lambda)/(press_conversion_factor*density_conversion_factor);  
+}
+  
+  
+KOKKOS_INLINE_FUNCTION
+void TovRHS_StellarCollapse(Real r, const Real in[NTOV], const Real Pmin,
+			    Real out[NTOV], Real s, Real nsamps, ParameterInput *pin, StateDescriptor *eospkg) {
+  Real m = in[TOV::M];
+  Real P = in[TOV::P];
+  std::cout<<"r="<<r<<" "<<"in_m="<<in[TOV::M]<<std::endl;
+  // Real phi = in[TOV::PHI];
+  if (P < Pmin) P = 0;
+  Real rho, eps, rho_adm;
+  if (P > Pmin){
+    AdiabatThermoFromP(P, s, nsamps, pin, eospkg, rho, eps);
+    rho_adm = rho * (1 + eps);
+  }
+  else{
+    rho_adm = 0;
+  }
   out[TOV::M] = GetMRHS(r, rho_adm);
   out[TOV::P] = GetPRHS(r, rho_adm, m, P, Pmin);
   out[TOV::PHI] = GetPhiRHS(r, rho_adm, m, P);
-  std::cout<<"r="<<r<<" "<<"P="<<P<<" "<<"rho_adm="<<rho_adm<<" "<<"MRHS="<<GetMRHS(r, rho_adm)<<std::endl;
-
+  std::cout<<"r="<<r<<" "<<"out_m="<<out[TOV::M]<<std::endl;
 }
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);

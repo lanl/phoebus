@@ -208,7 +208,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
       TovRHS(r, k1, K, Gamma, Pmin, rhs_k);
     }
     else if (eos_type == "StellarCollapse"){
-      TovRHS_StellarCollapse(r, k1, Pmin, rhs, s, nsamps, pin, eospkg);
+      TovRHS_StellarCollapse(r, k1, Pmin, rhs_k, s, nsamps, pin, eospkg);
     }
 #pragma omp simd
     for (int v = 0; v < NTOV; ++v) {
@@ -225,7 +225,13 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     if (press <= 1.1 * Pmin) {
       press = rho = eps = 0;
     } else {
-      PolytropeThermoFromP(press, K, Gamma, rho, eps);
+      if (eos_type == "IdealGas"){
+	PolytropeThermoFromP(press, K, Gamma, rho, eps);
+      }
+      else if (eos_type == "StellarCollapse"){
+	AdiabatThermoFromP(press, s, nsamps, pin, eospkg, rho, eps);
+	std::cout<<"rho="<<rho<<std::endl;
+      }
     }
     intrinsic_h(TOV::RHO0, i) = rho;
     intrinsic_h(TOV::EPS, i) = eps;

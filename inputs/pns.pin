@@ -93,6 +93,9 @@ method = derivative_order_1
 max_level = 3
 
 <eos>
+#type=IdealGas
+#Gamma=2.0
+#Cv=1.0
 type = StellarCollapse
 filename = /home/mari/Work/Phoebus/phoebus/Tests/LightBulb/testentropy/SFHo.sp5
 use_sp5 = true
@@ -119,11 +122,11 @@ Ye = true
 <fixup>
 enable_floors = true
 enable_ceilings = true
-enable_flux_fixup = true
-enable_c2p_fixup = true
-floor_type = X1RhoSie
-rho0_floor = 1.0e-8
-sie0_floor = 1.0e-3
+enable_flux_fixup = false
+enable_c2p_fixup = false
+floor_type = ConstantRhoSie
+rho0_floor = 1.0e-12
+sie0_floor = 1.0e-12
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
