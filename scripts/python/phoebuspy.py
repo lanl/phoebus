@@ -76,7 +76,7 @@ def PlotResolution1D(data,idump=0,iofile='PlotResolution1D.png'):
     
     return
 
-def Movie1D(data,varname='p.density',anax=None,anay=None,ylim=None,xlim=None):
+def Movie1D(data,varname='p.density',moviename=None,anax=None,anay=None,ylim=None,xlim=None,yscale='linear',xscale='linear'):
     #Arguments:
     #data = list of Data1D instances; there is one for each file.
     #anax = if there is an analytic solution to plot, then 
@@ -93,13 +93,17 @@ def Movie1D(data,varname='p.density',anax=None,anay=None,ylim=None,xlim=None):
             pl.ylim(ylim)
         if (xlim is not None):
             pl.xlim(xlim)
-        pl.yscale('log')
+        pl.yscale(yscale)
+        pl.xscale(xscale)
         pl.ylabel(varname)
         pl.xlabel('xc')
         pl.savefig(iofile)
 
 
-    system(f"ffmpeg -r 10 -f image2 -i img%04d.png -vcodec mpeg2video -crf 25 -pix_fmt yuv420p movie.{varname}.mpeg")
+    if (moviename  is None):
+        moviename = f'movie.{varname}.mpeg'
+        
+    system(f"ffmpeg -r 10 -f image2 -i img%04d.png -vcodec mpeg2video -crf 25 -pix_fmt yuv420p {moviename}")
     system("rm img????.png")
     
     return
@@ -131,20 +135,39 @@ def MovieGR(data,varname='monopole_gr/rhoadm',anax=None,anay=None,ylim=None,xlim
     
     return
 
-def ReadHistory(fname='tov.hst'):
+def ReadHistory(fname=None):
+    if (fname is None):
+        fname = glob(f"*.hst")[0] #This assumes that there is only one .hst file.
     #Get Data
-    histdata = np.loadtxt(fname)
+    tempdata = np.loadtxt(fname)
     #Get Variable Names
     f = open(fname,"r")
     line = f.readline()
     line = f.readline()
     vars = line.split("=")
-    vars2 = [re.sub(r'\[.*\]','',var).strip() for var in vars[1:]]
-    print(vars2)
-    print(vars[1:])
+    varkeys = [re.sub(r'\[.*\]','',var).strip() for var in vars[1:]]
+    print(f"The variables in {fname} are: {varkeys}")
+
+    histdata = {}
+    nkeys = len(varkeys)
+    for i in range(nkeys):
+        key = varkeys[i]
+        histdata[key] = tempdata[:,i]
     f.close()
     
     return histdata
+
+def PlotHistory(histdata,varname='maximum density'):
+    pl.clf()
+    pl.plot(histdata['time'],histdata[varname])
+    pl.ylabel(varname)
+    pl.xlabel('Time')
+    varn = varname.replace(" ","")
+    fout = f'History.{varn}.png'
+    pl.savefig(fout)
+    pl.close()
+
+    return
     
 def main():
     #List of outfile names
