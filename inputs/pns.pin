@@ -31,6 +31,7 @@ variables = p.density,  &
             c.energy,   &
 	    pressure,	&
 	    temperature, &
+	    entropy, &
       	    cs, &
       	    p.ye, &
       	    g.c.coord, &
@@ -52,7 +53,7 @@ dt = 1
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 5000      # time limit
+tlim        = 500000      # time limit
 integrator  = rk2       # time integration algorithm
 ncycle_out  = 1         # interval for stdout summary info
 dt_init_fact = 1.e-6
@@ -60,11 +61,11 @@ dt_init_fact = 1.e-6
 <parthenon/mesh>
 nghost = 4
 refinement = adaptive
-numlevel = 3
+numlevel = 4
 
 nx1         = 1024        # Number of zones in X1-direction
 x1min       = 0           # minimum value of X1
-x1max       = 250         # maximum value of X1
+x1max       = 5000         # maximum value of X1
 ix1_bc      = user        # Inner-X1 boundary condition flag
 ox1_bc      = user        # Outer-X1 boundary condition flag
 
@@ -90,7 +91,7 @@ nx3 = 1
 <parthenon/refinement0>
 field = c.c.bulk.rho
 method = derivative_order_1
-max_level = 3
+max_level = 4
 
 <eos>
 #type=IdealGas
@@ -127,16 +128,16 @@ enable_c2p_fixup = false
 floor_type = ConstantRhoSie
 rho0_floor = 1.0e-12
 sie0_floor = 1.0e-12
-rho_exp_floor = -2.0
-sie_exp_floor = -1.0
+#rho_exp_floor = -2.0
+#sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
 sie0_ceiling = 10.0;
 gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
-npoints = 2048
-rout = 250
+npoints = 16400
+rout = 5000
 # Disables time derivatives. Runs only at initialization
 force_static = false
 # Runs the first n subcycles. Then freezes. Source terms are not disabled.
@@ -153,10 +154,10 @@ dtwarn_eps = 1e-5
 
 <tov>
 enabled = true
-Pc = 1e-6
-entropy = 8
+Pc = 1.8e-4
+entropy = 3
 # pressure below which we terminate the TOV solver and transition to atmosphere
-Pmin = 1e-10
+Pmin = 1e-24
 # The atmosphere values in the problem generator for density and energy
 rhomin = 1e-12
 epsmin = 1e-12
@@ -164,3 +165,9 @@ epsmin = 1e-12
 vpert_amp = 0
 vpert_radius = 5
 vpert_sigma = 1
+
+
+<units>
+scale_free=false
+fluid_mass_g=2e33
+geom_mass_g=2e33

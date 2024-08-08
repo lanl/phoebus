@@ -230,7 +230,6 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
       }
       else if (eos_type == "StellarCollapse"){
 	AdiabatThermoFromP(press, s, nsamps, pin, eospkg, rho, eps);
-	std::cout<<"rho="<<rho<<std::endl;
       }
     }
     intrinsic_h(TOV::RHO0, i) = rho;
@@ -249,6 +248,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   Kokkos::deep_copy(matter_d, matter_h);
   Kokkos::deep_copy(state_d, state_h);
   Kokkos::deep_copy(intrinsic_d, intrinsic_h);
+
 
   return TaskStatus::complete;
 }

@@ -105,15 +105,18 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             std::max(rhomin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::RHO0));
         Real eps =
             std::max(epsmin, MonopoleGR::Interpolate(r, intrinsic, rgrid, TOV::EPS));
-        Real P = std::max(pmin, eos.PressureFromDensityInternalEnergy(rho, eps));
-
+	Real Ye = 0.5;
+	Real lambda[2];
+	lambda[0] = Ye;
+        Real P = std::max(pmin, eos.PressureFromDensityInternalEnergy(rho, eps, lambda));
+        
         // TODO(JMM): Add lambdas, Ye, etc
         v(irho, k, j, i) = rho;
         v(iprs, k, j, i) = P;
         v(ieng, k, j, i) = eps * rho;
-        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps);
+        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps, lambda);
         v(igm1, k, j, i) =
-            eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i)) /
+	  eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i), lambda) /
             v(iprs, k, j, i);
         for (int d = 0; d < 3; ++d) {
           v(ivlo + d, k, j, i) = 0.0;
