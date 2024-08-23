@@ -257,16 +257,16 @@ void ReduceLocalizationFunction(MeshData<Real> *md) {
   auto v = desc.GetPack(md);
   const int nblocks = v.GetNBlocks();
   auto geom = Geometry::GetCoordinateSystem(md);
+  auto analysis = pmb->packages.Get("analysis").get();
+  const Real sigma = analysis->Param<Real>("sigma");
 
   parthenon::par_for(
       parthenon::LoopPatternMDRange(), "Central Density for SN", DevExecSpace(), 0,
       nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         auto &coords = v.GetCoordinates(b);
-        auto analysis = pmb->packages.Get("analysis").get();
         const Real x[3] = {coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
                            coords.Xc<3>(k, j, i)};
-        const Real sigma = analysis->Param<Real>("sigma");
         Real gam[3][3];
         Real r2 = 0;
         geom.Metric(CellLocation::Cent, 0, k, j, i, gam);
