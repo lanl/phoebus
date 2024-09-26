@@ -15,9 +15,11 @@ Key Features
 ^^^^^^^^^^^^^
 
 * Finite volume GRMHD
-* Neutrino transport
-* GR...
-* fill out
+* Neutrino transport with Monte Carlo and moment methods
+* Analytic and tabulated spacetimes
+* Monopolar general relativistic gravity for core-collapse supernovae
+* Lagrangian tracer particles
+* Support for arbitrary equations of state
 
 .. note::
 
