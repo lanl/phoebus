@@ -6,17 +6,17 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Phoebus'
-copyright = '2024, Triad National Security'
-author = 'The Phoebus Team'
-release = '1.0.0'
+project = "Phoebus"
+copyright = "2024, Triad National Security"
+author = "The Phoebus Team"
+release = "1.0.0"
 
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinx_multiversion"]
+extensions = ["sphinx_multiversion", "sphinx.ext.todo", "sphinx_copybutton"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -41,3 +41,6 @@ html_static_path = ["_static"]
 
 # configuration for sphinx_multiversion
 smv_remote_whitelist = r"^(origin)$"
+
+# Display todos by setting to True
+todo_include_todos = True
