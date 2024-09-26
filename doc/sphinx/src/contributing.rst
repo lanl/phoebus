@@ -28,7 +28,7 @@ documentation, science test cases (gold standards), and continuous
 integration.
 
 To maintain their active status as Maintainer, all members will agree to
-adhere to our Community Code of Conduct and sign a Memorandum of
+adhere to our Community Code of Conduct and adhere to a Memorandum of
 Understanding described `here <GOVERNANCE.md>`__.
 
 Contributing to ``Phoebus``
