@@ -1,6 +1,7 @@
 phoebus
 ===
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/lanl/phoebus/tests.yml?branch=main)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/lanl/phoebus/docs.yml)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 Phifty One Ergs Blows Up a Star
