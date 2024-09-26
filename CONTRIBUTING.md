@@ -42,13 +42,13 @@ and actively participate in the technical review of contributions to `Phoebus`.
 ---
 | Name     | Handle       | Team       |
 |----------|--------------|------------|
-| Brandon Barker | [@AstroBarker](https://www.github.com/AstroBarker), Los Alamos National Lab |
-| Josh Dolence | [@jdolence](https://www.github.com/jdolence), Los Alamos National Lab |
-| Carl Fields | [@carlnotsagan](https://www.github.com/carlnotsagan), University of Arizona |
-| Mariam Gogilashvili | [@mari2895](https://www.github.com/mari2895), Niels Bohr Institute |
-| Jonah Miller | [@Yurlungur](https://www.github.com/Yurlungur), Los Alamos National Lab |
-| Jeremiah Murphy | [@curiousmiah](https://www.github.com/curiousmiah), Florida State University |
-| Ben Ryan | [@brryan](https://www.github.com/brryan), Los Alamos National Lab |
+| Brandon Barker | [@AstroBarker](https://www.github.com/AstroBarker) | Los Alamos National Lab |
+| Josh Dolence | [@jdolence](https://www.github.com/jdolence) | Los Alamos National Lab |
+| Carl Fields | [@carlnotsagan](https://www.github.com/carlnotsagan) | University of Arizona |
+| Mariam Gogilashvili | [@mari2895](https://www.github.com/mari2895) | Niels Bohr Institute |
+| Jonah Miller | [@Yurlungur](https://www.github.com/Yurlungur) | Los Alamos National Lab |
+| Jeremiah Murphy | [@curiousmiah](https://www.github.com/curiousmiah) | Florida State University |
+| Ben Ryan | [@brryan](https://www.github.com/brryan) | Los Alamos National Lab |
 
 * * *
 This article is cleared for unlimited release, LA-UR-24-25222.
