@@ -9,10 +9,17 @@ SOURCEDIR     = .
 BUILDDIR      = _build
 
 # Put it first so that "make" without argument is like "make help".
-help:
+help: sphinxhelp
+	$(info "Use make multiversion to use sphinx-multiversion")
+
+sphinxhelp:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-.PHONY: help Makefile
+multiversion: Makefile
+	sphinx-multiversion "$(SOURCEDIR)" "$(BUILDDIR)/html"
+	cp ../index.html "$(BUILDDIR)/html"
+
+.PHONY: help sphinxhelp multiversion Makefile
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
