@@ -70,6 +70,8 @@ The primary job of the meeting manager is to:
 2) ensure that the meeting runs on schedule, and 
 3) ensure equitable participation by all participants.   
 Again, in keeping with power-sharing, the meeting manager position will rotate among the core Maintainers, even junior members.
+We maintain some flexibility in the cadence and structure of meetings, in particular, in periods of low activity, meetings may 
+be skipped or held in a less formal manner.
 
 * * *
 This article is cleared for unlimited release, LA-UR-24-25222.
