@@ -26,6 +26,7 @@ jobs:
             pip install sphinx
             pip install sphinx-rtd-theme
             pip install sphinx-multiversion
+            pip install sphinx-copybutton
         - name: build docs
           run: |
             echo "Repo = ${GITHUB_REPOSITORY}"
