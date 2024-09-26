@@ -1,5 +1,7 @@
 phoebus
 ===
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/lanl/phoebus/tests.yml?branch=main)
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 Phifty One Ergs Blows Up a Star
 
@@ -73,7 +75,7 @@ Below are some example build commands
 
 ### MPI-parallel only
 
-The following will build `phoebus` with the `triple` problem with MPI parallelism but no shared memory parallelism
+The following will build `phoebus` with MPI parallelism but no shared memory parallelism
 ```bash
 cmake ..
 make -j
@@ -156,7 +158,7 @@ make -j
 
 Run phoebus from the `build` directory as
 ```bash
-./src/phoebus -i path/to/input/file.phin
+./src/phoebus -i path/to/input/file.pin
 ```
 The input files are in `phoebus/inputs/*`. There's typically one input file per problem setup file.
 
@@ -194,9 +196,15 @@ environment variable. For example:
 CFM=clang-format-12 ./scripts/bash/format.sh
 ```
 
+# Contribute
+We are always happy to have users contribute to `phoebus`.
+To contribute, issue a pull request against the main branch. 
+For more details on how to contribute to `phoebus`, please see [CONTRIBUTING.md](CONTRIBUTING.md).
+We adhere to a [code of conduct](CODE_OF_CONDUCT.md).
+
 # Copyright
 
-© 2021. Triad National Security, LLC. All rights reserved.  This
+© 2021-2024. Triad National Security, LLC. All rights reserved.  This
 program was produced under U.S. Government contract 89233218CNA000001
 for Los Alamos National Laboratory (LANL), which is operated by Triad
 National Security, LLC for the U.S.  Department of Energy/National
