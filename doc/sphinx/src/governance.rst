@@ -54,6 +54,9 @@ the repo and are working to keep the code sustainable long term.
 To maintain their active status as a User, Contributor, or Maintainer,
 all members will agree to adhere to a Code of Conduct.
 
+
+.. _mou:
+
 Memorandum of Understanding
 ---------------------------
 
@@ -64,14 +67,12 @@ the ``Phoebus`` Community requires the following:
 
 -  Maintainers will uphold and exemplify the *Development Model*
    outlined as part of the ``phoebus`` Community described
-   `here <CONTRIBUTING.md>`__.
+   :doc:`here <contributing>`.
 -  Maintainers will make a good-faith effort to attend team meetings. In
    an effort to accommodate the dynamic schedules and availability of
    many of the core team of *Maintainers*, coordination efforts will be
    made to ensure that *at least* 1 *Maintainer* is present for all
    meetings.
--  Maintainers will make a good-faith effort to attend the annual
-   workshop.
 -  Maintainers will make a good-faith effort to monitor the fraction of
    the meeting time that they speak. The meeting time is limited, and
    several people may have something interesting to say, report on their
