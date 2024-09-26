@@ -39,7 +39,7 @@ at the bottom of the pull request page. If this passes, your documentation will 
 On the bottom left of the documentation page on `github-pages`_, you can select the branch/build
 of the documentation, one of which should be the branch you wrote your changes on.
 
-.. _github-pages: https://parthenon-hpc-lab.github.io/parthenon
+.. _github-pages: https://lanl.github.io/phoebus
 
 
 Building documentation locally
