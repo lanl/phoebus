@@ -19,7 +19,7 @@ reviewers for pull requests, and are in charge of the maintaining, deployment, a
 towards: regression testing, documentation, science test cases (gold standards), and continuous integration. 
 
 To maintain their active status as Maintainer, all members will agree to adhere to our 
-Community Code of Conduct and sign a Memorandum of Understanding described [here](GOVERNANCE.md).
+Community Code of Conduct and adhere to a Memorandum of Understanding described [here](GOVERNANCE.md).
 
 # Contributing to `Phoebus`
 
