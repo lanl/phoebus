@@ -28,7 +28,7 @@ Community Code of Conduct and sign a Memorandum of Understanding described [here
 
 1. Create a new fork of `main` where your changes can be made.
 2. After completing, create a pull request, describe the final approach and ensure the branch has no conflicts with current Regression Tests and Formatting Checks. 
-3. Assign external reviewers (a minimum of 2, one of which should be a Maintainer). Provide concise description of changes.
+3. Assign external reviewers (a minimum of 1, one of which should be a Maintainer, and which cannot be the contributor). Provide concise description of changes.
 4. Once comments/feedback is addressed, the PR will be merged into the main branch and changes will be added to list of changes in the next release. 
 5. At present, Releases (with a git version tag) for the `main` branch of `Phoebus` will occur at a 6 to 12 month cadence or following implementation of a major enhancement or capability to the code base. 
 
