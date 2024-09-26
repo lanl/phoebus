@@ -199,7 +199,7 @@ CFM=clang-format-12 ./scripts/bash/format.sh
 
 # Contribute
 We are always happy to have users contribute to `phoebus`.
-To contribute, issue a pull request against the main branch. 
+To contribute, create a fork and issue a pull request against the main branch. 
 For more details on how to contribute to `phoebus`, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 We adhere to a [code of conduct](CODE_OF_CONDUCT.md).
 
