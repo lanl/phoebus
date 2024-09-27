@@ -51,8 +51,8 @@ require a vote.
 **Maintainer**: These are the core team who have “merge” permissions on
 the repo and are working to keep the code sustainable long term.
 
-To maintain their active status as a User, Contributor, or Maintainer,
-all members will agree to adhere to a Code of Conduct.
+To maintain their relevant active status, all members must 
+make a food faith effort to maintain a supportive, productive environment.
 
 
 .. _mou:
@@ -60,19 +60,18 @@ all members will agree to adhere to a Code of Conduct.
 Memorandum of Understanding
 ---------------------------
 
-In addition to our Community Code of Conduct, all code Maintainers will
-sign a memorandum of understanding (MoU) that will describe general
-expectations and responsibilities. The MoU that will serve as part of
-the ``Phoebus`` Community requires the following:
+In addition to our Community Code of Conduct, we ask that maintainers 
+especially keep the following suggestions in mind to help 
+facilitate an efficient and welcoming collaboration:
 
--  Maintainers will uphold and exemplify the *Development Model*
+-  Maintainers should uphold and exemplify the *Development Model*
    outlined as part of the ``phoebus`` Community described
    :doc:`here <contributing>`.
--  Maintainers will make a good-faith effort to attend team meetings. In
-   an effort to accommodate the dynamic schedules and availability of
-   many of the core team of *Maintainers*, coordination efforts will be
-   made to ensure that *at least* 1 *Maintainer* is present for all
-   meetings.
+-  Within reason, maintainers will make a good-faith effort to attend team 
+   meetings. In an effort to accommodate the dynamic schedules and 
+   availability of many of the core team of *Maintainers*, 
+   coordination efforts will be made to ensure that *at least* 
+   1 *Maintainer* is present for all meetings.
 -  Maintainers will make a good-faith effort to monitor the fraction of
    the meeting time that they speak. The meeting time is limited, and
    several people may have something interesting to say, report on their
@@ -91,7 +90,7 @@ Approval by Vote:
 -----------------
 
 | Many of the decisions in the organization will be enacted after an
-  approval by majority vote of the Maintainers. The process of listening
+  approval by majority vote of active Maintainers. The process of listening
   and adjusting strategies to meet everyone’s needs is vital for
   power-sharing organizations.
 | Importantly, spending a little time up front to listen and resolve
@@ -102,8 +101,8 @@ Communication and Connection:
 -----------------------------
 
 | To facilitate open and effective communication, the ``Phoebus`` will
-  offer multiple levels of communication.
-| Developers will communicate via email, GitHub, and a ``Phoebus`` Slack
+  offer multiple levels of communication. 
+  Developers will communicate via email, GitHub, and a ``Phoebus`` Slack
   channel.
 
 | To respond to user inquiries, the Phoebus Project will host a mailing
@@ -112,17 +111,17 @@ Communication and Connection:
   post the inquiries and responses on a public-facing site.
 | All Maintainers will have the option to respond to the inquires; to
   ensure that someone is responsive to the user inquiries, the team will
-  triage tickets/questions in a regular developer call.
+  triage tickets/questions in developer meetings.
 
-| Monthly Maintainer meetings will also be an important part of ensuring
-  productivity and timeliness of the meeting.
+| Subject to availability, monthly Maintainer meetings will also
+  be an important part of ensuring productivity and timeliness.
 | Each meeting will last up to 60 minutes. We will assess and discuss
   the goals from the previous meeting.
 | In particular, we will take note which goals were completed and which
   were not. If there are uncompleted goals, we will assess why they were
   not completed. Next, we will discuss the goals for the upcoming month,
   quarter, and year.
-| We will decide which goals to move forward during the next month.
+| We will decide which goals to prioritize.
 | All of this will be recorded on an online document which will be
   available to all Maintainers.
 
@@ -132,7 +131,10 @@ Communication and Connection:
   agenda items for the next meeting, 2) ensure that the meeting runs on
   schedule, and 3) ensure equitable participation by all participants.
 | Again, in keeping with power-sharing, the meeting manager position
-  will rotate among the core Maintainers, even junior members. We
-  maintain some flexibility in the cadence and structure of meetings, in
+  will rotate among the core Maintainers, even junior members. 
+
+.. note::
+  We maintain some flexibility in the cadence and structure of meetings, in
   particular, in periods of low activity, meetings may be skipped or
-  held in a less formal manner.
+  held in a less formal manner. We recognize that the availability 
+  of maintainers is contingent upon many factors.
