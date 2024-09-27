@@ -1,4 +1,5 @@
 .. _singularity-eos: https://lanl.github.io/singularity-eos 
+.. _Catch2: https://github.com/catchorg/Catch2
 
 Contributing
 =============================
@@ -47,6 +48,16 @@ useful output. For example:
 
     CFM=clang-format-12 VERBOSE=1 ./scripts/bash/format.sh
 
+In order for a pull request to merge, we require:
+
+- Provide a thorough summary of changes, especially if they are breaking changes
+- Obey style guidleines (format with ``clang-format`` and pass the necessary test)
+- Pass the existing test suite
+- Have at least one approval from a Maintainer
+- If Applicable:
+  - Write new tests for new features or bugs
+  - Include or update documentation in ``doc/``
+
 Test Suite
 ----------
 
@@ -59,20 +70,33 @@ and ensure a consistent code style.
 Adding Tests
 ````````````
 
-There are two primary categories of tests written in ``Phoebus``:
+.. todo::
 
-* Unit tests
-* Regression tests
+   This section is incomplete.
+
+There are two primary categories of tests written in ``Phoebus``:
+unit tests and regression tests.
 
 Unit
 ^^^^
 
+Unit tests live in ``tst/unit/``. They are implemented using the 
+`Catch2`_ unit testing framework. They are integrated with ``cmake`` 
+and can be run, when enabled, with ``ctest``. There are a few necessary ``cmake``
+configurations to beuild tests:
+
+========================== ========= =======================================
+    Option                  Default   Description
+========================== ========= =======================================
+PHOEBUS_ENABLE_UNIT_TESTS    OFF      Enables Catch2 unit tests
+PHOEBUS_ENABLE_DOWNLOADS     OFF      Enables unit tests using tabulated EOS
+========================== ========= =======================================
+
 Regression
-^^^^
-
-.. todo::
-
-   This section is incomplete.
+^^^^^^^^^^
+Regression tests run existing simulations and test against saved output 
+in order to verify sustained capabilities. They are implemented in Python in
+``test/regression/``.
 
 Expectations for code review
 -----------------------------
