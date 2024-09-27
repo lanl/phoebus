@@ -31,7 +31,7 @@ Pull request protocol
 ----------------------
 
 When submitting a pull request, there is a default template that is automatically
-poluated. The pull request should sufficiently summarize all changes.
+populated. The pull request should sufficiently summarize all changes.
 As necessary, tests should be added for new features of bugs fixed.
 
 Before a pull request will be merged, the code should be formatted. We
@@ -150,7 +150,7 @@ A Large Ecosystem
 
 ``Phoebus`` depends on several other open-source, Los Alamos
 maintained, projects. In particular, ``Parthenon``, ``singularity-eos``, 
-``singularity-opac``, ``spiner``, and ``kokkos``.
+``singularity-opac``, and ``spiner``.
 If you have issues with these projects, ideally
 submit issues on the relevant github pages. However, if you can't
 figure out where an issue belongs, no big deal. Submit where you can
@@ -166,7 +166,7 @@ process for contributing to ``Phoebus``.
 We welcome contributions from scientists from a large variety of
 relativistic astrophysics. New users are welcome to contributions to
 ``Phoebus`` via the *Contributors* process. Contributors with 6 merged
-pull requests into the ``main`` branch (over a minimum of 6 months) will
+pull requests into the main branch (over a minimum of 6 months) will
 be eligible to join as a *Maintainer* of ``Phoebus`` with additional
 repository access and roles. However, final approval of *Maintainer*
 status will require a unanimous approval by vote by existing
