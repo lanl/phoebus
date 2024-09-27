@@ -64,6 +64,12 @@ There are two primary categories of tests written in ``Phoebus``:
 * Unit tests
 * Regression tests
 
+Unit
+^^^^
+
+Regression
+^^^^
+
 .. todo::
 
    This section is incomplete.
@@ -169,23 +175,22 @@ relativistic astrophysics. New users are welcome to contributions to
 pull requests into the main branch (over a minimum of 6 months) will
 be eligible to join as a *Maintainer* of ``Phoebus`` with additional
 repository access and roles. However, final approval of *Maintainer*
-status will require a unanimous approval by vote by existing
+status will require a approval by vote by existing
 *Maintainers*, a necessary step to ensure the safety and integrity of
 the code base for all users of ``Phoebus``.
 
 The *Maintainers* of ``Phoebus`` consist of the original developers of
 the code and those that have a demonstrated history in the development
 of ``Phoebus`` prior to the implementation of the *Development Model*
-described here. Maintainers hold admin access, serve consistently as
+described here. Maintainers hold admin access, serve as
 reviewers for pull requests, and are in charge of the maintaining,
 deployment, and improvement of efforts towards: regression testing,
 documentation, science test cases (gold standards), and continuous
 integration.
 
-To maintain their active status as Maintainer, all members will agree to
-adhere to our Community Code of Conduct and adhere to a Memorandum of
-Understanding described :ref:`here <mou>`.
-
+Maintainers are excepted to make a good faith effort to adhere to 
+:ref:`these suggestions <mou>` in order to maintain a supportive and 
+productive environment.
 
 List of Current Maintainers of Phoebus
 ------------------------------------------
