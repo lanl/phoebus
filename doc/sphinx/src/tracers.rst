@@ -1,8 +1,10 @@
+.. _parthenon-swarms: https://parthenon-hpc-lab.github.io/parthenon/develop/src/particles.html
+
 Tracer Particles
 ================
 
 ``Phoebus`` includes Lagrangian tracer particles.
-These are primarily for the purpose of postprocessing simulation data for, e.g., nucleosynthesis.
+These are primarily for the purpose of post-processing simulation data for, e.g., nucleosynthesis.
 They are operator spit from the hydrodynamics and advected with a standard second order Runge-Kutta
 integrator. As ``Phoebus`` is a general relativistic code, we evolve tracer positions using a 
 relativistic advection equation:
@@ -20,6 +22,21 @@ Tracers may be enabled by in the ``Phoebus`` input deck as follow:
 
    <tracers>
    num_tracers = 1024
+
+Similarly, tracers may be output by modifying an existing Parthenon output block, or creating a new one:
+
+.. code-block::
+
+   <parthenon/output1>
+   // ...
+   swarms = tracers
+   tracers_variables = rho, temperature, ye
+
+   file_type = hdf5
+   dt = // output cadence
+
+Note that the position variables x, y, z are output for all swarms by default.
+See the `Parthenon docs <parthenon-swarms>`_ for more information.
 
 Tracers must, however, be configured in the problem generator.
 In the generator, the tracers should be distributed through the domain, assigned positions 
@@ -50,22 +67,31 @@ and unique ids. An example from the advection pgen is shown below.
       });
 
 In addition to position, tracers track a number of potentially useful quantities. 
-These quantites include
+These quantities include (bold quantities are 3-vectors with components _x, _y, _z)
 
-.. todo:: 
+=================== ================ ===================
+   Quantity           SwarmVar Name      Description
+=================== ================ ===================
+Density               rho             Primitive density
+Temperature           temperature     Temperature
+Ye                    ye              Electron fraction (0 if ye is disabled)
+Internal energy       energy          Primitive internal energy
+Entropy               entropy         Entropy
+**Velocity**           vel_x, ...      Three velocity
+Lorentz factor        lorentz         Relativistic Lorentz factor
+Lapse                 lapse           Relativistic lapse
+Metric determinant    detgamma        Spatial metric determinant
+**Shift**             shift_x, ...    Relativistic shift
+Mass                  mass            Tracer mass
+Total energy          bernoulli       Total energy Bernoulli quantity
+**Magnetic field**    B_x, ...        Primitive 3-magnetic field components (if mhd enabled)
+=================== ================ ===================
 
-   Clean up below.
+To minimize unnecessary work, these quantities are only populated before output using ``phoebus::UserWorkBeforeOutput``.
 
-* Density
-* Temperature
-* Electron fractionb
-* Internal energy
-* Entropy
-* 3-velocity
-* Relativistic shift
-* Relativistic lapse
-* Lorentz factor
-* Spartial metric determinant
-* Pressure
-* Bernoulli parameter
-* Primitive magnetic field components
+.. cpp:function:: void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin)
+   :no-contents-entry:
+
+   Describes work to be done prior to HDF5 output, such as populating tracer variables.
+   This is connected to the appropriate Parthenon function.
+
