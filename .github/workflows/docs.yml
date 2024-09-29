@@ -24,6 +24,7 @@ jobs:
         - name: install dependencies
           run: |
             pip install sphinx
+            pip install sphinx-sitemap
             pip install sphinx-rtd-theme
             pip install sphinx-multiversion
             pip install sphinx-copybutton

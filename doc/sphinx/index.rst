@@ -31,3 +31,9 @@ Key Features
    :glob:
 
    src/*
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`search`
