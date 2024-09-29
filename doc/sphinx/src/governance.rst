@@ -51,7 +51,7 @@ require a vote.
 **Maintainer**: These are the core team who have “merge” permissions on
 the repo and are working to keep the code sustainable long term.
 
-To maintain their relevant active status, all members must 
+To maintain their relevant active status, all members must
 make a food faith effort to maintain a supportive, productive environment.
 
 
@@ -60,17 +60,17 @@ make a food faith effort to maintain a supportive, productive environment.
 Memorandum of Understanding
 ---------------------------
 
-In addition to our Community Code of Conduct, we ask that maintainers 
-especially keep the following suggestions in mind to help 
+In addition to our Community Code of Conduct, we ask that maintainers
+especially keep the following suggestions in mind to help
 facilitate an efficient and welcoming collaboration:
 
 -  Maintainers should uphold and exemplify the *Development Model*
    outlined as part of the ``phoebus`` Community described
    :doc:`here <contributing>`.
--  Within reason, maintainers will make a good-faith effort to attend team 
-   meetings. In an effort to accommodate the dynamic schedules and 
-   availability of many of the core team of *Maintainers*, 
-   coordination efforts will be made to ensure that *at least* 
+-  Within reason, maintainers will make a good-faith effort to attend team
+   meetings. In an effort to accommodate the dynamic schedules and
+   availability of many of the core team of *Maintainers*,
+   coordination efforts will be made to ensure that *at least*
    1 *Maintainer* is present for all meetings.
 -  Maintainers will make a good-faith effort to monitor the fraction of
    the meeting time that they speak. The meeting time is limited, and
@@ -101,7 +101,7 @@ Communication and Connection:
 -----------------------------
 
 | To facilitate open and effective communication, the ``Phoebus`` will
-  offer multiple levels of communication. 
+  offer multiple levels of communication.
   Developers will communicate via email, GitHub, and a ``Phoebus`` Slack
   channel.
 
@@ -131,10 +131,10 @@ Communication and Connection:
   agenda items for the next meeting, 2) ensure that the meeting runs on
   schedule, and 3) ensure equitable participation by all participants.
 | Again, in keeping with power-sharing, the meeting manager position
-  will rotate among the core Maintainers, even junior members. 
+  will rotate among the core Maintainers, even junior members.
 
 .. note::
   We maintain some flexibility in the cadence and structure of meetings, in
   particular, in periods of low activity, meetings may be skipped or
-  held in a less formal manner. We recognize that the availability 
+  held in a less formal manner. We recognize that the availability
   of maintainers is contingent upon many factors.

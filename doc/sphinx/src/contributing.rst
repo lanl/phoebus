@@ -1,4 +1,4 @@
-.. _singularity-eos: https://lanl.github.io/singularity-eos 
+.. _singularity-eos: https://lanl.github.io/singularity-eos
 .. _Catch2: https://github.com/catchorg/Catch2
 
 Contributing
@@ -36,7 +36,7 @@ populated. The pull request should sufficiently summarize all changes.
 As necessary, tests should be added for new features of bugs fixed.
 
 Before a pull request will be merged, the code should be formatted. We
-use clang-format for this, pinned to version 12. 
+use clang-format for this, pinned to version 12.
 The script ``scripts/bash/format.sh`` will apply ``clang-format``
 to C++ source files in the repository as well as ``black`` to python files, if available.
 The script takes two CLI arguments
@@ -65,7 +65,7 @@ Test Suite
 Several sets of tests are triggered on a pull request: a static format
 check, a docs buld, and a suite of unit and regression tests.
 These are run through github's CPU infrastructure. These tests
-help ensure that modifications to the code do not break existing capabilities 
+help ensure that modifications to the code do not break existing capabilities
 and ensure a consistent code style.
 
 Adding Tests
@@ -77,8 +77,8 @@ unit tests and regression tests.
 Unit
 ^^^^
 
-Unit tests live in ``tst/unit/``. They are implemented using the 
-`Catch2`_ unit testing framework. They are integrated with ``cmake`` 
+Unit tests live in ``tst/unit/``. They are implemented using the
+`Catch2`_ unit testing framework. They are integrated with ``cmake``
 and can be run, when enabled, with ``ctest``. There are a few necessary ``cmake``
 configurations to beuild tests:
 
@@ -91,26 +91,27 @@ PHOEBUS_ENABLE_DOWNLOADS     OFF      Enables unit tests using tabulated EOS
 
 Regression
 ^^^^^^^^^^
-Regression tests run existing simulations and test against saved output 
-in order to verify sustained capabilities. 
+Regression tests run existing simulations and test against saved output
+in order to verify sustained capabilities.
 They are implemented in Python in
-``test/regression/``. To run the tests you will need a Python environment with 
+``test/regression/``. To run the tests you will need a Python environment with
 at least ``numpy`` and ``h5py``. Tests can be ran manually as, e.g.,
 
 .. code-block:: bash
 
    python linear_modes.py
 
-This will build Phoebus locally in ``phoebus/tst/regression/build`` and run it in 
+This will build Phoebus locally in ``phoebus/tst/regression/build`` and run it in
 ``phoebus/tst/regression/run``. Ensure that these directories do not already exist.
 Each script ``test.py`` has a correspodning "gold file" ``test.gold``.
-The gold files contain the gold standard data that the output of the regression test 
-is compared against. To generate new gold data, for example if a change is implemented 
+The gold files contain the gold standard data that the output of the regression test
+is compared against. To generate new gold data, for example if a change is implemented
 that changes the behavior of a test (not erroneously) or a new test is created, run the test
 script with the ``--upgold`` option. This will create or update the corresponding ``.gold`` file.
 To add a new test:
 
 1. Create a new test script.
+
    - Update the ``modified_inputs`` struct to change any input deck options
    - Set the ``variables`` list to contain the quantities to test against
 2. Run the script with the ``--upgold`` option
@@ -199,7 +200,7 @@ A Large Ecosystem
 ------------------------
 
 ``Phoebus`` depends on several other open-source, Los Alamos
-maintained, projects. In particular, ``Parthenon``, ``singularity-eos``, 
+maintained, projects. In particular, ``Parthenon``, ``singularity-eos``,
 ``singularity-opac``, and ``spiner``.
 If you have issues with these projects, ideally
 submit issues on the relevant github pages. However, if you can't
@@ -232,8 +233,8 @@ deployment, and improvement of efforts towards: regression testing,
 documentation, science test cases (gold standards), and continuous
 integration.
 
-Maintainers are excepted to make a good faith effort to adhere to 
-:ref:`these suggestions <mou>` in order to maintain a supportive and 
+Maintainers are excepted to make a good faith effort to adhere to
+:ref:`these suggestions <mou>` in order to maintain a supportive and
 productive environment.
 
 List of Current Maintainers of Phoebus
