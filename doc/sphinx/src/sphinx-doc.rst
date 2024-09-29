@@ -32,7 +32,7 @@ How to have github build your documentation for you
 ----------------------------------------------------
 
 Github can automatically build your documentation for you through the continuous integration pipeline.
-After you submit a pull request with your .rst changes for documentation on `github-pages`_, 
+After you submit a pull request with your .rst changes for documentation on `github-pages`_,
 the documentation will automatically get built. You will see a "build and deploy documentation" job
 at the bottom of the pull request page. If this passes, your documentation will have been generated.
 

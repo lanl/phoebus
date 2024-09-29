@@ -6,7 +6,7 @@ Tracer Particles
 ``Phoebus`` includes Lagrangian tracer particles.
 These are primarily for the purpose of post-processing simulation data for, e.g., nucleosynthesis.
 They are operator spit from the hydrodynamics and advected with a standard second order Runge-Kutta
-integrator. As ``Phoebus`` is a general relativistic code, we evolve tracer positions using a 
+integrator. As ``Phoebus`` is a general relativistic code, we evolve tracer positions using a
 relativistic advection equation:
 
 .. math::
@@ -39,7 +39,7 @@ Note that the position variables x, y, z are output for all swarms by default.
 See the `Parthenon docs <parthenon-swarms>`_ for more information.
 
 Tracers must, however, be configured in the problem generator.
-In the generator, the tracers should be distributed through the domain, assigned positions 
+In the generator, the tracers should be distributed through the domain, assigned positions
 and unique ids. An example from the advection pgen is shown below.
 
 .. code-block:: c++
@@ -49,7 +49,7 @@ and unique ids. An example from the advection pgen is shown below.
       KOKKOS_LAMBDA(const int n) {
         if (swarm_d.IsActive(n)) {
           auto rng_gen = rng_pool.get_state();
-  
+
           // sample in ball
           Real r2 = 1.0 + rin * rin; // init > rin^2
           while (r2 > rin * rin) {
@@ -59,14 +59,14 @@ and unique ids. An example from the advection pgen is shown below.
             r2 = x(n) * x(n) + y(n) * y(n) + z(n) * z(n);
           }
           id(n) = num_tracers_total * gid + n;
-  
+
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
           rng_pool.free_state(rng_gen);
         }
       });
 
-In addition to position, tracers track a number of potentially useful quantities. 
+In addition to position, tracers track a number of potentially useful quantities.
 These quantities include (bold quantities are 3-vectors with components _x, _y, _z)
 
 =================== ================ ===================

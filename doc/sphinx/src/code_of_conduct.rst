@@ -1,4 +1,4 @@
-.. _lanlcode: https://lanl.github.io/singularity-eos 
+.. _lanlcode: https://lanl.github.io/singularity-eos
 
 Code of Conduct
 =====================================
@@ -8,7 +8,7 @@ community a harassment-free experience for everyone.
 We will interact in ways that contribute to an open, welcoming,
 diverse, inclusive, and healthy community.
 
-We agree to uphold the `LANL Code of Conduct <lanlcode>`_ in all spaces relevant. 
+We agree to uphold the `LANL Code of Conduct <lanlcode>`_ in all spaces relevant.
 Of note:
 
 ::
