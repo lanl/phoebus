@@ -16,7 +16,12 @@ release = "1.0.0"
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinx_multiversion", "sphinx.ext.todo", "sphinx_copybutton"]
+extensions = [
+    "sphinx_multiversion",
+    "sphinx.ext.todo",
+    "sphinx_copybutton",
+    "sphinx_sitemap",
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -44,3 +49,6 @@ smv_remote_whitelist = r"^(origin)$"
 
 # Display todos by setting to True
 todo_include_todos = True
+
+# baseurl for sitemap
+html_baseurl = "https://lanl.github.io/phoebus"
