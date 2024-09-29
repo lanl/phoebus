@@ -25,7 +25,7 @@ create branches directly within `Phoebus`, they will hold repository
 admin privileges, and actively participate in the technical review of
 contributions to `Phoebus`.
 
-## Pull request protocol
+# Pull request protocol
 
 When submitting a pull request, there is a default template that is
 automatically populated. The pull request should sufficiently summarize
@@ -44,37 +44,85 @@ set to `1` adds useful output. For example:
 CFM=clang-format-12 VERBOSE=1 ./scripts/bash/format.sh
 ```
 
-## Test Suite
+In order for a pull request to merge, we require:
+
+-   Provide a thorough summary of changes, especially if they are
+    breaking changes
+-   Obey style guidleines (format with `clang-format` and pass the
+    necessary test)
+-   Pass the existing test suite
+-   Have at least one approval from a Maintainer
+-   If Applicable:
+    -   Write new tests for new features or bugs
+    -   Include or update documentation in `doc/`
+
+---
+
+# Test Suite
 
 Several sets of tests are triggered on a pull request: a static format
 check, a docs buld, and a suite of unit and regression tests. These are
-run through github's CPU infrastructure. These tests help ensure that
+run through github\'s CPU infrastructure. These tests help ensure that
 modifications to the code do not break existing capabilities and ensure
 a consistent code style.
 
-## Becoming a Maintainer
+## Adding Tests
 
-For the purpose of our development model, we label *Contributors* or
-*Maintainers* of `Phoebus`. Below we describe these labels and the
-process for contributing to `Phoebus`.
+There are two primary categories of tests written in `Phoebus`: unit
+tests and regression tests.
 
-We welcome contributions from scientists from a large variety of
-relativistic astrophysics. New users are welcome to contributions to
-`Phoebus` via the process above. Contributors with 6 merged
-pull requests into the main branch (over a minimum of 6 months) will be
-eligible to join as a *Maintainer* of `Phoebus` with additional
-repository access and roles. However, final approval of *Maintainer*
-status will require a approval by vote by existing
-*Maintainers*, a necessary step to ensure the safety and integrity of
-the code base for all users of `Phoebus`.
+### Unit
 
-The *Maintainers* of `Phoebus` consist of the original developers of the
-code and those that have a demonstrated history in the development of
-`Phoebus` prior to the implementation of the *Development Model*
-described here. Maintainers hold admin access, serve as reviewers for
-pull requests, and are in charge of the maintaining, deployment, and
-improvement of efforts towards: regression testing, documentation,
-science test cases (gold standards), and continuous integration.
+Unit tests live in `tst/unit/`. They are implemented using the
+[Catch2](https://github.com/catchorg/Catch2) unit testing framework.
+They are integrated with `cmake` and can be run, when enabled, with
+`ctest`. There are a few necessary `cmake` configurations to beuild
+tests:
+
++------------------------------+---------+------------------------------------------+
+| Option                       | Default | Description                              |
++==============================+=========+==========================================+
+| PHOEBUS\_ENABLE\_UNIT\_TESTS | OFF     | Enables Catch2 unit tests                |
++------------------------------+---------+------------------------------------------+
+| PHOEBUS\_ENABLE\_DOWNLOADS   | OFF     | Enables unit tests using tabulated EOS   |
++------------------------------+---------+------------------------------------------+
+
+### Regression
+
+Regression tests run existing simulations and test against saved output
+in order to verify sustained capabilities. They are implemented in
+Python in `test/regression/`. To run the tests you will need a Python
+environment with at least `numpy` and `h5py`. Tests can be ran manually
+as, e.g.,
+
+``` bash
+python linear_modes.py
+```
+
+This will build Phoebus locally in `phoebus/tst/regression/build` and
+run it in `phoebus/tst/regression/run`. Ensure that these directories do
+not already exist. Each script `test.py` has a correspodning \"gold
+file\" `test.gold`. The gold files contain the gold standard data that
+the output of the regression test is compared against. To generate new
+gold data, for example if a change is implemented that changes the
+behavior of a test (not erroneously) or a new test is created, run the
+test script with the `--upgold` option. This will create or update the
+corresponding `.gold` file. To add a new test:
+
+1.  Create a new test script.
+    -   Update the `modified_inputs` struct to change any input deck
+        options
+    -   Set the `variables` list to contain the quantities to test
+        against
+2.  Run the script with the `--upgold` option
+3.  Commit the test script and gold file
+4.  Update the CI to include the new test
+    (`phoebus/.github/workflows/tests.yml`)
+
+---
+See the [docs](https://lanl.github.io/phoebus) for further information
+about contributing to `Phoebus`.
+---
 
 ## List of Current Maintainers of Phoebus
 ---

@@ -54,7 +54,8 @@ In order for a pull request to merge, we require:
 - Obey style guidleines (format with ``clang-format`` and pass the necessary test)
 - Pass the existing test suite
 - Have at least one approval from a Maintainer
-- If Applicable:
+- If applicable:
+
   - Write new tests for new features or bugs
   - Include or update documentation in ``doc/``
 
@@ -69,10 +70,6 @@ and ensure a consistent code style.
 
 Adding Tests
 ````````````
-
-.. todo::
-
-   This section is incomplete.
 
 There are two primary categories of tests written in ``Phoebus``:
 unit tests and regression tests.
@@ -95,8 +92,31 @@ PHOEBUS_ENABLE_DOWNLOADS     OFF      Enables unit tests using tabulated EOS
 Regression
 ^^^^^^^^^^
 Regression tests run existing simulations and test against saved output 
-in order to verify sustained capabilities. They are implemented in Python in
-``test/regression/``.
+in order to verify sustained capabilities. 
+They are implemented in Python in
+``test/regression/``. To run the tests you will need a Python environment with 
+at least ``numpy`` and ``h5py``. Tests can be ran manually as, e.g.,
+
+.. code-block:: bash
+
+   python linear_modes.py
+
+This will build Phoebus locally in ``phoebus/tst/regression/build`` and run it in 
+``phoebus/tst/regression/run``. Ensure that these directories do not already exist.
+Each script ``test.py`` has a correspodning "gold file" ``test.gold``.
+The gold files contain the gold standard data that the output of the regression test 
+is compared against. To generate new gold data, for example if a change is implemented 
+that changes the behavior of a test (not erroneously) or a new test is created, run the test
+script with the ``--upgold`` option. This will create or update the corresponding ``.gold`` file.
+To add a new test:
+
+1. Create a new test script.
+   - Update the ``modified_inputs`` struct to change any input deck options
+   - Set the ``variables`` list to contain the quantities to test against
+2. Run the script with the ``--upgold`` option
+3. Commit the test script and gold file
+4. Update the CI to include the new test (``phoebus/.github/workflows/tests.yml``)
+
 
 Expectations for code review
 -----------------------------
