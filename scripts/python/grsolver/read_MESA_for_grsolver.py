@@ -4,10 +4,10 @@
 This script retrieves raw MESA profile data variables, reverses them to be center to surface, and outputs them in the format needed for GRSOLVER for use in Phoebus.
 
 Usage:
-    python read_MESA_for_grsolver.py --file='20m_cc' --ext='.dat'
+    python read_MESA_for_grsolver.py --file='20m_cc.dat'
 
 Arguments:
-    input_file: filename and file extension of MESA profile
+    input_file: filename of MESA profile
 """
 
 import numpy as np
@@ -15,14 +15,14 @@ import pandas as pd
 from argparse import ArgumentParser
 
 
-def load(file, ext):
-    df = pd.read_csv(file + ext, sep=r"\s+", header=4)
+def load(file):
+    df = pd.read_csv(file, sep=r"\s+", header=4)
     df = df.iloc[::-1].reset_index(drop=True)
     nzones = len(df)
     if nzones > 0:
-        print("loaded file:", file + ext, " with ", nzones, " zones.")
+        print("loaded file:", file, " with ", nzones, " zones.")
     else:
-        print("failed to load file", file + ext)
+        print("failed to load file", file)
         exit()
     return df
 
@@ -33,7 +33,8 @@ def retrieve_and_save(df, file):
     # if model non-rotating, pass array of zeros
     try:
         angular_velocity = df["omega"]
-    except:
+    except KeyError:
+        print("angular velocity not found, setting to zero.")
         angular_velocity = np.zeros_like((radius))
     density = df["density"]  # g/cm^3
     pressure = df["pressure"]  # g/cm^3
@@ -42,7 +43,7 @@ def retrieve_and_save(df, file):
     sie = df["energy"]  #  ! internal energy (ergs/g)
 
     np.savetxt(
-        file + str("_raw_data.txt"),
+        file.split(".")[0] + str("_raw_data.txt"),
         np.column_stack(
             [
                 radius,
@@ -55,7 +56,7 @@ def retrieve_and_save(df, file):
                 sie,
             ]
         ),
-        header="MESA output from model `" + str(file) + "` | \ "
+        header="MESA output from model `" + str(file.split(".")[0]) + "` | \ "
         "radius (cm) velocity (cm/s) angular_velocity (rad/s)  density (g/cm^3) pressure (dyne/cm^2) ye temperature (K) specific internal energy (erg/g)",
     )
     return
@@ -70,19 +71,12 @@ def main():
         "--file",
         type=str,
         default="file",
-        help="name of the input MESA file without extension",
-    )
-
-    parser.add_argument(
-        "--ext",
-        type=str,
-        default=".dat",
-        help="input MESA file extension",
+        help="name of the input MESA file",
     )
 
     args = parser.parse_args()
-    print(args.file, args.ext)
-    df = load(args.file, args.ext)
+    print(args.file)
+    df = load(args.file)
     retrieve_and_save(df, args.file)
 
     return
