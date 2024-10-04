@@ -4,7 +4,7 @@
 This script retrieves raw MESA profile data variables, reverses them to be center to surface, and outputs them in the format needed for GRSOLVER for use in Phoebus.
 
 Usage:
-    python read_MESA_for_grsolver.py --file='20m_cc.dat'
+    python read_MESA_for_grsolver.py 20m_cc.dat
 
 Arguments:
     input_file: filename of MESA profile
@@ -66,16 +66,14 @@ def main():
     parser = ArgumentParser(
         description="Retrieve raw MESA profile data variables and output to format needed for GRSOLVER for use in Phoebus."
     )
-
     parser.add_argument(
-        "--file",
+        "file",
         type=str,
         default="file",
         help="name of the input MESA file",
     )
-
     args = parser.parse_args()
-    print(args.file)
+
     df = load(args.file)
     retrieve_and_save(df, args.file)
 
