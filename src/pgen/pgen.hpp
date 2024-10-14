@@ -137,7 +137,7 @@ class PressResidual {
 };
 
 template <typename T>
-KOKKOS_FUNCTION Real energy_from_rho_P(T &eos, const Real rho, const Real P,
+KOKKOS_INLINE_FUNCTION Real energy_from_rho_P(T &eos, const Real rho, const Real P,
                                        const Real emin, const Real emax,
                                        const Real Ye = 0.0) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
