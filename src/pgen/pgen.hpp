@@ -138,8 +138,8 @@ class PressResidual {
 
 template <typename T>
 KOKKOS_INLINE_FUNCTION Real energy_from_rho_P(T &eos, const Real rho, const Real P,
-                                       const Real emin, const Real emax,
-                                       const Real Ye = 0.0) {
+                                              const Real emin, const Real emax,
+                                              const Real Ye = 0.0) {
   PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
   PressResidual res(eos, rho, P, Ye);
   root_find::RootFind root;
