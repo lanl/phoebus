@@ -14,7 +14,6 @@
 #include "geometry/geometry.hpp"
 
 #include "pgen.hpp"
-#include "phoebus_utils/root_find.hpp"
 
 namespace phoebus {
 
@@ -54,34 +53,6 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
   auto f = pinitmod_dict[name];
   f(pin, pmesh);
-}
-
-class PressResidual {
- public:
-  KOKKOS_INLINE_FUNCTION
-  PressResidual(const EOS &eos, const Real rho, const Real P, const Real Ye)
-      : eos_(eos), rho_(rho), P_(P) {
-    lambda_[0] = Ye;
-  }
-  KOKKOS_INLINE_FUNCTION
-  Real operator()(const Real e) {
-    return eos_.PressureFromDensityInternalEnergy(rho_, e, lambda_) - P_;
-  }
-
- private:
-  const EOS &eos_;
-  Real rho_, P_;
-  Real lambda_[2];
-};
-
-KOKKOS_FUNCTION
-Real energy_from_rho_P(const EOS &eos, const Real rho, const Real P, const Real emin,
-                       const Real emax, const Real Ye) {
-  PARTHENON_REQUIRE(P >= 0, "Pressure is negative!");
-  PressResidual res(eos, rho, P, Ye);
-  root_find::RootFind root;
-  Real eroot = root.regula_falsi(res, emin, emax, 1.e-10 * P, emin - 1.e10);
-  return rho * eroot;
 }
 
 } // namespace phoebus
