@@ -24,7 +24,7 @@ import shutil
 import os
 from subprocess import call, DEVNULL
 import glob
-from parthenon_tools import phdf
+#from parthenon_tools import phdf
 import time
 from enum import Enum
 from phoebus_constants import cgs, scalefree
