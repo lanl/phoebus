@@ -51,7 +51,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const Real rhoa = pin->GetOrAddReal("sedov", "rho_ambient", 1.0);
   const Real rinner = pin->GetOrAddReal("sedov", "rinner", 0.01);
-  const bool spherical = pin->GetOrAddReal("sedov", "spherical_coords", true);
+  const bool spherical = pin->GetOrAddBoolean("sedov", "spherical_coords", true);
 
   auto &coords = pmb->coords;
   auto pmesh = pmb->pmy_mesh;

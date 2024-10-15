@@ -54,7 +54,7 @@ class McKinneyGammieRyan {
                      Real smooth, Real hexp_br, Real hexp_nsq, Real hexp_csq)
       : derefine_poles_(derefine_poles), h_(h), xt_(xt), alpha_(alpha), x0_(x0),
         smooth_(smooth), norm_(GetNorm_(alpha_, xt_)), hexp_br_(hexp_br),
-        hexp_nsq_(hexp_nsq), hexp_csq_(hexp_csq_) {}
+        hexp_nsq_(hexp_nsq), hexp_csq_(hexp_csq) {}
   McKinneyGammieRyan(bool derefine_poles, Real h, Real xt, Real alpha, Real x0,
                      Real smooth)
       : derefine_poles_(derefine_poles), h_(h), xt_(xt), alpha_(alpha), x0_(x0),
