@@ -54,8 +54,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Metadata gcoord_cell =
       Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy}, cell_shape);
   // TODO(JMM): Make this actual node-centered data when available
+  // TODO: Warning: g.n.coord output broken in Parthenon currently
   std::vector<int> node_shape = {dims.nx1 + 1, dims.nx2 + 1, dims.nx3 + 1, 4};
-  Metadata gcoord_node = Metadata({Metadata::Derived, Metadata::OneCopy}, node_shape);
+  Metadata gcoord_node = Metadata({Metadata::Derived, Metadata::OneCopy, Metadata::None}, node_shape);
   geometry->AddField(geometric_variables::cell_coords::name(), gcoord_cell);
   geometry->AddField(geometric_variables::node_coords::name(), gcoord_node);
 

@@ -116,8 +116,8 @@ TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                        SwarmContainer *sc, const Real t0, const Real dt,
                                        Real *dNtot);
 
-TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb,
-                                                int *particles_outstanding);
+TaskStatus MonteCarloCountCommunicatedParticles(const BlockList_t &blocks,
+                                                const double tf_, bool *done);
 
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks);

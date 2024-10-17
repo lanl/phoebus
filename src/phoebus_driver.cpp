@@ -324,7 +324,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     if (rad_mocmc_active) {
       using MDT = std::remove_pointer<decltype(sc0.get())>::type;
       // TODO(BRR) stage_name[stage - 1]?
-      auto &sd0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+      auto &sd0 = pmb->meshblock_data.Get()->GetSwarmData();
       auto samples_transport =
           tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get(), dt);
       auto send = tl.AddTask(samples_transport, &SwarmContainer::Send, sd0.get(),
@@ -580,7 +580,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       for (int i = 0; i < blocks.size(); i++) {
         auto &tl = sync_region_tr[0];
         auto &pmb = blocks[i];
-        auto &sc = pmb->swarm_data.Get();
+        auto &sc = pmb->meshblock_data.Get()->GetSwarmData();
         auto reset_comms =
             tl.AddTask(none, &SwarmContainer::ResetCommunication, sc.get());
       }
@@ -590,8 +590,9 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
     for (int n = 0; n < blocks.size(); n++) {
       auto &tl = async_region_tr[n];
       auto &pmb = blocks[n];
-      auto &sc = pmb->swarm_data.Get();
+      auto &sc = pmb->meshblock_data.Get()->GetSwarmData();
       auto &mbd0 = pmb->meshblock_data.Get(stage_name[stage]);
+
       auto tracerAdvect = tl.AddTask(none, tracers::AdvectTracers, mbd0.get(), dt);
       auto tracerPurge =
           tl.AddTask(tracerAdvect, fixup::PurgeParticles, mbd0.get(), swarmName);
@@ -601,6 +602,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
       auto receive =
           tl.AddTask(send, &SwarmContainer::Receive, sc.get(), BoundaryCommSubset::all);
+      auto defrag = tl.AddTask(receive, &SwarmContainer::Defrag, sc.get(), 0.9);
     }
   }
 
@@ -932,7 +934,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       auto &pmb = blocks[i];
       auto &tl = async_region0[i];
       auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
-      auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+      auto &sc0 = pmb->meshblock_data.Get()->GetSwarmData();
       auto sample_particles = tl.AddTask(none, radiation::MonteCarloSourceParticles,
                                          pmb.get(), mbd0.get(), sc0.get(), t0, dt);
       auto transport_particles =
@@ -1023,7 +1025,8 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
  *  Fills Tracers
  *  Computes entropy for output
  **/
-void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
+void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin,
+                          const parthenon::SimTime &time) {
   auto tracer_pkg = pmb->packages.Get("tracers");
   bool do_tracers = tracer_pkg->Param<bool>("active");
 

@@ -55,7 +55,7 @@ template <class T>
 void MOCMCInitSamples(T *rc) {
 
   auto *pmb = rc->GetParentPointer();
-  auto &sc = pmb->swarm_data.Get();
+  auto &sc = rc->GetSwarmData();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
   auto rng_pool = rad->Param<RNGPool>("rng_pool");
@@ -160,9 +160,9 @@ void MOCMCInitSamples(T *rc) {
   //    },
   //  result);
 
-  const auto &x = swarm->template Get<Real>("x").Get();
-  const auto &y = swarm->template Get<Real>("y").Get();
-  const auto &z = swarm->template Get<Real>("z").Get();
+  const auto &x = swarm->template Get<Real>(swarm_position::x::name()).Get();
+  const auto &y = swarm->template Get<Real>(swarm_position::y::name()).Get();
+  const auto &z = swarm->template Get<Real>(swarm_position::z::name()).Get();
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
   const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
 
@@ -233,7 +233,7 @@ void MOCMCInitSamples(T *rc) {
 template <class T>
 TaskStatus MOCMCSampleBoundaries(T *rc) {
   auto *pmb = rc->GetParentPointer();
-  auto &sc = pmb->swarm_data.Get();
+  auto &sc = rc->GetSwarmData();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -251,9 +251,9 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   auto opac_pkg = pmb->packages.Get("opacity");
   const auto opac = opac_pkg->template Param<Opacities>("opacities");
 
-  const auto &x = swarm->template Get<Real>("x").Get();
-  const auto &y = swarm->template Get<Real>("y").Get();
-  const auto &z = swarm->template Get<Real>("z").Get();
+  const auto &x = swarm->template Get<Real>(swarm_position::x::name()).Get();
+  const auto &y = swarm->template Get<Real>(swarm_position::y::name()).Get();
+  const auto &z = swarm->template Get<Real>(swarm_position::z::name()).Get();
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
   const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
   const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
@@ -349,7 +349,7 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
 template <class T>
 TaskStatus MOCMCReconstruction(T *rc) {
   auto *pmb = rc->GetParentPointer();
-  auto &sc = pmb->swarm_data.Get();
+  auto &sc = rc->GetSwarmData();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -362,9 +362,9 @@ TaskStatus MOCMCReconstruction(T *rc) {
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  const auto &x = swarm->template Get<Real>("x").Get();
-  const auto &y = swarm->template Get<Real>("y").Get();
-  const auto &z = swarm->template Get<Real>("z").Get();
+  const auto &x = swarm->template Get<Real>(swarm_position::x::name()).Get();
+  const auto &y = swarm->template Get<Real>(swarm_position::y::name()).Get();
+  const auto &z = swarm->template Get<Real>(swarm_position::z::name()).Get();
   const auto &ncov = swarm->template Get<Real>("ncov").Get();
   const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
   const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
@@ -454,8 +454,8 @@ TaskStatus MOCMCReconstruction(T *rc) {
               }
               break;
             } // if inside
-          }   // m = 0..n
-        }     // n = 0..nsamp
+          } // m = 0..n
+        } // n = 0..nsamp
       });
 
   return TaskStatus::complete;
@@ -464,14 +464,14 @@ TaskStatus MOCMCReconstruction(T *rc) {
 template <class T>
 TaskStatus MOCMCTransport(T *rc, const Real dt) {
   auto *pmb = rc->GetParentPointer();
-  auto &sc = pmb->swarm_data.Get();
+  auto &sc = rc->GetSwarmData();
   auto &swarm = sc->Get("mocmc");
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto &t = swarm->template Get<Real>("t").Get();
-  auto &x = swarm->template Get<Real>("x").Get();
-  auto &y = swarm->template Get<Real>("y").Get();
-  auto &z = swarm->template Get<Real>("z").Get();
+  auto &x = swarm->template Get<Real>(swarm_position::x::name()).Get();
+  auto &y = swarm->template Get<Real>(swarm_position::y::name()).Get();
+  auto &z = swarm->template Get<Real>(swarm_position::z::name()).Get();
   auto &ncov = swarm->template Get<Real>("ncov").Get();
   auto swarm_d = swarm->GetDeviceContext();
 
@@ -505,7 +505,7 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   // Assume particles are already sorted from MOCMCReconstruction call!
 
   auto *pmb = rc->GetParentPointer();
-  auto &sc = pmb->swarm_data.Get();
+  auto &sc = rc->GetSwarmData();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
@@ -788,7 +788,7 @@ TaskStatus MOCMCEddington(T *rc) {
   namespace ir = radmoment_internal;
 
   auto *pmb = rc->GetParentPointer();
-  auto &sc = pmb->swarm_data.Get();
+  auto &sc = rc->GetSwarmData();
   auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 

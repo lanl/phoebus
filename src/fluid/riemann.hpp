@@ -70,8 +70,16 @@ class FluxState {
   }
   static void FluxVars(const std::string &var) { flux_vars.push_back(var); }
 
-  static std::vector<std::string> ReconVars() { return recon_vars; }
-  static std::vector<std::string> FluxVars() { return flux_vars; }
+  static std::vector<std::string> ReconVars() { 
+    for ( auto & v : recon_vars ) {
+    }
+    return recon_vars; 
+  }
+  static std::vector<std::string> FluxVars() { 
+    for ( auto & v : flux_vars ) {
+    }
+    return flux_vars; 
+  }
 
   KOKKOS_FORCEINLINE_FUNCTION
   int NumConserved() const { return ncons; }
@@ -229,12 +237,12 @@ class FluxState {
         pye(imap[fluid_prim::ye::name()].second),
         prs(imap[fluid_prim::pressure::name()].first),
         gm1(imap[fluid_prim::gamma1::name()].first),
-        crho(imap[fluid_cons::density::name()].first),
-        cmom_lo(imap[fluid_cons::momentum::name()].first),
-        ceng(imap[fluid_cons::energy::name()].first),
-        cb_lo(imap[fluid_cons::bfield::name()].first),
-        cb_hi(imap[fluid_cons::bfield::name()].second),
-        cye(imap[fluid_cons::ye::name()].first),
+        crho(imap[fluid_prim::density::name()].first),
+        cmom_lo(imap[fluid_prim::velocity::name()].first),
+        ceng(imap[fluid_prim::energy::name()].first),
+        cb_lo(imap[fluid_prim::bfield::name()].first),
+        cb_hi(imap[fluid_prim::bfield::name()].second),
+        cye(imap[fluid_prim::ye::name()].first),
         ncons(5 + (pb_hi - pb_lo + 1) + (cye > 0)) {
     PARTHENON_REQUIRE_THROWS(
         ncons <= NCONS_MAX,

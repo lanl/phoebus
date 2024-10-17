@@ -285,9 +285,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const auto new_particles_context = swarm->AddEmptyParticles(Nstot);
 
   auto &t = swarm->Get<Real>("t").Get();
-  auto &x = swarm->Get<Real>("x").Get();
-  auto &y = swarm->Get<Real>("y").Get();
-  auto &z = swarm->Get<Real>("z").Get();
+  auto &x = swarm->Get<Real>(swarm_position::x::name()).Get();
+  auto &y = swarm->Get<Real>(swarm_position::y::name()).Get();
+  auto &z = swarm->Get<Real>(swarm_position::z::name()).Get();
   auto &k0 = swarm->Get<Real>("k0").Get();
   auto &k1 = swarm->Get<Real>("k1").Get();
   auto &k2 = swarm->Get<Real>("k2").Get();
@@ -438,9 +438,9 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real d4x = dx_i * dx_j * dx_k * dt;
   auto geom = Geometry::GetCoordinateSystem(rc);
   auto &t = swarm->Get<Real>("t").Get();
-  auto &x = swarm->Get<Real>("x").Get();
-  auto &y = swarm->Get<Real>("y").Get();
-  auto &z = swarm->Get<Real>("z").Get();
+  auto &x = swarm->Get<Real>(swarm_position::x::name()).Get();
+  auto &y = swarm->Get<Real>(swarm_position::y::name()).Get();
+  auto &z = swarm->Get<Real>(swarm_position::z::name()).Get();
   auto &k0 = swarm->Get<Real>("k0").Get();
   auto &k1 = swarm->Get<Real>("k1").Get();
   auto &k2 = swarm->Get<Real>("k2").Get();
@@ -661,33 +661,42 @@ TaskStatus MonteCarloUpdateTuning(Mesh *pmesh, std::vector<Real> *resolution,
   return TaskStatus::complete;
 }
 
-TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb,
-                                                int *particles_outstanding) {
-  auto &swarm = pmb->swarm_data.Get()->Get("monte_carlo");
+// TODO(BLB) make sure this works if/when monte carlo solver in driver is updated...
+TaskStatus MonteCarloCountCommunicatedParticles(const BlockList_t &blocks,
+                                                const double tf_, bool *done) {
+  int num_unfinished = 0;
+  for (auto &block : blocks) {
+    auto sc = block->meshblock_data.Get()->GetSwarmData();
+    auto swarm = sc->Get("my_particles");
+    int max_active_index = swarm->GetMaxActiveIndex();
 
-  *particles_outstanding += swarm->num_particles_sent_;
+    auto &t = swarm->Get<Real>("t").Get();
 
-  // Reset communication flags
-  for (int n = 0; n < pmb->pbval->nneighbor; n++) {
-    auto &nb = pmb->pbval->neighbor[n];
-    swarm->vbswarm->bd_var_.flag[nb.bufid] = BoundaryStatus::waiting;
+    auto swarm_d = swarm->GetDeviceContext();
+
+    const auto &tf = tf_;
+
+    parthenon::par_reduce(
+        PARTHENON_AUTO_LABEL, 0, max_active_index,
+        KOKKOS_LAMBDA(const int n, int &num_unfinished) {
+          if (swarm_d.IsActive(n)) {
+            if (t(n) < tf) {
+              num_unfinished++;
+            }
+          }
+        },
+        Kokkos::Sum<int>(num_unfinished));
+  }
+
 #ifdef MPI_PARALLEL
-    swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
+  MPI_Allreduce(MPI_IN_PLACE, &num_unfinished, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 #endif // MPI_PARALLEL
-  }
 
-#ifdef MPI_PARALLEL
-  pmb->exec_space.fence();
-  for (int n = 0; n < pmb->pbval->nneighbor; n++) {
-    auto &nb = pmb->pbval->neighbor[n];
-    if (nb.snb.rank != Globals::my_rank) {
-      PARTHENON_MPI_CHECK(
-          MPI_Wait(&(swarm->vbswarm->bd_var_.req_send[nb.bufid]), MPI_STATUS_IGNORE));
-    }
-    swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
+  if (num_unfinished > 0) {
+    *done = false;
+  } else {
+    *done = true;
   }
-
-#endif
 
   return TaskStatus::complete;
 }
@@ -697,9 +706,9 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
   // Boundary transfers on same MPI proc are blocking
 #ifdef MPI_PARALLEL
   for (auto &block : blocks) {
-    auto swarm = block->swarm_data.Get()->Get(swarmName);
-    for (int n = 0; n < block->pbval->nneighbor; n++) {
-      auto &nb = block->pbval->neighbor[n];
+    auto swarm = block->meshblock_data.Get()->GetSwarmData()->Get(swarmName);
+    for (int n = 0; n < block->neighbors.size(); n++) {
+      auto &nb = block->neighbors[n];
 #ifdef MPI_PARALLEL
       swarm->vbswarm->bd_var_.req_send[nb.bufid] = MPI_REQUEST_NULL;
 #endif
@@ -710,7 +719,7 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
   // Reset boundary statuses
   for (auto &block : blocks) {
     auto &pmb = block;
-    auto sc = pmb->swarm_data.Get();
+    auto sc = pmb->meshblock_data.Get()->GetSwarmData();
     auto swarm = sc->Get(swarmName);
     swarm->ResetCommunication();
   }

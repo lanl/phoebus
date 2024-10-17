@@ -44,7 +44,8 @@ class PhoebusDriver : public EvolutionDriver {
 };
 
 parthenon::Packages_t ProcessPackages(std::unique_ptr<ParameterInput> &pin);
-void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin);
+void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin,
+                          const parthenon::SimTime &time);
 
 } // namespace phoebus
 
