@@ -104,58 +104,94 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       });
 
   fluid::PrimitiveToConserved(rc.get());
-
-  /* tracer init section */
-  if (do_tracers) {
-    auto &sc = pmb->swarm_data.Get();
-    auto &swarm = pmb->swarm_data.Get()->Get("tracers");
-    auto rng_pool = tracer_pkg->Param<RNGPool>("rng_pool");
-
-    const Real &x_min = pmb->coords.Xf<1>(ib.s);
-    const Real &y_min = pmb->coords.Xf<2>(jb.s);
-    const Real &z_min = pmb->coords.Xf<3>(kb.s);
-    const Real &x_max = pmb->coords.Xf<1>(ib.e + 1);
-    const Real &y_max = pmb->coords.Xf<2>(jb.e + 1);
-    const Real &z_max = pmb->coords.Xf<3>(kb.e + 1);
-
-    // as for num_tracers on each block... will get too many on multiple blocks
-    // TODO: distribute amongst blocks.
-    const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
-    const int number_block = num_tracers_total;
-
-    auto new_particles_context = swarm->AddEmptyParticles(number_block);
-
-    auto &x = swarm->Get<Real>("x").Get();
-    auto &y = swarm->Get<Real>("y").Get();
-    auto &z = swarm->Get<Real>("z").Get();
-    auto &id = swarm->Get<int>("id").Get();
-
-    auto swarm_d = swarm->GetDeviceContext();
-
-    const int gid = pmb->gid;
-    const int max_active_index = new_particles_context.GetNewParticlesMaxIndex();
-    pmb->par_for(
-        "ProblemGenerator::Torus::DistributeTracers", 0, max_active_index,
-        KOKKOS_LAMBDA(const int n) {
-          if (swarm_d.IsActive(n)) {
-            auto rng_gen = rng_pool.get_state();
-
-            // sample in ye ball
-            Real r2 = 1.0 + rin * rin; // init > rin^2
-            while (r2 > rin * rin) {
-              x(n) = x_min + rng_gen.drand() * (x_max - x_min);
-              y(n) = y_min + rng_gen.drand() * (y_max - y_min);
-              z(n) = z_min + rng_gen.drand() * (z_max - z_min);
-              r2 = x(n) * x(n) + y(n) * y(n) + z(n) * z(n);
-            }
-            id(n) = num_tracers_total * gid + n;
-
-            bool on_current_mesh_block = true;
-            swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
-            rng_pool.free_state(rng_gen);
-          }
-        });
-  }
 }
+
+void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+
+  const int ndim = pmesh->ndim;
+  for (auto &pmb : pmesh->block_list) {
+    auto &rc = pmb->meshblock_data.Get();
+    auto tracer_pkg = pmb->packages.Get("tracers");
+    bool do_tracers = tracer_pkg->Param<bool>("active");
+    const Real rin = pin->GetOrAddReal("advection", "rin", 0.1);
+    const Real v_inner = ndim == 3   ? (4. / 3.) * M_PI * std::pow(rin, 3.)
+                         : ndim == 2 ? M_PI * rin * rin
+                                     : rin;
+
+
+    auto geom = Geometry::GetCoordinateSystem(rc.get());
+    auto coords = pmb->coords;
+    if (do_tracers) {
+      const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
+      auto rng_pool = tracer_pkg->Param<RNGPool>("rng_pool");
+      auto &swarm = rc->GetSwarmData()->Get("tracers");
+
+      auto ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
+      auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
+      auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+      Real number_block = 0.0;
+
+      // Get fraction of block containing ye sphere
+      pmb->par_reduce(
+          "Phoebus::ProblemGenerator::Torus::BlockTracerNumber", kb.s, kb.e, jb.s, jb.e,
+          ib.s, ib.e,
+          KOKKOS_LAMBDA(const int k, const int j, const int i,
+                        Real &number_block_reduce) {
+            const Real dx1 = coords.Dxc<1>(k, j, i);
+            const Real dx2 = coords.Dxc<2>(k, j, i);
+            const Real dx3 = coords.Dxc<3>(k, j, i);
+            const Real x1 = coords.Xc<1>(k, j, i);
+            const Real x2 = coords.Xc<2>(k, j, i);
+            const Real x3 = coords.Xc<3>(k, j, i);
+
+            if (x1 * x1 + x2 * x2 + x3 * x3 < rin * rin) {
+              Real vol_block = dx1 * dx2 * dx3;
+              number_block_reduce += vol_block;
+            }
+          },
+          Kokkos::Sum<Real>(number_block));
+      number_block /= v_inner;
+      number_block = number_block * num_tracers_total;
+      const int num_tracers_block = (int)number_block;
+
+      // distribute
+      auto new_particles_context = swarm->AddEmptyParticles(number_block);
+
+      auto &x = swarm->Get<Real>(swarm_position::x::name()).Get();
+      auto &y = swarm->Get<Real>(swarm_position::y::name()).Get();
+      auto &z = swarm->Get<Real>(swarm_position::z::name()).Get();
+      auto &id = swarm->Get<int>("id").Get();
+
+      auto swarm_d = swarm->GetDeviceContext();
+
+      const int gid = pmb->gid;
+      const int max_active_index = new_particles_context.GetNewParticlesMaxIndex();
+      pmb->par_for(
+          "ProblemGenerator::Advection::DistributeTracers", 0, max_active_index,
+          KOKKOS_LAMBDA(const int new_n) {
+//            if (swarm_d.IsActive(n)) {
+              const int n = new_particles_context.GetNewParticleIndex(new_n);
+              auto rng_gen = rng_pool.get_state();
+
+              // sample in ye ball
+              Real r2 = 1.0 + rin * rin; // init > rin^2
+              while (r2 > rin * rin) {
+                x(n) = -rin +
+                       rng_gen.drand() * 2.0 * rin; // just sampling x \in [-rin, +rin]
+                y(n) = -rin + rng_gen.drand() * 2.0 * rin;
+                z(n) = -rin + rng_gen.drand() * 2.0 * rin;
+                r2 = x(n) * x(n) + y(n) * y(n) + z(n) * z(n);
+              }
+              id(n) = num_tracers_total * gid + n;
+
+              bool on_current_mesh_block = true;
+              swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+              rng_pool.free_state(rng_gen);
+ //           }
+          });
+    }
+  }
+
+} // PostInitializationModifier
 
 } // namespace advection

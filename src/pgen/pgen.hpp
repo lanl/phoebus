@@ -60,6 +60,7 @@ using namespace parthenon::package::prelude;
 // the name here
 #define FOREACH_POSTINIT_MODIFIER                                                        \
   POSTINIT_MODIFIER(phoebus)                                                             \
+  POSTINIT_MODIFIER(advection)                                                           \
   POSTINIT_MODIFIER(torus)
 
 /*

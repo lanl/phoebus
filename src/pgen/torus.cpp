@@ -630,8 +630,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
     // tracer initialization.
     if (do_tracers) {
-      auto &sc = pmb->swarm_data.Get();
-      auto &swarm = pmb->swarm_data.Get()->Get("tracers");
+      auto &swarm = rc->GetSwarmData()->Get("tracers");
       auto rng_pool = tracer_pkg->Param<RNGPool>("rng_pool");
       const auto num_tracers_total = tracer_pkg->Param<int>("num_tracers");
 
