@@ -730,6 +730,8 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   const std::string ox1_bc = fluid->Param<std::string>("ox1_bc");
   const std::string ix2_bc = fluid->Param<std::string>("ix2_bc");
   const std::string ox2_bc = fluid->Param<std::string>("ox2_bc");
+  const std::string ix3_bc = fluid->Param<std::string>("ix3_bc");
+  const std::string ox3_bc = fluid->Param<std::string>("ox3_bc");
 
   auto rad = pmb->packages.Get("radiation");
   int num_species = 0;
@@ -992,7 +994,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (ndim == 2) return TaskStatus::complete;
 
   // x3-direction
-  if (pmb->boundary_flag[BoundaryFace::inner_x3] == BoundaryFlag::outflow) {
+  if (ix3_bc == "outflow") {
     PackIndexMap imap;
     auto v =
         rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
@@ -1003,7 +1005,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
         ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           v.flux(X3DIR, crho, k, j, i) = std::min(v.flux(X3DIR, crho, k, j, i), 0.0);
         });
-  } else if (pmb->boundary_flag[BoundaryFace::inner_x3] == BoundaryFlag::reflect) {
+  } else if (ix3_bc == "reflect") {
     PackIndexMap imap;
     auto v = rc->PackVariablesAndFluxes(
         std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
@@ -1024,7 +1026,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           }
         });
   }
-  if (pmb->boundary_flag[BoundaryFace::outer_x3] == BoundaryFlag::outflow) {
+  if (ox3_bc == "outflow") {
     PackIndexMap imap;
     auto v =
         rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
@@ -1035,7 +1037,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
         jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
           v.flux(X3DIR, crho, k, j, i) = std::max(v.flux(X3DIR, crho, k, j, i), 0.0);
         });
-  } else if (pmb->boundary_flag[BoundaryFace::outer_x3] == BoundaryFlag::reflect) {
+  } else if (ox3_bc == "reflect") {
     PackIndexMap imap;
     auto v = rc->PackVariablesAndFluxes(
         std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
