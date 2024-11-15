@@ -668,9 +668,9 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
 
       auto new_particles_context = swarm->AddEmptyParticles(num_tracers);
 
-      auto &x = swarm->Get<Real>("x").Get();
-      auto &y = swarm->Get<Real>("y").Get();
-      auto &z = swarm->Get<Real>("z").Get();
+      auto &x = swarm->Get<Real>(swarm_position::x::name()).Get();
+      auto &y = swarm->Get<Real>(swarm_position::y::name()).Get();
+      auto &z = swarm->Get<Real>(swarm_position::z::name()).Get();
       auto &mass = swarm->Get<Real>("mass").Get();
       auto &id = swarm->Get<int>("id").Get();
 
