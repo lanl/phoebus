@@ -174,6 +174,8 @@ target_include_directories(phoebuslib PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}/../external/singularity-opac/utils"
 )
 
+find_package(Torch)
+
 target_compile_features(phoebuslib PUBLIC cxx_std_17)
 # TODO(JMM): Remove this since we're never going to run on XL again (I hope)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "XL")
@@ -193,12 +195,14 @@ if (Kokkos_ENABLE_CUDA)
 endif()
 
 target_link_libraries(phoebuslib PUBLIC parthenon
-  singularity-eos::singularity-eos
+  singularity-eos::singularity-eos "${TORCH_LIBRARIES}"
   # singularity-opac::singularity-opac
 )
 if (PHOEBUS_ENABLE_HDF5)
   target_link_libraries(phoebuslib PUBLIC hdf5::hdf5 hdf5::hdf5_hl)
 endif()
+
+#target_link_libraries(phoebuslib "${TORCH_LIBRARIES}")
 
 # Disable executable automatically for builds with downstream codes
 if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
