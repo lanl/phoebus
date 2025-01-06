@@ -285,7 +285,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   auto opacity_device = params.Get<singularity::neutrinos::Opacity>("d.opacity");
-  auto &mean_opac_device = params.Get<MeanOpacity>("d.mean_opacity");
+  auto &mean_opac_device = params.Get<MeanOpacityBase>("d.mean_opacity");
   auto &s_opacity_device = params.Get<SOpacity>("d.s_opacity");
   auto &mean_s_opac_device = params.Get<MeanSOpacity>("d.mean_s_opacity");
   Opacities opacities(opacity_device, mean_opac_device, s_opacity_device,
