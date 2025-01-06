@@ -86,7 +86,9 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
 
   // tracer position swarm pack
   const auto swarm_name = "tracers";
-  static auto desc_tracer = MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z>(swarm_name);
+  static auto desc_tracer =
+      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z>(
+          swarm_name);
   auto pack_tracers = desc_tracer.GetPack(rc);
 
   static const auto vars = {p::velocity::name()};
@@ -112,8 +114,7 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
           const Real z = pack_tracers(b, swarm_position::z(), n);
 
           // predictor
-          tracers_rhs(pack, geom, pvel_lo, pvel_hi, ndim, dt, x, y, z, rhs1,
-                      rhs2, rhs3);
+          tracers_rhs(pack, geom, pvel_lo, pvel_hi, ndim, dt, x, y, z, rhs1, rhs2, rhs3);
           const Real kx = x + 0.5 * dt * rhs1;
           const Real ky = y + 0.5 * dt * rhs2;
           const Real kz = z + 0.5 * dt * rhs3;
@@ -155,13 +156,16 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
   // tracer swarm pack
   const auto swarm_name = "tracers";
-  static auto desc_tracer_pos = MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z>(swarm_name);
+  static auto desc_tracer_pos =
+      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z>(
+          swarm_name);
   auto pack_tracers_pos = desc_tracer_pos.GetPack(rc);
 
   // tracer vars pack
-  std::vector<std::string> swarm_vars = {"vel_x", "vel_y", "vel_z", "rho", "temperature", 
-    "ye", "entropy", "energy", "lorentz", "lapse", "shift_x", "shift_y", 
-    "shift_z", "detgamma", "pressure", "bernoulli"};
+  std::vector<std::string> swarm_vars = {
+      "vel_x",   "vel_y",    "vel_z",    "rho",      "temperature", "ye",
+      "entropy", "energy",   "lorentz",  "lapse",    "shift_x",     "shift_y",
+      "shift_z", "detgamma", "pressure", "bernoulli"};
 
   if (mhd) {
     swarm_vars.push_back("B_x");
@@ -220,11 +224,12 @@ void FillTracers(MeshBlockData<Real> *rc) {
   // update loop.
   const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
-      "Fill Tracers", 0, pack_tracers_pos.GetMaxFlatIndex(), KOKKOS_LAMBDA(const int idx) {
+      "Fill Tracers", 0, pack_tracers_pos.GetMaxFlatIndex(),
+      KOKKOS_LAMBDA(const int idx) {
         const auto [b, n] = pack_tracers_pos.GetBlockParticleIndices(idx);
         const auto swarm_d = pack_tracers_pos.GetContext(b);
 
-        //TODO(BLB): clean up
+        // TODO(BLB): clean up
         const int ivel_x = pack_tracers_vars.GetLowerBound(b, spi_vel_x);
         const int ivel_y = pack_tracers_vars.GetLowerBound(b, spi_vel_y);
         const int ivel_z = pack_tracers_vars.GetLowerBound(b, spi_vel_z);

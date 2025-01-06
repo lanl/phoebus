@@ -118,7 +118,6 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
                          : ndim == 2 ? M_PI * rin * rin
                                      : rin;
 
-
     auto geom = Geometry::GetCoordinateSystem(rc.get());
     auto coords = pmb->coords;
     if (do_tracers) {
@@ -169,25 +168,22 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
       pmb->par_for(
           "ProblemGenerator::Advection::DistributeTracers", 0, max_active_index,
           KOKKOS_LAMBDA(const int new_n) {
-//            if (swarm_d.IsActive(n)) {
-              const int n = new_particles_context.GetNewParticleIndex(new_n);
-              auto rng_gen = rng_pool.get_state();
+            const int n = new_particles_context.GetNewParticleIndex(new_n);
+            auto rng_gen = rng_pool.get_state();
 
-              // sample in ye ball
-              Real r2 = 1.0 + rin * rin; // init > rin^2
-              while (r2 > rin * rin) {
-                x(n) = -rin +
-                       rng_gen.drand() * 2.0 * rin; // just sampling x \in [-rin, +rin]
-                y(n) = -rin + rng_gen.drand() * 2.0 * rin;
-                z(n) = -rin + rng_gen.drand() * 2.0 * rin;
-                r2 = x(n) * x(n) + y(n) * y(n) + z(n) * z(n);
-              }
-              id(n) = num_tracers_total * gid + n;
+            // sample in ye ball
+            Real r2 = 1.0 + rin * rin; // init > rin^2
+            while (r2 > rin * rin) {
+              x(n) = -rin + rng_gen.drand() * 2.0 * rin; // x \in [-rin, +rin]
+              y(n) = -rin + rng_gen.drand() * 2.0 * rin;
+              z(n) = -rin + rng_gen.drand() * 2.0 * rin;
+              r2 = x(n) * x(n) + y(n) * y(n) + z(n) * z(n);
+            }
+            id(n) = num_tracers_total * gid + n;
 
-              bool on_current_mesh_block = true;
-              swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
-              rng_pool.free_state(rng_gen);
- //           }
+            bool on_current_mesh_block = true;
+            swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+            rng_pool.free_state(rng_gen);
           });
     }
   }

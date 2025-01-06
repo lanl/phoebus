@@ -70,15 +70,15 @@ class FluxState {
   }
   static void FluxVars(const std::string &var) { flux_vars.push_back(var); }
 
-  static std::vector<std::string> ReconVars() { 
-    for ( auto & v : recon_vars ) {
+  static std::vector<std::string> ReconVars() {
+    for (auto &v : recon_vars) {
     }
-    return recon_vars; 
+    return recon_vars;
   }
-  static std::vector<std::string> FluxVars() { 
-    for ( auto & v : flux_vars ) {
+  static std::vector<std::string> FluxVars() {
+    for (auto &v : flux_vars) {
     }
-    return flux_vars; 
+    return flux_vars;
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
