@@ -317,8 +317,8 @@ void FillTracers(MeshBlockData<Real> *rc) {
             pack_tracers_vars(b, iB_z, n) = B_X3;
           }
 
-          //bool on_current_mesh_block = true;
-          //swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+          bool on_current_mesh_block = true;
+          swarm_d.GetNeighborBlockIndex(n, x, y, z, on_current_mesh_block);
         }
       });
 
