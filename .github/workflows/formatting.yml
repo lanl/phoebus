@@ -17,11 +17,11 @@ jobs:
         - name: Set system to non-interactive mode
           run: export DEBIAN_FRONTEND=noninteractive
         - name: install dependencies
-          - uses: BSFishy/pip-action@v1
-            with:
-              packages: |
-                clang-format==12.0.1
-          - run: |
+          uses: BSFishy/pip-action@v1
+          with:
+            packages: |
+               lang-format==12.0.1
+          run: |
             sudo apt-get install -y --force-yes -qq git
         - name: check formatting
           run: find . -regex '.*\.\(cpp\|hpp\)' | xargs clang-format -style=file -i && git diff --exit-code --ignore-submodules
