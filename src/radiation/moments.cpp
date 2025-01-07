@@ -513,12 +513,16 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
 
+  // TODO(@astrtobarker) move to sparse packs
   PackIndexMap imap_ql, imap_qr, imap;
   std::vector<std::string> vars{ir::ql::name(),   ir::qr::name(), ir::ql_v::name(),
                                 ir::qr_v::name(), ir::dJ::name(), ir::kappaH::name()};
   std::vector<std::string> flxs{cr::E::name(), cr::F::name()};
 
   auto v = rc->PackVariablesAndFluxes(vars, flxs, imap);
+
+  PackIndexMap imap_fl;
+  auto v_fl = rc->PackVariablesAndFluxes(flxs, flxs, imap_fl);
 
   auto idx_qlv = imap.GetFlatIdx(ir::ql_v::name());
   auto idx_qrv = imap.GetFlatIdx(ir::qr_v::name());
@@ -527,8 +531,8 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   auto idx_dJ = imap.GetFlatIdx(ir::dJ::name());
   auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name());
 
-  auto idx_Ff = imap.GetFlatIdx(cr::F::name());
-  auto idx_Ef = imap.GetFlatIdx(cr::E::name());
+  auto idx_Ff = imap_fl.GetFlatIdx(cr::F::name());
+  auto idx_Ef = imap_fl.GetFlatIdx(cr::E::name());
 
   auto num_species = rad_pkg->Param<int>("num_species");
 
@@ -737,14 +741,14 @@ TaskStatus CalculateFluxesImpl(T *rc) {
               0.5 * sdetgam * (conFl(idir) + conFr(idir) + sigspeed * (El - Er));
 
           SPACELOOP(ii) {
-            v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
+            v_fl.flux(idir_in, idx_Ff(ispec, ii), k, j, i) =
                 0.5 * sdetgam *
                 (Pl(idir, ii) + Pr(idir, ii) + sigspeed * (covFl(ii) - covFr(ii)));
           }
 
           if (sdetgam < robust::SMALL()) {
-            v.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
-            SPACELOOP(ii) v.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
+            v_fl.flux(idir_in, idx_Ef(ispec), k, j, i) = 0.0;
+            SPACELOOP(ii) v_fl.flux(idir_in, idx_Ff(ispec, ii), k, j, i) = 0.0;
           }
         }
       });
