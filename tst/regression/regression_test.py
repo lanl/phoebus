@@ -298,7 +298,9 @@ def gold_comparison(
         if len(variable.shape) > 1:
             dim = variable.shape[0]
             for d in range(dim):
-                variables_data = np.concatenate((variables_data, variable[d, :].flatten()))
+                variables_data = np.concatenate(
+                    (variables_data, variable[d, :].flatten())
+                )
         else:
             variables_data = np.concatenate((variables_data, variable))
 

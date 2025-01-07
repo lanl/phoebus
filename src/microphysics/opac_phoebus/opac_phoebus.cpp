@@ -144,8 +144,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   {
-    auto opacity_host =
-        params.Get<singularity::neutrinos::Opacity>("h.opacity");
+    auto opacity_host = params.Get<singularity::neutrinos::Opacity>("h.opacity");
     const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
     const Real YeMax = pin->GetOrAddReal("mean_opacity", "yemax", 0.5);
     const int NYe = pin->GetOrAddInteger("mean_opacity", "nye", 10);
