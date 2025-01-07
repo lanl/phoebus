@@ -145,7 +145,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   {
     auto opacity_host =
-        params.Get<singularity::neutrinos::Opacity>("h.opacity_baseunits");
+        params.Get<singularity::neutrinos::Opacity>("h.opacity");
     const Real YeMin = pin->GetOrAddReal("mean_opacity", "yemin", 0.1);
     const Real YeMax = pin->GetOrAddReal("mean_opacity", "yemax", 0.5);
     const int NYe = pin->GetOrAddInteger("mean_opacity", "nye", 10);
@@ -162,7 +162,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       auto mean_opac_host =
           MeanOpacityBase(opacity_host, lRhoMin, lRhoMax, NRho, lTMin, lTMax, NT, YeMin,
                           YeMax, NYe, lNuMin, lNuMax, NNu);
-      auto mean_opac_device = mean_opac_host.GetOnDevice();
+      MeanOpacity mean_opac_device = mean_opac_host.GetOnDevice();
       params.Add("h.mean_opacity", mean_opac_host);
       params.Add("d.mean_opacity", mean_opac_device);
     } else {
@@ -182,7 +182,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       auto mean_opac_host = MeanNonCGSUnits<MeanOpacityBase>(
           std::forward<MeanOpacityBase>(cgs_mean_opacity), time_unit, mass_unit,
           length_unit, temp_unit);
-      auto mean_opac_device = mean_opac_host.GetOnDevice();
+      MeanOpacity mean_opac_device = mean_opac_host.GetOnDevice();
       params.Add("h.mean_opacity", mean_opac_host);
       params.Add("d.mean_opacity", mean_opac_device);
     }
@@ -285,7 +285,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   auto opacity_device = params.Get<singularity::neutrinos::Opacity>("d.opacity");
-  auto &mean_opac_device = params.Get<MeanOpacityBase>("d.mean_opacity");
+  auto &mean_opac_device = params.Get<MeanOpacity>("d.mean_opacity");
   auto &s_opacity_device = params.Get<SOpacity>("d.s_opacity");
   auto &mean_s_opac_device = params.Get<MeanSOpacity>("d.mean_s_opacity");
   Opacities opacities(opacity_device, mean_opac_device, s_opacity_device,
