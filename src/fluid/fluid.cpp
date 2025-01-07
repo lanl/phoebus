@@ -786,25 +786,11 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto &resolved_pkgs = pmesh->resolved_packages;
-  // static auto desc = MakePackDescriptor<fluid_cons::bfield>(resolved_pkgs.get(),
-  // {parthenon::Metadata::WithFluxes}, {parthenon::PDOpt::WithFluxes});
   static auto desc = MakePackDescriptor<fluid_cons::bfield>(
       resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
-  // const auto v =
-  // rc->PackVariablesAndFluxes(std::vector<std::string>{fluid_cons::bfield::name()});
-  // auto f1 = rc->Get("bnd_flux::" + fluid_cons::bfield::name()).data.Get(0,0,0);
-  // auto f2 = rc->Get("bnd_flux::" + fluid_cons::bfield::name()).data.Get(1,0,0);
-  // auto f3 = rc->Get("bnd_flux::" + fluid_cons::bfield::name()).data.Get(2,0,0);
   auto v = desc.GetPack(rc);
-  // auto f1 = v.flux(0, X1DIR,  fluid_cons::bfield::name(), k, j, i);
-  // auto f2 = v.flux(0, X2DIR, fluid_cons::bfield::name(), k, j, i);
-  // auto f3 = v.flux(0, X3DIR, fluid_cons::bfield::name(), k, j, i);
-  // auto f1 = rc->Get(fluid_cons::bfield::name()).flux[X1DIR];
-  // auto f2 = rc->Get(fluid_cons::bfield::name()).flux[X2DIR];
-  // auto f3 = rc->Get(fluid_cons::bfield::name()).flux[X3DIR];
   auto emf = rc->Get(internal_variables::emf::name()).data;
 
-  // print
   if (ndim == 2) {
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "FluxCT::EMF::2D", DevExecSpace(), kb.s, kb.e, jb.s,
