@@ -29,7 +29,7 @@ import __main__
 BUILD_DIR = "build"
 RUN_DIR = "run"
 SOURCE_DIR = "../../../"
-NUM_PROCS = 4  # Default values for cmake --build --parallel can overwhelm CI systems
+NUM_PROCS = 8  # Default values for cmake --build --parallel can overwhelm CI systems
 TEMPORARY_INPUT_FILE = "test_input.pin"
 SCRIPT_NAME = os.path.basename(__main__.__file__).split(".py")[0]
 
@@ -298,7 +298,7 @@ def gold_comparison(
         if len(variable.shape) > 1:
             dim = variable.shape[0]
             for d in range(dim):
-                variables_data = np.concatenate((variables_data, variable[d, :]))
+                variables_data = np.concatenate((variables_data, variable[d, :].flatten()))
         else:
             variables_data = np.concatenate((variables_data, variable))
 
