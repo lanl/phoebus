@@ -76,7 +76,7 @@ KOKKOS_INLINE_FUNCTION void tracers_rhs(Pack &pack, Geometry &geom, const int pv
   }
 }
 
-TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt);
+TaskStatus AdvectTracers(MeshData<Real> *rc, const Real dt);
 
 void FillTracers(MeshBlockData<Real> *rc);
 

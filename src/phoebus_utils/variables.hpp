@@ -118,6 +118,29 @@ VARIABLE_CUSTOM(cell_coords, g.c.coord);
 VARIABLE_CUSTOM(node_coords, g.n.coord);
 } // namespace geometric_variables
 
+namespace tracer_variables {
+SWARM_VARIABLE(Real, tr, rho);
+SWARM_VARIABLE(Real, tr, temperature);
+SWARM_VARIABLE(Real, tr, ye);
+SWARM_VARIABLE(Real, tr, entropy);
+SWARM_VARIABLE(Real, tr, pressure);
+SWARM_VARIABLE(Real, tr, energy);
+SWARM_VARIABLE(Real, tr, vel_x);
+SWARM_VARIABLE(Real, tr, vel_y);
+SWARM_VARIABLE(Real, tr, vel_z);
+SWARM_VARIABLE(Real, tr, lorentz);
+SWARM_VARIABLE(Real, tr, lapse);
+SWARM_VARIABLE(Real, tr, detgamma);
+SWARM_VARIABLE(Real, tr, shift_x);
+SWARM_VARIABLE(Real, tr, shift_y);
+SWARM_VARIABLE(Real, tr, shift_z);
+SWARM_VARIABLE(Real, tr, mass);
+SWARM_VARIABLE(Real, tr, bernoulli);
+SWARM_VARIABLE(Real, tr, B_x);
+SWARM_VARIABLE(Real, tr, B_y);
+SWARM_VARIABLE(Real, tr, B_z);
+} // namespace tracer_variables
+
 namespace diagnostic_variables {
 VARIABLE_NONS(divb);
 VARIABLE_NONS(ratio_divv_cs);
