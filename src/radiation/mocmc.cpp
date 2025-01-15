@@ -887,7 +887,7 @@ TaskStatus MOCMCEddington(T *rc) {
 	//int* device_slice_ptr = &(data_view(i, j, k, 0, 0));
         //auto z3d = torch::from_blob(device_slice_ptr, {1, 1, grid_points, grid_points}, torch::kFloat).cuda();
 	//auto z3d = torch::from_blob(device_slice_ptr, {grid_points, grid_points}, torch::kFloat).cuda();
-	if (do_MLED){
+	//if (do_MLED){
         //Make a uniform theta-phi mesh to interpolate I onto
        
         Real theta_arr[grid_points], phi_arr[grid_points];
@@ -913,7 +913,7 @@ TaskStatus MOCMCEddington(T *rc) {
 	
         
         //******************
-	}
+	
         //Real input_arr[MAX_SPECIES][nsamp][3]; //array which will store theta,phi and intensity values for each species at each particle point  
 
 
@@ -962,11 +962,21 @@ TaskStatus MOCMCEddington(T *rc) {
               for (int isup = 0; isup < interp.StencilSize(); isup++) {
                 I[s] += nubin_wgt[isup] * Inuinv(nubin_shift[isup], s, nswarm) *
                         pow(nusamp(nubin), 4);
+		
               }
+	      
             }
           }
+	  Real Imax = 0.0;
+	  for (int s = 0; s<num_species; s++){
+	    if(I[s] > Imax){
+	      Imax = I[s];
+	    }
+	    //printf("I[%d,%d,%d,%d,%d] = %.2f",i,j,k,s,n,I[s]);
+	  }
+	  //printf("Imax = %.2f", Imax);
             //**********************
-	  if (do_MLED){
+	  //if (do_MLED){
 	    const Real trial[4] = {0., 1., 0., 0.};
 	    Geometry::Tetrads tetrads(ucon, trial, cov_g);
 	    Real ncov_coord[4] = {ncov(0, nswarm), ncov(1, nswarm), ncov(2, nswarm),
@@ -975,10 +985,10 @@ TaskStatus MOCMCEddington(T *rc) {
 	    tetrads.CoordToTetradCov(ncov_coord, ncov_tetrad);
           
 	    Real theta_val,phi_val;
-	    theta_val = acos(1.0 - ncov_tetrad[1]);
+	    theta_val = acos(ncov_tetrad[1]);
 	    phi_val = atan2(ncov_tetrad[3], ncov_tetrad[2]) + M_PI;
 
-	  
+	    //printf("theta_val = %.2f, phi_val = %.2f, %.2f\n", theta_val,phi_val, 1.0-ncov_tetrad[1]);
            // populate input array (assuming, theta and phi values of particles do not depend on s)
             /*for (int s = 0; s < num_species; s++) {
                 input_arr[s][n][0] = theta_val;
@@ -988,8 +998,8 @@ TaskStatus MOCMCEddington(T *rc) {
 	    
            // interpolate (nearest neighbor) input_arr onto z3d grid for each species
             for (int s=0; s<num_species; s++){
-	      for (int r = 0; r < grid_points; ++r) {
-                    for (int l = 0; l < grid_points; ++l) {
+	      for (int r = 0; r < grid_points; r++) {
+                    for (int l = 0; l < grid_points; l++) {
 		      //double min_dist = std::numeric_limits<double>::max();
                         double nearest_value = -1;
                         
@@ -998,16 +1008,19 @@ TaskStatus MOCMCEddington(T *rc) {
                             if (dist < min_dist[r][l]) {
                                 min_dist[r][l] = dist;
                                 nearest_value = I[s];
+				data_view(i, j, k, s, r, l) = nearest_value/(2*Imax);
+				//printf(nearest_value);
+
                             }
                         
                         //z3d[0][0][r][l] = nearest_value;
-			data_view(i, j, k, s, r, l) = nearest_value;
+
                     }
                 }
 		//auto non_const_model = model.clone();
                 //at::Tensor edd_output = non_const_model.forward({z3d}).toTensor();
 		
-                // fill eddington tensor from model output
+                // fill  eddington tensor from model output
                 //for (int ii = 0; ii < 3; ii++) {
 		//for (int jj = 0; jj < 3; jj++) {
 		//v(iTilPi(s, ii, jj), k, j, i) = edd_output[ii*3+jj].item<double>(); //converting to double here because get error between parthenon v and torch tensor edd_output
@@ -1015,10 +1028,11 @@ TaskStatus MOCMCEddington(T *rc) {
                 //}
                 
             }
+	    
 	    //deep copy z3d here
 	    //Kokkos::deep_copy(Kokkos::HostSpace, intensity_grid, data_view);
 	 
-	  }
+	    /*
 	  else{
            //***************************
         
@@ -1039,6 +1053,7 @@ TaskStatus MOCMCEddington(T *rc) {
           }
 	  }
 	}
+	
 	if (nsamp > 0) {
           for (int s = 0; s < num_species; s++) {
             for (int ii = 0; ii < 3; ii++) {
@@ -1054,10 +1069,15 @@ TaskStatus MOCMCEddington(T *rc) {
           v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
           v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
           v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
-        }
-      });
+	  printf("%.2f,  %.2f,  %.2f\n", v(iTilPi(s,0,0),k,j,i), v(iTilPi(s,1,1),k,j,i), v(iTilPi(s,2,2),k,j,i));
+	  }*/
+	
+      
+	}});
       
       // end par for loops here and do ml inference on cpu
+
+  
      auto data_view_host = Kokkos::create_mirror_view(Kokkos::HostSpace(), data_view);
      Kokkos::deep_copy(data_view_host, data_view);
      Kokkos::View<double*****, Kokkos::DefaultExecutionSpace> edd_view("edd_view", nx_i, nx_j, nx_k, num_species,9);
@@ -1073,7 +1093,9 @@ TaskStatus MOCMCEddington(T *rc) {
 		    }
 	     }
 	     torch::Tensor edd_output = model.forward({z3d}).toTensor();
-	     //std::cout << edd_output << std::endl;
+	     //std::cout << z3d <<std::endl;
+	     //std::cout << edd_output[0][0] << edd_output[0][4] << edd_output[0][8] << std::endl;
+	     std::cout << edd_output << std::endl;
 
 	     for (int m=0; m<9; m++){
 	       edd_grid(i, j, k, s, m) = edd_output[0][m].item<double>();
