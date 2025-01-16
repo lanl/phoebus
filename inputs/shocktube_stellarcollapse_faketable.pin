@@ -1,0 +1,119 @@
+# © 2021. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract 89233218CNA000001
+# for Los Alamos National Laboratory (LANL), which is operated by Triad
+# National Security, LLC for the U.S.  Department of Energy/National
+# Nuclear Security Administration. All rights in the program are
+# reserved by Triad National Security, LLC, and the U.S. Department of
+# Energy/National Nuclear Security Administration. The Government is
+# granted for itself and others acting on its behalf a nonexclusive,
+# paid-up, irrevocable worldwide license in this material to reproduce,
+# prepare derivative works, distribute copies to the public, perform
+# publicly and display publicly, and to permit others to do so.
+
+# Sod shock tube for fake stellar collapse table generated with ideal gas eos
+# to generate, run
+# python external/singularity-eos/utils/scripts/make_tabulated_gamma.py -o ideal_gas.h5
+# to generate ideal gas table.
+# optionally run the stellarcollapse2spiner utility in singularity-eos to convert to a
+# stellar collapse file. This will make reading the table much faster.
+
+<phoebus>
+problem = shock_tube
+ix1_bc = outflow
+ox1_bc = outflow
+
+<parthenon/job>
+problem_id  = sod       # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = p.density,  &
+	    c.density,  &
+            p.velocity, &
+            p.energy,   &
+	    pressure,	&
+	    cs, &
+	    p.ye
+
+file_type   = hdf5      # Tabular data dump
+dt          = 0.01      # time increment between outputs
+
+<parthenon/time>
+nlim        = -1       # cycle limit
+tlim        = 0.4      # time limit
+integrator  = rk2      # time integration algorithm
+ncycle_out  = 1        # interval for stdout summary info
+dt_init_fact = 1.e-6
+
+<parthenon/mesh>
+nghost = 4
+#refinement = adaptive
+#numlevel = 3
+
+nx1         = 512       # Number of zones in X1-direction
+x1min       = 0        # minimum value of X1
+x1max       = 1         # maximum value of X1
+ix1_bc      = user     # Inner-X1 boundary condition flag
+ox1_bc      = user     # Outer-X1 boundary condition flag
+
+nx2         = 1       # Number of zones in X2-direction
+x2min       = -1        # minimum value of X2
+x2max       = 1         # maximum value of X2
+ix2_bc      = periodic  # Inner-X2 boundary condition flag
+ox2_bc      = periodic  # Outer-X2 boundary condition flag
+
+nx3         = 1         # Number of zones in X3-direction
+x3min       = -1        # minimum value of X3
+x3max       = 1         # maximum value of X3
+ix3_bc      = periodic  # Inner-X3 boundary condition flag
+ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
+
+num_threads = 1         # maximum number of OMP threads
+
+<phoebus/mesh>
+bc_vars = conserved
+
+<parthenon/meshblock>
+nx1 = 512
+nx2 = 1
+nx3 = 1
+
+<parthenon/refinement0>
+field = c.c.bulk.rho
+method = derivative_order_1
+max_level = 3
+
+<eos>
+type = StellarCollapse
+# change to true if you ran stellarcollapse2spiner
+use_sp5 = false
+# change this to sp5 file if using sp5 true
+filename = ideal_gas.h5
+
+<physics>
+hydro = true
+he = false
+3t = false
+rad = false
+tracers = false
+
+<fluid>
+xorder = 2
+cfl = 0.8
+riemann = hll
+recon = weno5
+c2p_max_iter = 100
+Ye = true
+
+# Units set from the table units
+<units>
+scale_free = false
+fluid_mass_g = 1e3
+geom_length_cm = 1e3
+
+<shocktube>
+rhol = 10.0
+Pl = 13.3333333333333333333333
+vl = 0.0
+rhor = 1.0
+Pr = 1.e-6
+vr = 0.0

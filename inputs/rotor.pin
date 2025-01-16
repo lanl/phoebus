@@ -1,0 +1,139 @@
+# © 2021. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract 89233218CNA000001
+# for Los Alamos National Laboratory (LANL), which is operated by Triad
+# National Security, LLC for the U.S.  Department of Energy/National
+# Nuclear Security Administration. All rights in the program are
+# reserved by Triad National Security, LLC, and the U.S. Department of
+# Energy/National Nuclear Security Administration. The Government is
+# granted for itself and others acting on its behalf a nonexclusive,
+# paid-up, irrevocable worldwide license in this material to reproduce,
+# prepare derivative works, distribute copies to the public, perform
+# publicly and display publicly, and to permit others to do so.
+
+<phoebus>
+problem = rotor
+ix1_bc = outflow
+ox1_bc = outflow
+
+<parthenon/job>
+problem_id  = mhd_rotor       # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = p.density,  &
+	          c.density,  &
+            p.velocity, &
+	    c.momentum, &
+            p.energy,   &
+            c.energy,   &
+            p.bfield,   &
+	          pressure,	  &
+	          cs,
+	    flux_divergence, &
+	    src_terms
+
+file_type   = hdf5      # Tabular data dump
+dt          = 0.0001      # time increment between outputs
+
+<parthenon/time>
+nlim        = -1        # cycle limit
+tlim        = 0.4       # time limit
+integrator  = rk2       # time integration algorithm
+ncycle_out  = 1        # interval for stdout summary info
+dt_init_fact = 1.e-3
+
+<parthenon/mesh>
+nghost = 4
+#refinement = adaptive
+#numlevel = 3
+
+nx1         = 128       # Number of zones in X1-direction
+x1min       = -0.5       # minimum value of X1
+x1max       = 0.5         # maximum value of X1
+ix1_bc      = periodic  # Inner-X1 boundary condition flag
+ox1_bc      = periodic  # Outer-X1 boundary condition flag
+
+nx2         = 128       # Number of zones in X2-direction
+x2min       = -0.5         # minimum value of X2
+x2max       = 0.5         # maximum value of X2
+ix2_bc      = periodic  # Inner-X2 boundary condition flag
+ox2_bc      = periodic  # Outer-X2 boundary condition flag
+
+nx3         = 1         # Number of zones in X3-direction
+x3min       = -1        # minimum value of X3
+x3max       = 1         # maximum value of X3
+ix3_bc      = periodic  # Inner-X3 boundary condition flag
+ox3_bc      = periodic  # Outer-X3 boundary condition flfgag
+
+num_threads = 1         # maximum number of OMP threads
+
+<phoebus/mesh>
+#bc_vars = primitive
+
+#<parthenon/meshblock>
+#nx1 = 64
+#nx2 = 64
+#nx3 = 1
+
+<parthenon/refinement0>
+field = c.c.bulk.rho
+method = derivative_order_1
+max_level = 3
+
+# Uses this one for Boosted Minkowski
+<coordinates>
+# vx = 0.308606699924204
+# vy = 0.308606699924204
+vx = 0. # 0.436436
+vy = 0. # 0.436436
+
+# Uses this one for boosted snake coordinates
+# TODO(JMM): Should we unify this interface
+<geometry>
+# k = 25.1327 # wave number. Default is 2*pi
+kmult = 1     # Multiply k by this factor
+a = 0.0       # amplitude of wiggle
+alpha = 1.0 # 0.85    # lapse
+vy = 0. # 0.524631
+# vy = 0.81     # shift. Default is 0.
+# vy = 0.617213 # shift. Default is 0.
+# vy = 0      # shift. Default is 0.
+
+<eos>
+type = IdealGas
+Gamma = 1.333333333333333333
+Cv = 1.0
+
+<physics>
+hydro = true
+he = false
+3t = false
+rad = false
+tracers = false
+
+<fluid>
+mhd = true
+xorder = 2
+cfl = 0.8
+riemann = llf
+c2p_max_iter = 100
+recon = weno5
+c2p_tol = 1.e-12
+#c2p_method = classic
+c2p_method = robust
+
+<fixup>
+enable_floors = true
+enable_mhd_floors = false
+enable_ceilings = true
+enable_flux_fixup = false
+enable_c2p_fixup = false
+floor_type = ConstantRhoSie
+rho0_floor = 1.e-3
+sie0_floor = 1.e-3
+ceiling_type = ConstantGamSie
+gam0_ceiling = 20.0
+sie_ceiling = 100.0
+
+<rotor>
+#rho0 = 10.0
+#omega = 9.0

@@ -1,0 +1,165 @@
+
+<phoebus>
+problem = torus
+ix1_bc = outflow
+ox1_bc = outflow
+ix2_bc = outflow
+ox2_bc = outflow
+
+<phoebus/mesh>
+bc_vars = primitive
+
+<parthenon/job>
+problem_id  = torus       # problem ID: basename of output filenames
+
+<parthenon/output0>
+file_type = rst
+dt = 200.0
+
+<parthenon/output1>
+variables = p.density,       &
+            c.density,       &
+            p.velocity,      &
+            c.momentum,      &
+            p.energy,        &
+            c.energy,        &
+            pressure,      	 &
+            g.c.coord,       &
+            g.f1.coord,      &
+            g.f2.coord,      &
+            g.f3.coord,      &
+            g.n.coord,       &
+            g.c.detgam,      &
+            g.c.bcon,        &
+            g.c.alpha,       &
+            g.c.gcov,        &
+            src_terms,       &
+            flux_divergence, &
+            p.bfield
+
+file_type   = hdf5      # Tabular data dump
+dt          = 5.0       # time increment between outputs
+
+<parthenon/output2>
+file_type   = hst       # History data dump
+dt          = 1.0       # Time increment between outputs
+
+<parthenon/time>
+nlim        = -1        # cycle limit
+tlim        = 2000.0    # time limit
+integrator  = rk2       # time integration algorithm
+ncycle_out  = 1         # interval for stdout summary info
+dt_init_fact = 1.e-6
+
+<parthenon/mesh>
+nghost = 4
+#refinement = adaptive
+#numlevel = 3
+
+nx1         = 256           # Number of zones in X1-direction
+x1min       = 0.59          # minimum value of X1; overwritten for the torus problem
+x1max       = 3.69          # maximum value of X1; set by <coordinates>/r_outer for the torus problem
+ix1_bc      = user          # Inner-X1 boundary condition flag
+ox1_bc      = user          # Outer-X1 boundary condition flag
+
+nx2         = 256           # Number of zones in X2-direction
+x2min       = 0             # minimum value of X2
+x2max       = 1             # maximum value of X2. X2 = 1 -> theta = pi
+ix2_bc      = user          # Inner-X2 boundary condition flag
+ox2_bc      = user          # Outer-X2 boundary condition flag
+
+nx3         = 1             # Number of zones in X3-direction
+x3min       = 0             # minimum value of X3
+x3max       = 6.28318530718 # maximum value of X3. 2*pi
+ix3_bc      = periodic      # Inner-X3 boundary condition flag
+ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
+
+num_threads = 1         # maximum number of OMP threads
+pack_size = -1
+
+# Commenting out meshblock sizes makes the simulation 1 meshblock
+#<parthenon/meshblock>
+#nx1 = 128
+#nx2 = 128
+#nx3 = 1
+
+<parthenon/refinement0>
+field = c.c.bulk.rho
+method = derivative_order_1
+max_level = 3
+
+<eos>
+type = IdealGas
+#type = StellarCollapse
+#filename = ../../Data/sfho.h5
+#use_sp5 = false
+Gamma = 1.66666666666666666666666667
+Cv = 1.0
+rho_min = 1e-8
+sie_min = 1e-8
+nsamps_adiabat = 180
+
+<physics>
+hydro = true
+he = false
+3t = false
+rad = false
+tracers = false
+
+<fluid>
+xorder = 2
+cfl = 0.8
+riemann = llf
+recon = weno5
+c2p_max_iter = 100
+c2p_tol = 1.e-8
+c2p_method = robust
+Ye = false
+mhd = true
+
+<geometry>
+a = 0.9375
+axisymmetric = true
+do_fd_on_grid = false
+
+<coordinates>
+derefine_poles = false
+r_outer = 250
+# hexp_br = 1000. # Initial break radius for hyperexponential coordinates
+
+<fixup>
+enable_floors = true
+enable_mhd_floors = true
+enable_ceilings = true
+enable_flux_fixup = true
+enable_c2p_fixup = true
+floor_type = ExpX1RhoSie
+rho0_floor = 1.0e-8
+sie0_floor = 1.0e-3
+rho_exp_floor = -2.0
+sie_exp_floor = -1.0
+ceiling_type = ConstantGamSie
+sie0_ceiling = 1.0
+gam0_ceiling = 10.0
+enable_ox1_fmks_inflow_check = true
+enable_phi_enforcement = false
+enforced_phi = 1.
+enforced_phi_timescale = 500.
+enforced_phi_cadence = 1.
+
+<torus>
+target_beta = 100.
+harm_beta_normalization = true
+u_jitter = 0.05
+kappa = 0.01
+rin = 6.0
+rmax = 12.0
+n_inside_horizon = 5
+magnetized = true
+entropy = 4
+
+# For tabulated EoS
+#<units>
+#scale_free = false
+#geom_mass_msun = 2.8
+#fluid_density_cgs = 1.e11
