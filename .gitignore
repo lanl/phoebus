@@ -14,3 +14,7 @@ __pycache__
 *.png
 *~
 .ccls-cache/
+external
+external/singularity_eos
+libtorch
+ML_models

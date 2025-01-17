@@ -192,6 +192,9 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         pin->GetOrAddInteger("radiation/mocmc", "nsamp_per_zone", 32);
     params.Add("nsamp_per_zone", nsamp_per_zone);
 
+    bool do_MLED = pin->GetOrAddBoolean("radiation/mocmc", "do_MLED", false);
+    params.Add("do_MLED", do_MLED);
+
     ParArray1D<Real> nusamp("Frequency grid", nu_bins);
     auto nusamp_h = Kokkos::create_mirror_view(Kokkos::HostSpace(), nusamp);
     for (int n = 0; n < nu_bins; n++) {
