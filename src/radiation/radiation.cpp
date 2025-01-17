@@ -96,6 +96,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("dlnu", dlnu);
   }
 
+  // NOTE(BLB): This will have to change if we ever support more than 3 species.
+  PARTHENON_REQUIRE(do_nu_electron + do_nu_electron_anti + do_nu_heavy == MOCMC_NUM_SPECIES,
+                    "Requested species must be equal to compile time requested number of species.");
+  // TODO(BLB) With compile time num species this can be a static array.
   std::vector<RadiationType> species;
   if (do_nu_electron) {
     species.push_back(RadiationType::NU_ELECTRON);
@@ -106,7 +110,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   if (do_nu_heavy) {
     species.push_back(RadiationType::NU_HEAVY);
   }
-  const int num_species = species.size();
+  //const int num_species = species.size();
+  static constexpr int num_species = MOCMC_NUM_SPECIES;
   params.Add("num_species", num_species);
   params.Add("species", species);
 
@@ -161,7 +166,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddSwarmValue(mocmc_core::ncov::name(), swarm_name,
                            fourv_swarmvalue_metadata);
     Metadata Inu_swarmvalue_metadata({Metadata::Real},
-                                     std::vector<int>{MOCMC_NUM_SPECIES, nu_bins});
+                                     std::vector<int>{num_species, nu_bins});
     physics->AddSwarmValue(mocmc_core::Inuinv::name(), swarm_name,
                            Inu_swarmvalue_metadata);
 
