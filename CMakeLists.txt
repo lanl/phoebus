@@ -185,6 +185,9 @@ include(cmake/Geometry.cmake)
 # Fluid
 include(cmake/Fluid.cmake)
 
+# Transport
+include(cmake/Transport.cmake)
+
 # Phoebus src
 message("\nConfiguring src")
 add_subdirectory(src)

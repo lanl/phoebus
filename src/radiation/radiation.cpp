@@ -144,20 +144,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   if (method == "mocmc") {
-    std::string swarm_name = "mocmc";
+    static constexpr auto swarm_name = "mocmc";
     Metadata swarm_metadata({Metadata::Provides});
     physics->AddSwarm(swarm_name, swarm_metadata);
     Metadata real_swarmvalue_metadata({Metadata::Real});
-    physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("mu_lo", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("mu_hi", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("phi_lo", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("phi_hi", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::t::name(), swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::mu_lo::name(), swarm_name,
+                           real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::mu_hi::name(), swarm_name,
+                           real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::phi_lo::name(), swarm_name,
+                           real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::phi_hi::name(), swarm_name,
+                           real_swarmvalue_metadata);
     Metadata fourv_swarmvalue_metadata({Metadata::Real}, std::vector<int>{4});
-    physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::ncov::name(), swarm_name,
+                           fourv_swarmvalue_metadata);
     Metadata Inu_swarmvalue_metadata({Metadata::Real},
-                                     std::vector<int>{num_species, nu_bins});
-    physics->AddSwarmValue("Inuinv", swarm_name, Inu_swarmvalue_metadata);
+                                     std::vector<int>{MOCMC_NUM_SPECIES, nu_bins});
+    physics->AddSwarmValue(mocmc_core::Inuinv::name(), swarm_name,
+                           Inu_swarmvalue_metadata);
 
     // Boundary temperatures for outflow sample boundary conditions
     const std::string ix1_bc = pin->GetOrAddString("phoebus", "ix1_bc", "None");
