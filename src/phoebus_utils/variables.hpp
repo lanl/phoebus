@@ -14,6 +14,8 @@
 #ifndef PHOEBUS_UTILS_VARIABLES_HPP_
 #define PHOEBUS_UTILS_VARIABLES_HPP_
 
+#include "compile_constants.hpp"
+
 #include <interface/sparse_pack.hpp>
 #include <parthenon/package.hpp>
 
@@ -40,6 +42,17 @@
         : parthenon::variable_names::base_t<false>(std::forward<Ts>(args)...) {}         \
     static std::string name() { return #varstring; }                                     \
   }
+
+#define TENSOR_SWARM(type, ns, varname, ...)                                             \
+  struct varname : public parthenon::swarm_variable_names::base_t<type, __VA_ARGS__> {   \
+    template <class... Ts>                                                               \
+    KOKKOS_INLINE_FUNCTION varname(Ts &&...args)                                         \
+        : parthenon::swarm_variable_names::base_t<type, __VA_ARGS__>(                    \
+              std::forward<Ts>(args)...) {}                                              \
+    static std::string name() { return #ns "." #varname; }                               \
+  }
+
+using parthenon::variable_names::ANYDIM;
 
 namespace fluid_prim {
 VARIABLE(p, density);
@@ -96,6 +109,16 @@ VARIABLE(mocmc.i, Inu1);
 VARIABLE(mocmc.i, jinvs);
 } // namespace mocmc_internal
 
+namespace mocmc_core {
+SWARM_VARIABLE(Real, mocmc.c, t);
+SWARM_VARIABLE(Real, mocmc.c, mu_lo);
+SWARM_VARIABLE(Real, mocmc.c, mu_hi);
+SWARM_VARIABLE(Real, mocmc.c, phi_lo);
+SWARM_VARIABLE(Real, mocmc.c, phi_hi);
+SWARM_VARIABLE(Real, mocmc.c, ncov);
+TENSOR_SWARM(Real, mocmc.c, Inuinv, ANYDIM, MOCMC_NUM_SPECIES);
+} // namespace mocmc_core
+
 namespace internal_variables {
 VARIABLE_NONS(face_signal_speed);
 VARIABLE_NONS(cell_signal_speed);
@@ -139,6 +162,7 @@ SWARM_VARIABLE(Real, tr, bernoulli);
 SWARM_VARIABLE(Real, tr, B_x);
 SWARM_VARIABLE(Real, tr, B_y);
 SWARM_VARIABLE(Real, tr, B_z);
+TENSOR_SWARM(Real, tr, test, ANYDIM, MOCMC_NUM_SPECIES);
 } // namespace tracer_variables
 
 namespace diagnostic_variables {

@@ -35,17 +35,17 @@ void GetXSource(Real &Kcon0, Real &Kcon1, Real &Kcon2, Real &Kcon3, Real src[NDF
   src[3] = Kcon3 / Kcon0;
 }
 
-KOKKOS_INLINE_FUNCTION
-void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1,
-                Real &Kcov2, Real &Kcov3, Real &Kcon0,
-                const Geometry::CoordSysMeshBlock &geom, Real source[4]) {
+template <class Geom>
+KOKKOS_INLINE_FUNCTION void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3,
+                                       Real &Kcov0, Real &Kcov1, Real &Kcov2, Real &Kcov3,
+                                       Real &Kcon0, Geom &geom, Real source[4]) {
   SPACETIMELOOP(mu) { source[mu] = 0.; }
 }
 
-KOKKOS_INLINE_FUNCTION
-void PushParticle(Real &X0, Real &X1, Real &X2, Real &X3, Real &Kcov0, Real &Kcov1,
-                  Real &Kcov2, Real &Kcov3, const Real &dt,
-                  const Geometry::CoordSysMeshBlock &geom) {
+template <class Geom>
+KOKKOS_INLINE_FUNCTION void PushParticle(Real &X0, Real &X1, Real &X2, Real &X3,
+                                         Real &Kcov0, Real &Kcov1, Real &Kcov2,
+                                         Real &Kcov3, const Real &dt, Geom &geom) {
   Real c1[NDFULL], c2[NDFULL], d1[NDFULL], d2[NDFULL];
   Real Xtmp[NDFULL], Kcontmp[NDFULL], Kcovtmp[NDFULL];
   Real Kcov[NDFULL] = {Kcov0, Kcov1, Kcov2, Kcov3};

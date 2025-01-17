@@ -163,8 +163,8 @@ void MOCMCInitSamples(T *rc) {
   const auto &x = swarm->template Get<Real>(swarm_position::x::name()).Get();
   const auto &y = swarm->template Get<Real>(swarm_position::y::name()).Get();
   const auto &z = swarm->template Get<Real>(swarm_position::z::name()).Get();
-  const auto &ncov = swarm->template Get<Real>("ncov").Get();
-  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
+  const auto &ncov = swarm->template Get<Real>(mocmc_core::ncov::name()).Get();
+  const auto &Inuinv = swarm->template Get<Real>(mocmc_core::Inuinv::name()).Get();
 
   auto swarm_d = swarm->GetDeviceContext();
 
@@ -225,22 +225,20 @@ void MOCMCInitSamples(T *rc) {
       });
 
   // Initialize eddington tensor and opacities for first step
-  MOCMCReconstruction(rc);
-  MOCMCEddington(rc);
-  MOCMCFluidSource(rc, 0., false); // Update opacities for asymptotic fluxes
+  MOCMCReconstruction(rc, rc);
+  MOCMCEddington(rc, rc);
+  MOCMCFluidSource(rc, rc, 0., false); // Update opacities for asymptotic fluxes
 }
 
 template <class T>
-TaskStatus MOCMCSampleBoundaries(T *rc) {
+TaskStatus MOCMCSampleBoundaries(T *rc_base, T *rc) {
   auto *pmb = rc->GetParentPointer();
-  auto &sc = rc->GetSwarmData();
-  auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
   const auto geom = Geometry::GetCoordinateSystem(rc);
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   std::vector<std::string> variables{pr::J::name(), pf::velocity::name(),
                                      ir::tilPi::name()};
@@ -251,15 +249,14 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   auto opac_pkg = pmb->packages.Get("opacity");
   const auto opac = opac_pkg->template Param<Opacities>("opacities");
 
-  const auto &x = swarm->template Get<Real>(swarm_position::x::name()).Get();
-  const auto &y = swarm->template Get<Real>(swarm_position::y::name()).Get();
-  const auto &z = swarm->template Get<Real>(swarm_position::z::name()).Get();
-  const auto &ncov = swarm->template Get<Real>("ncov").Get();
-  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
-  const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
-  const auto &mu_hi = swarm->template Get<Real>("mu_hi").Get();
-  const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
-  const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
+  static constexpr auto swarm_name = "mocmc";
+  static const auto desc_mocmc =
+      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
+                              mocmc_core::ncov, mocmc_core::Inuinv, mocmc_core::mu_lo,
+                              mocmc_core::mu_hi, mocmc_core::phi_lo, mocmc_core::phi_hi>(
+          swarm_name);
+  auto pack_mocmc = desc_mocmc.GetPack(rc_base);
+
   auto pv = imap.GetFlatIdx(pf::velocity::name());
   auto iTilPi = imap.GetFlatIdx(ir::tilPi::name());
   auto iJ = imap.GetFlatIdx(pr::J::name());
@@ -272,8 +269,6 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   for (int s = 0; s < num_species; s++) {
     species_d[s] = species[s];
   }
-
-  auto swarm_d = swarm->GetDeviceContext();
 
   // TODO(BRR) provide *all* MOCMC boundaries
 
@@ -289,26 +284,33 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
   //  ox1_temp = rad->Param<Real>("ox1_temp");
   //}
 
-  pmb->par_for(
-      "Temporary MOCMC boundaries", 0, swarm->GetMaxActiveIndex(),
-      KOKKOS_LAMBDA(const int n) {
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MOCMC::SampleBoundaries", DevExecSpace(), 0,
+      pack_mocmc.GetMaxFlatIndex(), KOKKOS_LAMBDA(const int idx) {
+        const auto [b, n] = pack_mocmc.GetBlockParticleIndices(idx);
+        const auto swarm_d = pack_mocmc.GetContext(b);
         if (swarm_d.IsActive(n)) {
+          Real &x = pack_mocmc(b, swarm_position::x(), n);
+          Real &y = pack_mocmc(b, swarm_position::y(), n);
+          Real &z = pack_mocmc(b, swarm_position::z(), n);
 
           // Store zone before reflections
           int i, j, k;
-          swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+          swarm_d.Xtoijk(x, y, z, i, j, k);
 
-          if (x(n) < swarm_d.x_min_global_) {
+          if (x < swarm_d.x_min_global_) {
             // Reflect particle across boundary
-            x(n) = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x(n));
+            x = swarm_d.x_min_global_ + (swarm_d.x_min_global_ - x);
             // TODO(BRR) normalized in relativity?
-            ncov(1, n) = -ncov(1, n);
+            pack_mocmc(b, mocmc_core::ncov(1), n) =
+                -pack_mocmc(b, mocmc_core::ncov(1), n);
 
             for (int s = 0; s < num_species; s++) {
               Real temp = 0.;
               if (ix1_bc == MOCMCBoundaries::outflow) {
                 // Temperature from J in ghost zone
-                temp = opac.TemperatureFromEnergyDensity(v(iJ(s), k, j, i), species_d[s]);
+                temp =
+                    opac.TemperatureFromEnergyDensity(v(b, iJ(s), k, j, i), species_d[s]);
               } else {
                 // Fixed temperature
                 temp = ix1_temp;
@@ -317,7 +319,7 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
               // Reset intensities
               for (int nubin = 0; nubin < nu_bins; nubin++) {
                 const Real nu = nusamp(nubin);
-                Inuinv(nubin, s, n) =
+                pack_mocmc(b, mocmc_core::Inuinv(nubin, s), n) =
                     std::max<Real>(robust::SMALL(), opac.ThermalDistributionOfTNu(
                                                         temp, species_d[s], nu)) /
                     std::pow(nu, 3);
@@ -325,21 +327,22 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
             }
           }
 
-          if (x(n) > swarm_d.x_max_global_) {
+          if (x > swarm_d.x_max_global_) {
             // Reflect particle across boundary
-            x(n) = swarm_d.x_max_global_ - (x(n) - swarm_d.x_max_global_);
-            ncov(1, n) = -ncov(1, n);
+            x = swarm_d.x_max_global_ - (x - swarm_d.x_max_global_);
+            pack_mocmc(b, mocmc_core::ncov(1), n) =
+                -pack_mocmc(b, mocmc_core::ncov(1), n);
 
             // Reset intensities
             for (int nubin = 0; nubin < nu_bins; nubin++) {
               for (int s = 0; s < num_species; s++) {
-                Inuinv(nubin, s, n) = robust::SMALL();
+                pack_mocmc(b, mocmc_core::Inuinv(nubin, s), n) = robust::SMALL();
               }
             }
           }
 
           bool on_current_mesh_block = true;
-          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+          swarm_d.GetNeighborBlockIndex(n, x, y, z, on_current_mesh_block);
         }
       });
 
@@ -347,67 +350,72 @@ TaskStatus MOCMCSampleBoundaries(T *rc) {
 }
 
 template <class T>
-TaskStatus MOCMCReconstruction(T *rc) {
+TaskStatus MOCMCReconstruction(T *rc_base, T *rc) {
   auto *pmb = rc->GetParentPointer();
-  auto &sc = rc->GetSwarmData();
-  auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
+  Real num_total = 0;
+  // Sort and accumulate total active particles
+  // Sorting must be done before forming packs.
+  for (int b = 0; b <= rc->NumBlocks() - 1; b++) {
+    rc_base->GetSwarmData(b)->Get("mocmc")->SortParticlesByCell();
+    num_total += rc_base->GetSwarmData(b)->Get("mocmc")->GetNumActive();
+  }
+  rad->UpdateParam<Real>("num_total", num_total);
+
   const auto geom = Geometry::GetCoordinateSystem(rc);
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   std::vector<std::string> variables{pf::velocity::name(), ir::tilPi::name()};
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  const auto &x = swarm->template Get<Real>(swarm_position::x::name()).Get();
-  const auto &y = swarm->template Get<Real>(swarm_position::y::name()).Get();
-  const auto &z = swarm->template Get<Real>(swarm_position::z::name()).Get();
-  const auto &ncov = swarm->template Get<Real>("ncov").Get();
-  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
-  const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
-  const auto &mu_hi = swarm->template Get<Real>("mu_hi").Get();
-  const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
-  const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
+  static constexpr auto swarm_name = "mocmc";
+  static const auto desc_mocmc =
+      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
+                              mocmc_core::ncov, mocmc_core::Inuinv, mocmc_core::mu_lo,
+                              mocmc_core::mu_hi, mocmc_core::phi_lo, mocmc_core::phi_hi>(
+          swarm_name);
+  auto pack_mocmc = desc_mocmc.GetPack(rc_base);
   auto pv = imap.GetFlatIdx(pf::velocity::name());
   auto iTilPi = imap.GetFlatIdx(ir::tilPi::name());
 
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const int nu_bins = rad->Param<int>("nu_bins");
 
-  swarm->SortParticlesByCell();
-  auto swarm_d = swarm->GetDeviceContext();
-
-  rad->UpdateParam<Real>("num_total", swarm->GetNumActive());
-
   auto mocmc_recon = rad->Param<MOCMCRecon>("mocmc_recon");
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
-      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), 0, rc->NumBlocks() - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        const auto swarm_d = pack_mocmc.GetContext(b);
         const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
         for (int n = 0; n < nsamp; n++) {
           const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
           if (n == 0) {
-            mu_lo(nswarm) = 0.0;
-            mu_hi(nswarm) = 2.0;
-            phi_lo(nswarm) = 0.0;
-            phi_hi(nswarm) = 2.0 * M_PI;
+            pack_mocmc(b, mocmc_core::mu_lo(), nswarm) = 0.0;
+            pack_mocmc(b, mocmc_core::mu_hi(), nswarm) = 2.0;
+            pack_mocmc(b, mocmc_core::phi_lo(), nswarm) = 0.0;
+            pack_mocmc(b, mocmc_core::phi_hi(), nswarm) = 2.0 * M_PI;
             continue;
           }
 
           Real cov_g[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, k, j, i, cov_g);
-          const Real vpcon[] = {v(pv(0), k, j, i), v(pv(1), k, j, i), v(pv(2), k, j, i)};
+          geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, cov_g);
+          const Real vpcon[] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i),
+                                v(b, pv(2), k, j, i)};
           const Real trial[4] = {0., 1., 0., 0.};
           Real ucon[4];
-          GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
+          GetFourVelocity(vpcon, geom, CellLocation::Cent, b, k, j, i, ucon);
           Geometry::Tetrads tetrads(ucon, trial, cov_g);
 
-          Real ncov_coord[4] = {ncov(0, nswarm), ncov(1, nswarm), ncov(2, nswarm),
-                                ncov(3, nswarm)};
+          Real ncov_coord[4] = {pack_mocmc(b, mocmc_core::ncov(0), nswarm),
+                                pack_mocmc(b, mocmc_core::ncov(1), nswarm),
+                                pack_mocmc(b, mocmc_core::ncov(2), nswarm),
+                                pack_mocmc(b, mocmc_core::ncov(3), nswarm)};
           Real ncov_tetrad[4];
           tetrads.CoordToTetradCov(ncov_coord, ncov_tetrad);
 
@@ -417,40 +425,53 @@ TaskStatus MOCMCReconstruction(T *rc) {
           for (int m = 0; m < n; m++) {
             const int mswarm = swarm_d.GetFullIndex(k, j, i, m);
             PARTHENON_DEBUG_REQUIRE(mswarm != nswarm, "Comparing the same particle!");
-            if (mu > mu_lo(mswarm) && mu < mu_hi(mswarm) && phi > phi_lo(mswarm) &&
-                phi < phi_hi(mswarm)) {
-              Real mcov_tetrad[4] = {-1., ncov(1, mswarm), ncov(2, mswarm),
-                                     ncov(3, mswarm)};
-              Real mu0 = mu_hi(mswarm) - mu_lo(mswarm);
-              Real phi0 = phi_hi(mswarm) - phi_lo(mswarm);
+            if (mu > pack_mocmc(b, mocmc_core::mu_lo(), mswarm) &&
+                mu < pack_mocmc(b, mocmc_core::mu_hi(), mswarm) &&
+                phi > pack_mocmc(b, mocmc_core::phi_lo(), mswarm) &&
+                phi < pack_mocmc(b, mocmc_core::phi_hi(), mswarm)) {
+              Real mcov_tetrad[4] = {-1., pack_mocmc(b, mocmc_core::ncov(1), mswarm),
+                                     pack_mocmc(b, mocmc_core::ncov(2), mswarm),
+                                     pack_mocmc(b, mocmc_core::ncov(3), mswarm)};
+              Real mu0 = pack_mocmc(b, mocmc_core::mu_hi(), mswarm) -
+                         pack_mocmc(b, mocmc_core::mu_lo(), mswarm);
+              Real phi0 = pack_mocmc(b, mocmc_core::phi_hi(), mswarm) -
+                          pack_mocmc(b, mocmc_core::phi_lo(), mswarm);
               if (mu0 > phi0) {
                 const Real mu_m = 1.0 - ncov_tetrad[1];
                 mu0 = 0.5 * (mu + mu_m);
                 if (mu < mu0) {
-                  mu_lo(nswarm) = mu_lo(mswarm);
-                  mu_hi(nswarm) = mu0;
-                  mu_lo(mswarm) = mu0;
+                  pack_mocmc(b, mocmc_core::mu_lo(), nswarm) =
+                      pack_mocmc(b, mocmc_core::mu_lo(), mswarm);
+                  pack_mocmc(b, mocmc_core::mu_hi(), nswarm) = mu0;
+                  pack_mocmc(b, mocmc_core::mu_lo(), mswarm) = mu0;
                 } else {
-                  mu_lo(nswarm) = mu0;
-                  mu_hi(nswarm) = mu_hi(mswarm);
-                  mu_hi(mswarm) = mu0;
+                  pack_mocmc(b, mocmc_core::mu_lo(), nswarm) = mu0;
+                  pack_mocmc(b, mocmc_core::mu_hi(), nswarm) =
+                      pack_mocmc(b, mocmc_core::mu_hi(), mswarm);
+                  pack_mocmc(b, mocmc_core::mu_hi(), mswarm) = mu0;
                 }
-                phi_lo(nswarm) = phi_lo(mswarm);
-                phi_hi(nswarm) = phi_hi(mswarm);
+                pack_mocmc(b, mocmc_core::phi_lo(), nswarm) =
+                    pack_mocmc(b, mocmc_core::phi_lo(), mswarm);
+                pack_mocmc(b, mocmc_core::phi_hi(), nswarm) =
+                    pack_mocmc(b, mocmc_core::phi_hi(), mswarm);
               } else {
                 const Real phi_m = atan2(ncov_tetrad[3], ncov_tetrad[2]);
                 phi0 = 0.5 * (phi + phi_m);
                 if (phi < phi0) {
-                  phi_lo(nswarm) = phi_lo(mswarm);
-                  phi_hi(nswarm) = phi0;
-                  phi_lo(mswarm) = phi0;
+                  pack_mocmc(b, mocmc_core::phi_lo(), nswarm) =
+                      pack_mocmc(b, mocmc_core::phi_lo(), mswarm);
+                  pack_mocmc(b, mocmc_core::phi_hi(), nswarm) = phi0;
+                  pack_mocmc(b, mocmc_core::phi_lo(), mswarm) = phi0;
                 } else {
-                  phi_lo(nswarm) = phi0;
-                  phi_hi(nswarm) = phi_hi(mswarm);
-                  phi_hi(mswarm) = phi0;
+                  pack_mocmc(b, mocmc_core::phi_lo(), nswarm) = phi0;
+                  pack_mocmc(b, mocmc_core::phi_hi(), nswarm) =
+                      pack_mocmc(b, mocmc_core::phi_hi(), mswarm);
+                  pack_mocmc(b, mocmc_core::phi_hi(), mswarm) = phi0;
                 }
-                mu_lo(nswarm) = mu_lo(mswarm);
-                mu_hi(nswarm) = mu_hi(mswarm);
+                pack_mocmc(b, mocmc_core::mu_lo(), nswarm) =
+                    pack_mocmc(b, mocmc_core::mu_lo(), mswarm);
+                pack_mocmc(b, mocmc_core::mu_hi(), nswarm) =
+                    pack_mocmc(b, mocmc_core::mu_hi(), mswarm);
               }
               break;
             } // if inside
@@ -464,56 +485,54 @@ TaskStatus MOCMCReconstruction(T *rc) {
 template <class T>
 TaskStatus MOCMCTransport(T *rc, const Real dt) {
   auto *pmb = rc->GetParentPointer();
-  auto &sc = rc->GetSwarmData();
-  auto &swarm = sc->Get("mocmc");
 
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto &t = swarm->template Get<Real>("t").Get();
-  auto &x = swarm->template Get<Real>(swarm_position::x::name()).Get();
-  auto &y = swarm->template Get<Real>(swarm_position::y::name()).Get();
-  auto &z = swarm->template Get<Real>(swarm_position::z::name()).Get();
-  auto &ncov = swarm->template Get<Real>("ncov").Get();
-  auto swarm_d = swarm->GetDeviceContext();
+  static constexpr auto swarm_name = "mocmc";
+  static const auto desc_mocmc =
+      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
+                              mocmc_core::ncov, mocmc_core::t>(swarm_name);
+  auto pack_mocmc = desc_mocmc.GetPack(rc);
 
-  pmb->par_for(
-      "MOCMC::Transport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
+  parthenon::par_for(
+      DEFAULT_LOOP_PATTERN, "MOCMC::Transport", DevExecSpace(), 0,
+      pack_mocmc.GetMaxFlatIndex(), KOKKOS_LAMBDA(const int idx) {
+        const auto [b, n] = pack_mocmc.GetBlockParticleIndices(idx);
+        const auto swarm_d = pack_mocmc.GetContext(b);
         if (swarm_d.IsActive(n)) {
-          Real y0 = y(n);
-          Real z0 = z(n);
-          PushParticle(t(n), x(n), y(n), z(n), ncov(0, n), ncov(1, n), ncov(2, n),
-                       ncov(3, n), dt, geom);
+          Real &t = pack_mocmc(b, mocmc_core::t(), n);
+          Real &x = pack_mocmc(b, swarm_position::x(), n);
+          if (n == 240) std::printf("t, x, n, b = %f %f %d %d\n", t, x, n, b);
+          Real &y = pack_mocmc(b, swarm_position::y(), n);
+          Real &z = pack_mocmc(b, swarm_position::z(), n);
+          Real y0 = y;
+          Real z0 = z;
+          PushParticle(t, x, y, z, pack_mocmc(b, mocmc_core::ncov(0), n),
+                       pack_mocmc(b, mocmc_core::ncov(1), n),
+                       pack_mocmc(b, mocmc_core::ncov(2), n),
+                       pack_mocmc(b, mocmc_core::ncov(3), n), dt, geom);
+          if (n == 240) std::printf("t, x, n, b = %f %f %d %d\n", t, x, n, b);
 
           bool on_current_mesh_block = true;
-          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+          swarm_d.GetNeighborBlockIndex(n, x, y, z, on_current_mesh_block);
         }
       });
 
   return TaskStatus::complete;
 }
 
-// TODO(BRR): Hack to get around current lack of support for packing parthenon swarms
-template <>
-TaskStatus MOCMCFluidSource(MeshData<Real> *rc, const Real dt, const bool update_fluid) {
-  for (int n = 0; n < rc->NumBlocks(); n++) {
-    MOCMCFluidSource(rc->GetBlockData(n).get(), dt, update_fluid);
-  }
-  return TaskStatus::complete;
-}
-
 template <class T>
-TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
+TaskStatus MOCMCFluidSource(T *rc_base, T *rc, const Real dt, const bool update_fluid) {
   // Assume particles are already sorted from MOCMCReconstruction call!
 
   auto *pmb = rc->GetParentPointer();
-  auto &sc = rc->GetSwarmData();
-  auto &swarm = sc->Get("mocmc");
+  // swarm pack
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
   // Meshblock geometry
   const auto geom = Geometry::GetCoordinateSystem(rc);
-  const IndexRange &ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  const IndexRange &jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  const IndexRange &kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  const IndexRange &ib = rc->GetBoundsI(IndexDomain::interior);
+  const IndexRange &jb = rc->GetBoundsJ(IndexDomain::interior);
+  const IndexRange &kb = rc->GetBoundsK(IndexDomain::interior);
 
   // Microphysics
   auto opac = pmb->packages.Get("opacity");
@@ -556,13 +575,12 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
     cye = imap[cf::ye::name()].first;
   }
 
-  const auto &ncov = swarm->template Get<Real>("ncov").Get();
-  const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
-  const auto &mu_hi = swarm->template Get<Real>("mu_hi").Get();
-  const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
-  const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
-  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
-  const auto swarm_d = swarm->GetDeviceContext();
+  static constexpr auto swarm_name = "mocmc";
+  static const auto desc_mocmc =
+      MakeSwarmPackDescriptor<mocmc_core::ncov, mocmc_core::mu_lo, mocmc_core::mu_hi,
+                              mocmc_core::phi_lo, mocmc_core::phi_hi, mocmc_core::Inuinv>(
+          swarm_name);
+  auto pack_mocmc = desc_mocmc.GetPack(rc_base);
 
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   const int nu_bins = rad->Param<int>("nu_bins");
@@ -574,19 +592,21 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
     species_d[s] = species[s];
   }
 
-  const int iblock = 0; // No meshblockpacks right now
   int nspec = idx_E.DimSize(1);
 
   if (true) { // update = lagged
     parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), kb.s, kb.e, jb.s,
-        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+        DEFAULT_LOOP_PATTERN, "MOCMC::FluidSource", DevExecSpace(), 0,
+        rc->NumBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+          const auto swarm_d = pack_mocmc.GetContext(b);
           Real cov_g[4][4];
-          geom.SpacetimeMetric(CellLocation::Cent, iblock, k, j, i, cov_g);
-          Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
+          geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, cov_g);
+          Real alpha = geom.Lapse(CellLocation::Cent, b, k, j, i);
           Real con_beta[3];
-          geom.ContravariantShift(CellLocation::Cent, iblock, k, j, i, con_beta);
-          const Real vpcon[] = {v(pv(0), k, j, i), v(pv(1), k, j, i), v(pv(2), k, j, i)};
+          geom.ContravariantShift(CellLocation::Cent, b, k, j, i, con_beta);
+          const Real vpcon[] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i),
+                                v(b, pv(2), k, j, i)};
           const Real W = phoebus::GetLorentzFactor(vpcon, cov_g);
           const Real ucon[4] = {W / alpha, vpcon[0] - con_beta[0] * W / alpha,
                                 vpcon[1] - con_beta[1] * W / alpha,
@@ -596,23 +616,22 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
 
             // Set up the background state
-            Vec con_v{{v(iblock, pv(0), k, j, i), v(iblock, pv(1), k, j, i),
-                       v(iblock, pv(2), k, j, i)}};
+            Vec con_v{{v(b, pv(0), k, j, i), v(b, pv(1), k, j, i), v(b, pv(2), k, j, i)}};
             Tens2 cov_gamma;
-            geom.Metric(CellLocation::Cent, iblock, k, j, i, cov_gamma.data);
-            Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
-            Real sdetgam = geom.DetGamma(CellLocation::Cent, iblock, k, j, i);
-            LocalThreeGeometry g(geom, CellLocation::Cent, iblock, k, j, i);
-            Real Estar = v(iblock, idx_E(ispec), k, j, i) / sdetgam;
-            Vec cov_Fstar{v(iblock, idx_F(ispec, 0), k, j, i) / sdetgam,
-                          v(iblock, idx_F(ispec, 1), k, j, i) / sdetgam,
-                          v(iblock, idx_F(ispec, 2), k, j, i) / sdetgam};
+            geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
+            Real alpha = geom.Lapse(CellLocation::Cent, b, k, j, i);
+            Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
+            LocalThreeGeometry g(geom, CellLocation::Cent, b, k, j, i);
+            Real Estar = v(b, idx_E(ispec), k, j, i) / sdetgam;
+            Vec cov_Fstar{v(b, idx_F(ispec, 0), k, j, i) / sdetgam,
+                          v(b, idx_F(ispec, 1), k, j, i) / sdetgam,
+                          v(b, idx_F(ispec, 2), k, j, i) / sdetgam};
             Tens2 con_tilPi;
             SPACELOOP2(ii, jj) {
-              con_tilPi(ii, jj) = v(iblock, iTilPi(ispec, ii, jj), k, j, i);
+              con_tilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
             }
-            Real JBB = opac_d.EnergyDensityFromTemperature(v(iblock, pT, k, j, i),
-                                                           species_d[ispec]);
+            Real JBB =
+                opac_d.EnergyDensityFromTemperature(v(b, pT, k, j, i), species_d[ispec]);
 
             ClosureMOCMC<> c(con_v, &g);
 
@@ -621,15 +640,19 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
             // Calculate Inu0
             for (int bin = 0; bin < nu_bins; bin++) {
-              v(iblock, Inu0(ispec, bin), k, j, i) = 0.;
+              v(b, Inu0(ispec, bin), k, j, i) = 0.;
             }
             for (int n = 0; n < nsamp; n++) {
               const int nswarm = swarm_d.GetFullIndex(k, j, i, n);
-              const Real dOmega = (mu_hi(nswarm) - mu_lo(nswarm)) *
-                                  (phi_hi(nswarm) - phi_lo(nswarm)) / (4. * M_PI);
+              const Real dOmega = (pack_mocmc(b, mocmc_core::mu_hi(), nswarm) -
+                                   pack_mocmc(b, mocmc_core::mu_lo(), nswarm)) *
+                                  (pack_mocmc(b, mocmc_core::phi_hi(), nswarm) -
+                                   pack_mocmc(b, mocmc_core::phi_lo(), nswarm)) /
+                                  (4. * M_PI);
               for (int bin = 0; bin < nu_bins; bin++) {
-                v(iblock, Inu0(ispec, bin), k, j, i) +=
-                    Inuinv(bin, ispec, nswarm) * pow(nusamp(bin), 3) * dOmega;
+                v(b, Inu0(ispec, bin), k, j, i) +=
+                    pack_mocmc(b, mocmc_core::Inuinv(bin, ispec), nswarm) *
+                    pow(nusamp(bin), 3) * dOmega;
               }
             }
 
@@ -640,42 +663,39 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             Real Itot = 0.;
             for (int bin = 0; bin < nu_bins; bin++) {
               kappaJ += opac_d.AngleAveragedAbsorptionCoefficient(
-                            v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                            v(iblock, pye, k, j, i), species_d[ispec], nusamp(bin)) *
-                        v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
+                            v(b, pdens, k, j, i), v(b, pT, k, j, i), v(b, pye, k, j, i),
+                            species_d[ispec], nusamp(bin)) *
+                        v(b, Inu0(ispec, bin), k, j, i) * nusamp(bin);
               kappaH += opac_d.TotalScatteringCoefficient(
-                            v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                            v(iblock, pye, k, j, i), species_d[ispec], nusamp(bin)) *
-                        v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
-              Itot += v(iblock, Inu0(ispec, bin), k, j, i) * nusamp(bin);
+                            v(b, pdens, k, j, i), v(b, pT, k, j, i), v(b, pye, k, j, i),
+                            species_d[ispec], nusamp(bin)) *
+                        v(b, Inu0(ispec, bin), k, j, i) * nusamp(bin);
+              Itot += v(b, Inu0(ispec, bin), k, j, i) * nusamp(bin);
             }
 
             // Trapezoidal rule
             kappaJ -= 0.5 *
                       opac_d.AngleAveragedAbsorptionCoefficient(
-                          v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                          v(iblock, pye, k, j, i), species_d[ispec], nusamp(0)) *
-                      v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0);
-            kappaJ -=
-                0.5 *
-                opac_d.AngleAveragedAbsorptionCoefficient(
-                    v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                    v(iblock, pye, k, j, i), species_d[ispec], nusamp(nu_bins - 1)) *
-                v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
+                          v(b, pdens, k, j, i), v(b, pT, k, j, i), v(b, pye, k, j, i),
+                          species_d[ispec], nusamp(0)) *
+                      v(b, Inu0(ispec, 0), k, j, i) * nusamp(0);
+            kappaJ -= 0.5 *
+                      opac_d.AngleAveragedAbsorptionCoefficient(
+                          v(b, pdens, k, j, i), v(b, pT, k, j, i), v(b, pye, k, j, i),
+                          species_d[ispec], nusamp(nu_bins - 1)) *
+                      v(b, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
             kappaH -= 0.5 *
                       opac_d.TotalScatteringCoefficient(
-                          v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                          v(iblock, pye, k, j, i), species_d[ispec], nusamp(0)) *
-                      v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0);
-            kappaH -=
-                0.5 *
-                opac_d.TotalScatteringCoefficient(
-                    v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                    v(iblock, pye, k, j, i), species_d[ispec], nusamp(nu_bins - 1)) *
-                v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
-            Itot -= 0.5 *
-                    (v(iblock, Inu0(ispec, 0), k, j, i) * nusamp(0) +
-                     v(iblock, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1));
+                          v(b, pdens, k, j, i), v(b, pT, k, j, i), v(b, pye, k, j, i),
+                          species_d[ispec], nusamp(0)) *
+                      v(b, Inu0(ispec, 0), k, j, i) * nusamp(0);
+            kappaH -= 0.5 *
+                      opac_d.TotalScatteringCoefficient(
+                          v(b, pdens, k, j, i), v(b, pT, k, j, i), v(b, pye, k, j, i),
+                          species_d[ispec], nusamp(nu_bins - 1)) *
+                      v(b, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1);
+            Itot -= 0.5 * (v(b, Inu0(ispec, 0), k, j, i) * nusamp(0) +
+                           v(b, Inu0(ispec, nu_bins - 1), k, j, i) * nusamp(nu_bins - 1));
             kappaJ = robust::ratio(kappaJ, Itot);
             kappaH = robust::ratio(kappaH, Itot) + kappaJ;
 
@@ -683,24 +703,24 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
             Real tauH = alpha * dt * kappaH;
 
             // Store kappaH for asymptotic fluxes
-            v(iblock, idx_kappaH(ispec), k, j, i) = kappaH;
+            v(b, idx_kappaH(ispec), k, j, i) = kappaH;
 
             auto status = c.LinearSourceUpdate(Estar, cov_Fstar, con_tilPi, JBB, tauJ,
                                                tauH, &dE, &cov_dF);
 
             // Add source corrections to conserved radiation variables
-            v(iblock, idx_E(ispec), k, j, i) += sdetgam * dE;
+            v(b, idx_E(ispec), k, j, i) += sdetgam * dE;
             for (int idir = 0; idir < 3; ++idir) {
-              v(iblock, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
+              v(b, idx_F(ispec, idir), k, j, i) += sdetgam * cov_dF(idir);
             }
 
             // Add source corrections to conserved fluid variables
             if (update_fluid) {
-              v(iblock, cye, k, j, i) -= sdetgam * 0.0;
-              v(iblock, ceng, k, j, i) -= sdetgam * dE;
-              v(iblock, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
-              v(iblock, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
-              v(iblock, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
+              v(b, cye, k, j, i) -= sdetgam * 0.0;
+              v(b, ceng, k, j, i) -= sdetgam * dE;
+              v(b, cmom_lo + 0, k, j, i) -= sdetgam * cov_dF(0);
+              v(b, cmom_lo + 1, k, j, i) -= sdetgam * cov_dF(1);
+              v(b, cmom_lo + 2, k, j, i) -= sdetgam * cov_dF(2);
             }
 
             // Update sample intensities
@@ -709,7 +729,9 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
 
               Real nu_fluid0 = nusamp(0);
               Real nu_lab0 = 0.;
-              SPACETIMELOOP(nu) { nu_lab0 -= ncov(nu, nswarm) * ucon[nu]; }
+              SPACETIMELOOP(nu) {
+                nu_lab0 -= pack_mocmc(b, mocmc_core::ncov(nu), nswarm) * ucon[nu];
+              }
               nu_lab0 *= nusamp(0);
 
               const Real shift = (log(nusamp(0)) - log(nu_lab0)) / dlnu;
@@ -723,11 +745,11 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                 const Real nu_fluid = nusamp(bin);
                 const Real alphainv_s =
                     nu_fluid * opac_d.TotalScatteringCoefficient(
-                                   v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                                   v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
-                v(iblock, ijinvs(ispec, bin), k, j, i) =
-                    v(iblock, Inu0(ispec, bin), k, j, i) /
-                    (nu_fluid * nu_fluid * nu_fluid) * alphainv_s;
+                                   v(b, pdens, k, j, i), v(b, pT, k, j, i),
+                                   v(b, pye, k, j, i), species_d[ispec], nu_fluid);
+                v(b, ijinvs(ispec, bin), k, j, i) = v(b, Inu0(ispec, bin), k, j, i) /
+                                                    (nu_fluid * nu_fluid * nu_fluid) *
+                                                    alphainv_s;
               }
 
               for (int bin = 0; bin < nu_bins; bin++) {
@@ -736,27 +758,27 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
                 const Real ds = dt / ucon[0] / nu_fluid;
                 const Real alphainv_a =
                     nu_fluid * opac_d.TotalScatteringCoefficient(
-                                   v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                                   v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
+                                   v(b, pdens, k, j, i), v(b, pT, k, j, i),
+                                   v(b, pye, k, j, i), species_d[ispec], nu_fluid);
                 const Real alphainv_s =
                     nu_fluid * opac_d.TotalScatteringCoefficient(
-                                   v(iblock, pdens, k, j, i), v(iblock, pT, k, j, i),
-                                   v(iblock, pye, k, j, i), species_d[ispec], nu_fluid);
-                const Real jinv_a =
-                    opac_d.ThermalDistributionOfTNu(v(iblock, pT, k, j, i),
-                                                    species_d[ispec], nu_fluid) /
-                    (nu_fluid * nu_fluid * nu_fluid) * alphainv_a;
+                                   v(b, pdens, k, j, i), v(b, pT, k, j, i),
+                                   v(b, pye, k, j, i), species_d[ispec], nu_fluid);
+                const Real jinv_a = opac_d.ThermalDistributionOfTNu(
+                                        v(b, pT, k, j, i), species_d[ispec], nu_fluid) /
+                                    (nu_fluid * nu_fluid * nu_fluid) * alphainv_a;
 
                 // Interpolate invariant scattering emissivity to lab frame
                 Real jinv_s = 0.;
                 interp.GetIndicesAndWeights(bin, nubin_shift, nubin_wgt);
                 for (int isup = 0; isup < interp.StencilSize(); isup++) {
-                  jinv_s += nubin_wgt[isup] *
-                            v(iblock, ijinvs(ispec, nubin_shift[isup]), k, j, i);
+                  jinv_s +=
+                      nubin_wgt[isup] * v(b, ijinvs(ispec, nubin_shift[isup]), k, j, i);
                 }
 
-                Inuinv(bin, ispec, nswarm) =
-                    (Inuinv(bin, ispec, nswarm) + ds * (jinv_a + jinv_s)) /
+                pack_mocmc(b, mocmc_core::Inuinv(bin, ispec), nswarm) =
+                    (pack_mocmc(b, mocmc_core::Inuinv(bin, ispec), nswarm) +
+                     ds * (jinv_a + jinv_s)) /
                     (1. + ds * (alphainv_a + alphainv_s));
               }
             }
@@ -773,28 +795,17 @@ TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid) {
   return TaskStatus::complete;
 }
 
-// TODO(BRR): Hack to get around current lack of support for packing parthenon swarms
-template <>
-TaskStatus MOCMCEddington(MeshData<Real> *rc) {
-  for (int n = 0; n < rc->NumBlocks(); n++) {
-    MOCMCEddington(rc->GetBlockData(n).get());
-  }
-  return TaskStatus::complete;
-}
-
 template <class T>
-TaskStatus MOCMCEddington(T *rc) {
+TaskStatus MOCMCEddington(T *rc_base, T *rc) {
   // Assume list is sorted!
   namespace ir = radmoment_internal;
 
   auto *pmb = rc->GetParentPointer();
-  auto &sc = rc->GetSwarmData();
-  auto &swarm = sc->Get("mocmc");
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
-  IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
-  IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
+  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
+  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
+  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -802,12 +813,12 @@ TaskStatus MOCMCEddington(T *rc) {
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
-  const auto &Inuinv = swarm->template Get<Real>("Inuinv").Get();
-  const auto &ncov = swarm->template Get<Real>("ncov").Get();
-  const auto &mu_lo = swarm->template Get<Real>("mu_lo").Get();
-  const auto &mu_hi = swarm->template Get<Real>("mu_hi").Get();
-  const auto &phi_lo = swarm->template Get<Real>("phi_lo").Get();
-  const auto &phi_hi = swarm->template Get<Real>("phi_hi").Get();
+  static constexpr auto swarm_name = "mocmc";
+  static const auto desc_mocmc =
+      MakeSwarmPackDescriptor<mocmc_core::ncov, mocmc_core::mu_lo, mocmc_core::mu_hi,
+                              mocmc_core::phi_lo, mocmc_core::phi_hi, mocmc_core::Inuinv>(
+          swarm_name);
+  auto pack_mocmc = desc_mocmc.GetPack(rc_base);
   auto iTilPi = imap.GetFlatIdx(ir::tilPi::name());
   const auto pvel_lo = imap[pf::velocity::name()].first;
 
@@ -816,18 +827,16 @@ TaskStatus MOCMCEddington(T *rc) {
   auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
   auto num_species = rad->Param<int>("num_species");
 
-  // TODO(BRR) block packing eventually
-  const int iblock = 0;
-
-  auto swarm_d = swarm->GetDeviceContext();
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
-      ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+      DEFAULT_LOOP_PATTERN, "MOCMC::kdgrid", DevExecSpace(), 0, rc->NumBlocks() - 1, kb.s,
+      kb.e, jb.s, jb.e, ib.s, ib.e,
+      KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+        const auto swarm_d = pack_mocmc.GetContext(b);
         // initialize eddington to zero
         for (int s = 0; s < num_species; s++) {
           for (int ii = 0; ii < 3; ii++) {
             for (int jj = ii; jj < 3; jj++) {
-              v(iTilPi(s, ii, jj), k, j, i) = 0.0;
+              v(b, iTilPi(s, ii, jj), k, j, i) = 0.0;
             }
           }
         }
@@ -835,12 +844,12 @@ TaskStatus MOCMCEddington(T *rc) {
         const int nsamp = swarm_d.GetParticleCountPerCell(k, j, i);
 
         Real cov_g[4][4];
-        geom.SpacetimeMetric(CellLocation::Cent, iblock, k, j, i, cov_g);
-        Real alpha = geom.Lapse(CellLocation::Cent, iblock, k, j, i);
+        geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, cov_g);
+        Real alpha = geom.Lapse(CellLocation::Cent, b, k, j, i);
         Real con_beta[3];
-        geom.ContravariantShift(CellLocation::Cent, iblock, k, j, i, con_beta);
-        const Real vpcon[] = {v(pvel_lo, k, j, i), v(pvel_lo + 1, k, j, i),
-                              v(pvel_lo + 2, k, j, i)};
+        geom.ContravariantShift(CellLocation::Cent, b, k, j, i, con_beta);
+        const Real vpcon[] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
+                              v(b, pvel_lo + 2, k, j, i)};
         const Real W = phoebus::GetLorentzFactor(vpcon, cov_g);
         const Real ucon[4] = {W / alpha, vpcon[0] - con_beta[0] * W / alpha,
                               vpcon[1] - con_beta[1] * W / alpha,
@@ -851,7 +860,9 @@ TaskStatus MOCMCEddington(T *rc) {
 
           Real nu_fluid0 = nusamp(0);
           Real nu_lab0 = 0.;
-          SPACETIMELOOP(nu) { nu_lab0 -= ncov(nu, nswarm) * ucon[nu]; }
+          SPACETIMELOOP(nu) {
+            nu_lab0 -= pack_mocmc(b, mocmc_core::ncov(nu), nswarm) * ucon[nu];
+          }
           nu_lab0 *= nusamp(0);
 
           const Real shift = (log(nusamp(0)) - log(nu_lab0)) / dlnu;
@@ -866,26 +877,33 @@ TaskStatus MOCMCEddington(T *rc) {
             for (int s = 0; s < num_species; s++) {
               interp.GetIndicesAndWeights(nubin, nubin_shift, nubin_wgt);
               for (int isup = 0; isup < interp.StencilSize(); isup++) {
-                I[s] += nubin_wgt[isup] * Inuinv(nubin_shift[isup], s, nswarm) *
+                I[s] += nubin_wgt[isup] *
+                        pack_mocmc(b, mocmc_core::Inuinv(nubin_shift[isup], s), nswarm) *
                         pow(nusamp(nubin), 4);
               }
             }
           }
 
           Real wgts[6];
-          kdgrid::integrate_ninj_domega_quad(mu_lo(nswarm), mu_hi(nswarm), phi_lo(nswarm),
-                                             phi_hi(nswarm), wgts);
+          kdgrid::integrate_ninj_domega_quad(pack_mocmc(b, mocmc_core::mu_lo(), nswarm),
+                                             pack_mocmc(b, mocmc_core::mu_hi(), nswarm),
+                                             pack_mocmc(b, mocmc_core::phi_lo(), nswarm),
+                                             pack_mocmc(b, mocmc_core::phi_hi(), nswarm),
+                                             wgts);
           for (int ii = 0; ii < 3; ii++) {
             for (int jj = ii; jj < 3; jj++) {
               const int ind = Geometry::Utils::Flatten2(ii, jj, 3);
               for (int s = 0; s < num_species; s++) {
-                v(iTilPi(s, ii, jj), k, j, i) += wgts[ind] * I[s];
+                v(b, iTilPi(s, ii, jj), k, j, i) += wgts[ind] * I[s];
               }
             }
           }
           for (int s = 0; s < num_species; s++) {
-            energy[s] += (mu_hi(nswarm) - mu_lo(nswarm)) *
-                         (phi_hi(nswarm) - phi_lo(nswarm)) * I[s];
+            energy[s] += (pack_mocmc(b, mocmc_core::mu_hi(), nswarm) -
+                          pack_mocmc(b, mocmc_core::mu_lo(), nswarm)) *
+                         (pack_mocmc(b, mocmc_core::phi_hi(), nswarm) -
+                          pack_mocmc(b, mocmc_core::phi_lo(), nswarm)) *
+                         I[s];
           }
         }
 
@@ -893,17 +911,17 @@ TaskStatus MOCMCEddington(T *rc) {
           for (int s = 0; s < num_species; s++) {
             for (int ii = 0; ii < 3; ii++) {
               for (int jj = ii; jj < 3; jj++) {
-                v(iTilPi(s, ii, jj), k, j, i) /= energy[s];
+                v(b, iTilPi(s, ii, jj), k, j, i) /= energy[s];
               }
-              v(iTilPi(s, ii, ii), k, j, i) -= 1. / 3.;
+              v(b, iTilPi(s, ii, ii), k, j, i) -= 1. / 3.;
             }
           }
         }
 
         for (int s = 0; s < num_species; s++) {
-          v(iTilPi(s, 1, 0), k, j, i) = v(iTilPi(s, 0, 1), k, j, i);
-          v(iTilPi(s, 2, 0), k, j, i) = v(iTilPi(s, 0, 2), k, j, i);
-          v(iTilPi(s, 2, 1), k, j, i) = v(iTilPi(s, 1, 2), k, j, i);
+          v(b, iTilPi(s, 1, 0), k, j, i) = v(b, iTilPi(s, 0, 1), k, j, i);
+          v(b, iTilPi(s, 2, 0), k, j, i) = v(b, iTilPi(s, 0, 2), k, j, i);
+          v(b, iTilPi(s, 2, 1), k, j, i) = v(b, iTilPi(s, 1, 2), k, j, i);
         }
       });
 
@@ -920,16 +938,21 @@ TaskStatus MOCMCUpdateParticleCount(Mesh *pmesh, std::vector<Real> *resolution) 
   return TaskStatus::complete;
 }
 
-template TaskStatus MOCMCSampleBoundaries<MeshBlockData<Real>>(MeshBlockData<Real> *);
-template TaskStatus MOCMCReconstruction<MeshBlockData<Real>>(MeshBlockData<Real> *);
-template TaskStatus MOCMCEddington<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+template TaskStatus MOCMCSampleBoundaries<MeshData<Real>>(MeshData<Real> *rc_base,
+                                                          MeshData<Real> *rc);
+// template TaskStatus MOCMCSampleBoundaries<MeshData<Real>>(MeshData<Real> *);
+template TaskStatus MOCMCReconstruction<MeshData<Real>>(MeshData<Real> *rc_base,
+                                                        MeshData<Real> *rc);
+// template TaskStatus MOCMCReconstruction<MeshData<Real>>(MeshData<Real> *);
+template TaskStatus MOCMCEddington<MeshData<Real>>(MeshData<Real> *rc_base,
+                                                   MeshData<Real> *rc);
+// template TaskStatus MOCMCEddington<MeshData<Real>>(MeshData<Real> *rc);
 template void MOCMCInitSamples<MeshBlockData<Real>>(MeshBlockData<Real> *);
-template TaskStatus MOCMCTransport<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
-                                                        const Real dt);
+template TaskStatus MOCMCTransport<MeshData<Real>>(MeshData<Real> *rc, const Real dt);
 // template TaskStatus MOCMCFluidSource<MeshData<Real>>(MeshData<Real> *rc, const Real dt,
-// const bool update_fluid);
-template TaskStatus MOCMCFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *rc,
-                                                          const Real dt,
-                                                          const bool update_fluid);
+//                                                     const bool update_fluid);
+template TaskStatus MOCMCFluidSource<MeshData<Real>>(MeshData<Real> *rc_base,
+                                                     MeshData<Real> *rc, const Real dt,
+                                                     const bool update_fluid);
 
 } // namespace radiation

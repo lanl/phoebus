@@ -40,7 +40,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddParam<>("rng_pool", rng_pool);
 
   // Add swarm of tracers
-  std::string swarm_name = "tracers";
+  static constexpr auto swarm_name = "tracers";
   Metadata swarm_metadata({Metadata::Provides, Metadata::None});
   physics->AddSwarm(swarm_name, swarm_metadata);
   Metadata real_swarmvalue_metadata({Metadata::Real});
@@ -66,6 +66,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddSwarmValue(tv::mass::name(), swarm_name, real_swarmvalue_metadata);
   physics->AddSwarmValue(tv::bernoulli::name(), swarm_name, real_swarmvalue_metadata);
 
+  // TEST
+  Metadata Inu_swarmvalue_metadata({Metadata::Real}, std::vector<int>{3, 100});
+  physics->AddSwarmValue(tv::test::name(), swarm_name, Inu_swarmvalue_metadata);
+
   const bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
 
   if (mhd) {
@@ -85,7 +89,7 @@ TaskStatus AdvectTracers(MeshData<Real> *rc, const Real dt) {
   static const auto ndim = pmb->ndim;
 
   // tracer swarm pack
-  static const auto swarm_name = "tracers";
+  static constexpr auto swarm_name = "tracers";
   static const auto desc_tracer =
       MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z>(
           swarm_name);
@@ -158,14 +162,12 @@ void FillTracers(MeshBlockData<Real> *rc) {
   const auto mhd = fluid->Param<bool>("mhd");
 
   // tracer swarm pack
-  const auto swarm_name = "tracers";
-  static auto desc_tracers =
-      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
-                              tv::vel_x, tv::vel_y, tv::vel_z, tv::rho, tv::temperature,
-                              tv::ye, tv::entropy, tv::energy, tv::lorentz, tv::lapse,
-                              tv::shift_x, tv::shift_y, tv::shift_z, tv::detgamma,
-                              tv::pressure, tv::bernoulli, tv::B_x, tv::B_y, tv::B_z>(
-          swarm_name);
+  static constexpr auto swarm_name = "tracers";
+  static auto desc_tracers = MakeSwarmPackDescriptor<
+      swarm_position::x, swarm_position::y, swarm_position::z, tv::vel_x, tv::vel_y,
+      tv::vel_z, tv::rho, tv::temperature, tv::ye, tv::entropy, tv::energy, tv::lorentz,
+      tv::lapse, tv::shift_x, tv::shift_y, tv::shift_z, tv::detgamma, tv::pressure,
+      tv::bernoulli, tv::B_x, tv::B_y, tv::B_z, tv::test>(swarm_name);
   auto pack_tracers = desc_tracers.GetPack(rc);
 
   // hydro vars pack
@@ -191,7 +193,6 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   // update loop.
-  const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
       "Fill Tracers", 0, pack_tracers.GetMaxFlatIndex(), KOKKOS_LAMBDA(const int idx) {
         const auto [b, n] = pack_tracers.GetBlockParticleIndices(idx);
@@ -264,6 +265,7 @@ void FillTracers(MeshBlockData<Real> *rc) {
           pack_tracers(b, tv::detgamma(), n) = gdet;
           pack_tracers(b, tv::pressure(), n) = pressure;
           pack_tracers(b, tv::bernoulli(), n) = bernoulli;
+          pack_tracers(b, tv::test(2 + 5), n) = 1.1238;
           if (mhd) {
             pack_tracers(b, tv::B_x(), n) = B_X1;
             pack_tracers(b, tv::B_y(), n) = B_X2;
