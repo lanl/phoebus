@@ -501,7 +501,6 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
         if (swarm_d.IsActive(n)) {
           Real &t = pack_mocmc(b, mocmc_core::t(), n);
           Real &x = pack_mocmc(b, swarm_position::x(), n);
-          if (n == 240) std::printf("t, x, n, b = %f %f %d %d\n", t, x, n, b);
           Real &y = pack_mocmc(b, swarm_position::y(), n);
           Real &z = pack_mocmc(b, swarm_position::z(), n);
           Real y0 = y;
@@ -510,7 +509,6 @@ TaskStatus MOCMCTransport(T *rc, const Real dt) {
                        pack_mocmc(b, mocmc_core::ncov(1), n),
                        pack_mocmc(b, mocmc_core::ncov(2), n),
                        pack_mocmc(b, mocmc_core::ncov(3), n), dt, geom);
-          if (n == 240) std::printf("t, x, n, b = %f %f %d %d\n", t, x, n, b);
 
           bool on_current_mesh_block = true;
           swarm_d.GetNeighborBlockIndex(n, x, y, z, on_current_mesh_block);
