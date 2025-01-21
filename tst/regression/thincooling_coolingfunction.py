@@ -38,11 +38,14 @@ args = parser.parse_args()
 modified_inputs = {}
 modified_inputs["radiation/method"] = "cooling_function"
 
+cmake_extra_args = "-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off -DPHOEBUS_DO_NU_HEAVY=Off"
+
 code = rt.gold_comparison(
     variables=["p.density", "p.energy"],
     input_file=args.input,
     modified_inputs=modified_inputs,
     executable=args.executable,
+    cmake_extra_args=cmake_extra_args,
     geometry="Minkowski",
     use_gpu=args.use_gpu,
     use_mpiexec=args.use_mpiexec,

@@ -47,11 +47,15 @@ modified_inputs["radiation/nu_bins"] = 10
 modified_inputs["radiation/mocmc/nsamp_per_zone"] = 32
 modified_inputs["radiation_equilibration/J"] = 0.2
 
+
+cmake_extra_args = "-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off -DPHOEBUS_DO_NU_HEAVY=Off"
+
 code = rt.gold_comparison(
     variables=["r.p.J", "r.p.H"],
     input_file=args.input,
     modified_inputs=modified_inputs,
     executable=args.executable,
+    cmake_extra_args=cmake_extra_args,
     geometry="Minkowski",
     use_gpu=args.use_gpu,
     use_mpiexec=args.use_mpiexec,
