@@ -10,4 +10,24 @@
 # prepare derivative works, distribute copies to the public, perform
 # publicly and display publicly, and to permit others to do so.
 
-set(MOCMC_NUM_SPECIES 3 CACHE INTEGER "Number of radiation species for MOCMC.")
+option(PHOEBUS_DO_NU_ELECTRON "Evolve electron neutrinos" ON)
+option(PHOEBUS_DO_NU_ELECTRON_ANTI "Evolve electron antineutrinos" ON)
+option(PHOEBUS_DO_NU_HEAVY "Evolve heavy composite type neutrinos" ON)
+
+if(PHOEBUS_DO_NU_ELECTRON)
+  set(DO_NU_ELECTRON 1 CACHE BOOL "Electron neutrinos enabled")
+else()
+  set(DO_NU_ELECTRON 0 CACHE BOOL "Electron neutrinos disabled")
+endif()
+
+if(PHOEBUS_DO_NU_ELECTRON_ANTI)
+  set(DO_NU_ELECTRON_ANTI 1 CACHE BOOL "Electron antineutrinos enabled")
+else()
+  set(DO_NU_ELECTRON_ANTI 0 CACHE BOOL "Electron antineutrinos disabled")
+endif()
+
+if(PHOEBUS_DO_NU_HEAVY)
+  set(DO_NU_HEAVY 1 CACHE BOOL "Heavy neutrinos enabled")
+else()
+  set(DO_NU_HEAVY 0 CACHE BOOL "Heavy neutrinos disabled")
+endif()

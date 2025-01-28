@@ -19,6 +19,7 @@
 
 using Geometry::CoordSysMeshBlock;
 using Geometry::NDFULL;
+using parthenon::MakePackDescriptor;
 
 namespace radiation {
 
@@ -88,14 +89,14 @@ void SetWeight(Mesh *pmesh) {
   auto &phoebus_pkg = pmesh->packages.Get("phoebus");
   auto &unit_conv = phoebus_pkg->Param<phoebus::UnitConversions>("unit_conv");
   auto rad = pmesh->packages.Get("radiation");
-  const auto nusamp = rad->Param<ParArray1D<Real>>("nusamp");
+  const auto nusamp0 = rad->Param<Real>("nu_min");
   auto &code_constants = phoebus_pkg->Param<phoebus::CodeConstants>("code_constants");
 
   const Real sim_vol = PhoebusUtils::GetRegionVolume(pmesh->mesh_size);
   const Real h_code = code_constants.h;
   const Real dNtot = rad->Param<Real>("tune_emission") /
                      (std::pow(sim_vol, 1. / 3.) * 1.0); // Note: may need a dt term here?
-  rad->UpdateParam<Real>("wgtC", rad->Param<Real>("Jtot") / (h_code * dNtot) * nusamp[0]);
+  rad->UpdateParam<Real>("wgtC", rad->Param<Real>("Jtot") / (h_code * dNtot) * nusamp0);
 }
 
 TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
@@ -103,6 +104,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
+  namespace mci = monte_carlo_internal;
+  namespace mcc = monte_carlo_core;
   auto opac = pmb->packages.Get("opacity");
   auto rad = pmb->packages.Get("radiation");
   auto swarm = sc->Get("monte_carlo");
@@ -151,23 +154,13 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
 
-  std::vector<std::string> vars(
-      {p::density::name(), p::temperature::name(), p::ye::name(), p::velocity::name(),
-       "dNdlnu_max", "dNdlnu", "dN", "Ns", iv::Gcov::name(), iv::Gye::name()});
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-  const int pye = imap[p::ye::name()].first;
-  const int pdens = imap[p::density::name()].first;
-  const int ptemp = imap[p::temperature::name()].first;
-  const int pvlo = imap[p::velocity::name()].first;
-  const int pvhi = imap[p::velocity::name()].second;
-  const int idNdlnu = imap["dNdlnu"].first;
-  const int idNdlnu_max = imap["dNdlnu_max"].first;
-  const int idN = imap["dN"].first;
-  const int iNs = imap["Ns"].first;
-  const int Gcov_lo = imap[iv::Gcov::name()].first;
-  const int Gcov_hi = imap[iv::Gcov::name()].second;
-  const int Gye = imap[iv::Gye::name()].first;
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::temperature, p::ye, p::velocity, mci::dNdlnu_max,
+                         mci::dNdlnu, mci::dN, mci::Ns, iv::Gcov, iv::Gye>(
+          resolved_pkgs.get());
+  auto v = desc.GetPack(rc);
 
   // TODO(BRR) update this dynamically somewhere else. Get a reasonable starting value
   Real wgtC = rad->Param<Real>("wgtC");
@@ -175,10 +168,10 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   pmb->par_for(
       "MonteCarloZeroFiveForce", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
-        for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
-          v(mu, k, j, i) = 0.;
+        for (int mu = 0; mu <= 3; mu++) {
+          v(0, iv::Gcov(mu), k, j, i) = 0.;
         }
-        v(Gye, k, j, i) = 0.;
+        v(0, iv::Gye(), k, j, i) = 0.;
       });
 
   for (int sidx = 0; sidx < num_species; sidx++) {
@@ -188,9 +181,9 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
           auto rng_gen = rng_pool.get_state();
           Real detG = geom.DetG(CellLocation::Cent, k, j, i);
-          const Real &dens = v(pdens, k, j, i);
-          const Real &temp = v(ptemp, k, j, i);
-          const Real &ye = v(pye, k, j, i);
+          const Real &dens = v(0, p::density(), k, j, i);
+          const Real &temp = v(0, p::temperature(), k, j, i);
+          const Real &ye = v(0, p::ye(), k, j, i);
 
           Real dN = 0.;
           Real dNdlnu_max = 0.;
@@ -204,15 +197,14 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
             // Note that factors of nu in numerator and denominator cancel
             Real dNdlnu = Jnu * d3x * detG / (h_code * wgt);
-            // TODO(BRR) use FlatIdx
-            v(idNdlnu + sidx + n * num_species, k, j, i) = dNdlnu;
+            v(0, mci::dNdlnu(sidx + n * num_species), k, j, i) = dNdlnu;
             if (dNdlnu > dNdlnu_max) {
               dNdlnu_max = dNdlnu;
             }
           }
 
           for (int n = 0; n <= nu_bins; n++) {
-            v(idNdlnu + sidx + n * num_species, k, j, i) /= dNdlnu_max;
+            v(0, mci::dNdlnu(sidx + n * num_species), k, j, i) /= dNdlnu_max;
           }
 
           // Trapezoidal rule
@@ -224,7 +216,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 (h_code * GetWeight(wgtC, nu1)) * dlnu;
           dN *= d3x * detG * dt;
 
-          v(idNdlnu_max + sidx, k, j, i) = dNdlnu_max;
+          v(0, mci::dNdlnu_max(sidx), k, j, i) = dNdlnu_max;
 
           int Ns = static_cast<int>(dN);
           if (dN - Ns > rng_gen.drand()) {
@@ -232,8 +224,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
           }
 
           // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
-          v(idN + sidx, k, j, i) = dN;
-          v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
+          v(0, mci::dN(sidx), k, j, i) = dN;
+          v(0, mci::Ns(sidx), k, j, i) = static_cast<Real>(Ns);
           rng_pool.free_state(rng_gen);
         });
   }
@@ -244,7 +236,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       parthenon::loop_pattern_mdrange_tag, "MonteCarloReduceParticleCreation",
       DevExecSpace(), 0, num_species - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i, Real &dNtot) {
-        dNtot += v(idN + sidx, k, j, i);
+        dNtot += v(0, mci::dN(sidx), k, j, i);
       },
       Kokkos::Sum<Real>(dNtot));
 
@@ -260,14 +252,14 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
         auto rng_gen = rng_pool.get_state();
 
-        Real dN_upd = wgtCfac * v(idN + sidx, k, j, i);
+        Real dN_upd = wgtCfac * v(0, mci::dN(sidx), k, j, i);
         int Ns = static_cast<int>(dN_upd);
         if (dN_upd - Ns > rng_gen.drand()) {
           Ns++;
         }
 
         // TODO(BRR) Use a ParArrayND<int> instead of these weird static_casts
-        v(iNs + sidx, k, j, i) = static_cast<Real>(Ns);
+        v(0, mci::Ns(sidx), k, j, i) = static_cast<Real>(Ns);
         rng_pool.free_state(rng_gen);
       });
   int Nstot = 0;
@@ -275,7 +267,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
       parthenon::loop_pattern_mdrange_tag, "MonteCarloReduceParticleCreationNs",
       DevExecSpace(), 0, num_species - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i, int &Nstot) {
-        Nstot += static_cast<int>(v(iNs + sidx, k, j, i));
+        Nstot += static_cast<int>(v(0, mci::Ns(sidx), k, j, i));
       },
       Kokkos::Sum<int>(Nstot));
 
@@ -284,22 +276,23 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
 
   const auto new_particles_context = swarm->AddEmptyParticles(Nstot);
 
-  auto &t = swarm->Get<Real>("t").Get();
-  auto &x = swarm->Get<Real>(swarm_position::x::name()).Get();
-  auto &y = swarm->Get<Real>(swarm_position::y::name()).Get();
-  auto &z = swarm->Get<Real>(swarm_position::z::name()).Get();
-  auto &k0 = swarm->Get<Real>("k0").Get();
-  auto &k1 = swarm->Get<Real>("k1").Get();
-  auto &k2 = swarm->Get<Real>("k2").Get();
-  auto &k3 = swarm->Get<Real>("k3").Get();
-  auto &weight = swarm->Get<Real>("weight").Get();
-  auto &swarm_species = swarm->Get<int>("species").Get();
-  auto swarm_d = swarm->GetDeviceContext();
+  // monte carlo swarm pack
+  static constexpr auto swarm_name = "monte_carlo";
+  static const auto desc_mc =
+      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
+                              mcc::t, mcc::k0, mcc::k1, mcc::k2, mcc::k3, mcc::weight>(
+          swarm_name);
+  auto pack_mc = desc_mc.GetPack(rc);
+
+  // NOTE: Currently cannot pack Real and int valued swarms together, so species is
+  // separated
+  static const auto desc_species = MakeSwarmPackDescriptor<mcc::species>(swarm_name);
+  auto pack_species = desc_species.GetPack(rc);
 
   // Calculate array of starting index for each zone to compute particles
   ParArrayND<int> starting_index("Starting index", 3, nx_k, nx_j, nx_i);
   auto starting_index_h = starting_index.GetHostMirror();
-  auto dN = rc->Get("Ns").data;
+  auto dN = rc->Get(mci::Ns::name()).data;
   auto dN_h = dN.GetHostMirrorAndCopy();
   int index = 0;
   for (int sidx = 0; sidx < num_species; sidx++) {
@@ -314,7 +307,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
   }
   starting_index.DeepCopy(starting_index_h);
 
-  auto dNdlnu = rc->Get("dNdlnu").data;
+  auto dNdlnu = rc->Get(mci::dNdlnu::name()).data;
   // auto dNdlnu_max = rc->Get("dNdlnu_max").data;
 
   // Loop over zones and generate appropriate number of particles in each zone
@@ -324,15 +317,17 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
     pmb->par_for(
         "MonteCarloSourceParticles", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const auto swarm_d = pack_mc.GetContext(0);
           // Create tetrad transformation once per zone
           Real Gcov[4][4];
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, Gcov);
           Real Ucon[4];
-          Real vel[3] = {v(pvlo, k, j, i), v(pvlo + 1, k, j, i), v(pvlo + 2, k, j, i)};
+          Real vel[3] = {v(0, p::velocity(0), k, j, i), v(0, p::velocity(1), k, j, i),
+                         v(0, p::velocity(2), k, j, i)};
           GetFourVelocity(vel, geom, CellLocation::Cent, k, j, i, Ucon);
           Geometry::Tetrads Tetrads(Ucon, Gcov);
           Real detG = geom.DetG(CellLocation::Cent, k, j, i);
-          int dNs = v(iNs + sidx, k, j, i);
+          int dNs = v(0, mci::Ns(sidx), k, j, i);
           auto rng_gen = rng_pool.get_state();
 
           // Loop over particles to create in this zone
@@ -341,15 +336,15 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                 starting_index(sidx, k - kb.s, j - jb.s, i - ib.s) + n);
 
             // Set particle species
-            swarm_species(m) = static_cast<int>(s);
+            pack_species(0, mcc::species(), m) = static_cast<int>(s);
 
             // Create particles at initial time
-            t(m) = t0;
+            pack_mc(0, mcc::t(), m) = t0;
 
             // Create particles at zone centers
-            x(m) = minx_i + (i - ib.s + 0.5) * dx_i;
-            y(m) = minx_j + (j - jb.s + 0.5) * dx_j;
-            z(m) = minx_k + (k - kb.s + 0.5) * dx_k;
+            pack_mc(0, swarm_position::x(), m) = minx_i + (i - ib.s + 0.5) * dx_i;
+            pack_mc(0, swarm_position::y(), m) = minx_j + (j - jb.s + 0.5) * dx_j;
+            pack_mc(0, swarm_position::z(), m) = minx_k + (k - kb.s + 0.5) * dx_k;
 
             // Sample energy and set weight
             Real lnu;
@@ -368,7 +363,7 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             } while (rng_gen.drand() > prob);
             Real nu = exp(lnu);
 
-            weight(m) = GetWeight(wgtC / wgtCfac, nu);
+            pack_mc(0, mcc::weight(), m) = GetWeight(wgtC / wgtCfac, nu);
 
             // Encode frequency and randomly sample direction
             Real E = nu * h_code;
@@ -379,16 +374,18 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real K_coord[4];
             Tetrads.TetradToCoordCov(K_tetrad, K_coord);
 
-            k0(m) = K_coord[0];
-            k1(m) = K_coord[1];
-            k2(m) = K_coord[2];
-            k3(m) = K_coord[3];
+            pack_mc(0, mcc::k0(), m) = K_coord[0];
+            pack_mc(0, mcc::k1(), m) = K_coord[1];
+            pack_mc(0, mcc::k2(), m) = K_coord[2];
+            pack_mc(0, mcc::k3(), m) = K_coord[3];
 
-            for (int mu = Gcov_lo; mu <= Gcov_lo + 3; mu++) {
+            for (int mu = 0; mu <= 3; mu++) {
               // detG is in both numerator and denominator
-              v(mu, k, j, i) -= 1. / (d3x * dt) * weight(m) * K_coord[mu - Gcov_lo];
+              v(0, iv::Gcov(mu), k, j, i) -=
+                  1. / (d3x * dt) * pack_mc(0, mcc::weight(), m) * K_coord[mu];
             }
-            v(Gye, k, j, i) -= LeptonSign(s) / (d3x * dt) * Ucon[0] * weight(m) * mp_code;
+            v(0, iv::Gye(), k, j, i) -= LeptonSign(s) / (d3x * dt) * Ucon[0] *
+                                        pack_mc(0, mcc::weight(), m) * mp_code;
 
           } // for n
           rng_pool.free_state(rng_gen);
@@ -399,7 +396,8 @@ TaskStatus MonteCarloSourceParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
     pmb->par_for(
         "MonteCarloRemoveEmittedParticles", 0, num_species - 1, kb.s, kb.e, jb.s, jb.e,
         ib.s, ib.e, KOKKOS_LAMBDA(const int sidx, const int k, const int j, const int i) {
-          int dNs = v(iNs + sidx, k, j, i);
+          const auto swarm_d = pack_mc.GetContext(0);
+          int dNs = v(0, mci::Ns(sidx), k, j, i);
           // Loop over particles to create in this zone
           for (int n = 0; n < static_cast<int>(dNs); n++) {
             const int m = new_particles_context.GetNewParticleIndex(
@@ -418,6 +416,7 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   namespace p = fluid_prim;
   namespace c = fluid_cons;
   namespace iv = internal_variables;
+  namespace mcc = monte_carlo_core;
   auto rad = pmb->packages.Get("radiation");
   auto swarm = sc->Get("monte_carlo");
   auto opac = pmb->packages.Get("opacity");
@@ -437,17 +436,19 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real &dx_k = pmb->coords.Dxf<3>(pmb->cellbounds.ks(IndexDomain::interior));
   const Real d4x = dx_i * dx_j * dx_k * dt;
   auto geom = Geometry::GetCoordinateSystem(rc);
-  auto &t = swarm->Get<Real>("t").Get();
-  auto &x = swarm->Get<Real>(swarm_position::x::name()).Get();
-  auto &y = swarm->Get<Real>(swarm_position::y::name()).Get();
-  auto &z = swarm->Get<Real>(swarm_position::z::name()).Get();
-  auto &k0 = swarm->Get<Real>("k0").Get();
-  auto &k1 = swarm->Get<Real>("k1").Get();
-  auto &k2 = swarm->Get<Real>("k2").Get();
-  auto &k3 = swarm->Get<Real>("k3").Get();
-  auto &weight = swarm->Get<Real>("weight").Get();
-  auto &swarm_species = swarm->Get<int>("species").Get();
-  auto swarm_d = swarm->GetDeviceContext();
+
+  // monte carlo swarm pack
+  static constexpr auto swarm_name = "monte_carlo";
+  static const auto desc_mc =
+      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
+                              mcc::t, mcc::k0, mcc::k1, mcc::k2, mcc::k3, mcc::weight>(
+          swarm_name);
+  auto pack_mc = desc_mc.GetPack(rc);
+
+  // NOTE: Currently cannot pack Real and int valued swarms together, so species is
+  // separated
+  static const auto desc_species = MakeSwarmPackDescriptor<mcc::species>(swarm_name);
+  auto pack_species = desc_species.GetPack(rc);
 
   auto phoebus_pkg = pmb->packages.Get("phoebus");
   auto &unit_conv = phoebus_pkg->Param<phoebus::UnitConversions>("unit_conv");
@@ -456,46 +457,52 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
   const Real h_code = code_constants.h;
   const Real mp_code = code_constants.mp;
 
-  std::vector<std::string> vars({p::density::name(), p::ye::name(), p::velocity::name(),
-                                 p::temperature::name(), iv::Gcov::name(),
-                                 iv::Gye::name()});
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-  const int prho = imap[p::density::name()].first;
-  const int iye = imap[p::ye::name()].first;
-  const int ivlo = imap[p::velocity::name()].first;
-  const int ivhi = imap[p::velocity::name()].second;
-  const int itemp = imap[p::temperature::name()].first;
-  const int iGcov_lo = imap[iv::Gcov::name()].first;
-  const int iGcov_hi = imap[iv::Gcov::name()].second;
-  const int iGye = imap[iv::Gye::name()].first;
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc = MakePackDescriptor<p::density, p::temperature, p::ye, p::velocity,
+                                        iv::Gcov, iv::Gye>(resolved_pkgs.get());
+  auto v = desc.GetPack(rc);
 
   ParArray1D<Real> num_interactions("Number interactions", 2);
 
   pmb->par_for(
-      "MonteCarloTransport", 0, swarm->GetMaxActiveIndex(), KOKKOS_LAMBDA(const int n) {
+      "MonteCarloTransport", 0, pack_mc.GetMaxFlatIndex(), KOKKOS_LAMBDA(const int idx) {
+        const auto [b, n] = pack_mc.GetBlockParticleIndices(idx);
+        const auto swarm_d = pack_mc.GetContext(b);
         if (swarm_d.IsActive(n)) {
+          Real &x = pack_mc(b, swarm_position::x(), n);
+          Real &y = pack_mc(b, swarm_position::y(), n);
+          Real &z = pack_mc(b, swarm_position::z(), n);
+          Real &t = pack_mc(b, mcc::t(), n);
+          Real &k0 = pack_mc(b, mcc::k0(), n);
+          Real &k1 = pack_mc(b, mcc::k1(), n);
+          Real &k2 = pack_mc(b, mcc::k2(), n);
+          Real &k3 = pack_mc(b, mcc::k3(), n);
+          Real &weight = pack_mc(b, mcc::weight(), n);
+
           auto rng_gen = rng_pool.get_state();
 
-          auto s = static_cast<RadiationType>(swarm_species(n));
+          auto s = static_cast<RadiationType>(pack_species(b, mcc::species(), n));
 
           // TODO(BRR) Get u^mu, evaluate -k.u
-          const Real nu = -k0(n) / h_code;
+          const Real nu = -k0 / h_code;
 
           // TODO(BRR) Get K^0 via metric
-          Real Kcon0 = -k0(n);
+          Real Kcon0 = -k0;
           // Real dlam = dt / Kcon0;
 
           int k, j, i;
-          swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+          swarm_d.Xtoijk(x, y, z, i, j, k);
 
-          Real alphanu = opacities.AbsorptionCoefficient(
-              v(prho, k, j, i), v(itemp, k, j, i), v(iye, k, j, i), s, nu);
+          Real alphanu = opacities.AbsorptionCoefficient(v(b, p::density(), k, j, i),
+                                                         v(b, p::temperature(), k, j, i),
+                                                         v(b, p::ye(), k, j, i), s, nu);
 
           Real dtau_abs = alphanu * dt; // c = 1 in code units
-          Real vel[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
-          Real W = GetLorentzFactor(vel, geom, CellLocation::Cent, k, j, i);
-          Real alpha = geom.Lapse(CellLocation::Cent, k, j, i);
+          Real vel[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
+                         v(b, p::velocity(2), k, j, i)};
+          Real W = GetLorentzFactor(vel, geom, CellLocation::Cent, b, k, j, i);
+          Real alpha = geom.Lapse(CellLocation::Cent, b, k, j, i);
           Real Ucon0 = robust::ratio(W, std::abs(alpha));
 
           bool absorbed = false;
@@ -506,15 +513,12 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
             Real xabs = -log(rng_gen.drand());
             if (xabs <= dtau_abs) {
               // Deposit energy-momentum and lepton number in fluid
-              Kokkos::atomic_add(&(v(iGcov_lo, k, j, i)), 1. / d4x * weight(n) * k0(n));
-              Kokkos::atomic_add(&(v(iGcov_lo + 1, k, j, i)),
-                                 1. / d4x * weight(n) * k1(n));
-              Kokkos::atomic_add(&(v(iGcov_lo + 2, k, j, i)),
-                                 1. / d4x * weight(n) * k2(n));
-              Kokkos::atomic_add(&(v(iGcov_lo + 3, k, j, i)),
-                                 1. / d4x * weight(n) * k3(n));
-              Kokkos::atomic_add(&(v(iGye, k, j, i)),
-                                 LeptonSign(s) / d4x * weight(n) * mp_code * Ucon0);
+              Kokkos::atomic_add(&(v(b, iv::Gcov(0), k, j, i)), 1. / d4x * weight * k0);
+              Kokkos::atomic_add(&(v(b, iv::Gcov(1), k, j, i)), 1. / d4x * weight * k1);
+              Kokkos::atomic_add(&(v(b, iv::Gcov(2), k, j, i)), 1. / d4x * weight * k2);
+              Kokkos::atomic_add(&(v(b, iv::Gcov(3), k, j, i)), 1. / d4x * weight * k3);
+              Kokkos::atomic_add(&(v(b, iv::Gye(), k, j, i)),
+                                 LeptonSign(s) / d4x * weight * mp_code * Ucon0);
 
               absorbed = true;
               Kokkos::atomic_add(&(num_interactions[0]), 1.);
@@ -523,10 +527,10 @@ TaskStatus MonteCarloTransport(MeshBlock *pmb, MeshBlockData<Real> *rc,
           }
 
           if (absorbed == false) {
-            PushParticle(t(n), x(n), y(n), z(n), k0(n), k1(n), k2(n), k3(n), dt, geom);
+            PushParticle(t, x, y, z, k0, k1, k2, k3, dt, geom);
 
             bool on_current_mesh_block = true;
-            swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+            swarm_d.GetNeighborBlockIndex(n, x, y, z, on_current_mesh_block);
           }
 
           rng_pool.free_state(rng_gen);
