@@ -62,39 +62,24 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
+  namespace pf = fluid_prim;
 
   Mesh *pmesh = rc->GetMeshPointer();
   StateDescriptor *rad = pmesh->packages.Get("radiation").get();
+  const int n_species = rad->Param<int>("num_species");
 
   IndexRange ib = rc->GetBoundsI(IndexDomain::entire);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::entire);
   IndexRange kb = rc->GetBoundsK(IndexDomain::entire);
+  using parthenon::MakePackDescriptor;
+  auto &resolved_pkgs = pmesh->resolved_packages;
 
-  std::vector<std::string> variables{cr::E::name(),
-                                     cr::F::name(),
-                                     pr::J::name(),
-                                     pr::H::name(),
-                                     fluid_prim::velocity::name(),
-                                     ir::xi::name(),
-                                     ir::phi::name(),
-                                     ir::c2pfail::name(),
-                                     ir::tilPi::name()};
-  PackIndexMap imap;
-  auto v = rc->PackVariables(variables, imap);
+  static auto desc =
+      MakePackDescriptor<cr::E, cr::F, pr::J, pr::H, pf::velocity, ir::xi, ir::phi,
+                         ir::c2pfail, ir::tilPi>(resolved_pkgs.get());
 
-  auto cE = imap.GetFlatIdx(cr::E::name());
-  auto pJ = imap.GetFlatIdx(pr::J::name());
-  auto cF = imap.GetFlatIdx(cr::F::name());
-  auto pH = imap.GetFlatIdx(pr::H::name());
-  auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
-  auto specB = cE.GetBounds(1);
-  auto dirB = pH.GetBounds(2);
-
-  auto iXi = imap.GetFlatIdx(ir::xi::name());
-  auto iPhi = imap.GetFlatIdx(ir::phi::name());
-
-  auto ifail = imap[ir::c2pfail::name()].first;
+  auto v = desc.GetPack(rc);
+  const int nblocks = v.GetNBlocks();
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   const Real pi = acos(-1);
@@ -104,21 +89,22 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
 
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Con2Prim", DevExecSpace(), 0,
-      v.GetDim(5) - 1,  // Loop over meshblocks
-      specB.s, specB.e, // Loop over species
-      kb.s, kb.e,       // z-loop
-      jb.s, jb.e,       // y-loop
-      ib.s, ib.e,       // x-loop
+      rc->NumBlocks() - 1, // Loop over meshblocks
+      0, n_species - 1,    // Loop over species
+      kb.s, kb.e,          // z-loop
+      jb.s, jb.e,          // y-loop
+      ib.s, ib.e,          // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
         Tens2 cov_gamma;
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         const Real isdetgam = 1.0 / geom.DetGamma(CellLocation::Cent, b, k, j, i);
 
-        const Real vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i),
-                            v(b, pv(2), k, j, i)};
+        const Real vp[3] = {v(b, pf::velocity(0), k, j, i),
+                            v(b, pf::velocity(1), k, j, i),
+                            v(b, pf::velocity(2), k, j, i)};
         const Real W = phoebus::GetLorentzFactor(vp, cov_gamma.data);
-        Vec con_v{{v(b, pv(0), k, j, i) / W, v(b, pv(1), k, j, i) / W,
-                   v(b, pv(2), k, j, i) / W}};
+        Vec con_v{{v(b, pf::velocity(0), k, j, i) / W, v(b, pf::velocity(1), k, j, i) / W,
+                   v(b, pf::velocity(2), k, j, i) / W}};
 
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
         CLOSURE c(con_v, &g, closure_runtime_params);
@@ -126,44 +112,46 @@ TaskStatus MomentCon2PrimImpl(T *rc) {
         Real J;
         Vec covH;
         Tens2 conTilPi;
-        Real E = v(b, cE(ispec), k, j, i) * isdetgam;
-        Vec covF = {{v(b, cF(ispec, 0), k, j, i) * isdetgam,
-                     v(b, cF(ispec, 1), k, j, i) * isdetgam,
-                     v(b, cF(ispec, 2), k, j, i) * isdetgam}};
+        Real E = v(b, cr::E(ispec), k, j, i) * isdetgam;
+        Vec covF = {{v(b, cr::F(ispec, 0), k, j, i) * isdetgam,
+                     v(b, cr::F(ispec, 1), k, j, i) * isdetgam,
+                     v(b, cr::F(ispec, 2), k, j, i) * isdetgam}};
 
-        if (iTilPi.IsValid()) {
-          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
+        if (v.Contains(b, ir::tilPi())) {
+          SPACELOOP2(ii, jj) {
+            conTilPi(ii, jj) = v(b, ir::tilPi(ispec, ii, jj), k, j, i);
+          }
         } else {
           Real xi = 0.0;
           Real phi = pi;
           // TODO(BRR) Remove STORE_GUESS parameter and instead check if closure type is
           // M1?
           if (STORE_GUESS) {
-            xi = v(b, iXi(ispec), k, j, i);
-            phi = 1.0001 * v(b, iPhi(ispec), k, j, i);
+            xi = v(b, ir::xi(ispec), k, j, i);
+            phi = 1.0001 * v(b, ir::phi(ispec), k, j, i);
           }
           c.GetConTilPiFromCon(E, covF, xi, phi, &conTilPi);
           if (STORE_GUESS) {
-            v(b, iXi(ispec), k, j, i) = xi;
-            v(b, iPhi(ispec), k, j, i) = phi;
+            v(b, ir::xi(ispec), k, j, i) = xi;
+            v(b, ir::phi(ispec), k, j, i) = phi;
           }
         }
         auto status = c.Con2Prim(E, covF, conTilPi, &J, &covH);
 
         if (status == ClosureStatus::modified) {
           c.Prim2Con(J, covH, conTilPi, &E, &covF);
-          v(b, cE(ispec), k, j, i) = E / isdetgam;
-          SPACELOOP(ii) { v(b, cF(ispec, ii), k, j, i) = covF(ii) / isdetgam; }
+          v(b, cr::E(ispec), k, j, i) = E / isdetgam;
+          SPACELOOP(ii) { v(b, cr::F(ispec, ii), k, j, i) = covF(ii) / isdetgam; }
           status = ClosureStatus::success;
         }
 
-        v(b, pJ(ispec), k, j, i) = J;
-        for (int idir = dirB.s; idir <= dirB.e; ++idir) { // Loop over directions
+        v(b, pr::J(ispec), k, j, i) = J;
+        for (int idir = 0; idir <= 2; ++idir) { // Loop over directions
           // Use the scaled value of the rest frame flux for reconstruction
-          v(b, pH(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
+          v(b, pr::H(ispec, idir), k, j, i) = robust::ratio(covH(idir), J);
         }
 
-        v(b, ifail, k, j, i) =
+        v(b, ir::c2pfail(), k, j, i) =
             (status == ClosureStatus::success ? FailFlags::success : FailFlags::fail);
       });
 
@@ -199,16 +187,30 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   namespace cr = radmoment_cons;
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
+  namespace pf = fluid_prim;
 
+  Mesh *pmesh = rc->GetMeshPointer();
+  StateDescriptor *rad = pmesh->packages.Get("radiation").get();
   IndexRange ib = rc->GetBoundsI(domain);
   IndexRange jb = rc->GetBoundsJ(domain);
   IndexRange kb = rc->GetBoundsK(domain);
 
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<cr::E, cr::F, pr::J, pr::H, pf::velocity, ir::tilPi>(
+          resolved_pkgs.get());
+
+  auto v = desc.GetPack(rc);
+
+  /*
   std::vector<std::string> variables{cr::E::name(), cr::F::name(), pr::J::name(),
                                      pr::H::name(), fluid_prim::velocity::name()};
   if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
     variables.push_back(ir::tilPi::name());
   }
+
+
+
   PackIndexMap imap;
   auto v = rc->PackVariables(variables, imap);
 
@@ -218,19 +220,21 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
   auto pH = imap.GetFlatIdx(pr::H::name());
   auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
   auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
+  */
 
-  auto specB = cE.GetBounds(1);
-  auto dirB = pH.GetBounds(2);
+  // auto specB = cE.GetBounds(1);
+  // auto dirB = pH.GetBounds(2);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
+  const int n_species = rad->Param<int>("num_species");
   parthenon::par_for(
       DEFAULT_LOOP_PATTERN, "RadMoments::Prim2Con", DevExecSpace(), 0,
-      v.GetDim(5) - 1,  // Loop over meshblocks
-      specB.s, specB.e, // Loop over species
-      kb.s, kb.e,       // z-loop
-      jb.s, jb.e,       // y-loop
-      ib.s, ib.e,       // x-loop
+      rc->NumBlocks() - 1, // Loop over meshblocks
+      0, n_species - 1,    // Loop over species
+      kb.s, kb.e,          // z-loop
+      jb.s, jb.e,          // y-loop
+      ib.s, ib.e,          // x-loop
       KOKKOS_LAMBDA(const int b, const int ispec, const int k, const int j, const int i) {
         // Set up the background
         const Real sdetgam = geom.DetGamma(CellLocation::Cent, b, k, j, i);
@@ -238,8 +242,9 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         geom.Metric(CellLocation::Cent, b, k, j, i, cov_gamma.data);
         typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
 
-        const Real con_vp[3] = {v(b, pv(0), k, j, i), v(b, pv(1), k, j, i),
-                                v(b, pv(2), k, j, i)};
+        const Real con_vp[3] = {v(b, pf::velocity(0), k, j, i),
+                                v(b, pf::velocity(1), k, j, i),
+                                v(b, pf::velocity(2), k, j, i)};
         const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
         Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
 
@@ -248,12 +253,15 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
         Real E;
         Vec covF;
         Tens2 conTilPi;
-        Real J = v(b, pJ(ispec), k, j, i);
-        Vec covH = {{v(b, pH(ispec, 0), k, j, i) * J, v(b, pH(ispec, 1), k, j, i) * J,
-                     v(b, pH(ispec, 2), k, j, i) * J}};
+        Real J = v(b, pr::J(ispec), k, j, i);
+        Vec covH = {{v(b, pr::H(ispec, 0), k, j, i) * J,
+                     v(b, pr::H(ispec, 1), k, j, i) * J,
+                     v(b, pr::H(ispec, 2), k, j, i) * J}};
 
-        if (iTilPi.IsValid()) {
-          SPACELOOP2(ii, jj) { conTilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i); }
+        if (v.Contains(b, ir::tilPi())) {
+          SPACELOOP2(ii, jj) {
+            conTilPi(ii, jj) = v(b, ir::tilPi(ispec, ii, jj), k, j, i);
+          }
         } else {
           c.GetConTilPiFromPrim(J, covH, &conTilPi);
         }
@@ -262,9 +270,9 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
 
         c.Prim2Con(J, covH, conTilPi, &E, &covF);
 
-        v(b, cE(ispec), k, j, i) = sdetgam * E;
-        for (int idir = dirB.s; idir <= dirB.e; ++idir) {
-          v(b, cF(ispec, idir), k, j, i) = sdetgam * covF(idir);
+        v(b, cr::E(ispec), k, j, i) = sdetgam * E;
+        for (int idir = 0; idir <= 2; ++idir) {
+          v(b, cr::F(ispec, idir), k, j, i) = sdetgam * covF(idir);
         }
       });
 
