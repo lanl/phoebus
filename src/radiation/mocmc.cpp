@@ -523,7 +523,6 @@ TaskStatus MOCMCFluidSource(T *rc_base, T *rc, const Real dt, const bool update_
   // Assume particles are already sorted from MOCMCReconstruction call!
 
   auto *pmb = rc->GetParentPointer();
-  // swarm pack
   StateDescriptor *rad = pmb->packages.Get("radiation").get();
 
   // Meshblock geometry
