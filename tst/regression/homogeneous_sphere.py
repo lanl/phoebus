@@ -46,13 +46,14 @@ modified_inputs["radiation_advection/Hz"] = 0.0
 modified_inputs["radiation_advection/vx"] = 0.0
 modified_inputs["radiation_advection/radius"] = 1.0
 
+cmake_extra_args = "-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off -DPHOEBUS_DO_NU_HEAVY=Off"
 
 code = rt.gold_comparison(
     variables=["r.p.J", "r.p.H"],
     input_file=args.input,
     modified_inputs=modified_inputs,
     executable=args.executable,
-    cmake_extra_args="",
+    cmake_extra_args=cmake_extra_args,
     geometry="SphericalMinkowski",
     use_gpu=args.use_gpu,
     use_mpiexec=args.use_mpiexec,
