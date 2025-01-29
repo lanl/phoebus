@@ -1,10 +1,10 @@
 
 <phoebus>
 problem = torus
-ix1_bc = outflow
-ox1_bc = outflow
-ix2_bc = outflow 
-ox2_bc = outflow
+ix1_bc = gr_outflow
+ox1_bc = gr_outflow
+ix2_bc = gr_outflow 
+ox2_bc = gr_outflow
 
 <phoebus/mesh>
 bc_vars = primitive
@@ -58,15 +58,15 @@ nx1         = 256           # Number of zones in X1-direction
 #nx1 = 128
 x1min       = 0.59          # minimum value of X1; overwritten for the torus problem
 x1max       = 3.69          # maximum value of X1; set by <coordinates>/r_outer for the torus problem
-ix1_bc      = user          # Inner-X1 boundary condition flag
-ox1_bc      = user          # Outer-X1 boundary condition flag
+ix1_bc      = gr_outflow    # Inner-X1 boundary condition flag
+ox1_bc      = gr_outflow    # Outer-X1 boundary condition flag
 
 nx2         = 256           # Number of zones in X2-direction
 #nx2 = 128
 x2min       = 0             # minimum value of X2
 x2max       = 1             # maximum value of X2. X2 = 1 -> theta = pi
-ix2_bc      = user          # Inner-X2 boundary condition flag
-ox2_bc      = user          # Outer-X2 boundary condition flag
+ix2_bc      = gr_outflow    # Inner-X2 boundary condition flag
+ox2_bc      = gr_outflow    # Outer-X2 boundary condition flag
 
 nx3         = 1             # Number of zones in X3-direction
 #nx3 = 64

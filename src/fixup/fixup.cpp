@@ -751,7 +751,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 
   // x1-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
-    if (ix1_bc == "outflow") {
+    if (ix1_bc == "gr_outflow") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
                                           std::vector<std::string>({c::density::name()}),
@@ -787,7 +787,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     }
   }
   if (pmb->boundary_flag[BoundaryFace::outer_x1] == BoundaryFlag::user) {
-    if (ox1_bc == "outflow") {
+    if (ox1_bc == "gr_outflow") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
                                           std::vector<std::string>({c::density::name()}),
@@ -826,7 +826,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
 
   // x2-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x2] == BoundaryFlag::user) {
-    if (ix2_bc == "outflow") {
+    if (ix2_bc == "gr_outflow") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
                                           std::vector<std::string>({c::density::name()}),
@@ -908,7 +908,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
     }
   }
   if (pmb->boundary_flag[BoundaryFace::outer_x2] == BoundaryFlag::user) {
-    if (ox2_bc == "outflow") {
+    if (ox2_bc == "gr_outflow") {
       PackIndexMap imap;
       auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
                                           std::vector<std::string>({c::density::name()}),
@@ -994,7 +994,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (ndim == 2) return TaskStatus::complete;
 
   // x3-direction
-  if (ix3_bc == "outflow") {
+  if (ix3_bc == "gr_outflow") {
     PackIndexMap imap;
     auto v =
         rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
@@ -1026,7 +1026,7 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
           }
         });
   }
-  if (ox3_bc == "outflow") {
+  if (ox3_bc == "gr_outflow") {
     PackIndexMap imap;
     auto v =
         rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),

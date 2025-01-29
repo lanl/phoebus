@@ -15,7 +15,7 @@
 <phoebus>
 problem = rhs_tester
 ix1_bc = reflect
-ox1_bc = outflow
+ox1_bc = gr_outflow
 ix2_bc = reflect
 ox2_bc = reflect
 
@@ -50,17 +50,17 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 64         # Number of zones in X1-direction
-x1min       = 0           # minimum value of X1
-x1max       = 1           # maximum value of X1
-ix1_bc      = user        # Inner-X1 boundary condition flag
-ox1_bc      = user        # Outer-X1 boundary condition flag
+nx1         = 64            # Number of zones in X1-direction
+x1min       = 0             # minimum value of X1
+x1max       = 1             # maximum value of X1
+ix1_bc      = reflect       # Inner-X1 boundary condition flag
+ox1_bc      = gr_outflow    # Outer-X1 boundary condition flag
 
 nx2         = 1             # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
 x2max       = 3.14159265359 # maximum value of X2. Pi
-ix2_bc      = user          # Inner-X2 boundary condition flag
-ox2_bc      = user          # Outer-X2 boundary condition flag
+ix2_bc      = reflect       # Inner-X2 boundary condition flag
+ox2_bc      = reflect       # Outer-X2 boundary condition flag
 
 nx3         = 1             # Number of zones in X3-direction
 x3min       = 0             # minimum value of X3

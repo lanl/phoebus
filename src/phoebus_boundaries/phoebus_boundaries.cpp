@@ -476,9 +476,9 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
         pman.pinput->GetOrAddBoolean("coordinates", "derefine_poles", true);
     if (derefine_poles) {
       const std::string ix2_bc =
-          pman.pinput->GetOrAddString("phoebus", "ix2_bc", "outflow");
+          pman.pinput->GetOrAddString("phoebus", "ix2_bc", "gr_outflow");
       const std::string ox2_bc =
-          pman.pinput->GetOrAddString("phoebus", "ox2_bc", "outflow");
+          pman.pinput->GetOrAddString("phoebus", "ox2_bc", "gr_outflow");
       PARTHENON_REQUIRE(
           ix2_bc != "reflect" && ix2_bc != "polar" && ox2_bc != "reflect" &&
               ox2_bc != "polar",
@@ -500,7 +500,7 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
       //                        parthenon/mesh/" +
       //                            name);
 
-      const std::string bc = pman.pinput->GetOrAddString("phoebus", name, "outflow");
+      const std::string bc = pman.pinput->GetOrAddString("phoebus", name, "gr_outflow");
       if (bc == "reflect") {
         pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "reflect",
                                                   reflect[d - 1][outer]);
