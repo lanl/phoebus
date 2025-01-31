@@ -24,10 +24,6 @@
 
 <phoebus>
 problem = shock_tube
-ix1_bc = reflect
-ox1_bc = gr_outflow
-ix2_bc = reflect
-ox2_bc = reflect
 
 <parthenon/job>
 problem_id  = sedov       # problem ID: basename of output filenames

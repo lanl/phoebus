@@ -12,8 +12,6 @@
 
 <phoebus>
 problem = shock_tube
-ix1_bc = gr_outflow
-ox1_bc = gr_outflow
 
 <parthenon/job>
 problem_id  = sod       # problem ID: basename of output filenames

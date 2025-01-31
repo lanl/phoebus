@@ -496,64 +496,49 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
       const std::string parth_bc = pman.pinput->GetString("parthenon/mesh", name);
 
       const std::string bc = pman.pinput->GetOrAddString("phoebus", name, "gr_outflow");
-      if (bc == "reflect") {
-        pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "reflect",
-                                                  reflect[d - 1][outer]);
-      } else if (bc == "polar") {
-        PARTHENON_REQUIRE(d == 2, "Polar boundary conditions only supported in X2!");
+      pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "reflect",
+                                                reflect[d - 1][outer]);
+      if (d == 2) { // polar BC only supported for X2
         pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "polar",
                                                   polar[d - 1][outer]);
-      } else if (bc == "gr_outflow") {
-        pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "gr_outflow",
-                                                  outflow[d - 1][outer]);
-        if (d == 1) {
-          if (outer == 0) {
-            if (rad_method == "mocmc") {
-              pman.app_input->RegisterSwarmBoundaryCondition(
-                  parthenon::BoundaryFace::inner_x1, "swarm_no_bc",
-                  &Boundaries::SwarmNoWorkBC);
-            } else {
-              pman.app_input->RegisterSwarmBoundaryCondition(
-                  parthenon::BoundaryFace::inner_x1, "swarm_outflow",
-                  &parthenon::BoundaryFunction::SwarmOutflowInnerX1);
-            }
-          } else if (outer == 1) {
-            if (rad_method == "mocmc") {
-              pman.app_input->RegisterSwarmBoundaryCondition(
-                  parthenon::BoundaryFace::outer_x1, "swarm_no_bc",
-                  &Boundaries::SwarmNoWorkBC);
-            } else {
-              pman.app_input->RegisterSwarmBoundaryCondition(
-                  parthenon::BoundaryFace::outer_x1, "swarm_outflow",
-                  &parthenon::BoundaryFunction::SwarmOutflowOuterX1);
-            }
-          }
+      }
+      pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "gr_outflow",
+                                                outflow[d - 1][outer]);
+      if (d == 1) {
+        if (outer == 0) {
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::inner_x1, "swarm_no_bc",
+              &Boundaries::SwarmNoWorkBC);
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::inner_x1, "swarm_outflow",
+              &parthenon::BoundaryFunction::SwarmOutflowInnerX1);
+        } else if (outer == 1) {
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::outer_x1, "swarm_no_bc",
+              &Boundaries::SwarmNoWorkBC);
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::outer_x1, "swarm_outflow",
+              &parthenon::BoundaryFunction::SwarmOutflowOuterX1);
         }
-        if (d == 2) {
-          if (outer == 0) {
-            if (rad_method == "mocmc") {
-              pman.app_input->RegisterSwarmBoundaryCondition(
-                  parthenon::BoundaryFace::inner_x2, "swarm_no_bc",
-                  &Boundaries::SwarmNoWorkBC);
-            } else {
-              pman.app_input->RegisterSwarmBoundaryCondition(
-                  parthenon::BoundaryFace::inner_x2, "swarm_outflow",
-                  &parthenon::BoundaryFunction::SwarmOutflowInnerX1);
-            }
-          } else if (outer == 1) {
-            if (rad_method == "mocmc") {
-              pman.app_input->RegisterSwarmBoundaryCondition(
-                  parthenon::BoundaryFace::outer_x2, "swarm_no_bc",
-                  &Boundaries::SwarmNoWorkBC);
-            } else {
-              pman.app_input->RegisterSwarmBoundaryCondition(
-                  parthenon::BoundaryFace::outer_x2, "swarm_outflow",
-                  &parthenon::BoundaryFunction::SwarmOutflowOuterX2);
-            }
-          }
+      }
+      if (d == 2) {
+        if (outer == 0) {
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::inner_x2, "swarm_no_bc",
+              &Boundaries::SwarmNoWorkBC);
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::inner_x2, "swarm_outflow",
+              &parthenon::BoundaryFunction::SwarmOutflowInnerX1);
+        } else if (outer == 1) {
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::outer_x2, "swarm_no_bc",
+              &Boundaries::SwarmNoWorkBC);
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::outer_x2, "swarm_outflow",
+              &parthenon::BoundaryFunction::SwarmOutflowOuterX2);
         }
-      } // periodic boundaries, which are handled by parthenon, so no need to set anything
-    }
+      }
+    } // periodic boundaries, which are handled by parthenon, so no need to set anything
   }
 }
 
