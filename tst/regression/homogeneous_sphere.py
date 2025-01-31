@@ -46,7 +46,7 @@ modified_inputs["radiation_advection/Hz"] = 0.0
 modified_inputs["radiation_advection/vx"] = 0.0
 modified_inputs["radiation_advection/radius"] = 1.0
 
-cmake_extra_args = "-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off -DPHOEBUS_DO_NU_HEAVY=Off"
+cmake_extra_args = ["-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off", "-DPHOEBUS_DO_NU_HEAVY=Off"]
 
 code = rt.gold_comparison(
     variables=["r.p.J", "r.p.H"],

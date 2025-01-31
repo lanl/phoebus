@@ -43,7 +43,7 @@ modified_inputs["radiation/method"] = "moment_eddington"
 modified_inputs["opacity/gray_kappa"] = 0.1
 modified_inputs["radiation_equilibration/J"] = 0.2
 
-cmake_extra_args = "-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off -DPHOEBUS_DO_NU_HEAVY=Off"
+cmake_extra_args = ["-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off", "-DPHOEBUS_DO_NU_HEAVY=Off"]
 
 code = rt.gold_comparison(
     variables=["r.p.J", "r.p.H"],

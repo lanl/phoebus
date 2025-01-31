@@ -38,7 +38,7 @@ args = parser.parse_args()
 modified_inputs = {}
 modified_inputs["radiation/method"] = "monte_carlo"
 
-cmake_extra_args = "-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off -DPHOEBUS_DO_NU_HEAVY=Off"
+cmake_extra_args = ["-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off", "-DPHOEBUS_DO_NU_HEAVY=Off"]
 
 code = rt.gold_comparison(
     variables=["p.density", "p.energy"],

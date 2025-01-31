@@ -56,7 +56,7 @@ modified_inputs["radiation/mocmc/nsamp_per_zone"] = 32
 modified_inputs["parthenon/mesh/nx1"] = 64
 modified_inputs["parthenon/meshblock/nx1"] = 64
 
-cmake_extra_args = "-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off -DPHOEBUS_DO_NU_HEAVY=Off"
+cmake_extra_args = ["-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off", "-DPHOEBUS_DO_NU_HEAVY=Off"]
 
 code = rt.gold_comparison(
     variables=["r.p.J", "r.p.H"],

@@ -148,7 +148,7 @@ def modify_input(dict_key, value, input_file):
 
 
 # -- Configure and build phoebus with problem-specific options
-def build_code(geometry, use_gpu=False, build_type="Release", cmake_extra_args=""):
+def build_code(geometry, use_gpu=False, build_type="Release", cmake_extra_args=[]):
     if os.path.isdir(BUILD_DIR):
         print(
             f'BUILD_DIR "{BUILD_DIR}" already exists! Clean up before calling a regression test script!'
@@ -166,9 +166,8 @@ def build_code(geometry, use_gpu=False, build_type="Release", cmake_extra_args="
     else:
         print(f'Build type "{build_type}" not known!')
         sys.exit(os.EX_SOFTWARE)
-    #configure_options.append(cmake_extra_args)
-    for arg in cmake_extra_args.split():
-        configure_options.append(arg)
+
+    configure_options += cmake_extra_args
     configure_options.append("-DPHOEBUS_ENABLE_UNIT_TESTS=OFF")
     configure_options.append("-DMAX_NUMBER_CONSERVED_VARS=10")
     configure_options.append("-DPHOEBUS_CACHE_GEOMETRY=ON")
@@ -242,7 +241,7 @@ def gold_comparison(
     input_file,
     modified_inputs={},
     executable=None,
-    cmake_extra_args="",
+    cmake_extra_args=[],
     geometry="Minkowski",
     use_gpu=False,
     use_mpiexec=False,
