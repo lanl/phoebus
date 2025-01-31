@@ -39,7 +39,12 @@ template <class Geom>
 KOKKOS_INLINE_FUNCTION void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3,
                                        Real &Kcov0, Real &Kcov1, Real &Kcov2, Real &Kcov3,
                                        Real &Kcon0, Geom &geom, Real source[4]) {
-  if constexpr (std::is_same<PHOEBUS_GEOMETRY, Geometry::FMKS>::value) {
+  // TODO(BLB): include options for more geometries to exploit spacetime symmetries
+  if constexpr (std::is_same<PHOEBUS_GEOMETRY,
+                             Geometry::Minkowski>::value) { // flat space
+    SPACETIMELOOP(mu) { source[mu] = 0.0; }
+  } else { // generic
+    // TODO(BLB): hook into metric machinery instead of doing it here
     Real Kcov[NDFULL] = {Kcov0, Kcov1, Kcov2, Kcov3};
     Real Xm[NDFULL], Xp[NDFULL];
     Real Gconm[NDFULL][NDFULL], Gconp[NDFULL][NDFULL];
@@ -68,8 +73,6 @@ KOKKOS_INLINE_FUNCTION void GetKSource(Real &X0, Real &X1, Real &X2, Real &X3,
 
       source[mu] *= -1.0 / (2.0 * Kcon0);
     }
-  } else {
-    SPACETIMELOOP(mu) { source[mu] = 0.; }
   }
 }
 
