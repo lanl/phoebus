@@ -383,5 +383,13 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
 template TaskStatus
 ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+// template TaskStatus
+template <>
+TaskStatus ConservedToPrimitiveFixup<MeshData<Real>>(MeshData<Real> *rc) {
+  for (int b = 0; b < rc->NumBlocks(); b++) {
+    ConservedToPrimitiveFixup(rc->GetBlockData(b).get());
+  }
+  return TaskStatus::complete;
+}
 
 } // namespace fixup

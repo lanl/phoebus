@@ -251,5 +251,12 @@ TaskStatus RadConservedToPrimitiveFixup(T *rc) {
 
 template TaskStatus
 RadConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+template <>
+TaskStatus RadConservedToPrimitiveFixup<MeshData<Real>>(MeshData<Real> *rc) {
+  for (int b = 0; b < rc->NumBlocks(); b++) {
+    RadConservedToPrimitiveFixup(rc->GetBlockData(b).get());
+  }
+  return TaskStatus::complete;
+}
 
 } // namespace fixup

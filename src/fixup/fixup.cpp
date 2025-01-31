@@ -717,6 +717,13 @@ TaskStatus ApplyFloors(T *rc) {
 }
 
 template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+template <>
+TaskStatus ApplyFloors<MeshData<Real>>(MeshData<Real> *rc) {
+  for (int b = 0; b < rc->NumBlocks(); b++) {
+    ApplyFloors(rc->GetBlockData(b).get());
+  }
+  return TaskStatus::complete;
+}
 
 TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   using parthenon::BoundaryFace;

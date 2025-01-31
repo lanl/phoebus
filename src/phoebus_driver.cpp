@@ -560,40 +560,27 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   }
 
   // Fix up flux failures
-  // TODO (BLB) once the fixups can work with MeshData,
-  // -- then  stitch this section back together
-  TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);
-  for (int ib = 0; ib < num_independent_task_lists; ib++) {
-    auto pmb = blocks[ib].get();
-    auto &tl = async_region_2[ib];
-
-    // first make other useful containers
-    // auto &base = pmb->meshblock_data.Get();
+  TaskRegion &sync_region_fixup = tc.AddRegion(num_partitions);
+  TaskID gas_rad_int(0);
+  for (int ib = 0; ib < num_partitions; ib++) {
+    auto &tl = sync_region_fixup[ib];
 
     // pull out the container we'll use to get fluxes and/or compute RHSs
-    auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
-    using MDT = std::remove_pointer<decltype(sc1.get())>::type;
+    auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
 
     // fill in derived fields
     auto fill_derived =
-        tl.AddTask(none, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+        tl.AddTask(none, parthenon::Update::FillDerived<MeshData<Real>>, sc1.get());
 
-    auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+    auto fixup = tl.AddTask(fill_derived,
+                            fixup::ConservedToPrimitiveFixup<MeshData<Real>>, sc1.get());
 
-    auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+    auto radfixup =
+        tl.AddTask(fixup, fixup::RadConservedToPrimitiveFixup<MeshData<Real>>, sc1.get());
 
-    auto floors =
-        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
-  }
+    auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshData<Real>>, sc1.get());
 
-  TaskRegion &sync_region_fixup = tc.AddRegion(num_partitions);
-  TaskID gas_rad_int(0);
-  if (rad_mocmc_active) {
-    for (int ib = 0; ib < num_partitions; ib++) {
-      auto &tl = sync_region_fixup[ib];
-
+    if (rad_mocmc_active) {
       auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
       auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
       using MDT = std::remove_pointer<decltype(base.get())>::type;
