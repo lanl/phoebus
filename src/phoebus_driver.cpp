@@ -560,7 +560,6 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   }
 
   // Fix up flux failures
-  // TODO (DO NOT MERGE) is this loop right
   // TODO (BLB) once the fixups can work with MeshData,
   // -- then  stitch this section back together
   TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);

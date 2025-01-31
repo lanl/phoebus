@@ -494,11 +494,6 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
       auto &face = inner_outer[outer];
       const std::string name = face + "x" + std::to_string(d) + "_bc";
       const std::string parth_bc = pman.pinput->GetString("parthenon/mesh", name);
-      // TODO: proper check here??
-      //      PARTHENON_REQUIRE(parth_bc == "user" || parth_bc == "periodic",
-      //                        "Only \"user\" and \"periodic\" allowed for
-      //                        parthenon/mesh/" +
-      //                            name);
 
       const std::string bc = pman.pinput->GetOrAddString("phoebus", name, "gr_outflow");
       if (bc == "reflect") {
