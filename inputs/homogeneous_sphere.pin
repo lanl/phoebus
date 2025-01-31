@@ -98,7 +98,6 @@ nu_min = 1.e15
 nu_max = 1.e22
 nu_bins = 200
 absorption = true
-:x
 B_fake = 1.0
 use_B_fake = true
 
