@@ -475,8 +475,8 @@ TaskStatus MOCMCReconstruction(T *rc_base, T *rc) {
               }
               break;
             } // if inside
-          } // m = 0..n
-        } // n = 0..nsamp
+          }   // m = 0..n
+        }     // n = 0..nsamp
       });
 
   return TaskStatus::complete;
