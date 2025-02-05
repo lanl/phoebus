@@ -599,9 +599,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
           tl.AddTask(impl_update, radiation::MOCMCEddington<MDT>, base.get(), sc1.get());
       gas_rad_int = gas_rad_int | impl_edd;
     } else if (rad_moments_active) {
-      auto impl_update =
-          tl.AddTask(floors, radiation::MomentFluidSource<MDT>, sc1.get(),
-                     beta * dt, fluid_active);
+      auto impl_update = tl.AddTask(floors, radiation::MomentFluidSource<MDT>, sc1.get(),
+                                    beta * dt, fluid_active);
       gas_rad_int = gas_rad_int | impl_update;
     }
 
