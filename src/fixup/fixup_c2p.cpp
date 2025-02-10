@@ -385,9 +385,9 @@ template TaskStatus
 ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 // template TaskStatus
 template <>
-TaskStatus ConservedToPrimitiveFixup<MeshData<Real>>(MeshData<Real> *rc) {
-  for (int b = 0; b < rc->NumBlocks(); b++) {
-    ConservedToPrimitiveFixup(rc->GetBlockData(b).get());
+TaskStatus ConservedToPrimitiveFixup<MeshData<Real>>(MeshData<Real> *md) {
+  for (const auto &mbd : md->GetAllBlockData()) {
+    ConservedToPrimitiveFixup(mbd.get());
   }
   return TaskStatus::complete;
 }

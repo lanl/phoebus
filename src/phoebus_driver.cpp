@@ -51,9 +51,7 @@ using namespace Geometry;
 namespace phoebus {
 
 TaskStatus MeshResetCommunication(MeshData<Real> *md) {
-  const int nblocks = md->NumBlocks();
-  for (int n = 0; n < nblocks; n++) {
-    auto &mbd = md->GetBlockData(n);
+  for (const auto &mbd : md->GetAllBlockData()) {
     auto &sc = mbd->GetSwarmData();
     sc->ResetCommunication();
   }
@@ -62,9 +60,7 @@ TaskStatus MeshResetCommunication(MeshData<Real> *md) {
 }
 
 TaskStatus MeshSend(MeshData<Real> *md) {
-  const int nblocks = md->NumBlocks();
-  for (int n = 0; n < nblocks; n++) {
-    auto &mbd = md->GetBlockData(n);
+  for (const auto &mbd : md->GetAllBlockData()) {
     auto &sc = mbd->GetSwarmData();
     sc->Send(BoundaryCommSubset::all);
   }
@@ -74,9 +70,7 @@ TaskStatus MeshSend(MeshData<Real> *md) {
 
 TaskStatus MeshReceive(MeshData<Real> *md) {
   TaskStatus status = TaskStatus::complete;
-  const int nblocks = md->NumBlocks();
-  for (int n = 0; n < nblocks; n++) {
-    auto &mbd = md->GetBlockData(n);
+  for (const auto &mbd : md->GetAllBlockData()) {
     auto &sc = mbd->GetSwarmData();
     auto local_status = sc->Receive(BoundaryCommSubset::all);
     if (local_status == TaskStatus::incomplete) {

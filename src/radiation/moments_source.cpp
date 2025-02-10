@@ -990,8 +990,8 @@ template TaskStatus MomentFluidSource<MeshBlockData<Real>>(MeshBlockData<Real> *
 template <>
 TaskStatus MomentFluidSource<MeshData<Real>>(MeshData<Real> *md, Real dt,
                                              bool update_fluid) {
-  for (int b = 0; b < md->NumBlocks(); b++) {
-    MomentFluidSource(md->GetBlockData(b).get(), dt, update_fluid);
+  for (const auto &mbd : md->GetAllBlockData()) {
+    MomentFluidSource(mbd.get(), dt, update_fluid);
   }
   return TaskStatus::complete;
 }

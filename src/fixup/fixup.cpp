@@ -718,9 +718,9 @@ TaskStatus ApplyFloors(T *rc) {
 
 template TaskStatus ApplyFloors<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
 template <>
-TaskStatus ApplyFloors<MeshData<Real>>(MeshData<Real> *rc) {
-  for (int b = 0; b < rc->NumBlocks(); b++) {
-    ApplyFloors(rc->GetBlockData(b).get());
+TaskStatus ApplyFloors<MeshData<Real>>(MeshData<Real> *md) {
+  for (const auto &mbd : md->GetAllBlockData()) {
+    ApplyFloors(mbd.get());
   }
   return TaskStatus::complete;
 }
