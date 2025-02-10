@@ -19,16 +19,6 @@ problem = tov
 # change inner BCs to reflect
 # and change domain to [0,xmax]
 
-ix1_bc = gr_outflow
-ox1_bc = gr_outflow
-
-ix2_bc = gr_outflow
-ox2_bc = gr_outflow
-
-ix3_bc = gr_outflow
-ox3_bc = gr_outflow
-
-
 <parthenon/job>
 problem_id  = tov # problem ID: basename of output filenames
 
