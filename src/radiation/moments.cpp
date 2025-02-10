@@ -202,29 +202,6 @@ TaskStatus MomentPrim2ConImpl(T *rc, IndexDomain domain) {
 
   auto v = desc.GetPack(rc);
 
-  /*
-  std::vector<std::string> variables{cr::E::name(), cr::F::name(), pr::J::name(),
-                                     pr::H::name(), fluid_prim::velocity::name()};
-  if (programming::is_specialization_of<CLOSURE, ClosureMOCMC>::value) {
-    variables.push_back(ir::tilPi::name());
-  }
-
-
-
-  PackIndexMap imap;
-  auto v = rc->PackVariables(variables, imap);
-
-  auto cE = imap.GetFlatIdx(cr::E::name());
-  auto pJ = imap.GetFlatIdx(pr::J::name());
-  auto cF = imap.GetFlatIdx(cr::F::name());
-  auto pH = imap.GetFlatIdx(pr::H::name());
-  auto pv = imap.GetFlatIdx(fluid_prim::velocity::name());
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
-  */
-
-  // auto specB = cE.GetBounds(1);
-  // auto dirB = pH.GetBounds(2);
-
   auto geom = Geometry::GetCoordinateSystem(rc);
 
   const int n_species = rad->Param<int>("num_species");
