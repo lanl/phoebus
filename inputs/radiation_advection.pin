@@ -108,9 +108,6 @@ nu_min = 1.e-2
 nu_max = 1.e2
 nu_bins = 10
 absorption = true
-do_nu_electron = true
-do_nu_electron_anti = false
-do_nu_heavy = false
 src_solver = oned
 
 <radiation/mocmc>

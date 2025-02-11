@@ -15,7 +15,6 @@
 
 #include "fixup.hpp"
 
-#include <bvals/bvals_interfaces.hpp>
 #include <defs.hpp>
 
 #include "fluid/con2prim_robust.hpp"
@@ -384,5 +383,13 @@ TaskStatus ConservedToPrimitiveFixup(T *rc) {
 
 template TaskStatus
 ConservedToPrimitiveFixup<MeshBlockData<Real>>(MeshBlockData<Real> *rc);
+// template TaskStatus
+template <>
+TaskStatus ConservedToPrimitiveFixup<MeshData<Real>>(MeshData<Real> *md) {
+  for (const auto &mbd : md->GetAllBlockData()) {
+    ConservedToPrimitiveFixup(mbd.get());
+  }
+  return TaskStatus::complete;
+}
 
 } // namespace fixup

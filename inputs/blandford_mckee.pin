@@ -1,4 +1,4 @@
-# © 2021. Triad National Security, LLC. All rights reserved.  This
+# © 2021-2025. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
 # National Security, LLC for the U.S.  Department of Energy/National
@@ -50,14 +50,14 @@ nghost = 4
 nx1         = 512         # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
 x1max       = 1         # maximum value of X1
-ix1_bc      = user        # Inner-X1 boundary condition flag
-ox1_bc      = user        # Outer-X1 boundary condition flag
+ix1_bc      = reflect # Inner-X1 boundary condition flag
+ox1_bc      = gr_outflow        # Outer-X1 boundary condition flag
 
 nx2         = 1             # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
 x2max       = 3.14159265359 # maximum value of X2. Pi
-ix2_bc      = reflecting    # Inner-X2 boundary condition flag
-ox2_bc      = reflecting    # Outer-X2 boundary condition flag
+ix2_bc      = reflect    # Inner-X2 boundary condition flag
+ox2_bc      = reflect    # Outer-X2 boundary condition flag
 
 nx3         = 1             # Number of zones in X3-direction
 x3min       = 0             # minimum value of X3

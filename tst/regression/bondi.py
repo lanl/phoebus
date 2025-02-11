@@ -46,6 +46,7 @@ code = rt.gold_comparison(
     input_file=args.input,
     modified_inputs=modified_inputs,
     executable=args.executable,
+    cmake_extra_args=[],
     geometry="FMKS",
     use_gpu=args.use_gpu,
     use_mpiexec=args.use_mpiexec,

@@ -1,4 +1,4 @@
-# © 2021-2022. Triad National Security, LLC. All rights reserved.  This
+# © 2021-2025. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
 # National Security, LLC for the U.S.  Department of Energy/National
@@ -18,8 +18,6 @@
 
 <phoebus>
 problem = tov
-ix1_bc = reflect
-ox1_bc = outflow
 
 <parthenon/job>
 problem_id  = tov # problem ID: basename of output filenames
@@ -62,8 +60,8 @@ nghost = 4
 nx1         = 1024        # Number of zones in X1-direction
 x1min       = 0           # minimum value of X1
 x1max       = 250         # maximum value of X1
-ix1_bc      = user        # Inner-X1 boundary condition flag
-ox1_bc      = user        # Outer-X1 boundary condition flag
+ix1_bc      = reflect     # Inner-X1 boundary condition flag
+ox1_bc      = gr_outflow  # Outer-X1 boundary condition flag
 
 nx2         = 1             # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2

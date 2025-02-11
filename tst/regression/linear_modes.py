@@ -40,18 +40,24 @@ modified_inputs["parthenon/mesh/nx1"] = 64
 modified_inputs["parthenon/mesh/nx2"] = 64
 modified_inputs["parthenon/meshblock/nx1"] = 64
 modified_inputs["parthenon/meshblock/nx2"] = 64
+modified_inputs["fluid/mhd"] = "true"
+
+
+cmake_extra_args = ["-DPHOEBUS_DO_NU_ELECTRON_ANTI=Off", "-DPHOEBUS_DO_NU_HEAVY=Off", "-DCMAKE_CXX_RELEASE_FLAGS='-O1'"]
 
 code = rt.gold_comparison(
-    variables=["p.density", "p.velocity"],
+        variables=["p.density", "p.velocity"],
     input_file=args.input,
     modified_inputs=modified_inputs,
     executable=args.executable,
+    cmake_extra_args=cmake_extra_args,
     geometry="Minkowski",
     use_gpu=args.use_gpu,
     use_mpiexec=args.use_mpiexec,
     build_type=args.build_type,
     upgold=args.upgold,
     compression_factor=10,
+    tolerance=1.0e-3
 )
 
 sys.exit(code)

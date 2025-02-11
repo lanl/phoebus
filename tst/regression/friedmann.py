@@ -39,6 +39,7 @@ code = rt.gold_comparison(
     variables=["p.density", "p.energy"],
     input_file=args.input,
     executable=args.executable,
+    cmake_extra_args=[],
     geometry="FLRW",
     use_gpu=args.use_gpu,
     use_mpiexec=args.use_mpiexec,

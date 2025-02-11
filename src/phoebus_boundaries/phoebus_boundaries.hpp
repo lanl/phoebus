@@ -18,11 +18,14 @@
 
 #include <memory>
 
+#include <bvals/boundary_conditions.hpp>
+#include <bvals/boundary_conditions_generic.hpp>
 #include <parthenon/driver.hpp>
 #include <parthenon/package.hpp>
 #include <parthenon_manager.hpp>
 #include <utils/error_checking.hpp>
 using namespace parthenon::package::prelude;
+using namespace parthenon::BoundaryFunction;
 
 namespace Boundaries {
 
@@ -46,28 +49,20 @@ void OutflowOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void ReflectInnerX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 void ReflectOuterX3(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse);
 
-class ParticleBoundNoWork : public parthenon::ParticleBound {
- public:
-  KOKKOS_INLINE_FUNCTION void
-  Apply(const int n, double &x, double &y, double &z,
-        const parthenon::SwarmDeviceContext &swarm_d) const override {}
-};
+void SwarmNoWorkBC(std::shared_ptr<Swarm> &swarm);
 
-inline auto SetSwarmIX1Outflow() {
-  return parthenon::DeviceAllocate<parthenon::ParticleBoundIX1Outflow>();
-}
-inline auto SetSwarmOX1Outflow() {
-  return parthenon::DeviceAllocate<parthenon::ParticleBoundOX1Outflow>();
-}
-inline auto SetSwarmIX2Outflow() {
-  return parthenon::DeviceAllocate<parthenon::ParticleBoundIX2Outflow>();
-}
-inline auto SetSwarmOX2Outflow() {
-  return parthenon::DeviceAllocate<parthenon::ParticleBoundOX2Outflow>();
-}
-inline auto SetSwarmNoWorkBC() {
-  return parthenon::DeviceAllocate<ParticleBoundNoWork>();
-}
+// inline auto SetSwarmIX1Outflow() {
+//   return parthenon::BoundaryFunction::OutflowInnerX1;
+// }
+// inline auto SetSwarmOX1Outflow() {
+//   return parthenon::BoundaryFunction::OutflowOuterX1;
+// }
+// inline auto SetSwarmIX2Outflow() {
+//   return parthenon::BoundaryFunction::OutflowInnerX2;
+// }
+// inline auto SetSwarmOX2Outflow() {
+//   return parthenon::BoundaryFunction::OutflowOuterX2;
+// }
 
 TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc);
 

@@ -62,12 +62,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool is_frequency_dependent = (method == "monte_carlo" || method == "mocmc");
 
   // Set which neutrino species to include in simulation
-  bool do_nu_electron = pin->GetOrAddBoolean("radiation", "do_nu_electron", true);
+  bool do_nu_electron = DO_NU_ELECTRON;
   params.Add("do_nu_electron", do_nu_electron);
-  bool do_nu_electron_anti =
-      pin->GetOrAddBoolean("radiation", "do_nu_electron_anti", true);
+  bool do_nu_electron_anti = DO_NU_ELECTRON_ANTI;
   params.Add("do_nu_electron_anti", do_nu_electron_anti);
-  bool do_nu_heavy = pin->GetOrAddBoolean("radiation", "do_nu_heavy", true);
+  bool do_nu_heavy = DO_NU_HEAVY;
   params.Add("do_nu_heavy", do_nu_heavy);
 
   // Boundary conditions
@@ -96,17 +95,18 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     params.Add("dlnu", dlnu);
   }
 
+  // TODO(BLB) With compile time num species this can be a static array.
   std::vector<RadiationType> species;
-  if (do_nu_electron) {
+  if (DO_NU_ELECTRON) {
     species.push_back(RadiationType::NU_ELECTRON);
   }
-  if (do_nu_electron_anti) {
+  if (DO_NU_ELECTRON_ANTI) {
     species.push_back(RadiationType::NU_ELECTRON_ANTI);
   }
-  if (do_nu_heavy) {
+  if (DO_NU_HEAVY) {
     species.push_back(RadiationType::NU_HEAVY);
   }
-  const int num_species = species.size();
+  static constexpr int num_species = PHOEBUS_NUM_SPECIES;
   params.Add("num_species", num_species);
   params.Add("species", species);
 
@@ -144,20 +144,26 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   if (method == "mocmc") {
-    std::string swarm_name = "mocmc";
+    static constexpr auto swarm_name = "mocmc";
     Metadata swarm_metadata({Metadata::Provides});
     physics->AddSwarm(swarm_name, swarm_metadata);
     Metadata real_swarmvalue_metadata({Metadata::Real});
-    physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("mu_lo", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("mu_hi", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("phi_lo", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("phi_hi", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::t::name(), swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::mu_lo::name(), swarm_name,
+                           real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::mu_hi::name(), swarm_name,
+                           real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::phi_lo::name(), swarm_name,
+                           real_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::phi_hi::name(), swarm_name,
+                           real_swarmvalue_metadata);
     Metadata fourv_swarmvalue_metadata({Metadata::Real}, std::vector<int>{4});
-    physics->AddSwarmValue("ncov", swarm_name, fourv_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::ncov::name(), swarm_name,
+                           fourv_swarmvalue_metadata);
     Metadata Inu_swarmvalue_metadata({Metadata::Real},
                                      std::vector<int>{num_species, nu_bins});
-    physics->AddSwarmValue("Inuinv", swarm_name, Inu_swarmvalue_metadata);
+    physics->AddSwarmValue(mocmc_core::Inuinv::name(), swarm_name,
+                           Inu_swarmvalue_metadata);
 
     // Boundary temperatures for outflow sample boundary conditions
     const std::string ix1_bc = pin->GetOrAddString("phoebus", "ix1_bc", "None");
@@ -224,28 +230,31 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   }
 
   if (method == "monte_carlo") {
-    std::string swarm_name = "monte_carlo";
+    namespace mci = monte_carlo_internal;
+    namespace mcc = monte_carlo_core;
+
+    constexpr static auto swarm_name = "monte_carlo";
     Metadata swarm_metadata({Metadata::Provides});
     physics->AddSwarm(swarm_name, swarm_metadata);
     Metadata real_swarmvalue_metadata({Metadata::Real});
-    physics->AddSwarmValue("t", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("k0", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("k1", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("k2", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("k3", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("weight", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mcc::t::name(), swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mcc::k0::name(), swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mcc::k1::name(), swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mcc::k2::name(), swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mcc::k3::name(), swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(mcc::weight::name(), swarm_name, real_swarmvalue_metadata);
     Metadata int_swarmvalue_metadata({Metadata::Integer});
-    physics->AddSwarmValue("species", swarm_name, int_swarmvalue_metadata);
+    physics->AddSwarmValue(mcc::species::name(), swarm_name, int_swarmvalue_metadata);
 
     Metadata mspecies_scalar =
         Metadata({Metadata::Cell, Metadata::OneCopy}, std::vector<int>{num_species});
-    physics->AddField("dNdlnu_max", mspecies_scalar);
-    physics->AddField("dN", mspecies_scalar);
-    physics->AddField("Ns", mspecies_scalar);
+    physics->AddField(mci::dNdlnu_max::name(), mspecies_scalar);
+    physics->AddField(mci::dN::name(), mspecies_scalar);
+    physics->AddField(mci::Ns::name(), mspecies_scalar);
 
     std::vector<int> dNdlnu_size{num_species, params.Get<int>("nu_bins") + 1};
     Metadata mdNdlnu = Metadata({Metadata::Cell, Metadata::OneCopy}, dNdlnu_size);
-    physics->AddField("dNdlnu", mdNdlnu);
+    physics->AddField(mci::dNdlnu::name(), mdNdlnu);
 
     // Parameters controlling automatic sampling resolution.
     // This system targets 1 scattering per light crossing time.
@@ -551,7 +560,6 @@ TaskStatus ApplyRadiationFourForce(MeshData<Real> *rc, const double dt) {
       MakePackDescriptor<c::density, c::energy, c::momentum, c::ye, iv::Gcov, iv::Gye>(
           resolved_pkgs.get());
 
-  PackIndexMap imap;
   auto v = desc.GetPack(rc);
   const int nblocks = v.GetNBlocks();
 
@@ -580,6 +588,7 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
   // Note that this is still used for the cooling function even though that option
   // contains no transport. This is useful for consistency between methods.
+  Mesh *pmesh = rc->GetMeshPointer();
   auto pmb = rc->GetBlockPointer();
   IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
@@ -592,11 +601,9 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
 
-  PackIndexMap imap;
-  std::vector<std::string> vars{ir::kappaH::name(), p::velocity::name()};
-  auto v = rc->PackVariables(vars, imap);
-  auto idx_v = imap.GetFlatIdx(p::velocity::name());
-  auto idx_kappaH = imap.GetFlatIdx(ir::kappaH::name(), false);
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc = MakePackDescriptor<ir::kappaH, p::velocity>(resolved_pkgs.get());
+  auto v = desc.GetPack(rc);
 
   auto num_species = rad->Param<int>("num_species");
 
@@ -615,14 +622,15 @@ Real EstimateTimestepBlock(MeshBlockData<Real> *rc) {
 
         for (int ispec = 0; ispec < num_species; ispec++) {
 
-          const Real kappaH = idx_kappaH.IsValid() ? v(idx_kappaH(ispec), k, j, i) : 0.;
+          const Real kappaH =
+              v.Contains(0, ir::kappaH()) ? v(0, ir::kappaH(ispec), k, j, i) : 0.;
 
           for (int d = 0; d < ndim; d++) {
             // Signal speeds (assume (i.e. somewhat overestimate, esp. for large opt.
             // depth) cs_rad = 1)
             const Real sigp = alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
             const Real sigm = -alpha * std::sqrt(con_gamma(d, d)) - con_beta(d);
-            const Real asym_sigl = alpha * v(idx_v(d), k, j, i) - con_beta(d);
+            const Real asym_sigl = alpha * v(0, p::velocity(d), k, j, i) - con_beta(d);
             const Real rad_speed = std::max<Real>(std::fabs(sigm), std::fabs(sigp));
             const Real asym_speed = std::fabs(asym_sigl);
 

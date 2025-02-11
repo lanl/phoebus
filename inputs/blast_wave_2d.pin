@@ -74,8 +74,8 @@ num_threads = 1         # maximum number of OMP threads
 bc_vars = conserved
 
 <parthenon/meshblock>
-nx1 = 32
-nx2 = 32
+nx1 = 64
+nx2 = 64
 nx3 = 1
 
 <parthenon/refinement0>

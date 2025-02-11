@@ -50,6 +50,37 @@ using namespace Geometry;
 
 namespace phoebus {
 
+TaskStatus MeshResetCommunication(MeshData<Real> *md) {
+  for (const auto &mbd : md->GetAllBlockData()) {
+    auto &sc = mbd->GetSwarmData();
+    sc->ResetCommunication();
+  }
+
+  return TaskStatus::complete;
+}
+
+TaskStatus MeshSend(MeshData<Real> *md) {
+  for (const auto &mbd : md->GetAllBlockData()) {
+    auto &sc = mbd->GetSwarmData();
+    sc->Send(BoundaryCommSubset::all);
+  }
+
+  return TaskStatus::complete;
+}
+
+TaskStatus MeshReceive(MeshData<Real> *md) {
+  TaskStatus status = TaskStatus::complete;
+  for (const auto &mbd : md->GetAllBlockData()) {
+    auto &sc = mbd->GetSwarmData();
+    auto local_status = sc->Receive(BoundaryCommSubset::all);
+    if (local_status == TaskStatus::incomplete) {
+      status = TaskStatus::incomplete;
+    }
+  }
+
+  return status;
+}
+
 // *************************************************//
 // define the application driver. in this case,    *//
 // that mostly means defining the MakeTaskList     *//
@@ -282,6 +313,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   }
 
   // Goal: make async regions go away
+  // TODO(BLB): move moments code to packs / MeshData
   TaskRegion &async_region_1 = tc.AddRegion(num_independent_task_lists);
   for (int ib = 0; ib < num_independent_task_lists; ib++) {
     auto pmb = blocks[ib].get();
@@ -320,24 +352,32 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto fix_flux = tl.AddTask(sndrcv_flux_depend, fixup::FixFluxes, sc0.get());
       sndrcv_flux_depend = sndrcv_flux_depend | fix_flux;
     }
+  }
 
-    if (rad_mocmc_active) {
-      using MDT = std::remove_pointer<decltype(sc0.get())>::type;
+  if (rad_mocmc_active) {
+    TaskRegion &sync_region_mocmc = tc.AddRegion(num_partitions);
+    for (int n = 0; n < num_partitions; n++) {
+      auto &tl = sync_region_mocmc[n];
+
+      auto &base = pmesh->mesh_data.GetOrAdd("base", n);
+      using MDT = std::remove_pointer<decltype(base.get())>::type;
       // TODO(BRR) stage_name[stage - 1]?
-      auto &sd0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+      auto reset_comms = tl.AddTask(none, MeshResetCommunication, base.get());
       auto samples_transport =
-          tl.AddTask(none, radiation::MOCMCTransport<MDT>, sc0.get(), dt);
-      auto send = tl.AddTask(samples_transport, &SwarmContainer::Send, sd0.get(),
-                             BoundaryCommSubset::all);
-      auto receive =
-          tl.AddTask(send, &SwarmContainer::Receive, sd0.get(), BoundaryCommSubset::all);
-      auto sample_bounds =
-          tl.AddTask(receive, radiation::MOCMCSampleBoundaries<MDT>, sc0.get());
-      auto sample_recon =
-          tl.AddTask(sample_bounds, radiation::MOCMCReconstruction<MDT>, sc0.get());
-      auto eddington =
-          tl.AddTask(sample_recon, radiation::MOCMCEddington<MDT>, sc0.get());
+          tl.AddTask(reset_comms, radiation::MOCMCTransport<MDT>, base.get(), beta * dt);
+      auto send = tl.AddTask(samples_transport, MeshSend, base.get());
+      auto receive = tl.AddTask(samples_transport | send, MeshReceive, base.get());
 
+      auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], n);
+      // TODO(BRR) stage_name[stage - 1]?
+      auto sample_bounds =
+          tl.AddTask(none, radiation::MOCMCSampleBoundaries<MDT>, base.get(), sc1.get());
+      auto sample_recon = tl.AddTask(sample_bounds, radiation::MOCMCReconstruction<MDT>,
+                                     base.get(), sc1.get());
+      auto eddington =
+          tl.AddTask(sample_recon, radiation::MOCMCEddington<MDT>, base.get(), sc1.get());
+
+      TaskID geom_src(0);
       geom_src = geom_src | eddington;
     }
   }
@@ -524,43 +564,37 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   }
 
   // Fix up flux failures
-  TaskRegion &async_region_2 = tc.AddRegion(num_independent_task_lists);
-  for (int ib = 0; ib < num_independent_task_lists; ib++) {
-    auto pmb = blocks[ib].get();
-    auto &tl = async_region_2[ib];
-
-    // first make other useful containers
-    auto &base = pmb->meshblock_data.Get();
+  TaskRegion &sync_region_fixup = tc.AddRegion(num_partitions);
+  for (int ib = 0; ib < num_partitions; ib++) {
+    auto &tl = sync_region_fixup[ib];
 
     // pull out the container we'll use to get fluxes and/or compute RHSs
-    auto &sc1 = pmb->meshblock_data.Get(stage_name[stage]);
-    using MDT = std::remove_pointer<decltype(sc1.get())>::type;
+    auto &sc1 = pmesh->mesh_data.GetOrAdd(stage_name[stage], ib);
 
     // fill in derived fields
     auto fill_derived =
-        tl.AddTask(none, parthenon::Update::FillDerived<MeshBlockData<Real>>, sc1.get());
+        tl.AddTask(none, parthenon::Update::FillDerived<MeshData<Real>>, sc1.get());
 
-    auto fixup = tl.AddTask(
-        fill_derived, fixup::ConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+    auto fixup = tl.AddTask(fill_derived,
+                            fixup::ConservedToPrimitiveFixup<MeshData<Real>>, sc1.get());
 
-    auto radfixup = tl.AddTask(
-        fixup, fixup::RadConservedToPrimitiveFixup<MeshBlockData<Real>>, sc1.get());
+    auto radfixup =
+        tl.AddTask(fixup, fixup::RadConservedToPrimitiveFixup<MeshData<Real>>, sc1.get());
 
-    auto floors =
-        tl.AddTask(radfixup, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+    auto floors = tl.AddTask(radfixup, fixup::ApplyFloors<MeshData<Real>>, sc1.get());
 
+    auto &base = pmesh->mesh_data.GetOrAdd("base", ib);
+    using MDT = std::remove_pointer<decltype(base.get())>::type;
     TaskID gas_rad_int(0);
     if (rad_mocmc_active) {
-      auto impl_update =
-          tl.AddTask(floors, radiation::MOCMCFluidSource<MeshBlockData<Real>>, sc1.get(),
-                     beta * dt, fluid_active);
-      auto impl_edd = tl.AddTask(
-          impl_update, radiation::MOCMCEddington<MeshBlockData<Real>>, sc1.get());
+      auto impl_update = tl.AddTask(floors, radiation::MOCMCFluidSource<MDT>, base.get(),
+                                    sc1.get(), beta * dt, fluid_active);
+      auto impl_edd =
+          tl.AddTask(impl_update, radiation::MOCMCEddington<MDT>, base.get(), sc1.get());
       gas_rad_int = gas_rad_int | impl_edd;
     } else if (rad_moments_active) {
-      auto impl_update =
-          tl.AddTask(floors, radiation::MomentFluidSource<MeshBlockData<Real>>, sc1.get(),
-                     beta * dt, fluid_active);
+      auto impl_update = tl.AddTask(floors, radiation::MomentFluidSource<MDT>, sc1.get(),
+                                    beta * dt, fluid_active);
       gas_rad_int = gas_rad_int | impl_update;
     }
 
@@ -568,7 +602,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       // Only apply floors because MomentFluidSource already ensured that a sensible state
       // was returned
       auto floors =
-          tl.AddTask(gas_rad_int, fixup::ApplyFloors<MeshBlockData<Real>>, sc1.get());
+          tl.AddTask(gas_rad_int, fixup::ApplyFloors<MeshData<Real>>, sc1.get());
     }
   }
 
@@ -580,27 +614,35 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       for (int i = 0; i < blocks.size(); i++) {
         auto &tl = sync_region_tr[0];
         auto &pmb = blocks[i];
-        auto &sc = pmb->swarm_data.Get();
+        auto &sc = pmb->meshblock_data.Get()->GetSwarmData();
         auto reset_comms =
             tl.AddTask(none, &SwarmContainer::ResetCommunication, sc.get());
       }
     }
 
-    TaskRegion &async_region_tr = tc.AddRegion(blocks.size());
-    for (int n = 0; n < blocks.size(); n++) {
+    TaskRegion &async_region_tr = tc.AddRegion(num_partitions);
+    for (int n = 0; n < num_partitions; n++) {
       auto &tl = async_region_tr[n];
       auto &pmb = blocks[n];
-      auto &sc = pmb->swarm_data.Get();
+      auto &base = pmesh->mesh_data.GetOrAdd("base", n);
       auto &mbd0 = pmb->meshblock_data.Get(stage_name[stage]);
-      auto tracerAdvect = tl.AddTask(none, tracers::AdvectTracers, mbd0.get(), dt);
+
+      auto tracerAdvect = tl.AddTask(none, tracers::AdvectTracers, base.get(), dt);
       auto tracerPurge =
           tl.AddTask(tracerAdvect, fixup::PurgeParticles, mbd0.get(), swarmName);
+    }
 
-      auto send = tl.AddTask(tracerPurge, &SwarmContainer::Send, sc.get(),
-                             BoundaryCommSubset::all);
+    TaskRegion &async_region_tr_comm = tc.AddRegion(blocks.size());
+    for (int n = 0; n < blocks.size(); n++) {
+      auto &tl = async_region_tr_comm[n];
+      auto &pmb = blocks[n];
+      auto &sc = pmb->meshblock_data.Get()->GetSwarmData();
+      auto send =
+          tl.AddTask(none, &SwarmContainer::Send, sc.get(), BoundaryCommSubset::all);
 
       auto receive =
           tl.AddTask(send, &SwarmContainer::Receive, sc.get(), BoundaryCommSubset::all);
+      auto defrag = tl.AddTask(receive, &SwarmContainer::Defrag, sc.get(), 0.9);
     }
   }
 
@@ -932,7 +974,7 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
       auto &pmb = blocks[i];
       auto &tl = async_region0[i];
       auto &mbd0 = pmb->meshblock_data.Get(stage_name[integrator->nstages]);
-      auto &sc0 = pmb->swarm_data.Get(stage_name[integrator->nstages]);
+      auto &sc0 = pmb->meshblock_data.Get()->GetSwarmData();
       auto sample_particles = tl.AddTask(none, radiation::MonteCarloSourceParticles,
                                          pmb.get(), mbd0.get(), sc0.get(), t0, dt);
       auto transport_particles =
@@ -1023,7 +1065,8 @@ TaskListStatus PhoebusDriver::MonteCarloStep() {
  *  Fills Tracers
  *  Computes entropy for output
  **/
-void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin) {
+void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin,
+                          const parthenon::SimTime &time) {
   auto tracer_pkg = pmb->packages.Get("tracers");
   bool do_tracers = tracer_pkg->Param<bool>("active");
 

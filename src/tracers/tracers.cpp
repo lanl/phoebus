@@ -20,6 +20,7 @@
 
 namespace tracers {
 using namespace parthenon::package::prelude;
+using parthenon::MakePackDescriptor;
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto physics = std::make_shared<StateDescriptor>("tracers");
@@ -39,93 +40,102 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddParam<>("rng_pool", rng_pool);
 
   // Add swarm of tracers
-  std::string swarm_name = "tracers";
+  static constexpr auto swarm_name = "tracers";
   Metadata swarm_metadata({Metadata::Provides, Metadata::None});
   physics->AddSwarm(swarm_name, swarm_metadata);
   Metadata real_swarmvalue_metadata({Metadata::Real});
   physics->AddSwarmValue("id", swarm_name, Metadata({Metadata::Integer}));
 
   // thermo variables
-  physics->AddSwarmValue("rho", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("temperature", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("ye", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("entropy", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("pressure", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("energy", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("vel_x", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("vel_y", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("vel_z", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("lorentz", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("lapse", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("detgamma", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("shift_x", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("shift_y", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("shift_z", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("mass", swarm_name, real_swarmvalue_metadata);
-  physics->AddSwarmValue("bernoulli", swarm_name, real_swarmvalue_metadata);
+  namespace tv = tracer_variables;
+  physics->AddSwarmValue(tv::rho::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::temperature::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::ye::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::entropy::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::pressure::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::energy::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::vel_x::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::vel_y::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::vel_z::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::lorentz::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::lapse::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::detgamma::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::shift_x::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::shift_y::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::shift_z::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::mass::name(), swarm_name, real_swarmvalue_metadata);
+  physics->AddSwarmValue(tv::bernoulli::name(), swarm_name, real_swarmvalue_metadata);
+
+  // TEST
+  Metadata Inu_swarmvalue_metadata({Metadata::Real}, std::vector<int>{3, 100});
+  physics->AddSwarmValue(tv::test::name(), swarm_name, Inu_swarmvalue_metadata);
 
   const bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
 
   if (mhd) {
-    physics->AddSwarmValue("B_x", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("B_y", swarm_name, real_swarmvalue_metadata);
-    physics->AddSwarmValue("B_z", swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(tv::B_x::name(), swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(tv::B_y::name(), swarm_name, real_swarmvalue_metadata);
+    physics->AddSwarmValue(tv::B_z::name(), swarm_name, real_swarmvalue_metadata);
   }
 
   return physics;
 } // Initialize
 
-TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
+TaskStatus AdvectTracers(MeshData<Real> *rc, const Real dt) {
   namespace p = fluid_prim;
 
   auto *pmb = rc->GetParentPointer();
-  auto &sc = pmb->swarm_data.Get();
-  auto &swarm = sc->Get("tracers");
 
-  const auto ndim = pmb->pmy_mesh->ndim;
+  static const auto ndim = pmb->ndim;
 
-  auto &x = swarm->Get<Real>("x").Get();
-  auto &y = swarm->Get<Real>("y").Get();
-  auto &z = swarm->Get<Real>("z").Get();
+  // tracer swarm pack
+  static constexpr auto swarm_name = "tracers";
+  static const auto desc_tracer =
+      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z>(
+          swarm_name);
+  auto pack_tracers = desc_tracer.GetPack(rc);
 
-  auto swarm_d = swarm->GetDeviceContext();
-
-  const std::vector<std::string> vars = {p::velocity::name()};
+  static const auto vars = {p::velocity::name()};
+  static const auto desc = MakePackDescriptor<p::velocity>(rc);
 
   PackIndexMap imap;
   auto pack = rc->PackVariables(vars, imap);
 
+  // TODO(BLB): move to sparse packs. requires reworking tracer_rhs
   const int pvel_lo = imap[p::velocity::name()].first;
   const int pvel_hi = imap[p::velocity::name()].second;
 
-  auto geom = Geometry::GetCoordinateSystem(rc);
+  const auto geom = Geometry::GetCoordinateSystem(rc);
 
   // update loop. RK2
-  const int max_active_index = swarm->GetMaxActiveIndex();
-  pmb->par_for(
-      "Advect Tracers", 0, max_active_index, KOKKOS_LAMBDA(const int n) {
+  parthenon::par_for(
+      "Advect Tracers", 0, pack_tracers.GetMaxFlatIndex(), KOKKOS_LAMBDA(const int idx) {
+        const auto [b, n] = pack_tracers.GetBlockParticleIndices(idx);
+        const auto swarm_d = pack_tracers.GetContext(b);
         if (swarm_d.IsActive(n)) {
-          int k, j, i;
-          swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
-
           Real rhs1, rhs2, rhs3;
 
+          const Real x = pack_tracers(b, swarm_position::x(), n);
+          const Real y = pack_tracers(b, swarm_position::y(), n);
+          const Real z = pack_tracers(b, swarm_position::z(), n);
+
           // predictor
-          tracers_rhs(pack, geom, pvel_lo, pvel_hi, ndim, dt, x(n), y(n), z(n), rhs1,
-                      rhs2, rhs3);
-          const Real kx = x(n) + 0.5 * dt * rhs1;
-          const Real ky = y(n) + 0.5 * dt * rhs2;
-          const Real kz = z(n) + 0.5 * dt * rhs3;
+          tracers_rhs(pack, geom, pvel_lo, pvel_hi, ndim, dt, x, y, z, rhs1, rhs2, rhs3);
+          const Real kx = x + 0.5 * dt * rhs1;
+          const Real ky = y + 0.5 * dt * rhs2;
+          const Real kz = z + 0.5 * dt * rhs3;
 
           // corrector
           tracers_rhs(pack, geom, pvel_lo, pvel_hi, ndim, dt, kx, ky, kz, rhs1, rhs2,
                       rhs3);
-          x(n) += rhs1 * dt;
-          y(n) += rhs2 * dt;
-          z(n) += rhs3 * dt;
+
+          // update positions
+          pack_tracers(b, swarm_position::x(), n) += rhs1 * dt;
+          pack_tracers(b, swarm_position::y(), n) += rhs2 * dt;
+          pack_tracers(b, swarm_position::z(), n) += rhs3 * dt;
 
           bool on_current_mesh_block = true;
-          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+          swarm_d.GetNeighborBlockIndex(n, x, y, z, on_current_mesh_block);
         }
       });
 
@@ -141,46 +151,26 @@ TaskStatus AdvectTracers(MeshBlockData<Real> *rc, const Real dt) {
 void FillTracers(MeshBlockData<Real> *rc) {
   using namespace LCInterp;
   namespace p = fluid_prim;
+  namespace tv = tracer_variables;
 
   auto *pmb = rc->GetParentPointer();
   auto fluid = pmb->packages.Get("fluid");
-  auto &sc = pmb->swarm_data.Get();
+  auto &sc = rc->GetSwarmData();
   auto &swarm = sc->Get("tracers");
   auto eos = pmb->packages.Get("eos")->Param<EOS>("d.EOS");
 
   const auto mhd = fluid->Param<bool>("mhd");
 
-  // pull swarm vars
-  auto &x = swarm->Get<Real>("x").Get();
-  auto &y = swarm->Get<Real>("y").Get();
-  auto &z = swarm->Get<Real>("z").Get();
-  auto &v1 = swarm->Get<Real>("vel_x").Get();
-  auto &v2 = swarm->Get<Real>("vel_y").Get();
-  auto &v3 = swarm->Get<Real>("vel_z").Get();
-  auto B1 = v1.Get();
-  auto B2 = v1.Get();
-  auto B3 = v1.Get();
-  if (mhd) {
-    B1 = swarm->Get<Real>("B_x").Get();
-    B2 = swarm->Get<Real>("B_y").Get();
-    B3 = swarm->Get<Real>("B_z").Get();
-  }
-  auto &s_rho = swarm->Get<Real>("rho").Get();
-  auto &s_temperature = swarm->Get<Real>("temperature").Get();
-  auto &s_ye = swarm->Get<Real>("ye").Get();
-  auto &s_entropy = swarm->Get<Real>("entropy").Get();
-  auto &s_energy = swarm->Get<Real>("energy").Get();
-  auto &s_lorentz = swarm->Get<Real>("lorentz").Get();
-  auto &s_lapse = swarm->Get<Real>("lapse").Get();
-  auto &s_shift_x = swarm->Get<Real>("shift_x").Get();
-  auto &s_shift_y = swarm->Get<Real>("shift_y").Get();
-  auto &s_shift_z = swarm->Get<Real>("shift_z").Get();
-  auto &s_detgamma = swarm->Get<Real>("detgamma").Get();
-  auto &s_pressure = swarm->Get<Real>("pressure").Get();
-  auto &s_bernoulli = swarm->Get<Real>("bernoulli").Get();
+  // tracer swarm pack
+  static constexpr auto swarm_name = "tracers";
+  static auto desc_tracers = MakeSwarmPackDescriptor<
+      swarm_position::x, swarm_position::y, swarm_position::z, tv::vel_x, tv::vel_y,
+      tv::vel_z, tv::rho, tv::temperature, tv::ye, tv::entropy, tv::energy, tv::lorentz,
+      tv::lapse, tv::shift_x, tv::shift_y, tv::shift_z, tv::detgamma, tv::pressure,
+      tv::bernoulli, tv::B_x, tv::B_y, tv::B_z, tv::test>(swarm_name);
+  auto pack_tracers = desc_tracers.GetPack(rc);
 
-  auto swarm_d = swarm->GetDeviceContext();
-
+  // hydro vars pack
   std::vector<std::string> vars = {p::density::name(), p::temperature::name(),
                                    p::velocity::name(), p::energy::name(),
                                    p::pressure::name()};
@@ -203,37 +193,41 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
   auto geom = Geometry::GetCoordinateSystem(rc);
   // update loop.
-  const int max_active_index = swarm->GetMaxActiveIndex();
   pmb->par_for(
-      "Fill Tracers", 0, max_active_index, KOKKOS_LAMBDA(const int n) {
+      "Fill Tracers", 0, pack_tracers.GetMaxFlatIndex(), KOKKOS_LAMBDA(const int idx) {
+        const auto [b, n] = pack_tracers.GetBlockParticleIndices(idx);
+        const auto swarm_d = pack_tracers.GetContext(b);
+
         if (swarm_d.IsActive(n)) {
-          int k, j, i;
-          swarm_d.Xtoijk(x(n), y(n), z(n), i, j, k);
+
+          const Real x = pack_tracers(b, swarm_position::x(), n);
+          const Real y = pack_tracers(b, swarm_position::y(), n);
+          const Real z = pack_tracers(b, swarm_position::z(), n);
 
           // geom quantities
           Real gcov4[4][4];
-          geom.SpacetimeMetric(0.0, x(n), y(n), z(n), gcov4);
-          Real lapse = geom.Lapse(0.0, x(n), y(n), z(n));
+          geom.SpacetimeMetric(0.0, x, y, z, gcov4);
+          Real lapse = geom.Lapse(0.0, x, y, z);
           Real shift[3];
-          geom.ContravariantShift(0.0, x(n), y(n), z(n), shift);
-          const Real gdet = geom.DetGamma(0.0, x(n), y(n), z(n));
+          geom.ContravariantShift(0.0, x, y, z, shift);
+          const Real gdet = geom.DetGamma(0.0, x, y, z);
 
           // Interpolate
-          const Real Wvel_X1 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo);
-          const Real Wvel_X2 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_lo + 1);
-          const Real Wvel_X3 = LCInterp::Do(0, x(n), y(n), z(n), pack, pvel_hi);
+          const Real Wvel_X1 = LCInterp::Do(0, x, y, z, pack, pvel_lo);
+          const Real Wvel_X2 = LCInterp::Do(0, x, y, z, pack, pvel_lo + 1);
+          const Real Wvel_X3 = LCInterp::Do(0, x, y, z, pack, pvel_hi);
           Real B_X1 = 0.0;
           Real B_X2 = 0.0;
           Real B_X3 = 0.0;
           if (mhd) {
-            B_X1 = LCInterp::Do(0, x(n), y(n), z(n), pack, pB_lo);
-            B_X2 = LCInterp::Do(0, x(n), y(n), z(n), pack, pB_lo + 1);
-            B_X3 = LCInterp::Do(0, x(n), y(n), z(n), pack, pB_hi);
+            B_X1 = LCInterp::Do(0, x, y, z, pack, pB_lo);
+            B_X2 = LCInterp::Do(0, x, y, z, pack, pB_lo + 1);
+            B_X3 = LCInterp::Do(0, x, y, z, pack, pB_hi);
           }
-          const Real rho = LCInterp::Do(0, x(n), y(n), z(n), pack, prho);
-          const Real temperature = LCInterp::Do(0, x(n), y(n), z(n), pack, ptemp);
-          const Real energy = LCInterp::Do(0, x(n), y(n), z(n), pack, penergy);
-          const Real pressure = LCInterp::Do(0, x(n), y(n), z(n), pack, ppres);
+          const Real rho = LCInterp::Do(0, x, y, z, pack, prho);
+          const Real temperature = LCInterp::Do(0, x, y, z, pack, ptemp);
+          const Real energy = LCInterp::Do(0, x, y, z, pack, penergy);
+          const Real pressure = LCInterp::Do(0, x, y, z, pack, ppres);
           const Real Wvel[] = {Wvel_X1, Wvel_X2, Wvel_X3};
           const Real W = phoebus::GetLorentzFactor(Wvel, gcov4);
           const Real vel_X1 = Wvel_X1 / W;
@@ -242,7 +236,7 @@ void FillTracers(MeshBlockData<Real> *rc) {
           Real ye;
           Real lambda[2] = {0.0, 0.0};
           if (pye > 0) {
-            ye = LCInterp::Do(0, x(n), y(n), z(n), pack, pye);
+            ye = LCInterp::Do(0, x, y, z, pack, pye);
             lambda[1] = ye;
           } else {
             ye = 0.0;
@@ -255,30 +249,31 @@ void FillTracers(MeshBlockData<Real> *rc) {
           const Real bernoulli = -(W / lapse) * h - 1.0;
 
           // store
-          s_rho(n) = rho;
-          s_temperature(n) = temperature;
-          s_ye(n) = ye;
-          s_energy(n) = energy;
-          s_entropy(n) = entropy;
-          v1(n) = vel_X1;
-          v2(n) = vel_X3;
-          v3(n) = vel_X2;
-          s_shift_x(n) = shift[0];
-          s_shift_y(n) = shift[1];
-          s_shift_z(n) = shift[2];
-          s_lapse(n) = lapse;
-          s_lorentz(n) = W;
-          s_detgamma(n) = gdet;
-          s_pressure(n) = pressure;
-          s_bernoulli(n) = bernoulli;
+          pack_tracers(b, tv::rho(), n) = rho;
+          pack_tracers(b, tv::temperature(), n) = temperature;
+          pack_tracers(b, tv::ye(), n) = ye;
+          pack_tracers(b, tv::energy(), n) = energy;
+          pack_tracers(b, tv::entropy(), n) = entropy;
+          pack_tracers(b, tv::vel_x(), n) = vel_X1;
+          pack_tracers(b, tv::vel_y(), n) = vel_X2;
+          pack_tracers(b, tv::vel_z(), n) = vel_X3;
+          pack_tracers(b, tv::shift_x(), n) = shift[0];
+          pack_tracers(b, tv::shift_y(), n) = shift[1];
+          pack_tracers(b, tv::shift_z(), n) = shift[2];
+          pack_tracers(b, tv::lapse(), n) = lapse;
+          pack_tracers(b, tv::lorentz(), n) = W;
+          pack_tracers(b, tv::detgamma(), n) = gdet;
+          pack_tracers(b, tv::pressure(), n) = pressure;
+          pack_tracers(b, tv::bernoulli(), n) = bernoulli;
+          pack_tracers(b, tv::test(2 + 5), n) = 1.1238;
           if (mhd) {
-            B1(n) = B_X1;
-            B2(n) = B_X2;
-            B3(n) = B_X3;
+            pack_tracers(b, tv::B_x(), n) = B_X1;
+            pack_tracers(b, tv::B_y(), n) = B_X2;
+            pack_tracers(b, tv::B_z(), n) = B_X3;
           }
 
           bool on_current_mesh_block = true;
-          swarm_d.GetNeighborBlockIndex(n, x(n), y(n), z(n), on_current_mesh_block);
+          swarm_d.GetNeighborBlockIndex(n, x, y, z, on_current_mesh_block);
         }
       });
 

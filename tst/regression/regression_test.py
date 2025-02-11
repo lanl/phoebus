@@ -29,7 +29,7 @@ import __main__
 BUILD_DIR = "build"
 RUN_DIR = "run"
 SOURCE_DIR = "../../../"
-NUM_PROCS = 4  # Default values for cmake --build --parallel can overwhelm CI systems
+NUM_PROCS = 8  # Default values for cmake --build --parallel can overwhelm CI systems
 TEMPORARY_INPUT_FILE = "test_input.pin"
 SCRIPT_NAME = os.path.basename(__main__.__file__).split(".py")[0]
 
@@ -148,7 +148,7 @@ def modify_input(dict_key, value, input_file):
 
 
 # -- Configure and build phoebus with problem-specific options
-def build_code(geometry, use_gpu=False, build_type="Release"):
+def build_code(geometry, use_gpu=False, build_type="Release", cmake_extra_args=[]):
     if os.path.isdir(BUILD_DIR):
         print(
             f'BUILD_DIR "{BUILD_DIR}" already exists! Clean up before calling a regression test script!'
@@ -166,6 +166,8 @@ def build_code(geometry, use_gpu=False, build_type="Release"):
     else:
         print(f'Build type "{build_type}" not known!')
         sys.exit(os.EX_SOFTWARE)
+
+    configure_options += cmake_extra_args
     configure_options.append("-DPHOEBUS_ENABLE_UNIT_TESTS=OFF")
     configure_options.append("-DMAX_NUMBER_CONSERVED_VARS=10")
     configure_options.append("-DPHOEBUS_CACHE_GEOMETRY=ON")
@@ -187,6 +189,7 @@ def build_code(geometry, use_gpu=False, build_type="Release"):
     for option in configure_options:
         cmake_call.append(option)
     cmake_call.append(SOURCE_DIR)
+    print(cmake_call)
 
     # Configure
     call(cmake_call)
@@ -238,6 +241,7 @@ def gold_comparison(
     input_file,
     modified_inputs={},
     executable=None,
+    cmake_extra_args=[],
     geometry="Minkowski",
     use_gpu=False,
     use_mpiexec=False,
@@ -260,7 +264,7 @@ def gold_comparison(
 
     if executable is None:
         executable = os.path.join(BUILD_DIR, "src", "phoebus")
-        build_code(geometry, use_gpu, build_type)
+        build_code(geometry, use_gpu, build_type, cmake_extra_args)
 
     if os.path.isdir(RUN_DIR):
         print(
@@ -298,7 +302,9 @@ def gold_comparison(
         if len(variable.shape) > 1:
             dim = variable.shape[0]
             for d in range(dim):
-                variables_data = np.concatenate((variables_data, variable[d, :]))
+                variables_data = np.concatenate(
+                    (variables_data, variable[d, :].flatten())
+                )
         else:
             variables_data = np.concatenate((variables_data, variable))
 

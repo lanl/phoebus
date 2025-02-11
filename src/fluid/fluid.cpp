@@ -183,6 +183,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("ix2_bc", ix2_bc);
   const std::string ox2_bc = pin->GetString("phoebus", "ox2_bc");
   params.Add("ox2_bc", ox2_bc);
+  const std::string ix3_bc = pin->GetString("phoebus", "ix3_bc");
+  params.Add("ix3_bc", ix3_bc);
+  const std::string ox3_bc = pin->GetString("phoebus", "ox3_bc");
+  params.Add("ox3_bc", ox3_bc);
 
   int ndim = 1;
   if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
@@ -768,6 +772,7 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
 }
 
 TaskStatus FluxCT(MeshBlockData<Real> *rc) {
+  using parthenon::MakePackDescriptor;
   Mesh *pmesh = rc->GetMeshPointer();
   auto &fluid = pmesh->packages.Get("fluid");
   if (!fluid->Param<bool>("mhd") || !fluid->Param<bool>("active") ||
@@ -780,49 +785,54 @@ TaskStatus FluxCT(MeshBlockData<Real> *rc) {
   IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
   IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
 
-  auto f1 = rc->Get(fluid_cons::bfield::name()).flux[X1DIR];
-  auto f2 = rc->Get(fluid_cons::bfield::name()).flux[X2DIR];
-  auto f3 = rc->Get(fluid_cons::bfield::name()).flux[X3DIR];
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc = MakePackDescriptor<fluid_cons::bfield>(
+      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
+  auto v = desc.GetPack(rc);
   auto emf = rc->Get(internal_variables::emf::name()).data;
 
   if (ndim == 2) {
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "FluxCT::EMF::2D", DevExecSpace(), kb.s, kb.e, jb.s,
         jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          emf(k, j, i) = 0.25 * (f1(1, k, j, i) + f1(1, k, j - 1, i) - f2(0, k, j, i) -
-                                 f2(0, k, j, i - 1));
+          emf(k, j, i) =
+              0.25 * (v.flux(0, X1DIR, 1, k, j, i) + v.flux(0, X1DIR, 1, k, j - 1, i) -
+                      v.flux(0, X2DIR, 0, k, j, i) - v.flux(0, X2DIR, 0, k, j, i - 1));
         });
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "FluxCT::Flux::2D", DevExecSpace(), kb.s, kb.e, jb.s,
         jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          f1(0, k, j, i) = 0.0;
-          f1(1, k, j, i) = 0.5 * (emf(k, j, i) + emf(k, j + 1, i));
-          f2(0, k, j, i) = -0.5 * (emf(k, j, i) + emf(k, j, i + 1));
-          f2(1, k, j, i) = 0.0;
+          v.flux(0, X1DIR, 0, k, j, i) = 0.0;
+          v.flux(0, X1DIR, 1, k, j, i) = 0.5 * (emf(k, j, i) + emf(k, j + 1, i));
+          v.flux(0, X2DIR, 0, k, j, i) = -0.5 * (emf(k, j, i) + emf(k, j, i + 1));
+          v.flux(0, X2DIR, 1, k, j, i) = 0.0;
         });
   } else if (ndim == 3) {
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "FluxCT::EMF::3D", DevExecSpace(), kb.s, kb.e + 1, jb.s,
         jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          emf(0, k, j, i) = 0.25 * (f2(2, k, j, i) + f2(2, k - 1, j, i) - f3(1, k, j, i) -
-                                    f3(1, k, j - 1, i));
-          emf(1, k, j, i) = -0.25 * (f1(2, k, j, i) + f1(2, k - 1, j, i) -
-                                     f3(0, k, j, i) - f3(0, k, j, i - 1));
-          emf(2, k, j, i) = 0.25 * (f1(1, k, j, i) + f1(1, k, j - 1, i) - f2(0, k, j, i) -
-                                    f2(0, k, j, i - 1));
+          emf(0, k, j, i) =
+              0.25 * (v.flux(0, X2DIR, 2, k, j, i) + v.flux(0, X2DIR, 2, k - 1, j, i) -
+                      v.flux(0, X3DIR, 1, k, j, i) - v.flux(0, X3DIR, 1, k, j - 1, i));
+          emf(1, k, j, i) =
+              -0.25 * (v.flux(0, X1DIR, 2, k, j, i) + v.flux(0, X1DIR, 2, k - 1, j, i) -
+                       v.flux(0, X3DIR, 0, k, j, i) - v.flux(0, X3DIR, 0, k, j, i - 1));
+          emf(2, k, j, i) =
+              0.25 * (v.flux(0, X1DIR, 1, k, j, i) + v.flux(0, X1DIR, 1, k, j - 1, i) -
+                      v.flux(0, X2DIR, 0, k, j, i) - v.flux(0, X2DIR, 0, k, j, i - 1));
         });
     parthenon::par_for(
         DEFAULT_LOOP_PATTERN, "FluxCT::Flux::3D", DevExecSpace(), kb.s, kb.e + 1, jb.s,
         jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          f1(0, k, j, i) = 0.0;
-          f1(1, k, j, i) = 0.5 * (emf(2, k, j, i) + emf(2, k, j + 1, i));
-          f1(2, k, j, i) = -0.5 * (emf(1, k, j, i) + emf(1, k + 1, j, i));
-          f2(0, k, j, i) = -0.5 * (emf(2, k, j, i) + emf(2, k, j, i + 1));
-          f2(1, k, j, i) = 0.0;
-          f2(2, k, j, i) = 0.5 * (emf(0, k, j, i) + emf(0, k + 1, j, i));
-          f3(0, k, j, i) = 0.5 * (emf(1, k, j, i) + emf(1, k, j, i + 1));
-          f3(1, k, j, i) = -0.5 * (emf(0, k, j, i) + emf(0, k, j + 1, i));
-          f3(2, k, j, i) = 0.0;
+          v.flux(0, X1DIR, 0, k, j, i) = 0.0;
+          v.flux(0, X1DIR, 1, k, j, i) = 0.5 * (emf(2, k, j, i) + emf(2, k, j + 1, i));
+          v.flux(0, X1DIR, 2, k, j, i) = -0.5 * (emf(1, k, j, i) + emf(1, k + 1, j, i));
+          v.flux(0, X2DIR, 0, k, j, i) = -0.5 * (emf(2, k, j, i) + emf(2, k, j, i + 1));
+          v.flux(0, X2DIR, 1, k, j, i) = 0.0;
+          v.flux(0, X2DIR, 2, k, j, i) = 0.5 * (emf(0, k, j, i) + emf(0, k + 1, j, i));
+          v.flux(0, X3DIR, 0, k, j, i) = 0.5 * (emf(1, k, j, i) + emf(1, k, j, i + 1));
+          v.flux(0, X3DIR, 1, k, j, i) = -0.5 * (emf(0, k, j, i) + emf(0, k, j + 1, i));
+          v.flux(0, X3DIR, 2, k, j, i) = 0.0;
         });
   }
 

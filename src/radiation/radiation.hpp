@@ -116,8 +116,8 @@ TaskStatus MonteCarloEstimateParticles(MeshBlock *pmb, MeshBlockData<Real> *rc,
                                        SwarmContainer *sc, const Real t0, const Real dt,
                                        Real *dNtot);
 
-TaskStatus MonteCarloCountCommunicatedParticles(MeshBlock *pmb,
-                                                int *particles_outstanding);
+TaskStatus MonteCarloCountCommunicatedParticles(const BlockList_t &blocks,
+                                                const double tf_, bool *done);
 
 TaskStatus InitializeCommunicationMesh(const std::string swarmName,
                                        const BlockList_t &blocks);
@@ -154,16 +154,20 @@ template <class T>
 TaskStatus MOCMCTransport(T *rc, const Real dt);
 
 template <class T>
-TaskStatus MOCMCSampleBoundaries(T *rc);
+TaskStatus MOCMCSampleBoundaries(T *rc_base, T *rc);
+// TaskStatus MOCMCSampleBoundaries(T *rc);
 
 template <class T>
-TaskStatus MOCMCReconstruction(T *rc);
+TaskStatus MOCMCReconstruction(T *rc_base, T *rc);
+// TaskStatus MOCMCReconstruction(T *rc);
 
 template <class T>
-TaskStatus MOCMCEddington(T *rc);
+TaskStatus MOCMCEddington(T *rc_base, T *rc);
+// TaskStatus MOCMCEddington(T *rc);
 
 template <class T>
-TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid);
+// TaskStatus MOCMCFluidSource(T *rc, const Real dt, const bool update_fluid);
+TaskStatus MOCMCFluidSource(T *rc_base, T *rc, const Real dt, const bool update_fluid);
 
 TaskStatus MOCMCUpdateParticleCount(Mesh *pmesh, std::vector<Real> *resolution);
 

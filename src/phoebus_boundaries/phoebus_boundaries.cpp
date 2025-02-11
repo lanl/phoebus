@@ -33,6 +33,8 @@ using namespace parthenon::package::prelude;
 
 namespace Boundaries {
 
+void SwarmNoWorkBC(std::shared_ptr<Swarm> &swarm) {}
+
 parthenon::TopologicalElement CC = parthenon::TopologicalElement::CC;
 
 // Copied out of Parthenon, with slight modification
@@ -84,8 +86,9 @@ void GenericBC(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   const bool rescale = fluid->Param<std::string>("bc_vars") == "conserved";
 
   // Do the thing
+  const bool fine = false; // NOTE(BLB): will need changing for fine fields
   pmb->par_for_bndry(
-      label, nb, domain, CC, coarse,
+      label, nb, domain, CC, coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         int kref, jref, iref, sgn;
         if (TYPE == BCType::Reflect) {
@@ -128,9 +131,10 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto &fluid = rc->GetMeshPointer()->packages.Get("fluid");
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
 
+  const bool fine = false;
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
-        "OutflowInnerX1Cons", nb, domain, CC, coarse,
+        "OutflowInnerX1Cons", nb, domain, CC, coarse, fine,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
           Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -139,7 +143,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         });
   } else if (bc_vars == "primitive") {
     pmb->par_for_bndry(
-        "OutflowInnerX1Prim", nb, domain, CC, coarse,
+        "OutflowInnerX1Prim", nb, domain, CC, coarse, fine,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
         });
@@ -165,8 +169,9 @@ void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   const auto idx_pvel = imap.GetFlatIdx(fluid_prim::velocity::name(), false);
   const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield::name(), false);
 
+  const bool fine = false;
   pmb->par_for_bndry(
-      "PolarInnerX2Prim", nb, domain, CC, coarse,
+      "PolarInnerX2Prim", nb, domain, CC, coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         const int jref = -j + 2 * j0 - 1;
         if (l == idx_pvel(1)) {
@@ -199,8 +204,9 @@ void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   const auto idx_pb = imap.GetFlatIdx(fluid_prim::bfield::name(), false);
 
   const std::string label = "PolarOuterX2Prim";
+  const bool fine = false;
   pmb->par_for_bndry(
-      label, nb, domain, CC, coarse,
+      label, nb, domain, CC, coarse, fine,
       KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
         const int jref = -j + 2 * (j0 + 1) - 1;
         if (l == idx_pvel(1)) {
@@ -235,9 +241,10 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
   const int num_species = rad->Param<bool>("active") ? rad->Param<int>("num_species") : 0;
 
+  const bool fine = false;
   if (bc_vars == "conserved") {
     pmb->par_for_bndry(
-        "OutflowOuterX1Cons", nb, IndexDomain::outer_x1, CC, coarse,
+        "OutflowOuterX1Cons", nb, IndexDomain::outer_x1, CC, coarse, fine,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           Real detg_ref = geom.DetGamma(CellLocation::Cent, k, j, ref);
           Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
@@ -246,7 +253,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
         });
   } else if (bc_vars == "primitive") {
     pmb->par_for_bndry(
-        "OutflowOuterX1Prim", nb, domain, CC, coarse,
+        "OutflowOuterX1Prim", nb, domain, CC, coarse, fine,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
           q(l, k, j, i) = q(l, k, j, ref);
         });
@@ -335,6 +342,9 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
 
     // TODO(BRR) Is this always true?
     const bool coarse = false;
+    // NOTE(BLB): setting fine to false. Will require refactoring
+    // if we use fine fields in the future, ala parthenon/pull/991
+    const bool fine = false;
 
     PackIndexMap imap;
     std::vector<std::string> vars{fluid_prim::velocity::name(),
@@ -348,7 +358,7 @@ TaskStatus ConvertBoundaryConditions(std::shared_ptr<MeshBlockData<Real>> &rc) {
     const int num_species =
         pkg_rad->Param<bool>("active") ? pkg_rad->Param<int>("num_species") : 0;
     pmb->par_for_bndry(
-        "OutflowOuterX1PrimFixup", nb1, domain, CC, coarse,
+        "OutflowOuterX1PrimFixup", nb1, domain, CC, coarse, fine,
         KOKKOS_LAMBDA(const int &dummy, const int &k, const int &j, const int &i) {
           // Enforce u^1 >= 0
           Real vcon[3] = {q(pv_lo, k, j, i), q(pv_lo + 1, k, j, i),
@@ -460,20 +470,23 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
   const std::string rad_method =
       pman.pinput->GetOrAddString("radiation", "method", "None");
 
+  // TODO: logic for gr outflow et/
   if (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS)) {
     bool derefine_poles =
         pman.pinput->GetOrAddBoolean("coordinates", "derefine_poles", true);
     if (derefine_poles) {
       const std::string ix2_bc =
-          pman.pinput->GetOrAddString("phoebus", "ix2_bc", "outflow");
+          pman.pinput->GetOrAddString("phoebus", "ix2_bc", "gr_outflow");
       const std::string ox2_bc =
-          pman.pinput->GetOrAddString("phoebus", "ox2_bc", "outflow");
+          pman.pinput->GetOrAddString("phoebus", "ox2_bc", "gr_outflow");
       PARTHENON_REQUIRE(
           ix2_bc != "reflect" && ix2_bc != "polar" && ox2_bc != "reflect" &&
               ox2_bc != "polar",
           "Polar and Reflecting X2 BCs not supported for \"derefine_poles = true\"!");
     }
   }
+  pman.app_input->RegisterSwarmBoundaryCondition(
+      parthenon::BoundaryFace::inner_x3, "swarm_no_bc", &Boundaries::SwarmNoWorkBC);
 
   for (int d = 1; d <= 3; ++d) {
     // outer = 0 for inner face, outer = 1 for outer face
@@ -481,66 +494,51 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
       auto &face = inner_outer[outer];
       const std::string name = face + "x" + std::to_string(d) + "_bc";
       const std::string parth_bc = pman.pinput->GetString("parthenon/mesh", name);
-      PARTHENON_REQUIRE(parth_bc == "user" || parth_bc == "periodic",
-                        "Only \"user\" and \"periodic\" allowed for parthenon/mesh/" +
-                            name);
 
-      const std::string bc = pman.pinput->GetOrAddString("phoebus", name, "outflow");
-      if (bc == "reflect") {
-        pman.app_input->boundary_conditions[loc[d - 1][outer]] = reflect[d - 1][outer];
-      } else if (bc == "polar") {
-        PARTHENON_REQUIRE(d == 2, "Polar boundary conditions only supported in X2!");
-        pman.app_input->boundary_conditions[loc[d - 1][outer]] = polar[d - 1][outer];
-      } else if (bc == "outflow") {
-        pman.app_input->boundary_conditions[loc[d - 1][outer]] = outflow[d - 1][outer];
-        if (d == 1) {
-          if (outer == 0) {
-            if (rad_method == "mocmc") {
-              pman.app_input
-                  ->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x1] =
-                  Boundaries::SetSwarmNoWorkBC;
-            } else {
-              pman.app_input
-                  ->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x1] =
-                  Boundaries::SetSwarmIX1Outflow;
-            }
-          } else if (outer == 1) {
-            if (rad_method == "mocmc") {
-              pman.app_input
-                  ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-                  Boundaries::SetSwarmNoWorkBC;
-            } else {
-              pman.app_input
-                  ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x1] =
-                  Boundaries::SetSwarmOX1Outflow;
-            }
-          }
+      const std::string bc = pman.pinput->GetOrAddString("phoebus", name, "gr_outflow");
+      pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "reflect",
+                                                reflect[d - 1][outer]);
+      if (d == 2) { // polar BC only supported for X2
+        pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "polar",
+                                                  polar[d - 1][outer]);
+      }
+      pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "gr_outflow",
+                                                outflow[d - 1][outer]);
+      if (d == 1) {
+        if (outer == 0) {
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::inner_x1, "swarm_no_bc",
+              &Boundaries::SwarmNoWorkBC);
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::inner_x1, "swarm_outflow",
+              &parthenon::BoundaryFunction::SwarmOutflowInnerX1);
+        } else if (outer == 1) {
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::outer_x1, "swarm_no_bc",
+              &Boundaries::SwarmNoWorkBC);
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::outer_x1, "swarm_outflow",
+              &parthenon::BoundaryFunction::SwarmOutflowOuterX1);
         }
-        if (d == 2) {
-          if (outer == 0) {
-            if (rad_method == "mocmc") {
-              pman.app_input
-                  ->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x2] =
-                  Boundaries::SetSwarmNoWorkBC;
-            } else {
-              pman.app_input
-                  ->swarm_boundary_conditions[parthenon::BoundaryFace::inner_x2] =
-                  Boundaries::SetSwarmIX2Outflow;
-            }
-          } else if (outer == 1) {
-            if (rad_method == "mocmc") {
-              pman.app_input
-                  ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x2] =
-                  Boundaries::SetSwarmNoWorkBC;
-            } else {
-              pman.app_input
-                  ->swarm_boundary_conditions[parthenon::BoundaryFace::outer_x2] =
-                  Boundaries::SetSwarmOX2Outflow;
-            }
-          }
+      }
+      if (d == 2) {
+        if (outer == 0) {
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::inner_x2, "swarm_no_bc",
+              &Boundaries::SwarmNoWorkBC);
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::inner_x2, "swarm_outflow",
+              &parthenon::BoundaryFunction::SwarmOutflowInnerX1);
+        } else if (outer == 1) {
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::outer_x2, "swarm_no_bc",
+              &Boundaries::SwarmNoWorkBC);
+          pman.app_input->RegisterSwarmBoundaryCondition(
+              parthenon::BoundaryFace::outer_x2, "swarm_outflow",
+              &parthenon::BoundaryFunction::SwarmOutflowOuterX2);
         }
-      } // periodic boundaries, which are handled by parthenon, so no need to set anything
-    }
+      }
+    } // periodic boundaries, which are handled by parthenon, so no need to set anything
   }
 }
 

@@ -166,6 +166,7 @@ set(SINGULARITY_USE_FORTRAN OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_FORCE_SUBMODULE_MODE ON CACHE BOOL "" FORCE)
 set(SINGULARITY_USE_KOKKOSKERNELS OFF CACHE BOOL "" FORCE)
 set(SINGULARITY_BUILD_CLOSURE OFF CACHE BOOL "" FORCE)
+set(SINGULARITY_USE_TRUE_LOG_GRIDDING ON CACHE BOOL "" FORCE)
 
 # Kill cmake's package registry because it can interfere
 set(CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY ON CACHE BOOL "" FORCE)
@@ -183,6 +184,9 @@ include(cmake/Geometry.cmake)
 
 # Fluid
 include(cmake/Fluid.cmake)
+
+# Transport
+include(cmake/Transport.cmake)
 
 # Phoebus src
 message("\nConfiguring src")

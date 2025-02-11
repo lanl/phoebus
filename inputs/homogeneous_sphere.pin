@@ -1,4 +1,4 @@
-# © 2021. Triad National Security, LLC. All rights reserved.  This
+# © 2021-2025. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract 89233218CNA000001
 # for Los Alamos National Laboratory (LANL), which is operated by Triad
 # National Security, LLC for the U.S.  Department of Energy/National
@@ -12,8 +12,6 @@
 
 <phoebus>
 problem = homogeneous_sphere
-ix1_bc = reflect
-ox1_bc = outflow
 
 <parthenon/job>
 problem_id  = hom_sph   # problem ID: basename of output filenames
@@ -39,17 +37,17 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 3
 
-nx1         = 128      # Number of zones in X1-direction
-x1min       = 0        # minimum value of X1
-x1max       = 5        # maximum value of X1
-ix1_bc      = user     # Inner-X1 boundary condition flag
-ox1_bc      = user     # Outer-X1 boundary condition flag
+nx1         = 128        # Number of zones in X1-direction
+x1min       = 0          # minimum value of X1
+x1max       = 5          # maximum value of X1
+ix1_bc      = reflect    # Inner-X1 boundary condition flag
+ox1_bc      = gr_outflow # Outer-X1 boundary condition flag
 
-nx2         = 1         # Number of zones in X2-direction
-x2min       = 0         # minimum value of X2
-x2max       = 3.14159265359   # maximum value of X2
-ix2_bc      = periodic  # Inner-X2 boundary condition flag
-ox2_bc      = periodic  # Outer-X2 boundary condition flag
+nx2         = 1             # Number of zones in X2-direction
+x2min       = 0             # minimum value of X2
+x2max       = 3.14159265359 # maximum value of X2
+ix2_bc      = periodic      # Inner-X2 boundary condition flag
+ox2_bc      = periodic      # Outer-X2 boundary condition flag
 
 nx3         = 1         # Number of zones in X3-direction
 x3min       = -1        # minimum value of X3
@@ -98,10 +96,6 @@ nu_min = 1.e15
 nu_max = 1.e22
 nu_bins = 200
 absorption = true
-do_nu_electron = true
-do_nu_electron_anti = false
-do_nu_heavy = false
-
 B_fake = 1.0
 use_B_fake = true
 
@@ -110,7 +104,7 @@ type = gray
 gray_kappa = 1.e1
 
 <homogeneous_sphere>
-J = 0.01
+J = 0.1
 Hx = 0.01
 Hy = 0.0
 Hz = 0.0

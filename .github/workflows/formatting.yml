@@ -18,6 +18,11 @@ jobs:
           run: export DEBIAN_FRONTEND=noninteractive
         - name: install dependencies
           run: |
-            sudo apt-get install -y --force-yes -qq git clang-format-12
+            sudo apt-get install -y --force-yes -qq git
+        - name: Install pip, clang-format
+          uses: BSFishy/pip-action@v1
+          with:
+            packages: |
+               clang-format==12.0.1
         - name: check formatting
-          run: find . -regex '.*\.\(cpp\|hpp\)' | xargs clang-format-12 -style=file -i && git diff --exit-code --ignore-submodules
+          run: find . -regex '.*\.\(cpp\|hpp\)' | xargs clang-format -style=file -i && git diff --exit-code --ignore-submodules
