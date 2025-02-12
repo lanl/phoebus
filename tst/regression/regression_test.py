@@ -240,6 +240,7 @@ def gold_comparison(
     variables,
     input_file,
     modified_inputs={},
+    swarm_variables=None,  # dictionary: keys are swarms, values are swarm vars
     executable=None,
     cmake_extra_args=[],
     geometry="Minkowski",
@@ -250,6 +251,39 @@ def gold_comparison(
     compression_factor=1,
     tolerance=1.0e-5,
 ):
+    """
+    Run test problem with previously built code, input file,
+    and modified inputs, and compare to gold outputs.
+
+    Parameters
+    ----------
+    variables : list[str]
+        Phoebus outputs.
+    input_file : str
+        Phoebus input string.
+    modified_input : dict[str, str]
+        Changes to input.
+    swarm_variables : dict[str, str], optional
+        Swarms to compare (default is None).
+    executable : str, optional
+        Executable to run (default is None).
+    cmake_extra_args : tuple[str]
+        Extra build options
+    geometry : str, optional
+        Geometry type (default is "Minkowski").
+    use_gpu : bool, optional
+        Use GPU for the simulation (default is False).
+    use_mpiexec : bool, optional
+        Run with MPI (default is False).
+    build_type : str, optional
+        CMake build type (default is "Release").
+    upgold : bool, optional
+        Update gold file (default is False).
+    compression_factor : int, optional
+        Compression factor for gold file storage  (default is 1).
+    tolerance : float, optional
+        Error tolerance (default is 1e-5).
+    """
     problem = read_input_value("phoebus", "problem", input_file)
     print("\n=== GOLD COMPARISON TEST PROBLEM ===")
     print(f"= problem:     {problem}")
@@ -307,6 +341,15 @@ def gold_comparison(
                 )
         else:
             variables_data = np.concatenate((variables_data, variable))
+
+    # Swarms output
+    if swarm_variables is not None:
+        for swarm_name, swarm_vars in swarm_variables.items():
+            swarm = dump.GetSwarm(swarm_name)
+            for svar in swarm_vars:
+                variable = swarm.Get(svar)
+                variables_data = np.concatenate((variables_data, variable))
+
 
     # Compress results, if desired
     compression_factor = int(compression_factor)
