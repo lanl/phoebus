@@ -32,7 +32,6 @@ SOURCE_DIR = "../../../"
 NUM_PROCS = 4  # Default values for cmake --build --parallel can overwhelm CI systems
 TEMPORARY_INPUT_FILE = "test_input.pin"
 SCRIPT_NAME = sys.argv[0].split(".py")[0]
-print(SCRIPT_NAME)
 
 # ------------------------------------------------------------------------------------------------ #
 # Utility functions
