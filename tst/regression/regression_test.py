@@ -16,11 +16,11 @@ import sys
 import numpy as np
 from subprocess import call
 import shutil
+import sys
 import glob
 
 sys.path.insert(0, "../../external/parthenon/scripts/python/packages/parthenon_tools")
-from parthenon_tools import phdf
-import __main__
+from parthenon_tools import phdf  # type: ignore
 
 # ------------------------------------------------------------------------------------------------ #
 # Constants
@@ -29,9 +29,9 @@ import __main__
 BUILD_DIR = "build"
 RUN_DIR = "run"
 SOURCE_DIR = "../../../"
-NUM_PROCS = 8  # Default values for cmake --build --parallel can overwhelm CI systems
+NUM_PROCS = 4  # Default values for cmake --build --parallel can overwhelm CI systems
 TEMPORARY_INPUT_FILE = "test_input.pin"
-SCRIPT_NAME = os.path.basename(__main__.__file__).split(".py")[0]
+SCRIPT_NAME = sys.argv[0].split(".py")[0]
 
 # ------------------------------------------------------------------------------------------------ #
 # Utility functions
@@ -39,7 +39,7 @@ SCRIPT_NAME = os.path.basename(__main__.__file__).split(".py")[0]
 
 
 # -- Compare two values up to some floating point tolerance
-def soft_equiv(val, ref, tol=1.0e-5):
+def soft_equiv(val: float, ref: float, tol: float = 1.0e-5) -> bool:
     numerator = np.fabs(val - ref)
     denominator = max(np.fabs(ref), 1.0e-10)
 
@@ -50,7 +50,7 @@ def soft_equiv(val, ref, tol=1.0e-5):
 
 
 # -- Read value of parameter in input file
-def read_input_value(block, key, input_file):
+def read_input_value(block: str, key: str, input_file: str) -> int | str:
     with open(input_file, "r") as infile:
         lines = infile.readlines()
         for line in lines:
@@ -76,10 +76,11 @@ def read_input_value(block, key, input_file):
                     return sline.split("=")[1].strip()
 
     assert False, "block/key not found!"
+    return os.EX_OK
 
 
 # -- Modify key in input file, add key (and block) if not present, write new file
-def modify_input(dict_key, value, input_file):
+def modify_input(dict_key: str, value: str, input_file: str) -> str | int:
     key = dict_key.split("/")[-1]
     block = dict_key.split(key)[0][:-1]
 
@@ -110,7 +111,6 @@ def modify_input(dict_key, value, input_file):
 
             else:
                 current_key = sline.split("=")[0].strip()
-                current_value = sline.split("=")[1].strip()
 
                 newline = line
                 if block == current_block and key == current_key:
@@ -123,7 +123,7 @@ def modify_input(dict_key, value, input_file):
             new_input_file.append(line)
 
     index = None
-    if input_found == False:
+    if not input_found:
         print(f'Input "{block}" "{key}" not found!')
         for i, line in enumerate(new_input_file):
             if line == f"<{block}>":
@@ -140,6 +140,7 @@ def modify_input(dict_key, value, input_file):
     with open(input_file, "w") as outfile:
         for line in new_input_file:
             outfile.write(line)
+    return os.EX_OK
 
 
 # ------------------------------------------------------------------------------------------------ #
@@ -148,7 +149,12 @@ def modify_input(dict_key, value, input_file):
 
 
 # -- Configure and build phoebus with problem-specific options
-def build_code(geometry, use_gpu=False, build_type="Release", cmake_extra_args=[]):
+def build_code(
+    geometry: str,
+    use_gpu: bool = False,
+    build_type: str = "Release",
+    cmake_extra_args: list[str] = [""],
+) -> int:
     if os.path.isdir(BUILD_DIR):
         print(
             f'BUILD_DIR "{BUILD_DIR}" already exists! Clean up before calling a regression test script!'
@@ -199,10 +205,11 @@ def build_code(geometry, use_gpu=False, build_type="Release", cmake_extra_args=[
 
     # Return to base directory
     os.chdir("..")
+    return os.EX_OK
 
 
 # -- Clean up working directory
-def cleanup():
+def cleanup() -> int:
     if (
         os.getcwd().split(os.sep)[-1] == BUILD_DIR
         or os.getcwd().split(os.sep)[-1] == RUN_DIR
@@ -224,32 +231,68 @@ def cleanup():
     if os.path.exists(BUILD_DIR):
         try:
             shutil.rmtree(BUILD_DIR)
-        except:
+        except Exception:
             print(f'Error cleaning up build directory "{BUILD_DIR}"!')
 
     if os.path.exists(RUN_DIR):
         try:
             shutil.rmtree(RUN_DIR)
-        except:
+        except Exception:
             print(f'Error cleaning up build directory "{RUN_DIR}"!')
+    return os.EX_OK
 
 
 # -- Run test problem with previously built code, input file, and modified inputs, and compare
 #    to gold output
 def gold_comparison(
-    variables,
-    input_file,
-    modified_inputs={},
-    executable=None,
-    cmake_extra_args=[],
-    geometry="Minkowski",
-    use_gpu=False,
-    use_mpiexec=False,
-    build_type="Release",
-    upgold=False,
-    compression_factor=1,
-    tolerance=1.0e-5,
-):
+    variables: list[str],
+    input_file: str,
+    modified_inputs: dict[str, str] = {},
+    swarm_variables: dict[str, str]
+    | None = None,  # dictionary: keys are swarms, values are swarm vars
+    executable: str | None = None,
+    cmake_extra_args: list[str] = [""],
+    geometry: str = "Minkowski",
+    use_gpu: bool = False,
+    use_mpiexec: bool = False,
+    build_type: str = "Release",
+    upgold: bool = False,
+    compression_factor: int = 1,
+    tolerance: float = 1.0e-5,
+) -> int:
+    """
+    Run test problem with previously built code, input file,
+    and modified inputs, and compare to gold outputs.
+
+    Parameters
+    ----------
+    variables : list[str]
+        Phoebus outputs.
+    input_file : str
+        Phoebus input string.
+    modified_input : dict[str, str]
+        Changes to input.
+    swarm_variables : dict[str, str], optional
+        Swarms to compare (default is None).
+    executable : str, optional
+        Executable to run (default is None).
+    cmake_extra_args : list[str]
+        Extra build options
+    geometry : str, optional
+        Geometry type (default is "Minkowski").
+    use_gpu : bool, optional
+        Use GPU for the simulation (default is False).
+    use_mpiexec : bool, optional
+        Run with MPI (default is False).
+    build_type : str, optional
+        CMake build type (default is "Release").
+    upgold : bool, optional
+        Update gold file (default is False).
+    compression_factor : int, optional
+        Compression factor for gold file storage  (default is 1).
+    tolerance : float, optional
+        Error tolerance (default is 1e-5).
+    """
     problem = read_input_value("phoebus", "problem", input_file)
     print("\n=== GOLD COMPARISON TEST PROBLEM ===")
     print(f"= problem:     {problem}")
@@ -280,7 +323,7 @@ def gold_comparison(
         modify_input(key, modified_inputs[key], TEMPORARY_INPUT_FILE)
 
     # Run test problem
-    preamble = []
+    preamble: list[str] = []
     if use_mpiexec:
         preamble = preamble + ["mpiexec", "-n", "1"]
     if os.path.isabs(executable):
@@ -307,6 +350,14 @@ def gold_comparison(
                 )
         else:
             variables_data = np.concatenate((variables_data, variable))
+
+    # Swarms output
+    if swarm_variables is not None:
+        for swarm_name, swarm_vars in swarm_variables.items():
+            swarm = dump.GetSwarm(swarm_name)
+            for svar in swarm_vars:
+                variable = swarm.Get(svar)
+                variables_data = np.concatenate((variables_data, variable))
 
     # Compress results, if desired
     compression_factor = int(compression_factor)
@@ -335,6 +386,7 @@ def gold_comparison(
     # Report upgolding, success, or failure
     if upgold:
         print(f"Gold file {gold_name} updated!")
+        return os.EX_OK
     else:
         if success:
             print("TEST PASSED")
