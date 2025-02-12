@@ -62,6 +62,7 @@ jobs:
             ./linear_modes.py --executable build_minkowski_release/src/phoebus
             ./thincooling.py --executable build_minkowski_release/src/phoebus
             ./thincooling_coolingfunction.py --executable build_minkowski_release/src/phoebus
+            ./tracer_advection.py --executable build_minkowski_release/src/phoebus
 
             # Debug suite
             ./radiation_diffusion.py --executable build_minkowski_debug/src/phoebus
@@ -72,6 +73,7 @@ jobs:
             ./linear_modes.py --executable build_minkowski_debug/src/phoebus
             ./thincooling.py --executable build_minkowski_debug/src/phoebus
             ./thincooling_coolingfunction.py --executable build_minkowski_debug/src/phoebus
+            ./tracer_advection.py --executable build_minkowski_debug/src/phoebus
 
             # Custom builds
             ./friedmann.py
