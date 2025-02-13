@@ -81,6 +81,19 @@ TaskStatus MeshReceive(MeshData<Real> *md) {
   return status;
 }
 
+TaskStatus MeshDefragParticles(MeshData<Real> *md, const std::string swarm_name,
+                               const int defrag_frac) {
+  for (const auto &mbd : md->GetAllBlockData()) {
+    auto &swarm = mbd->GetSwarmData()->Get(swarm_name);
+    if (swarm->GetNumActive() > 0) {
+      if (swarm->GetPackingEfficiency() < defrag_frac) {
+        swarm->Defrag();
+      }
+    }
+  }
+  return TaskStatus::complete;
+}
+
 // *************************************************//
 // define the application driver. in this case,    *//
 // that mostly means defining the MakeTaskList     *//
@@ -608,17 +621,8 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
 
   // First order operator split tracer advection
   if (stage == integrator->nstages && tracers_active) {
-    const std::string swarmName = "tracers";
-    TaskRegion &sync_region_tr = tc.AddRegion(1);
-    {
-      for (int i = 0; i < blocks.size(); i++) {
-        auto &tl = sync_region_tr[0];
-        auto &pmb = blocks[i];
-        auto &sc = pmb->meshblock_data.Get()->GetSwarmData();
-        auto reset_comms =
-            tl.AddTask(none, &SwarmContainer::ResetCommunication, sc.get());
-      }
-    }
+    const std::string swarm_name = "tracers";
+    const int defrag_frac = 0.9; // TODO(BLB): make runtime param
 
     TaskRegion &async_region_tr = tc.AddRegion(num_partitions);
     for (int n = 0; n < num_partitions; n++) {
@@ -627,22 +631,14 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
       auto &base = pmesh->mesh_data.GetOrAdd("base", n);
       auto &mbd0 = pmb->meshblock_data.Get(stage_name[stage]);
 
-      auto tracerAdvect = tl.AddTask(none, tracers::AdvectTracers, base.get(), dt);
+      auto reset_comms = tl.AddTask(none, MeshResetCommunication, base.get());
+      auto tracerAdvect = tl.AddTask(reset_comms, tracers::AdvectTracers, base.get(), dt);
       auto tracerPurge =
-          tl.AddTask(tracerAdvect, fixup::PurgeParticles, mbd0.get(), swarmName);
-    }
-
-    TaskRegion &async_region_tr_comm = tc.AddRegion(blocks.size());
-    for (int n = 0; n < blocks.size(); n++) {
-      auto &tl = async_region_tr_comm[n];
-      auto &pmb = blocks[n];
-      auto &sc = pmb->meshblock_data.Get()->GetSwarmData();
-      auto send =
-          tl.AddTask(none, &SwarmContainer::Send, sc.get(), BoundaryCommSubset::all);
-
-      auto receive =
-          tl.AddTask(send, &SwarmContainer::Receive, sc.get(), BoundaryCommSubset::all);
-      auto defrag = tl.AddTask(receive, &SwarmContainer::Defrag, sc.get(), 0.9);
+          tl.AddTask(tracerAdvect, fixup::PurgeParticles, mbd0.get(), swarm_name);
+      auto send = tl.AddTask(tracerPurge, MeshSend, base.get());
+      auto receive = tl.AddTask(send, MeshReceive, base.get());
+      auto defrag =
+          tl.AddTask(receive, MeshDefragParticles, base.get(), swarm_name, defrag_frac);
     }
   }
 
