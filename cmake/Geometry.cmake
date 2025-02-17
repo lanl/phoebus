@@ -29,6 +29,7 @@ set(PHOEBUS_ANALYTIC_GEOMETRIES
     "Inchworm"
     "MonopoleSph"
     "MonopoleCart"
+    "SuperimposedKerrSchild"
     )
 
 if(PHOEBUS_ANALYTIC_GEOMETRY)

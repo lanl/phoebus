@@ -197,6 +197,63 @@ KOKKOS_INLINE_FUNCTION int SymSize() {
   return size * size - (size * (size - 1)) / 2;
 }
 
+KOKKOS_INLINE_FUNCTION
+void InvertSpacetimeMetric(Real gcov[NDFULL][NDFULL], Real gcon[NDFULL][NDFULL]) {
+  // A^{-1} = Ajdugate(A)/Determinant(A)
+  Real determinant = LinearAlgebra::Determinant4D(gcov);
+  //calculate adjugates
+  gcon[0][0] = -gcov[1][3]*gcov[2][2]*gcov[3][1] + gcov[1][2]*gcov[2][3]*gcov[3][1] + 
+                gcov[1][3]*gcov[2][1]*gcov[3][2] - gcov[1][1]*gcov[2][3]*gcov[3][2] - 
+                gcov[1][2]*gcov[2][1]*gcov[3][3] + gcov[1][1]*gcov[2][2]*gcov[3][3];
+
+  gcon[0][1] =  gcov[0][3]*gcov[2][2]*gcov[3][1] - gcov[0][2]*gcov[2][3]*gcov[3][1] - 
+                gcov[0][3]*gcov[2][1]*gcov[3][2] + gcov[0][1]*gcov[2][3]*gcov[3][2] + 
+                gcov[0][2]*gcov[2][1]*gcov[3][3] - gcov[0][1]*gcov[2][2]*gcov[3][3];
+
+  gcon[0][2] = -gcov[0][3]*gcov[1][2]*gcov[3][1] + gcov[0][2]*gcov[1][3]*gcov[3][1] + 
+                gcov[0][3]*gcov[1][1]*gcov[3][2] - gcov[0][1]*gcov[1][3]*gcov[3][2] - 
+                gcov[0][2]*gcov[1][1]*gcov[3][3] + gcov[0][1]*gcov[1][2]*gcov[3][3];
+
+  gcon[0][3] =  gcov[0][3]*gcov[1][2]*gcov[2][1] - gcov[0][2]*gcov[1][3]*gcov[2][1] - 
+                gcov[0][3]*gcov[1][1]*gcov[2][2] + gcov[0][1]*gcov[1][3]*gcov[2][2] + 
+                gcov[0][2]*gcov[1][1]*gcov[2][3] - gcov[0][1]*gcov[1][2]*gcov[2][3];
+
+  gcon[1][1] = -gcov[0][3]*gcov[2][2]*gcov[3][0] + gcov[0][2]*gcov[2][3]*gcov[3][0] + 
+                gcov[0][3]*gcov[2][0]*gcov[3][2] - gcov[0][0]*gcov[2][3]*gcov[3][2] - 
+                gcov[0][2]*gcov[2][0]*gcov[3][3] + gcov[0][0]*gcov[2][2]*gcov[3][3];
+
+  gcon[1][2] =  gcov[0][3]*gcov[1][2]*gcov[3][0] - gcov[0][2]*gcov[1][3]*gcov[3][0] - 
+                gcov[0][3]*gcov[1][0]*gcov[3][2] + gcov[0][0]*gcov[1][3]*gcov[3][2] + 
+                gcov[0][2]*gcov[1][0]*gcov[3][3] - gcov[0][0]*gcov[1][2]*gcov[3][3];
+
+  gcon[1][3] = -gcov[0][3]*gcov[1][2]*gcov[2][0] + gcov[0][2]*gcov[1][3]*gcov[2][0] + 
+                gcov[0][3]*gcov[1][0]*gcov[2][2] - gcov[0][0]*gcov[1][3]*gcov[2][2] - 
+                gcov[0][2]*gcov[1][0]*gcov[2][3] + gcov[0][0]*gcov[1][2]*gcov[2][3];
+
+  gcon[2][2] = -gcov[0][3]*gcov[1][1]*gcov[3][0] + gcov[0][1]*gcov[1][3]*gcov[3][0] + 
+                gcov[0][3]*gcov[1][0]*gcov[3][1] - gcov[0][0]*gcov[1][3]*gcov[3][1] - 
+                gcov[0][1]*gcov[1][0]*gcov[3][3] + gcov[0][0]*gcov[1][1]*gcov[3][3];
+
+  gcon[2][3] =  gcov[0][3]*gcov[1][1]*gcov[2][0] - gcov[0][1]*gcov[1][3]*gcov[2][0] - 
+                gcov[0][3]*gcov[1][0]*gcov[2][1] + gcov[0][0]*gcov[1][3]*gcov[2][1] + 
+                gcov[0][1]*gcov[1][0]*gcov[2][3] - gcov[0][0]*gcov[1][1]*gcov[2][3];
+
+  gcon[3][3] = -gcov[0][2]*gcov[1][1]*gcov[2][0] + gcov[0][1]*gcov[1][2]*gcov[2][0] + 
+                gcov[0][2]*gcov[1][0]*gcov[2][1] - gcov[0][0]*gcov[1][2]*gcov[2][1] - 
+                gcov[0][1]*gcov[1][0]*gcov[2][2] + gcov[0][0]*gcov[1][1]*gcov[2][2];
+
+  //symmetries
+  gcon[1][0] = gcon[0][1];
+  gcon[2][0] = gcon[0][2];
+  gcon[3][0] = gcon[0][3];
+  gcon[2][1] = gcon[1][2];
+  gcon[3][1] = gcon[1][3];
+  gcon[3][2] = gcon[2][3];
+
+  //inverse
+  SPACETIMELOOP2(i,j) gcon[i][j] /= determinant;
+}
+
 } // namespace Utils
 
 namespace impl {
