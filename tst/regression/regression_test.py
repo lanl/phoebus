@@ -38,6 +38,12 @@ SCRIPT_NAME = sys.argv[0].split(".py")[0]
 #
 
 
+# -- simultaneously sort two lists
+def dual_sort(a, b):
+    list1, list2 = (list(t) for t in zip(*sorted(zip(a, b))))
+    return list1, list2
+
+
 # -- Compare two values up to some floating point tolerance
 def soft_equiv(val: float, ref: float, tol: float = 1.0e-5) -> bool:
     numerator = np.fabs(val - ref)
@@ -355,8 +361,10 @@ def gold_comparison(
     if swarm_variables is not None:
         for swarm_name, swarm_vars in swarm_variables.items():
             swarm = dump.GetSwarm(swarm_name)
+            swarm_id = swarm.Get("id")
             for svar in swarm_vars:
                 variable = swarm.Get(svar)
+                variable, temp = dual_sort(variable, swarm_id)
                 variables_data = np.concatenate((variables_data, variable))
 
     # Compress results, if desired
