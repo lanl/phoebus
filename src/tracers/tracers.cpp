@@ -68,7 +68,6 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // TEST
   Metadata Inu_swarmvalue_metadata({Metadata::Real}, std::vector<int>{3, 100});
-  physics->AddSwarmValue(tv::test::name(), swarm_name, Inu_swarmvalue_metadata);
 
   const bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
 
@@ -163,11 +162,13 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
   // tracer swarm pack
   static constexpr auto swarm_name = "tracers";
-  static auto desc_tracers = MakeSwarmPackDescriptor<
-      swarm_position::x, swarm_position::y, swarm_position::z, tv::vel_x, tv::vel_y,
-      tv::vel_z, tv::rho, tv::temperature, tv::ye, tv::entropy, tv::energy, tv::lorentz,
-      tv::lapse, tv::shift_x, tv::shift_y, tv::shift_z, tv::detgamma, tv::pressure,
-      tv::bernoulli, tv::B_x, tv::B_y, tv::B_z, tv::test>(swarm_name);
+  static auto desc_tracers =
+      MakeSwarmPackDescriptor<swarm_position::x, swarm_position::y, swarm_position::z,
+                              tv::vel_x, tv::vel_y, tv::vel_z, tv::rho, tv::temperature,
+                              tv::ye, tv::entropy, tv::energy, tv::lorentz, tv::lapse,
+                              tv::shift_x, tv::shift_y, tv::shift_z, tv::detgamma,
+                              tv::pressure, tv::bernoulli, tv::B_x, tv::B_y, tv::B_z>(
+          swarm_name);
   auto pack_tracers = desc_tracers.GetPack(rc);
 
   // hydro vars pack
@@ -265,7 +266,6 @@ void FillTracers(MeshBlockData<Real> *rc) {
           pack_tracers(b, tv::detgamma(), n) = gdet;
           pack_tracers(b, tv::pressure(), n) = pressure;
           pack_tracers(b, tv::bernoulli(), n) = bernoulli;
-          pack_tracers(b, tv::test(2 + 5), n) = 1.1238;
           if (mhd) {
             pack_tracers(b, tv::B_x(), n) = B_X1;
             pack_tracers(b, tv::B_y(), n) = B_X2;
