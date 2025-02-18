@@ -85,7 +85,7 @@ TaskStatus AdvectTracers(MeshData<Real> *rc, const Real dt) {
 
   auto *pmb = rc->GetParentPointer();
 
-  static const auto ndim = pmb->ndim;
+  const auto ndim = pmb->ndim;
 
   // tracer swarm pack
   static constexpr auto swarm_name = "tracers";
