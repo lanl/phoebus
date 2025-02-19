@@ -189,7 +189,6 @@ SWARM_VARIABLE(Real, tr, bernoulli);
 SWARM_VARIABLE(Real, tr, B_x);
 SWARM_VARIABLE(Real, tr, B_y);
 SWARM_VARIABLE(Real, tr, B_z);
-TENSOR_SWARM(Real, tr, test, ANYDIM, PHOEBUS_NUM_SPECIES);
 } // namespace tracer_variables
 
 namespace diagnostic_variables {
