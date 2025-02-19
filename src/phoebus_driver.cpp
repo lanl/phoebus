@@ -82,7 +82,7 @@ TaskStatus MeshReceive(MeshData<Real> *md) {
 }
 
 TaskStatus MeshDefragParticles(MeshData<Real> *md, const std::string swarm_name,
-                               const int defrag_frac) {
+                               const Real defrag_frac) {
   for (const auto &mbd : md->GetAllBlockData()) {
     auto &swarm = mbd->GetSwarmData()->Get(swarm_name);
     if (swarm->GetNumActive() > 0) {
@@ -622,7 +622,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   // First order operator split tracer advection
   if (stage == integrator->nstages && tracers_active) {
     const std::string swarm_name = "tracers";
-    const int defrag_frac = 0.9; // TODO(BLB): make runtime param
+    const Real defrag_frac = 0.9; // TODO(BLB): make runtime param && ensure \in [0,1)
 
     TaskRegion &async_region_tr = tc.AddRegion(num_partitions);
     for (int n = 0; n < num_partitions; n++) {
