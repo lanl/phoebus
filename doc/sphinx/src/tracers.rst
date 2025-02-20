@@ -22,7 +22,16 @@ Tracers may be enabled by in the ``Phoebus`` input deck as follow:
 
    <tracers>
    num_tracers = 1024
+   defrag_frac = 0.2
 
+Where `<physics>/tracers = true` enables tracer particles for applicable problems, 
+`<tracers>/num_tracers` sets the number of tracer particles (usually per block), if applicable, 
+and `<tracers>/defrag_frac` sets the fractional occupancy of tracer swarm containers.
+.. note::
+   Particles typically loop from 0 to some `max_active_index`.
+   If only a small fraction of particles in that range are active, this 
+   is inefficient. `Defrag` copies active particles to a contiguous range.
+   It can be inefficient, so should be done sparingly.
 Similarly, tracers may be output by modifying an existing Parthenon output block, or creating a new one:
 
 .. code-block::

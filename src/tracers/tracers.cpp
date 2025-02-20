@@ -33,6 +33,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   const int num_tracers = pin->GetOrAddInteger("tracers", "num_tracers", 0);
   params.Add("num_tracers", num_tracers);
 
+  const Real defrag_frac = pin->GetOrAddReal("tracers", "defrag_frac", 0.0);
+  PARTHENON_REQUIRE(defrag_frac >= 0.0 && defrag_frac < 1.0,
+                    "Tracer defrag fraction must be >= 0 and less than 1");
+  params.Add("defrag_frac", defrag_frac);
+
   // Initialize random number generator pool
   int rng_seed = pin->GetOrAddInteger("tracers", "rng_seed", time(NULL));
   physics->AddParam<>("rng_seed", rng_seed);
