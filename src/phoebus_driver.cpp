@@ -622,7 +622,7 @@ TaskCollection PhoebusDriver::RungeKuttaStage(const int stage) {
   // First order operator split tracer advection
   if (stage == integrator->nstages && tracers_active) {
     const std::string swarm_name = "tracers";
-    const Real defrag_frac = 0.9; // TODO(BLB): make runtime param && ensure \in [0,1)
+    const Real defrag_frac = tracers->Param<Real>("defrag_frac");
 
     TaskRegion &async_region_tr = tc.AddRegion(num_partitions);
     for (int n = 0; n < num_partitions; n++) {
