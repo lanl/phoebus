@@ -63,6 +63,7 @@ TaskStatus SumMdotPhiForNetFieldScaling(MeshData<Real> *md, const Real t, const 
 
 TaskStatus NetFieldStartReduce(MeshData<Real> *md, const Real t, const int stage,
                                AllReduce<std::vector<Real>> *net_field_totals) {
+  using namespace parthenon;
   Mesh *pm = md->GetMeshPointer();
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
 
