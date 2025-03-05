@@ -168,7 +168,7 @@ class Modified {
     Real Jcov[NDSPACE][NDSPACE];
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
-    Real detJ = LinearAlgebra::Determinant(Jcov);
+    Real detJ = LinearAlgebra::Determinant3D(Jcov);
     return std::abs(s_.DetGamma(X0, C[0], C[1], C[2]) * detJ);
   }
   KOKKOS_INLINE_FUNCTION
@@ -177,7 +177,7 @@ class Modified {
     Real Jcov[NDSPACE][NDSPACE];
     Real Jcon[NDSPACE][NDSPACE];
     GetTransformation_(X1, X2, X3, C, Jcov, Jcon);
-    Real detJ = LinearAlgebra::Determinant(Jcov);
+    Real detJ = LinearAlgebra::Determinant3D(Jcov);
     return std::abs(s_.DetG(X0, C[0], C[1], C[2]) * detJ);
   }
 

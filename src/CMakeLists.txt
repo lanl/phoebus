@@ -70,6 +70,8 @@ set (SRC_LIST
   geometry/spherical_kerr_schild.cpp
   geometry/spherical_minkowski.hpp
   geometry/spherical_minkowski.cpp
+  geometry/sks.hpp
+  geometry/sks.cpp
 
   microphysics/eos_phoebus/eos_phoebus.hpp
   microphysics/eos_phoebus/eos_phoebus.cpp
