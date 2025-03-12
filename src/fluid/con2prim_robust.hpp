@@ -103,7 +103,7 @@ class Residual {
     bounds_.GetFloors(x1_, x2_, x3_, rho, e_floor_);
     e_floor_ *= floor_scale_fac_;
     const Real ehat_trial =
-      What * (qbar - mu * rbarsq) + vhatsq * What * robust::ratio(What, 1.0 + What);
+        What * (qbar - mu * rbarsq) + vhatsq * What * robust::ratio(What, 1.0 + What);
     used_energy_floor_ = false;
     used_energy_max_ = false;
     if (ehat_trial <= e_floor_) {
@@ -326,7 +326,7 @@ class ConToPrim {
 #endif // USE_VALENCIA
     const Real q = robust::ratio(tau, D);
 
-    if (pye > 0) v(pye) = robust::ratio(v(cye),  v(crho));
+    if (pye > 0) v(pye) = robust::ratio(v(cye), v(crho));
     Real ye_local = (pye > 0) ? v(pye) : 0.5;
 
     Real bsq = 0.0;
