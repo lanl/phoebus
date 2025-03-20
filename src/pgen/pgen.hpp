@@ -32,6 +32,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(phoebus)                                                                       \
   PROBLEM(advection)                                                                     \
   PROBLEM(check_cached_geom)                                                             \
+  PROBLEM(cross_beam)                                                                    \
   PROBLEM(shock_tube)                                                                    \
   PROBLEM(friedmann)                                                                     \
   PROBLEM(linear_modes)                                                                  \

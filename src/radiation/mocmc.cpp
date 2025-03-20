@@ -841,7 +841,7 @@ TaskStatus MOCMCEddington(T *rc) {
     
   // load ML model
   torch::Device device = torch::kCUDA;
-  std::string model_path = "/lustre/scratch5/adithan/phoebus/ML_models/sph_harm_32_3.pt";
+  std::string model_path = "/lustre/scratch5/adithan/phoebus/ML_models/sph_harm_norm_32.pth";
   torch::jit::script::Module model = torch::jit::load(model_path);
   model.eval();
   //model.to(device);
@@ -955,6 +955,7 @@ TaskStatus MOCMCEddington(T *rc) {
 
           // get the energy integrated intensity
           Real I[MAX_SPECIES] = {0.0};
+	  Real Imax[MAX_SPECIES] = {0.0};
           for (int nubin = 0; nubin < nu_bins; nubin++) {
             // First order interpolation
             for (int s = 0; s < num_species; s++) {
@@ -962,18 +963,21 @@ TaskStatus MOCMCEddington(T *rc) {
               for (int isup = 0; isup < interp.StencilSize(); isup++) {
                 I[s] += nubin_wgt[isup] * Inuinv(nubin_shift[isup], s, nswarm) *
                         pow(nusamp(nubin), 4);
+		if(I[s] > Imax[s]){
+		  Imax[s] = I[s]; // retaining to normalize intensity grid before feeding into ML model
+		}
 		
               }
 	      
             }
           }
-	  Real Imax = 0.0;
-	  for (int s = 0; s<num_species; s++){
-	    if(I[s] > Imax){
-	      Imax = I[s];
+       
+	  /*for (int s = 0; s<num_species; s++){
+	    if(I[s] > Imax[s]){
+	      Imax[s] = I[s];
 	    }
 	    //printf("I[%d,%d,%d,%d,%d] = %.2f",i,j,k,s,n,I[s]);
-	  }
+	    }*/
 	  //printf("Imax = %.2f", Imax);
             //**********************
 	  //if (do_MLED){
@@ -1008,7 +1012,7 @@ TaskStatus MOCMCEddington(T *rc) {
                             if (dist < min_dist[r][l]) {
                                 min_dist[r][l] = dist;
                                 nearest_value = I[s];
-				data_view(i, j, k, s, r, l) = nearest_value/(2*Imax);
+				data_view(i, j, k, s, r, l) = nearest_value/(Imax[s]); // create view of interpolated grid, which will be dopied oto host
 				//printf(nearest_value);
 
                             }

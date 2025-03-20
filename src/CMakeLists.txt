@@ -89,6 +89,7 @@ set (SRC_LIST
   pgen/blandford_mckee.cpp
   pgen/bondi.cpp
   pgen/check_cached_geom.cpp
+  pgen/cross_beam
   pgen/friedmann.cpp
   pgen/homogeneous_sphere.cpp
   pgen/progenitor.cpp
