@@ -62,7 +62,7 @@ class Residual {
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
-  Real x_mu(const Real mu) { return 1.0 / (1.0 + mu * bsq_); }
+  Real x_mu(const Real mu) { return robust::ratio(1.0, 1.0 + mu * bsq_); }
   KOKKOS_FORCEINLINE_FUNCTION
   Real rbarsq_mu(const Real mu, const Real x) {
     return x * (x * rsq_ + mu * (1.0 + x) * rbsq_);
@@ -99,11 +99,11 @@ class Residual {
   KOKKOS_FORCEINLINE_FUNCTION
   Real ehat_mu(const Real mu, const Real qbar, const Real rbarsq, const Real vhatsq,
                const Real What) {
-    Real rho = rhohat_mu(1.0 / What);
+    Real rho = rhohat_mu(robust::ratio(1.0, What));
     bounds_.GetFloors(x1_, x2_, x3_, rho, e_floor_);
     e_floor_ *= floor_scale_fac_;
     const Real ehat_trial =
-        What * (qbar - mu * rbarsq) + vhatsq * What * What / (1.0 + What);
+        What * (qbar - mu * rbarsq) + vhatsq * What * robust::ratio(What, 1.0 + What);
     used_energy_floor_ = false;
     used_energy_max_ = false;
     if (ehat_trial <= e_floor_) {
@@ -124,13 +124,13 @@ class Residual {
     const Real qbar = qbar_mu(mu, x);
     const Real vhatsq = vhatsq_mu(mu, rbarsq);
     const Real iWhat = iWhat_mu(vhatsq);
-    const Real What = 1.0 / iWhat;
+    const Real What = robust::ratio(1.0, iWhat);
     Real rhohat = rhohat_mu(iWhat);
     Real ehat = ehat_mu(mu, qbar, rbarsq, vhatsq, What);
     const Real Phat = eos_.PressureFromDensityInternalEnergy(rhohat, ehat, lambda_);
     Real hhat = rhohat * (1.0 + ehat) + Phat;
     const Real ahat = Phat / make_positive(hhat - Phat);
-    hhat /= rhohat;
+    hhat /= make_positive(rhohat);
 
     const Real nua = (1.0 + ahat) * (1.0 + ehat) * iWhat;
     const Real nub = (1.0 + ahat) * (1.0 + qbar - mu * rbarsq);
@@ -324,9 +324,9 @@ class ConToPrim {
     SPACETIMELOOP(mu) { tau -= Qcov[mu] * ncon[mu]; }
     tau -= D;
 #endif // USE_VALENCIA
-    const Real q = tau / D;
+    const Real q = robust::ratio(tau, D);
 
-    if (pye > 0) v(pye) = v(cye) / v(crho);
+    if (pye > 0) v(pye) = robust::ratio(v(cye), v(crho));
     Real ye_local = (pye > 0) ? v(pye) : 0.5;
 
     Real bsq = 0.0;
