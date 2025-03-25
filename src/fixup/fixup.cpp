@@ -1001,69 +1001,77 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   if (ndim == 2) return TaskStatus::complete;
 
   // x3-direction
-  if (ix3_bc == "gr_outflow") {
-    PackIndexMap imap;
-    auto v =
-        rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
-                                   std::vector<std::string>({c::density::name()}), imap);
-    const auto crho = imap[c::density::name()].first;
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.s, kb.s, jb.s, jb.e,
-        ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          v.flux(X3DIR, crho, k, j, i) = std::min(v.flux(X3DIR, crho, k, j, i), 0.0);
-        });
-  } else if (ix3_bc == "reflect") {
-    PackIndexMap imap;
-    auto v = rc->PackVariablesAndFluxes(
-        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
-        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
-        imap);
-    const auto crho = imap[c::density::name()].first;
-    const auto cener = imap[c::energy::name()].first;
-    auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.s, kb.s, jb.s, jb.e,
-        ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          v.flux(X3DIR, crho, k, j, i) = 0.0;
-          v.flux(X3DIR, cener, k, j, i) = 0.0;
-          if (idx_E.IsValid()) {
-            for (int ispec = 0; ispec < num_species; ispec++) {
-              v.flux(X3DIR, idx_E(ispec), k, j, i) = 0.;
+  if (pmb->boundary_flag[BoundaryFace::inner_x3] == BoundaryFlag::user) {
+    if (ix3_bc == "gr_outflow") {
+      PackIndexMap imap;
+      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
+                                          std::vector<std::string>({c::density::name()}),
+                                          imap);
+      const auto crho = imap[c::density::name()].first;
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.s, kb.s, jb.s, jb.e,
+          ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            v.flux(X3DIR, crho, k, j, i) = std::min(v.flux(X3DIR, crho, k, j, i), 0.0);
+          });
+    } else if (ix3_bc == "reflect") {
+      PackIndexMap imap;
+      auto v = rc->PackVariablesAndFluxes(
+          std::vector<std::string>(
+              {c::density::name(), c::energy::name(), cr::E::name()}),
+          std::vector<std::string>(
+              {c::density::name(), c::energy::name(), cr::E::name()}),
+          imap);
+      const auto crho = imap[c::density::name()].first;
+      const auto cener = imap[c::energy::name()].first;
+      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.s, kb.s, jb.s, jb.e,
+          ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            v.flux(X3DIR, crho, k, j, i) = 0.0;
+            v.flux(X3DIR, cener, k, j, i) = 0.0;
+            if (idx_E.IsValid()) {
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                v.flux(X3DIR, idx_E(ispec), k, j, i) = 0.;
+              }
             }
-          }
-        });
+          });
+    }
   }
-  if (ox3_bc == "gr_outflow") {
-    PackIndexMap imap;
-    auto v =
-        rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
-                                   std::vector<std::string>({c::density::name()}), imap);
-    const auto crho = imap[c::density::name()].first;
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.e + 1, kb.e + 1, jb.s,
-        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          v.flux(X3DIR, crho, k, j, i) = std::max(v.flux(X3DIR, crho, k, j, i), 0.0);
-        });
-  } else if (ox3_bc == "reflect") {
-    PackIndexMap imap;
-    auto v = rc->PackVariablesAndFluxes(
-        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
-        std::vector<std::string>({c::density::name(), c::energy::name(), cr::E::name()}),
-        imap);
-    const auto crho = imap[c::density::name()].first;
-    const auto cener = imap[c::energy::name()].first;
-    auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.e + 1, kb.e + 1, jb.s,
-        jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          v.flux(X3DIR, crho, k, j, i) = 0.0;
-          v.flux(X3DIR, cener, k, j, i) = 0.0;
-          if (idx_E.IsValid()) {
-            for (int ispec = 0; ispec < num_species; ispec++) {
-              v.flux(X3DIR, idx_E(ispec), k, j, i) = 0.;
+  if (pmb->boundary_flag[BoundaryFace::outer_x3] == BoundaryFlag::user) {
+    if (ox3_bc == "gr_outflow") {
+      PackIndexMap imap;
+      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
+                                          std::vector<std::string>({c::density::name()}),
+                                          imap);
+      const auto crho = imap[c::density::name()].first;
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.e + 1, kb.e + 1, jb.s,
+          jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            v.flux(X3DIR, crho, k, j, i) = std::max(v.flux(X3DIR, crho, k, j, i), 0.0);
+          });
+    } else if (ox3_bc == "reflect") {
+      PackIndexMap imap;
+      auto v = rc->PackVariablesAndFluxes(
+          std::vector<std::string>(
+              {c::density::name(), c::energy::name(), cr::E::name()}),
+          std::vector<std::string>(
+              {c::density::name(), c::energy::name(), cr::E::name()}),
+          imap);
+      const auto crho = imap[c::density::name()].first;
+      const auto cener = imap[c::energy::name()].first;
+      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.e + 1, kb.e + 1, jb.s,
+          jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            v.flux(X3DIR, crho, k, j, i) = 0.0;
+            v.flux(X3DIR, cener, k, j, i) = 0.0;
+            if (idx_E.IsValid()) {
+              for (int ispec = 0; ispec < num_species; ispec++) {
+                v.flux(X3DIR, idx_E(ispec), k, j, i) = 0.;
+              }
             }
-          }
-        });
+          });
+    }
   }
 
   return TaskStatus::complete;
