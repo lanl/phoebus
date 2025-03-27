@@ -156,7 +156,7 @@ make -j
 ```
 ## Build on Polaris
 
-Create a modules.sh script with the following
+Before building on Polaris, you will need to load the appropriate modules.  As of 3/27/2025, the following recipe seems to work.  Create a modules.sh script with the following
 ```
 #!/bin/bash
 
@@ -227,6 +227,24 @@ environment variable. For example:
 ```bash
 CFM=clang-format-12 ./scripts/bash/format.sh
 ```
+
+# Python
+
+## Python on Polaris
+
+To run python scripts on polairs, you will need to laod specific python modules.  Here are the contents of a script for loading the python relevant modules.
+
+```
+#!/bin/bash
+
+module use /soft/modulefiles; module load conda ; conda activate base
+module load spack-pe-base/0.8.1; module load ffmpeg/6.1.1
+#module load ffmpeg
+export PYTHONPATH="/home/[username]/phoebus/scripts/python"
+```
+You may load these modules with the command
+
+```. module_python.sh```
 
 # Contribute
 We are always happy to have users contribute to `phoebus`.
