@@ -11,12 +11,12 @@
 # publicly and display publicly, and to permit others to do so.
 
 <phoebus>
-problem = radiation_equilibration
+problem = cross_beam
 bc_ix1 = outflow
 bc_ox1 = outflow
 
 <parthenon/job>
-problem_id  = rad_eql   # problem ID: basename of output filenames
+problem_id  = rad_cross   # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = p.density, &
@@ -27,7 +27,7 @@ variables = p.density, &
             p.energy, &
             c.energy
 
-file_type   = bin      # Tabular data dump
+file_type   = hdf5      # Tabular data dump
 dt          = 1.e-1     # time increment between outputs
 
 <parthenon/time>
@@ -96,12 +96,12 @@ Ye = true
 
 <radiation>
 cfl = 0.8
-method = mocmc
+method = moment_m1  #moment_m1 #mocmc    #moment_eddington
 nsamp_per_zone = 32
 nu_min = 1.e-2
 nu_max = 1.e2
 nu_bins = 10
-absorption = true
+absorption = false
 do_nu_electron = true
 do_nu_electron_anti = false
 do_nu_heavy = false
@@ -109,8 +109,9 @@ do_MLED = false
 
 <opacity>
 type = gray
-gray_kappa = 0.2
+gray_kappa = 0.0
 
 <cross_beam>
-J = 0.2
+J_1 = 1.0  #intensity amplitude of beam1
+J_2 = 1.0  # "" of beam 2
 

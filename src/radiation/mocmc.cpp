@@ -841,7 +841,7 @@ TaskStatus MOCMCEddington(T *rc) {
     
   // load ML model
   torch::Device device = torch::kCUDA;
-  std::string model_path = "/lustre/scratch5/adithan/phoebus/ML_models/sph_harm_norm_32.pth";
+  std::string model_path = "/lustre/scratch5/adithan/phoebus/ML_models/sph_harm_norm_32.pt";
   torch::jit::script::Module model = torch::jit::load(model_path);
   model.eval();
   //model.to(device);

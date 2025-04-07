@@ -15,12 +15,13 @@
 #include <string>
 
 #include "pgen/pgen.hpp"
-#include "radiation/radiation.hpp"
+//#include "radiation/radiation.hpp"
+#include "phoebus_utils/programming_utils.hpp"
 
 namespace cross_beam {
 
-using Microphysics::RadiationType;
-using radiation::species;
+  //using Microphysics::RadiationType;
+  //using radiation::species;
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
@@ -53,14 +54,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto idv = imap.GetFlatIdx(fluid_prim::velocity::name());
 
   const auto specB = idJ.GetBounds(1);
-  const Real J = pin->GetOrAddReal("cross_beam", "J", 0.0);
+  const Real J_1 = pin->GetOrAddReal("cross_beam", "J_1", 1.0);
+  const Real J_2 = pin->GetOrAddReal("cross_beam", "J_2", 1.0);
   const Real width = pin->GetOrAddReal("cross_beam", "width", sqrt(2.0));
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
   IndexRange kb = pmb->cellbounds.GetBoundsK(IndexDomain::entire);
 
-  auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
+   auto eos = pmb->packages.Get("eos")->Param<Microphysics::EOS::EOS>("d.EOS");
   /*const auto opac =
       pmb->packages.Get("opacity")->template Param<Microphysics::Opacities>("opacities");*/
 
@@ -108,18 +110,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(pye, k, j, i) = Ye0;
         SPACELOOP(ii) v(idv(ii), k, j, i) = 0.0;
         
-          // setup energy density for gaussian cross beams
-        Real J1 = J * std::max(exp(-std::pow(y-x, 2)/(2*width*width)),1.e-10);
-        Real J2 = J * std::max(exp(-std::pow(y - (xmax-x) , 2)/(2*width*width)),1.e-10);
+          // setup energy density for gaussian cross beams (beams at 45 degrees)
+        Real J1 = J_1 * std::max(exp(-std::pow(x-y, 2)/(2*width*width)),1.0e-10);
+        Real J2 = J_2 * std::max(exp(-std::pow(y - (xmax-x) , 2)/(2*width*width)),1.0e-10);
+	
           
-          
-
+	//printf("spec_s=%d, spec_e=%d", specB.s,specB.e);
         for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
+	  //printf("%i", ispec);
             v(idJ(ispec), k, j, i) = J1 + J2;
             v(idH(ispec, 0), k, j, i) = (J1 + J2)/(sqrt(2.0));
             v(idH(ispec, 1), k, j, i) = (J1 - J2)/(sqrt(2.0));
             v(idH(ispec, 2), k, j, i) = 0.0; //2D cross beams for now
-
+	    //printf("[%.3f] (%.3f)\n", v(idJ(ispec), k, j, i), v(idH(ispec, 1), k, j, i));
         }
       });
 
