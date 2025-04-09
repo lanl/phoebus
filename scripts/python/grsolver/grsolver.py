@@ -27,7 +27,7 @@ c = const.c.cgs.value
 class GR_Solver:
     def __init__(self, prob, R, Ni, loc, filename, eosfilename):
         self.problem = prob
-        self.R = R
+        self.R = R[R > 0]
         self.Ni = Ni
         self.loc = loc
         self.filename = filename
@@ -47,6 +47,18 @@ class GR_Solver:
             temp = np.load(self.loc + "/temp.npy")
             ye = np.load(self.loc + "/ye.npy")
 
+            if (self.problem=='GR1D' or 'Phoebus_CCSN_1D'):
+                loc='output_snapshot/'
+                r_data=np.load(loc+'r.npy')
+                v=np.load(loc+'v.npy')
+                v_ang=np.load(loc+'v_ang.npy')
+                rho_m=np.load(loc+'rho_m.npy')
+                rho=np.load(loc+'rho.npy')
+                p=np.load(loc+'p.npy')
+                eps=np.load(loc+'eps.npy')
+                temp=np.load(loc+'temp.npy')
+                ye=np.load(loc+'ye.npy')
+            
         if self.problem == "tov":
             r_data = np.load("TOV_DATA/tov_r.npy") * 1.0e2
             v = np.zeros(len(r_data))
@@ -157,7 +169,7 @@ class GR_Solver:
                 rad
             ) * c ** 2.0 + (self.alpha2_int(rad) * gamma2 + 2.0) * self.p_int(rad)
 
-        if (self.problem == "stellartable") or (self.problem == "homologouscollapse"):
+        if (self.problem == "stellartable") or (self.problem == "homologouscollapse") or (self.problem == "GR1D") or (self.problem == "Phoebus1D"):
             alpha2, a2 = self.CalculateMetricForNewtonian(rad)
             rho_adm = alpha2 * self.rho_int(rad) * gamma2
             P_adm = (
@@ -420,7 +432,7 @@ def main():
         r = np.linspace(0.00001, 2500, 1000) * 1.0e2
     if args.problem == "stellartable":
         r = np.linspace(45, 10000, 1000) * 1.0e5
-    if args.problem == "homologouscollapse":
+    if args.problem == "homologouscollapse" or args.problem == "GR1D" or args.problem == "Phoebus1D":
         r = np.load(args.loc + "/r.npy")
 
     Ni = 100
