@@ -20,6 +20,8 @@
 problem = tov
 ix1_bc = reflect
 ox1_bc = outflow
+ix2_bc = reflect
+ox2_bc = reflect
 
 <parthenon/job>
 problem_id  = tov # problem ID: basename of output filenames
@@ -32,6 +34,7 @@ variables = p.density,  &
             p.energy,   &
             c.energy,   &
 	    pressure,	&
+	    temperature, &
       	    cs, &
       	    p.ye, &
       	    g.c.coord, &
@@ -68,8 +71,8 @@ ox1_bc      = user        # Outer-X1 boundary condition flag
 nx2         = 1             # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
 x2max       = 3.14159265359 # maximum value of X2. Pi
-ix2_bc      = reflecting    # Inner-X2 boundary condition flag
-ox2_bc      = reflecting    # Outer-X2 boundary condition flag
+ix2_bc      = user    # Inner-X2 boundary condition flag
+ox2_bc      = user    # Outer-X2 boundary condition flag
 
 nx3         = 1             # Number of zones in X3-direction
 x3min       = 0             # minimum value of X3
@@ -91,14 +94,14 @@ max_level = 3
 
 <eos>
 type = IdealGas
-Gamma = 2
+Gamma = 2.0
 Cv = 1.0
 
 <physics>
 hydro = true
 he = false
 3t = false
-rad = false
+rad = true
 tracers = false
 
 <fluid>
@@ -113,12 +116,12 @@ Ye = false
 enable_floors = true
 enable_ceilings = true
 enable_flux_fixup = true
-enable_c2p_fixup = true
-floor_type = X1RhoSie
+enable_c2p_fixup = false
+floor_type = ConstantRhoSie
 rho0_floor = 1.0e-8
 sie0_floor = 1.0e-3
-rho_exp_floor = -2.0
-sie_exp_floor = -1.0
+#rho_exp_floor = -2.0
+#sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
 sie0_ceiling = 10.0;
 gam0_ceiling = 10.0;
@@ -146,3 +149,22 @@ epsmin = 1e-10
 vpert_amp = 0
 vpert_radius = 5
 vpert_sigma = 1
+
+
+
+<radiation>
+cfl = 0.5
+recon = weno5
+method = moment_eddington
+absorption = false
+do_nu_electron = true
+do_nu_electron_anti = false
+do_nu_heavy = false
+src_solver = oned # fourd
+src_use_oned_backup = false # true
+src_rootfind_eps = 1.e-6
+src_rootfind_tol = 1.e-8
+src_rootfind_maxiter = 100
+oned_fixup_strategy = ignore_dJ
+recon_fixup_strategy = bounds
+closure_c2p_strategy = robust

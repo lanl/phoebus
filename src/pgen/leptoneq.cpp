@@ -55,7 +55,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &unit_conv =
       pmb->packages.Get("phoebus")->Param<phoebus::UnitConversions>("unit_conv");
 
-  const Real rho0 = 1.e10 * unit_conv.GetMassDensityCGSToCode();
+  const Real rho0 = 1.e9 * unit_conv.GetMassDensityCGSToCode();
   const Real T0 = 2.5 * 1.e6 * pc::eV / pc::kb * unit_conv.GetTemperatureCGSToCode();
 
   pmb->par_for(
@@ -71,7 +71,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         } else if (x >= 0.25 && x <= 0.75 && y >= 0.25 && y <= 0.75) {
           v(iye, k, j, i) = 0.35;
         } else {
-          v(iye, k, j, i) = 0.225;
+          v(iye, k, j, i) = 0.1;
         }
 
         double lambda[2] = {v(iye, k, j, i), 0.};

@@ -128,7 +128,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   auto state_h = params.Get<TOV::State_host_t>("tov_state_h");
   auto intrinsic_h = params.Get<TOV::State_host_t>("tov_intrinsic_h");
 
-  // Currently only works with ideal gas.
+  // Currently only works with ideal gas. (MG): Not anymore.
   using Microphysics::EOS::EOS;
   auto pc = params.Get<Real>("pc");
   auto s = params.Get<Real>("entropy");
@@ -137,46 +137,17 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   auto eos = eospkg->Param<EOS>("d.EOS");
   auto eos_h = eospkg->Param<EOS>("h.EOS");
   const int nsamps = pin->GetOrAddReal("eos", "nsamps_adiabat", 1);
-  //  auto unit_conv = phoebus::UnitConversions(pin);
-  
-  //const Real density_conversion_factor = unit_conv.GetMassDensityCodeToCGS();
-  
   
   Real Gamma;
   Real K;
 
-
-  /*  Real Ye;
-  using DataBox = Spiner::DataBox<Real>;
-  DataBox rho_h(nsamps);
-  DataBox temp_h(nsamps);
-  */
   const Real dr = radius.dx();
   if (eos_type == "IdealGas"){
     auto gm1 = eospkg->Param<Real>("gm1");
     Gamma = gm1 + 1;
     K = PolytropeK(s, Gamma);
   } 
-  /*else if (eos_type == "StellarCollapse"){
-    std::cout<<"entering in stellarcollapse"<<std::endl;
-    
-    Ye = 0.5;
-    const Real rho_min = eospkg->Param<Real>("rho_min");
-    const Real rho_max = eospkg->Param<Real>("rho_max");
-    const Real lrho_min = std::log10(rho_min);
-    const Real lrho_max = std::log10(rho_max);
-    const Real T_min = eospkg->Param<Real>("T_min");
-    const Real T_max = eospkg->Param<Real>("T_max");
-    Real lrho_min_adiabat, lrho_max_adiabat;
-    Adiabats::GetRhoBounds(eos_h, rho_min, rho_max, T_min, T_max, Ye, s, lrho_min_adiabat,
-                           lrho_max_adiabat);
-    Adiabats::SampleRho(rho_h, lrho_min_adiabat, lrho_max_adiabat, nsamps);
-    Adiabats::ComputeAdiabats(rho_h, temp_h, eos_h, Ye, s, T_min, T_max, nsamps);
-  }
-  
-  auto rho_d = rho_h.getOnDevice();
-  auto temp_d = temp_h.getOnDevice();
-  */
+
   state_h(TOV::M, 0) = 0;
   state_h(TOV::P, 0) = pc;
   state_h(TOV::PHI, 0) = std::log(alpha_h(0));
@@ -229,7 +200,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
 	PolytropeThermoFromP(press, K, Gamma, rho, eps);
       }
       else if (eos_type == "StellarCollapse"){
-	AdiabatThermoFromP(press, s, nsamps, pin, eospkg, rho, eps);
+	PNSThermoFromP(press, s, nsamps, pin, eospkg, rho, eps);
       }
     }
     intrinsic_h(TOV::RHO0, i) = rho;

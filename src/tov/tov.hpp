@@ -21,6 +21,7 @@
 #include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
 #include "phoebus_utils/adiabats.hpp"
+#include "radiation/light_bulb_constants.hpp"
 
 namespace TOV {
 constexpr int NTOV = 3;
@@ -85,7 +86,8 @@ void TovRHS(Real r, const Real in[NTOV], const Real K, const Real Gamma, const R
   out[TOV::PHI] = GetPhiRHS(r, rho_adm, m, P);
 }
 
-
+//MG: Maybe it is useful to have this for constructing PNS profile after deleptonization.
+  
 KOKKOS_INLINE_FUNCTION
 void AdiabatThermoFromP(const Real P, Real s, Real nsamps, ParameterInput *pin, StateDescriptor *eospkg, Real &rho, Real &eps){
   using Microphysics::EOS::EOS;
@@ -114,8 +116,9 @@ void AdiabatThermoFromP(const Real P, Real s, Real nsamps, ParameterInput *pin, 
   const Real rho_max_adiabat = std::pow(10.0, lrho_max_adiabat);
   auto unit_conv = phoebus::UnitConversions(pin);
   auto target = [&](const Real rho) {
-      return eos_h.PressureFromDensityTemperature(rho, temp_h(std::log10(rho)), lambda) - P;
-    }; 
+    return eos_h.PressureFromDensityTemperature(rho, temp_h(std::log10(rho)), lambda) - P;
+
+  }; 
 
   const Real guess0 = (rho_max_adiabat-rho_min_adiabat)/2.0;
   const Real epsilon = std::numeric_limits<Real>::epsilon();
@@ -128,6 +131,114 @@ void AdiabatThermoFromP(const Real P, Real s, Real nsamps, ParameterInput *pin, 
   eps = eos_h.InternalEnergyFromDensityTemperature(rho, temp_root, lambda);  
 }
   
+
+
+KOKKOS_INLINE_FUNCTION
+void PNSThermoFromP(const Real P, Real s, Real nsamps, ParameterInput *pin, StateDescriptor *eospkg, Real &rho, Real &eps){
+  using Microphysics::EOS::EOS;
+  auto eos_h = eospkg->Param<EOS>("h.EOS");
+  Real lambda[2];
+
+    
+  auto unit_conv = phoebus::UnitConversions(pin);
+  auto temp = [&](const Real rho){
+     constexpr Real bh0 = LightBulb::Liebendorfer::BH0;
+     constexpr Real bh1 = LightBulb::Liebendorfer::BH1;
+     constexpr Real bl0 = LightBulb::Liebendorfer::BL0;
+     constexpr Real bl1 = LightBulb::Liebendorfer::BL1;
+     constexpr Real bl2 = LightBulb::Liebendorfer::BL2;
+     constexpr Real bl3 = LightBulb::Liebendorfer::BL3;
+     constexpr Real bl4 = LightBulb::Liebendorfer::BL4;
+     constexpr Real bl5 = LightBulb::Liebendorfer::BL5;
+     constexpr Real bl6 = LightBulb::Liebendorfer::BL6;
+     constexpr Real bl7 = LightBulb::Liebendorfer::BL7;
+
+     constexpr Real logrho_Tmax = LightBulb::Liebendorfer::LOGRHO_TMAX;
+     const Real lRho = std::log10(rho);
+     const Real lRho2 = lRho * lRho;
+     const Real lRho3 = lRho2 * lRho;
+     const Real lRho4 = lRho2 * lRho2;
+     const Real lRho5 = lRho4 * lRho;
+     const Real lRho6 = lRho3 * lRho3;
+     const Real lRho7 = lRho4 * lRho3;
+
+     if (lRho > logrho_Tmax){
+       return bh0 + bh1 * lRho;
+     }
+     else{
+       return bl0 + bl1 * lRho + bl2* lRho2 + bl3 * lRho3 + bl4 * lRho4 + bl5 * lRho5 + bl6 * lRho6 + bl7 * lRho7;
+     }
+  };
+
+  auto ye = [&](const Real rho){
+     constexpr Real c0 = LightBulb::Liebendorfer::C0;
+     constexpr Real c1 = LightBulb::Liebendorfer::C1;
+     constexpr Real c2 = LightBulb::Liebendorfer::C2;
+     constexpr Real c3 = LightBulb::Liebendorfer::C3;
+     constexpr Real c4 = LightBulb::Liebendorfer::C4;
+     /*     constexpr Real c5 = LightBulb::Liebendorfer::C5;
+     constexpr Real c6 = LightBulb::Liebendorfer::C6;
+     constexpr Real c7 = LightBulb::Liebendorfer::C7;
+     constexpr Real c8 = LightBulb::Liebendorfer::C8;
+     constexpr Real c9 = LightBulb::Liebendorfer::C9;
+     constexpr Real c10 = LightBulb::Liebendorfer::C10;
+     constexpr Real c11 = LightBulb::Liebendorfer::C11;
+     constexpr Real c12 = LightBulb::Liebendorfer::C12;
+     constexpr Real c13 = LightBulb::Liebendorfer::C13;
+     constexpr Real c14 = LightBulb::Liebendorfer::C14;
+     */
+     const Real lRho = std::log10(rho);
+     const Real lRho2 = lRho * lRho;
+     const Real lRho3 = lRho2 * lRho;
+     const Real lRho4 = lRho2 * lRho2;
+       
+     return c0 + c1 * lRho + c2 * lRho2 + c3 * lRho3 + c4 * lRho4;
+ 
+  };
+ 
+  const Real density_conv_factor = unit_conv.GetMassDensityCodeToCGS();
+  const Real density_inv_conv_factor = unit_conv.GetMassDensityCGSToCode();
+  
+  auto target = [&](const Real rho) {
+    const Real rho_cgs = rho * density_conv_factor;
+    Real temperature;
+
+    if (rho * density_conv_factor < pow(10,10)){
+      lambda[0] = 0.5;
+      temperature=rho_cgs/pow(10,10)*0.2e11;
+    }else{
+      lambda[0] = ye(rho_cgs);
+      temperature = temp(rho_cgs);
+    }
+    Real Pcalc = eos_h.PressureFromDensityTemperature(rho, temperature * unit_conv.GetTemperatureCGSToCode(), lambda);
+    if (std::abs(Pcalc-P)/P>1e-3){
+      return Pcalc - P;
+    }else{
+      return 0.0;
+    }
+  }; 
+
+  const Real rho_min = pow(10,9) * density_inv_conv_factor;
+  const Real rho_max = 6 * pow(10,14) * density_inv_conv_factor;
+
+  const Real guess0 = (rho_max-rho_min)/2.0;
+  const Real epsilon = std::numeric_limits<Real>::epsilon();
+  const Real guess = guess0;
+  Real rho_adm;
+  Real T;
+  root_find::RootFind root_find;
+  rho = root_find.regula_falsi(target, rho_min, rho_max, epsilon * 10 * guess, guess);
+  if (rho < rho_min){
+    lambda[0] = 0.5;
+    T = 1e6;
+  }else{
+    lambda[0] = ye(rho*density_conv_factor);
+    T = temp(rho*density_conv_factor);
+  }
+  eps = eos_h.InternalEnergyFromDensityTemperature(rho, T*unit_conv.GetTemperatureCGSToCode(), lambda);  
+}
+  
+
   
 KOKKOS_INLINE_FUNCTION
 void TovRHS_StellarCollapse(Real r, const Real in[NTOV], const Real Pmin,
@@ -138,7 +249,7 @@ void TovRHS_StellarCollapse(Real r, const Real in[NTOV], const Real Pmin,
   if (P < Pmin) P = 0;
   Real rho, eps, rho_adm;
   if (P > Pmin){
-    AdiabatThermoFromP(P, s, nsamps, pin, eospkg, rho, eps);
+    PNSThermoFromP(P, s, nsamps, pin, eospkg, rho, eps);
     rho_adm = rho * (1 + eps);
   }
   else{

@@ -14,10 +14,10 @@
 
 <phoebus>
 problem = tov
-#ix1_bc = reflect
-#ox1_bc = outflow
-#ix2_bc = reflect
-#ox2_bc = reflect
+ix1_bc = reflect
+ox1_bc = outflow
+ix2_bc = reflect
+ox2_bc = reflect
 
 <parthenon/job>
 problem_id  = tov # problem ID: basename of output filenames
@@ -63,18 +63,17 @@ nghost = 4
 #refinement = adaptive
 #numlevel = 4
 
-#nx1         = 10000        # Number of zones in X1-direction
-nx1         = 1000
+nx1         = 20800        # Number of zones in X1-direction
 x1min       = 0           # minimum value of X1
 x1max       = 5000         # maximum value of X1
-ix1_bc      = periodic        # Inner-X1 boundary condition flag
-ox1_bc      = periodic        # Outer-X1 boundary condition flag
+ix1_bc      = user        # Inner-X1 boundary condition flag
+ox1_bc      = user        # Outer-X1 boundary condition flag
 
 nx2         = 1             # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
 x2max       = 3.14159265359 # maximum value of X2. Pi
-ix2_bc      = periodic          # Inner-X2 boundary condition flag
-ox2_bc      = periodic          # Outer-X2 boundary condition flag
+ix2_bc      = user          # Inner-X2 boundary condition flag
+ox2_bc      = user          # Outer-X2 boundary condition flag
 
 nx3         = 1             # Number of zones in X3-direction
 x3min       = 0             # minimum value of X3
@@ -85,7 +84,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 10
+nx1 = 20800
 nx2 = 1
 nx3 = 1
 
@@ -101,13 +100,16 @@ max_level = 4
 type = StellarCollapse
 filename = /home/mari/Work/Phoebus/phoebus/Tests/LightBulb/testentropy/SFHo.sp5
 use_sp5 = true
+nsamps_adiabat = 1080
+T_min=166.053945865
+T_max=3.1640913e+15
 
 
 <physics>
 hydro = true
 he = false
 3t = false
-rad = true
+rad = false
 tracers = false
 
 <fluid>
@@ -118,53 +120,14 @@ recon = weno5
 c2p_max_iter = 1000
 Ye = true
 
-<radiation>
-method = monte_carlo
-nu_min = 8.8e19
-nu_max = 2.37.e23
-nu_bins = 61
-#tune_emission = 1.e-11
-num_particles = 100
-opacity_model = tabular
-absorption = true
-rng_seed = 2783
-do_nu_electron = true
-do_nu_electron_anti = true
-do_nu_heavy = true
-
-
-<opacity>
-type=tabular
-filename=/home/mari/Work/Phoebus/phoebus/Tests/PNS_cooling/TOV/nulib_test.sp5
-#filename=/home/mari/Work/Phoebus/phoebus/Tests/LightBulb/testentropy/SFHo.sp5
-
-
-<mean_opacity>
-lrhomin=6.0
-lrhomax=15.5
-nrho=58
-numin=8.8053927e+19
-numax=2.2355633367422704e23
-nnu=61
-ltmin=8.76359737304
-ltmax=12.2407186278
-nt=62
-yemin=0.035
-yemax=0.55
-nye=30
-
-<monte_carlo>
-remove_emitted_particles = true
-
-
 <fixup>
 enable_floors = true
 enable_ceilings = true
 enable_flux_fixup = false
 enable_c2p_fixup = false
 floor_type = ConstantRhoSie
-rho0_floor = 1.0e-16
-sie0_floor = 1.0e-16
+rho0_floor = 1.0e-12
+sie0_floor = 1.0e-12
 #rho_exp_floor = -2.0
 #sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
@@ -173,7 +136,7 @@ gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
-npoints = 1000
+npoints = 20800
 rout = 5000
 # Disables time derivatives. Runs only at initialization
 force_static = false
@@ -191,10 +154,10 @@ dtwarn_eps = 1e-5
 
 <tov>
 enabled = true
-Pc = 8e-5
-entropy = 8
+Pc = 1.8e-4
+entropy = 30
 # pressure below which we terminate the TOV solver and transition to atmosphere
-Pmin = 1e-12
+Pmin = 1e-24
 # The atmosphere values in the problem generator for density and energy
 rhomin = 1e-12
 epsmin = 1e-12

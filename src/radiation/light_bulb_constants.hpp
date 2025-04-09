@@ -25,6 +25,31 @@ constexpr Real A5 = -1.226365543366e-02;
 constexpr Real A6 = 1.983947360151e-04;
 constexpr Real LRHOMIN = 8.;
 constexpr Real LRHOMAX = 13.;
+
+  
+// 14th order polynomial fit for T(rho); Useful to construct PNS.
+// piecewise fit: high-density
+constexpr Real BH0 = 1.05507273308e13;
+constexpr Real BH1 = -6.99255736359e11;
+
+//pievewise fit: low-density
+constexpr Real BL0 = 2.66396927e9;
+constexpr Real BL1 = 3.59155951e10; 
+constexpr Real BL2 = 4.21460709e9; 
+constexpr Real BL3 = -3.30158741e9;
+constexpr Real BL4 = 2.10721665e7;
+constexpr Real BL5 = 9.24399769e7; 
+constexpr Real BL6 = -9.99999997e6;
+constexpr Real BL7 = 3.10736981e5;
+
+constexpr Real LOGRHO_TMAX = 14.437384726278943;
+// 4th order polynomial fit for Ye(rho); Constructs PNS at t=1s after bounce. 
+constexpr Real C0 = -10.67;
+constexpr Real C1 = 4.158;
+constexpr Real C2 = -0.5399;
+constexpr Real C3 = 0.02862;
+constexpr Real C4 = -0.0005247; 
+
 } // namespace Liebendorfer
 
 namespace HeatAndCool {

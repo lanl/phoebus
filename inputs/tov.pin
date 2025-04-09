@@ -30,6 +30,7 @@ variables = p.density,  &
             p.energy,   &
             c.energy,   &
 	    pressure,	&
+	    temperature, &
       	    cs, &
       	    p.ye, &
       	    g.c.coord, &
@@ -58,8 +59,8 @@ dt_init_fact = 1.e-6
 
 <parthenon/mesh>
 nghost = 4
-#refinement = adaptive
-#numlevel = 3
+refinement = adaptive
+numlevel = 3
 
 nx1         = 1024        # Number of zones in X1-direction
 x1min       = 0           # minimum value of X1
