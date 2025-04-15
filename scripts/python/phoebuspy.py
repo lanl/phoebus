@@ -10,9 +10,11 @@ class Dump1D:
         with h5py.File(filename, "r") as f:
             #print(f.keys())
             #print(f["Info"].attrs.keys())
+            #exit()
             self.nx,self.ny,self.nz = f["Info"].attrs["MeshBlockSize"]
             self.NumMB = f["Info"].attrs["NumMeshBlocks"]
             #print(f["Params"].attrs.keys())
+            #exit()
             #print(np.shape(f["Params"].attrs["monopole_gr/shift"]))
             self.varkeys = list(f.keys())[8:]
             #print(f["Locations"].keys())
@@ -33,6 +35,8 @@ class Dump1D:
                 self.var['monopole_gr/lapse_h'] = f["Params"].attrs['monopole_gr/lapse_h']
                 self.var['monopole_gr/hypersurface_h']=f["Params"].attrs["monopole_gr/hypersurface_h"]
                 self.var['monopole_gr/shift']=f["Params"].attrs["monopole_gr/shift"]
+                #print(np.shape(f["Params"].attrs['monopole_gr/matter_h']))
+                self.var['monopole_gr/rhoadm'] = f["Params"].attrs['monopole_gr/matter_h'][0,:]
                 nxgr = np.size(self.var['monopole_gr/lapse_h'])
                 rout = f["Params"].attrs['monopole_gr/rout']
                 rin = f["Params"].attrs['monopole_gr/rin']

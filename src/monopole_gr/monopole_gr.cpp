@@ -300,7 +300,7 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   Real dr = radius.dx();
 
   Real state[NHYPER];
-  Real k1[NHYPER];
+  /*Real k1[NHYPER];
   Real src[NMAT_H];
   Real src_k[NMAT_H];
   Real rhs[NHYPER];
@@ -332,7 +332,55 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
     for (int v = 0; v < NHYPER; ++v) {
       hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr * rhs_k[v];
     }
+  }*/
+  
+  Real k1[NHYPER];
+  Real src[NMAT_H];
+  Real src_k[NMAT_H];
+  Real rhs[NHYPER];
+  Real rhs_2[NHYPER];
+  Real rhs_3[NHYPER];
+  Real rhs_4[NHYPER];
+
+  hypersurface_h(iA, 0) = 1.0;
+  hypersurface_h(iK, 0) = 0.0;
+  for (int i = 0; i < npoints - 1; ++i) {
+    Real r = radius.x(i);
+#pragma omp simd
+    for (int v = 0; v < NHYPER; ++v) {
+      state[v] = hypersurface_h(v, i);
+    }
+#pragma omp simd
+    for (int v = 0; v < NMAT_H; ++v) {
+      src[v] = matter_h(v, i);
+    }
+    HypersurfaceRHS(r, state, src, rhs);
+#pragma omp simd
+    for (int v = 0; v < NHYPER; ++v) {
+      k1[v] = state[v] + 0.5 * dr * rhs[v];
+    }
+#pragma omp simd
+    for (int v = 0; v < NMAT_H; ++v) {
+      src_k[v] = 0.5 * (matter_h(v, i) + matter_h(v, i + 1));
+    }
+    HypersurfaceRHS(r, k1, src_k, rhs_2);
+#pragma omp simd
+    for (int v = 0; v < NHYPER; ++v) {
+      k1[v] = state[v] + 0.5 * dr * rhs_2[v];
+    }
+    HypersurfaceRHS(r, k1, src_k, rhs_3);
+#pragma omp simd
+    for (int v = 0; v < NHYPER; ++v) {
+      k1[v] = state[v] + dr * rhs_3[v];
+    }
+    HypersurfaceRHS(r, k1, src_k, rhs_4);
+#pragma omp simd
+    for (int v = 0; v < NHYPER; ++v) {
+      hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr *
+	(rhs[v] + 2.0*(rhs_2[v] + rhs_3[v]) + rhs_4[v])/6.0;
+    }
   }
+  
   for (int v = 0; v < NHYPER; ++v) {
     if (std::isnan(hypersurface_h(v, npoints - 1))) {
       if (parthenon::Globals::my_rank == 0) {
