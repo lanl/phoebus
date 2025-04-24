@@ -1105,7 +1105,7 @@ void UserWorkBeforeOutput(MeshBlock *pmb, ParameterInput *pin,
             v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda);
         const Real sie = eos.InternalEnergyFromDensityTemperature(
             v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda);
-	v(0, p::sie(), k, j, i) = sie;
+        v(0, p::sie(), k, j, i) = sie;
         const Real h = sie + p / v(0, p::density(), k, j, i) + 1;
         const Real cs = std::sqrt(bmod / v(0, p::density(), k, j, i) / h);
         Real divv;
