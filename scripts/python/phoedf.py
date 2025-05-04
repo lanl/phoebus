@@ -1,4 +1,4 @@
-# © 2022. Triad National Security, LLC. All rights reserved.  This
+# © 2022-2023. Triad National Security, LLC. All rights reserved.  This
 # program was produced under U.S. Government contract
 # 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 # is operated by Triad National Security, LLC for the U.S.  Department
@@ -18,19 +18,21 @@ sys.path.insert(
     "../../external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/",
 )
 import phdf
-
 # from parthenon_tools import phdf
-
 from phoebus_constants import *
 from phoebus_eos import *
 from phoebus_opacities import *
 
-
 # ---------------------------------------------------------------------------- #
 # Phoebus-specific derived class from Parthenon's phdf datafile reader
+#
+# geomfile : optional geometry file to read many files more efficiently
+# clip     : Whether to restrict output variables to the range [-1e100, 1e100]
 class phoedf(phdf.phdf):
-    def __init__(self, filename, geomfile=None):
+    def __init__(self, filename, geomfile=None, clip=True):
         super().__init__(filename)
+
+        self.clip = clip
 
         try:
             self.eos_type = self.Params["eos/type"].decode()
@@ -53,6 +55,18 @@ class phoedf(phdf.phdf):
         self.Nx2 = self.MeshBlockSize[1]
         self.Nx3 = self.MeshBlockSize[2]
 
+        self.Dx1 = np.zeros([self.NumBlocks])
+        self.Dx2 = np.zeros([self.NumBlocks])
+        self.Dx3 = np.zeros([self.NumBlocks])
+        for b in range(self.NumBlocks):
+            bounds = self.BlockBounds[b]
+            self.Dx1[b] = (bounds[1] - bounds[0])/self.MeshBlockSize[0]
+            self.Dx2[b] = (bounds[3] - bounds[2])/self.MeshBlockSize[1]
+            self.Dx3[b] = (bounds[5] - bounds[4])/self.MeshBlockSize[2]
+
+        assert self.MaxLevel == 0, "phoedf and its derivatives do not currently support mesh refinement!"
+
+        # Common array dimensions
         self.ScalarField = [self.NumBlocks, self.Nx3, self.Nx2, self.Nx1]
         self.ThreeVectorField = [self.NumBlocks, 3, self.Nx3, self.Nx2, self.Nx1]
         self.FourVectorField = [self.NumBlocks, 4, self.Nx3, self.Nx2, self.Nx1]
@@ -106,6 +120,8 @@ class phoedf(phdf.phdf):
         else:
             kstart = None
             kend = None
+        kstart = None
+        kend = None
 
         # Unroll gcov for convenience
         for mu in range(4):
@@ -159,8 +175,11 @@ class phoedf(phdf.phdf):
         self.Pr = None
         self.tau = None
         self.Tg = None
+        self.vpcov = None
         self.ucon = None
+        self.ucov = None
         self.bcon = None
+        self.bcov = None
         self.J = None
         self.Hcov = None
         self.E = None
@@ -215,7 +234,7 @@ class phoedf(phdf.phdf):
 
             Bcon = self.GetBcon()
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             ucon = self.Getucon()
             gcov = self.gcov
             alpha = self.alpha
@@ -239,6 +258,17 @@ class phoedf(phdf.phdf):
                 ) / Gamma
 
         return self.bcon
+
+    def Getbcov(self):
+        if self.bcov is None:
+            self.bcov = np.zeros(self.FourVectorField)
+
+            bcon = self.Getbcon()
+
+            for mu in range(4):
+                self.bcov[:,:,:,:,:] = self.gcov[:,0,:,:,:,:] * bcon[:,:,:,:,:]
+
+        return self.bcov
 
     def GetEOS(self):
         return eos_type_dict[self.eos_type](self.Params)
@@ -274,7 +304,8 @@ class phoedf(phdf.phdf):
 
                 self.tau[b, :, :, :] = kappaH[b, :, :, :] * dX
 
-            self.tau = np.clip(self.tau, 1.0e-100, 1.0e100)
+            if clip:
+                self.tau = np.clip(self.tau, 1.0e-100, 1.0e100)
 
         return self.tau
 
@@ -295,7 +326,8 @@ class phoedf(phdf.phdf):
                 / self.EnergyDensityCodeToCGS
             )
 
-            self.Pg = np.clip(self.Pg, 1.0e-100, 1.0e100)
+            if self.clip:
+                self.Pg = np.clip(self.Pg, 1.0e-100, 1.0e100)
 
         return self.Pg
 
@@ -317,7 +349,8 @@ class phoedf(phdf.phdf):
                 / self.TemperatureCodeToCGS
             )
 
-            self.Tg = np.clip(self.Tg, 1.0e-100, 1.0e100)
+            if self.clip:
+                self.Tg = np.clip(self.Tg, 1.0e-100, 1.0e100)
 
         return self.Tg
 
@@ -339,7 +372,8 @@ class phoedf(phdf.phdf):
                     )
 
             self.Pm = bsq / 2.0
-            self.Pm = np.clip(self.Pm, 1.0e-100, 1.0e100)
+            if self.clip:
+                self.Pm = np.clip(self.Pm, 1.0e-100, 1.0e100)
 
         return self.Pm
 
@@ -351,7 +385,8 @@ class phoedf(phdf.phdf):
             for ispec in range(self.NumSpecies):
                 self.Pr[:, :, :, :] += 1.0 / 3.0 * J[:, ispec, :, :, :]
 
-            self.Pr = np.clip(self.Pr, 1.0e-100, 1.0e100)
+            if self.clip:
+                self.Pr = np.clip(self.Pr, 1.0e-100, 1.0e100)
 
         return self.Pr
 
@@ -359,7 +394,7 @@ class phoedf(phdf.phdf):
         if self.Gamma is None:
             self.Gamma = np.zeros(self.ScalarField)
 
-            vpcon = self.GetVpCon()
+            vpcon = self.Getvpcon()
             for ii in range(3):
                 for jj in range(3):
                     self.Gamma[:, :, :, :] += (
@@ -371,20 +406,35 @@ class phoedf(phdf.phdf):
 
         return self.Gamma
 
-    def GetVpCon(self):
+    def Getvpcov(self):
+        if self.vpcov is None:
+            self.vpcov = np.zeros(self.ThreeVectorField)
+
+            vpcon = self.Getvpcon()
+            for ii in range(3):
+                for jj in range(3):
+                    self.vpcov[:,ii,:,:,:] += self.gcov[:, ii + 1,jj + 1,:,:,:]*vpcon[:,jj,:,:,:]
+
+        return self.vpcov
+
+    def Getvpcon(self):
         if self.vpcon is None:
-            self.vpcon = np.clip(
-                self.Get("p.velocity", flatten=False), -1.0e100, 1.0e100
-            )
+            self.vpcon = self.Get("p.velocity", flatten=False)
             assert self.vpcon is not None
+            if self.clip:
+                self.vpcon = np.clip(self.vpcon, -1.0e100, 1.0e100)
 
         return self.vpcon
+
+    # Backwards compatibility TODO(BRR) remove?
+    def GetVpCon(self):
+        return self.Getvpcon()
 
     def Getucon(self):
         if self.ucon is None:
             self.ucon = np.zeros(self.FourVectorField)
 
-            vpcon = self.GetVpCon()
+            vpcon = self.Getvpcon()
             Gamma = self.GetGamma()
 
             self.ucon[:, 0, :, :, :] = Gamma[:, :, :, :] / self.alpha[:, :, :, :]
@@ -398,7 +448,21 @@ class phoedf(phdf.phdf):
 
         return self.ucon
 
+    def Getucov(self):
+        if self.ucov is None:
+            self.ucov = np.zeros(self.FourVectorField)
+
+            ucon = self.Getucon()
+
+            for mu in range(4):
+                self.ucov[:,:,:,:,:] = self.gcov[:,0,:,:,:,:] * ucon[:,:,:,:,:]
+
+        return self.ucov
+
     def GetXi(self):
+        if not self.RadiationActive:
+            return None
+
         if self.xi is None:
             self.xi = np.zeros(
                 [self.NumBlocks, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1]
@@ -406,7 +470,7 @@ class phoedf(phdf.phdf):
 
             Hcov = self.GetHcov() / self.GetJ()[:, np.newaxis, :, :, :]
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             for ispec in range(self.NumSpecies):
                 vdH = np.zeros(self.ScalarField)
                 for ii in range(3):
@@ -420,18 +484,22 @@ class phoedf(phdf.phdf):
                 self.xi[:, ispec, :, :, :] -= vdH * vdH
             self.xi = np.sqrt(self.xi)
 
-            self.xi = np.clip(self.xi, 1.0e-100, 1.0)
+            if self.clip:
+                self.xi = np.clip(self.xi, 1.0e-100, 1.0)
 
         return self.xi
 
     def GetE(self):
+        if not self.RadiationActive:
+            return None
+
         if self.E is None:
             self.E = np.zeros(
                 [self.NumBlocks, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1]
             )
 
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             J = self.GetJ()
             Hcov = self.GetHcov()
 
@@ -452,13 +520,16 @@ class phoedf(phdf.phdf):
         return self.E
 
     def GetF(self):
+        if not self.RadiationActive:
+            return None
+
         if self.F is None:
             self.F = np.zeros(
                 [self.NumBlocks, 3, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1]
             )
 
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             J = self.GetJ()
             Hcov = self.GetHcov()
             gammacon = self.gammacon
@@ -492,13 +563,16 @@ class phoedf(phdf.phdf):
         return self.F
 
     def GetP(self):
+        if not self.RadiationActive:
+            return None
+
         if self.P is None:
             self.P = np.zeros(
                 [self.NumBlocks, 3, 3, self.NumSpecies, self.Nx3, self.Nx2, self.Nx1]
             )
 
             Gamma = self.GetGamma()
-            vcon = self.GetVpCon() / Gamma[:, np.newaxis, :, :, :]
+            vcon = self.Getvpcon() / Gamma[:, np.newaxis, :, :, :]
             J = self.GetJ()
             Hcov = self.GetHcov()
             gammacon = self.gammacon
@@ -574,6 +648,9 @@ class phoedf(phdf.phdf):
         return Tmunu_concov
 
     def GetRmunu_concon(self, b, k, j, i):
+        if not self.RadiationActive:
+            return None
+
         Rmunu = np.zeros([4, 4, self.NumSpecies])
 
         ncon = np.zeros(4)
@@ -603,6 +680,9 @@ class phoedf(phdf.phdf):
         return Rmunu
 
     def GetRmunu_concov(self, b, k, j, i):
+        if not self.RadiationActive:
+            return None
+
         Rmunu_concon = self.GetRmunu_concon(b, k, j, i)
 
         gcov = self.gcov[b, :, :, k, j, i]
@@ -619,4 +699,4 @@ class phoedf(phdf.phdf):
 
     def GetMdotEddington(self, eff=0.1):
         Mbh = self.LengthCodeToCGS * cgs["CL"] ** 2 / cgs["GNEWT"]
-        return 1.4e18 * Mbh / cgs["MSOLAR"]  # Nominal eff = 0.1
+        return 1.4e19 * eff * Mbh / cgs["MSOLAR"]

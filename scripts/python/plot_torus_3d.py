@@ -120,10 +120,10 @@ def plot_frame_from_phoedf(
     ldensity = np.log10(dfile.GetRho())
 
     density = dfile.Get("p.density", flatten=False)
-    J = dfile.Get("r.p.J", flatten=False)
-    # print(f'density min: {density.min()} max: {density.max()}')
-    # if J is not None:
-    #  print(f'J min:       {J.min()} max: {J.max()}')
+    if dfile.RadiationActive:
+        J = dfile.Get("r.p.J", flatten=False)
+    else:
+        J = None
 
     if ndim == 2:
         k = 0
