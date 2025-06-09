@@ -300,7 +300,8 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
   Real dr = radius.dx();
 
   Real state[NHYPER];
-  /*Real k1[NHYPER];
+  //--Original code--
+  Real k1[NHYPER];
   Real src[NMAT_H];
   Real src_k[NMAT_H];
   Real rhs[NHYPER];
@@ -332,9 +333,11 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
     for (int v = 0; v < NHYPER; ++v) {
       hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr * rhs_k[v];
     }
-  }*/
-  
-  Real k1[NHYPER];
+  }
+  //--Original code--
+
+  //--rk4 code--
+  /*Real k1[NHYPER];
   Real src[NMAT_H];
   Real src_k[NMAT_H];
   Real rhs[NHYPER];
@@ -379,7 +382,8 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
       hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr *
 	(rhs[v] + 2.0*(rhs_2[v] + rhs_3[v]) + rhs_4[v])/6.0;
     }
-  }
+  }*/
+  //--rk4 code--
   
   for (int v = 0; v < NHYPER; ++v) {
     if (std::isnan(hypersurface_h(v, npoints - 1))) {
