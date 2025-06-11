@@ -141,6 +141,7 @@ dtwarn_eps = 1e-5
 
 <tov>
 enabled = true
+output_tov_profile = true
 Pc = 4.01e-5
 entropy = 4.605
 # pressure below which we terminate the TOV solver and transition to atmosphere

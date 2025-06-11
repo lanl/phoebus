@@ -177,7 +177,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
 
   //--DEBUG
   std::ofstream OutFile;
-  if (output_profile){
+  if (output_profile && (parthenon::Globals::my_rank == 0)){
     OutFile.open("tovintegrate.txt");
     OutFile << "r, rho, mass, press, eps, phi" << std::endl;
   }
@@ -194,7 +194,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
       PolytropeThermoFromP(press, K, Gamma, rho, eps);
     }
     //--DEBUG
-    if (output_profile){
+    if (output_profile && (parthenon::Globals::my_rank == 0)){
       Real r = radius.x(i);
       Real phi = state_h(TOV::PHI,i);
       Real rhoadm = rho*(1+eps);
@@ -209,7 +209,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     matter_h(MonopoleGR::Matter::Srr, i) = press;
   }
   //--DEBUG
-  if (output_profile){
+  if (output_profile && (parthenon::Globals::my_rank == 0)){
     OutFile.close();
   }
   //--DEBUG
