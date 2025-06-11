@@ -16,11 +16,9 @@
 #include <cstdio>
 #include <memory>
 #include <sstream>
-//--DEBUG
 #include <fstream>
 #include <iostream>
 #include <iomanip>
-//--DEBUG
 
 // Parthenon
 #include <kokkos_abstraction.hpp>
@@ -175,13 +173,13 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     }
   }
 
-  //--DEBUG
+
   std::ofstream OutFile;
   if (output_profile && (parthenon::Globals::my_rank == 0)){
     OutFile.open("tovintegrate.txt");
     OutFile << "r, rho, mass, press, eps, phi" << std::endl;
   }
-  //--DEBUG
+
   // second loop, to set density, specific energy, and matter state
   for (int i = 0; i < npoints; ++i) {
     Real mass = state_h(TOV::M, i);
@@ -193,14 +191,14 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     } else {
       PolytropeThermoFromP(press, K, Gamma, rho, eps);
     }
-    //--DEBUG
+
     if (output_profile && (parthenon::Globals::my_rank == 0)){
       Real r = radius.x(i);
       Real phi = state_h(TOV::PHI,i);
       Real rhoadm = rho*(1+eps);
       OutFile << r << ", " << rho << ", " << mass << ", " << press << ", " << eps << ", " << phi << std::endl;
     }
-    //--DEBUG
+
     intrinsic_h(TOV::RHO0, i) = rho;
     intrinsic_h(TOV::EPS, i) = eps;
     matter_h(MonopoleGR::Matter::RHO, i) = rho * (1 + eps); // ADM mass
@@ -208,11 +206,11 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     matter_h(MonopoleGR::Matter::trcS, i) = 3 * press;      // in rest frame of fluid
     matter_h(MonopoleGR::Matter::Srr, i) = press;
   }
-  //--DEBUG
+
   if (output_profile && (parthenon::Globals::my_rank == 0)){
     OutFile.close();
   }
-  //--DEBUG
+
   printf("TOV star constructed. Total mass = %.14e\n", state_h(TOV::M, npoints - 1));
 
   // Copy to device
