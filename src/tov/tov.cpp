@@ -80,6 +80,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real s = pin->GetOrAddReal("tov", "entropy", 8);
   params.Add("entropy", s);
 
+  //Shall we output tov profile from integrator
+  bool output_profile = pin->GetOrAddBoolean("tov","output_tov_profile",false);
+  params.Add("output_profile",output_profile);
+  
   // Arrays for TOV stuff
   TOV::State_t tov_state("TOV state", TOV::NTOV, npoints);
   auto tov_state_h = Kokkos::create_mirror_view(tov_state);
@@ -137,6 +141,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   auto pc = params.Get<Real>("pc");
   auto s = params.Get<Real>("entropy");
   auto Pmin = params.Get<Real>("pmin");
+  auto output_profile = params.Get<bool>("output_profile");
   auto gm1 = eospkg->Param<Real>("gm1");
   const Real Gamma = gm1 + 1;
   const Real K = PolytropeK(s, Gamma);
@@ -171,18 +176,17 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
   }
 
   //--DEBUG
-  std::ofstream OutFile("tovintegrate.txt");
-  OutFile << "r, rho, mass, press, eps, phi" << std::endl;
+  std::ofstream OutFile;
+  if (output_profile){
+    OutFile.open("tovintegrate.txt");
+    OutFile << "r, rho, mass, press, eps, phi" << std::endl;
+  }
   //--DEBUG
   // second loop, to set density, specific energy, and matter state
   for (int i = 0; i < npoints; ++i) {
     Real mass = state_h(TOV::M, i);
     Real press = state_h(TOV::P, i);
     Real rho, eps;
-    //--DEBUG
-    Real r = radius.x(i);
-    Real phi = state_h(TOV::PHI,i);
-    //--DEBUG
     // needed for analytic solution. Bad for actual code.
     if (press <= 1.1 * Pmin) {
       press = rho = eps = 0;
@@ -190,8 +194,12 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
       PolytropeThermoFromP(press, K, Gamma, rho, eps);
     }
     //--DEBUG
-    Real rhoadm = rho*(1+eps);
-    OutFile << r << ", " << rho << ", " << mass << ", " << press << ", " << eps << ", " << phi << std::endl;
+    if (output_profile){
+      Real r = radius.x(i);
+      Real phi = state_h(TOV::PHI,i);
+      Real rhoadm = rho*(1+eps);
+      OutFile << r << ", " << rho << ", " << mass << ", " << press << ", " << eps << ", " << phi << std::endl;
+    }
     //--DEBUG
     intrinsic_h(TOV::RHO0, i) = rho;
     intrinsic_h(TOV::EPS, i) = eps;
@@ -201,7 +209,9 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     matter_h(MonopoleGR::Matter::Srr, i) = press;
   }
   //--DEBUG
-  OutFile.close();
+  if (output_profile){
+    OutFile.close();
+  }
   //--DEBUG
   printf("TOV star constructed. Total mass = %.14e\n", state_h(TOV::M, npoints - 1));
 
