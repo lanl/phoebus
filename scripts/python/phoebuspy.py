@@ -8,16 +8,14 @@ from glob import glob
 class Dump1D:
     def __init__(self, filename):
         with h5py.File(filename, "r") as f:
+            #The various variables and states are embedded within several datasets.  The following print commands show the various keys.
             #print(f.keys())
             #print(f["Info"].attrs.keys())
-            #exit()
+            #print(f["Params"].attrs.keys())
+            #print(f["Locations"].keys())
             self.nx,self.ny,self.nz = f["Info"].attrs["MeshBlockSize"]
             self.NumMB = f["Info"].attrs["NumMeshBlocks"]
-            #print(f["Params"].attrs.keys())
-            #exit()
-            #print(np.shape(f["Params"].attrs["monopole_gr/shift"]))
             self.varkeys = list(f.keys())[8:]
-            #print(f["Locations"].keys())
             self.t = f["Info"].attrs["Time"]
             self.xf = f["Locations/x"][:,:]
             self.xc = 0.5 * (self.xf[:,1:] + self.xf[:,:-1])
@@ -25,8 +23,6 @@ class Dump1D:
             self.yc = 0.5 * (self.yf[:,1:] + self.yf[:,:-1])
             self.zf = f["Locations/z"][:,:]
             self.zc = 0.5 * (self.zf[:,1:] + self.zf[:,:-1])
-            #self.rhoc = f["c.density"]
-            #print(self.rhoc.shape)
             self.var = {}
             for key in self.varkeys:
                 self.var[key] = f[key][:,0,0,:] #ib,iz,iy,ix
@@ -35,7 +31,6 @@ class Dump1D:
                 self.var['monopole_gr/lapse_h'] = f["Params"].attrs['monopole_gr/lapse_h']
                 self.var['monopole_gr/hypersurface_h']=f["Params"].attrs["monopole_gr/hypersurface_h"]
                 self.var['monopole_gr/shift']=f["Params"].attrs["monopole_gr/shift"]
-                #print(np.shape(f["Params"].attrs['monopole_gr/matter_h']))
                 self.var['monopole_gr/rhoadm'] = f["Params"].attrs['monopole_gr/matter_h'][0,:]
                 nxgr = np.size(self.var['monopole_gr/lapse_h'])
                 rout = f["Params"].attrs['monopole_gr/rout']
@@ -48,9 +43,6 @@ class Dump1D:
 class DumpGR:
     def __init__(self, filename):
         with h5py.File(filename, "r") as f:
-            #print(f["Params"].attrs.keys())
-            #print(np.shape(f["Params"].attrs["monopole_gr/shift"]))
-            #exit()
             self.t = f["Info"].attrs["Time"]
             self.var = {}
 
@@ -180,8 +172,6 @@ def main():
     #List of data dumps for each file
     data = [Dump1D(fnam) for fnam in filenames]
     Movie1D(data)
-    #for i in range(nfiles):
-    #    print(data[i].rhop)
     
 if (__name__=="__main__"):
     main()
