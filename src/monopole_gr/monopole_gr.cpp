@@ -380,11 +380,11 @@ TaskStatus IntegrateHypersurface(StateDescriptor *pkg) {
 #pragma omp simd
     for (int v = 0; v < NHYPER; ++v) {
       hypersurface_h(v, i + 1) = hypersurface_h(v, i) + dr *
-	(rhs[v] + 2.0*(rhs_2[v] + rhs_3[v]) + rhs_4[v])/6.0;
+        (rhs[v] + 2.0*(rhs_2[v] + rhs_3[v]) + rhs_4[v])/6.0;
     }
   }*/
   //--rk4 code--
-  
+
   for (int v = 0; v < NHYPER; ++v) {
     if (std::isnan(hypersurface_h(v, npoints - 1))) {
       if (parthenon::Globals::my_rank == 0) {

@@ -14,11 +14,11 @@
 // stdlib
 #include <cmath>
 #include <cstdio>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <memory>
 #include <sstream>
-#include <fstream>
-#include <iostream>
-#include <iomanip>
 
 // Parthenon
 #include <kokkos_abstraction.hpp>
@@ -78,10 +78,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   Real s = pin->GetOrAddReal("tov", "entropy", 8);
   params.Add("entropy", s);
 
-  //Shall we output tov profile from integrator
-  bool output_profile = pin->GetOrAddBoolean("tov","output_tov_profile",false);
-  params.Add("output_profile",output_profile);
-  
+  // Shall we output tov profile from integrator
+  bool output_profile = pin->GetOrAddBoolean("tov", "output_tov_profile", false);
+  params.Add("output_profile", output_profile);
+
   // Arrays for TOV stuff
   TOV::State_t tov_state("TOV state", TOV::NTOV, npoints);
   auto tov_state_h = Kokkos::create_mirror_view(tov_state);
@@ -173,9 +173,8 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     }
   }
 
-
   std::ofstream OutFile;
-  if (output_profile && (parthenon::Globals::my_rank == 0)){
+  if (output_profile && (parthenon::Globals::my_rank == 0)) {
     OutFile.open("tovintegrate.txt");
     OutFile << "r, rho, mass, press, eps, phi" << std::endl;
   }
@@ -192,11 +191,12 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
       PolytropeThermoFromP(press, K, Gamma, rho, eps);
     }
 
-    if (output_profile && (parthenon::Globals::my_rank == 0)){
+    if (output_profile && (parthenon::Globals::my_rank == 0)) {
       Real r = radius.x(i);
-      Real phi = state_h(TOV::PHI,i);
-      Real rhoadm = rho*(1+eps);
-      OutFile << r << ", " << rho << ", " << mass << ", " << press << ", " << eps << ", " << phi << std::endl;
+      Real phi = state_h(TOV::PHI, i);
+      Real rhoadm = rho * (1 + eps);
+      OutFile << r << ", " << rho << ", " << mass << ", " << press << ", " << eps << ", "
+              << phi << std::endl;
     }
 
     intrinsic_h(TOV::RHO0, i) = rho;
@@ -207,7 +207,7 @@ TaskStatus IntegrateTov(StateDescriptor *tovpkg, StateDescriptor *monopolepkg,
     matter_h(MonopoleGR::Matter::Srr, i) = press;
   }
 
-  if (output_profile && (parthenon::Globals::my_rank == 0)){
+  if (output_profile && (parthenon::Globals::my_rank == 0)) {
     OutFile.close();
   }
 
