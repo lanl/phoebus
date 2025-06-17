@@ -39,17 +39,17 @@ variables = p.density,  &
 	    src_terms
 
 file_type   = hdf5      # Tabular data dump
-dt          = 5         # time increment between outputs
+dt          = 20         # time increment between outputs
 
 <parthenon/output2>
 file_type = hst
-dt = 1
+dt = 5
 
 <parthenon/time>
 nlim        = -1        # cycle limit
-tlim        = 5000      # time limit
+tlim        = 1000      # time limit
 integrator  = rk2       # time integration algorithm
-ncycle_out  = 1         # interval for stdout summary info
+ncycle_out  = 100         # interval for stdout summary info
 dt_init_fact = 1.e-6
 
 <parthenon/mesh>
@@ -59,9 +59,9 @@ nghost = 4
 
 nx1         = 1024        # Number of zones in X1-direction
 x1min       = 0           # minimum value of X1
-x1max       = 250         # maximum value of X1
+x1max       = 200         # maximum value of X1
 ix1_bc      = reflect     # Inner-X1 boundary condition flag
-ox1_bc      = gr_outflow  # Outer-X1 boundary condition flag
+ox1_bc      = reflect  # Outer-X1 boundary condition flag
 
 nx2         = 1             # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
@@ -78,7 +78,7 @@ ox3_bc      = periodic      # Outer-X3 boundary condition flfgag
 num_threads = 1         # maximum number of OMP threads
 
 <parthenon/meshblock>
-nx1 = 1024
+nx1 = 128
 nx2 = 1
 nx3 = 1
 
@@ -110,11 +110,11 @@ Ye = false
 <fixup>
 enable_floors = true
 enable_ceilings = true
-enable_flux_fixup = true
-enable_c2p_fixup = true
-floor_type = X1RhoSie
-rho0_floor = 1.0e-8
-sie0_floor = 1.0e-3
+enable_flux_fixup = false
+enable_c2p_fixup = false
+floor_type = ConstantRhoSie
+rho0_floor = 1.0e-16
+sie0_floor = 1.0e-16
 rho_exp_floor = -2.0
 sie_exp_floor = -1.0
 ceiling_type = ConstantGamSie
@@ -123,8 +123,8 @@ gam0_ceiling = 10.0;
 
 <monopole_gr>
 enabled = true
-npoints = 2048
-rout = 250
+npoints = 8192
+rout = 200
 # Disables time derivatives. Runs only at initialization
 force_static = false
 # Runs the first n subcycles. Then freezes. Source terms are not disabled.
@@ -141,10 +141,11 @@ dtwarn_eps = 1e-5
 
 <tov>
 enabled = true
-Pc = 1e-6
-entropy = 8
+output_tov_profile = true
+Pc = 4.01e-5
+entropy = 4.605
 # pressure below which we terminate the TOV solver and transition to atmosphere
-Pmin = 1e-10
+Pmin = 1e-16
 # The atmosphere values in the problem generator for density and energy
 rhomin = 1e-12
 epsmin = 1e-12
