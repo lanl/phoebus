@@ -183,27 +183,43 @@ def MovieGR(data,varname='monopole_gr/rhoadm',anax=None,anay=None,ylim=None,xlim
     
     return
 
-def PlotScatter3DvsRadius(ax,data,varname=None):
+def CalcScatter3DvsRadius(data,nradbins=100,varname=None):
     if (varname is None):
         varname = 'p.density'
 
     print("Calculating Radius...",end="")
     radius = np.sqrt(data.xgrid**2 + data.ygrid**2 + data.zgrid**2)
     print("Done.")
-    nradbins = 100
-    radedges = np.linspace(0.,np.max(radius),nradbins+1)
+    
+    radmax_overall = np.max(radius)
+    radedges = np.linspace(0.,radmax_overall,nradbins+1)
+
     varpercentiles = np.zeros((3,nradbins))
-    #Consider reducing the complexity by looping over meshblocks.
-    for ibin in range(nradbins):
-        idx = np.where((radius > radedges[ibin]) & (radius < radedges[ibin+1]))[0]
-        ninbin = np.size(idx)
-        print(ninbin)
-    exit()
-    print("Plotting Scatter Plot...",end="")
-    ax.scatter(radius,data.var[varname])
-    print("Done.")
+    varhopper = [[] for _ in range(nradbins)]
+    for im in range(data.NumMB):
+        irads = (radius[im,:,:,:]/radmax_overall*nradbins).astype(int)
+        data_mb = data.var[varname][im,:,:,:]
         
-    return
+        irmin = np.min(irads)
+        irmax = np.max(irads)
+        irmax = min(irmax,nradbins-1)
+
+        print(f'Adding vars to varhopper for meshblock {im}...',end="")
+        for ir in range(irmin,irmax+1):
+            idx = np.where(ir == irads)
+            vars_in_bin = data_mb[idx]
+            varhopper[ir].extend(vars_in_bin.tolist())
+        print("Done.")
+
+    for i,vars_in_bin in enumerate(varhopper):
+        ncells = len(vars_in_bin)
+        print(f"{ncells} cells in radial bin {i}.")
+        percentiles = np.percentile(np.array(vars_in_bin), [20, 50, 80])
+        varpercentiles[:, i] = percentiles
+
+    radbins = 0.5*(radedges[0:-1]+radedges[1:])
+        
+    return radbins,varpercentiles
 
 def ReadHistory(fname=None):
     if (fname is None):
