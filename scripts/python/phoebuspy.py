@@ -1,9 +1,13 @@
 from os import system
 import numpy as np
+import numexpr as ne
 import matplotlib.pyplot as pl
 import h5py
 import re
 from glob import glob
+
+#On Polaris, you need to create a conda environment via...
+#conda create -n phoebuspy numpy numexpr matplotlib h5py scipy -y
 
 class Dump1D:
     def __init__(self, filename):
@@ -187,39 +191,97 @@ def CalcScatter3DvsRadius(data,nradbins=100,varname=None):
     if (varname is None):
         varname = 'p.density'
 
-    print("Calculating Radius...",end="")
-    radius = np.sqrt(data.xgrid**2 + data.ygrid**2 + data.zgrid**2)
-    print("Done.")
+    import time
+    #start = time.time()
+    #radius = np.sqrt(data.xgrid**2 + data.ygrid**2 + data.zgrid**2)
+    #print("Numpy took", time.time() - start)
+
+    #start = time.time()
+    #x=data.xgrid
+    #y=data.ygrid
+    #z=data.zgrid
+    #radius_ne = ne.evaluate("sqrt(x**2 + y**2 + z**2)")
+    #print("NumExpr took", time.time() - start)
+    #exit()
+    #print("Calculating Radius...",end="")
+    x=data.xgrid
+    y=data.ygrid
+    z=data.zgrid
+    radius = ne.evaluate("sqrt(x**2 + y**2 + z**2)")
+    
+    #from scipy.stats import binned_statistic
+    ## Flatten everything
+    #flat_radius = radius.ravel()
+    #flat_var = data.var[varname].ravel()
+    #radius = np.sqrt(data.xgrid**2 + data.ygrid**2 + data.zgrid**2)
+    #print("Done.")
     
     radmax_overall = np.max(radius)
     radedges = np.linspace(0.,radmax_overall,nradbins+1)
+    radcenters = 0.5 * (radedges[:-1] + radedges[1:])
 
+    ## Compute percentiles
+    #p20, _, _ = binned_statistic(flat_radius, flat_var, statistic=lambda v: np.percentile(v, 20), bins=radedges)
+    #p50, _, _ = binned_statistic(flat_radius, flat_var, statistic=lambda v: np.percentile(v, 50), bins=radedges)
+    #p80, _, _ = binned_statistic(flat_radius, flat_var, statistic=lambda v: np.percentile(v, 80), bins=radedges)
+
+    ## Stack for plotting
+    #varpercentiles = np.vstack([p20, p50, p80])
+    
     varpercentiles = np.zeros((3,nradbins))
     varhopper = [[] for _ in range(nradbins)]
     for im in range(data.NumMB):
         irads = (radius[im,:,:,:]/radmax_overall*nradbins).astype(int)
+        irads[irads == nradbins] = nradbins - 1
         data_mb = data.var[varname][im,:,:,:]
+
+        # Flatten both arrays
+        irads_flat = irads.ravel()
+        data_flat = data_mb.ravel()
+    
+        # Sort bin assignments and values together
+        sort_idx = np.argsort(irads_flat)
+        irads_sorted = irads_flat[sort_idx]
+        data_sorted = data_flat[sort_idx]
+
+        # Now group data into bins in a single pass
+        start = 0
+        for ir in np.unique(irads_sorted):
+            end = np.searchsorted(irads_sorted, ir + 1, side='left')
+            varhopper[ir].append(data_sorted[start:end])
+            start = end 
         
-        irmin = np.min(irads)
-        irmax = np.max(irads)
-        irmax = min(irmax,nradbins-1)
+        ##irmin = np.min(irads)
+        ##irmax = np.max(irads)
+        ##irmax = min(irmax,nradbins-1)
+        #ir_used = np.unique(irads)
 
-        print(f'Adding vars to varhopper for meshblock {im}...',end="")
-        for ir in range(irmin,irmax+1):
-            idx = np.where(ir == irads)
-            vars_in_bin = data_mb[idx]
-            varhopper[ir].extend(vars_in_bin.tolist())
-        print("Done.")
+        #print(f'Adding vars to varhopper for meshblock {im}...',end="")
+        ##for ir in range(irmin,irmax+1):
+        #for ir in ir_used:
+        #    mask = (irads == ir)
+        #    vars_in_bin = data_mb[mask]
+        #    #idx = np.where(ir == irads)
+        #    #vars_in_bin = data_mb[idx]
+        #    varhopper[ir].extend(vars_in_bin.tolist())
+        #print("Done.")
 
-    for i,vars_in_bin in enumerate(varhopper):
-        ncells = len(vars_in_bin)
-        print(f"{ncells} cells in radial bin {i}.")
-        percentiles = np.percentile(np.array(vars_in_bin), [20, 50, 80])
-        varpercentiles[:, i] = percentiles
+    for i, bin_chunks in enumerate(varhopper):
+        if bin_chunks:
+            values = np.concatenate(bin_chunks)
+            varpercentiles[:, i] = np.percentile(values, [20, 50, 80])
+        else:
+            varpercentiles[:, i] = np.nan
+            
+    #for i,vars_in_bin in enumerate(varhopper):
+    #    ncells = len(vars_in_bin)
+    #    print(f"{ncells} cells in radial bin {i}.")
+    #    percentiles = np.percentile(np.array(vars_in_bin), [20, 50, 80])
+    #    varpercentiles[:, i] = percentiles
 
-    radbins = 0.5*(radedges[0:-1]+radedges[1:])
+    #radbins = 0.5*(radedges[0:-1]+radedges[1:])
         
-    return radbins,varpercentiles
+    return radcenters,varpercentiles
 
 def ReadHistory(fname=None):
     if (fname is None):
