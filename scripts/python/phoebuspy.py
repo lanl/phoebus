@@ -318,12 +318,38 @@ def PlotHistory(histdata,varname='maximum density'):
     return
     
 def main():
-    #List of outfile names
-    filenames = sorted(glob(f"*.out1.*.phdf"))
-    nfiles = len(filenames)
-    #List of data dumps for each file
-    data = [Dump1D(fnam) for fnam in filenames]
-    Movie1D(data)
+
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--Movie1D', action='store_true')
+    parser.add_argument('--CalcOneDProfiles', action='store_true')
+    parser.add_argument('--varname', type=str, default='p.density')
+    args= parser.parse_args()
+
+    #Split varname into a list if needed
+    varnames = args.varname.split(',')
+    varnames = [varname.strip() for varname in varnames]
+    args.varname = varnames
+
+    if (args.CalcOneDProfiles):
+        #List of outfile names                                                      
+        filenames = sorted(glob(f"*.out1.*.phdf"))
+        nfiles = len(filenames)
+        for i in range(nfiles):
+            data = Dump3D(filenames[i],extractvars=args.varname)
+            for var in args.varname:
+                iofile=f'OneDProfile.{var}.{i:04d}.npz'
+                print(f"Making {iofile}")
+                radbins,varpercentiles = CalcScatter3DvsRadius(data,nradbins=400,varname=var)
+                np.savez(iofile,radbins=radbins,varpercentiles=varpercentiles)
+                
+    if (args.Movie1D):
+        #List of outfile names
+        filenames = sorted(glob(f"*.out1.*.phdf"))
+        nfiles = len(filenames)
+        #List of data dumps for each file
+        data = [Dump1D(fnam) for fnam in filenames]
+        Movie1D(data)
     
 if (__name__=="__main__"):
     main()
