@@ -11,8 +11,8 @@
 // distribute copies to the public, perform publicly and display
 // publicly, and to permit others to do so.
 
-#ifndef _PGEN_H_
-#define _PGEN_H_
+#ifndef PGEN_HPP_
+#define PGEN_HPP_
 
 // Parthenon includes
 #include <parthenon/package.hpp>
@@ -22,10 +22,13 @@ using namespace parthenon::package::prelude;
 // internal includes
 #include "fluid/fluid.hpp"
 #include "geometry/geometry.hpp"
+#include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "phoebus_utils/root_find.hpp"
 #include "phoebus_utils/variables.hpp"
 #include "radiation/radiation.hpp"
 #include "tracers/tracers.hpp"
+
+using Microphysics::EOS::EOS;
 
 // add the name of a namespace that contains your new ProblemGenerator
 #define FOREACH_PROBLEM                                                                  \
@@ -148,6 +151,35 @@ KOKKOS_INLINE_FUNCTION Real energy_from_rho_P(T &eos, const Real rho, const Real
   return rho * eroot;
 }
 
+// Error helper used in p2c2p.cpp
+template <typename Pack, typename var_t>
+void ReportErrorP2C2P(Coordinates_t &coords, Pack &v, var_t var,
+                 Real f(const Real)) {
+
+  Real max_error = 0.0;
+  Real x0, val0, v0;
+  /*parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "ReportError",
+    DevExecSpace(), 0, v.GetDim(3)-1, 0, v.GetDim(2)-1, 0, v.GetDim(1)-1,
+    KOKKOS_LAMBDA(const int k, const int j, const int i, Real &merr) {*/
+  int k = 0;
+  int j = 0;
+  for (int i = 0; i < v(0,0).GetDim(1); i++) {
+    const Real x = coords.Xc<1>(i);
+    const Real val = f(x);
+    const Real err = std::abs(val - v(0, var, k, j, i)) / val;
+    //std::printf("true, val = %f %f\n", val, v(0, var_t(), k, j, i));
+    if (err > max_error) {
+      max_error = err;
+      x0 = x;
+      val0 = val;
+      v0 = v(0, var, k, j, i);
+    }
+    // merr = (err > merr ? err : merr);
+  } //, Kokkos::Max<Real>(max_error));
+
+  printf("Max error [%s] = %g    %g %g %g\n", var_t::name().c_str(), max_error, x0, val0, v0);
+
+}
 } // namespace phoebus
 
-#endif
+#endif // PGEN_HPP_

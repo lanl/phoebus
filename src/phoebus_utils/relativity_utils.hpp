@@ -153,12 +153,11 @@ KOKKOS_INLINE_FUNCTION Real GetMagneticFieldSquared(
 template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real GetMagneticFieldSquared(const CellLocation loc, const int b,
                                                     const int k, const int j, const int i,
-                                                    Geometry &geom, Pack &v,
-                                                    const int ivlo, const int iblo) {
+                                                    Geometry &geom, Pack &v) {
   Real gcov[3][3];
   geom.Metric(loc, b, k, j, i, gcov);
-  Real vp[] = {v(b, ivlo, k, j, i), v(b, ivlo + 1, k, j, i), v(b, ivlo + 2, k, j, i)};
-  Real Bp[] = {v(b, iblo, k, j, i), v(b, iblo + 1, k, j, i), v(b, iblo + 2, k, j, i)};
+  Real vp[] = {v(b, fluid_prim::velocity(0), k, j, i), v(b, fluid_prim::velocity(1), k, j, i), v(b, fluid_prim::velocity(2), k, j, i)};
+  Real Bp[] = {v(b, fluid_prim::bfield(0), k, j, i), v(b, fluid_prim::bfield(1), k, j, i), v(b, fluid_prim::bfield(2), k, j, i)};
   const Real W = GetLorentzFactor(vp, gcov);
   return GetMagneticFieldSquared(gcov, vp, Bp, W);
 }
@@ -176,9 +175,8 @@ KOKKOS_INLINE_FUNCTION Real GetMagneticFieldSquared(const CellLocation loc, cons
 template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real GetMagneticFieldSquared(const CellLocation loc, const int k,
                                                     const int j, const int i,
-                                                    Geometry &geom, Pack &v,
-                                                    const int ivlo, const int iblo) {
-  return GetMagneticFieldSquared(loc, 0, k, j, i, geom, v, ivlo, iblo);
+                                                    Geometry &geom, Pack &v) {
+  return GetMagneticFieldSquared(loc, 0, k, j, i, geom, v);
 }
 
 } // namespace phoebus

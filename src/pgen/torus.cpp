@@ -129,6 +129,8 @@ void GetStateFromEnthalpy(const EOS &eos, const EosType eos_type, const Real hm1
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+  namespace p = fluid_prim;
+  namespace r = radmoment_prim;
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::FMKS),
                     "Problem \"torus\" requires FMKS geometry!");
 
@@ -137,28 +139,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto rad_pkg = pmb->packages.Get("radiation");
   bool do_rad = rad_pkg->Param<bool>("active");
 
-  PackIndexMap imap;
-  auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                              fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                              fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                              fluid_prim::temperature::name(), fluid_prim::gamma1::name(),
-                              radmoment_prim::J::name(), radmoment_prim::H::name()},
-                             imap);
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::velocity, p::energy,
+                        p::bfield, p::ye, p::pressure, 
+                        p::temperature, p::gamma1, r::J, r::H>(
+          resolved_pkgs.get());
 
-  const int irho = imap[fluid_prim::density::name()].first;
-  const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
-  const int ieng = imap[fluid_prim::energy::name()].first;
-  const int iblo = imap[fluid_prim::bfield::name()].first;
-  const int ibhi = imap[fluid_prim::bfield::name()].second;
-  const int iye = imap[fluid_prim::ye::name()].second;
-  const int iprs = imap[fluid_prim::pressure::name()].first;
-  const int itmp = imap[fluid_prim::temperature::name()].first;
-  const int igm1 = imap[fluid_prim::gamma1::name()].first;
-
-  auto iJ = imap.GetFlatIdx(radmoment_prim::J::name(), false);
-  auto iH = imap.GetFlatIdx(radmoment_prim::H::name(), false);
-  const auto specB = iJ.IsValid() ? iJ.GetBounds(1) : parthenon::IndexRange();
+  auto v = desc.GetPack(rc);
 
   // this only works with ideal gases
   // The Fishbone solver needs to know about Ye
@@ -287,9 +276,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         auto rng_gen = rng_pool.get_state();
         const Real dx_sub = coords.CellWidthFA(X1DIR, k, j, i) / nsub;
         const Real dy_sub = coords.CellWidthFA(X2DIR, k, j, i) / nsub;
-        v(irho, k, j, i) = 0.0;
-        v(ieng, k, j, i) = 0.0;
-        SPACELOOP(d) { v(ivlo + d, k, j, i) = 0.0; }
+        v(0, p::density(), k, j, i) = 0.0;
+        v(0, p::energy(), k, j, i) = 0.0;
+        SPACELOOP(d) { v(0, p::velocity(d), k, j, i) = 0.0; }
         const Real x3 = coords.Xc<3>(k, j, i);
         for (int m = 0; m < nsub; m++) {
           for (int n = 0; n < nsub; n++) {
@@ -325,10 +314,10 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
               Real vcon[] = {ucon[1] / W + beta[0] / lapse, ucon[2] / W + beta[1] / lapse,
                              ucon[3] / W + beta[2] / lapse};
 
-              v(irho, k, j, i) += rho / (nsub * nsub);
-              v(ieng, k, j, i) += u / (nsub * nsub);
+              v(0, p::density(), k, j, i) += rho / (nsub * nsub);
+              v(0, p::energy(), k, j, i) += u / (nsub * nsub);
               for (int d = 0; d < 3; d++) {
-                v(ivlo + d, k, j, i) += W * vcon[d] / (nsub * nsub);
+                v(0, p::velocity(d), k, j, i) += W * vcon[d] / (nsub * nsub);
               }
             }
           }
@@ -336,30 +325,30 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real x1v = coords.Xc<1>(k, j, i);
         const Real x2v = coords.Xc<2>(k, j, i);
 
-        v(ieng, k, j, i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
+        v(0, p::energy(), k, j, i) *= (1. + u_jitter * (rng_gen.drand() - 0.5));
 
         // fixup
         Real rhoflr = 0;
         Real epsflr;
         floor.GetFloors(x1v, x2v, x3, rhoflr, epsflr);
         Real lambda[2] = {Ye, 0.0};
-        if (iye > 0) {
-          v(iye, k, j, i) = lambda[0];
+        if (v.Contains(0, p::ye())) {
+          v(0, p::ye(), k, j, i) = lambda[0];
         }
-        v(irho, k, j, i) = v(irho, k, j, i) < rhoflr ? rhoflr : v(irho, k, j, i);
-        v(ieng, k, j, i) = v(ieng, k, j, i) / v(irho, k, j, i) < epsflr
-                               ? v(irho, k, j, i) * epsflr
-                               : v(ieng, k, j, i);
-        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-            v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), lambda);
-        v(iprs, k, j, i) = eos.PressureFromDensityTemperature(v(irho, k, j, i),
-                                                              v(itmp, k, j, i), lambda);
-        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                               v(irho, k, j, i), v(itmp, k, j, i), lambda) /
-                           v(iprs, k, j, i);
+        v(0, p::density(), k, j, i) = v(0, p::density(), k, j, i) < rhoflr ? rhoflr : v(0, p::density(), k, j, i);
+        v(0, p::energy(), k, j, i) = v(0, p::energy(), k, j, i) / v(0, p::density(), k, j, i) < epsflr
+                               ? v(0, p::density(), k, j, i) * epsflr
+                               : v(0, p::energy(), k, j, i);
+        v(0, p::temperature(), k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+            v(0, p::density(), k, j, i), v(0, p::energy(), k, j, i) / v(0, p::density(), k, j, i), lambda);
+        v(0, p::pressure(), k, j, i) = eos.PressureFromDensityTemperature(v(0, p::density(), k, j, i),
+                                                              v(0, p::temperature(), k, j, i), lambda);
+        v(0, p::gamma1(), k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda) /
+                           v(0, p::pressure(), k, j, i);
 
         Real ucon[4] = {0};
-        Real vpcon[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+        Real vpcon[3] = {v(0, p::velocity(0), k, j, i), v(0, p::velocity(1), k, j, i), v(0, p::velocity(2), k, j, i)};
         Real gcov[4][4] = {0};
         geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
         GetFourVelocity(vpcon, geom, CellLocation::Cent, k, j, i, ucon);
@@ -377,46 +366,46 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           if (lnh > 0.0) {
 
             // TODO(BRR) only first species right now
-            for (int ispec = specB.s; ispec < 1; ispec++) {
+            for (int ispec = 0; ispec < 1; ++ispec) {
               // Given total pressure, calculate temperature such that fluid and radiation
               // pressures sum to total pressure
               // TODO(BRR) Generalize to all neutrino species
-              const Real Ptot = v(iprs, k, j, i);
-              const Real T = v(itmp, k, j, i);
-              const Real Ye = iye > 0 ? v(iye, k, j, i) : 0.5;
+              const Real Ptot = v(0, p::pressure(), k, j, i);
+              const Real T = v(0, p::temperature(), k, j, i);
+              const Real Ye =  v.Contains(0, p::ye()) ? v(0, p::ye(), k, j, i) : 0.5;
 
               if (init_rad == InitialRadiation::thermal) {
                 root_find::RootFind root_find;
-                GasRadTemperatureResidual res(v(iprs, k, j, i), v(irho, k, j, i),
+                GasRadTemperatureResidual res(v(0, p::pressure(), k, j, i), v(0, p::density(), k, j, i),
                                               opacities, eos, species_d[ispec], Ye);
-                v(itmp, k, j, i) = root_find.regula_falsi(res, 0, T, 1.e-6 * T, T);
+                v(0, p::temperature(), k, j, i) = root_find.regula_falsi(res, 0, T, 1.e-6 * T, T);
               }
 
               // Set fluid u/P/T and radiation J using equilibrium temperature
               Real lambda[2] = {Ye, 0.0};
-              v(ieng, k, j, i) =
-                  v(irho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
-                                         v(irho, k, j, i), v(itmp, k, j, i), lambda);
-              v(iprs, k, j, i) = eos.PressureFromDensityTemperature(
-                  v(irho, k, j, i), v(itmp, k, j, i), lambda);
+              v(0, p::energy(), k, j, i) =
+                  v(0, p::density(), k, j, i) * eos.InternalEnergyFromDensityTemperature(
+                                         v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda);
+              v(0, p::pressure(), k, j, i) = eos.PressureFromDensityTemperature(
+                  v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda);
 
               if (init_rad == InitialRadiation::thermal) {
-                v(iJ(ispec), k, j, i) = opacities.EnergyDensityFromTemperature(
-                    v(itmp, k, j, i), species_d[ispec]);
+                v(0, r::J(ispec), k, j, i) = opacities.EnergyDensityFromTemperature(
+                    v(0, p::temperature(), k, j, i), species_d[ispec]);
               } else {
-                v(iJ(ispec), k, j, i) = 1.e-5 * v(ieng, k, j, i);
+                v(0, r::J(ispec), k, j, i) = 1.e-5 * v(0, p::energy(), k, j, i);
               }
 
               // Zero comoving frame fluxes
-              SPACELOOP(ii) { v(iH(ispec, 0), k, j, i) = 0.; }
+              SPACELOOP(ii) { v(0, r::H(ispec, 0), k, j, i) = 0.; }
             }
           } else {
             // In the atmosphere set some small radiation energy
-            for (int ispec = specB.s; ispec < 1; ispec++) {
-              v(iJ(ispec), k, j, i) = 1.e-5 * v(ieng, k, j, i);
+            for (int ispec = 0; ispec < 1; ++ispec) {
+              v(0, r::J(ispec), k, j, i) = 1.e-5 * v(0, p::energy(), k, j, i);
 
               // Zero comoving frame fluxes
-              SPACELOOP(ii) { v(iH(ispec, 0), k, j, i) = 0.; }
+              SPACELOOP(ii) { v(0, r::H(ispec, 0), k, j, i) = 0.; }
             }
           }
         } // do_rad
@@ -435,8 +424,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       "Phoebus::ProblemGenerator::Torus2", jb.s + 1, jb.e, ib.s + 1, ib.e,
       KOKKOS_LAMBDA(const int j, const int i) {
         const Real rho_av =
-            0.25 * (v(irho, kb.s, j, i) + v(irho, kb.s, j, i - 1) +
-                    v(irho, kb.s, j - 1, i) + v(irho, kb.s, j - 1, i - 1));
+            0.25 * (v(0, p::density(), kb.s, j, i) + v(0, p::density(), kb.s, j, i - 1) +
+                    v(0, p::density(), kb.s, j - 1, i) + v(0, p::density(), kb.s, j - 1, i - 1));
         // JMM: Classic HARM divides by rho_max here, to normalize rho_av.
         // However, we have already normalized rho, and thus rho_av. So
         // we should not renormalize.
@@ -449,7 +438,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       });
 
   // Initialize B field lines, to be normalized in PostInitializationModifier
-  if (ibhi > 0) {
+  if (v.Contains(0, p::bfield(0))) {
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
         KOKKOS_LAMBDA(const int k, const int j, const int i) {
@@ -457,11 +446,11 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           // This means the HARM primitives are smaller than the Phoebus
           // primitives by a factor of alpha.
           const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-          v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
+          v(0, p::bfield(0), k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
                              (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gamdet);
-          v(iblo + 1, k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
+          v(0, p::bfield(1), k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
                                  (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gamdet);
-          v(ibhi, k, j, i) = 0.0;
+          v(0, p::bfield(2), k, j, i) = 0.0;
         });
   }
 
@@ -523,6 +512,9 @@ void ProblemModifier(ParameterInput *pin) {
 }
 
 void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
+  namespace p = fluid_prim;
+  namespace r = radmoment_prim;
+
   const bool magnetized = pin->GetOrAddBoolean("torus", "magnetized", true);
   const Real beta_target = pin->GetOrAddReal("torus", "target_beta", 100.);
   const bool harm_style_beta =
@@ -617,13 +609,13 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-    PackIndexMap imap;
-    std::vector<std::string> vars = {fluid_prim::bfield::name(),
-                                     fluid_prim::density::name()};
-    auto v = rc->PackVariables(vars, imap);
-    const int iblo = imap[fluid_prim::bfield::name()].first;
-    const int ibhi = imap[fluid_prim::bfield::name()].second;
-    const int irho = imap[fluid_prim::density::name()].first;
+    Mesh *pmesh = rc->GetMeshPointer();
+    auto &resolved_pkgs = pmesh->resolved_packages;
+    static auto desc =
+        MakePackDescriptor<p::density, p::bfield>(
+            resolved_pkgs.get());
+
+    auto v = desc.GetPack(rc.get());
 
     auto tracer_pkg = pmb->packages.Get("tracers");
     bool do_tracers = tracer_pkg->Param<bool>("active");
@@ -716,7 +708,7 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
               Real detgamma = geom.DetGamma(CellLocation::Cent, k, j, i);
               const Real vol = coords.CellVolume(k, j, i);
               const int num_tr_cell = swarm_d.GetParticleCountPerCell(k, j, i);
-              mass(n) = detgamma * v(irho, k, j, i) * vol / num_tr_cell;
+              mass(n) = detgamma * v(0, p::density(), k, j, i) * vol / num_tr_cell;
             }
           });
     }
@@ -724,8 +716,8 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     pmb->par_for(
         "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
         ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          for (int ib = iblo; ib <= ibhi; ib++) {
-            v(ib, k, j, i) *= B_field_fac;
+          for (int ib = 0; ib < 3; ++ib) {
+            v(0, p::bfield(ib), k, j, i) *= B_field_fac;
           }
         });
 
@@ -842,6 +834,8 @@ Real ucon_norm(Real ucon[4], Real gcov[4][4]) {
 // TODO(JMM): Should this be elsewhere in Phoebus?
 void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
                   Real &beta_pmax) {
+  namespace p = fluid_prim;
+  namespace r = radmoment_prim;
   Real beta_min = std::numeric_limits<Real>::infinity();
   Real press_max = -std::numeric_limits<Real>::infinity();
   Real bsq_max = -std::numeric_limits<Real>::infinity();
@@ -854,22 +848,16 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
     auto jb = pmb->cellbounds.GetBoundsJ(IndexDomain::interior);
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
-    PackIndexMap imap;
-    auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                                fluid_prim::bfield::name(), fluid_prim::pressure::name(),
-                                radmoment_prim::J::name()},
-                               imap);
+    Mesh *pmesh = rc->GetMeshPointer();
+    auto &resolved_pkgs = pmesh->resolved_packages;
+    static auto desc =
+        MakePackDescriptor<p::density, p::velocity,
+                          p::bfield, p::pressure, r::J>(
+            resolved_pkgs.get());
 
-    const int irho = imap[fluid_prim::density::name()].first;
-    const int ivlo = imap[fluid_prim::velocity::name()].first;
-    const int ivhi = imap[fluid_prim::velocity::name()].second;
-    const int iblo = imap[fluid_prim::bfield::name()].first;
-    const int ibhi = imap[fluid_prim::bfield::name()].second;
-    const int iprs = imap[fluid_prim::pressure::name()].first;
+    auto v = desc.GetPack(rc.get());
 
-    auto idx_J = imap.GetFlatIdx(radmoment_prim::J::name(), false);
-
-    if (ibhi < 0) return;
+    if (v.Contains(0, p::bfield(0))) return;
 
     Real beta_min_local;
     pmb->par_reduce(
@@ -877,15 +865,15 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
         ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &beta_min) {
           const Real bsq =
-              GetMagneticFieldSquared(CellLocation::Cent, k, j, i, geom, v, ivlo, iblo);
-          Real Ptot = v(iprs, k, j, i);
+              GetMagneticFieldSquared(CellLocation::Cent, k, j, i, geom, v);
+          Real Ptot = v(0, p::pressure(), k, j, i);
           // TODO(BRR) multiple species
-          if (idx_J.IsValid()) {
+          if (v.Contains(0, r::J(0))) {
             int ispec = 0;
-            Ptot += 1. / 3. * v(idx_J(ispec), k, j, i);
+            Ptot += 1. / 3. * v(0, r::J(ispec), k, j, i);
           }
-          const Real beta = robust::ratio(v(iprs, k, j, i), 0.5 * bsq);
-          if (v(irho, k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
+          const Real beta = robust::ratio(v(0, p::pressure(), k, j, i), 0.5 * bsq);
+          if (v(0, p::density(), k, j, i) > rho_min_bnorm && beta < beta_min) beta_min = beta;
         },
         Kokkos::Min<Real>(beta_min_local));
     beta_min = std::min<Real>(beta_min_local, beta_min);
@@ -896,7 +884,7 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
         ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &bsq_max) {
           const Real bsq =
-              GetMagneticFieldSquared(CellLocation::Cent, k, j, i, geom, v, ivlo, iblo);
+              GetMagneticFieldSquared(CellLocation::Cent, k, j, i, geom, v);
           bsq_max = std::max(bsq, bsq_max);
         },
         Kokkos::Max<Real>(bsq_max_local));
@@ -907,7 +895,7 @@ void ComputeBetas(Mesh *pmesh, Real rho_min_bnorm, Real &beta_min_global,
         "Phoebus::ProblemGenerator::Torus::BFieldNorm::press_max", kb.s, kb.e, jb.s, jb.e,
         ib.s, ib.e,
         KOKKOS_LAMBDA(const int k, const int j, const int i, Real &P_max) {
-          P_max = std::max(v(iprs, k, j, i), P_max);
+          P_max = std::max(v(0, p::pressure(), k, j, i), P_max);
         },
         Kokkos::Max<Real>(press_max_local));
     press_max = std::max<Real>(press_max, press_max_local);

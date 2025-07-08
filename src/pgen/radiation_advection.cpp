@@ -21,28 +21,20 @@ namespace radiation_advection {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+  namespace p = fluid_prim;
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski),
                     "Problem \"advection\" requires \"Minkowski\" geometry!");
 
   auto &rc = pmb->meshblock_data.Get();
 
-  PackIndexMap imap;
-  auto v = rc->PackVariables(
-      std::vector<std::string>(
-          {radmoment_prim::J::name(), radmoment_prim::H::name(),
-           fluid_prim::density::name(), fluid_prim::temperature::name(),
-           fluid_prim::energy::name(), fluid_prim::velocity::name(),
-           radmoment_internal::xi::name(), radmoment_internal::phi::name()}),
-      imap);
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::velocity, p::temperature, p::energy,
+                         radmoment_prim::J, radmoment_prim::H, radmoment_internal::xi, radmoment_internal::phi>(
+          resolved_pkgs.get());
 
-  auto idJ = imap.GetFlatIdx(radmoment_prim::J::name());
-  auto idH = imap.GetFlatIdx(radmoment_prim::H::name());
-  auto idv = imap.GetFlatIdx(fluid_prim::velocity::name());
-  auto ixi = imap.GetFlatIdx(radmoment_internal::xi::name());
-  auto iphi = imap.GetFlatIdx(radmoment_internal::phi::name());
-  const int prho = imap[fluid_prim::density::name()].first;
-  const int pT = imap[fluid_prim::temperature::name()].first;
-  const int peng = imap[fluid_prim::energy::name()].first;
+  auto v = desc.GetPack(rc.get());
 
   Params &phoebus_params = pmb->packages.Get("phoebus")->AllParams();
 
@@ -54,7 +46,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real RHO = unit_conv.GetMassDensityCGSToCode();
   const Real TEMP = unit_conv.GetTemperatureCGSToCode();
 
-  const auto specB = idJ.GetBounds(1);
   const bool scale_free = pin->GetOrAddBoolean("units", "scale_free", true);
   const Real J0 = pin->GetOrAddReal("radiation_advection", "J", 1.0);
   const Real Hx = pin->GetOrAddReal("radiation_advection", "Hx", 0.0);
@@ -70,7 +61,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int shapedim = pin->GetOrAddInteger("radiation_advection", "shapedim", 1);
 
   auto &coords = pmb->coords;
-  auto pmesh = pmb->pmy_mesh;
   int ndim = pmesh->ndim;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::interior);
@@ -102,37 +92,37 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real z = (ndim > 2 && shapedim > 2) ? coords.Xc<3>(k) : 0;
         Real r = std::sqrt(x * x + y * y + z * z);
 
-        v(prho, k, j, i) = rho0;
-        v(pT, k, j, i) = T0;
+        v(0, p::density(), k, j, i) = rho0;
+        v(0, p::temperature(), k, j, i) = T0;
         Real lambda[2] = {0.};
-        v(peng, k, j, i) =
-            v(prho, k, j, i) * eos.InternalEnergyFromDensityTemperature(
-                                   v(prho, k, j, i), v(pT, k, j, i), lambda);
+        v(0, p::energy(), k, j, i) =
+            v(0, p::density(), k, j, i) * eos.InternalEnergyFromDensityTemperature(
+                                   v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda);
 
-        v(idv(0), k, j, i) = W * vx;
-        v(idv(1), k, j, i) = 0.0;
-        v(idv(2), k, j, i) = 0.0;
+        v(0, p::velocity(0), k, j, i) = W * vx;
+        v(0, p::velocity(1), k, j, i) = 0.0;
+        v(0, p::velocity(2), k, j, i) = 0.0;
 
         // Write down boosted diffusion initial condition
         Real tp = W * (t0 - vx * x);
         Real xp = W * (x - vx * t0);
-        for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
-          v(ixi(ispec), k, j, i) = 0.0;
-          v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
+        for (int ispec = 0; ispec < num_species; ++ispec) {
+          v(0, radmoment_internal::xi(ispec), k, j, i) = 0.0;
+          v(0, radmoment_internal::phi(ispec), k, j, i) = acos(-1.0) * 1.000001;
 
           if (boost) {
-            v(idJ(ispec), k, j, i) =
+            v(0, radmoment_prim::J(ispec), k, j, i) =
                 J0 * std::max(sqrt(t0p / tp) *
                                   exp(-3 * kappa * std::pow(xp - x0p, 2) / (4 * tp)),
                               1.e-10);
           } else {
-            v(idJ(ispec), k, j, i) =
+            v(0, radmoment_prim::J(ispec), k, j, i) =
                 J0 * std::max(exp(-std::pow((x - 0.5) / width, 2) / 2.0), 1.e-10);
           }
 
-          v(idH(ispec, 0), k, j, i) = Hx;
-          v(idH(ispec, 1), k, j, i) = Hy;
-          v(idH(ispec, 2), k, j, i) = Hz;
+          v(0, radmoment_prim::H(ispec, 0), k, j, i) = Hx;
+          v(0, radmoment_prim::H(ispec, 1), k, j, i) = Hy;
+          v(0, radmoment_prim::H(ispec, 2), k, j, i) = Hz;
         }
       });
 

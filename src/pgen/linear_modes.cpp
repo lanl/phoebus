@@ -31,6 +31,7 @@ namespace linear_modes {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+  namespace p = fluid_prim;
   const bool is_minkowski = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski));
   const bool is_boosted_minkowski =
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::BoostedMinkowski));
@@ -42,29 +43,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
   const int ndim = pmb->pmy_mesh->ndim;
 
-  PackIndexMap imap;
-  std::vector<std::string> vars({fluid_prim::density::name(),
-                                 fluid_prim::velocity::name(), fluid_prim::energy::name(),
-                                 fluid_prim::bfield::name(), fluid_prim::pressure::name(),
-                                 fluid_prim::temperature::name(),
-                                 fluid_prim::gamma1::name(), fluid_prim::ye::name()});
-  auto v = rc->PackVariables(vars, imap);
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::velocity, p::energy,
+                        p::bfield, p::ye, p::pressure, 
+                        p::temperature, p::gamma1>(
+          resolved_pkgs.get());
 
-  const int irho = imap[fluid_prim::density::name()].first;
-  const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
-  const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield::name()].first;
-  const int ib_hi = imap[fluid_prim::bfield::name()].second;
-  const int iprs = imap[fluid_prim::pressure::name()].first;
-  const int itmp = imap[fluid_prim::temperature::name()].first;
-  const int igm1 = imap[fluid_prim::gamma1::name()].first;
-  const int iye = imap[fluid_prim::ye::name()].second;
-  const int nv = ivhi - ivlo + 1;
+  auto v = desc.GetPack(rc.get());
 
   const Real gam = pin->GetReal("eos", "Gamma");
 
-  PARTHENON_REQUIRE_THROWS(nv == 3, "3 have 3 velocities");
+  //PARTHENON_REQUIRE_THROWS(nv == 3, "3 have 3 velocities");
 
   const std::string mode = pin->GetOrAddString("hydro_modes", "mode", "entropy");
   const std::string physics = pin->GetOrAddString("hydro_modes", "physics", "mhd");
@@ -209,65 +200,65 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const double mode = amp * cos(k1 * x + k2 * y);
 
         double rho = rho0 + (drho * mode).real();
-        v(irho, k, j, i) = rho;
+        v(0, p::density(), k, j, i) = rho;
         double ug = ug0 + (dug * mode).real();
         double Pg = (gam - 1.) * ug;
-        v(ieng, k, j, i) = ug;
-        v(iprs, k, j, i) = Pg;
+        v(0, p::energy(), k, j, i) = ug;
+        v(0, p::pressure(), k, j, i) = Pg;
 
         Real eos_lambda[2];
-        if (iye > 0) {
-          v(iye, k, j, i) = 0.5;
-          eos_lambda[0] = v(iye, k, j, i);
+        if (v.Contains(0, p::ye())) {
+          v(0, p::ye(), k, j, i) = 0.5;
+          eos_lambda[0] = v(0, p::ye(), k, j, i);
         }
         // This line causes NaNs and I don't know why
-        // v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(rho, v(ieng,
+        // v(0, p::pressure(), k, j, i) = eos.PressureFromDensityInternalEnergy(rho, v(0, p::energy(),
         // k, j, i)/rho);
-        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-            rho, v(ieng, k, j, i) / rho, eos_lambda);
-        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
-                           v(iprs, k, j, i);
-        if (ivhi > 0) {
-          v(ivlo, k, j, i) = u10 + (du1 * mode).real();
+        v(0, p::temperature(), k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+            rho, v(0, p::energy(), k, j, i) / rho, eos_lambda);
+        v(0, p::gamma1(), k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), eos_lambda) /
+                           v(0, p::pressure(), k, j, i);
+        if (ndim > 1) {
+          v(0, p::velocity(0), k, j, i) = u10 + (du1 * mode).real();
         }
-        if (ivhi >= 2) {
-          v(ivlo + 1, k, j, i) = u20 + (du2 * mode).real();
+        if (ndim > 2) {
+          v(0, p::velocity(1), k, j, i) = u20 + (du2 * mode).real();
         }
-        if (ivhi >= 3) {
-          v(ivlo + 2, k, j, i) = u30 + (du3 * mode).real();
+        if (ndim == 3) {
+          v(0, p::velocity(2), k, j, i) = u30 + (du3 * mode).real();
         }
-        if (ib_hi >= 1) {
-          v(ib_lo, k, j, i) = B10 + (dB1 * mode).real();
+        if (ndim > 1) {
+          v(0, p::bfield(0), k, j, i) = B10 + (dB1 * mode).real();
         }
-        if (ib_hi >= 2) {
-          v(ib_lo + 1, k, j, i) = B20 + (dB2 * mode).real();
+        if (ndim > 2) {
+          v(0, p::bfield(1), k, j, i) = B20 + (dB2 * mode).real();
         }
-        if (ib_hi >= 3) {
-          v(ib_lo + 2, k, j, i) = B30 + (dB3 * mode).real();
+        if (ndim > 3) {
+          v(0, p::bfield(2), k, j, i) = B30 + (dB3 * mode).real();
         }
 
         Real vsq = 0.;
-        SPACELOOP(ii) { vsq += v(ivlo + ii, k, j, i) * v(ivlo + ii, k, j, i); }
+        SPACELOOP(ii) { vsq += v(0, p::velocity(ii), k, j, i) * v(0, p::velocity(ii), k, j, i); }
         Real Gamma = sqrt(1. + vsq);
 
         if (is_snake || is_inchworm || is_boosted_minkowski) {
-          PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
+          //PARTHENON_REQUIRE(ivhi == 3, "Only works for 3D velocity!");
           // Transform velocity
           Real gcov[NDFULL][NDFULL] = {0};
           geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
           Real shift[NDSPACE];
           geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
           Real ucon[NDFULL] = {Gamma,            // alpha = 1 in Minkowski
-                               v(ivlo, k, j, i), // beta^i = 0 in Minkowski
-                               v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+                               v(0, p::velocity(0), k, j, i), // beta^i = 0 in Minkowski
+                               v(0, p::velocity(1), k, j, i), v(0, p::velocity(2), k, j, i)};
           Real Bdotv = 0.0;
-          for (int d = ib_lo; d <= ib_hi; d++) {
-            Bdotv += v(d, k, j, i) * v(ivlo + d - ib_lo, k, j, i) / Gamma;
+          for (int d = 0; d < 3; ++d) {
+            Bdotv += v(0, p::bfield(d), k, j, i) * v(0, p::velocity(d), k, j, i) / Gamma;
           }
           Real bcon[NDFULL] = {Gamma * Bdotv, 0.0, 0.0, 0.0};
-          for (int d = ib_lo; d <= ib_hi; d++) {
-            bcon[d - ib_lo + 1] = (v(d, k, j, i) + bcon[0] * ucon[d - ib_lo + 1]) / Gamma;
+          for (int d = 0; d < 3; ++d) {
+            bcon[d + 1] = (v(0, p::bfield(d), k, j, i) + bcon[0] * ucon[d + 1]) / Gamma;
           }
           Real J[NDFULL][NDFULL] = {0};
           if (is_snake) {
@@ -294,12 +285,12 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           }
 
           Gamma = alpha * ucon_transformed[0];
-          v(ivlo, k, j, i) = ucon_transformed[1] + Gamma * shift[0] / alpha;
-          v(ivlo + 1, k, j, i) = ucon_transformed[2] + Gamma * shift[1] / alpha;
-          v(ivlo + 2, k, j, i) = ucon_transformed[3] + Gamma * shift[2] / alpha;
-          for (int d = ib_lo; d <= ib_hi; d++) {
-            v(d, k, j, i) = bcon_transformed[d - ib_lo + 1] * Gamma -
-                            alpha * bcon_transformed[0] * ucon_transformed[d - ib_lo + 1];
+          v(0, p::velocity(0), k, j, i) = ucon_transformed[1] + Gamma * shift[0] / alpha;
+          v(0, p::velocity(1), k, j, i) = ucon_transformed[2] + Gamma * shift[1] / alpha;
+          v(0, p::velocity(2), k, j, i) = ucon_transformed[3] + Gamma * shift[2] / alpha;
+          for (int d = 0; d < 3; ++d) {
+            v(0, p::bfield(d), k, j, i) = bcon_transformed[d + 1] * Gamma -
+                            alpha * bcon_transformed[0] * ucon_transformed[d + 1];
           }
         }
       });

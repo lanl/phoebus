@@ -46,18 +46,21 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md);
 void ReduceLocalizationFunction(MeshData<Real> *md);
 Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain);
 
-template <typename Reducer_t>
-Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
+template <typename Reducer_t, typename Var_t>
+Real ReduceOneVar(MeshData<Real> *md, int idx = 0) {
+  using parthenon::MakePackDescriptor;
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
 
-  PackIndexMap imap;
-  std::vector<std::string> vars = {varname};
-  const auto pack = md->PackVariables(vars, imap);
-  const auto ivar = imap[varname];
-  PARTHENON_REQUIRE(ivar.first >= 0, "Var must exist");
-  PARTHENON_REQUIRE(ivar.second >= ivar.first + idx, "Var must exist");
+  auto &resolved_pkgs = md->GetMeshPointer()->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<Var_t>(resolved_pkgs.get());
+
+  auto pack = desc.GetPack(md);
+
+  //PARTHENON_REQUIRE(pack.Contains(0, Var_t), "Var must exist");
+  //PARTHENON_REQUIRE(pack.Contains(0, Var_t(idx)), "Var must exist");
 
   // We choose to apply volume weighting when using the sum reduction.
   // This assumes that for "Sum" variables, the variable is densitized, meaning
@@ -71,15 +74,15 @@ Real ReduceOneVar(MeshData<Real> *md, const std::string &varname, int idx = 0) {
       std::is_same<Reducer_t, Kokkos::Sum<Real, Kokkos::DefaultExecutionSpace>>::value;
 
   parthenon::par_reduce(
-      parthenon::LoopPatternMDRange(), "Phoebus History for " + varname, DevExecSpace(),
-      0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      parthenon::LoopPatternMDRange(), "Phoebus History for " + Var_t::name(), DevExecSpace(),
+      0, pack.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
         // join is a Kokkos construct
         // that automatically does the
         // reduction operation locally
-        const auto &coords = pack.GetCoords(b);
+        const auto &coords = pack.GetCoordinates(b);
         const Real vol = volume_weighting ? coords.CellVolume(k, j, i) : 1.0;
-        reducer.join(lresult, pack(b, ivar.first + idx, k, j, i) * vol);
+        reducer.join(lresult, pack(b, idx, k, j, i) * vol);
       },
       reducer);
   return result;

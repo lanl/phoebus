@@ -30,20 +30,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   namespace c = fluid_cons;
   auto &rc = pmb->meshblock_data.Get();
 
-  PackIndexMap imap;
-  auto v = rc->PackVariables({p::density::name(), p::velocity::name(), p::energy::name(),
-                              p::ye::name(), p::pressure::name(), p::temperature::name(),
-                              p::gamma1::name()},
-                             imap);
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::velocity, p::energy,
+                        p::bfield, p::ye, p::pressure, 
+                        p::temperature, p::gamma1>(
+          resolved_pkgs.get());
 
-  const int irho = imap[p::density::name()].first;
-  const int ivlo = imap[p::velocity::name()].first;
-  const int ivhi = imap[p::velocity::name()].second;
-  const int ieng = imap[p::energy::name()].first;
-  const int iye = imap[p::ye::name()].first;
-  const int iprs = imap[p::pressure::name()].first;
-  const int itmp = imap[p::temperature::name()].first;
-  const int igm1 = imap[p::gamma1::name()].first;
+  auto v = desc.GetPack(rc.get());
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -63,27 +58,27 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
       KOKKOS_LAMBDA(const int k, const int j, const int i) {
         const Real x = coords.Xc<1>(i);
         const Real y = coords.Xc<2>(j);
-        v(irho, k, j, i) = rho0;
-        v(itmp, k, j, i) = T0;
+        v(0, p::density(), k, j, i) = rho0;
+        v(0, p::temperature(), k, j, i) = T0;
 
         if (x >= -0.75 && x <= -0.25 && y >= -0.75 && y <= -0.25) {
-          v(iye, k, j, i) = 0.1;
+          v(0, p::ye(), k, j, i) = 0.1;
         } else if (x >= 0.25 && x <= 0.75 && y >= 0.25 && y <= 0.75) {
-          v(iye, k, j, i) = 0.35;
+          v(0, p::ye(), k, j, i) = 0.35;
         } else {
-          v(iye, k, j, i) = 0.225;
+          v(0, p::ye(), k, j, i) = 0.225;
         }
 
-        double lambda[2] = {v(iye, k, j, i), 0.};
-        v(ieng, k, j, i) =
+        double lambda[2] = {v(0, p::ye(), k, j, i), 0.};
+        v(0, p::energy(), k, j, i) =
             rho0 * eos.InternalEnergyFromDensityTemperature(rho0, T0, lambda);
-        v(iprs, k, j, i) = eos.PressureFromDensityTemperature(rho0, T0, lambda);
-        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                               v(irho, k, j, i), v(itmp, k, j, i), lambda) /
-                           v(iprs, k, j, i);
+        v(0, p::pressure(), k, j, i) = eos.PressureFromDensityTemperature(rho0, T0, lambda);
+        v(0, p::gamma1(), k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda) /
+                           v(0, p::pressure(), k, j, i);
 
         for (int d = 0; d < 3; d++)
-          v(ivlo + d, k, j, i) = 0.0;
+          v(0, p::velocity(d), k, j, i) = 0.0;
       });
 
   fluid::PrimitiveToConserved(rc.get());

@@ -27,6 +27,7 @@ namespace shock_tube {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
+  namespace p = fluid_prim;
   PARTHENON_REQUIRE(typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski) ||
                         typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::SphericalMinkowski),
                     "Problem \"shock_tube\" requires \"Minkowski\" or "
@@ -34,24 +35,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &rc = pmb->meshblock_data.Get();
 
-  PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
-                        imap);
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::velocity, p::energy,
+                        p::bfield, p::ye, p::pressure, 
+                        p::temperature, p::gamma1>(
+          resolved_pkgs.get());
 
-  const int irho = imap[fluid_prim::density::name()].first;
-  const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
-  const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield::name()].first;
-  const int ib_hi = imap[fluid_prim::bfield::name()].second;
-  const int iye = imap[fluid_prim::ye::name()].second;
-  const int iprs = imap[fluid_prim::pressure::name()].first;
-  const int itmp = imap[fluid_prim::temperature::name()].first;
-  const int igm1 = imap[fluid_prim::gamma1::name()].first;
+  auto v = desc.GetPack(rc.get());
 
   const Real rhol = pin->GetOrAddReal("shocktube", "rhol", 1.0);
   const Real Pl = pin->GetOrAddReal("shocktube", "Pl", 1.0);
@@ -85,37 +77,39 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real vel = x < 0.5 ? vl : vr;
 
         Real lambda[2];
-        if (iye > 0) {
-          v(iye, k, j, i) = 0.5;
-          lambda[0] = v(iye, k, j, i);
+        if (v.Contains(0, p::ye())) {
+          v(0, p::ye(), k, j, i) = 0.5;
+          lambda[0] = v(0, p::ye(), k, j, i);
         }
 
-        v(irho, k, j, i) = rho;
-        v(iprs, k, j, i) = P;
-        v(ieng, k, j, i) = phoebus::energy_from_rho_P(eos, rho, P, emin, emax, lambda[0]);
-        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-            rho, v(ieng, k, j, i) / rho,
+        v(0, p::density(), k, j, i) = rho;
+        v(0, p::pressure(), k, j, i) = P;
+        v(0, p::energy(), k, j, i) = phoebus::energy_from_rho_P(eos, rho, P, emin, emax, lambda[0]);
+        v(0, p::temperature(), k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+            rho, v(0, p::energy(), k, j, i) / rho,
             lambda); // this doesn't have to be exact, just a reasonable guess
-        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                               v(irho, k, j, i), v(itmp, k, j, i), lambda) /
-                           v(iprs, k, j, i);
-        for (int d = 0; d < 3; d++)
-          v(ivlo + d, k, j, i) = 0.0;
-        v(ivlo, k, j, i) = vel;
+        v(0, p::gamma1(), k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i), lambda) /
+                           v(0, p::pressure(), k, j, i);
+        for (int d = 0; d < 3; ++d)
+          v(0, p::velocity(d), k, j, i) = 0.0;
+        v(0, p::velocity(0), k, j, i) = vel;
         Real gammacov[3][3] = {0};
-        Real vcon[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+        Real vcon[3] = {v(0, p::velocity(0), k, j, i), v(0, p::velocity(1), k, j, i), v(0, p::velocity(2), k, j, i)};
         geom.Metric(CellLocation::Cent, k, j, i, gammacov);
         Real Gamma = phoebus::GetLorentzFactor(vcon, gammacov);
-        v(ivlo, k, j, i) *= Gamma;
-        if (ib_hi > 0) {
+        v(0, p::velocity(0), k, j, i) *= Gamma;
+        if (v.Contains(0, p::bfield(0))) {
           const Real Bx = x < 0.5 ? Bxl : Bxr;
           const Real By = x < 0.5 ? Byl : Byr;
           const Real Bz = x < 0.5 ? Bzl : Bzr;
-          v(ib_lo, k, j, i) = Bx;
-          v(ib_lo + 1, k, j, i) = By;
-          v(ib_hi, k, j, i) = Bz;
+          v(0, p::bfield(0), k, j, i) = Bx;
+          v(0, p::bfield(1), k, j, i) = By;
+          v(0, p::bfield(2), k, j, i) = Bz;
         }
-        if (iye > 0) v(iye, k, j, i) = sin(2.0 * M_PI * x);
+        if (v.Contains(0, p::ye())) {
+          v(0, p::ye(), k, j, i) = sin(2.0 * M_PI * x);
+        }
       });
 
   fluid::PrimitiveToConserved(rc.get());

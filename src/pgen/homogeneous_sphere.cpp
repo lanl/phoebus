@@ -27,24 +27,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto &rc = pmb->meshblock_data.Get();
 
-  PackIndexMap imap;
-  auto v =
-      rc->PackVariables(std::vector<std::string>(
-                            {radmoment_prim::J::name(), radmoment_prim::H::name(),
-                             fluid_prim::density::name(), fluid_prim::temperature::name(),
-                             fluid_prim::velocity::name(), radmoment_internal::xi::name(),
-                             radmoment_internal::phi::name()}),
-                        imap);
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<fluid_prim::density, fluid_prim::velocity, fluid_prim::temperature, 
+                         radmoment_prim::J, radmoment_prim::H, radmoment_internal::xi, radmoment_internal::phi>(
+          resolved_pkgs.get());
 
-  auto idJ = imap.GetFlatIdx(radmoment_prim::J::name());
-  auto idH = imap.GetFlatIdx(radmoment_prim::H::name());
-  auto idv = imap.GetFlatIdx(fluid_prim::velocity::name());
-  auto ixi = imap.GetFlatIdx(radmoment_internal::xi::name());
-  auto iphi = imap.GetFlatIdx(radmoment_internal::phi::name());
-  const int prho = imap[fluid_prim::density::name()].first;
-  const int pT = imap[fluid_prim::temperature::name()].first;
+  auto v = desc.GetPack(rc.get());
 
-  const auto specB = idJ.GetBounds(1);
+  auto rad_pkg = pmb->packages.Get("radiation");
+  auto num_species = rad_pkg->Param<int>("num_species");
   const Real sphere_rad = pin->GetOrAddReal("homogeneous_sphere", "radius", 1.0);
   const Real rho_min = pin->GetOrAddReal("homogeneous_sphere", "rho_min", 1.e-10);
   const Real J = pin->GetOrAddReal("homogeneous_sphere", "J", 0.0);
@@ -65,27 +58,27 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real r = coords.Xc<1>(i);
 
         if (r < sphere_rad) {
-          v(prho, k, j, i) = 1.0;
+          v(0, fluid_prim::density(), k, j, i) = 1.0;
         } else {
-          v(prho, k, j, i) = rho_min;
+          v(0, fluid_prim::density(), k, j, i) = rho_min;
         }
-        v(pT, k, j, i) = 1.0;
+        v(0, fluid_prim::temperature(), k, j, i) = 1.0;
 
-        v(idv(0), k, j, i) = vx;
-        v(idv(1), k, j, i) = 0.0;
-        v(idv(2), k, j, i) = 0.0;
+        v(0, fluid_prim::velocity(0), k, j, i) = vx;
+        v(0, fluid_prim::velocity(1), k, j, i) = 0.0;
+        v(0, fluid_prim::velocity(2), k, j, i) = 0.0;
 
-        for (int ispec = specB.s; ispec <= specB.e; ++ispec) {
+        for (int ispec = 0; ispec < num_species; ++ispec) {
 
-          v(ixi(ispec), k, j, i) = 0.0;
-          v(iphi(ispec), k, j, i) = acos(-1.0) * 1.000001;
+          v(0, radmoment_internal::xi(ispec), k, j, i) = 0.0;
+          v(0, radmoment_internal::phi(ispec), k, j, i) = acos(-1.0) * 1.000001;
 
-          v(idJ(ispec), k, j, i) = J;
-          printf("i = %i r = %e J = %e rho = %e\n", i, r, v(idJ(ispec), k, j, i),
-                 v(prho, k, j, i));
-          v(idH(ispec, 0), k, j, i) = Hx;
-          v(idH(ispec, 1), k, j, i) = Hy;
-          v(idH(ispec, 2), k, j, i) = Hz;
+          v(0, radmoment_prim::J(ispec), k, j, i) = J;
+          printf("i = %i r = %e J = %e rho = %e\n", i, r, v(0, radmoment_prim::J(ispec), k, j, i),
+                 v(0, fluid_prim::density(), k, j, i));
+          v(0, radmoment_prim::H(ispec, 0), k, j, i) = Hx;
+          v(0, radmoment_prim::H(ispec, 1), k, j, i) = Hy;
+          v(0, radmoment_prim::H(ispec, 2), k, j, i) = Hz;
         }
       });
 

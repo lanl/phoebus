@@ -27,24 +27,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto tracer_pkg = pmb->packages.Get("tracers");
   bool do_tracers = tracer_pkg->Param<bool>("active");
 
-  PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
-                        imap);
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
+                        fluid_prim::bfield, fluid_prim::ye, fluid_prim::pressure, 
+                        fluid_prim::temperature, fluid_prim::gamma1>(
+          resolved_pkgs.get());
 
-  const int irho = imap[fluid_prim::density::name()].first;
-  const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
-  const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield::name()].first;
-  const int ib_hi = imap[fluid_prim::bfield::name()].second;
-  const int iye = imap[fluid_prim::ye::name()].second;
-  const int iprs = imap[fluid_prim::pressure::name()].first;
-  const int itmp = imap[fluid_prim::temperature::name()].first;
-  const int igm1 = imap[fluid_prim::gamma1::name()].first;
+  auto v = desc.GetPack(rc.get());
 
   const Real rho = pin->GetOrAddReal("advection", "rho", 1.0);
   const Real u = pin->GetOrAddReal("advection", "u", 1.0);
@@ -55,7 +46,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int shapedim = pin->GetOrAddInteger("advection", "shapedim", 2);
 
   auto &coords = pmb->coords;
-  auto pmesh = pmb->pmy_mesh;
   int ndim = pmesh->ndim;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -77,30 +67,30 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real gcov[4][4];
         geom.SpacetimeMetric(0.0, x, y, z, gcov);
 
-        if (iye > 0) {
-          v(iye, k, j, i) = (r * r <= rin * rin) ? 1.0 : 0.0;
-          eos_lambda[0] = v(iye, k, j, i);
+        if (v.Contains(0, fluid_prim::ye())) {
+          v(0, fluid_prim::ye(), k, j, i) = (r * r <= rin * rin) ? 1.0 : 0.0;
+          eos_lambda[0] = v(0, fluid_prim::ye(), k, j, i);
         }
 
         const Real eps = u / (rho + 1e-20);
         const Real T = eos.TemperatureFromDensityInternalEnergy(rho, eps, eos_lambda);
         const Real P = eos.PressureFromDensityInternalEnergy(rho, eps, eos_lambda);
 
-        v(irho, k, j, i) = rho;
-        v(iprs, k, j, i) = P;
-        v(ieng, k, j, i) = u;
-        v(itmp, k, j, i) = T;
-        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
-                           v(iprs, k, j, i);
+        v(0, fluid_prim::density(), k, j, i) = rho;
+        v(0, fluid_prim::pressure(), k, j, i) = P;
+        v(0, fluid_prim::energy(), k, j, i) = u;
+        v(0, fluid_prim::temperature(), k, j, i) = T;
+        v(0, fluid_prim::gamma1(), k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(0, fluid_prim::density(), k, j, i), v(0, fluid_prim::temperature(), k, j, i), eos_lambda) /
+                           v(0, fluid_prim::pressure(), k, j, i);
         Real vsq = 0.;
         const Real vcon[3] = {vx, vy, vz};
         SPACELOOP2(ii, jj) { vsq += gcov[ii + 1][jj + 1] * vcon[ii] * vcon[jj]; }
         const Real W = 1. / sqrt(1. - vsq);
 
-        v(ivlo + 0, k, j, i) = W * vx;
-        v(ivlo + 1, k, j, i) = W * vy;
-        v(ivlo + 2, k, j, i) = W * vz;
+        v(0, fluid_prim::velocity(0), k, j, i) = W * vx;
+        v(0, fluid_prim::velocity(1), k, j, i) = W * vy;
+        v(0, fluid_prim::velocity(2), k, j, i) = W * vz;
       });
 
   fluid::PrimitiveToConserved(rc.get());

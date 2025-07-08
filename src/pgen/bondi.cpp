@@ -90,24 +90,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto rc = pmb->meshblock_data.Get().get();
 
-  PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
-                        imap);
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
+                        fluid_prim::bfield, fluid_prim::ye, fluid_prim::pressure, 
+                        fluid_prim::temperature, fluid_prim::gamma1>(
+          resolved_pkgs.get());
 
-  const int irho = imap[fluid_prim::density::name()].first;
-  const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
-  const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield::name()].first;
-  const int ib_hi = imap[fluid_prim::bfield::name()].second;
-  const int iye = imap[fluid_prim::ye::name()].second;
-  const int iprs = imap[fluid_prim::pressure::name()].first;
-  const int itmp = imap[fluid_prim::temperature::name()].first;
-  const int igm1 = imap[fluid_prim::gamma1::name()].first;
+  auto v = desc.GetPack(rc);
 
   // this only works with ideal gases
   const std::string eos_type = pin->GetString("eos", "type");
@@ -167,21 +158,21 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         Real eos_lambda[2];
-        if (iye > 0) {
-          v(iye, k, j, i) = 0.5;
-          eos_lambda[0] = v(iye, k, j, i);
+        if (v.Contains(0, fluid_prim::ye())) {
+          v(0, fluid_prim::ye(), k, j, i) = 0.5;
+          eos_lambda[0] = v(0, fluid_prim::ye(), k, j, i);
         }
 
-        v(itmp, k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
-        v(irho, k, j, i) = std::pow(v(itmp, k, j, i), n);
-        v(ieng, k, j, i) = v(irho, k, j, i) * v(itmp, k, j, i) / (gam - 1.0);
-        v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(
-            v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i), eos_lambda);
-        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                               v(irho, k, j, i), v(itmp, k, j, i), eos_lambda) /
-                           v(iprs, k, j, i);
+        v(0, fluid_prim::temperature(), k, j, i) = get_bondi_temp(r, n, C1, C2, Tc, rs);
+        v(0, fluid_prim::density(), k, j, i) = std::pow(v(0, fluid_prim::temperature(), k, j, i), n);
+        v(0, fluid_prim::energy(), k, j, i) = v(0, fluid_prim::density(), k, j, i) * v(0, fluid_prim::temperature(), k, j, i) / (gam - 1.0);
+        v(0, fluid_prim::pressure(), k, j, i) = eos.PressureFromDensityInternalEnergy(
+            v(0, fluid_prim::density(), k, j, i), v(0, fluid_prim::energy(), k, j, i) / v(0, fluid_prim::density(), k, j, i), eos_lambda);
+        v(0, fluid_prim::gamma1(), k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(0, fluid_prim::density(), k, j, i), v(0, fluid_prim::temperature(), k, j, i), eos_lambda) /
+                           v(0, fluid_prim::pressure(), k, j, i);
         Real ucon_bl[] = {0.0, 0.0, 0.0, 0.0};
-        ucon_bl[1] = -C1 / (std::pow(v(itmp, k, j, i), n) * std::pow(r, 2));
+        ucon_bl[1] = -C1 / (std::pow(v(0, fluid_prim::temperature(), k, j, i), n) * std::pow(r, 2));
 
         Real gcov[4][4];
         const Real th = tr.bl_theta(x1, x2);
@@ -221,7 +212,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         geom.ContravariantShift(CellLocation::Cent, k, j, i, beta);
         Real W = lapse * ucon[0];
         for (int d = 0; d < 3; d++) {
-          v(ivlo + d, k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
+          v(0, fluid_prim::velocity(d), k, j, i) = ucon[d + 1] + W * beta[d] / lapse;
         }
       });
 

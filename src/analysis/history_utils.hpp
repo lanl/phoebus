@@ -32,8 +32,7 @@ using namespace Geometry;
 namespace History {
 
 template <typename Pack, typename Geometry>
-KOKKOS_INLINE_FUNCTION Real CalcMassFlux(Pack &pack, Geometry &geom, const int prho,
-                                         const int pvel_lo, const int pvel_hi,
+KOKKOS_INLINE_FUNCTION Real CalcMassFlux(Pack &pack, Geometry &geom,
                                          const int b, const int k, const int j,
                                          const int i) {
 
@@ -42,30 +41,28 @@ KOKKOS_INLINE_FUNCTION Real CalcMassFlux(Pack &pack, Geometry &geom, const int p
   Real shift[3];
   geom.ContravariantShift(CellLocation::Cent, b, k, j, i, shift);
 
-  const Real vel[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
-                      pack(b, pvel_hi, k, j, i)};
+  const Real vel[] = {pack(b, fluid_prim::velocity(0), k, j, i), pack(b, fluid_prim::velocity(1), k, j, i),
+                      pack(b, fluid_prim::velocity(2), k, j, i)};
 
   Real gcov4[4][4];
   geom.SpacetimeMetric(CellLocation::Cent, b, k, j, i, gcov4);
   const Real W = phoebus::GetLorentzFactor(vel, gcov4);
   const Real ucon = vel[0] - shift[0] * W / lapse;
 
-  return -lapse * gdet * pack(b, prho, k, j, i) * ucon;
+  return -lapse * gdet * pack(b, fluid_prim::density(), k, j, i) * ucon;
 }
 
 template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real CalcMagnetization(Pack &pack, Geometry &geom,
-                                              const int pvel_lo, const int pvel_hi,
-                                              const int pb_lo, const int pb_hi,
-                                              const int prho, const int b, const int k,
+                                              const int b, const int k,
                                               const int j, const int i) {
   Real gam[3][3];
   geom.Metric(CellLocation::Cent, b, k, j, i, gam);
-  const Real Bp[] = {pack(b, pb_lo, k, j, i), pack(b, pb_lo + 1, k, j, i),
-                     pack(b, pb_hi, k, j, i)};
-  const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
-                       pack(b, pvel_hi, k, j, i)};
-  const Real rho = pack(b, prho, k, j, i);
+  const Real Bp[] = {pack(b, fluid_prim::bfield(0), k, j, i), pack(b, fluid_prim::bfield(1), k, j, i),
+                     pack(b, fluid_prim::bfield(2), k, j, i)};
+  const Real vcon[] = {pack(b, fluid_prim::velocity(0), k, j, i), pack(b, fluid_prim::velocity(1), k, j, i),
+                       pack(b, fluid_prim::velocity(2), k, j, i)};
+  const Real rho = pack(b, fluid_prim::density(), k, j, i);
   const Real W = phoebus::GetLorentzFactor(vcon, gam);
 
   const Real bsq = phoebus::GetMagneticFieldSquared(gam, vcon, Bp, W);
@@ -75,8 +72,6 @@ KOKKOS_INLINE_FUNCTION Real CalcMagnetization(Pack &pack, Geometry &geom,
 
 template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom,
-                                             const int pvel_lo, const int pvel_hi,
-                                             const int pb_lo, const int pb_hi,
                                              const int b, const int k, const int j,
                                              const int i) {
   Real gam[3][3];
@@ -86,10 +81,10 @@ KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom,
   Real shift[3];
   geom.ContravariantShift(CellLocation::Cent, b, k, j, i, shift);
 
-  const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
-                       pack(b, pvel_hi, k, j, i)};
-  const Real Bp[] = {pack(b, pb_lo, k, j, i), pack(b, pb_lo + 1, k, j, i),
-                     pack(b, pb_hi, k, j, i)};
+  const Real vcon[] = {pack(b, fluid_prim::velocity(0), k, j, i), pack(b, fluid_prim::velocity(1), k, j, i),
+                       pack(b, fluid_prim::velocity(2), k, j, i)};
+  const Real Bp[] = {pack(b, fluid_prim::bfield(0), k, j, i), pack(b, fluid_prim::bfield(1), k, j, i),
+                     pack(b, fluid_prim::bfield(2), k, j, i)};
   const Real W = phoebus::GetLorentzFactor(vcon, gam);
 
   Real Bdotv = 0.0;
@@ -113,8 +108,6 @@ KOKKOS_INLINE_FUNCTION Real CalcEMEnergyFlux(Pack &pack, Geometry &geom,
 
 template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
-                                               const int pvel_lo, const int pvel_hi,
-                                               const int pb_lo, const int pb_hi,
                                                const int b, const int k, const int j,
                                                const int i) {
   Real gam[3][3];
@@ -124,10 +117,10 @@ KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
   Real shift[3];
   geom.ContravariantShift(CellLocation::Cent, b, k, j, i, shift);
 
-  const Real vcon[] = {pack(b, pvel_lo, k, j, i), pack(b, pvel_lo + 1, k, j, i),
-                       pack(b, pvel_hi, k, j, i)};
-  const Real Bp[] = {pack(b, pb_lo, k, j, i), pack(b, pb_lo + 1, k, j, i),
-                     pack(b, pb_hi, k, j, i)};
+  const Real vcon[] = {pack(b, fluid_prim::velocity(0), k, j, i), pack(b, fluid_prim::velocity(1), k, j, i),
+                       pack(b, fluid_prim::velocity(2), k, j, i)};
+  const Real Bp[] = {pack(b, fluid_prim::bfield(0), k, j, i), pack(b, fluid_prim::bfield(1), k, j, i),
+                     pack(b, fluid_prim::bfield(2), k, j, i)};
   const Real W = phoebus::GetLorentzFactor(vcon, gam);
 
   Real Bdotv = 0.0;
@@ -156,12 +149,12 @@ KOKKOS_INLINE_FUNCTION Real CalcEMMomentumFlux(Pack &pack, Geometry &geom,
 
 template <typename Pack, typename Geometry>
 KOKKOS_INLINE_FUNCTION Real CalcMagneticFluxPhi(Pack &pack, Geometry &geom,
-                                                const int cb_lo, const int b, const int k,
+                                                const int b, const int k,
                                                 const int j, const int i) {
   Real lapse = geom.Lapse(CellLocation::Cent, b, k, j, i);
 
   // \int B^r sqrt(-gdet) := (detgam B^r) * lapse
-  return std::abs(pack(b, cb_lo, k, j, i)) * lapse;
+  return std::abs(pack(b, fluid_cons::bfield(0), k, j, i)) * lapse;
 } // Phi
 
 } // namespace History

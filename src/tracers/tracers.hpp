@@ -46,22 +46,23 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
  * dt not included
  **/
 template <typename Pack, typename Geometry>
-KOKKOS_INLINE_FUNCTION void tracers_rhs(Pack &pack, Geometry &geom, const int pvel_lo,
-                                        const int pvel_hi, const int ndim, const Real dt,
-                                        const Real x, const Real y, const Real z,
-                                        Real &rhs1, Real &rhs2, Real &rhs3) {
+KOKKOS_INLINE_FUNCTION void tracers_rhs(Pack &pack, Geometry &geom, 
+                                        const int ndim, const Real dt, 
+                                        const int b, const Real x, 
+                                        const Real y, const Real z, Real &rhs1,
+                                        Real &rhs2, Real &rhs3) {
 
   // geom quantities
   Real gcov4[4][4];
-  geom.SpacetimeMetric(0.0, x, y, z, gcov4);
-  Real lapse = geom.Lapse(0.0, x, y, z);
+  geom.SpacetimeMetric(b, 0.0, x, y, z, gcov4);
+  Real lapse = geom.Lapse(b, 0.0, x, y, z);
   Real shift[3];
-  geom.ContravariantShift(0.0, x, y, z, shift);
+  geom.ContravariantShift(b, 0.0, x, y, z, shift);
 
   // Get shift, W, lapse
-  const Real Wvel_X1 = LCInterp::Do(0, x, y, z, pack, pvel_lo);
-  const Real Wvel_X2 = LCInterp::Do(0, x, y, z, pack, pvel_lo + 1);
-  const Real Wvel_X3 = LCInterp::Do(0, x, y, z, pack, pvel_hi);
+  const Real Wvel_X1 = LCInterp::Do(b, x, y, z, pack, fluid_prim::velocity(0));
+  const Real Wvel_X2 = LCInterp::Do(b, x, y, z, pack, fluid_prim::velocity(1));
+  const Real Wvel_X3 = LCInterp::Do(b, x, y, z, pack, fluid_prim::velocity(2));
   const Real Wvel[] = {Wvel_X1, Wvel_X2, Wvel_X3};
   const Real W = phoebus::GetLorentzFactor(Wvel, gcov4);
   const Real vel_X1 = Wvel_X1 / W;
