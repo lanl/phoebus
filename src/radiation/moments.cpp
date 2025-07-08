@@ -33,6 +33,7 @@ namespace radiation {
 using fixup::Bounds;
 using Microphysics::Opacities;
 using Microphysics::EOS::EOS;
+using parthenon::MakePackDescriptor;
 
 template <class T>
 class ReconstructionIndexer {
@@ -298,27 +299,23 @@ TaskStatus ReconstructEdgeStates(T *rc) {
   namespace pr = radmoment_prim;
   namespace ir = radmoment_internal;
 
-  PackIndexMap imap_ql, imap_qr, imap;
-  VariablePack<Real> ql_base =
-      rc->PackVariables(std::vector<std::string>{ir::ql::name()}, imap_ql);
-  VariablePack<Real> qr_base =
-      rc->PackVariables(std::vector<std::string>{ir::qr::name()}, imap_qr);
-  std::vector<std::string> variables = {pr::J::name(), pr::H::name(), ir::tilPi::name()};
-  variables.push_back(ir::dJ::name());
-  VariablePack<Real> v = rc->PackVariables(variables, imap);
-  auto idx_J = imap.GetFlatIdx(pr::J::name());
-  auto idx_dJ = imap.GetFlatIdx(ir::dJ::name());
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
+  static auto desc_ql =
+      MakePackDescriptor<ir::ql>(rc);
+  static auto desc_qr =
+      MakePackDescriptor<ir::qr>(rc);
+  static auto desc = MakePackDescriptor<pr::J, pr::H, ir::tilPi, ir::dJ>(rc);
+  static auto desc_vel = MakePackDescriptor<fluid_prim::velocity>(rc);
+  auto ql_base = desc_ql.GetPack(rc);
+  auto qr_base = desc_qr.GetPack(rc);
+  auto v = desc.GetPack(rc);
+  auto v_vel = desc_vel.GetPack(rc);
 
   ParArrayND<Real> ql_v = rc->Get(ir::ql_v::name()).data;
   ParArrayND<Real> qr_v = rc->Get(ir::qr_v::name()).data;
-  VariablePack<Real> v_vel =
-      rc->PackVariables(std::vector<std::string>{fluid_prim::velocity::name()});
-  auto qIdx = imap_ql.GetFlatIdx(ir::ql::name());
 
-  const int nspec = qIdx.DimSize(1);
+  const int nspec = rad_pkg->Param<int>(num_species);
   int nrecon = 4 * nspec;
-  if (iTilPi.IsValid()) {
+  if (v.ContainsHost(0, ir::tilPi)) {
     nrecon = (4 + 9) * nspec; // TODO(BRR) 6 instead of 9 for conTilPi by symmetry
   }
 

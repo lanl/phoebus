@@ -26,6 +26,8 @@
 namespace tov {
 
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
+  namespace p = fluid_prim;
+
   const bool is_monopole_cart =
       (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::MonopoleCart));
   const bool is_monopole_sph =
@@ -70,24 +72,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
-  PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
-                        imap);
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::velocity, p::energy,
+                        p::bfield, p::ye, p::pressure, 
+                        p::temperature, p::gamma1>(
+          resolved_pkgs.get());
 
-  const int irho = imap[fluid_prim::density::name()].first;
-  const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
-  const int ieng = imap[fluid_prim::energy::name()].first;
-  const int iblo = imap[fluid_prim::bfield::name()].first;
-  const int ibhi = imap[fluid_prim::bfield::name()].second;
-  const int iye = imap[fluid_prim::ye::name()].second;
-  const int iprs = imap[fluid_prim::pressure::name()].first;
-  const int itmp = imap[fluid_prim::temperature::name()].first;
-  const int igm1 = imap[fluid_prim::gamma1::name()].first;
+  auto v = desc.GetPack(rc.get());
 
   pmb->par_for(
       "Phoebus::ProblemGenerator::TOV", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
@@ -108,19 +101,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         Real P = std::max(pmin, eos.PressureFromDensityInternalEnergy(rho, eps));
 
         // TODO(JMM): Add lambdas, Ye, etc
-        v(irho, k, j, i) = rho;
-        v(iprs, k, j, i) = P;
-        v(ieng, k, j, i) = eps * rho;
-        v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps);
-        v(igm1, k, j, i) =
-            eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i)) /
-            v(iprs, k, j, i);
+        v(0, p::density(), k, j, i) = rho;
+        v(0, p::pressure(), k, j, i) = P;
+        v(0, p::energy(), k, j, i) = eps * rho;
+        v(0, p::temperature(), k, j, i) = eos.TemperatureFromDensityInternalEnergy(rho, eps);
+        v(0, p::gamma1(), k, j, i) =
+            eos.BulkModulusFromDensityTemperature(v(0, p::density(), k, j, i), v(0, p::temperature(), k, j, i)) /
+            v(0, p::pressure(), k, j, i);
         for (int d = 0; d < 3; ++d) {
-          v(ivlo + d, k, j, i) = 0.0;
+          v(0, p::velocity(d), k, j, i) = 0.0;
         }
         // Perturbation in velocity for testing
         if (vpert_a > 0) {
-          v(ivlo, k, j, i) =
+          v(0, p::velocity(0), k, j, i) =
               vpert_a * r *
               std::exp(-(r - vpert_r) * (r - vpert_r) / (4 * vpert_s * vpert_s));
         }

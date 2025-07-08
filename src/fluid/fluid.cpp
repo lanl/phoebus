@@ -324,13 +324,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   parthenon::HstVar_list hst_vars = {};
 
   auto ReduceMass = [](MeshData<Real> *md) {
-    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::density::name(), 0);
+    return ReduceOneVar<Kokkos::Sum<Real>, fluid_cons::density>(md, 0);
   };
   auto ReduceEn = [](MeshData<Real> *md) {
-    return ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::energy::name(), 0);
+    return ReduceOneVar<Kokkos::Sum<Real>, fluid_cons::energy>(md, 0);
   };
   auto MaxDensity = [](MeshData<Real> *md) {
-    return ReduceOneVar<Kokkos::Max<Real>>(md, fluid_prim::density::name(), 0);
+    return ReduceOneVar<Kokkos::Max<Real>, fluid_prim::density>(md, 0);
   };
 
   hst_vars.emplace_back(HistoryOutputVar(HstMax, MaxDensity, "maximum density"));
@@ -339,8 +339,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   for (int d = 0; d < 3; ++d) {
     auto ReduceMom = [d](MeshData<Real> *md) {
-      return History::ReduceOneVar<Kokkos::Sum<Real>>(md, fluid_cons::momentum::name(),
-                                                      d);
+      return History::ReduceOneVar<Kokkos::Sum<Real>, fluid_cons::momentum>(md, d);
     };
     hst_vars.emplace_back(HistoryOutputVar(
         HstSum, ReduceMom, "total X" + std::to_string(d + 1) + " momentum"));

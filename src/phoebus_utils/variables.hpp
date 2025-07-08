@@ -85,6 +85,16 @@ VARIABLE(c, bfield);
 VARIABLE(c, ye);
 } // namespace fluid_cons
 
+namespace MonopoleGR {
+VARIABLE(mgr, a);
+VARIABLE(mgr, Krr);
+VARIABLE(mgr, alpha);
+VARIABLE(mgr, rho_ADM);
+VARIABLE(mgr, j_ADM);
+VARIABLE(mgr, TrcS_ADM);
+VARIABLE(mgr, Srr_ADM);
+} // namespace MonopoleGR
+
 namespace radmoment_prim {
 VARIABLE(r.p, J);
 TENSOR_VARIABLE(r.p, H, ANYDIM, 3); // (num_species, 3)

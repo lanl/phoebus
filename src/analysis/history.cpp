@@ -23,6 +23,7 @@
 namespace History {
 
 Real ReduceMassAccretionRate(MeshData<Real> *md) {
+  using parthenon::MakePackDescriptor;
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -32,33 +33,30 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars({p::density::name(), p::velocity::name()});
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::velocity>(resolved_pkgs.get());
 
-  PackIndexMap imap;
-  auto pack = md->PackVariables(vars, imap);
-
-  const int prho = imap[p::density::name()].first;
-  const int pvel_lo = imap[p::velocity::name()].first;
-  const int pvel_hi = imap[p::velocity::name()].second;
+  auto pack = desc.GetPack(md);
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
   Real result = 0.0;
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Phoebus History for Mass Accretion Rate",
-      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DevExecSpace(), 0, pack.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
-        const auto &coords = pack.GetCoords(b);
+        const auto &coords = pack.GetCoordinates(b);
         if (coords.Xf<1>(i) <= xh && xh < coords.Xf<1>(i + 1)) {
           const Real dx1 = coords.CellWidthFA(X1DIR, k, j, i);
           const Real dx2 = coords.CellWidthFA(X2DIR, k, j, i);
           const Real dx3 = coords.CellWidthFA(X3DIR, k, j, i);
 
           // interp to make sure we're getting the horizon correct
-          auto m = (CalcMassFlux(pack, geom, prho, pvel_lo, pvel_hi, b, k, j, i + 1) -
-                    CalcMassFlux(pack, geom, prho, pvel_lo, pvel_hi, b, k, j, i - 1)) /
+          auto m = (CalcMassFlux(pack, geom, b, k, j, i + 1) -
+                    CalcMassFlux(pack, geom, b, k, j, i - 1)) /
                    (2.0 * dx1);
-          auto flux = (CalcMassFlux(pack, geom, prho, pvel_lo, pvel_hi, b, k, j, i) +
+          auto flux = (CalcMassFlux(pack, geom, b, k, j, i) +
                        (xh - coords.Xc<1>(i)) * m) *
                       dx2 * dx3;
 
@@ -72,6 +70,7 @@ Real ReduceMassAccretionRate(MeshData<Real> *md) {
 } // mass accretion
 
 Real ReduceJetEnergyFlux(MeshData<Real> *md) {
+  using parthenon::MakePackDescriptor;
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -81,17 +80,11 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars(
-      {p::density::name(), p::bfield::name(), p::velocity::name()});
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::velocity, p::bfield>(resolved_pkgs.get());
 
-  PackIndexMap imap;
-  auto pack = md->PackVariables(vars, imap);
-
-  const int prho = imap[p::density::name()].first;
-  const int pvel_lo = imap[p::velocity::name()].first;
-  const int pvel_hi = imap[p::velocity::name()].second;
-  const int pb_lo = imap[p::bfield::name()].first;
-  const int pb_hi = imap[p::bfield::name()].second;
+  auto pack = desc.GetPack(md);
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
@@ -100,25 +93,20 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
   Real result = 0.0;
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Phoebus History for Jet Energy Flux",
-      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DevExecSpace(), 0, pack.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
-        const auto &coords = pack.GetCoords(b);
-        const Real sigma = CalcMagnetization(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi,
-                                             prho, b, k, j, i);
+        const auto &coords = pack.GetCoordinates(b);
+        const Real sigma = CalcMagnetization(pack, geom, b, k, j, i);
         if (coords.Xf<1>(i) <= xh && xh < coords.Xf<1>(i + 1) && sigma > sigma_cutoff) {
           const Real dx1 = coords.CellWidthFA(X1DIR, k, j, i);
           const Real dx2 = coords.CellWidthFA(X2DIR, k, j, i);
           const Real dx3 = coords.CellWidthFA(X3DIR, k, j, i);
 
           // interp to make sure we're getting the horizon correct
-          auto m = (CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j,
-                                     i + 1) -
-                    CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j,
-                                     i - 1)) /
-                   (2.0 * dx1);
+          auto m = (CalcEMEnergyFlux(pack, geom, b, k, j, i + 1) -
+                    CalcEMEnergyFlux(pack, geom, b, k, j, i - 1)) / (2.0 * dx1);
           auto flux =
-              (CalcEMEnergyFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k, j, i) +
-               (xh - coords.Xc<1>(i)) * m) *
+              (CalcEMEnergyFlux(pack, geom, b, k, j, i) + (xh - coords.Xc<1>(i)) * m) *
               dx2 * dx3;
 
           lresult += flux;
@@ -132,6 +120,7 @@ Real ReduceJetEnergyFlux(MeshData<Real> *md) {
 } // JetEnergyFlux
 
 Real ReduceJetMomentumFlux(MeshData<Real> *md) {
+  using parthenon::MakePackDescriptor;
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -141,17 +130,11 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace p = fluid_prim;
-  const std::vector<std::string> vars(
-      {p::density::name(), p::bfield::name(), p::velocity::name()});
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<p::density, p::velocity, p::bfield>(resolved_pkgs.get());
 
-  PackIndexMap imap;
-  auto pack = md->PackVariables(vars, imap);
-
-  const int prho = imap[p::density::name()].first;
-  const int pvel_lo = imap[p::velocity::name()].first;
-  const int pvel_hi = imap[p::velocity::name()].second;
-  const int pb_lo = imap[p::bfield::name()].first;
-  const int pb_hi = imap[p::bfield::name()].second;
+  auto pack = desc.GetPack(md);
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
@@ -160,24 +143,20 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
   Real result = 0.0;
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Phoebus History for Jet Momentum Flux",
-      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DevExecSpace(), 0, pack.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
-        const auto &coords = pack.GetCoords(b);
-        const Real sigma = CalcMagnetization(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi,
-                                             prho, b, k, j, i);
+        const auto &coords = pack.GetCoordinates(b);
+        const Real sigma = CalcMagnetization(pack, geom, b, k, j, i);
         if (coords.Xf<1>(i) <= xh && xh < coords.Xf<1>(i + 1) && sigma > sigma_cutoff) {
           const Real dx1 = coords.CellWidthFA(X1DIR, k, j, i);
           const Real dx2 = coords.CellWidthFA(X2DIR, k, j, i);
           const Real dx3 = coords.CellWidthFA(X3DIR, k, j, i);
 
           // interp to make sure we're getting the horizon correct
-          auto m = (CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k,
-                                       j, i + 1) -
-                    CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b, k,
-                                       j, i - 1)) /
+          auto m = (CalcEMMomentumFlux(pack, geom, b, k, j, i + 1) -
+                    CalcEMMomentumFlux(pack, geom, b, k, j, i - 1)) /
                    (2.0 * dx1);
-          auto flux = (CalcEMMomentumFlux(pack, geom, pvel_lo, pvel_hi, pb_lo, pb_hi, b,
-                                          k, j, i) +
+          auto flux = (CalcEMMomentumFlux(pack, geom, b, k, j, i) +
                        (xh - coords.Xc<1>(i)) * m) *
                       dx2 * dx3;
 
@@ -192,6 +171,7 @@ Real ReduceJetMomentumFlux(MeshData<Real> *md) {
 } // ReduceJetMomentumFlux
 
 Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
+  using parthenon::MakePackDescriptor;
   const auto ib = md->GetBoundsI(IndexDomain::interior);
   const auto jb = md->GetBoundsJ(IndexDomain::interior);
   const auto kb = md->GetBoundsK(IndexDomain::interior);
@@ -201,31 +181,30 @@ Real ReduceMagneticFluxPhi(MeshData<Real> *md) {
   const Real xh = pars.Get<Real>("xh");
 
   namespace c = fluid_cons;
-  const std::vector<std::string> vars({c::bfield::name()});
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<c::bfield>(resolved_pkgs.get());
 
-  PackIndexMap imap;
-  auto pack = md->PackVariables(vars, imap);
-
-  const int cb_lo = imap[c::bfield::name()].first;
+  auto pack = desc.GetPack(md);
 
   auto geom = Geometry::GetCoordinateSystem(md);
 
   Real result = 0.0;
   parthenon::par_reduce(
       parthenon::LoopPatternMDRange(), "Phoebus History for Jet Magnetic Flux Phi",
-      DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+      DevExecSpace(), 0, pack.GetNBlocks() - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i, Real &lresult) {
-        const auto &coords = pack.GetCoords(b);
+        const auto &coords = pack.GetCoordinates(b);
         if (coords.Xf<1>(i) <= xh && xh < coords.Xf<1>(i + 1)) {
           const Real dx1 = coords.CellWidthFA(X1DIR, k, j, i + 1);
           const Real dx2 = coords.CellWidthFA(X2DIR, k, j, i + 1);
           const Real dx3 = coords.CellWidthFA(X3DIR, k, j, i + 1);
 
           // interp to make sure we're getting the horizon correct
-          auto m = (CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i + 1 + 1) -
-                    CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i - 1 + 1)) /
+          auto m = (CalcMagneticFluxPhi(pack, geom, b, k, j, i + 1 + 1) -
+                    CalcMagneticFluxPhi(pack, geom, b, k, j, i - 1 + 1)) /
                    (2.0 * dx1);
-          auto flux = (CalcMagneticFluxPhi(pack, geom, cb_lo, b, k, j, i + 1) +
+          auto flux = (CalcMagneticFluxPhi(pack, geom, b, k, j, i + 1) +
                        (xh - coords.Xc<1>(i + 1)) * m) *
                       dx2 * dx3;
 

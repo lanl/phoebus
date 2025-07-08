@@ -99,15 +99,8 @@ TaskStatus AdvectTracers(MeshData<Real> *rc, const Real dt) {
           swarm_name);
   auto pack_tracers = desc_tracer.GetPack(rc);
 
-  static const auto vars = {p::velocity::name()};
   static const auto desc = MakePackDescriptor<p::velocity>(rc);
-
-  PackIndexMap imap;
-  auto pack = rc->PackVariables(vars, imap);
-
-  // TODO(BLB): move to sparse packs. requires reworking tracer_rhs
-  const int pvel_lo = imap[p::velocity::name()].first;
-  const int pvel_hi = imap[p::velocity::name()].second;
+  auto pack = desc.GetPack(rc);
 
   const auto geom = Geometry::GetCoordinateSystem(rc);
 
@@ -124,14 +117,13 @@ TaskStatus AdvectTracers(MeshData<Real> *rc, const Real dt) {
           const Real z = pack_tracers(b, swarm_position::z(), n);
 
           // predictor
-          tracers_rhs(pack, geom, pvel_lo, pvel_hi, ndim, dt, x, y, z, rhs1, rhs2, rhs3);
+          tracers_rhs(pack, geom, ndim, dt, b, x, y, z, rhs1, rhs2, rhs3);
           const Real kx = x + 0.5 * dt * rhs1;
           const Real ky = y + 0.5 * dt * rhs2;
           const Real kz = z + 0.5 * dt * rhs3;
 
           // corrector
-          tracers_rhs(pack, geom, pvel_lo, pvel_hi, ndim, dt, kx, ky, kz, rhs1, rhs2,
-                      rhs3);
+          tracers_rhs(pack, geom, ndim, dt, b, kx, ky, kz, rhs1, rhs2, rhs3);
 
           // update positions
           pack_tracers(b, swarm_position::x(), n) += rhs1 * dt;
@@ -177,28 +169,11 @@ void FillTracers(MeshBlockData<Real> *rc) {
   auto pack_tracers = desc_tracers.GetPack(rc);
 
   // hydro vars pack
-  std::vector<std::string> vars = {p::density::name(), p::temperature::name(),
-                                   p::velocity::name(), p::energy::name(),
-                                   p::pressure::name()};
-  if (mhd) {
-    vars.push_back(p::bfield::name());
-  }
-
-  PackIndexMap imap;
-  auto pack = rc->PackVariables(vars, imap);
-
-  const int pvel_lo = imap[p::velocity::name()].first;
-  const int pvel_hi = imap[p::velocity::name()].second;
-  const int pB_lo = imap[p::bfield::name()].first;
-  const int pB_hi = imap[p::bfield::name()].second;
-  const int prho = imap[p::density::name()].first;
-  const int ptemp = imap[p::temperature::name()].first;
-  const int pye = imap[p::ye::name()].second;
-  const int penergy = imap[p::energy::name()].first;
-  const int ppres = imap[p::pressure::name()].first;
+  static const auto desc = MakePackDescriptor<p::density, p::temperature, p::velocity, p::energy, p::pressure, p::ye, p::bfield>(rc);
+  auto pack = desc.GetPack(rc);
 
   auto geom = Geometry::GetCoordinateSystem(rc);
-  // update loop.
+
   pmb->par_for(
       "Fill Tracers", 0, pack_tracers.GetMaxFlatIndex(), KOKKOS_LAMBDA(const int idx) {
         const auto [b, n] = pack_tracers.GetBlockParticleIndices(idx);
@@ -212,28 +187,28 @@ void FillTracers(MeshBlockData<Real> *rc) {
 
           // geom quantities
           Real gcov4[4][4];
-          geom.SpacetimeMetric(0.0, x, y, z, gcov4);
-          Real lapse = geom.Lapse(0.0, x, y, z);
+          geom.SpacetimeMetric(b, 0.0, x, y, z, gcov4);
+          Real lapse = geom.Lapse(b, 0.0, x, y, z);
           Real shift[3];
-          geom.ContravariantShift(0.0, x, y, z, shift);
-          const Real gdet = geom.DetGamma(0.0, x, y, z);
+          geom.ContravariantShift(b, 0.0, x, y, z, shift);
+          const Real gdet = geom.DetGamma(b, 0.0, x, y, z);
 
           // Interpolate
-          const Real Wvel_X1 = LCInterp::Do(0, x, y, z, pack, pvel_lo);
-          const Real Wvel_X2 = LCInterp::Do(0, x, y, z, pack, pvel_lo + 1);
-          const Real Wvel_X3 = LCInterp::Do(0, x, y, z, pack, pvel_hi);
+          const Real Wvel_X1 = LCInterp::Do(b, x, y, z, pack, p::velocity(0));
+          const Real Wvel_X2 = LCInterp::Do(b, x, y, z, pack, p::velocity(1));
+          const Real Wvel_X3 = LCInterp::Do(b, x, y, z, pack, p::velocity(2));
           Real B_X1 = 0.0;
           Real B_X2 = 0.0;
           Real B_X3 = 0.0;
           if (mhd) {
-            B_X1 = LCInterp::Do(0, x, y, z, pack, pB_lo);
-            B_X2 = LCInterp::Do(0, x, y, z, pack, pB_lo + 1);
-            B_X3 = LCInterp::Do(0, x, y, z, pack, pB_hi);
+            B_X1 = LCInterp::Do(b, x, y, z, pack, p::bfield(0));
+            B_X2 = LCInterp::Do(b, x, y, z, pack, p::bfield(1));
+            B_X3 = LCInterp::Do(b, x, y, z, pack, p::bfield(2));
           }
-          const Real rho = LCInterp::Do(0, x, y, z, pack, prho);
-          const Real temperature = LCInterp::Do(0, x, y, z, pack, ptemp);
-          const Real energy = LCInterp::Do(0, x, y, z, pack, penergy);
-          const Real pressure = LCInterp::Do(0, x, y, z, pack, ppres);
+          const Real rho = LCInterp::Do(0, x, y, z, pack, p::density());
+          const Real temperature = LCInterp::Do(0, x, y, z, pack, p::temperature());
+          const Real energy = LCInterp::Do(0, x, y, z, pack, p::energy());
+          const Real pressure = LCInterp::Do(0, x, y, z, pack, p::pressure());
           const Real Wvel[] = {Wvel_X1, Wvel_X2, Wvel_X3};
           const Real W = phoebus::GetLorentzFactor(Wvel, gcov4);
           const Real vel_X1 = Wvel_X1 / W;
@@ -241,8 +216,8 @@ void FillTracers(MeshBlockData<Real> *rc) {
           const Real vel_X3 = Wvel_X3 / W;
           Real ye;
           Real lambda[2] = {0.0, 0.0};
-          if (pye > 0) {
-            ye = LCInterp::Do(0, x, y, z, pack, pye);
+          if (pack.Contains(b, p::ye())) {
+            ye = LCInterp::Do(b, x, y, z, pack, p::ye());
             lambda[1] = ye;
           } else {
             ye = 0.0;

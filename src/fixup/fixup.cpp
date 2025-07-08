@@ -42,6 +42,7 @@ using radiation::ClosureVerbosity;
 using radiation::Tens2;
 using radiation::Vec;
 using robust::ratio;
+using parthenon::MakePackDescriptor;
 
 namespace fixup {
 
@@ -311,38 +312,18 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   const Real ye_min = eos_pkg->Param<Real>("ye_min");
   const Real ye_max = eos_pkg->Param<Real>("ye_max");
 
-  const std::vector<std::string> vars(
-      {p::density::name(), c::density::name(), p::velocity::name(), c::momentum::name(),
-       p::energy::name(), c::energy::name(), p::bfield::name(), p::ye::name(),
-       c::ye::name(), p::pressure::name(), p::temperature::name(), p::gamma1::name(),
-       pr::J::name(), pr::H::name(), cr::E::name(), cr::F::name(),
-       impl::cell_signal_speed::name(), impl::fail::name(), ir::tilPi::name()});
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  const int ndim = pmesh->ndim;
 
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
+  static auto desc =
+      MakePackDescriptor<p::density, c::density, p::velocity, c::momentum, 
+                         p::energy, c::energy, p::bfield, p::ye, c::ye, 
+                         p::pressure, p::temperature, p::gamma1, 
+                         pr::J, pr::H, cr::E, cr::F, impl::cell_signal_speed, 
+                         impl::fail, ir::tilPi>(
+          resolved_pkgs.get());
 
-  const int prho = imap[p::density::name()].first;
-  const int crho = imap[c::density::name()].first;
-  const int pvel_lo = imap[p::velocity::name()].first;
-  const int pvel_hi = imap[p::velocity::name()].second;
-  const int cmom_lo = imap[c::momentum::name()].first;
-  const int cmom_hi = imap[c::momentum::name()].second;
-  const int peng = imap[p::energy::name()].first;
-  const int ceng = imap[c::energy::name()].first;
-  const int prs = imap[p::pressure::name()].first;
-  const int tmp = imap[p::temperature::name()].first;
-  const int gm1 = imap[p::gamma1::name()].first;
-  const int slo = imap[impl::cell_signal_speed::name()].first;
-  const int shi = imap[impl::cell_signal_speed::name()].second;
-  const int pb_lo = imap[p::bfield::name()].first;
-  const int pb_hi = imap[p::bfield::name()].second;
-  int pye = imap[p::ye::name()].second; // negative if not present
-  int cye = imap[c::ye::name()].second;
-  auto idx_J = imap.GetFlatIdx(pr::J::name(), false);
-  auto idx_H = imap.GetFlatIdx(pr::H::name(), false);
-  auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
-  auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
-  auto iTilPi = imap.GetFlatIdx(ir::tilPi::name(), false);
+  auto v = desc.GetPack(rc);
 
   const int num_species = enable_rad_floors ? rad_pkg->Param<int>("num_species") : 0;
 
@@ -368,13 +349,13 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
   Coordinates_t coords = rc->GetParentPointer()->coords;
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetDim(5) - 1, kb.s, kb.e,
+      DEFAULT_LOOP_PATTERN, "ApplyFloors", DevExecSpace(), 0, v.GetNBlocks() - 1, kb.s, kb.e,
       jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         double eos_lambda[2]; // used for stellarcollapse eos and
                               // other EOS's that require root
                               // finding.
-        eos_lambda[1] = std::log10(v(b, tmp, k, j, i)); // use last temp as initial guess
+        eos_lambda[1] = std::log10(v(b, p::temperature(), k, j, i)); // use last temp as initial guess
 
         double rho_floor, sie_floor;
         bounds.GetFloors(coords.Xc<1>(k, j, i), coords.Xc<2>(k, j, i),
@@ -411,10 +392,10 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
         if (enable_mhd_floors) {
           Real Bsq = 0.0;
           Real Bdotv = 0.0;
-          const Real vp[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                              v(b, pvel_lo + 2, k, j, i)};
-          const Real bp[3] = {v(b, pb_lo, k, j, i), v(pb_lo + 1, k, j, i),
-                              v(pb_lo + 2, k, j, i)};
+          const Real vp[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
+                              v(b, p::velocity(2), k, j, i)};
+          const Real bp[3] = {v(b, p::bfield(0), k, j, i), v(b, p::bfield(1), k, j, i),
+                              v(b, p::bfield(2), k, j, i)};
           const Real W = phoebus::GetLorentzFactor(vp, gcov);
           const Real iW = 1.0 / W;
           SPACELOOP2(ii, jj) {
@@ -428,11 +409,11 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           u_floor_max = std::max<Real>(u_floor_max, bsq / bsqou_max);
 
           rho_floor_max = std::max<Real>(
-              rho_floor_max, std::max<Real>(v(b, peng, k, j, i), u_floor_max) / e_max);
+              rho_floor_max, std::max<Real>(v(b, p::energy(), k, j, i), u_floor_max) / e_max);
         }
 
-        Real drho = rho_floor_max - v(b, prho, k, j, i);
-        Real du = u_floor_max - v(b, peng, k, j, i);
+        Real drho = rho_floor_max - v(b, p::density(), k, j, i);
+        Real du = u_floor_max - v(b, p::energy(), k, j, i);
         if (drho > 0. || du > 0.) {
           floor_applied = true;
           drho = std::max<Real>(drho, du / sie_floor);
@@ -441,15 +422,15 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
         Real dcrho, dS[3], dBcons[3], dtau, dyecons;
         Real bp[3] = {0};
-        if (pb_hi > 0) {
-          SPACELOOP(ii) { bp[ii] = v(b, pb_lo + ii, k, j, i); }
+        if (v.Contains(b, p::bfield(2))) {
+          SPACELOOP(ii) { bp[ii] = v(b, p::bfield(ii), k, j, i); }
         }
 
         if (floor_applied) {
           Real vp_normalobs[3] = {0}; // Inject floors at rest in normal observer frame
           Real ye = 0.5;
-          if (pye > 0) {
-            ye = v(b, cye, k, j, i);
+          if (v.Contains(b, c::ye())) {
+            ye = v(b, c::ye(), k, j, i);
           }
           eos_lambda[0] = ye;
           Real dprs =
@@ -461,90 +442,90 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                         betacon, alpha, sdetgam, dcrho, dS, dBcons, dtau, dyecons);
 
           // Update cons vars (not B field)
-          v(b, crho, k, j, i) += dcrho;
-          SPACELOOP(ii) { v(b, cmom_lo + ii, k, j, i) += dS[ii]; }
-          v(b, ceng, k, j, i) += dtau;
-          if (pye > 0) {
-            v(b, cye, k, j, i) += dyecons;
+          v(b, c::density(), k, j, i) += dcrho;
+          SPACELOOP(ii) { v(b, c::momentum(ii), k, j, i) += dS[ii]; }
+          v(b, c::energy(), k, j, i) += dtau;
+          if (v.Contains(b, c::ye())) {
+            v(b, c::ye(), k, j, i) += dyecons;
           }
 
           // fluid c2p
           auto status = invert(geom, eos, coords, k, j, i);
           if (status == con2prim_robust::ConToPrimStatus::failure) {
             // If fluid c2p fails, set to floors
-            v(b, prho, k, j, i) = drho;
-            SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = vp_normalobs[ii]; }
-            v(b, peng, k, j, i) = du;
-            if (pye > 0) {
-              v(b, pye, k, j, i) = ye_min;
+            v(b, p::density(), k, j, i) = drho;
+            SPACELOOP(ii) { v(b, p::velocity(ii), k, j, i) = vp_normalobs[ii]; }
+            v(b, p::energy(), k, j, i) = du;
+            if (v.Contains(b, p::ye())) {
+              v(b, p::ye(), k, j, i) = ye_min;
             }
 
             // Update auxiliary primitives
-            if (pye > 0) {
-              eos_lambda[0] = v(b, pye, k, j, i);
+            if (v.Contains(b, p::ye())) {
+              eos_lambda[0] = v(b, p::ye(), k, j, i);
             }
-            v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-                v(b, prho, k, j, i), v(b, peng, k, j, i) / v(b, prho, k, j, i),
+            v(b, p::temperature(), k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+                v(b, p::density(), k, j, i), v(b, p::energy(), k, j, i) / v(b, p::density(), k, j, i),
                 eos_lambda);
 
             // Update cons vars (not B field)
             prim2con::p2c(drho, vp_normalobs, bp, du, ye, dprs, dgm1, gcov, gammacon,
-                          betacon, alpha, sdetgam, v(b, crho, k, j, i), dS, dBcons,
-                          v(b, ceng, k, j, i), dyecons);
-            SPACELOOP(ii) { v(b, cmom_lo + ii, k, j, i) = dS[ii]; }
-            if (pye > 0) {
-              v(b, cye, k, j, i) = dyecons;
+                          betacon, alpha, sdetgam, v(b, c::density(), k, j, i), dS, dBcons,
+                          v(b, c::energy(), k, j, i), dyecons);
+            SPACELOOP(ii) { v(b, c::momentum(ii), k, j, i) = dS[ii]; }
+            if (v.Contains(b, c::ye())) {
+              v(b, c::ye(), k, j, i) = dyecons;
             }
           }
         }
 
         // Fluid ceilings?
-        Real vpcon[3] = {v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                         v(b, pvel_lo + 2, k, j, i)};
+        Real vpcon[3] = {v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
+                         v(b, p::velocity(2), k, j, i)};
         const Real W = phoebus::GetLorentzFactor(vpcon, gcov);
-        if (W > gamma_max || v(b, peng, k, j, i) / v(b, prho, k, j, i) > e_max) {
+        if (W > gamma_max || v(b, p::energy(), k, j, i) / v(b, p::density(), k, j, i) > e_max) {
           ceiling_applied = true;
         }
 
         if (ceiling_applied) {
           const Real rescale = std::sqrt(gamma_max * gamma_max - 1.) / (W * W - 1.);
           SPACELOOP(ii) { vpcon[ii] *= rescale; }
-          SPACELOOP(ii) { v(b, pvel_lo + ii, k, j, i) = vpcon[ii]; }
+          SPACELOOP(ii) { v(b, p::velocity(ii), k, j, i) = vpcon[ii]; }
 
           Real ye = 0.;
-          if (pye > 0) {
-            ye = v(b, pye, k, j, i);
+          if (v.Contains(b, p::ye())) {
+            ye = v(b, p::ye(), k, j, i);
           }
-          prim2con::p2c(v(b, prho, k, j, i), vpcon, bp, v(b, peng, k, j, i), ye,
-                        v(b, prs, k, j, i), v(b, gm1, k, j, i), gcov, gammacon, betacon,
-                        alpha, sdetgam, v(b, crho, k, j, i), dS, dBcons,
-                        v(b, ceng, k, j, i), dyecons);
-          SPACELOOP(ii) { v(b, cmom_lo + ii, k, j, i) = dS[ii]; }
-          if (pye > 0) {
-            v(b, cye, k, j, i) = dyecons;
+          prim2con::p2c(v(b, p::density(), k, j, i), vpcon, bp, v(b, p::energy(), k, j, i), ye,
+                        v(b, p::pressure(), k, j, i), v(b, p::gamma1(), k, j, i), gcov, gammacon, betacon,
+                        alpha, sdetgam, v(b, c::density(), k, j, i), dS, dBcons,
+                        v(b, c::energy(), k, j, i), dyecons);
+          SPACELOOP(ii) { v(b, c::momentum(ii), k, j, i) = dS[ii]; }
+          if (v.Contains(b, c::ye())) {
+            v(b, c::ye(), k, j, i) = dyecons;
           }
         }
 
         if (floor_applied || ceiling_applied) {
           // Update derived prims
-          if (pye > 0) eos_lambda[0] = v(b, pye, k, j, i);
-          v(b, tmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
-              v(b, prho, k, j, i), ratio(v(b, peng, k, j, i), v(b, prho, k, j, i)),
+          if (v.Contains(b, p::ye())) eos_lambda[0] = v(b, p::ye(), k, j, i);
+          v(b, p::temperature(), k, j, i) = eos.TemperatureFromDensityInternalEnergy(
+              v(b, p::density(), k, j, i), ratio(v(b, p::energy(), k, j, i), v(b, p::density(), k, j, i)),
               eos_lambda);
-          v(b, prs, k, j, i) = eos.PressureFromDensityTemperature(
-              v(b, prho, k, j, i), v(b, tmp, k, j, i), eos_lambda);
-          v(b, gm1, k, j, i) =
-              ratio(eos.BulkModulusFromDensityTemperature(v(b, prho, k, j, i),
-                                                          v(b, tmp, k, j, i), eos_lambda),
-                    v(b, prs, k, j, i));
+          v(b, p::pressure(), k, j, i) = eos.PressureFromDensityTemperature(
+              v(b, p::density(), k, j, i), v(b, p::temperature(), k, j, i), eos_lambda);
+          v(b, p::gamma1(), k, j, i) =
+              ratio(eos.BulkModulusFromDensityTemperature(v(b, p::density(), k, j, i),
+                                                          v(b, p::temperature(), k, j, i), eos_lambda),
+                    v(b, p::pressure(), k, j, i));
         }
 
         if (rad_active) {
-          Vec con_vp{v(b, pvel_lo, k, j, i), v(b, pvel_lo + 1, k, j, i),
-                     v(b, pvel_lo + 2, k, j, i)};
+          Vec con_vp{v(b, p::velocity(0), k, j, i), v(b, p::velocity(1), k, j, i),
+                     v(b, p::velocity(2), k, j, i)};
           const Real W = phoebus::GetLorentzFactor(con_vp.data, gcov);
-          Vec con_v{v(b, pvel_lo, k, j, i) / W, v(b, pvel_lo + 1, k, j, i) / W,
-                    v(b, pvel_lo + 2, k, j, i) / W};
+          Vec con_v{v(b, p::velocity(0), k, j, i) / W, v(b, p::velocity(1), k, j, i) / W,
+                    v(b, p::velocity(2), k, j, i) / W};
           typename CLOSURE::LocalGeometryType g(geom, CellLocation::Cent, b, k, j, i);
           Real E;
           Real J;
@@ -559,13 +540,13 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
             // rad c2p
 
             for (int ispec = 0; ispec < num_species; ++ispec) {
-              E = v(b, idx_E(ispec), k, j, i) / sdetgam;
-              SPACELOOP(ii) { cov_F(ii) = v(b, idx_F(ispec, ii), k, j, i) / sdetgam; }
+              E = v(b, cr::E(ispec), k, j, i) / sdetgam;
+              SPACELOOP(ii) { cov_F(ii) = v(b, cr::F(ispec, ii), k, j, i) / sdetgam; }
 
               // We need the real conTilPi
-              if (iTilPi.IsValid()) {
+              if (v.Contains(b, ir::tilPi())) {
                 SPACELOOP2(ii, jj) {
-                  con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                  con_TilPi(ii, jj) = v(b, ir::tilPi(ispec, ii, jj), k, j, i);
                 }
               } else {
                 // TODO(BRR) don't be lazy and actually retrieve these
@@ -575,8 +556,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               }
 
               c.Con2Prim(E, cov_F, con_TilPi, &J, &cov_H);
-              v(b, idx_J(ispec), k, j, i) = J;
-              SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J; }
+              v(b, pr::J(ispec), k, j, i) = J;
+              SPACELOOP(ii) { v(b, pr::H(ispec, ii), k, j, i) = cov_H(ii) / J; }
             }
           }
 
@@ -585,7 +566,7 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
           CLOSURE c_iso(con_v_normalobs, &g);
           Tens2 con_tilPi_iso{0};
           for (int ispec = 0; ispec < num_species; ++ispec) {
-            Real dJ = J_floor - v(b, idx_J(ispec), k, j, i);
+            Real dJ = J_floor - v(b, pr::J(ispec), k, j, i);
             if (dJ > 0.) {
 
               constexpr bool update_cons_vars = true; // false;
@@ -601,16 +582,16 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                 PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(2)), "bad");
                 c_iso.Prim2Con(J, cov_H, con_tilPi_iso, &E, &cov_F);
 
-                E += v(b, idx_E(ispec), k, j, i) / sdetgam;
-                SPACELOOP(ii) { cov_F(ii) += v(b, idx_F(ispec, ii), k, j, i) / sdetgam; }
+                E += v(b, cr::E(ispec), k, j, i) / sdetgam;
+                SPACELOOP(ii) { cov_F(ii) += v(b, cr::F(ispec, ii), k, j, i) / sdetgam; }
 
-                v(b, idx_E(ispec), k, j, i) = E * sdetgam;
-                SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
+                v(b, cr::E(ispec), k, j, i) = E * sdetgam;
+                SPACELOOP(ii) { v(b, cr::F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
 
                 // We need the real conTilPi
-                if (iTilPi.IsValid()) {
+                if (v.Contains(b, ir::tilPi())) {
                   SPACELOOP2(ii, jj) {
-                    con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                    con_TilPi(ii, jj) = v(b, ir::tilPi(ispec, ii, jj), k, j, i);
                   }
                 } else {
                   // TODO(BRR) don't be lazy and actually retrieve these
@@ -621,18 +602,18 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
 
                 c.Con2Prim(E, cov_F, con_TilPi, &J, &cov_H);
 
-                v(b, idx_J(ispec), k, j, i) = J;
-                SPACELOOP(ii) { v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J; }
+                v(b, pr::J(ispec), k, j, i) = J;
+                SPACELOOP(ii) { v(b, pr::H(ispec, ii), k, j, i) = cov_H(ii) / J; }
               } else {
-                v(b, idx_J(ispec), k, j, i) += dJ;
+                v(b, pr::J(ispec), k, j, i) += dJ;
 
-                J = v(b, idx_J(ispec), k, j, i);
-                SPACELOOP(ii) { cov_H(ii) = v(b, idx_H(ispec, ii), k, j, i) * J; }
+                J = v(b, pr::J(ispec), k, j, i);
+                SPACELOOP(ii) { cov_H(ii) = v(b, pr::H(ispec, ii), k, j, i) * J; }
 
                 // We need the real conTilPi
-                if (iTilPi.IsValid()) {
+                if (v.Contains(b, ir::tilPi())) {
                   SPACELOOP2(ii, jj) {
-                    con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                    con_TilPi(ii, jj) = v(b, ir::tilPi(ispec, ii, jj), k, j, i);
                   }
                 } else {
                   c.GetConTilPiFromPrim(J, cov_H, &con_TilPi);
@@ -644,29 +625,29 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
                 PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(2)), "bad");
 
                 c.Prim2Con(J, cov_H, con_TilPi, &E, &cov_F);
-                v(b, idx_E(ispec), k, j, i) = E * sdetgam;
-                SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
+                v(b, cr::E(ispec), k, j, i) = E * sdetgam;
+                SPACELOOP(ii) { v(b, cr::F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
               }
             }
 
-            Vec cov_H{v(b, idx_H(ispec, 0), k, j, i), v(b, idx_H(ispec, 1), k, j, i),
-                      v(b, idx_H(ispec, 2), k, j, i)};
+            Vec cov_H{v(b, pr::H(ispec, 0), k, j, i), v(b, pr::H(ispec, 1), k, j, i),
+                      v(b, pr::H(ispec, 2), k, j, i)};
             const Real xi =
                 std::sqrt(g.contractCov3Vectors(cov_H, cov_H) -
                           std::pow(g.contractConCov3Vectors(con_v, cov_H), 2));
 
             if (xi > xi_max) {
 
-              J = v(b, idx_J(ispec), k, j, i);
+              J = v(b, pr::J(ispec), k, j, i);
               SPACELOOP(ii) {
-                cov_H(ii) = (xi_max / xi) * v(b, idx_H(ispec, ii), k, j, i) * J;
-                v(b, idx_H(ispec, ii), k, j, i) = cov_H(ii) / J;
+                cov_H(ii) = (xi_max / xi) * v(b, pr::H(ispec, ii), k, j, i) * J;
+                v(b, pr::H(ispec, ii), k, j, i) = cov_H(ii) / J;
               }
 
               // We need the real conTilPi
-              if (iTilPi.IsValid()) {
+              if (v.Contains(b, ir::tilPi())) {
                 SPACELOOP2(ii, jj) {
-                  con_TilPi(ii, jj) = v(b, iTilPi(ispec, ii, jj), k, j, i);
+                  con_TilPi(ii, jj) = v(b, ir::tilPi(ispec, ii, jj), k, j, i);
                 }
               } else {
                 c.GetConTilPiFromPrim(J, cov_H, &con_TilPi);
@@ -676,8 +657,8 @@ TaskStatus ApplyFloorsImpl(T *rc, IndexDomain domain = IndexDomain::entire) {
               PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(1)), "bad");
               PARTHENON_DEBUG_REQUIRE(!std::isnan(cov_H(2)), "bad");
               c.Prim2Con(J, cov_H, con_TilPi, &E, &cov_F);
-              v(b, idx_E(ispec), k, j, i) = E * sdetgam;
-              SPACELOOP(ii) { v(b, idx_F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
+              v(b, cr::E(ispec), k, j, i) = E * sdetgam;
+              SPACELOOP(ii) { v(b, cr::F(ispec, ii), k, j, i) = cov_F(ii) * sdetgam; }
             }
           }
         }
@@ -756,38 +737,33 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   namespace c = fluid_cons;
   namespace cr = radmoment_cons;
 
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
   // x1-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x1] == BoundaryFlag::user) {
     if (ix1_bc == "gr_outflow") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
-                                          std::vector<std::string>({c::density::name()}),
-                                          imap);
-      const auto crho = imap[c::density::name()].first;
+      auto desc =
+          MakePackDescriptor<c::density>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X1DIR, crho, k, j, i) = std::min(v.flux(X1DIR, crho, k, j, i), 0.0);
+            v.flux(0, X1DIR, c::density(), k, j, i) = std::min(v.flux(0, X1DIR, c::density(), k, j, i), 0.0);
           });
     } else if (ix1_bc == "reflect") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), cr::E::name()}),
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), cr::E::name()}),
-          imap);
-      const auto crho = imap[c::density::name()].first;
-      const auto cener = imap[c::energy::name()].first;
-      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      auto desc =
+          MakePackDescriptor<c::density, c::energy, cr::E>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.s, ib.s, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X1DIR, crho, k, j, i) = 0.0;
-            v.flux(X1DIR, cener, k, j, i) = 0.0;
-            if (idx_E.IsValid()) {
+            v.flux(0, X1DIR, c::density(), k, j, i) = 0.0;
+            v.flux(0, X1DIR, c::energy(), k, j, i) = 0.0;
+            if (v.Contains(0, cr::E(0))) {
               for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X1DIR, idx_E(ispec), k, j, i) = 0.0;
+                v.flux(0, X1DIR, cr::E(ispec), k, j, i) = 0.0;
               }
             }
           });
@@ -795,35 +771,28 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   }
   if (pmb->boundary_flag[BoundaryFace::outer_x1] == BoundaryFlag::user) {
     if (ox1_bc == "gr_outflow") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
-                                          std::vector<std::string>({c::density::name()}),
-                                          imap);
-      const auto crho = imap[c::density::name()].first;
+      auto desc =
+          MakePackDescriptor<c::density>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.e + 1, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X1DIR, crho, k, j, i) = std::max(v.flux(X1DIR, crho, k, j, i), 0.0);
+            v.flux(0, X1DIR, c::density(), k, j, i) = std::max(v.flux(0, X1DIR, c::density(), k, j, i), 0.0);
           });
     } else if (ox1_bc == "reflect") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), cr::E::name()}),
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), cr::E::name()}),
-          imap);
-      const auto crho = imap[c::density::name()].first;
-      const auto cener = imap[c::energy::name()].first;
-      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      auto desc =
+          MakePackDescriptor<c::density, c::energy, cr::E>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x1", DevExecSpace(), kb.s, kb.e, jb.s, jb.e,
           ib.e + 1, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X1DIR, crho, k, j, i) = 0.0;
-            v.flux(X1DIR, cener, k, j, i) = 0.0;
-            if (idx_E.IsValid()) {
+            v.flux(0, X1DIR, c::density(), k, j, i) = 0.0;
+            v.flux(0, X1DIR, c::energy(), k, j, i) = 0.0;
+            if (v.Contains(0, cr::E(0))) {
               for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X1DIR, idx_E(ispec), k, j, i) = 0.0;
+                v.flux(0, X1DIR, cr::E(ispec), k, j, i) = 0.0;
               }
             }
           });
@@ -834,81 +803,60 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   // x2-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x2] == BoundaryFlag::user) {
     if (ix2_bc == "gr_outflow") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
-                                          std::vector<std::string>({c::density::name()}),
-                                          imap);
-      const auto crho = imap[c::density::name()].first;
+      auto desc =
+          MakePackDescriptor<c::density>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X2DIR, crho, k, j, i) = std::min(v.flux(X2DIR, crho, k, j, i), 0.0);
+            v.flux(0, X2DIR, c::density(), k, j, i) = std::min(v.flux(0, X2DIR, c::density(), k, j, i), 0.0);
           });
     } else if (ix2_bc == "polar") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), c::bfield::name(), cr::E::name(),
-                                    cr::F::name()}),
-          std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), c::bfield::name(), cr::E::name(),
-                                    cr::F::name()}),
-          imap);
-      const auto crho = imap[c::density::name()].first;
-      const auto cener = imap[c::energy::name()].first;
-      auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
-      auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
-      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
-      auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
+      auto desc =
+          MakePackDescriptor<c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X2DIR, crho, k, j, i) = 0.0;
-            v.flux(X2DIR, cener, k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::density(), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::energy(), k, j, i) = 0.0;
             SPACELOOP(ii) {
-              v.flux(X2DIR, idx_cmom(ii), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_cb(ii), k, j, i) = 0.0;
+              v.flux(0, X2DIR, c::momentum(ii), k, j, i) = 0.0;
+              v.flux(0, X2DIR, c::bfield(ii), k, j, i) = 0.0;
             }
-            v.flux(X1DIR, idx_cb(1), k, j - 1, i) = -v.flux(X1DIR, idx_cb(1), k, j, i);
+            v.flux(0, X1DIR, c::bfield(1), k, j - 1, i) = -v.flux(0, X1DIR, c::bfield(1), k, j, i);
             if (ndim == 3) {
-              v.flux(X3DIR, idx_cb(1), k, j - 1, i) = -v.flux(X3DIR, idx_cb(1), k, j, i);
+              v.flux(0, X3DIR, c::bfield(1), k, j - 1, i) = -v.flux(0, X3DIR, c::bfield(1), k, j, i);
             }
 
-            if (idx_E.IsValid()) {
+            if (v.Contains(0, cr::E(0))) {
               for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
-                v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
-                v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::E(ispec), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::F(ispec, 0), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::F(ispec, 2), k, j, i) = 0.0;
               }
             }
           });
     } else if (ix2_bc == "reflect") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), cr::E::name(), cr::F::name()}),
-          std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), cr::E::name(), cr::F::name()}),
-          imap);
-      const auto crho = imap[c::density::name()].first;
-      const auto cener = imap[c::energy::name()].first;
-      auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
-      auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
-      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
-      auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
+      auto desc =
+          MakePackDescriptor<c::density, c::energy, c::momentum, cr::E, cr::F>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.s, jb.s,
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X2DIR, crho, k, j, i) = 0.0;
-            v.flux(X2DIR, cener, k, j, i) = 0.0;
-            v.flux(X2DIR, idx_cmom(0), k, j, i) = 0.0;
-            v.flux(X2DIR, idx_cmom(2), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::density(), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::energy(), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::momentum(0), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::momentum(2), k, j, i) = 0.0;
 
             if (moments_active) {
               for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
-                v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
-                v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::E(ispec), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::F(ispec, 0), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::F(ispec, 2), k, j, i) = 0.0;
               }
             }
           });
@@ -916,82 +864,61 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   }
   if (pmb->boundary_flag[BoundaryFace::outer_x2] == BoundaryFlag::user) {
     if (ox2_bc == "gr_outflow") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
-                                          std::vector<std::string>({c::density::name()}),
-                                          imap);
-      const auto crho = imap[c::density::name()].first;
+      auto desc =
+          MakePackDescriptor<c::density>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
 
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e + 1,
           jb.e + 1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X2DIR, crho, k, j, i) = std::max(v.flux(X2DIR, crho, k, j, i), 0.0);
+            v.flux(0, X2DIR, c::density(), k, j, i) = std::max(v.flux(0, X2DIR, c::density(), k, j, i), 0.0);
           });
     } else if (ox2_bc == "polar") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), c::bfield::name(), cr::E::name(),
-                                    cr::F::name()}),
-          std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), c::bfield::name(), cr::E::name(),
-                                    cr::F::name()}),
-          imap);
-      const auto crho = imap[c::density::name()].first;
-      const auto cener = imap[c::energy::name()].first;
-      auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
-      auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
-      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
-      auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
+      auto desc =
+          MakePackDescriptor<c::density, c::energy, c::momentum, c::bfield, cr::E, cr::F>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e + 1,
           jb.e + 1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X2DIR, crho, k, j, i) = 0.0;
-            v.flux(X2DIR, cener, k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::density(), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::energy(), k, j, i) = 0.0;
             SPACELOOP(ii) {
-              v.flux(X2DIR, idx_cmom(ii), k, j, i) = 0.0;
-              v.flux(X2DIR, idx_cb(ii), k, j, i) = 0.0;
+              v.flux(0, X2DIR, c::momentum(ii), k, j, i) = 0.0;
+              v.flux(0, X2DIR, c::bfield(ii), k, j, i) = 0.0;
             }
-            v.flux(X1DIR, idx_cb(1), k, j, i) = -v.flux(X1DIR, idx_cb(1), k, j - 1, i);
+            v.flux(0, X1DIR, c::bfield(1), k, j, i) = -v.flux(0, X1DIR, c::bfield(1), k, j - 1, i);
             if (ndim == 3) {
-              v.flux(X3DIR, idx_cb(1), k, j, i) = -v.flux(X3DIR, idx_cb(1), k, j - 1, i);
+              v.flux(0, X3DIR, c::bfield(1), k, j, i) = -v.flux(0, X3DIR, c::bfield(1), k, j - 1, i);
             }
 
-            if (idx_E.IsValid()) {
+            if (v.Contains(0, cr::E(0))) {
               for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
-                v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
-                v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::E(ispec), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::F(ispec, 0), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::F(ispec, 2), k, j, i) = 0.0;
               }
             }
           });
     } else if (ox2_bc == "reflect") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), cr::E::name(), cr::F::name()}),
-          std::vector<std::string>({c::density::name(), c::energy::name(),
-                                    c::momentum::name(), cr::E::name(), cr::F::name()}),
-          imap);
-      const auto crho = imap[c::density::name()].first;
-      const auto cener = imap[c::energy::name()].first;
-      auto idx_cmom = imap.GetFlatIdx(c::momentum::name());
-      auto idx_cb = imap.GetFlatIdx(c::bfield::name(), false);
-      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
-      auto idx_F = imap.GetFlatIdx(cr::F::name(), false);
+      auto desc =
+          MakePackDescriptor<c::density, c::energy, c::momentum, cr::E, cr::F>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x2", DevExecSpace(), kb.s, kb.e, jb.e + 1,
           jb.e + 1, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X2DIR, crho, k, j, i) = 0.0;
-            v.flux(X2DIR, cener, k, j, i) = 0.0;
-            v.flux(X2DIR, idx_cmom(0), k, j, i) = 0.0;
-            v.flux(X2DIR, idx_cmom(2), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::density(), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::energy(), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::momentum(0), k, j, i) = 0.0;
+            v.flux(0, X2DIR, c::momentum(2), k, j, i) = 0.0;
 
-            if (idx_E.IsValid()) {
+            if (v.Contains(0, cr::E(0))) {
               for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X2DIR, idx_E(ispec), k, j, i) = 0.0;
-                v.flux(X2DIR, idx_F(ispec, 0), k, j, i) = 0.0;
-                v.flux(X2DIR, idx_F(ispec, 2), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::E(ispec), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::F(ispec, 0), k, j, i) = 0.0;
+                v.flux(0, X2DIR, cr::F(ispec, 2), k, j, i) = 0.0;
               }
             }
           });
@@ -1003,35 +930,28 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   // x3-direction
   if (pmb->boundary_flag[BoundaryFace::inner_x3] == BoundaryFlag::user) {
     if (ix3_bc == "gr_outflow") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
-                                          std::vector<std::string>({c::density::name()}),
-                                          imap);
-      const auto crho = imap[c::density::name()].first;
+      auto desc =
+          MakePackDescriptor<c::density>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.s, kb.s, jb.s, jb.e,
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X3DIR, crho, k, j, i) = std::min(v.flux(X3DIR, crho, k, j, i), 0.0);
+            v.flux(0, X3DIR, c::density(), k, j, i) = std::min(v.flux(0, X3DIR, c::density(), k, j, i), 0.0);
           });
     } else if (ix3_bc == "reflect") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), cr::E::name()}),
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), cr::E::name()}),
-          imap);
-      const auto crho = imap[c::density::name()].first;
-      const auto cener = imap[c::energy::name()].first;
-      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      auto desc =
+          MakePackDescriptor<c::density, c::energy, cr::E>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.s, kb.s, jb.s, jb.e,
           ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X3DIR, crho, k, j, i) = 0.0;
-            v.flux(X3DIR, cener, k, j, i) = 0.0;
-            if (idx_E.IsValid()) {
+            v.flux(0, X3DIR, c::density(), k, j, i) = 0.0;
+            v.flux(0, X3DIR, c::energy(), k, j, i) = 0.0;
+            if (v.Contains(0, cr::E(0))) {
               for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X3DIR, idx_E(ispec), k, j, i) = 0.;
+                v.flux(0, X3DIR, cr::E(ispec), k, j, i) = 0.;
               }
             }
           });
@@ -1039,35 +959,28 @@ TaskStatus FixFluxes(MeshBlockData<Real> *rc) {
   }
   if (pmb->boundary_flag[BoundaryFace::outer_x3] == BoundaryFlag::user) {
     if (ox3_bc == "gr_outflow") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(std::vector<std::string>({c::density::name()}),
-                                          std::vector<std::string>({c::density::name()}),
-                                          imap);
-      const auto crho = imap[c::density::name()].first;
+      auto desc =
+          MakePackDescriptor<c::density>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.e + 1, kb.e + 1, jb.s,
           jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X3DIR, crho, k, j, i) = std::max(v.flux(X3DIR, crho, k, j, i), 0.0);
+            v.flux(0, X3DIR, c::density(), k, j, i) = std::max(v.flux(0, X3DIR, c::density(), k, j, i), 0.0);
           });
     } else if (ox3_bc == "reflect") {
-      PackIndexMap imap;
-      auto v = rc->PackVariablesAndFluxes(
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), cr::E::name()}),
-          std::vector<std::string>(
-              {c::density::name(), c::energy::name(), cr::E::name()}),
-          imap);
-      const auto crho = imap[c::density::name()].first;
-      const auto cener = imap[c::energy::name()].first;
-      auto idx_E = imap.GetFlatIdx(cr::E::name(), false);
+      auto desc =
+          MakePackDescriptor<c::density, c::energy, cr::E>(resolved_pkgs.get(), {}, {PDOpt::WithFluxes});
+
+      auto v = desc.GetPack(rc);
       parthenon::par_for(
           DEFAULT_LOOP_PATTERN, "FixFluxes::x3", DevExecSpace(), kb.e + 1, kb.e + 1, jb.s,
           jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-            v.flux(X3DIR, crho, k, j, i) = 0.0;
-            v.flux(X3DIR, cener, k, j, i) = 0.0;
-            if (idx_E.IsValid()) {
+            v.flux(0, X3DIR, c::density(), k, j, i) = 0.0;
+            v.flux(0, X3DIR, c::energy(), k, j, i) = 0.0;
+            if (v.Contains(0, cr::E(0))) {
               for (int ispec = 0; ispec < num_species; ispec++) {
-                v.flux(X3DIR, idx_E(ispec), k, j, i) = 0.;
+                v.flux(0, X3DIR, cr::E(ispec), k, j, i) = 0.;
               }
             }
           });

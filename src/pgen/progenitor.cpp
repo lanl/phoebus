@@ -26,6 +26,7 @@
 #include <utils/error_checking.hpp>
 
 using DataBox = Spiner::DataBox<Real>;
+using parthenon::MakePackDescriptor;
 
 // Homologously collapsing star.
 namespace homologous {
@@ -38,26 +39,17 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
   auto geom = Geometry::GetCoordinateSystem(rc.get());
 
-  PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
-                        imap);
-  const int irho = imap[fluid_prim::density::name()].first;
-  const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
-  const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield::name()].first;
-  const int ib_hi = imap[fluid_prim::bfield::name()].second;
-  const int iye = imap[fluid_prim::ye::name()].second;
-  const int iprs = imap[fluid_prim::pressure::name()].first;
-  const int itmp = imap[fluid_prim::temperature::name()].first;
-  const int igm1 = imap[fluid_prim::gamma1::name()].first;
+  Mesh *pmesh = rc->GetMeshPointer();
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc =
+      MakePackDescriptor<fluid_prim::density, fluid_prim::velocity, fluid_prim::energy,
+                        fluid_prim::bfield, fluid_prim::ye, fluid_prim::pressure, 
+                        fluid_prim::temperature, fluid_prim::gamma1>(
+          resolved_pkgs.get());
+
+  auto v = desc.GetPack(rc.get());
 
   auto &coords = pmb->coords;
-  auto pmesh = pmb->pmy_mesh;
   int ndim = pmesh->ndim;
 
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
@@ -126,9 +118,9 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
 
         Real lambda[2];
-        if (iye > 0) {
-          v(iye, k, j, i) = Ye_dev.interpToReal(r);
-          lambda[0] = v(iye, k, j, i);
+        if (v.Contains(0, fluid_prim::ye())) {
+          v(0, fluid_prim::ye(), k, j, i) = Ye_dev.interpToReal(r);
+          lambda[0] = v(0, fluid_prim::ye(), k, j, i);
         }
 
         const Real u = phoebus::energy_from_rho_P(eos, mass_density_dev.interpToReal(r),
@@ -147,19 +139,19 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           vel_vec_out[0] = vel_vec_in[0];
         }
 
-        v(irho, k, j, i) = mass_density_dev.interpToReal(r);
-        SPACELOOP(d) { v(ivlo + d, k, j, i) = vel_vec_out[d]; }
-        v(iprs, k, j, i) = pressure_dev.interpToReal(r);
-        v(ieng, k, j, i) = u;
-        v(itmp, k, j, i) = T;
-        v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
-                               v(irho, k, j, i), v(itmp, k, j, i), lambda) /
-                           v(iprs, k, j, i);
+        v(0, fluid_prim::density(), k, j, i) = mass_density_dev.interpToReal(r);
+        SPACELOOP(d) { v(0, fluid_prim::velocity(d), k, j, i) = vel_vec_out[d]; }
+        v(0, fluid_prim::pressure(), k, j, i) = pressure_dev.interpToReal(r);
+        v(0, fluid_prim::energy(), k, j, i) = u;
+        v(0, fluid_prim::temperature(), k, j, i) = T;
+        v(0, fluid_prim::gamma1(), k, j, i) = eos.BulkModulusFromDensityTemperature(
+                               v(0, fluid_prim::density(), k, j, i), v(0, fluid_prim::temperature(), k, j, i), lambda) /
+                           v(0, fluid_prim::pressure(), k, j, i);
         Real Gammacov[3][3] = {0};
-        Real vcon[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+        Real vcon[3] = {v(0, fluid_prim::velocity(0), k, j, i), v(0, fluid_prim::velocity(1), k, j, i), v(0, fluid_prim::velocity(2), k, j, i)};
         geom.Metric(CellLocation::Cent, k, j, i, Gammacov);
         Real Gamma = phoebus::GetLorentzFactor(vcon, Gammacov);
-        SPACELOOP(d) { v(ivlo + d, k, j, i) *= Gamma; }
+        SPACELOOP(d) { v(0, fluid_prim::velocity(d), k, j, i) *= Gamma; }
       });
 
   fluid::PrimitiveToConserved(rc.get());

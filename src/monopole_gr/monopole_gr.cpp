@@ -44,6 +44,7 @@
 using namespace parthenon::package::prelude;
 using parthenon::AllReduce;
 using parthenon::MetadataFlag;
+using parthenon::MakePackDescriptor;
 
 namespace MonopoleGR {
 
@@ -196,13 +197,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     std::vector<MetadataFlag> geom_flags = {Metadata::Private, Metadata::Cell,
                                             Metadata::Derived, Metadata::OneCopy};
     Metadata mgeom = Metadata(geom_flags);
-    monopole_gr->AddField("a", mgeom);
-    monopole_gr->AddField("Krr", mgeom);
-    monopole_gr->AddField("alpha", mgeom);
-    monopole_gr->AddField("rho_ADM", mgeom);
-    monopole_gr->AddField("j_ADM", mgeom);
-    monopole_gr->AddField("TrcS_ADM", mgeom);
-    monopole_gr->AddField("Srr_ADM", mgeom);
+    monopole_gr->AddField<MonopoleGR::a>(mgeom);
+    monopole_gr->AddField(MonopoleGR::Krr::name(), mgeom);
+    monopole_gr->AddField(MonopoleGR::alpha::name(), mgeom);
+    monopole_gr->AddField(MonopoleGR::rho_ADM::name(), mgeom);
+    monopole_gr->AddField(MonopoleGR::j_ADM::name(), mgeom);
+    monopole_gr->AddField(MonopoleGR::TrcS_ADM::name(), mgeom);
+    monopole_gr->AddField(MonopoleGR::Srr_ADM::name(), mgeom);
 #ifndef PHOEBUS_IN_UNIT_TESTS
     monopole_gr->FillDerivedBlock = InterpMetricToGrid<MeshBlockData<Real>>;
 #endif
@@ -742,22 +743,12 @@ TaskStatus InterpMetricToGrid(T *rc) {
   auto const &geom_pkg = pmb->packages.Get("geometry");
   auto transform = Geometry::GetTransformation<Transformation_t>(geom_pkg.get());
 
-  const std::vector<std::string> vars{"monopole_gr::a",      "monopole_gr::Krr",
-                                      "monopole_gr::alpha",  "monopole_gr::rho_ADM",
-                                      "monopole_gr::j_ADM",  "monopole_gr::TrcS_ADM",
-                                      "monopole_gr::Srr_ADM"};
-  PackIndexMap imap;
-  auto v = rc->PackVariables(vars, imap);
-  const int ia = imap["monopole_gr::a"].first;
-  const int iK = imap["monopole_gr::Krr"].first;
-  const int ialpha = imap["monopole_gr::alpha"].first;
-  const int irho = imap["monopole_gr::rho_ADM"].first;
-  const int iJ = imap["monopole_gr::j_ADM"].first;
-  const int iTrcS = imap["monopole_gr::TrcS_ADM"].first;
-  const int iSrr = imap["monopole_gr::Srr_ADM"].first;
+  static const auto desc = MakePackDescriptor<MonopoleGR::a, MonopoleGR::Krr, MonopoleGR::alpha, MonopoleGR::rho_ADM, MonopoleGR::j_ADM, 
+               MonopoleGR::TrcS_ADM, MonopoleGR::Srr_ADM>(rc);
+  auto pack = desc.GetPack(rc);
 
   parthenon::par_for(
-      DEFAULT_LOOP_PATTERN, "Interp metric to grid", DevExecSpace(), 0, v.GetDim(5) - 1,
+      DEFAULT_LOOP_PATTERN, "Interp metric to grid", DevExecSpace(), 0, pack.GetNBlocks() - 1,
       kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
       KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
         Real x1 = coords.Xc<1>(k, j, i);
@@ -773,15 +764,15 @@ TaskStatus InterpMetricToGrid(T *rc) {
           transform(x1, x2, x3, C, c2s, s2c);
         }
 
-        v(b, ia, k, j, i) =
+        pack(b, MonopoleGR::a(), k, j, i) =
             Interpolate(r, hypersurface, radius, MonopoleGR::Hypersurface::A);
-        v(b, iK, k, j, i) =
+        pack(b, MonopoleGR::Krr(), k, j, i) =
             Interpolate(r, hypersurface, radius, MonopoleGR::Hypersurface::K);
-        v(b, ialpha, k, j, i) = Interpolate(r, alpha, radius);
-        v(b, irho, k, j, i) = Interpolate(r, matter, radius, MonopoleGR::Matter::RHO);
-        v(b, iJ, k, j, i) = Interpolate(r, matter, radius, MonopoleGR::Matter::J_R);
-        v(b, iTrcS, k, j, i) = Interpolate(r, matter, radius, MonopoleGR::Matter::trcS);
-        v(b, iSrr, k, j, i) = Interpolate(r, matter, radius, MonopoleGR::Matter::Srr);
+        pack(b, MonopoleGR::alpha(), k, j, i) = Interpolate(r, alpha, radius);
+        pack(b, MonopoleGR::rho_ADM(), k, j, i) = Interpolate(r, matter, radius, MonopoleGR::Matter::RHO);
+        pack(b, MonopoleGR::j_ADM(), k, j, i) = Interpolate(r, matter, radius, MonopoleGR::Matter::J_R);
+        pack(b, MonopoleGR::TrcS_ADM(), k, j, i) = Interpolate(r, matter, radius, MonopoleGR::Matter::trcS);
+        pack(b, MonopoleGR::Srr_ADM(), k, j, i) = Interpolate(r, matter, radius, MonopoleGR::Matter::Srr);
       });
   return TaskStatus::complete;
 }
