@@ -283,6 +283,22 @@ def CalcScatter3DvsRadius(data,nradbins=100,varname=None):
         
     return radcenters,varpercentiles
 
+def Make2DSlice(data,sliceaxis=1,slice=0.):
+    #sliceaxis=1 => z
+    #sliceaxis=2 => y
+    #sliceaxis=3 => x
+
+    if (sliceaxis==1):
+        w=data.zgrid
+    elif(slice==2):
+        w=data.ygrid
+    elif(slice==3):
+        w=data.zgrid
+        
+    for im in range(data.NumMB):
+        if ()
+    return
+
 def ReadHistory(fname=None):
     if (fname is None):
         fname = glob(f"*.hst")[0] #This assumes that there is only one .hst file.
@@ -324,6 +340,7 @@ def main():
     parser.add_argument('--Movie1D', action='store_true')
     parser.add_argument('--CalcOneDProfiles', action='store_true')
     parser.add_argument('--varname', type=str, default='p.density')
+    parser.add_argument('--MakeSlices', action='store_true')
     args= parser.parse_args()
 
     #Split varname into a list if needed
@@ -342,6 +359,18 @@ def main():
                 print(f"Making {iofile}")
                 radbins,varpercentiles = CalcScatter3DvsRadius(data,nradbins=400,varname=var)
                 np.savez(iofile,radbins=radbins,varpercentiles=varpercentiles)
+                
+    if (args.MakeSlices):
+        #List of outfile names                                                      
+        filenames = sorted(glob(f"*.out1.*.phdf"))
+        nfiles = len(filenames)
+        for i in range(nfiles):
+            data = Dump3D(filenames[i],extractvars=args.varname)
+            for var in args.varname:
+                iofile=f'TwoDSlice.{var}.{i:04d}.npz'
+                print(f"Making {iofile}")
+                dataslice=Make2DSlice(data)
+                np.save(iofile,dataslice)
                 
     if (args.Movie1D):
         #List of outfile names
