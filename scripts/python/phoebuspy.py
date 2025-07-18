@@ -283,21 +283,52 @@ def CalcScatter3DvsRadius(data,nradbins=100,varname=None):
         
     return radcenters,varpercentiles
 
-def Make2DSlice(data,sliceaxis=1,slice=0.):
+def Make2DSlice(data,sliceaxis=1,slice=0.,extractvars=['p.density']):
     #sliceaxis=1 => z
     #sliceaxis=2 => y
     #sliceaxis=3 => x
 
     if (sliceaxis==1):
-        w=data.zgrid
-    elif(slice==2):
-        w=data.ygrid
-    elif(slice==3):
-        w=data.zgrid
-        
+        w=data.zf
+    elif(sliceaxis==2):
+        w=data.yf
+    elif(sliceaxis==3):
+        w=data.xf
+    else:
+        raise ValueError("sliceaxis must be 1 (z), 2 (y), or 3 (x)")
+
+    slice_data = []
+    
     for im in range(data.NumMB):
-        if ()
-    return
+        # w[im] shape: (nz+1), (ny+1), or (nx+1) depending on sliceaxis
+        w_local = w[im, :]
+
+        # Find zones where the slice falls between w_local edges
+        mask = (w_local[:-1] <= slice) & (slice < w_local[1:])
+        
+        if (np.any(mask)):
+            assert np.sum(mask) == 1, f"Multiple indices match in meshblock {im}"
+
+            idx = np.where(mask)[0][0]
+            # Extract 2D slice by fixing idx along the chosen axis
+            if sliceaxis == 1:
+                slice_vars = {key: data.var[key][im, idx, :, :] for key in extractvars}
+                coords = (data.xgrid[im, idx, :, :], data.ygrid[im, idx, :, :])
+            elif sliceaxis == 2:
+                slice_vars = {key: data.var[key][im, :, idx, :] for key in extractvars}
+                coords = (data.xgrid[im, :, idx, :], data.zgrid[im, :, idx, :])
+            elif sliceaxis == 3:
+                slice_vars = {key: data.var[key][im, :, :, idx] for key in extractvars}
+                coords = (data.ygrid[im, :, :, idx], data.zgrid[im, :, :, idx])
+
+            slice_data.append({
+                'meshblock': im,
+                'index': idx,
+                'slice_vars': slice_vars,
+                'coords': coords,
+            })
+
+    return slice_data
 
 def ReadHistory(fname=None):
     if (fname is None):
@@ -361,16 +392,18 @@ def main():
                 np.savez(iofile,radbins=radbins,varpercentiles=varpercentiles)
                 
     if (args.MakeSlices):
+        import pickle
         #List of outfile names                                                      
         filenames = sorted(glob(f"*.out1.*.phdf"))
         nfiles = len(filenames)
         for i in range(nfiles):
             data = Dump3D(filenames[i],extractvars=args.varname)
-            for var in args.varname:
-                iofile=f'TwoDSlice.{var}.{i:04d}.npz'
-                print(f"Making {iofile}")
-                dataslice=Make2DSlice(data)
-                np.save(iofile,dataslice)
+            iofile=f'TwoDSlice{i:04d}.pkl'
+            print(f"Making {iofile}")
+            slice_data=Make2DSlice(data,extractvars=args.varname)
+            #Saving the slice with python's pickel.  We might consider using hdf5 instead.
+            with open(iofile, "wb") as f:
+                pickle.dump(slice_data, f)
                 
     if (args.Movie1D):
         #List of outfile names
