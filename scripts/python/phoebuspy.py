@@ -115,6 +115,57 @@ class DumpGR:
                 pass
         return
 
+def ReadParameterFile(FileName='Params.dat'):
+    fobj = open('Params.dat')
+    params = {}
+    
+    for line in fobj:
+        line = line.strip()
+        key_value = line.split('=')
+        if len(key_value) == 2:
+            params[key_value[0].strip()] = key_value[1].strip()
+
+    #convert to float
+    floatparams = ['slice','varmin','varmax']
+    for fpar in floatparams:
+        if(fpar in params):
+            params[fpar] = float(params[fpar])
+
+    #convert to int
+    intparams = ['sliceaxis']
+    for ipar in intparams:
+        if(ipar in params):
+            params[ipar] = int(params[ipar])
+
+    #convert to boolean
+    boolparams = ['plotlog']
+    for bpar in boolparams:
+        if (bpar in params):
+            params[bpar] = (params[bpar].lower() == 'true')
+
+    #Split param into a list if needed
+    splitparams = ['varname']
+    for spar in splitparams:
+        if (spar in params):
+            temp = params[spar]
+            temp = temp.split(',')
+            temp = [s.strip() for s in temp]
+            params[spar] = temp
+
+    #Default Values
+    if (('varname' in params) == False):
+        params['varname'] = 'p.density'
+    if (('sliceaxis' in params) == False):
+        params['sliceaxis'] = 1
+    if (('varmin' in params) == False):
+        params['varmin'] = -16.
+    if (('varmax' in params) == False):
+        params['varmax'] = -3.
+    if (('plotlog' in params) == False):
+        params['plotlog'] = False
+        
+    return params
+
 def PlotResolution1D(data,idump=0,iofile='PlotResolution1D.png'):
 
     pl.clf()
@@ -125,38 +176,6 @@ def PlotResolution1D(data,idump=0,iofile='PlotResolution1D.png'):
     pl.ylabel('dx')
     pl.ylim(bottom=0.)
     pl.savefig(iofile)
-    
-    return
-
-def Movie2DSlice(data,varname='p.density',moviename=None,anax=None,anay=None,ylim=None,xlim=None,yscale='linear',xscale='linear'):
-    #Arguments:
-    #data = is a dict defined by list of Data1D instances; there is one for each file.
-    #anax = if there is an analytic solution to plot, then 
-    ndata = len(data)
-    for i in range(ndata):
-        iofile=f'img{i:04d}.png'
-        print(iofile,data[i].t)
-        pl.clf()
-        for ib in range(data[i].NumMB):
-            pl.plot(data[i].xc[ib,:],data[i].var[varname][ib,:],color='red')
-        if (anax is not None):
-            pl.plot(anax,anay,linestyle='dashed',color='black')
-        if (ylim is not None):
-            pl.ylim(ylim)
-        if (xlim is not None):
-            pl.xlim(xlim)
-        pl.yscale(yscale)
-        pl.xscale(xscale)
-        pl.ylabel(varname)
-        pl.xlabel('xc')
-        pl.savefig(iofile)
-
-
-    if (moviename  is None):
-        moviename = f'movie.{varname}.mpeg'
-        
-    system(f"ffmpeg -r 10 -f image2 -i img%04d.png -vcodec mpeg2video -crf 25 -pix_fmt yuv420p {moviename}")
-    system("rm img????.png")
     
     return
 
@@ -357,14 +376,69 @@ def Make2DSlice(data,sliceaxis=1,slice=0.,extractvars=['p.density']):
                 coords = (data.yf[im, :], data.zf[im, :])
 
             slice_data.append({
+                'time': data.t,
                 'sliceaxis': sliceaxis,
+                'slice': slice,
                 'meshblock': im,
                 'index': idx,
                 'slice_vars': slice_vars,
-                'coords': coords,
+                'coords': coords
             })
 
     return slice_data
+
+def Movie2DSlices(varname='p.density',plotlog=True,varbounds=[-16.,-3.]):
+    import pickle
+    filenames = sorted(glob(f"*TwoDSlice*.pkl"))
+    nfiles = len(filenames)
+    minvar = np.inf
+    maxvar = -np.inf
+    moviename=f'Movie2Dslices.{varname}.mpeg'
+    for i in range(nfiles):
+        with open(filenames[i], "rb") as f:
+            slice_data = pickle.load(f)
+        iofile=f'img{i:04d}.png'
+        print(f"Making {iofile}")
+        pl.clf()
+        ax = pl.gca()
+        for block in slice_data:
+            x, y = block['coords']
+            var = block['slice_vars'][varname]
+            if (plotlog):
+                var =  np.log10(var)
+            minvar = min(minvar,np.min(var))
+            maxvar = max(maxvar,np.max(var))
+            ax.pcolormesh(x, y, var, shading='auto',vmin=varbounds[0],vmax=varbounds[1])
+        print(f'min and max = {minvar}, {maxvar}')
+
+        dy = 0.05
+        xleft = 0.05
+        ybot = 0.05
+        time = block['time']
+        ttext = f'time = {time}'
+        ax.text(xleft,ybot,ttext,transform=ax.transAxes,color='white')
+        
+        slice = block['slice']
+        if (block['sliceaxis']==1):
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            stext = f'z = {slice}'
+        elif(block['sliceaxis']==2):
+            ax.set_xlabel('x')
+            ax.set_ylabel('z')
+            stext = f'y = {slice}'
+        elif(block['sliceaxis']==3):
+            ax.set_xlabel('y')
+            ax.set_ylabel('z')
+            stext = f'x = {slice}'
+        ax.text(xleft,ybot+dy,stext,transform=ax.transAxes,color='white')
+        
+        pl.colorbar(ax.collections[0], ax=ax, label='p.density')
+        pl.savefig(iofile)
+            
+    system(f"ffmpeg -r 10 -f image2 -i img%04d.png -vcodec mpeg2video -crf 25 -pix_fmt yuv420p {moviename}")
+    
+    return
 
 def ReadHistory(fname=None):
     if (fname is None):
@@ -406,27 +480,26 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--Movie1D', action='store_true')
     parser.add_argument('--CalcOneDProfiles', action='store_true')
-    parser.add_argument('--varname', type=str, default='p.density')
+    #parser.add_argument('--varname', type=str, default='p.density')
     parser.add_argument('--MakeSlices', action='store_true')
     parser.add_argument('--Movie2DSlices', action='store_true')
     args= parser.parse_args()
 
-    #Split varname into a list if needed
-    varnames = args.varname.split(',')
-    varnames = [varname.strip() for varname in varnames]
-    args.varname = varnames
+    params = ReadParameterFile()
 
+    
     if (args.CalcOneDProfiles):
         #List of outfile names                                                      
         filenames = sorted(glob(f"*.out1.*.phdf"))
         nfiles = len(filenames)
         for i in range(nfiles):
-            data = Dump3D(filenames[i],extractvars=args.varname)
-            for var in args.varname:
+            data = Dump3D(filenames[i],extractvars=params['varname'])
+            for var in params['varname']:
                 iofile=f'OneDProfile.{var}.{i:04d}.npz'
                 print(f"Making {iofile}")
                 radbins,varpercentiles = CalcScatter3DvsRadius(data,nradbins=400,varname=var)
                 np.savez(iofile,radbins=radbins,varpercentiles=varpercentiles)
+
                 
     if (args.MakeSlices):
         import pickle
@@ -434,53 +507,18 @@ def main():
         filenames = sorted(glob(f"*.out1.*.phdf"))
         nfiles = len(filenames)
         for i in range(nfiles):
-            data = Dump3D(filenames[i],extractvars=args.varname)
+            data = Dump3D(filenames[i],extractvars=params['varname'])
             iofile=f'TwoDSlice{i:04d}.pkl'
             print(f"Making {iofile}")
-            slice_data=Make2DSlice(data,extractvars=args.varname)
+            slice_data=Make2DSlice(data,sliceaxis=params['sliceaxis'],extractvars=params['varname'])
             #Saving the slice with python's pickel.  We might consider using hdf5 instead.
             with open(iofile, "wb") as f:
                 pickle.dump(slice_data, f)
 
+                
     if (args.Movie2DSlices):
-        import pickle
-        moviename='Movie2Dslices.mpeg'
-        filenames = sorted(glob(f"*TwoDSlice*.pkl"))
-        nfiles = len(filenames)
-        minvar = np.inf
-        maxvar = -np.inf
-        varmin = -16.
-        varmax = -3.
-        plotlog = True
-        for i in range(nfiles):
-            with open(filenames[i], "rb") as f:
-                slice_data = pickle.load(f)
-            iofile=f'img{i:04d}.png'
-            print(f"Making {iofile}")
-            pl.clf()
-            ax = pl.gca()
-            for block in slice_data:
-                x, y = block['coords']
-                var = block['slice_vars']['p.density']
-                if (plotlog):
-                    var =  np.log10(var)
-                minvar = min(minvar,np.min(var))
-                maxvar = max(maxvar,np.max(var))
-                ax.pcolormesh(x, y, var, shading='auto',vmin=varmin,vmax=varmax)
-            print(f'min and max = {minvar}, {maxvar}')
-            if (block['sliceaxis']==1):
-                ax.set_xlabel('x')
-                ax.set_ylabel('y')
-            elif(block['sliceaxis']==2):
-                ax.set_xlabel('x')
-                ax.set_ylabel('z')
-            elif(block['sliceaxis']==3):
-                ax.set_xlabel('y')
-                ax.set_ylabel('z')
-            pl.colorbar(ax.collections[0], ax=ax, label='p.density')
-            pl.savefig(iofile)
-            
-        system(f"ffmpeg -r 10 -f image2 -i img%04d.png -vcodec mpeg2video -crf 25 -pix_fmt yuv420p {moviename}")
+        Movie2DSlices(plotlog=params['plotlog'],varbounds=[params['varmin'],params['varmax']])
+        
             
     if (args.Movie1D):
         #List of outfile names
