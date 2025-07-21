@@ -338,7 +338,7 @@ def Make2DSlice(data,sliceaxis=1,slice=0.,extractvars=['p.density']):
     #sliceaxis=1 => z
     #sliceaxis=2 => y
     #sliceaxis=3 => x
-
+    
     if (sliceaxis==1):
         w=data.zf
     elif(sliceaxis==2):
@@ -433,7 +433,7 @@ def Movie2DSlices(varname='p.density',plotlog=True,varbounds=[-16.,-3.]):
             stext = f'x = {slice}'
         ax.text(xleft,ybot+dy,stext,transform=ax.transAxes,color='white')
         
-        pl.colorbar(ax.collections[0], ax=ax, label='p.density')
+        pl.colorbar(ax.collections[0], ax=ax, label=varname)
         pl.savefig(iofile)
             
     system(f"ffmpeg -r 10 -f image2 -i img%04d.png -vcodec mpeg2video -crf 25 -pix_fmt yuv420p {moviename}")
@@ -517,7 +517,8 @@ def main():
 
                 
     if (args.Movie2DSlices):
-        Movie2DSlices(plotlog=params['plotlog'],varbounds=[params['varmin'],params['varmax']])
+        #This will only make a Movie2DSlice for the first varname if there is a list.
+        Movie2DSlices(varname=params['varname'][0],plotlog=params['plotlog'],varbounds=[params['varmin'],params['varmax']])
         
             
     if (args.Movie1D):
