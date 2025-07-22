@@ -132,7 +132,7 @@ def ReadParameterFile(FileName='Params.dat'):
             params[fpar] = float(params[fpar])
 
     #convert to int
-    intparams = ['sliceaxis']
+    intparams = ['sliceaxis','nslices']
     for ipar in intparams:
         if(ipar in params):
             params[ipar] = int(params[ipar])
@@ -387,6 +387,52 @@ def Make2DSlice(data,sliceaxis=1,slice=0.,extractvars=['p.density']):
 
     return slice_data
 
+def MakeSlicesVsTime(params):
+    import pickle
+    #List of outfile names                                                      
+    filenames = sorted(glob(f"*.out1.*.phdf"))
+    nfiles = len(filenames)
+    for i in range(nfiles):
+        data = Dump3D(filenames[i],extractvars=params['varname'])
+        iofile=f'TwoDSlice{i:04d}.pkl'
+        print(f"Making {iofile}")
+        slice_data=Make2DSlice(data,sliceaxis=params['sliceaxis'],extractvars=params['varname'])
+        #Saving the slice with python's pickel.  We might consider using hdf5 instead.
+        with open(iofile, "wb") as f:
+            pickle.dump(slice_data, f)
+
+    return
+
+def MakeSlicesVsCoord(params):
+    import pickle
+    #List of outfile names                                                      
+    filename = params['phdffile']
+    data = Dump3D(filename,extractvars=params['varname'])
+    
+    sliceaxis = params['sliceaxis']
+    if (sliceaxis == 1):
+        wmin = np.min(data.zf[:,:-1])
+        wmax = np.max(data.zf[:,:-1])
+    elif (sliceaxis == 2):
+        wmin = np.min(data.yf[:,:-1])
+        wmax = np.max(data.yf[:,:-1])
+    elif (sliceaxis == 3):
+        wmin = np.min(data.xf[:,:-1])
+        wmax = np.max(data.xf[:,:-1])
+
+    nslices = params['nslices']
+    wslices = np.linspace(wmin,wmax,num=nslices)
+    
+    for i in range(nslices):
+        iofile=f'TwoDSlice{i:04d}.pkl'
+        print(f"Making {iofile}")
+        slice_data=Make2DSlice(data,sliceaxis=params['sliceaxis'],slice=wslices[i],extractvars=params['varname'])
+        #Saving the slice with python's pickel.  We might consider using hdf5 instead.
+        with open(iofile, "wb") as f:
+            pickle.dump(slice_data, f)
+
+    return
+
 def Movie2DSlices(varname='p.density',plotlog=True,varbounds=[-16.,-3.]):
     import pickle
     filenames = sorted(glob(f"*TwoDSlice*.pkl"))
@@ -481,7 +527,8 @@ def main():
     parser.add_argument('--Movie1D', action='store_true')
     parser.add_argument('--CalcOneDProfiles', action='store_true')
     #parser.add_argument('--varname', type=str, default='p.density')
-    parser.add_argument('--MakeSlices', action='store_true')
+    parser.add_argument('--MakeSlicesVsTime', action='store_true')
+    parser.add_argument('--MakeSlicesVsCoord', action='store_true')
     parser.add_argument('--Movie2DSlices', action='store_true')
     args= parser.parse_args()
 
@@ -501,20 +548,11 @@ def main():
                 np.savez(iofile,radbins=radbins,varpercentiles=varpercentiles)
 
                 
-    if (args.MakeSlices):
-        import pickle
-        #List of outfile names                                                      
-        filenames = sorted(glob(f"*.out1.*.phdf"))
-        nfiles = len(filenames)
-        for i in range(nfiles):
-            data = Dump3D(filenames[i],extractvars=params['varname'])
-            iofile=f'TwoDSlice{i:04d}.pkl'
-            print(f"Making {iofile}")
-            slice_data=Make2DSlice(data,sliceaxis=params['sliceaxis'],extractvars=params['varname'])
-            #Saving the slice with python's pickel.  We might consider using hdf5 instead.
-            with open(iofile, "wb") as f:
-                pickle.dump(slice_data, f)
-
+    if (args.MakeSlicesVsTime):
+        MakeSlicesVsTime(params)
+                
+    if (args.MakeSlicesVsCoord):
+        MakeSlicesVsCoord(params)
                 
     if (args.Movie2DSlices):
         #This will only make a Movie2DSlice for the first varname if there is a list.
