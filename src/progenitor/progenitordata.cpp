@@ -144,7 +144,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   for (auto rc : mdot_radii) {
     auto rc_code = rc * 1e5 * LengthCGSToCode;
     auto Mdot = [rc_code](MeshData<Real> *md) {
-      return History::CalculateMdot(md, rc_code, 0);
+      return History::CalculateMdot(md, rc_code, false);
     };
     hst_vars.emplace_back(
         HistoryOutputVar(HstSum, Mdot, "Mdot at r = " + std::to_string(int(rc)) + "km"));
@@ -152,11 +152,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   Real x1max = pin->GetReal("parthenon/mesh", "x1max");
   auto Mdot_gain = [x1max](MeshData<Real> *md) {
-    return History::CalculateMdot(md, x1max, 1);
+    return History::CalculateMdot(md, x1max, true);
   };
-  hst_vars.emplace_back(HistoryOutputVar(HstSum, Mgain, "Mgain"));
-  hst_vars.emplace_back(HistoryOutputVar(HstSum, Qgain, "total net heat"));
-  hst_vars.emplace_back(HistoryOutputVar(HstSum, Mdot_gain, "Mdot gain"));
+
+  const bool rad_active = pin->GetBoolean("physics", "rad");
+  if (rad_active) {
+    hst_vars.emplace_back(HistoryOutputVar(HstSum, Mgain, "Mgain"));
+    hst_vars.emplace_back(HistoryOutputVar(HstSum, Qgain, "total net heat"));
+    hst_vars.emplace_back(HistoryOutputVar(HstSum, Mdot_gain, "Mdot gain"));
+  }
   params.Add(parthenon::hist_param_key, hst_vars);
 
   return progenitor_pkg;
