@@ -116,47 +116,70 @@ class DumpGR:
         return
 
 def ReadParameterFile(FileName='Params.dat'):
-    fobj = open('Params.dat')
     params = {}
+
+    with open(FileName) as fobj:
     
-    for line in fobj:
-        line = line.strip()
-        key_value = line.split('=')
-        if len(key_value) == 2:
-            params[key_value[0].strip()] = key_value[1].strip()
+        for line in fobj:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue #skip blank lines and comments
+            key_value = line.split('=')
+            if len(key_value) == 2:
+                #params[key_value[0].strip()] = key_value[1].strip()
+                key = key_value[0].strip()
+                val = key_value[1].strip()
+                #Detect lists: comma-separated
+                if ',' in val:
+                    val = [v.strip() for v in val.split(',')]
+                params[key] = val
 
     #convert to float
     floatparams = ['slice','varmin','varmax']
     for fpar in floatparams:
         if(fpar in params):
-            params[fpar] = float(params[fpar])
+            val = params[fpar]
+            if isinstance(val,list):
+                params[fpar] = [float(v) for v in val]
+            else:
+                params[fpar] = float(val)
 
     #convert to int
-    intparams = ['sliceaxis','nslices']
+    intparams = ['sliceaxis','nslices','keepaxis']
     for ipar in intparams:
         if(ipar in params):
-            params[ipar] = int(params[ipar])
+            val = params[ipar]
+            if (isinstance(val,list)):
+                params[ipar] = [int(v) for v in val]
+            else:
+                params[ipar] = int(val)
 
     #convert to boolean
     boolparams = ['plotlog']
     for bpar in boolparams:
         if (bpar in params):
-            params[bpar] = (params[bpar].lower() == 'true')
+            val = params[bpar]
+            if (isinstance(val,list)):
+                params[bpar] = [(v.lower()=='true') for v in val]
+            else:
+                params[bpar] = (val.lower() == 'true')
 
-    #Split param into a list if needed
-    splitparams = ['varname']
-    for spar in splitparams:
-        if (spar in params):
-            temp = params[spar]
-            temp = temp.split(',')
-            temp = [s.strip() for s in temp]
-            params[spar] = temp
+    ##Split param into a list if needed
+    #splitparams = ['varname']
+    #for spar in splitparams:
+    #    if (spar in params):
+    #        temp = params[spar]
+    #        temp = temp.split(',')
+    #        temp = [s.strip() for s in temp]
+    #        params[spar] = temp
 
     #Default Values
     if (('varname' in params) == False):
         params['varname'] = 'p.density'
     if (('sliceaxis' in params) == False):
         params['sliceaxis'] = 1
+    if (('keepaxis' in params) == False):
+        params['keepaxis'] = 3
     if (('varmin' in params) == False):
         params['varmin'] = -16.
     if (('varmax' in params) == False):
@@ -164,6 +187,8 @@ def ReadParameterFile(FileName='Params.dat'):
     if (('plotlog' in params) == False):
         params['plotlog'] = False
         
+    params['varname'] = params['varname'] if isinstance(params['varname'],list) else [params['varname']]
+    
     return params
 
 def PlotResolution1D(data,idump=0,iofile='PlotResolution1D.png'):
@@ -387,7 +412,61 @@ def Make2DSlice(data,sliceaxis=1,slice=0.,extractvars=['p.density']):
 
     return slice_data
 
-def MakeSlicesVsTime(params):
+def Make1DSlice(data,keepaxis=1,slice=[0.,0.],extractvars=['p.density']):
+    #keepaxis=1 => z
+    #keepaxis=2 => y
+    #keepaxis=3 => x
+
+    if (keepaxis==1):
+        w=[data.yf,data.xf]
+    elif(keepaxis==2):
+        w=[data.zf,data.xf]
+    elif(keepaxis==3):
+        w=[data.zf,data.yf]
+    else:
+        raise ValueError("keepaxis must be 1 (z), 2 (y), or 3 (x)")
+
+    slice_data = []
+    
+    for im in range(data.NumMB):
+        # w[im] shape: (nz+1), (ny+1), or (nx+1) depending on sliceaxis
+        w0_local = w[0][im, :]
+        w1_local = w[1][im, :]
+
+        # Find zones where the slice falls between w_local edges
+        mask0 = (w0_local[:-1] <= slice[0]) & (slice[0] < w0_local[1:])
+        mask1 = (w1_local[:-1] <= slice[1]) & (slice[1] < w1_local[1:])
+        
+        if (np.any(mask0) & np.any(mask1)):
+            assert np.sum(mask0) == 1, f"Multiple indices match in meshblock {im}"
+            assert np.sum(mask1) == 1, f"Multiple indices match in meshblock {im}"
+
+            idx0 = np.where(mask0)[0][0]
+            idx1 = np.where(mask1)[0][0]
+            # Extract 1D slice by fixing idx0 and idx1 along the chosen axes
+            if keepaxis == 1:
+                slice_vars = {key: data.var[key][im, :, idx0, idx1] for key in extractvars}
+                coords = data.zc[im, :]
+            elif keepaxis == 2:
+                slice_vars = {key: data.var[key][im, idx0, :, idx1] for key in extractvars}
+                coords = data.yc[im, :]
+            elif keepaxis == 3:
+                slice_vars = {key: data.var[key][im, idx0, idx1, :] for key in extractvars}
+                coords = data.xc[im, :]
+
+            slice_data.append({
+                'time': data.t,
+                'keepaxis': keepaxis,
+                'slice': slice,
+                'meshblock': im,
+                'index': [idx0,idx1],
+                'slice_vars': slice_vars,
+                'coords': coords
+            })
+
+    return slice_data
+
+def Make2DSlicesVsTime(params):
     import pickle
     #List of outfile names                                                      
     filenames = sorted(glob(f"*.out1.*.phdf"))
@@ -403,7 +482,7 @@ def MakeSlicesVsTime(params):
 
     return
 
-def MakeSlicesVsCoord(params):
+def Make2DSlicesVsCoord(params):
     import pickle
     #List of outfile names                                                      
     filename = params['phdffile']
@@ -427,6 +506,27 @@ def MakeSlicesVsCoord(params):
         iofile=f'TwoDSlice{i:04d}.pkl'
         print(f"Making {iofile}")
         slice_data=Make2DSlice(data,sliceaxis=params['sliceaxis'],slice=wslices[i],extractvars=params['varname'])
+        #Saving the slice with python's pickel.  We might consider using hdf5 instead.
+        with open(iofile, "wb") as f:
+            pickle.dump(slice_data, f)
+
+    return
+
+def Make1DSlicesVsTime(params):
+    import pickle
+    #List of outfile names                                                      
+    filenames = sorted(glob(f"*.out1.*.phdf"))
+    nfiles = len(filenames)
+    for i in range(nfiles):
+        data = Dump3D(filenames[i],extractvars=params['varname'])
+        if (params['keepaxis']==1):
+            iofile=f'OneDSliceZ_T{i:04d}.pkl'
+        elif (params['keepaxis']==2):
+            iofile=f'OneDSliceY_T{i:04d}.pkl'
+        elif (params['keepaxis']==3):
+            iofile=f'OneDSliceX_T{i:04d}.pkl'
+        print(f"Making {iofile}")
+        slice_data=Make1DSlice(data,keepaxis=params['keepaxis'],slice=params['slice'],extractvars=params['varname'])
         #Saving the slice with python's pickel.  We might consider using hdf5 instead.
         with open(iofile, "wb") as f:
             pickle.dump(slice_data, f)
@@ -486,6 +586,86 @@ def Movie2DSlices(varname='p.density',plotlog=True,varbounds=[-16.,-3.]):
     
     return
 
+def Movie1DSlicesVsTime(varname=['p.density'],plotlog=True,varbounds=[-16.,-3.]):
+    import pickle
+    filenamesX = sorted(glob(f"*OneDSliceX_T*.pkl"))
+    filenamesY = sorted(glob(f"*OneDSliceY_T*.pkl"))
+    filenamesZ = sorted(glob(f"*OneDSliceZ_T*.pkl"))
+    nfilesX = len(filenamesX)
+    nfilesY = len(filenamesY)
+    nfilesZ = len(filenamesZ)
+
+    if not (nfilesX == nfilesY == nfilesZ):
+        print(f"Error: nfilesX={nfilesX}, nfilesY={nfilesY}, nfilesZ={nfilesZ} must be equal.")
+        exit(1)
+        
+    moviename=f'Movie1DslicesVsTime.{varname[0]}.mpeg'
+
+    colors = ['black','blue','green']
+    def PlotSliceData(ax,slice_data,color='black'):
+        minvar = np.inf
+        maxvar = -np.inf
+        for block in slice_data:
+            x = block['coords']
+            var = block['slice_vars'][varname[0]]
+            minvar = min(minvar,np.min(var))
+            maxvar = max(maxvar,np.max(var))
+            ax.scatter(x, var,color=color,marker='.')
+        print(f'min and max = {minvar}, {maxvar}')
+        
+    for i in range(nfilesX):
+        with open(filenamesX[i], "rb") as fX:
+            slice_dataX = pickle.load(fX)
+        with open(filenamesY[i], "rb") as fY:
+            slice_dataY = pickle.load(fY)
+        with open(filenamesZ[i], "rb") as fZ:
+            slice_dataZ = pickle.load(fZ)
+        iofile=f'img{i:04d}.png'
+        print(f"Making {iofile}")
+        pl.clf()
+        ax = pl.gca()
+        PlotSliceData(ax,slice_dataX,color=colors[0])
+        PlotSliceData(ax,slice_dataY,color=colors[1])
+        PlotSliceData(ax,slice_dataZ,color=colors[2])
+
+        if (plotlog):
+            ax.set_yscale('log')
+        ax.set_ylim(varbounds)
+        dy = 0.05
+        xleft = 0.05
+        ybot = 0.05
+        block = slice_dataX[0]
+        time = block['time']
+        ttext = f'time = {time}'
+        ax.text(xleft,ybot,ttext,transform=ax.transAxes,color='black')
+        
+        block = slice_dataX[0]
+        keepaxis = block['keepaxis']
+        slice = block['slice']
+        ttext = f'[{slice[0]},{slice[1]},:]'
+        ax.text(xleft,ybot+3.*dy,ttext,transform=ax.transAxes,color=colors[0])
+
+        block = slice_dataY[0]
+        keepaxis = block['keepaxis']
+        slice = block['slice']
+        ttext = f'[{slice[0]},:,{slice[1]}]'
+        ax.text(xleft,ybot+2.*dy,ttext,transform=ax.transAxes,color=colors[1])
+
+        block = slice_dataZ[0]
+        keepaxis = block['keepaxis']
+        slice = block['slice']
+        ttext = f'[:,{slice[0]},{slice[1]}]'
+        ax.text(xleft,ybot+1.*dy,ttext,transform=ax.transAxes,color=colors[2])
+
+        ttext = '[Z,Y,X]'
+        ax.text(xleft,ybot+4.*dy,ttext,transform=ax.transAxes,color='black')
+                
+        pl.savefig(iofile)
+            
+    system(f"ffmpeg -r 10 -f image2 -i img%04d.png -vcodec mpeg2video -crf 25 -pix_fmt yuv420p {moviename}")
+    
+    return
+
 def ReadHistory(fname=None):
     if (fname is None):
         fname = glob(f"*.hst")[0] #This assumes that there is only one .hst file.
@@ -525,38 +705,47 @@ def main():
     import argparse
     parser=argparse.ArgumentParser()
     parser.add_argument('--Movie1D', action='store_true')
-    parser.add_argument('--CalcOneDProfiles', action='store_true')
+    parser.add_argument('--CalcScatterProfiles', action='store_true')
     #parser.add_argument('--varname', type=str, default='p.density')
-    parser.add_argument('--MakeSlicesVsTime', action='store_true')
-    parser.add_argument('--MakeSlicesVsCoord', action='store_true')
+    parser.add_argument('--Make2DSlicesVsTime', action='store_true')
+    parser.add_argument('--Make2DSlicesVsCoord', action='store_true')
+    parser.add_argument('--Make1DSlicesVsTime', action='store_true')
     parser.add_argument('--Movie2DSlices', action='store_true')
+    parser.add_argument('--Movie1DSlicesVsTime', action='store_true')
     args= parser.parse_args()
 
     params = ReadParameterFile()
 
     
-    if (args.CalcOneDProfiles):
+    if (args.CalcScatterProfiles):
         #List of outfile names                                                      
         filenames = sorted(glob(f"*.out1.*.phdf"))
         nfiles = len(filenames)
         for i in range(nfiles):
             data = Dump3D(filenames[i],extractvars=params['varname'])
             for var in params['varname']:
-                iofile=f'OneDProfile.{var}.{i:04d}.npz'
+                iofile=f'ScatterProfile.{var}.{i:04d}.npz'
                 print(f"Making {iofile}")
                 radbins,varpercentiles = CalcScatter3DvsRadius(data,nradbins=400,varname=var)
                 np.savez(iofile,radbins=radbins,varpercentiles=varpercentiles)
 
                 
-    if (args.MakeSlicesVsTime):
-        MakeSlicesVsTime(params)
+    if (args.Make2DSlicesVsTime):
+        Make2DSlicesVsTime(params)
                 
-    if (args.MakeSlicesVsCoord):
-        MakeSlicesVsCoord(params)
+    if (args.Make1DSlicesVsTime):
+        Make1DSlicesVsTime(params)
+                
+    if (args.Make2DSlicesVsCoord):
+        Make2DSlicesVsCoord(params)
                 
     if (args.Movie2DSlices):
         #This will only make a Movie2DSlice for the first varname if there is a list.
-        Movie2DSlices(varname=params['varname'][0],plotlog=params['plotlog'],varbounds=[params['varmin'],params['varmax']])
+        Movie2DSlices(varname=params['varname'],plotlog=params['plotlog'],varbounds=[params['varmin'],params['varmax']])
+        
+    if (args.Movie1DSlicesVsTime):
+        #This will only make a Movie2DSlice for the first varname if there is a list.
+        Movie1DSlicesVsTime(varname=params['varname'],plotlog=params['plotlog'],varbounds=[params['varmin'],params['varmax']])
         
             
     if (args.Movie1D):

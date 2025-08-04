@@ -645,11 +645,11 @@ TaskStatus CalculateFluidSourceTerms(MeshData<Real> *rc, MeshData<Real> *rc_src)
         }
 
 #if SET_FLUX_SRC_DIAGS
-        src(diag::src_terms(0), b, k, j, i) = 0.0;
-        src(diag::src_terms(1), b, k, j, i) = src(c::momentum(0), k, j, i);
-        src(diag::src_terms(2), b, k, j, i) = src(c::momentum(1), k, j, i);
-        src(diag::src_terms(3), b, k, j, i) = src(c::momentum(2), k, j, i);
-        src(diag::src_terms(4), b, k, j, i) = src(c::energy(), k, j, i);
+        src(b,diag::src_terms(0), k, j, i) = 0.0;
+        src(b,diag::src_terms(1), k, j, i) = src(b,c::momentum(0), k, j, i);
+        src(b,diag::src_terms(2), k, j, i) = src(b,c::momentum(1), k, j, i);
+        src(b,diag::src_terms(3), k, j, i) = src(b,c::momentum(2), k, j, i);
+        src(b,diag::src_terms(4), k, j, i) = src(b,c::energy(), k, j, i);
 #endif
       });
 
