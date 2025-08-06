@@ -303,10 +303,15 @@ Real CalculateMdot(MeshData<Real> *md, Real rc, bool gain) {
   const int nblocks = v.GetNBlocks();
   auto geom = Geometry::GetCoordinateSystem(md);
   Real result = 0.0;
+
   auto rad = pmb->packages.Get("radiation").get();
-  const parthenon::AllReduce<bool> *pdo_gain_reducer =
-      rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
-  const bool do_gain = pdo_gain_reducer->val;
+  const bool rad_active = rad->Param<bool>("active");
+  bool do_gain = false;
+  if (rad_active) {
+    const parthenon::AllReduce<bool> *pdo_gain_reducer =
+        rad->MutableParam<parthenon::AllReduce<bool>>("do_gain_reducer");
+    do_gain = pdo_gain_reducer->val;
+  }
   auto progenitor = pmb->packages.Get("progenitor").get();
   const Real inside_pns_threshold = progenitor->Param<Real>("inside_pns_threshold");
   const Real net_heat_threshold = progenitor->Param<Real>("net_heat_threshold");
