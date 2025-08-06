@@ -1,0 +1,341 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Building &mdash; Phoebus 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+
+  
+    <link rel="canonical" href="https://lanl.github.io/phoebus/src/building.html" />
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Code of Conduct" href="code_of_conduct.html" />
+    <link rel="prev" title="Phoebus: Performance portable GRRMHD for supernovae, mergers, and more" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Phoebus
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Building</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#obtaining-the-source-code">Obtaining the Source Code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-builds">Example builds</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#mpi-parallel-only">MPI-parallel only</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#openmp-parallel">OpenMP-parallel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cuda">Cuda</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#build-options">Build Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cmake-machine-configs">Cmake machine configs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running">Running</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#external-required">External (Required)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#optional">Optional</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="code_of_conduct.html">Code of Conduct</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="governance.html">Organizational Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sphinx-doc.html">How to Use Sphinx for Writing Docs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tracers.html">Tracer Particles</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Phoebus</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Building</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/src/building.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="building">
+<h1>Building<a class="headerlink" href="#building" title="Link to this heading"></a></h1>
+<section id="obtaining-the-source-code">
+<h2>Obtaining the Source Code<a class="headerlink" href="#obtaining-the-source-code" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">phoebus</span></code> uses submodules extensively. To make sure you get them all,
+clone it as</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>--recursive<span class="w"> </span>git@github.com:lanl/phoebus.git
+</pre></div>
+</div>
+<p>or as</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:lanl/phoebus.git
+<span class="nb">cd</span><span class="w"> </span>phoebus
+git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init<span class="w"> </span>--recursive
+</pre></div>
+</div>
+</section>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h2>
+<p>To build <code class="docutils literal notranslate"><span class="pre">phoebus</span></code>, you need to create a build directly, as in-source builds are not supported.
+After cloning the repository,</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>phoebus
+mkdir<span class="w"> </span>bin
+<span class="nb">cd</span><span class="w"> </span>bin
+</pre></div>
+</div>
+</section>
+<section id="example-builds">
+<h2>Example builds<a class="headerlink" href="#example-builds" title="Link to this heading"></a></h2>
+<p>Below are some example build commands</p>
+<section id="mpi-parallel-only">
+<h3>MPI-parallel only<a class="headerlink" href="#mpi-parallel-only" title="Link to this heading"></a></h3>
+<p>The following will build <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> with MPI parallelism but no shared
+memory parallelism</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>..
+make<span class="w"> </span>-j
+</pre></div>
+</div>
+</section>
+<section id="openmp-parallel">
+<h3>OpenMP-parallel<a class="headerlink" href="#openmp-parallel" title="Link to this heading"></a></h3>
+<p>The following will build <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> with OpenMP parallelism only</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>-DPHOEBUS_ENABLE_MPI<span class="o">=</span>Off<span class="w"> </span>-DPHOEBUS_ENABLE_OPENMP<span class="o">=</span>ON<span class="w"> </span>..
+make<span class="w"> </span>-j
+</pre></div>
+</div>
+</section>
+<section id="cuda">
+<h3>Cuda<a class="headerlink" href="#cuda" title="Link to this heading"></a></h3>
+<p>The following will build <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> with no MPI or OpenMP parallelism.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>-DPHOEBUS_ENABLE_CUDA<span class="o">=</span>On<span class="w"> </span>-DCMAKE_CXX_COMPILER<span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/phoebus/external/singularity-eos/utils/kokkos/bin/nvcc_wrapper<span class="w"> </span>-DKokkos_ARCH_HSW<span class="o">=</span>ON<span class="w"> </span>-DKokkos_ARCH_VOLTA70<span class="o">=</span>ON<span class="w"> </span>-DPHOEBUS_ENABLE_MPI<span class="o">=</span>OFF<span class="w"> </span>..
+</pre></div>
+</div>
+<p>A few notes for this one: - Note here the <code class="docutils literal notranslate"><span class="pre">-DCMAKE_CXX_COMPILER</span></code> flag.
+This is necessary. You <em>must</em> set the compiler to <code class="docutils literal notranslate"><span class="pre">nvcc_wrapper</span></code>
+provided by Kokkos. - Note the <code class="docutils literal notranslate"><span class="pre">-DKokkos_ARCH_*</span></code> flags. Those set the
+host and device microarchitectures and are required. The choice here is
+on an <code class="docutils literal notranslate"><span class="pre">x86_64</span></code> machine with a <code class="docutils literal notranslate"><span class="pre">volta</span></code> GPU.</p>
+</section>
+</section>
+<section id="build-options">
+<h2>Build Options<a class="headerlink" href="#build-options" title="Link to this heading"></a></h2>
+<p>The build options explicitly provided by <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> are:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Comment</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>PHOEBUS_ENABLE_CUDA</p></td>
+<td><p>OFF</p></td>
+<td><p>Cuda</p></td>
+</tr>
+<tr class="row-odd"><td><p>PHOEBUS_ENABLE_HDF5</p></td>
+<td><p>ON</p></td>
+<td><p>HDF5. Required for output and restarts.</p></td>
+</tr>
+<tr class="row-even"><td><p>PHOEBUS_ENABLE_MPI</p></td>
+<td><p>ON</p></td>
+<td><p>MPI. Required for distributed memory
+parallelism.</p></td>
+</tr>
+<tr class="row-odd"><td><p>PHOEBUS_ENABLE_OPENMP</p></td>
+<td><p>OFF</p></td>
+<td><p>OpenMP. Required for shared memory
+parallelism.</p></td>
+</tr>
+<tr class="row-even"><td><p>MACHINE_CFG</p></td>
+<td><p>None</p></td>
+<td><p>Machine-specific config file, optional.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Some relevant settings from Parthenon and Kokkos you may need to play
+with are:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Comment</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>CMAKE_CXX_COMPILER</p></td>
+<td><p>None</p></td>
+<td><p>Must be set to <code class="docutils literal notranslate"><span class="pre">nvcc_wrapper</span></code> with cuda
+backend</p></td>
+</tr>
+<tr class="row-odd"><td><p>Kokkos_ARCH_XXXX</p></td>
+<td><p>OFF</p></td>
+<td><p>You must set the GPU architecture when
+compiling for Cuda</p></td>
+</tr>
+</tbody>
+</table>
+<p>You can see all the Parthenon build options
+<a class="reference external" href="https://github.com/lanl/parthenon/blob/develop/docs/building.md">here</a>
+and all the Kokkos build options
+<a class="reference external" href="https://github.com/kokkos/kokkos/wiki/Compiling">here</a></p>
+</section>
+<section id="cmake-machine-configs">
+<h2>Cmake machine configs<a class="headerlink" href="#cmake-machine-configs" title="Link to this heading"></a></h2>
+<p>If you are proficient with <code class="docutils literal notranslate"><span class="pre">cmake</span></code> You can optionally write a
+<code class="docutils literal notranslate"><span class="pre">cmake</span></code> file that sets the configure parameters that you like on a
+given machine. Both <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> and <code class="docutils literal notranslate"><span class="pre">parthenon</span></code> can make use of it.
+You can point to the file with</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="n">DMACHINE_CFG</span><span class="o">=</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">machine</span><span class="o">/</span><span class="n">file</span>
+</pre></div>
+</div>
+<p>at config time or by setting the environment variable <code class="docutils literal notranslate"><span class="pre">MACHINE_CFG</span></code> to
+point at it, e.g.,</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">MACHINE_CFG</span><span class="o">=</span>path/to/machine/file
+</pre></div>
+</div>
+<p>An example machine file might look like</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Machine file for x86_64-volta on Darwin</span>
+<span class="n">message</span><span class="p">(</span><span class="n">STATUS</span> <span class="s2">&quot;Loading machine configuration for Darwin x86-volta node&quot;</span><span class="p">)</span>
+<span class="n">message</span><span class="p">(</span><span class="n">STATUS</span> <span class="s2">&quot;Assumes: module load module load gcc/7.4.0 cuda/10.2 openmpi/4.0.3-gcc_7.4.0 anaconda/Anaconda3.2019.10 cmake &amp;&amp; spack load hdf5&quot;</span><span class="p">)</span>
+<span class="n">message</span><span class="p">(</span><span class="n">STATUS</span> <span class="s2">&quot;Also assumes you have a valid spack installation loaded.&quot;</span><span class="p">)</span>
+
+<span class="nb">set</span><span class="p">(</span><span class="n">PHOEBUS_ENABLE_CUDA</span> <span class="n">ON</span> <span class="n">CACHE</span> <span class="n">BOOL</span> <span class="s2">&quot;Cuda backend&quot;</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="n">PHOEBUS_ENABLE_MPI</span> <span class="n">OFF</span> <span class="n">CACHE</span> <span class="n">BOOL</span> <span class="s2">&quot;No MPI&quot;</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="n">Kokkos_ARCH_HSW</span> <span class="n">ON</span> <span class="n">CACHE</span> <span class="n">BOOL</span> <span class="s2">&quot;Haswell target&quot;</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="n">Kokkos_ARCH_VOLTA70</span> <span class="n">ON</span> <span class="n">CACHE</span> <span class="n">BOOL</span> <span class="s2">&quot;volta target&quot;</span><span class="p">)</span>
+<span class="nb">set</span><span class="p">(</span><span class="n">CMAKE_CXX_COMPILER</span> <span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">jonahm</span><span class="o">/</span><span class="n">phoebus</span><span class="o">/</span><span class="n">external</span><span class="o">/</span><span class="n">parthenon</span><span class="o">/</span><span class="n">external</span><span class="o">/</span><span class="n">Kokkos</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">nvcc_wrapper</span> <span class="n">CACHE</span> <span class="n">STRING</span> <span class="s2">&quot;nvcc wrapper&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>you could then configure and compile as</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>-DMACHINE_CFG<span class="o">=</span>path/to/machine/file<span class="w"> </span>..
+make<span class="w"> </span>-j
+</pre></div>
+</div>
+</section>
+<section id="running">
+<h2>Running<a class="headerlink" href="#running" title="Link to this heading"></a></h2>
+<p>Run phoebus from the <code class="docutils literal notranslate"><span class="pre">build</span></code> directory as</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>./src/phoebus<span class="w"> </span>-i<span class="w"> </span>path/to/input/file.pin
+</pre></div>
+</div>
+<p>The input files are in <code class="docutils literal notranslate"><span class="pre">phoebus/inputs/*</span></code>. There’s typically one input
+file per problem setup file.</p>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">parthenon</span></code> asynchronous tasking and block-AMR infrastructure</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">singularity-eos</span></code> provides performance-portable equations of state
+and PTE solvers</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">singularity-opac</span></code> provides performance-portable opacities and
+emissivities</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Kokkos</span></code> provides performance portable shared-memory parallelism.
+It allows our loops to be CUDA, OpenMP, or something else. By default
+we use the <code class="docutils literal notranslate"><span class="pre">Kokkos</span></code> shipped with <code class="docutils literal notranslate"><span class="pre">parthenon</span></code>.</p></li>
+</ul>
+</section>
+<section id="external-required">
+<h2>External (Required)<a class="headerlink" href="#external-required" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cmake</span></code> for building</p></li>
+</ul>
+</section>
+<section id="optional">
+<h2>Optional<a class="headerlink" href="#optional" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">hdf5</span></code> for output (must be parallel if MPI is enabled)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MPI</span></code> for distributed memory parallelism</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python3</span></code> for visualization</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="Phoebus: Performance portable GRRMHD for supernovae, mergers, and more" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="code_of_conduct.html" class="btn btn-neutral float-right" title="Code of Conduct" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Triad National Security.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    <span class="fa fa-book"> Other Versions</span>
+    v: jwm/TOV3D
+    <span class="fa fa-caret-down"></span>
+  </span>
+  <div class="rst-other-versions">
+    <dl>
+      <dt>Branches</dt>
+      <dd><a href="../../../main/src/building.html">main</a></dd>
+      <dd><a href="../../../adi_test/src/building.html">adi_test</a></dd>
+      <dd><a href="../../../adithan/MLED/src/building.html">adithan/MLED</a></dd>
+      <dd><a href="../../../blb/mc_on_meshdata/src/building.html">blb/mc_on_meshdata</a></dd>
+      <dd><a href="../../../blb/sparsepacks/src/building.html">blb/sparsepacks</a></dd>
+      <dd><a href="building.html">jwm/TOV3D</a></dd>
+      <dd><a href="../../TovOnPolaris/src/building.html">jwm/TovOnPolaris</a></dd>
+    </dl>
+  </div>
+</div><script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

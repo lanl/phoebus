@@ -1,0 +1,244 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How to Use Sphinx for Writing Docs &mdash; Phoebus 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+
+  
+    <link rel="canonical" href="https://lanl.github.io/phoebus/src/sphinx-doc.html" />
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Tracer Particles" href="tracers.html" />
+    <link rel="prev" title="Organizational Structure" href="governance.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Phoebus
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="building.html">Building</a></li>
+<li class="toctree-l1"><a class="reference internal" href="code_of_conduct.html">Code of Conduct</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="governance.html">Organizational Structure</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">How to Use Sphinx for Writing Docs</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#how-to-convert-a-markdown-file-to-rst">How to convert a Markdown file to rst</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-to-have-github-build-your-documentation-for-you">How to have github build your documentation for you</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#building-documentation-locally">Building documentation locally</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-to-get-the-dependencies">How to Get the Dependencies</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#using-docker">Using Docker</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#more-info">More Info.</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tracers.html">Tracer Particles</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Phoebus</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">How to Use Sphinx for Writing Docs</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/src/sphinx-doc.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="how-to-use-sphinx-for-writing-docs">
+<h1>How to Use Sphinx for Writing Docs<a class="headerlink" href="#how-to-use-sphinx-for-writing-docs" title="Link to this heading"></a></h1>
+<section id="how-to-convert-a-markdown-file-to-rst">
+<h2>How to convert a Markdown file to rst<a class="headerlink" href="#how-to-convert-a-markdown-file-to-rst" title="Link to this heading"></a></h2>
+<p>We are using the <a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html">reStructuredText</a> (rst) format for our documentation.
+If you have a markdown file you would like to convert to rst,
+as a first pass, you can have <a class="reference external" href="https://pandoc.org/">Pandoc</a> convert your file. For example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pandoc<span class="w"> </span>Metadata.md<span class="w"> </span>--from<span class="w"> </span>markdown<span class="w"> </span>--to<span class="w"> </span>rst<span class="w"> </span>-s<span class="w"> </span>-o<span class="w"> </span>metadata.rst
+</pre></div>
+</div>
+<p>Pandoc can be installed easily through a Linux package manager. For example on Ubuntu,</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>apt<span class="w"> </span>install<span class="w"> </span>pandoc
+</pre></div>
+</div>
+<p>will get you the tool.</p>
+</section>
+<section id="how-to-have-github-build-your-documentation-for-you">
+<h2>How to have github build your documentation for you<a class="headerlink" href="#how-to-have-github-build-your-documentation-for-you" title="Link to this heading"></a></h2>
+<p>Github can automatically build your documentation for you through the continuous integration pipeline.
+After you submit a pull request with your .rst changes for documentation on <a class="reference external" href="https://lanl.github.io/phoebus">github-pages</a>,
+the documentation will automatically get built. You will see a “build and deploy documentation” job
+at the bottom of the pull request page. If this passes, your documentation will have been generated.</p>
+<p>On the bottom left of the documentation page on <a class="reference external" href="https://lanl.github.io/phoebus">github-pages</a>, you can select the branch/build
+of the documentation, one of which should be the branch you wrote your changes on.</p>
+</section>
+<section id="building-documentation-locally">
+<h2>Building documentation locally<a class="headerlink" href="#building-documentation-locally" title="Link to this heading"></a></h2>
+<p>While you can rely on the CI to build the documentation associated with your
+branch, you can also very easily build sphinx documentation locally through
+python. These instructions also <em>do not</em> require admin access and are usable
+with shared machines or python distributions.</p>
+<p>First, ensure that you are running a modern version of python (i.e. python 3 of
+some flavor)</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>python<span class="w"> </span>--version
+Python<span class="w"> </span><span class="m">3</span>.9.7
+</pre></div>
+</div>
+<p>Then, use pip to install <code class="code docutils literal notranslate"><span class="pre">spinx</span></code> and the RTD theme</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--user<span class="w"> </span>sphinx<span class="w"> </span>sphinx-rtd-theme
+</pre></div>
+</div>
+<p>Now, navigate to the <code class="code docutils literal notranslate"><span class="pre">../doc/sphinx</span></code> directory where a <code class="code docutils literal notranslate"><span class="pre">make</span> <span class="pre">help</span></code>
+shows all of the available ways to build the documentation</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ make help
+Sphinx v4.2.0
+Please use `make target&#39; where target is one of
+  html        to make standalone HTML files
+  dirhtml     to make HTML files named index.html in directories
+  singlehtml  to make a single large HTML file
+  pickle      to make pickle files
+  json        to make JSON files
+  htmlhelp    to make HTML files and an HTML help project
+  qthelp      to make HTML files and a qthelp project
+  devhelp     to make HTML files and a Devhelp project
+  epub        to make an epub
+  latex       to make LaTeX files, you can set PAPER=a4 or PAPER=letter
+  latexpdf    to make LaTeX and PDF files (default pdflatex)
+  latexpdfja  to make LaTeX files and run them through platex/dvipdfmx
+  text        to make text files
+  man         to make manual pages
+  texinfo     to make Texinfo files
+  info        to make Texinfo files and run them through makeinfo
+  gettext     to make PO message catalogs
+  changes     to make an overview of all changed/added/deprecated items
+  xml         to make Docutils-native XML files
+  pseudoxml   to make pseudoxml-XML files for display purposes
+  linkcheck   to check all external links for integrity
+  doctest     to run all doctests embedded in the documentation (if enabled)
+  coverage    to run coverage check of the documentation (if enabled)
+  clean       to remove everything in the build directory
+</pre></div>
+</div>
+<p>Making the documentation will create a new directory, <code class="code docutils literal notranslate"><span class="pre">_build</span></code> in the
+<code class="code docutils literal notranslate"><span class="pre">sphinx</span></code> directory along with whichever type of documentation you wanted
+to build.</p>
+<p>For example, building the HTML documentation with <code class="code docutils literal notranslate"><span class="pre">make</span> <span class="pre">html</span></code> produces the
+<code class="code docutils literal notranslate"><span class="pre">../doc/sphinx/_build/html</span></code> directory with an <code class="code docutils literal notranslate"><span class="pre">index.html</span></code> file that
+you can point a browser to in order to view the documenation.</p>
+</section>
+<section id="how-to-get-the-dependencies">
+<h2>How to Get the Dependencies<a class="headerlink" href="#how-to-get-the-dependencies" title="Link to this heading"></a></h2>
+<section id="using-docker">
+<h3>Using Docker<a class="headerlink" href="#using-docker" title="Link to this heading"></a></h3>
+<p>If you are using <a class="reference external" href="https://www.docker.com">Docker</a>, then simply pull the docker image specified below:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">image</span><span class="p">:</span> <span class="n">sphinxdoc</span><span class="o">/</span><span class="n">sphinx</span><span class="o">-</span><span class="n">latexpdf</span>
+</pre></div>
+</div>
+<p>Then, after running <code class="code docutils literal notranslate"><span class="pre">docker</span> <span class="pre">run</span> <span class="pre">-it</span> <span class="pre">&lt;docker-image-name&gt;</span> <span class="pre">/bin/bash</span></code>, install the theme we are using with <code class="code docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">sphinx_rtd_theme</span></code></p>
+</section>
+</section>
+<section id="more-info">
+<h2>More Info.<a class="headerlink" href="#more-info" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/installation.html">Sphinx Installation</a></p></li>
+</ul>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html">Sphinx reStructuredText Documentation</a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="governance.html" class="btn btn-neutral float-left" title="Organizational Structure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="tracers.html" class="btn btn-neutral float-right" title="Tracer Particles" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Triad National Security.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    <span class="fa fa-book"> Other Versions</span>
+    v: blb/sparsepacks
+    <span class="fa fa-caret-down"></span>
+  </span>
+  <div class="rst-other-versions">
+    <dl>
+      <dt>Branches</dt>
+      <dd><a href="../../../main/src/sphinx-doc.html">main</a></dd>
+      <dd><a href="../../../adi_test/src/sphinx-doc.html">adi_test</a></dd>
+      <dd><a href="../../../adithan/MLED/src/sphinx-doc.html">adithan/MLED</a></dd>
+      <dd><a href="../../mc_on_meshdata/src/sphinx-doc.html">blb/mc_on_meshdata</a></dd>
+      <dd><a href="sphinx-doc.html">blb/sparsepacks</a></dd>
+      <dd><a href="../../../jwm/TOV3D/src/sphinx-doc.html">jwm/TOV3D</a></dd>
+      <dd><a href="../../../jwm/TovOnPolaris/src/sphinx-doc.html">jwm/TovOnPolaris</a></dd>
+    </dl>
+  </div>
+</div><script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
