@@ -28,5 +28,11 @@ namespace Progenitor {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
 
+namespace Constants {
+
+const Real BOUNCE_DENS = 2.0e14; // g/cm^3
+const Real BOUNCE_ENTR = 3.0; // kB per baryon; not sure on conversion...
+}
+
 } // namespace Progenitor
 #endif
