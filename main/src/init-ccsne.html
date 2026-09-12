@@ -1,0 +1,1005 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CCSNe Initialization &mdash; Phoebus 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+
+  
+    <link rel="canonical" href="https://lanl.github.io/phoebus/src/init-ccsne.html" />
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How to Use Sphinx for Writing Docs" href="sphinx-doc.html" />
+    <link rel="prev" title="Organizational Structure" href="governance.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Phoebus
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="building.html">Building</a></li>
+<li class="toctree-l1"><a class="reference internal" href="code_of_conduct.html">Code of Conduct</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="governance.html">Organizational Structure</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">CCSNe Initialization</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#how-do-i-use-this-pipeline">How do I use this pipeline?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dependencies">Dependencies</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#documentation">Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-progenitors">Progenitor Processing &amp; I/O</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.get_MESA_profile"><code class="docutils literal notranslate"><span class="pre">get_MESA_profile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.get_KEPLER_profile"><code class="docutils literal notranslate"><span class="pre">get_KEPLER_profile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.get_GR1D_profile"><code class="docutils literal notranslate"><span class="pre">get_GR1D_profile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.wmavg"><code class="docutils literal notranslate"><span class="pre">wmavg()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.interp_to_eulerian"><code class="docutils literal notranslate"><span class="pre">interp_to_eulerian()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.fixup_rad_vel"><code class="docutils literal notranslate"><span class="pre">fixup_rad_vel()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.save_raw_profile"><code class="docutils literal notranslate"><span class="pre">save_raw_profile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.save_ADM_profile"><code class="docutils literal notranslate"><span class="pre">save_ADM_profile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.read_time_series"><code class="docutils literal notranslate"><span class="pre">read_time_series()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.find_nearest_time"><code class="docutils literal notranslate"><span class="pre">find_nearest_time()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#progenitors.get_tbounce"><code class="docutils literal notranslate"><span class="pre">get_tbounce()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#solving-for-adm-initial-conditions">Solving for ADM initial conditions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#adm.ADMSolver"><code class="docutils literal notranslate"><span class="pre">ADMSolver</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-convert">Converting to Phoebus-style input</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#convert.convert_PHB_profile"><code class="docutils literal notranslate"><span class="pre">convert_PHB_profile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#convert.make_info_file"><code class="docutils literal notranslate"><span class="pre">make_info_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#seos.calculate_eos_energy_stellarcollapse"><code class="docutils literal notranslate"><span class="pre">calculate_eos_energy_stellarcollapse()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#seos.calculate_eos_energy_helmholtz"><code class="docutils literal notranslate"><span class="pre">calculate_eos_energy_helmholtz()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#seos.get_eos_bounds"><code class="docutils literal notranslate"><span class="pre">get_eos_bounds()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sphinx-doc.html">How to Use Sphinx for Writing Docs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tracers.html">Tracer Particles</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Phoebus</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">CCSNe Initialization</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/src/init-ccsne.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="ccsne-initialization">
+<h1>CCSNe Initialization<a class="headerlink" href="#ccsne-initialization" title="Link to this heading"></a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>These docs (and this pipeline!) are under active development. If you encounter a bug or add a new feature, let the developers know!</p>
+</div>
+<p>If you’re interested in exploring the core-collapse supernova (e.g. <code class="docutils literal notranslate"><span class="pre">progenitor</span></code> ) problem in <code class="docutils literal notranslate"><span class="pre">Phoebus</span></code>,
+you’ll need to take a stellar progenitor from a Lagrangian code (e.g. MESA, KEPLER, GR1D) and convert it to
+a <code class="docutils literal notranslate"><span class="pre">Phoebus</span></code> -readable input file.</p>
+<p>This Python pipeline offers a variety of options to make that conversion as simple as possible.</p>
+<section id="how-do-i-use-this-pipeline">
+<h2>How do I use this pipeline?<a class="headerlink" href="#how-do-i-use-this-pipeline" title="Link to this heading"></a></h2>
+<p>Like <code class="docutils literal notranslate"><span class="pre">Phoebus</span></code>, this pipeline works through a master input file. You can run the entire process using the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>stellar.py<span class="w"> </span>--file<span class="w"> </span><span class="o">{</span>input<span class="w"> </span>file<span class="w"> </span>name<span class="o">}</span><span class="w"> </span>-v
+</pre></div>
+</div>
+<p>Within the input file, there are a variety of flags and options that can be used to process your stellar progenitor.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 20.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑model‑path</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">../lawhite/mesa/15m_at_cc.dat</span></code></p></td>
+<td><p>Absolute or relative path to input model/data.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑model‑name</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">aag21</span></code></p></td>
+<td><p>Desired name/id for your model.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑model‑type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MESA</span></code></p></td>
+<td><p>Type of model (options: MESA, GR1D, KEPLER).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑model‑header</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">-1</span></code></p></td>
+<td><p>(optional) Line number (zero-indexed) of the profile header (if &lt; 0, goes to defaults - MESA: 4, KEPLER: 1).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑atbounce</span></code></p></td>
+<td></td>
+<td><p>(bool) If using a GR1D model, pulls data files at bounce.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑timestamp</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.3</span></code></p></td>
+<td><p>(optional) If using a GR1D model and atbounce = false, gets data from timestep (in seconds).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑wma‑vel</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Enables weighted mean averaging for velocity.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑wma‑all</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Enables weighted mean averaging for all primitives in profile.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑wma‑n</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">100</span></code></p></td>
+<td><p>(optional) Window for weighted mean average.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑wma‑exp</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">3</span></code></p></td>
+<td><p>(optional) Exponent to raise wma weights to.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑factor‑interp</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10</span></code></p></td>
+<td><p>(optional) Factor to increase profile radial grid resolution by.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑use‑drad‑interp</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Enables radial spacing critera for interpolation instead of factor, recommended for lagrangian (mass coordinate) input models.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑drad‑interp</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1e7</span></code></p></td>
+<td><p>(optional) If using radial spacing for interpolation, sets minimum spacing requirement in cm.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑use‑uniform</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Determines if the higher resolution profile uses a uniform grid.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑unif‑max</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">5.0e9</span></code></p></td>
+<td><p>(optional) If above disabled, sets outer boundary of inner uniform grid (uniform &gt; log).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑adm‑problem</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">StellarTable</span></code></p></td>
+<td><p>(optional) Type of ADM interpolation to use, default: StellarCollapse (options: StellarCollapse, tov, homologous).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑eos‑path</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">../grsolver/SFHo.h5</span></code></p></td>
+<td><p>Absolute or relative path to eos table (must be *.h5 file).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑eos‑type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">StellarCollapse</span></code></p></td>
+<td><p>Type of tabulated eos, default: StellarCollapse (options: StellarCollapse, Helmholtz).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑use‑rhocut</span></code></p></td>
+<td></td>
+<td><p>(bool) Enables a density-only cut for the new grid. Default option if no ADM grid flags are included.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑rhocut</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2.0e3</span></code></p></td>
+<td><p>(optional) If using rhocut, the density to truncate at in g/cm^3.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑use‑radcut</span></code></p></td>
+<td></td>
+<td><p>(bool) Enables a radius-only cut for the new grid; keeps original inner radius.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑radcut</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.0e9</span></code></p></td>
+<td><p>(optional) If using radcut, the radius to truncate at in cm.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑use‑custom</span></code></p></td>
+<td></td>
+<td><p>(bool) Lets user input custom grid (radial) in cm.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑custom‑min</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">5.0e5</span></code></p></td>
+<td><p>(optional) Inner radial limit for custom grid in cm.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑custom‑max</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">5.0e9</span></code></p></td>
+<td><p>(optional) Outer radial limit for custom grid in cm.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑use‑def‑rad</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Uses the default input radial grid of the progenitor (best used for GR1D models at or after bounce).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑zones</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">2048</span></code></p></td>
+<td><p>(optional) Desired number of grid zones for new profile. Recommended to be 2^x zones for phoebus AMR.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑interp‑method</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">cubic</span></code></p></td>
+<td><p>(optional) Method of interpolation for ADM solver, non-ADM primitives (options: linear, cubic, akima, makima).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑bc‑type</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">not‑a‑knot</span></code></p></td>
+<td><p>(optional) Boundary conditions if using cubic interpolation (options: clamped, not-a-knot, periodic).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑interp‑method‑adm</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">piecewise</span></code></p></td>
+<td><p>(optional) Method of interpolation for ADM solver, ADM quantities (options: linear, piecewise).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑iterations</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">100</span></code></p></td>
+<td><p>(optional) Number of iterations the ADM solver will try when converging.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑dalpha‑eps</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">1.0e-12</span></code></p></td>
+<td><p>(optional) Allowable variation of the lapse, s.t. dalpha must converge to be less than dalpha-eps</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑extrapolate</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Extrapolate the output grid to r = 0.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑do‑fixup</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Enables a FLASH-style fixup to radius (face ‑‑&gt; cell centered) and first (inner) zone velocity.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑save‑path</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">test-profiles</span></code></p></td>
+<td><p>Absolute or relative path to desired directory to save all output.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑save‑info</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Saves info file for cgs -&gt; phb unit conversions and input.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑save‑unconverted</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Saves output for phoebus before conversion to phb units.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑save‑input</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Saves input parameter file for future use.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑save‑raw</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) Saves the processed, pre ADM solver progenitor.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">‑‑depr</span></code></p></td>
+<td></td>
+<td><p>(optional, bool) FOR TESTING ONLY, uses original grsolver pipeline.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The full parameter documentation can also be found in <code class="docutils literal notranslate"><span class="pre">phoebus/scripts/python/stellar/params.in</span></code>, which can be copied and used as a starting template.</p>
+<section id="dependencies">
+<h3>Dependencies<a class="headerlink" href="#dependencies" title="Link to this heading"></a></h3>
+<p>For this pipeline to run, you’ll need the following libraries:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">numpy</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">astropy</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">scipy</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pandas</span></code></p></li>
+</ul>
+<p>You’ll also need an installation of <a class="reference external" href="https://lanl.github.io/singularity-eos">singularity-eos</a> that’s been compiled with the Python bindings enabled. Something similar to
+the following (adjusted for your HPC environment) should suffice.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>--recursive<span class="w"> </span>git@github.com:lanl/singularity-eos.git
+<span class="nb">cd</span><span class="w"> </span>singularity-eos
+
+<span class="c1"># load python and hdf5/phdf5 here!</span>
+
+cmake<span class="w"> </span>-B<span class="w"> </span>builddir<span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+-DSINGULARITY_FORCE_SUBMODULE_MODE<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+-DSINGULARITY_USE_FORTRAN<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
+-DSINGULARITY_USE_STELLAR_COLLAPSE<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+-DSINGULARITY_BUILD_PYTHON<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+-DSINGULARITY_USE_SPINER<span class="o">=</span>ON
+
+cmake<span class="w"> </span>--build<span class="w"> </span>builddir<span class="w"> </span>--parallel
+mkdir<span class="w"> </span>install<span class="w"> </span><span class="c1"># &lt;&lt; or install directory of your choice</span>
+cmake<span class="w"> </span>--install<span class="w"> </span>builddir<span class="w"> </span>--prefix<span class="w"> </span>install
+</pre></div>
+</div>
+</section>
+</section>
+<section id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading"></a></h2>
+<p>This entire pipeline can be used as a “black-box” process. However, there are many functions that may be helpful for detailed analysis,
+processing, progenitor I/O, troubleshooting, and more. Detailed documentation for all classes, methods, and functions can be found below.</p>
+<section id="module-progenitors">
+<span id="progenitor-processing-i-o"></span><h3>Progenitor Processing &amp; I/O<a class="headerlink" href="#module-progenitors" title="Link to this heading"></a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.get_MESA_profile">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">get_MESA_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">PATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="headerlink" href="#progenitors.get_MESA_profile" title="Link to this definition"></a></dt>
+<dd><p>Retrieves a MESA stellar evolution profile.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>PATH</strong> (<em>str</em>) – Path to the desired profile.</p></li>
+<li><p><strong>header</strong> (<em>int</em><em>, </em><em>optional</em>) – Line number where column headers begin (zero-indexed). Default is 4.</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enables command line output. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>np.ndarray</em> – original profile values of [radius, velocity, density, pressure, ye, temperature, energy, omega, abar, zbar], from innermost radial coordinate outward.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.get_KEPLER_profile">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">get_KEPLER_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">PATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="headerlink" href="#progenitors.get_KEPLER_profile" title="Link to this definition"></a></dt>
+<dd><p>Retrieves a KEPLER-style stellar evolution profile.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>PATH</strong> (<em>str</em>) – Path to the desired profile.</p></li>
+<li><p><strong>header</strong> (<em>int</em><em>, </em><em>optional</em>) – Line number where column headers begin (zero-indexed). Default is 1.</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enables command line output. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>np.ndarray</em> – original profile values of [radius, velocity, density, pressure, ye, temperature, energy, omega, abar, zbar], from innermost radial coordinate outward.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.get_GR1D_profile">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">get_GR1D_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">PATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">at_bounce</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="headerlink" href="#progenitors.get_GR1D_profile" title="Link to this definition"></a></dt>
+<dd><p>Retrieves a GR1D explosion profile.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>PATH</strong> (<em>str</em>) – Path to the desired profile.</p></li>
+<li><p><strong>at_bounce</strong> (<em>bool</em><em>, </em><em>optional</em>) – Finds the time of core bounce from GR1D’s <cite>tbounce.dat</cite> output file.  Defaults to True.</p></li>
+<li><p><strong>time</strong> (<em>float</em><em>, </em><em>optional</em>) – If at_bounce is false, use GR1D output files nearest to this time (in seconds).</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enables command line output. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>np.ndarray</em> – original profile values of [radius, velocity, density, pressure, ye, temperature, energy, omega, abar, zbar], from innermost radial coordinate outward.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.wmavg">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">wmavg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_inverse</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">avg_edges</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#progenitors.wmavg" title="Link to this definition"></a></dt>
+<dd><p>Takes a weighted moving average of an array, using either a traditional or inverse method.</p>
+<ol class="arabic simple">
+<li><p><span class="math notranslate nohighlight">\(w_i = i^e\)</span> (traditional)</p></li>
+<li><p><span class="math notranslate nohighlight">\(w_i = \frac{1}{i^e}\)</span> (inverse)</p></li>
+</ol>
+<p>for <span class="math notranslate nohighlight">\(i = 1...n\)</span> and exponent <span class="math notranslate nohighlight">\(e\)</span>. Weights are applied to the data in the array from indices <span class="math notranslate nohighlight">\((j - n) \ldots (j + n)\)</span> so that the <span class="math notranslate nohighlight">\(n\)</span> elements to the left and right of the central value at index j are weighted accordingly and applied to the average.
+The central value <span class="math notranslate nohighlight">\(a\)</span> is weighted at one. So for some central value <span class="math notranslate nohighlight">\(a\)</span>, we find</p>
+<p><div class="math notranslate nohighlight">
+\[a_{wma} = \sum_{i = 1}^{n} x_i w_i \cdot (\sum_{i = 1}^{n} w_i)^{-1}\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>np.ndarray</em>) – The array to be averaged.</p></li>
+<li><p><strong>n</strong> (<em>int</em><em>, </em><em>optional</em>) – The averaging <cite>window</cite>. For some central index j, averaging will occur from indices <span class="math notranslate nohighlight">\((j - n) \ldots (j + n)\)</span>. Default is 1.</p></li>
+<li><p><strong>exp</strong> (<em>int</em><em>, </em><em>optional</em>) – The exponent to raise each weight to. Default is 1.</p></li>
+<li><p><strong>use_inverse</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enables the use of the inverse weighting method. Defaults to True.</p></li>
+<li><p><strong>avg_edges</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enables a reduced weighted mean average on the values at indices <span class="math notranslate nohighlight">\(0 \ldots n\)</span> and <span class="math notranslate nohighlight">\((m - n) \ldots m\)</span> for an array of size m. Default is True,
+recommended to avoid edge effects or discontinuities in data.</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enables command line output. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>np.ndarray</em> – The <cite>smoothed</cite> data with a rolling weighted mean average applied to every element.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.interp_to_eulerian">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">interp_to_eulerian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prof</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_drad</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drad</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_uniform</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unif_max</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#progenitors.interp_to_eulerian" title="Link to this definition"></a></dt>
+<dd><p>Increases the radial resolution of a Lagrangian (mass coordinate) input profile to an Eulerian-appropriate radial resolution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>prof</strong> (<em>np.ndarray</em>) – Original Lagrangian stellar/ccsne profile (from MESA, KEPLER, GR1D…).</p></li>
+<li><p><strong>factor</strong> (<em>int</em>) – Factor to increase radial resolution by. Default is 4, <strong>not recommended</strong> for <code class="docutils literal notranslate"><span class="pre">phoebus</span></code>.</p></li>
+<li><p><strong>use_drad</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enables the use of a specific radial spacing. Default is False.</p></li>
+<li><p><strong>drad</strong> (<em>float</em><em>, </em><em>optional</em>) – If use_drad enabled, specifices desired minimum radial spacing (in cm). Default is 1.0e7 cm</p></li>
+<li><p><strong>use_uniform</strong> (<em>bool</em><em>, </em><em>optional</em>) – Creates a uniformly spaced grid over the full radial domain. Default is False, <strong>not recommended</strong> for <code class="docutils literal notranslate"><span class="pre">phoebus</span></code>.</p></li>
+<li><p><strong>unif_max</strong> (<em>float</em><em>, </em><em>optional</em>) – If use_uniform not enabled, sets the radius (in cm) at which the transiton from uniform (linear) radial grid to log radial grid occurs. Default is 5.0e9 cm.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>np.ndarray</em> – The original profile, with increased radial resolution.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.fixup_rad_vel">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">fixup_rad_vel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prof</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#progenitors.fixup_rad_vel" title="Link to this definition"></a></dt>
+<dd><p>Applies a FLASH-style fixup (e.g. Couch et al. 2013…) to a stellar/ccsne profile. This includes:</p>
+<ul class="simple">
+<li><p>Adjusting the radius to be cell-centered values (instead of edge)</p></li>
+<li><p>Fixing the innermost zone of the velocity to be consistent with new radial values (all other primitives assumed piecewise const.)</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>prof</strong> (<em>np.ndarray</em>) – Post-ADM, Eulerian stellar/ccsne profile (from MESA, KEPLER, GR1D…).
+Assumed to be in following column order: [radius, density, temperature, ye, sie, velocity, pressure, density (adm), momentum (adm), <span class="math notranslate nohighlight">\(S\)</span> (adm), <span class="math notranslate nohighlight">\(S^r_r\)</span> (adm)]</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enables command line output. Defaults to False.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.save_raw_profile">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">save_raw_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prof</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">OUTPATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#progenitors.save_raw_profile" title="Link to this definition"></a></dt>
+<dd><dl class="simple">
+<dt>Saves a processed (pre-ADM) stellar/ccsne profile to a ASCII- and numpy-readable file (with nice formatting).</dt><dd><p>File naming convention is <cite>(model_name)_(model_type).prof</cite>.</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>prof</strong> – Post-ADM, Eulerian stellar/ccsne profile (from MESA, KEPLER, GR1D…).
+Assumed to be in following column order: [radius, velocity, density, pressure, ye, temperature, energy, omega, abar, zbar]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.save_ADM_profile">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">save_ADM_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prof</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EOSPATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eos_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">OUTPATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_unconverted</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#progenitors.save_ADM_profile" title="Link to this definition"></a></dt>
+<dd><p>Saves a processed, post-ADM, converted (code units) <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> input profile to a ASCII- and numpy-readable file (with nice formatting). Also saves:</p>
+<ul class="simple">
+<li><p>unconverted (cgs units) <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> input profile (optional)</p></li>
+<li><p>model info file with characteristic values, unit conversions, and progenitor + eos bounds (optional)</p></li>
+</ul>
+<p>File naming conventions are:</p>
+<ul class="simple">
+<li><p><cite>(model_name)_(model_type)_adm_converted.prof</cite>.</p></li>
+<li><p><cite>(model_name)_(model_type)_adm.prof</cite>.</p></li>
+<li><p><cite>(model_name)_(model_type).info</cite>.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>prof</strong> – Post-ADM, Eulerian stellar/ccsne profile (from MESA, KEPLER, GR1D…).
+Assumed to be in following column order: [radius, density, temperature, ye, sie, velocity, pressure, density (adm), momentum (adm), <span class="math notranslate nohighlight">\(S\)</span> (adm), <span class="math notranslate nohighlight">\(S^r_r\)</span> (adm)]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.read_time_series">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">read_time_series</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">PATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#progenitors.read_time_series" title="Link to this definition"></a></dt>
+<dd><p>Reads a time series file from GR1D (<a href="#id1"><span class="problematic" id="id2">*</span></a>.xg) for some arbitrary quantity at each time step.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>PATH</strong> (<em>str</em>) – Path to the run directory (should contain all GR1D output files).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p><em>tuple</em> –</p>
+<ul class="simple">
+<li><p>data (dict): Time series data (key: time, value: quantity at that timestep).</p></li>
+<li><p>times (list): Times that correspond to the keys in the full dictionary.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.find_nearest_time">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">find_nearest_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">times</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">set</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#progenitors.find_nearest_time" title="Link to this definition"></a></dt>
+<dd><p>Finds the time closest to the requested target time given a list of timesteps.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target_time</strong> (<em>float</em>) – Desired time (in seconds) to search for.</p></li>
+<li><p><strong>times</strong> (<em>set</em>) – List or set of timesteps or keys to search through.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>float</em> – Time or key nearest to the provided target time.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="progenitors.get_tbounce">
+<span class="sig-prename descclassname"><span class="pre">progenitors.</span></span><span class="sig-name descname"><span class="pre">get_tbounce</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">PATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#progenitors.get_tbounce" title="Link to this definition"></a></dt>
+<dd><p>Retrieves the time of bounce from the default GR1D output.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>PATH</strong> (<em>str</em>) – Path to the run directory (should contain all GR1D output files).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>float</em> – The time of core bounce, as given in <cite>tbounce.dat</cite>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="solving-for-adm-initial-conditions">
+<h3>Solving for ADM initial conditions<a class="headerlink" href="#solving-for-adm-initial-conditions" title="Link to this heading"></a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="adm.ADMSolver">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">adm.</span></span><span class="sig-name descname"><span class="pre">ADMSolver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">problem</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DATPATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EOSPATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eos_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_def_rad</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_rho_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rho_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_rad_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rad_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_custom</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">custom_min</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">custom_max</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zones</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interp_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bc_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interp_method_adm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_iterations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dalpha_eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extrapolate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver" title="Link to this definition"></a></dt>
+<dd><p>Solves for the necessary GR quantities needed to initialize monopole GR in <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> using the ADM (Arnowitt-Deser-Misner) formalism.</p>
+<p>For the full details of the methodologies used, refer to</p>
+<ul class="simple">
+<li><p>ch. 5.2 (Gravity) of Mariam Gogilashvili’s thesis (Gogilashvili 2024, FSU); <strong>recommended</strong> as this contains full derivations,</p></li>
+<li><p><a class="reference external" href="https://academic.oup.com/book/9640">Introduction to 3+1 Numerical Relativity</a> for a detailed reference on 3 + 1 formalisms,</p></li>
+<li><p>the <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> instrument paper; <a class="reference external" href="10.48550/arXiv.2410.09146">Barker et al. 2024</a>, and</p></li>
+<li><p>the header file for monopole GR in the main <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> codebase; <code class="docutils literal notranslate"><span class="pre">src/monopole_gr/monopole_gr.hpp</span></code>.</p></li>
+</ul>
+<p>A refactor of Mariam Gogilashvili’s original GR_Solver class.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">problem</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">DATPATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EOSPATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eos_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_def_rad</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_rho_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rho_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_rad_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rad_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_custom</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">custom_min</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">custom_max</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zones</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interp_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bc_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interp_method_adm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_iterations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dalpha_eps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extrapolate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.__init__" title="Link to this definition"></a></dt>
+<dd><p>Constructor for the ADMSolver class.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>problem</strong> (<em>str</em>) – Which problem you want to generate <code class="docutils literal notranslate"><span class="pre">phoebus</span></code> input for. Options are ‘StellarTable’, ‘TOV’ (not implemented), and ‘homologous’ (not implemented).</p></li>
+<li><p><strong>DATPATH</strong> (<em>str</em>) – Desired directory to save file(s) in.</p></li>
+<li><p><strong>EOSPATH</strong> (<em>str</em>) – Path and filename pointing to the <a href="#id3"><span class="problematic" id="id4">*</span></a>.h5 tabulated equation of state.</p></li>
+<li><p><strong>eos_type</strong> (<em>str</em><em>, </em><em>optional</em>) – The type of tabulated EOS. Options are ‘StellarCollapse’ or ‘Helmholtz’; default is ‘StellarCollapse’</p></li>
+<li><p><strong>use_def_rad</strong> (<em>bool</em><em>, </em><em>optional</em>) – If enabled, uses the original radial grid of the input progenitor profile.</p></li>
+<li><p><strong>use_rho_cut</strong> (<em>bool</em><em>, </em><em>optional</em>) – If enabled, uses a density threshold (in g/cm^3) to truncate outer radial coordinate.</p></li>
+<li><p><strong>rho_cut</strong> (<em>float</em><em>, </em><em>optional</em>) – Density to make the radial truncation at, if use_rho_cut enabled.</p></li>
+<li><p><strong>use_rad_cut</strong> (<em>bool</em><em>, </em><em>optional</em>) – If enabled, uses a radial threshold (in cm) to truncate outer radial coordinate.</p></li>
+<li><p><strong>rad_cut</strong> (<em>float</em><em>, </em><em>optional</em>) – Radius to make the radial truncation at, if use_rad_cut enabled.</p></li>
+<li><p><strong>use_custom</strong> (<em>bool</em><em>, </em><em>optional</em>) – If enabled, allows user to input custom grid using radial bounds (in cm).</p></li>
+<li><p><strong>custom_min</strong> (<em>float</em><em>, </em><em>optional</em>) – Minimum radius of grid, if use_custom enabled.</p></li>
+<li><p><strong>custom_max</strong> (<em>float</em><em>, </em><em>optional</em>) – Maximum radius of grid, if use_custom enabled.</p></li>
+<li><p><strong>zones</strong> (<em>int</em><em>, </em><em>optional</em>) – Radial resolution of the desired post-ADM grid. Also number of zones used for ADM calculations.</p></li>
+<li><p><strong>interp_method</strong> (<em>str</em><em>, </em><em>optional</em>) – Interpolation method for primitive calculations/quantities. Options are ‘linear’, ‘cubic’, ‘akima’, ‘makima’.</p></li>
+<li><p><strong>bc_type</strong> (<em>str</em><em>, </em><em>optional</em>) – Type of boundary conditions, if using cubic interpolation.</p></li>
+<li><p><strong>interp_method_adm</strong> (<em>str</em><em>, </em><em>optional</em>) – Interpolation method for ADM calculations/quantities. Options are ‘linear’, ‘piecewise’.</p></li>
+<li><p><strong>num_iterations</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of iterations the solver will do when attempting to converge below some <span class="math notranslate nohighlight">\(d \alpha\)</span> threshold.</p></li>
+<li><p><strong>dalpha_eps</strong> (<em>float</em><em>, </em><em>optional</em>) – Allowable variation of the lapse, <span class="math notranslate nohighlight">\(\alpha\)</span>, between solver iterations.</p></li>
+<li><p><strong>extrapolate</strong> (<em>bool</em><em>, </em><em>optional</em>) – If enabled, extrapolates the post-ADM profile to r = 0.</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em><em>, </em><em>optional</em>) – Enables command line output. Defaults to True.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.interp">
+<span class="sig-name descname"><span class="pre">interp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.interp" title="Link to this definition"></a></dt>
+<dd><p>Allows for flexible selection of primitive interpolation method, based on <cite>interp_method</cite> at initialization.
+Interpolates based on the original radial grid of the progenitor profile. Allows for extrapolation with all methods.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>y</strong> (<em>np.ndarray</em>) – the data to be interpolated.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.interp_adm">
+<span class="sig-name descname"><span class="pre">interp_adm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.interp_adm" title="Link to this definition"></a></dt>
+<dd><p>Allows for flexible selection of ADM interpolation method, based on <cite>interp_method_adm</cite> at initialization.
+Interpolates based on the new, post-ADM grid. Allows for extrapolation with all methods.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>y</strong> (<em>np.ndarray</em>) – the data to be interpolated.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.get_grid_data">
+<span class="sig-name descname"><span class="pre">get_grid_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">use_def_rad</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_rho_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rho_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_rad_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rad_cut</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_custom</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">custom_min</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">custom_max</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.get_grid_data" title="Link to this definition"></a></dt>
+<dd><p>Creates a new radial grid based on initialization parameters (<cite>use_def_rad</cite>, <cite>use_*_cut</cite>, <cite>use_custom</cite>) and generates
+interpolators for all primitive quantities. Also recalculates specific internal energy using <code class="docutils literal notranslate"><span class="pre">Singularity-EOS</span></code> to
+be consistent with the equation of state that will be used in <code class="docutils literal notranslate"><span class="pre">phoebus</span></code>.</p>
+<p>If no initialization parameters are input, <cite>use_rho_cut</cite> at a threshold density of 2.0e3 g/cm^3 is used to create the new grid.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>use_def_rad</strong> (<em>bool</em><em>, </em><em>optional</em>) – If enabled, uses the original radial grid of the input progenitor profile. Defaults to False.</p></li>
+<li><p><strong>use_rho_cut</strong> (<em>bool</em><em>, </em><em>optional</em>) – If enabled, uses a density threshold (in g/cm^3) to truncate outer radial coordinate. Defaults to True.</p></li>
+<li><p><strong>rho_cut</strong> (<em>float</em><em>, </em><em>optional</em>) – Density to make the radial truncation at, if use_rho_cut enabled. Default is 2.0e3 (g/cm^3).</p></li>
+<li><p><strong>use_rad_cut</strong> (<em>bool</em><em>, </em><em>optional</em>) – If enabled, uses a radial threshold (in cm) to truncate outer radial coordinate. Defaults to False.</p></li>
+<li><p><strong>rad_cut</strong> (<em>float</em><em>, </em><em>optional</em>) – Radius to make the radial truncation at, if use_rad_cut enabled. Default is 5.0e9 cm.</p></li>
+<li><p><strong>use_custom</strong> (<em>bool</em><em>, </em><em>optional</em>) – If enabled, allows user to input custom grid using radial bounds (in cm). Defaults to False.</p></li>
+<li><p><strong>custom_min</strong> (<em>float</em><em>, </em><em>optional</em>) – Minimum radius of grid, if use_custom enabled. Default is 5.0e5 cm.</p></li>
+<li><p><strong>custom_max</strong> (<em>float</em><em>, </em><em>optional</em>) – Maximum radius of grid, if use_custom enabled. Default is 5.0e9 cm.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.calculate_newtonian_metric">
+<span class="sig-name descname"><span class="pre">calculate_newtonian_metric</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.calculate_newtonian_metric" title="Link to this definition"></a></dt>
+<dd><p>Using a spherically symmetric metric, calculates the values of <span class="math notranslate nohighlight">\(\alpha^2\)</span>, <span class="math notranslate nohighlight">\(a^2\)</span> in the weak-field (e.g. Newtonian) limit.</p>
+<p>Beginnning with our ADM metric in natural units (s.t. <span class="math notranslate nohighlight">\(c = 1\)</span>), s.t.</p>
+<blockquote>
+<div><p><div class="math notranslate nohighlight">
+\[ds^2 = (-\alpha^2 +\beta_i \beta^i) dt^2 + 2 \beta_i dt dx^i + \gamma_{ij} dx^i dx^j\]</div>
+</p>
+<p>and taking a sph. symm. ansatz at <span class="math notranslate nohighlight">\(t=0\)</span> (s.t. our shift <span class="math notranslate nohighlight">\(\beta = 0\)</span>), we write the metric as</p>
+</div></blockquote>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(ds^2 = -\alpha^2 dt^2 + a^2 dr^2 + b^2 r^2 d \Omega^2\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(ds^2 = -e^{2 \varphi}dt^2 +  e^{-2 \varphi}dr^2 + r^2 d \Omega^2\)</span></p></li>
+</ul>
+<p>In the weak-field limit (e.g. when gravitational potential <span class="math notranslate nohighlight">\(\varphi \rightarrow 0\)</span>), we can take a small-x Taylor expansion
+to solve for <span class="math notranslate nohighlight">\(a\)</span>, <span class="math notranslate nohighlight">\(\alpha\)</span>, s.t.</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\alpha^2 = e^{2 \varphi} \approx 1 + 2 \varphi\)</span>, and</p></li>
+<li><p><span class="math notranslate nohighlight">\(a^2 = e^{-2 \varphi} \approx 1 + 2r \partial \varphi\)</span>,</p></li>
+</ul>
+<p>recalling that <span class="math notranslate nohighlight">\(\varphi = -r \partial \varphi\)</span> and given a symm. spherical gravitational potential, s.t.</p>
+<p><div class="math notranslate nohighlight">
+\[\varphi = - \frac{2 \pi G}{c^2} \rho r^2\]</div>
+</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><p><em>tuple</em> –</p>
+<ul class="simple">
+<li><p>alpha2 (np.ndarray): Lapse function (<span class="math notranslate nohighlight">\(\alpha\)</span>) squared, weak-field approximation.</p></li>
+<li><p>a2 (np.ndarray): Metric component (<span class="math notranslate nohighlight">\(a\)</span>) squared, weak-field approximation.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.calculate_initial_ADM">
+<span class="sig-name descname"><span class="pre">calculate_initial_ADM</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.calculate_initial_ADM" title="Link to this definition"></a></dt>
+<dd><p>Calculates initial values for ADM density, momentum, and stress tensor given the Newtonian values of <span class="math notranslate nohighlight">\(\alpha^2\)</span>, <span class="math notranslate nohighlight">\(a^2\)</span>.</p>
+<p>Given our 3-metric , s.t.</p>
+<p><div class="math notranslate nohighlight">
+\[\gamma^2 = (1 - (v^2 + \omega^2 r^2))^{-1}\]</div>
+</p>
+<p>We find inital values for ADM quantities as given by</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\rho^{(ADM)} = \rho \alpha^2 \gamma^2 \)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(P^{(ADM)} = \alpha \gamma^2 (\rho P)^2 \omega\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(S^{(ADM)} = (\alpha^2 \gamma^2 - 1) \rho^2 + (\alpha^2 \gamma^2 + 2)P\)</span></p></li>
+</ul>
+<p>Also ref. Eqs. 5.10-12 in Gogilashvili 2024 for further relation to <span class="math notranslate nohighlight">\(T^{\mu \nu}\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><p><em>tuple</em> –</p>
+<ul class="simple">
+<li><p>rho_adm (np.ndarray): Initial ADM density, on the (new) radial grid.</p></li>
+<li><p>P_adm (np.ndarray): Initial ADM momentum, on the (new) radial grid.</p></li>
+<li><p>S_adm (np.ndarray): Initial ADM stress tensor, on the (new) radial grid.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.calculate_metric">
+<span class="sig-name descname"><span class="pre">calculate_metric</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rho_adm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">P_adm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">S_adm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.calculate_metric" title="Link to this definition"></a></dt>
+<dd><p>Calculates the components <span class="math notranslate nohighlight">\(a\)</span> (metric) and <span class="math notranslate nohighlight">\(K_r^r\)</span> (extrinsic curvature) using the Einstein constraint equations
+with a Hamiltonian constraint (Barker et al. 2024, eqs. 16-17) and the boundary conditions as detailed in eqs. 23-28.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rho_adm</strong> (<em>np.ndarray</em>) – ADM density, on the (new) radial grid.</p></li>
+<li><p><strong>P_adm</strong> (<em>np.ndarray</em>) – ADM momentum, on the (new) radial grid.</p></li>
+<li><p><strong>S_adm</strong> (<em>np.ndarray</em>) – ADM stress tensor, on the (new) radial grid.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p><em>tuple</em> –</p>
+<ul class="simple">
+<li><p>a (np.ndarray): Metric component (<span class="math notranslate nohighlight">\(a\)</span>).</p></li>
+<li><p>K (np.ndarray): Extrinsic curvature (<span class="math notranslate nohighlight">\(K_r^r\)</span>).</p></li>
+<li><p>alpha (np.ndarray): Lapse function (<span class="math notranslate nohighlight">\(\alpha\)</span>).</p></li>
+<li><p>beta (np.ndarray): Shift function (<span class="math notranslate nohighlight">\(\beta\)</span>).</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.calculate_ADM">
+<span class="sig-name descname"><span class="pre">calculate_ADM</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.calculate_ADM" title="Link to this definition"></a></dt>
+<dd><p>Calculates spherically symmetric, time-dependent ADM density, momentum, and stress tensor using full matrix equations and 4-metric <span class="math notranslate nohighlight">\(g_{\mu \nu}\)</span>.
+Refer to Appendix A of Barker et al. 2024, along with ch. 5.2.6 of Gogilashvili 2024 for full derivations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a</strong> (<em>np.ndarray</em>) – Metric component (<span class="math notranslate nohighlight">\(a\)</span>).</p></li>
+<li><p><strong>alpha</strong> (<em>np.ndarray</em>) – Lapse function (<span class="math notranslate nohighlight">\(\alpha\)</span>).</p></li>
+<li><p><strong>beta</strong> (<em>np.ndarray</em>) – Shift function (<span class="math notranslate nohighlight">\(\beta\)</span>).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p><em>tuple</em> –</p>
+<ul class="simple">
+<li><p>rho_adm (np.ndarray): ADM density.</p></li>
+<li><p>P_adm (np.ndarray): ADM momentum.</p></li>
+<li><p>S_adm (np.ndarray): ADM stress tensor, trace.</p></li>
+<li><p>Srr_adm (np.ndarray): ADM stress tensor.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.iterate">
+<span class="sig-name descname"><span class="pre">iterate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.iterate" title="Link to this definition"></a></dt>
+<dd><p>Iterates through the full ADM solver pipeline until we find that <span class="math notranslate nohighlight">\(d \alpha &lt; \epsilon\)</span> after <span class="math notranslate nohighlight">\(n\)</span> iterations,
+where <span class="math notranslate nohighlight">\(\epsilon\)</span> is the threshold value set at initialization by <code class="docutils literal notranslate"><span class="pre">dalpha_eps</span></code> and <span class="math notranslate nohighlight">\(n \less N\)</span>, where <span class="math notranslate nohighlight">\(N\)</span> is the
+maximum number of iterations as set by the user at initialization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><p><em>tuple</em> –</p>
+<ul class="simple">
+<li><p>rho_adm (np.ndarray): Final ADM density.</p></li>
+<li><p>P_adm (np.ndarray): Final ADM momentum.</p></li>
+<li><p>S_adm (np.ndarray): Final ADM stress tensor, trace.</p></li>
+<li><p>Srr_adm (np.ndarray): Final ADM stress tensor.</p></li>
+<li><p>a (np.ndarray): Final metric component (<span class="math notranslate nohighlight">\(a\)</span>).</p></li>
+<li><p>K (np.ndarray): Final extrinsic curvature (<span class="math notranslate nohighlight">\(K_r^r\)</span>).</p></li>
+<li><p>alpha (np.ndarray): Final lapse function (<span class="math notranslate nohighlight">\(\alpha\)</span>).</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.calculate_all">
+<span class="sig-name descname"><span class="pre">calculate_all</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.calculate_all" title="Link to this definition"></a></dt>
+<dd><p>Handles all iteration, solving, and final interpolation/extrapolation to the user-input radial grid.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="adm.ADMSolver.get_final_profile">
+<span class="sig-name descname"><span class="pre">get_final_profile</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#adm.ADMSolver.get_final_profile" title="Link to this definition"></a></dt>
+<dd><p>Serves as the driver for ADMSolver.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>np.ndarray</em> – Post-ADM, Eulerian stellar/ccsne profile (from MESA, KEPLER, GR1D…).
+Assumed to be in following column order: [radius, density, temperature, ye, sie, velocity, pressure, density (adm), momentum (adm), <span class="math notranslate nohighlight">\(S\)</span> (adm), <span class="math notranslate nohighlight">\(S^r_r\)</span> (adm)]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="module-convert">
+<span id="converting-to-phoebus-style-input"></span><h3>Converting to Phoebus-style input<a class="headerlink" href="#module-convert" title="Link to this heading"></a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="convert.convert_PHB_profile">
+<span class="sig-prename descclassname"><span class="pre">convert.</span></span><span class="sig-name descname"><span class="pre">convert_PHB_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prof</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#convert.convert_PHB_profile" title="Link to this definition"></a></dt>
+<dd><p>Converts a post-ADM stellar/ccsne profile to a <code class="docutils literal notranslate"><span class="pre">phoebus</span></code>-readable input file in code (phb) units.
+Also calculates and provides the central density, along with characteristic mass and radius as given by</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(M_0 = \rho_c^{-1/2} c^3 G^{-3/2}\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(R_0 = G M_0 c^{-2}\)</span></p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>prof</strong> (<em>np.ndarray</em>) – Post-ADM, Eulerian stellar/ccsne profile (from MESA, KEPLER, GR1D…).
+Assumed to be in following column order: [radius, density, temperature, ye, sie, velocity, pressure, density (adm), momentum (adm), <span class="math notranslate nohighlight">\(S\)</span> (adm), <span class="math notranslate nohighlight">\(S^r_r\)</span> (adm)]</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p><em>tuple</em> –</p>
+<ul class="simple">
+<li><p>prof (np.ndarray): The original profile with all primitive and ADM quantities converted to code units.</p></li>
+<li><p>rhoc (float): Central density of the profile.</p></li>
+<li><p>M0 (float): Characteristic mass of the profile.</p></li>
+<li><p>R0 (float): Characteristic radius of the profile.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="convert.make_info_file">
+<span class="sig-prename descclassname"><span class="pre">convert.</span></span><span class="sig-name descname"><span class="pre">make_info_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rhoc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">M0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">R0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prof_conv</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">EOSPATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eos_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">OUTPATH</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#convert.make_info_file" title="Link to this definition"></a></dt>
+<dd><p>Generates and outputs a summary/info file for a post-ADM, post unit conversion stellar/ccsne progenitor profile, including:</p>
+<ul class="simple">
+<li><p>characteristic values used to convert to code units,</p></li>
+<li><p>useful length scales for the core-collapse problem,</p></li>
+<li><p>bounds of the progenitor profile and equation of state, and</p></li>
+<li><p>conversion factors to convert between cgs and code (phb) units.</p></li>
+</ul>
+<p>This file is ASCII- and numpy-readable for ease of use when conducting post-simulation data analysis, e.g. <code class="docutils literal notranslate"><span class="pre">np.loadtxt('s15.0_mesa.info',</span> <span class="pre">usecols=0)</span></code></p>
+<p>File naming convention is <cite>(model_name)_(model_type).info</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rhoc</strong> (<em>float</em>) – Central density of the profile.</p></li>
+<li><p><strong>M0</strong> (<em>float</em>) – Characteristic mass of the profile.</p></li>
+<li><p><strong>R0</strong> (<em>float</em>) – Characteristic radius of the profile.</p></li>
+<li><p><strong>prof_conv</strong> (<em>np.ndarray</em>) – Post-ADM, converted Eulerian stellar/ccsne profile.</p></li>
+<li><p><strong>model_name</strong> (<em>str</em>) – Model name.</p></li>
+<li><p><strong>model_type</strong> (<em>str</em>) – Model type (e.g. MESA, KEPLER, GR1D…).</p></li>
+<li><p><strong>EOSPATH</strong> (<em>str</em>) – Directory that contains the <a href="#id5"><span class="problematic" id="id6">*</span></a>.h5 tabulated equation of state.</p></li>
+<li><p><strong>eos_type</strong> (<em>str</em><em>, </em><em>optional</em>) – The type of tabulated EOS. Options are ‘StellarCollapse’ or ‘Helmholtz’; default is ‘StellarCollapse’</p></li>
+<li><p><strong>OUTPATH</strong> (<em>str</em><em>, </em><em>optional</em>) – Desired directory to save file(s) in. Default is current working directory.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<p>There are also a few helper modules that use <a class="reference external" href="https://lanl.github.io/singularity-eos">singularity-eos</a> that can be used to calculate specific internal energy and get bounds for the
+equation of state in use:</p>
+<dl class="py function" id="module-seos">
+<dt class="sig sig-object py" id="seos.calculate_eos_energy_stellarcollapse">
+<span class="sig-prename descclassname"><span class="pre">seos.</span></span><span class="sig-name descname"><span class="pre">calculate_eos_energy_stellarcollapse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rho</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ye</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#seos.calculate_eos_energy_stellarcollapse" title="Link to this definition"></a></dt>
+<dd><p>Calculates an EOS-consistent specific internal energy for a stellar/ccsne progenitor profile using a StellarCollpase equation
+of state and <code class="docutils literal notranslate"><span class="pre">Singularity-EOS</span></code> Python bindings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rho</strong> (<em>np.ndarray</em>) – Density of the profile.</p></li>
+<li><p><strong>T</strong> (<em>np.ndarray</em>) – Temperature of the profile.</p></li>
+<li><p><strong>ye</strong> (<em>np.ndarray</em>) – Electron fraction of the profile.</p></li>
+<li><p><strong>filename</strong> (<em>str</em>) – Full filename and path pointing to the <a href="#id7"><span class="problematic" id="id8">*</span></a>.h5 tabulated equation of state.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p><em>tuple</em> –</p>
+<ul class="simple">
+<li><p>eps (np.ndarray): Specific internal energy of the profile.</p></li>
+<li><p>u (np.ndarray): Energy density of the profile.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="seos.calculate_eos_energy_helmholtz">
+<span class="sig-prename descclassname"><span class="pre">seos.</span></span><span class="sig-name descname"><span class="pre">calculate_eos_energy_helmholtz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rho</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">abar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zbar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">numpy.ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#seos.calculate_eos_energy_helmholtz" title="Link to this definition"></a></dt>
+<dd><p>Calculates an EOS-consistent specific internal energy for a stellar/ccsne progenitor profile using a Helmholtz equation
+of state and <code class="docutils literal notranslate"><span class="pre">Singularity-EOS</span></code> Python bindings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rho</strong> (<em>np.ndarray</em>) – Density of the profile.</p></li>
+<li><p><strong>T</strong> (<em>np.ndarray</em>) – Temperature of the profile.</p></li>
+<li><p><strong>ye</strong> (<em>np.ndarray</em>) – Electron fraction of the profile.</p></li>
+<li><p><strong>filename</strong> (<em>str</em>) – Full filename and path pointing to the <a href="#id9"><span class="problematic" id="id10">*</span></a>.h5 tabulated equation of state.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p><em>tuple</em> –</p>
+<ul class="simple">
+<li><p>eps (np.ndarray): Specific internal energy of the profile.</p></li>
+<li><p>u (np.ndarray): Energy density of the profile.</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="seos.get_eos_bounds">
+<span class="sig-prename descclassname"><span class="pre">seos.</span></span><span class="sig-name descname"><span class="pre">get_eos_bounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eos_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">numpy.ndarray</span></span></span><a class="headerlink" href="#seos.get_eos_bounds" title="Link to this definition"></a></dt>
+<dd><p>Calculates the upper and lower bounds (in density, temperature, specific internal energy, and electron fraction)
+of a tabulated Stellar Collapse equation of state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<em>str</em>) – Full filename and path pointing to the <a href="#id11"><span class="problematic" id="id12">*</span></a>.h5 tabulated equation of state.</p></li>
+<li><p><strong>eos_type</strong> (<em>str</em><em>, </em><em>optional</em>) – The type of tabulated EOS. Default is ‘StellarCollapse’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>np.ndarray</em> – EOS bounds, in the following order: [rhoMin, rhoMax, TMin, TMax, sieMin, sieMax, YeMin, YeMax]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="governance.html" class="btn btn-neutral float-left" title="Organizational Structure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sphinx-doc.html" class="btn btn-neutral float-right" title="How to Use Sphinx for Writing Docs" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Triad National Security.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+<div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    <span class="fa fa-book"> Other Versions</span>
+    v: main
+    <span class="fa fa-caret-down"></span>
+  </span>
+  <div class="rst-other-versions">
+    <dl>
+      <dt>Branches</dt>
+      <dd><a href="../../adi_test/index.html">adi_test</a></dd>
+      <dd><a href="../../adithan/MLED/index.html">adithan/MLED</a></dd>
+      <dd><a href="../../blb/ctmhd/index.html">blb/ctmhd</a></dd>
+      <dd><a href="../../blb/mc_on_meshdata/index.html">blb/mc_on_meshdata</a></dd>
+      <dd><a href="../../blb/sparsepacks/index.html">blb/sparsepacks</a></dd>
+      <dd><a href="../../jwm/TOV3D/index.html">jwm/TOV3D</a></dd>
+      <dd><a href="../../jwm/TovOnPolaris/index.html">jwm/TovOnPolaris</a></dd>
+      <dd><a href="../../jwm/tov3d-debug/index.html">jwm/tov3d-debug</a></dd>
+      <dd><a href="../../law/ccsne-utils/src/init-ccsne.html">law/ccsne-utils</a></dd>
+      <dd><a href="../../law/entropy/src/init-ccsne.html">law/entropy</a></dd>
+      <dd><a href="../../law/homologous/src/init-ccsne.html">law/homologous</a></dd>
+      <dd><a href="init-ccsne.html">main</a></dd>
+      <dd><a href="../../star_shredder/index.html">star_shredder</a></dd>
+    </dl>
+  </div>
+</div><script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
