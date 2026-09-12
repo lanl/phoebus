@@ -122,6 +122,15 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("S_adm_dev", S_adm_dev);
   params.Add("Srr_adm_dev", Srr_adm_dev);
 
+  // criterion for bounce in ccsne (O'Connor & Ott 2010)
+  params.Add("bounce_density", Constants::BOUNCE_DENS);
+  params.Add("bounce_entropy", Constants::BOUNCE_ENTR);
+  // set these if bounce occurs
+  params.Add("bounce_density_actual"; -1.0); 
+  params.Add("bounce_entropy_actual"; -1.0); 
+  params.Add("bounce_time"; -1.0);
+  params.Add("post_bounce", False);
+
   params.Add("outside_pns_threshold", outside_pns_threshold);
   params.Add("inside_pns_threshold", inside_pns_threshold);
   params.Add("net_heat_threshold", net_heat_threshold);

@@ -41,6 +41,7 @@ def convert_PHB_profile(prof: np.ndarray):
         - rhoc (float): Central density of the profile.
         - M0 (float): Characteristic mass of the profile.
         - R0 (float): Characteristic radius of the profile.
+        - T0 (float): Characteristic time of the profile.
     '''
 
     # the input profile has the following columns:
@@ -54,6 +55,7 @@ def convert_PHB_profile(prof: np.ndarray):
     rhoc = prof_conv[0, 1]  # central density
     M0 = 1.0 / (rhoc**0.5) * ((c**2.0 / G) ** 1.5)  # characteristic mass
     R0 = (G * M0) / (c**2.0)  # characteristic radius
+    T0 = R0 / c # characteristic time
 
     # --- primitive quantities
     prof_conv[:, 0] *= (c**2.0) / G / M0  # radius
@@ -70,10 +72,10 @@ def convert_PHB_profile(prof: np.ndarray):
     prof_conv[:, 9] *= G**3.0 / c**8.0 * M0**2.0  # adm entropy (?)
     prof_conv[:, 10] *= G**3.0 / c**8.0 * M0**2.0  # adm entropy, radial component (?)
 
-    return prof_conv, rhoc, M0, R0
+    return prof_conv, rhoc, M0, R0, T0
 
 
-def make_info_file( rhoc: float, M0: float, R0: float, prof_conv: np.ndarray, model_name: str, model_type: str, EOSPATH: str, eos_type: str ='stellarcollapse', OUTPATH: str ='') -> None:
+def make_info_file( rhoc: float, M0: float, R0: float, T0: float, prof_conv: np.ndarray, model_name: str, model_type: str, EOSPATH: str, eos_type: str ='stellarcollapse', OUTPATH: str ='') -> None:
     '''
     Generates and outputs a summary/info file for a post-ADM, post unit conversion stellar/ccsne progenitor profile, including:
 
@@ -90,6 +92,7 @@ def make_info_file( rhoc: float, M0: float, R0: float, prof_conv: np.ndarray, mo
         rhoc (float): Central density of the profile.
         M0 (float): Characteristic mass of the profile.
         R0 (float): Characteristic radius of the profile.
+        T0 (float): Characteristic time of the profile.
         prof_conv (np.ndarray): Post-ADM, converted Eulerian stellar/ccsne profile.
         model_name (str): Model name.
         model_type (str): Model type (e.g. MESA, KEPLER, GR1D...).
@@ -114,10 +117,15 @@ def make_info_file( rhoc: float, M0: float, R0: float, prof_conv: np.ndarray, mo
         fout.write(fmt % (rhoc, 'central density'))
         fout.write(fmt % (M0, 'characteristic mass'))
         fout.write(fmt % (R0, 'characteristic radius'))
+        fout.write(fmt % (T0, 'characteristic time'))
         fout.write('\n')
         fout.write('# -----length scales [phb]\n')
         fout.write(fmt % (500e5 / R0, 'radius, 500 km'))
         fout.write(fmt % (1e9 / R0, 'radius, 1e4 km'))
+        fout.write('\n')
+        fout.write('# -----temporal scales [phb]\n')
+        fout.write(fmt % (1e-3 / T0, 'time, 1 ms'))
+        fout.write(fmt % (1.0 / T0, 'time, 1 s'))
         fout.write('\n')
 
         # --- model bounds
@@ -154,6 +162,7 @@ def make_info_file( rhoc: float, M0: float, R0: float, prof_conv: np.ndarray, mo
         fout.write(fmt % (c**2.0, 'sie'))
         fout.write(fmt % (c, 'velocity'))
         fout.write(fmt % (1 / (G**3.0 / c**8.0 * M0**2.0), 'pressure'))
+        fout.write(fmt % (T0, 'time'))
         fout.write('\n')
 
         fout.close()
