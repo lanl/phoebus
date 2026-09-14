@@ -1,0 +1,31 @@
+name: compile_and_build_phoebus
+description: 'Compile and build Phoebus using selected compiler'
+inputs:
+  compiler:
+    description: compiler for test
+    required: true
+    default: 'g++'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Compile various builds of Phoebus using ${{ inputs.compiler }}
+      run: |
+        mkdir build_release_minkowski
+        cd build_release_minkowski
+        cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_GEOMETRY=Minkowski -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON -DPHOEBUS_ENABLE_MPI=Off -DPHOEBUS_ENABLE_OPENMP=ON ..
+        cmake --build . --parallel 8
+        cd ..
+
+        mkdir build_release_monopoleshp
+        cd build_release_monopoleshp
+        cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_GEOMETRY=MonopoleSph -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON -DPHOEBUS_ENABLE_MPI=Off -DPHOEBUS_ENABLE_OPENMP=ON ..
+        cmake --build . --parallel 8
+        cd ..
+
+        mkdir build_release_monopolecart
+        cd build_release_monopolecart
+        cmake -DCMAKE_BUILD_TYPE=Release -DPHOEBUS_GEOMETRY=MonopoleCart -DPHOEBUS_CACHE_GEOMETRY=ON -DPARTHENON_DISABLE_HDF5_COMPRESSION=ON -DPHOEBUS_ENABLE_MPI=Off -DPHOEBUS_ENABLE_OPENMP=ON ..
+        cmake --build . --parallel 8
+        cd ..
+      shell: bash

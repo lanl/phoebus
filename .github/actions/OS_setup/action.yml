@@ -1,0 +1,55 @@
+name: OS-setup
+description: 'Setup OS for compiling and building Phoebus'
+inputs:
+  compiler:
+    description: compiler for test
+    required: true
+    default: 'g++'
+  uses_mpi:
+    description: whether we need to build with MPI or not
+    required: true
+    default: 'true'
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install dependencies 
+    # Set system to non-interactive mode
+      run: |
+        export DEBIAN_FRONTEND=noninteractive
+        sudo apt-get update -qq
+        sudo apt-get install -qq --no-install-recommends tzdata
+        sudo apt-get install -qq git
+        sudo apt-get install -qq libopenmpi-dev
+        sudo apt-get install -qq openssh-client
+        sudo apt-get install -qq python3 python3-numpy python3-h5py python3-matplotlib
+      shell: bash
+
+    - if: inputs.uses_mpi == 'true'
+      run:  sudo apt-get install -qq libhdf5-openmpi-dev
+      shell: bash
+
+    - if: inputs.uses_mpi == 'false'
+      run: sudo apt-get install -qq libhdf5-serial-dev
+      shell: bash
+
+    - if: runner.os == 'Linux' && inputs.compiler == 'g++'
+      run: sudo apt-get install -qq g++
+      shell: bash
+
+    - if: runner.os == 'Linux' && inputs.compiler == 'clang'
+      run: sudo apt-get install -qq clang
+      shell: bash
+
+    - if: runner.os == 'Linux' && inputs.compiler == 'intel'
+      run: |
+        wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+        sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+        rm GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+        sudo echo "deb https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+        sudo apt-get update
+        sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp
+      shell: bash

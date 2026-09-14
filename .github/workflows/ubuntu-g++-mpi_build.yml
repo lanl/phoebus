@@ -1,0 +1,36 @@
+name: Ubuntu-g++-mpi_build
+
+on:
+  push:
+    # paths-ignore: ['docs/**', 'wiki/**', '**/*.md', '**/*.markdown', '**/*.rst', 'Makefile_old', '.gitattributes', '.gitignore', 'AUTHORS', 'LICENSE', 'implementations/**']
+    branches: [main, tests]
+  pull_request:
+    # paths-ignore: ['docs/**', 'wiki/**', '**/*.md', '**/*.markdown', '**/*.rst', 'Makefile_old', '.gitattributes', '.gitignore', 'AUTHORS', 'LICENSE', 'implementations/**']
+    branches: [ main, tests ]
+  # Run workflow on the 1st and 15th of every month at 7:33 AM PST (UTC-8)
+  schedule:
+    - cron: '33 15 1,15 * *'
+
+jobs:
+  phoebus_compile_and_build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # This forces GitHub to automatically pull down parthenon, singularity-eos, and kokkos
+          submodules: recursive
+      - name: Setup OS and compile
+        uses: ./.github/actions/OS_setup
+        with:
+          compiler: 'g++'
+          uses_mpi: "true"
+      - name: Compile and build Phoebus - mpi
+        uses: ./.github/actions/compile_and_build_phoebus/mpi
+        with:
+          compiler: 'g++'
