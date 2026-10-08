@@ -9,8 +9,10 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
+#include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
 #include "progenitordata.hpp"
+
 namespace Progenitor {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
@@ -236,8 +238,14 @@ TaskStatus GetProgenitorState(MeshData<Real> *md, Real simtime) {
         },
         Kokkos::MinMax<Real>(minmax));
 
+// now we do an MPI reduce if enabled; otherwise get the values directly.
+#ifdef MPI_PARALLEL
+    MPI_Allreduce(&minmax.max_val, &max_density, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&minmax.min_val, &min_entropy, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+#else
     max_density = minmax.max_val;
     min_entropy = minmax.min_val;
+#endif // MPI_PARALLEL
 
     // this could be updated with entropy criteria later (not necessarily needed)
     if (max_density >= bounce_density_crit) {
@@ -246,13 +254,19 @@ TaskStatus GetProgenitorState(MeshData<Real> *md, Real simtime) {
       // update in params for continuity (also in case of restart?)
       progen->UpdateParam<bool>("post_bounce", true);
 
+      // let's get some nice (human readable) units
+      Mesh *pm = md->GetMeshPointer();
+      auto uc = pm->packages.Get("phoebus")->Param<UnitConversions>("unit_conv");
+
       // output data file, in code units and cgs units
       FILE *fout;
       fout = fopen("bounce.dat", "w"); // questionable naming...
-      fprintf(fout, "%-20s\n", ">> bounce reached!");
-      fprintf(fout, "%-16s  %.14e\n", "time", bounce_time);
-      fprintf(fout, "%-16s  %.14e\n", "central density", max_density);
-      fprintf(fout, "%-16s  %.14e\n", "central entropy", min_entropy);
+      fprintf(fout, "%-26s  %.14e  %.14e\n", "time [s]", bounce_time,
+              uc.GetTimeCodeToCGS() * bounce_time);
+      fprintf(fout, "%-26s  %.14e  %.14e\n", "central density [g/cc]", max_density,
+              uc.GetMassDensityCodeToCGS() * max_density);
+      fprintf(fout, "%-26s  %.14e  %.14e\n", "central entropy [erg/K/g]", min_entropy,
+              uc.GetEntropyCodeToCGS() * min_entropy);
       fclose(fout);
     }
 
