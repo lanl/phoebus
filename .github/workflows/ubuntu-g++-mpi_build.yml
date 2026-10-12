@@ -1,4 +1,5 @@
-name: Ubuntu-g++-mpi_build
+name: MPI Build
+run-name: Ubuntu-g++ mpi build
 
 on:
   push:
@@ -13,6 +14,7 @@ on:
 
 jobs:
   phoebus_compile_and_build:
+    name: Ubuntu-g++ mpi build
     strategy:
       fail-fast: false
       matrix:

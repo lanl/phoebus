@@ -1,4 +1,5 @@
-name: Ubuntu-g++-openmpi_build
+name: OpenMP-MPI Build
+run-name: Ubuntu-g++ openmp + mpi build
 
 on:
   push:
@@ -13,6 +14,7 @@ on:
 
 jobs:
   phoebus_compile_and_build:
+    name: Ubuntu-g++ openmp + mpi build
     strategy:
       fail-fast: false
       matrix:
