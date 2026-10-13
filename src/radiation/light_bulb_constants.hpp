@@ -30,9 +30,10 @@ constexpr Real LRHOMAX = 13.;
 
 namespace Liebendorfer {
 // log rho parameters
-constexpr Real LR1_G15 = std::log10(3.0e7);
-constexpr Real LR1_N13 = std::log10(2.0e7);
-constexpr Real LR2 = std::log10(2.0e13);
+// TPJ: the calls to log with constexpr complains when compiling on GPU
+constexpr Real LR1_G15 = 7.477121254719663; // std::log10(3.0e7);
+constexpr Real LR1_N13 = 7.301029995663981; // std::log10(2.0e7);
+constexpr Real LR2 = 13.301029995663981; // std::log10(2.0e13);
 // ye parameters
 constexpr Real Y1 = 0.5;
 constexpr Real Y2_G15 = 0.278;
