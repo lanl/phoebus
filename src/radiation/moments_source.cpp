@@ -348,8 +348,9 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
             const Real W = phoebus::GetLorentzFactor(con_vp, cov_gamma.data);
             Vec con_v{{con_vp[0] / W, con_vp[1] / W, con_vp[2] / W}};
 
-            Real J0[3] = {v(iblock, idx_J(0), k, j, i), 0, 0};
-            PARTHENON_REQUIRE(num_species == 1, "Multiple species not implemented");
+            Real J0[3] = {v(iblock, idx_J(0), k, j, i),
+                          v(iblock, idx_J(1), k, j, i),
+                          v(iblock, idx_J(2), k, j, i)};
 
             const Real dtau = alpha * dt / W; // Elapsed time in fluid frame
 
@@ -482,8 +483,6 @@ TaskStatus MomentFluidSourceImpl(T *rc, Real dt, bool update_fluid) {
               dE[ispec] = 0.;
               SPACELOOP(ii) { cov_dF[ispec](ii) = 0.; }
               success = true;
-            } else {
-              break; // Don't bother with other species if this failed
             }
           } // ispec
         } else if (src_solver == SourceSolver::fourd) {
