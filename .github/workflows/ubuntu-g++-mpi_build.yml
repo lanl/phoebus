@@ -5,11 +5,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [ main ]
-  # Run workflow on the 1st and 15th of every month at 12:30 AM PST (UTC-8)
-  schedule:
-    - cron: '30 12 1,15 * *'
-
+    branches: [main]
 jobs:
   phoebus_compile_and_build:
     name: Ubuntu-g++ mpi build
