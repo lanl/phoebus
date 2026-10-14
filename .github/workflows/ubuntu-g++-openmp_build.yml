@@ -1,0 +1,32 @@
+name: OpenMP Build
+run-name: Ubuntu-g++ openmp build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  phoebus_compile_and_build:
+    name: Ubuntu-g++ openmp build
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          # This forces GitHub to automatically pull down parthenon, singularity-eos, and kokkos
+          submodules: recursive
+      - name: Setup OS and compile
+        uses: ./.github/actions/OS_setup
+        with:
+          compiler: 'g++'
+          uses_mpi: "false"
+      - name: Compile and build Phoebus - openmp
+        uses: ./.github/actions/compile_and_build_phoebus/openmp
+        with:
+          compiler: 'g++'
