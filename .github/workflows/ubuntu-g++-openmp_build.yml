@@ -3,20 +3,17 @@ run-name: Ubuntu-g++ openmp build
 
 on:
   push:
-    # paths-ignore: ['docs/**', 'wiki/**', '**/*.md', '**/*.markdown', '**/*.rst', 'Makefile_old', '.gitattributes', '.gitignore', 'AUTHORS', 'LICENSE', 'implementations/**']
-    branches: [main, tests]
+    branches: [main]
   pull_request:
-    # paths-ignore: ['docs/**', 'wiki/**', '**/*.md', '**/*.markdown', '**/*.rst', 'Makefile_old', '.gitattributes', '.gitignore', 'AUTHORS', 'LICENSE', 'implementations/**']
-    branches: [ main, tests ]
-  # Run workflow on the 1st and 15th of every month at 7:33 AM PST (UTC-8)
+    branches: [ main ]
+  # Run workflow on the 1st and 15th of every month at 12:30 AM PST (UTC-8)
   schedule:
-    - cron: '33 15 1,15 * *'
+    - cron: '30 12 1,15 * *'
 
 jobs:
   phoebus_compile_and_build:
     name: Ubuntu-g++ openmp build
     strategy:
-      fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
