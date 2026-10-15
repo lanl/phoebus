@@ -88,11 +88,19 @@ VARIABLE(c, ye);
 namespace radmoment_prim {
 VARIABLE(r.p, J);
 TENSOR_VARIABLE(r.p, H, ANYDIM, 3); // (num_species, 3)
+  namespace num {
+  VARIABLE(r.p.n, J);
+  TENSOR_VARIABLE(r.p.n, H, ANYDIM, 3); // (num_species, 3)
+  } // namespace num, for number moment evolution
 } // namespace radmoment_prim
 
 namespace radmoment_cons {
 VARIABLE(r.c, E);
 TENSOR_VARIABLE(r.c, F, ANYDIM, 3); // (num_species, 3)
+  namespace num {
+  VARIABLE(r.p.n, E);
+  TENSOR_VARIABLE(r.p.n, F, ANYDIM, 3); // (num_species, 3)
+  } // namespace num, for number moment evolution
 } // namespace radmoment_cons
 
 namespace radmoment_internal {
@@ -103,13 +111,23 @@ TENSOR_VARIABLE(r.i, qr, ANYDIM, 3); // (num_species, nrecon)
 VARIABLE(r.i, ql_v);
 VARIABLE(r.i, qr_v);
 VARIABLE(r.i, dJ);
-VARIABLE(r.i, kappaJ);
+VARIABLE(r.i, kappaJ);  
 VARIABLE(r.i, kappaH);
 VARIABLE(r.i, JBB);
 TENSOR_VARIABLE(r.i, tilPi, PHOEBUS_NUM_SPECIES, 3, 3);
 VARIABLE(r.i, kappaH_mean);
 VARIABLE(r.i, c2pfail);
 VARIABLE(r.i, srcfail);
+  namespace num { 
+  VARIABLE(r.i.n, xi);
+  VARIABLE(r.i.n, phi);
+  VARIABLE(r.i.n, dJ);
+  VARIABLE(r.i.n, kappaJ);
+  VARIABLE(r.i.n, kappaH);
+  VARIABLE(r.i.n, kappaH_mean);
+  VARIABLE(r.i.n, JBB);
+  TENSOR_VARIABLE(r.i.n, tilPi, PHOEBUS_NUM_SPECIES, 3, 3);
+  }
 } // namespace radmoment_internal
 
 namespace mocmc_internal {
