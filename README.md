@@ -2,6 +2,9 @@ phoebus
 ===
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/lanl/phoebus/tests.yml?branch=main)
 [![Documentation](https://github.com/lanl/phoebus/actions/workflows/docs.yml/badge.svg?branch=main)](https://lanl.github.io/phoebus/main/index.html)
+[![OpenMP + MPI build](https://github.com/lanl/phoebus/actions/workflows/ubuntu-g++-openmpi_build.yml/badge.svg)](https://github.com/lanl/phoebus/actions/workflows/ubuntu-g++-openmpi_build.yml)
+[![MPI Build](https://github.com/lanl/phoebus/actions/workflows/ubuntu-g++-mpi_build.yml/badge.svg)](https://github.com/lanl/phoebus/actions/workflows/ubuntu-g++-mpi_build.yml)
+[![OpenMP build](https://github.com/lanl/phoebus/actions/workflows/ubuntu-g++-openmp_build.yml/badge.svg)](https://github.com/lanl/phoebus/actions/workflows/ubuntu-g++-openmp_build.yml)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 Phifty One Ergs Blows Up a Star
