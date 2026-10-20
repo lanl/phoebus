@@ -176,4 +176,5 @@ geom_mass_g = 1.5014897706552896e+37
 
 <progenitor>
 enabled=true
+post_bounce_model = false # when is the simulation beginning? pre- or post-bounce?
 tablepath=../Data/converted_ADM_stellartable_rescaledT.dat

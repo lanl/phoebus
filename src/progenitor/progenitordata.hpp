@@ -22,11 +22,23 @@
 #include <utils/error_checking.hpp>
 #include <vector>
 
+// do we need this??
+#include <kokkos_abstraction.hpp>
 using namespace parthenon::package::prelude;
 
 namespace Progenitor {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin);
+
+// for progenitor runtime diagnostics
+TaskStatus GetProgenitorState(MeshData<Real> *md, Real simtime);
+TaskStatus PostStepDiagnostics(const parthenon::SimTime &time, MeshData<Real> *md);
+
+namespace Constants {
+
+const Real BOUNCE_DENS = 2.0e14; // g/cm^3
+const Real BOUNCE_ENTR = 3.0;    // kB/baryon
+} // namespace Constants
 
 } // namespace Progenitor
 #endif

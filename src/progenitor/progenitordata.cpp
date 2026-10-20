@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <memory>
 #include <vector>
 
@@ -8,13 +9,16 @@
 #include "microphysics/eos_phoebus/eos_phoebus.hpp"
 #include "monopole_gr/monopole_gr.hpp"
 #include "pgen/pgen.hpp"
+#include "phoebus_utils/reduction.hpp"
 #include "phoebus_utils/unit_conversions.hpp"
 #include "progenitordata.hpp"
+
 namespace Progenitor {
 
 std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   auto progenitor_pkg = std::make_shared<StateDescriptor>("progenitor");
   Params &params = progenitor_pkg->AllParams();
+  auto mutable_param = parthenon::Params::Mutability::Mutable;
 
   bool enabled = pin->GetOrAddBoolean("progenitor", "enabled", false);
   params.Add("enabled", enabled);
@@ -92,10 +96,16 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                                                 0.008); // corresponds to r < 80 km
   Real net_heat_threshold = pin->GetOrAddReal("progenitor", "net_heat_threshold",
                                               1e-8); // corresponds to r < 80 km
-  UnitConversions units(pin);
-  Real LengthCGSToCode = units.GetLengthCGSToCode();
   auto mdot_radii = pin->GetOrAddVector("progenitor", "mdot_radii",
                                         std::vector<Real>{400}); // default 400km
+  // progenitor status params
+  bool post_bounce_model = pin->GetOrAddBoolean("progenitor", "post_bounce_model", false);
+
+  // unit conversions
+  UnitConversions units(pin);
+  CodeConstants consts(units);
+  Real LengthCGSToCode = units.GetLengthCGSToCode();
+  Real DensityCGSToCode = units.GetMassDensityCGSToCode();
 
   // Add Params
   params.Add("mass_density", mass_density);
@@ -122,10 +132,21 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   params.Add("S_adm_dev", S_adm_dev);
   params.Add("Srr_adm_dev", Srr_adm_dev);
 
+  // criterion for bounce in ccsne (O'Connor & Ott 2010)
+  params.Add("bounce_density", Constants::BOUNCE_DENS * DensityCGSToCode);
+  // set if bounce occurs
+  params.Add("post_bounce", false, mutable_param);
+  // initial model state
+  params.Add("post_bounce_model", post_bounce_model);
+
   params.Add("outside_pns_threshold", outside_pns_threshold);
   params.Add("inside_pns_threshold", inside_pns_threshold);
   params.Add("net_heat_threshold", net_heat_threshold);
   params.Add("mdot_radii", mdot_radii);
+
+  if (!post_bounce_model) {
+    progenitor_pkg->PostStepDiagnosticsMesh = PostStepDiagnostics;
+  }
 
   // Reductions
   auto HstSum = parthenon::UserHistoryOperation::sum;
@@ -168,5 +189,99 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   return progenitor_pkg;
 } // Initialize
+
+TaskStatus GetProgenitorState(MeshData<Real> *md, Real simtime) {
+
+  // bounds
+  const auto ib = md->GetBoundsI(IndexDomain::interior);
+  const auto jb = md->GetBoundsJ(IndexDomain::interior);
+  const auto kb = md->GetBoundsK(IndexDomain::interior);
+
+  // namespaces, etc.
+  using parthenon::MakePackDescriptor;
+  namespace p = fluid_prim;
+  auto *pmb = md->GetParentPointer();
+  Mesh *pmesh = md->GetMeshPointer();
+
+  // could re-calc entropy if needed, but requires an extra eos retrieval + call
+  auto &resolved_pkgs = pmesh->resolved_packages;
+  static auto desc = MakePackDescriptor<p::density, p::entropy>(resolved_pkgs.get());
+
+  auto v = desc.GetPack(md);
+  const int nblocks = v.GetNBlocks();
+
+  // reading in parameters/conditions from package
+  auto progen = pmb->packages.Get("progenitor").get(); // actual progenitor package
+  const auto progenitor_enabled = progen->Param<bool>("enabled");
+  auto post_bounce = progen->MutableParam<bool>("post_bounce");
+
+  // we only want to write this file once at bounce!
+  if (progenitor_enabled && !(*post_bounce)) {
+    const Real bounce_density_crit = progen->Param<Real>("bounce_density");
+
+    Real max_density, min_entropy, bounce_time;
+    typename Kokkos::MinMax<Real>::value_type minmax; // is this right?
+
+    parthenon::par_reduce(
+        parthenon::LoopPatternMDRange(),
+        "Calculates max density and min entropy (pre-bounce) in SNe.", DevExecSpace(), 0,
+        nblocks - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i,
+                      typename Kokkos::MinMax<Real>::value_type &lminmax) {
+          // checking for maximum density and minimum entropy
+          lminmax.min_val =
+              (v(b, p::entropy(), k, j, i) < lminmax.min_val ? v(b, p::entropy(), k, j, i)
+                                                             : lminmax.min_val);
+          lminmax.max_val =
+              (v(b, p::density(), k, j, i) > lminmax.max_val ? v(b, p::density(), k, j, i)
+                                                             : lminmax.max_val);
+        },
+        Kokkos::MinMax<Real>(minmax));
+
+// now we do an MPI reduce if enabled; otherwise get the values directly.
+#ifdef MPI_PARALLEL
+    MPI_Allreduce(&minmax.max_val, &max_density, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&minmax.min_val, &min_entropy, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+#else
+    max_density = minmax.max_val;
+    min_entropy = minmax.min_val;
+#endif // MPI_PARALLEL
+
+    // this could be updated with entropy criteria later (not necessarily needed)
+    if (max_density >= bounce_density_crit) {
+
+      bounce_time = simtime; // capture bounce time
+      // update in params for continuity (also in case of restart?)
+      progen->UpdateParam<bool>("post_bounce", true);
+
+      // let's get some nice (human readable) units
+      Mesh *pm = md->GetMeshPointer();
+      auto uc = pm->packages.Get("phoebus")->Param<UnitConversions>("unit_conv");
+
+      // output data file, in code units and cgs units
+      FILE *fout;
+      fout = fopen("bounce.dat", "w"); // questionable naming...
+      fprintf(fout, "%-26s  %.14e  %.14e\n", "time [s]", bounce_time,
+              uc.GetTimeCodeToCGS() * bounce_time);
+      fprintf(fout, "%-26s  %.14e  %.14e\n", "central density [g/cc]", max_density,
+              uc.GetMassDensityCodeToCGS() * max_density);
+      fprintf(fout, "%-26s  %.14e  %.14e\n", "central entropy [erg/K/g]", min_entropy,
+              uc.GetEntropyCodeToCGS() * min_entropy);
+      fclose(fout);
+    }
+
+    // todo: do we want a file even if bounce isn't reached? just for progen stats?
+  }
+
+  return TaskStatus::complete;
+
+} // GetProgenitorState
+
+TaskStatus PostStepDiagnostics(const parthenon::SimTime &time, MeshData<Real> *md) {
+
+  // we'll call our progenitor diagnostics in here for each cycle
+  return GetProgenitorState(md, time.time);
+
+} // PostStepDiagnostics
 
 } // namespace Progenitor
