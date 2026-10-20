@@ -142,8 +142,8 @@ def make_info_file( rhoc: float, M0: float, R0: float, T0: float, prof_conv: np.
         bounds = get_eos_bounds(EOSPATH, eos_type)
 
         fout.write('# -----bounds, equation of state [phb]\n')
-        fout.write(fmt % (bounds[0] / (1 / ((c**2.0) / G / M0)), 'minimum density'))
-        fout.write(fmt % (bounds[1] / (1 / ((c**2.0) / G / M0)), 'maximum density'))
+        fout.write(fmt % (bounds[0] / (1 / ((G / c**2.0) ** 3.0 * M0**2.0)), 'minimum density'))
+        fout.write(fmt % (bounds[1] / (1 / ((G / c**2.0) ** 3.0 * M0**2.0)), 'maximum density'))
         fout.write(fmt % (bounds[2] * kB, 'minimum temperature'))
         fout.write(fmt % (bounds[3] * kB, 'maximum temperature'))
         fout.write(fmt % (bounds[4] / (c**2.0), 'minimum sie'))
@@ -157,7 +157,7 @@ def make_info_file( rhoc: float, M0: float, R0: float, T0: float, prof_conv: np.
             '# -----conversion factors, multiply to get back to cgs [phb -> cgs]\n'
         )
         fout.write(fmt % (R0, 'radius'))
-        fout.write(fmt % (1 / ((c**2.0) / G / M0), 'density'))
+        fout.write(fmt % (1 / ((G / c**2.0) ** 3.0 * M0**2.0)), 'density')
         fout.write(fmt % (1 / kB, 'temperature'))
         fout.write(fmt % (c**2.0, 'sie'))
         fout.write(fmt % (c, 'velocity'))
