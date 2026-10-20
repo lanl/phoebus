@@ -42,6 +42,11 @@ TaskStatus UpdateGeometry(Data *rc);
 CoordSysMeshBlock GetCoordinateSystem(MeshBlockData<Real> *rc);
 CoordSysMesh GetCoordinateSystem(MeshData<Real> *rc);
 
+template <typename System>
+System GetCoordinateSystem(MeshBlockData<Real> *rc, bool coarse) {
+  return GetCoordinateSystem<System>(rc).WithIndexer(GetIndexer(rc, coarse));
+}
+
 } // namespace Geometry
 
 #endif // GEOMETRY_GEOMETRY_HPP_

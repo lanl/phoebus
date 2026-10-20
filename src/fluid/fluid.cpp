@@ -207,23 +207,14 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
   // c::bfield is a face-to-cell cache for existing fluid operators.
   std::vector<MetadataFlag> cons_flags_bfield = {
-      Metadata::Cell,       Metadata::Intensive, Metadata::Conserved, Metadata::Vector,
-      Metadata::WithFluxes, Metadata::Derived,   Metadata::OneCopy};
+      Metadata::Cell,   Metadata::Intensive,  Metadata::Conserved,
+      Metadata::Vector, Metadata::WithFluxes, Metadata::Derived};
   Metadata mcons_threev_bfield = Metadata(cons_flags_bfield, three_vec);
 
-  // TODO(BRR) Should these go in a "phoebus" package?
-  const std::string ix1_bc = pin->GetString("phoebus", "ix1_bc");
-  params.Add("ix1_bc", ix1_bc);
-  const std::string ox1_bc = pin->GetString("phoebus", "ox1_bc");
-  params.Add("ox1_bc", ox1_bc);
-  const std::string ix2_bc = pin->GetString("phoebus", "ix2_bc");
-  params.Add("ix2_bc", ix2_bc);
-  const std::string ox2_bc = pin->GetString("phoebus", "ox2_bc");
-  params.Add("ox2_bc", ox2_bc);
-  const std::string ix3_bc = pin->GetString("phoebus", "ix3_bc");
-  params.Add("ix3_bc", ix3_bc);
-  const std::string ox3_bc = pin->GetString("phoebus", "ox3_bc");
-  params.Add("ox3_bc", ox3_bc);
+  for (const std::string name :
+       {"ix1_bc", "ox1_bc", "ix2_bc", "ox2_bc", "ix3_bc", "ox3_bc"}) {
+    params.Add(name, pin->GetOrAddString("parthenon/mesh", name, "outflow"));
+  }
 
   // add the primitive variables
   physics->template AddField<p::density>(mprim_scalar);

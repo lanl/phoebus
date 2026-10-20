@@ -29,8 +29,8 @@ TaskStatus MeshFaceToCell(MeshData<Real> *md, IndexDomain domain);
 // Edge EMF from Riemann fluxes. In 1D this is the direct X1 Riemann EMF.
 TaskStatus CalculateEMF(MeshData<Real> *md);
 
-// Zero/average EMF at physical (non-periodic, non-block-internal) domain boundaries.
-TaskStatus BoundaryEMF(MeshData<Real> *md);
+// Apply physical EMF boundary conditions.
+TaskStatus BoundaryEMF(MeshData<Real> *md, bool coarse);
 
 // EMF circulation -> face-field source.
 TaskStatus AddSource(MeshData<Real> *md, MeshData<Real> *mdudt, IndexDomain domain);
@@ -44,9 +44,9 @@ TaskStatus UpdateFaceField(MeshData<Real> *mc0, MeshData<Real> *mdudt, Real beta
 Real MaxDivB(MeshData<Real> *md);
 TaskStatus CalcDivB(MeshBlockData<Real> *rc);
 
-// Physical-boundary EMF treatments, called by BoundaryEMF per block/face.
-void ZeroBoundaryEMF(MeshBlockData<Real> *rc, IndexDomain domain);
-void AverageBoundaryEMF(MeshBlockData<Real> *rc, IndexDomain domain);
+// EMF boundary treatments called by BoundaryEMF.
+void ZeroBoundaryEMF(MeshBlockData<Real> *rc, IndexDomain domain, bool coarse);
+void AverageBoundaryEMF(MeshBlockData<Real> *rc, IndexDomain domain, bool coarse);
 
 // Fill face-field ghosts; reflection zeros normal B on the boundary.
 void OutflowFaceB(MeshBlockData<Real> *rc, IndexDomain domain, bool coarse);

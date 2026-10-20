@@ -237,7 +237,7 @@ TaskStatus CalculateEMF(MeshData<Real> *md) {
   return TaskStatus::complete;
 }
 
-TaskStatus BoundaryEMF(MeshData<Real> *md) {
+TaskStatus BoundaryEMF(MeshData<Real> *md, const bool coarse) {
   auto pmesh = md->GetMeshPointer();
   auto fluid = pmesh->packages.Get("fluid");
   if (!fluid->Param<bool>("mhd")) return TaskStatus::complete;
@@ -262,9 +262,15 @@ TaskStatus BoundaryEMF(MeshData<Real> *md) {
       const IndexDomain domain = face.second.second;
       const std::string bc = fluid->Param<std::string>(bc_key);
       if (bc == "reflect") {
-        ZeroBoundaryEMF(rc.get(), domain);
-      } else {
-        AverageBoundaryEMF(rc.get(), domain);
+        ZeroBoundaryEMF(rc.get(), domain, coarse);
+      } else if (bc == "polar") {
+        PARTHENON_REQUIRE(pmesh->ndim < 3 ||
+                              (pmb->boundary_flag[parthenon::BoundaryFace::inner_x3] ==
+                                   parthenon::BoundaryFlag::periodic &&
+                               pmb->boundary_flag[parthenon::BoundaryFace::outer_x3] ==
+                                   parthenon::BoundaryFlag::periodic),
+                          "Polar EMF averaging requires each block to span all of X3");
+        AverageBoundaryEMF(rc.get(), domain, coarse);
       }
     }
   }

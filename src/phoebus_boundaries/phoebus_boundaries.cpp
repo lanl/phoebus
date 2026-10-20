@@ -34,6 +34,9 @@ using namespace parthenon::package::prelude;
 
 namespace Boundaries {
 
+// Boundary callbacks can receive shallow/coarse containers without cached geometry.
+using BoundaryGeometry = Geometry::Analytic<PHOEBUS_GEOMETRY, Geometry::IndexerMeshBlock>;
+
 void SwarmNoWorkBC(std::shared_ptr<Swarm> &swarm) {}
 
 parthenon::TopologicalElement CC = parthenon::TopologicalElement::CC;
@@ -80,40 +83,41 @@ void GenericBC(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   // used for reflections
   const int offset = 2 * ref + (INNER ? -1 : 1);
 
-  // needed because our conserved variables are densitized
-  auto geom = Geometry::GetCoordinateSystem(rc.get());
-
   auto &fluid = rc->GetMeshPointer()->packages.Get("fluid");
   const bool rescale = fluid->Param<std::string>("bc_vars") == "conserved";
 
   // Do the thing
   const bool fine = false; // NOTE(BLB): will need changing for fine fields
-  pmb->par_for_bndry(
-      label, nb, domain, CC, coarse, fine,
-      KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
-        int kref, jref, iref, sgn;
-        if (TYPE == BCType::Reflect) {
-          kref = IS_X3 ? offset - k : k;
-          jref = IS_X2 ? offset - j : j;
-          iref = IS_X1 ? offset - i : i;
-          sgn = (q.VectorComponent(l) == DIR) ? -1.0 : 1.0;
-        } else {
-          kref = IS_X3 ? ref : k;
-          jref = IS_X2 ? ref : j;
-          iref = IS_X1 ? ref : i;
-          sgn = 1;
-        }
-
-        const Real detg_ref = geom.DetGamma(CellLocation::Cent, kref, jref, iref);
-        const Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
-        const Real gratio = robust::ratio(detg, detg_ref);
-
-        if (rescale) {
-          q(l, k, j, i) = sgn * gratio * q(l, kref, jref, iref);
-        } else {
-          q(l, k, j, i) = sgn * q(l, kref, jref, iref);
-        }
-      });
+  if (q.GetDim(4) > 0) {
+    if (rescale) {
+      // Conserved variables require determinant rescaling.
+      auto geom = Geometry::GetCoordinateSystem<BoundaryGeometry>(rc.get(), coarse);
+      pmb->par_for_bndry(
+          label, nb, domain, CC, coarse, fine,
+          KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+            const int kref = IS_X3 ? (TYPE == BCType::Reflect ? offset - k : ref) : k;
+            const int jref = IS_X2 ? (TYPE == BCType::Reflect ? offset - j : ref) : j;
+            const int iref = IS_X1 ? (TYPE == BCType::Reflect ? offset - i : ref) : i;
+            const Real sgn =
+                (TYPE == BCType::Reflect && q.VectorComponent(l) == DIR) ? -1.0 : 1.0;
+            const Real detg_ref = geom.DetGamma(CellLocation::Cent, kref, jref, iref);
+            const Real detg = geom.DetGamma(CellLocation::Cent, k, j, i);
+            const Real gratio = robust::ratio(detg, detg_ref);
+            q(l, k, j, i) = sgn * gratio * q(l, kref, jref, iref);
+          });
+    } else {
+      pmb->par_for_bndry(
+          label, nb, domain, CC, coarse, fine,
+          KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
+            const int kref = IS_X3 ? (TYPE == BCType::Reflect ? offset - k : ref) : k;
+            const int jref = IS_X2 ? (TYPE == BCType::Reflect ? offset - j : ref) : j;
+            const int iref = IS_X1 ? (TYPE == BCType::Reflect ? offset - i : ref) : i;
+            const Real sgn =
+                (TYPE == BCType::Reflect && q.VectorComponent(l) == DIR) ? -1.0 : 1.0;
+            q(l, k, j, i) = sgn * q(l, kref, jref, iref);
+          });
+    }
+  }
 
   if (TYPE == BCType::Reflect) {
     b_ct::ReflectFaceB(rc.get(), domain, coarse);
@@ -124,7 +128,6 @@ void GenericBC(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
 void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto pmb = rc->GetBlockPointer();
-  auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   int ref = bounds.GetBoundsI(IndexDomain::interior).s;
@@ -140,7 +143,8 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   std::string bc_vars = fluid->Param<std::string>("bc_vars");
 
   const bool fine = false;
-  if (bc_vars == "conserved") {
+  if (bc_vars == "conserved" && q.GetDim(4) > 0) {
+    auto geom = Geometry::GetCoordinateSystem<BoundaryGeometry>(rc.get(), coarse);
     pmb->par_for_bndry(
         "OutflowInnerX1Cons", nb, domain, CC, coarse, fine,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
@@ -149,7 +153,7 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           Real gratio = robust::ratio(detg, detg_ref);
           q(l, k, j, i) = gratio * q(l, k, j, ref);
         });
-  } else if (bc_vars == "primitive") {
+  } else if (bc_vars == "primitive" && q.GetDim(4) > 0) {
     pmb->par_for_bndry(
         "OutflowInnerX1Prim", nb, domain, CC, coarse, fine,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
@@ -161,7 +165,6 @@ void OutflowInnerX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
 void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto pmb = rc->GetBlockPointer();
-  auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   PackIndexMap imap;
@@ -194,7 +197,6 @@ void PolarInnerX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
 void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto pmb = rc->GetBlockPointer();
-  auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   PackIndexMap imap;
@@ -228,7 +230,6 @@ void PolarOuterX2(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
 
 void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   auto pmb = rc->GetBlockPointer();
-  auto geom = Geometry::GetCoordinateSystem(rc.get());
 
   auto bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   int ref = bounds.GetBoundsI(IndexDomain::interior).e;
@@ -250,7 +251,8 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
   const int num_species = rad->Param<bool>("active") ? rad->Param<int>("num_species") : 0;
 
   const bool fine = false;
-  if (bc_vars == "conserved") {
+  if (bc_vars == "conserved" && q.GetDim(4) > 0) {
+    auto geom = Geometry::GetCoordinateSystem<BoundaryGeometry>(rc.get(), coarse);
     pmb->par_for_bndry(
         "OutflowOuterX1Cons", nb, IndexDomain::outer_x1, CC, coarse, fine,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
@@ -259,7 +261,7 @@ void OutflowOuterX1(std::shared_ptr<MeshBlockData<Real>> &rc, bool coarse) {
           Real gratio = robust::ratio(detg, detg_ref);
           q(l, k, j, i) = gratio * q(l, k, j, ref);
         });
-  } else if (bc_vars == "primitive") {
+  } else if (bc_vars == "primitive" && q.GetDim(4) > 0) {
     pmb->par_for_bndry(
         "OutflowOuterX1Prim", nb, domain, CC, coarse, fine,
         KOKKOS_LAMBDA(const int &l, const int &k, const int &j, const int &i) {
@@ -484,10 +486,8 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
     bool derefine_poles =
         pman.pinput->GetOrAddBoolean("coordinates", "derefine_poles", true);
     if (derefine_poles) {
-      const std::string ix2_bc =
-          pman.pinput->GetOrAddString("phoebus", "ix2_bc", "gr_outflow");
-      const std::string ox2_bc =
-          pman.pinput->GetOrAddString("phoebus", "ox2_bc", "gr_outflow");
+      const std::string ix2_bc = pman.pinput->GetString("parthenon/mesh", "ix2_bc");
+      const std::string ox2_bc = pman.pinput->GetString("parthenon/mesh", "ox2_bc");
       PARTHENON_REQUIRE(
           ix2_bc != "reflect" && ix2_bc != "polar" && ox2_bc != "reflect" &&
               ox2_bc != "polar",
@@ -502,9 +502,6 @@ void ProcessBoundaryConditions(parthenon::ParthenonManager &pman) {
     for (int outer = 0; outer <= 1; ++outer) {
       auto &face = inner_outer[outer];
       const std::string name = face + "x" + std::to_string(d) + "_bc";
-      const std::string parth_bc = pman.pinput->GetString("parthenon/mesh", name);
-
-      const std::string bc = pman.pinput->GetOrAddString("phoebus", name, "gr_outflow");
       pman.app_input->RegisterBoundaryCondition(loc[d - 1][outer], "reflect",
                                                 reflect[d - 1][outer]);
       if (d == 2) { // polar BC only supported for X2

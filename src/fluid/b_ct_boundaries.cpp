@@ -16,6 +16,7 @@
 #include "b_ct.hpp"
 
 #include <array>
+#include <type_traits>
 #include <vector>
 
 #include "geometry/geometry.hpp"
@@ -30,6 +31,8 @@ namespace b_ct {
 namespace {
 
 using TE = parthenon::TopologicalElement;
+// Shallow containers omit cached geometry fields.
+using BoundaryGeometry = Geometry::Analytic<PHOEBUS_GEOMETRY, Geometry::IndexerMeshBlock>;
 
 // Direction (1, 2, or 3) normal to a domain boundary face.
 int BoundaryDirection(IndexDomain domain) {
@@ -76,18 +79,20 @@ TE FaceNormalTo(int bdir) {
 void OutflowFaceB(MeshBlockData<Real> *rc, IndexDomain domain, bool coarse) {
   auto pmb = rc->GetBlockPointer();
   if (!pmb->packages.Get("fluid")->Param<bool>("mhd")) return;
+  if (!rc->HasVariable(fluid_cons::fbfield::name())) return;
 
-  auto Bf = rc->PackVariables(std::vector<std::string>{fluid_cons::fbfield::name()});
-  if (Bf.GetDim(4) == 0) return;
-  auto geom = Geometry::GetCoordinateSystem(rc);
+  auto Bf =
+      rc->PackVariables(std::vector<std::string>{fluid_cons::fbfield::name()}, coarse);
+  auto geom = Geometry::GetCoordinateSystem<BoundaryGeometry>(rc, coarse);
+  const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const int bdir = BoundaryDirection(domain);
   const bool inner = BoundaryIsInner(domain);
 
   // Copy physical B into ghost faces.
   for (auto el : Faces()) {
-    const auto ib = rc->GetBoundsI(IndexDomain::interior, el);
-    const auto jb = rc->GetBoundsJ(IndexDomain::interior, el);
-    const auto kb = rc->GetBoundsK(IndexDomain::interior, el);
+    const auto ib = bounds.GetBoundsI(IndexDomain::interior, el);
+    const auto jb = bounds.GetBoundsJ(IndexDomain::interior, el);
+    const auto kb = bounds.GetBoundsK(IndexDomain::interior, el);
     const int iref = (bdir == 1) ? (inner ? ib.s : ib.e) : 0;
     const int jref = (bdir == 2) ? (inner ? jb.s : jb.e) : 0;
     const int kref = (bdir == 3) ? (inner ? kb.s : kb.e) : 0;
@@ -109,19 +114,21 @@ void OutflowFaceB(MeshBlockData<Real> *rc, IndexDomain domain, bool coarse) {
 void ReflectFaceB(MeshBlockData<Real> *rc, IndexDomain domain, bool coarse) {
   auto pmb = rc->GetBlockPointer();
   if (!pmb->packages.Get("fluid")->Param<bool>("mhd")) return;
+  if (!rc->HasVariable(fluid_cons::fbfield::name())) return;
 
-  auto Bf = rc->PackVariables(std::vector<std::string>{fluid_cons::fbfield::name()});
-  if (Bf.GetDim(4) == 0) return;
-  auto geom = Geometry::GetCoordinateSystem(rc);
+  auto Bf =
+      rc->PackVariables(std::vector<std::string>{fluid_cons::fbfield::name()}, coarse);
+  auto geom = Geometry::GetCoordinateSystem<BoundaryGeometry>(rc, coarse);
+  const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const int bdir = BoundaryDirection(domain);
   const bool inner = BoundaryIsInner(domain);
   const auto normal_face = FaceNormalTo(bdir);
 
   // Zero normal B; mirror normal/tangential fields with odd/even parity.
   for (auto el : Faces()) {
-    const auto ib = rc->GetBoundsI(IndexDomain::interior, el);
-    const auto jb = rc->GetBoundsJ(IndexDomain::interior, el);
-    const auto kb = rc->GetBoundsK(IndexDomain::interior, el);
+    const auto ib = bounds.GetBoundsI(IndexDomain::interior, el);
+    const auto jb = bounds.GetBoundsJ(IndexDomain::interior, el);
+    const auto kb = bounds.GetBoundsK(IndexDomain::interior, el);
     const bool normal = el == normal_face;
     const int iref = (bdir == 1) ? (inner ? ib.s : ib.e) : 0;
     const int jref = (bdir == 2) ? (inner ? jb.s : jb.e) : 0;
@@ -167,28 +174,52 @@ void ReflectFaceB(MeshBlockData<Real> *rc, IndexDomain domain, bool coarse) {
   }
 }
 
-void ZeroBoundaryEMF(MeshBlockData<Real> *rc, IndexDomain domain) {
+void ZeroBoundaryEMF(MeshBlockData<Real> *rc, IndexDomain domain, const bool coarse) {
   auto pmb = rc->GetBlockPointer();
-  auto emf =
-      rc->PackVariables(std::vector<std::string>{internal_variables::eemf::name()});
+  auto emf = rc->PackVariables(std::vector<std::string>{internal_variables::eemf::name()},
+                               coarse);
+  const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const int bdir = BoundaryDirection(domain);
+  const bool inner = BoundaryIsInner(domain);
+
+  // CT constrains the physical edge, not the ghost slab.
   for (auto el : TangentialEdges(bdir)) {
-    pmb->par_for_bndry(
-        "b_ct::ZeroBoundaryEMF", IndexRange{0, 0}, domain, el, /*coarse=*/false,
-        /*fine=*/false,
-        KOKKOS_LAMBDA(const int &, const int &k, const int &j, const int &i) {
+    auto ib = bounds.GetBoundsI(domain, el);
+    auto jb = bounds.GetBoundsJ(domain, el);
+    auto kb = bounds.GetBoundsK(domain, el);
+    const auto ibi = bounds.GetBoundsI(IndexDomain::interior, el);
+    const auto jbi = bounds.GetBoundsJ(IndexDomain::interior, el);
+    const auto kbi = bounds.GetBoundsK(IndexDomain::interior, el);
+    if (bdir == 1) ib = {inner ? ibi.s : ibi.e, inner ? ibi.s : ibi.e};
+    if (bdir == 2) jb = {inner ? jbi.s : jbi.e, inner ? jbi.s : jbi.e};
+    if (bdir == 3) kb = {inner ? kbi.s : kbi.e, inner ? kbi.s : kbi.e};
+
+    pmb->par_for(
+        "b_ct::ZeroBoundaryEMF", kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+        KOKKOS_LAMBDA(const int &k, const int &j, const int &i) {
           emf(el, 0, k, j, i) = 0.0;
         });
   }
 }
 
-void AverageBoundaryEMF(MeshBlockData<Real> *rc, IndexDomain domain) {
+void AverageBoundaryEMF(MeshBlockData<Real> *rc, IndexDomain domain, const bool coarse) {
   auto pmb = rc->GetBlockPointer();
-  auto emf =
-      rc->PackVariables(std::vector<std::string>{internal_variables::eemf::name()});
+  auto emf = rc->PackVariables(std::vector<std::string>{internal_variables::eemf::name()},
+                               coarse);
+  const auto &bounds = coarse ? pmb->c_cellbounds : pmb->cellbounds;
   const int ndim = pmb->pmy_mesh->ndim;
   const int bdir = BoundaryDirection(domain);
   const bool inner = BoundaryIsInner(domain);
+
+  // There is no in-face direction to average in 1D.
+  if (ndim == 1) return;
+
+  constexpr bool spherical =
+      std::is_same_v<PHOEBUS_GEOMETRY, Geometry::FMKS> ||
+      std::is_same_v<PHOEBUS_GEOMETRY, Geometry::SphericalKerrSchild> ||
+      std::is_same_v<PHOEBUS_GEOMETRY, Geometry::SphericalMinkowski> ||
+      std::is_same_v<PHOEBUS_GEOMETRY, Geometry::BoyerLindquist> ||
+      std::is_same_v<PHOEBUS_GEOMETRY, Geometry::MonopoleSph>;
 
   for (auto el : TangentialEdges(bdir)) {
     // In 2D there is no true E1 (X2 boundary) / E2 (X1 boundary) edge to average.
@@ -196,21 +227,90 @@ void AverageBoundaryEMF(MeshBlockData<Real> *rc, IndexDomain domain) {
       continue;
     }
 
-    IndexRange ib = rc->GetBoundsI(IndexDomain::interior, el);
-    IndexRange jb = rc->GetBoundsJ(IndexDomain::interior, el);
-    IndexRange kb = rc->GetBoundsK(IndexDomain::interior, el);
-    const int iref = (bdir == 1) ? (inner ? ib.s : ib.e) : 0;
-    const int jref = (bdir == 2) ? (inner ? jb.s : jb.e) : 0;
-    const int kref = (bdir == 3) ? (inner ? kb.s : kb.e) : 0;
+    const auto ib = bounds.GetBoundsI(domain, el);
+    const auto jb = bounds.GetBoundsJ(domain, el);
+    const auto kb = bounds.GetBoundsK(domain, el);
+    const auto ibi = bounds.GetBoundsI(IndexDomain::interior, el);
+    const auto jbi = bounds.GetBoundsJ(IndexDomain::interior, el);
+    const auto kbi = bounds.GetBoundsK(IndexDomain::interior, el);
+    const int cface =
+        (bdir == 1) ? (inner ? ibi.s : ibi.e)
+                    : ((bdir == 2) ? (inner ? jbi.s : jbi.e) : (inner ? kbi.s : kbi.e));
 
-    pmb->par_for_bndry(
-        "b_ct::AverageBoundaryEMF", IndexRange{0, 0}, domain, el, /*coarse=*/false,
-        /*fine=*/false,
-        KOKKOS_LAMBDA(const int &, const int &k, const int &j, const int &i) {
-          const int kk = (bdir == 3) ? kref : k;
-          const int jj = (bdir == 2) ? jref : j;
-          const int ii = (bdir == 1) ? iref : i;
-          emf(el, 0, k, j, i) = emf(el, 0, kk, jj, ii);
+    if (spherical && bdir == 2 && el == TE::E3) {
+      // The azimuthal edge length vanishes at a spherical polar face.
+      pmb->par_for(
+          "b_ct::ZeroPolarBoundaryEMF", kb.s, kb.e, cface, cface, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int &k, const int &j, const int &i) {
+            emf(el, 0, k, j, i) = 0.0;
+          });
+      continue;
+    }
+
+    int inner_dir;
+    IndexRange outer;
+    if (bdir == 1) {
+      outer = (el == TE::E2) ? jb : kb;
+      inner_dir = (el == TE::E2) ? X3DIR : X2DIR;
+    } else if (bdir == 2) {
+      outer = (el == TE::E1) ? ib : kb;
+      inner_dir = (el == TE::E1) ? X3DIR : X1DIR;
+    } else {
+      outer = (el == TE::E1) ? ib : jb;
+      inner_dir = (el == TE::E1) ? X2DIR : X1DIR;
+    }
+
+    parthenon::par_for_outer(
+        DEFAULT_OUTER_LOOP_PATTERN, "b_ct::AverageBoundaryEMF", pmb->exec_space, 0, 1,
+        outer.s, outer.e, KOKKOS_LAMBDA(parthenon::team_mbr_t member, const int &o) {
+          Real emf_sum = 0.0;
+          Kokkos::Sum<Real> sum_reducer(emf_sum);
+          const int ii = (el == TE::E1) ? o : cface;
+          const int jj = (el == TE::E2) ? o : cface;
+          const int kk = (el == TE::E3) ? o : cface;
+
+          int len;
+          if (inner_dir == X1DIR) {
+            len = ibi.e - ibi.s;
+            parthenon::par_reduce_inner(
+                parthenon::inner_loop_pattern_ttr_tag, member, ibi.s, ibi.e - 1,
+                [&](const int &i, Real &local_result) {
+                  local_result += emf(el, 0, kk, jj, i);
+                },
+                sum_reducer);
+          } else if (inner_dir == X2DIR) {
+            len = jbi.e - jbi.s;
+            parthenon::par_reduce_inner(
+                parthenon::inner_loop_pattern_ttr_tag, member, jbi.s, jbi.e - 1,
+                [&](const int &j, Real &local_result) {
+                  local_result += emf(el, 0, kk, j, ii);
+                },
+                sum_reducer);
+          } else {
+            len = kbi.e - kbi.s;
+            parthenon::par_reduce_inner(
+                parthenon::inner_loop_pattern_ttr_tag, member, kbi.s, kbi.e - 1,
+                [&](const int &k, Real &local_result) {
+                  local_result += emf(el, 0, k, jj, ii);
+                },
+                sum_reducer);
+          }
+          member.team_barrier();
+
+          const Real emf_av = emf_sum / len;
+          if (inner_dir == X1DIR) {
+            parthenon::par_for_inner(member, ib.s, ib.e, [&](const int &i) {
+              emf(el, 0, kk, jj, i) = emf_av;
+            });
+          } else if (inner_dir == X2DIR) {
+            parthenon::par_for_inner(member, jb.s, jb.e, [&](const int &j) {
+              emf(el, 0, kk, j, ii) = emf_av;
+            });
+          } else {
+            parthenon::par_for_inner(member, kb.s, kb.e, [&](const int &k) {
+              emf(el, 0, k, jj, ii) = emf_av;
+            });
+          }
         });
   }
 }

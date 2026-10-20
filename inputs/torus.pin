@@ -72,8 +72,8 @@ ox1_bc      = gr_outflow    # Outer-X1 boundary condition flag
 nx2         = 256           # Number of zones in X2-direction
 x2min       = 0             # minimum value of X2
 x2max       = 1             # maximum value of X2. X2 = 1 -> theta = pi
-ix2_bc      = gr_outflow    # Inner-X2 boundary condition flag
-ox2_bc      = gr_outflow    # Outer-X2 boundary condition flag
+ix2_bc      = reflect       # Inner-X2 boundary condition flag
+ox2_bc      = reflect       # Outer-X2 boundary condition flag
 
 nx3         = 1             # Number of zones in X3-direction
 x3min       = 0             # minimum value of X3
@@ -85,13 +85,13 @@ num_threads = 1         # maximum number of OMP threads
 pack_size = -1
 
 # Commenting out meshblock sizes makes the simulation 1 meshblock
-#<parthenon/meshblock>
-#nx1 = 128
-#nx2 = 128
-#nx3 = 1
+<parthenon/meshblock>
+nx1 = 128
+nx2 = 128
+nx3 = 1
 
 <parthenon/refinement0>
-field = c.c.bulk.rho
+field = p.density
 method = derivative_order_1
 max_level = 3
 
