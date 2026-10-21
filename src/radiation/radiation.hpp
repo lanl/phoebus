@@ -125,16 +125,18 @@ TaskStatus InitializeCommunicationMesh(const std::string swarmName,
 Real EstimateTimestepBlock(MeshBlockData<Real> *rc);
 
 // Moment tasks
+enum class RadEnergyMoment {Number, Energy};
+
 template <class T>
 TaskStatus MomentCon2Prim(T *rc);
 
 template <class T>
 TaskStatus MomentPrim2Con(T *rc, IndexDomain domain = IndexDomain::entire);
 
-template <class T>
+template <class T, RadEnergyMoment EMOMENT = RadEnergyMoment::Energy>
 TaskStatus ReconstructEdgeStates(T *rc);
 
-template <class T>
+template <class T, RadEnergyMoment EMOMENT = RadEnergyMoment::Energy>
 TaskStatus CalculateFluxes(T *rc);
 
 template <class T>
@@ -170,6 +172,52 @@ template <class T>
 TaskStatus MOCMCFluidSource(T *rc_base, T *rc, const Real dt, const bool update_fluid);
 
 TaskStatus MOCMCUpdateParticleCount(Mesh *pmesh, std::vector<Real> *resolution);
+
+struct RadiationVariableNames {
+  static RadiationVariableNames GetByMomentType(RadEnergyMoment type) {
+    namespace cr = radmoment_cons;
+    namespace pr = radmoment_prim;
+    namespace ir = radmoment_internal; 
+    if (type == RadEnergyMoment::Number) { 
+      return RadiationVariableNames{cr::num::E::name(), cr::num::F::name(), 
+                                    pr::num::J::name(), pr::num::H::name(), 
+                                    ir::num::xi::name(), ir::num::phi::name(),
+                                    ir::ql::name(), ir::qr::name(),
+                                    ir::ql_v::name(), ir::qr_v::name(), 
+                                    ir::num::dJ::name(), ir::num::kappaJ::name(), ir::num::kappaH::name(), 
+                                    ir::num::JBB::name(), ir::num::tilPi::name(), ir::num::kappaH_mean::name(),
+                                    ir::c2pfail::name(), ir::srcfail::name()};
+    } else /*if (type == RadEnergyMoment::Energy)*/ { 
+      return RadiationVariableNames{cr::E::name(), cr::F::name(), 
+                                    pr::J::name(), pr::H::name(), 
+                                    ir::xi::name(), ir::phi::name(), 
+                                    ir::ql::name(), ir::qr::name(),
+                                    ir::ql_v::name(), ir::qr_v::name(), 
+                                    ir::dJ::name(), ir::kappaJ::name(), ir::kappaH::name(), 
+                                    ir::JBB::name(), ir::tilPi::name(), ir::kappaH_mean::name(),
+                                    ir::c2pfail::name(), ir::srcfail::name()};
+    }
+  }
+  const std::string& E; 
+  const std::string& F; 
+  const std::string& J;
+  const std::string& H; 
+  
+  const std::string& xi; 
+  const std::string& phi; 
+  const std::string& ql; 
+  const std::string& qr; 
+  const std::string& ql_v; 
+  const std::string& qr_v; 
+  const std::string& dJ; 
+  const std::string& kappaJ; 
+  const std::string& kappaH; 
+  const std::string& JBB; 
+  const std::string& tilPi;
+  const std::string& kappaH_mean; 
+  const std::string& c2pfail; 
+  const std::string& srcfail; 
+};
 
 } // namespace radiation
 

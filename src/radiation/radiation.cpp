@@ -506,6 +506,20 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Fields for saving guesses for NR iteration in the radiation Con2Prim type solve
     physics->AddField(i::xi::name(), mspecies_scalar);
     physics->AddField(i::phi::name(), mspecies_scalar);
+    
+    const bool do_num_evol =
+        pin->GetOrAddBoolean("radiation", "do_number_evolution", true);
+    params.Add("do_number_evolution", do_num_evol);
+    if (do_num_evol) { 
+      physics->AddField(c::num::E::name(), mspecies_scalar_cons);
+      physics->AddField(c::num::F::name(), mspecies_three_vector_cons);
+    
+      physics->AddField(p::num::J::name(), mspecies_scalar);
+      physics->AddField(p::num::H::name(), mspecies_three_vector);
+
+      physics->AddField(i::num::xi::name(), mspecies_scalar);
+      physics->AddField(i::num::phi::name(), mspecies_scalar);
+    }
 
     // Fields for cell edge reconstruction
     /// TODO: (LFR) The amount of storage can likely be reduced, but maybe at the expense
@@ -527,6 +541,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     Metadata mdJ = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
                             std::vector<int>{num_species, ndim, ndim});
     physics->AddField(i::dJ::name(), mdJ);
+    if (do_num_evol) physics->AddField(i::num::dJ::name(), mdJ); 
 
     // Add variables for source functions
     Metadata mSourceVar = Metadata({Metadata::Cell, Metadata::Derived, Metadata::OneCopy},
@@ -534,7 +549,11 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     physics->AddField(i::kappaJ::name(), mSourceVar);
     physics->AddField(i::kappaH::name(), mSourceVar);
     physics->AddField(i::JBB::name(), mSourceVar);
-
+    if (do_num_evol) {
+      physics->AddField(i::num::kappaJ::name(), mSourceVar);
+      physics->AddField(i::num::kappaH::name(), mSourceVar);
+      physics->AddField(i::num::JBB::name(), mSourceVar);
+    }
     // this fail flag should really be an enum or something
     // but parthenon doesn't yet support that kind of thing
     Metadata m_scalar = Metadata({Metadata::Cell, Metadata::OneCopy, Metadata::Derived,
@@ -549,6 +568,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
           std::vector<int>{num_species, 3, 3});
 
       physics->AddField(i::tilPi::name(), mspecies_three_tensor);
+      if (do_num_evol) physics->AddField(i::num::tilPi::name(), mspecies_three_tensor);
       physics->AddField(mocmc_internal::dnsamp::name(), mscalar);
     }
 
