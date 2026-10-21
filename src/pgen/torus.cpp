@@ -254,6 +254,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real lrho_max = std::log10(rho_max);
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
   const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
+  // check floor type
+  const bool is_floor_rhoT = pmb->packages.Get("fixup")->Param<bool>("is_floor_rhoT");
 
   // adiabat calculation for table
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
@@ -339,8 +341,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // fixup
         Real rhoflr = 0;
         Real epsflr, tmpflr;
-        // check floor type
-        bool is_floor_rhoT = pmb->packages.Get("fixup")->Param<bool>("is_floor_rhoT");
         floor.GetFloors(x1v, x2v, x3, rhoflr, epsflr, tmpflr);
         Real lambda[2] = {Ye, 0.0};
         if (iye > 0) {
