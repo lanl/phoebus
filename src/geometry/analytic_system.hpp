@@ -22,6 +22,7 @@
 // Parthenon includes
 #include <coordinates/coordinates.hpp>
 #include <kokkos_abstraction.hpp>
+#include <mesh/mesh_refinement.hpp>
 #include <parthenon/package.hpp>
 #include <utils/error_checking.hpp>
 
@@ -96,10 +97,16 @@ class IndexerMeshBlock {
  private:
   Coordinates_t coordinates_;
 };
-inline IndexerMeshBlock GetIndexer(MeshBlockData<Real> *rc) {
+inline IndexerMeshBlock GetIndexer(MeshBlockData<Real> *rc, const bool coarse) {
   auto pmb = rc->GetParentPointer();
-  auto &coords = pmb->coords;
-  return IndexerMeshBlock(coords);
+  if (coarse) {
+    PARTHENON_REQUIRE(pmb->pmr != nullptr, "Coarse geometry requires mesh refinement");
+    return IndexerMeshBlock(pmb->pmr->GetCoarseCoords());
+  }
+  return IndexerMeshBlock(pmb->coords);
+}
+inline IndexerMeshBlock GetIndexer(MeshBlockData<Real> *rc) {
+  return GetIndexer(rc, false);
 }
 
 class IndexerMesh {
@@ -164,6 +171,11 @@ class Analytic {
   template <typename... Args>
   Analytic(Real X0, const Indexer &indexer, Args... args)
       : X0_(X0), indexer_(indexer), system_(std::forward<Args>(args)...) {}
+  Analytic WithIndexer(const Indexer &indexer) const {
+    auto system = *this;
+    system.indexer_ = indexer;
+    return system;
+  }
   KOKKOS_INLINE_FUNCTION
   Real Lapse(Real X0, Real X1, Real X2, Real X3) const {
     return system_.Lapse(X0, X1, X2, X3);

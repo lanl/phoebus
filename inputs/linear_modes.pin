@@ -22,13 +22,18 @@ variables = p.density,  &
             p.velocity, &
             p.energy,   &
             p.bfield,   &
+            divb,       &
 	          pressure,	  &
                   g.n.coord, &
                   g.c.coord, &
 	          cs
 
 file_type   = hdf5      # Tabular data dump
-dt          = 0.5      # time increment between outputs
+dt          = 0.2      # time increment between outputs
+
+<parthenon/output2>
+file_type = hst      # History data dump (includes MaxDivB whenever fluid/mhd = true)
+dt        = 0.01
 
 <parthenon/time>
 nlim        = -1        # cycle limit
@@ -40,7 +45,7 @@ dt_init_fact = 0.1
 <parthenon/mesh>
 nghost = 4
 #refinement = adaptive
-#numlevel = 3
+numlevel = 3
 
 nx1         = 128       # Number of zones in X1-direction
 x1min       = 0        # minimum value of X1
@@ -71,7 +76,12 @@ nx2 = 64
 # nx3 = 1
 
 <parthenon/refinement0>
-field = c.c.bulk.rho
+field = p.density
+method = derivative_order_1
+max_level = 3
+
+<parthenon/refinement1>
+field = p.velocity
 method = derivative_order_1
 max_level = 3
 
@@ -118,6 +128,6 @@ c2p_tol = 1.e-12
 c2p_method = robust
 
 <hydro_modes>
-physics = hydro
-mode = sound
+physics = hydro # hydro | mhd
+mode = sound # sound | entropy | fast | slow | alfven
 amplitude = 1.e-5

@@ -1,4 +1,4 @@
-// © 2021-2022. Triad National Security, LLC. All rights reserved.
+// © 2021-2026. Triad National Security, LLC. All rights reserved.
 // This program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -15,6 +15,8 @@
 
 #include "analysis/analysis.hpp"
 #include "analysis/history.hpp"
+#include "b_ct.hpp"
+#include "b_ct_functions.hpp"
 #include "con2prim.hpp"
 #include "con2prim_robust.hpp"
 #include "fixup/fixup.hpp"
@@ -32,6 +34,7 @@
 #include <interface/sparse_pack.hpp>
 #include <kokkos_abstraction.hpp>
 #include <parthenon/package.hpp>
+#include <prolong_restrict/prolong_restrict.hpp>
 #include <utils/error_checking.hpp>
 
 using parthenon::MetadataFlag;
@@ -133,6 +136,13 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   bool mhd = pin->GetOrAddBoolean("fluid", "mhd", false);
   params.Add("mhd", mhd);
 
+  int ndim = 1;
+  if (pin->GetInteger("parthenon/mesh", "nx3") > 1) {
+    ndim = 3;
+  } else if (pin->GetInteger("parthenon/mesh", "nx2") > 1) {
+    ndim = 2;
+  }
+
   Real sigma_cutoff = pin->GetOrAddReal("fluid", "sigma_cutoff", 1.0);
   params.Add("sigma_cutoff", sigma_cutoff);
 
@@ -150,12 +160,19 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
       Metadata::Cell,      Metadata::Independent, Metadata::Intensive,
       Metadata::Conserved, Metadata::Vector,      Metadata::WithFluxes};
 
+  // Face metadata supplies one scalar for each F1/F2/F3 bank. CT updates this field from
+  // EMF circulation, not flux divergence.
+  std::vector<MetadataFlag> cons_flags_face = {Metadata::Face, Metadata::Independent,
+                                               Metadata::Intensive, Metadata::Conserved,
+                                               Metadata::Restart};
+
   const std::string bc_vars = pin->GetOrAddString("phoebus/mesh", "bc_vars", "conserved");
   params.Add("bc_vars", bc_vars);
 
   if (bc_vars == "conserved") {
     cons_flags_scalar.push_back(Metadata::FillGhost);
     cons_flags_vector.push_back(Metadata::FillGhost);
+    if (mhd) cons_flags_face.push_back(Metadata::FillGhost);
   } else if (bc_vars == "primitive") {
     prim_flags_scalar.push_back(Metadata::FillGhost);
     prim_flags_vector.push_back(Metadata::FillGhost);
@@ -163,48 +180,57 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
     // Fixing this requires modifying parthenon Metadata logic.
     cons_flags_scalar.push_back(Metadata::FillGhost);
     cons_flags_vector.push_back(Metadata::FillGhost);
+    if (mhd) cons_flags_face.push_back(Metadata::FillGhost);
   } else {
     PARTHENON_REQUIRE_THROWS(
         bc_vars == "conserved" || bc_vars == "primitive",
         "\"bc_vars\" must be either \"conserved\" or \"primitive\"!");
   }
 
+  Metadata mcons_face_meta;
+  if (mhd) {
+    mcons_face_meta = Metadata(cons_flags_face);
+    // Preserve div(B) during internal AMR prolongation.
+    mcons_face_meta.RegisterRefinementOps<
+        parthenon::refinement_ops::ProlongateSharedMinMod,
+        parthenon::refinement_ops::RestrictAverage, b_ct::ProlongateInternalOlivares>();
+  }
+
   Metadata mprim_threev = Metadata(prim_flags_vector, three_vec);
+  Metadata mprim_threev_bfield =
+      Metadata({Metadata::Cell, Metadata::Intensive, Metadata::Vector, Metadata::Derived,
+                Metadata::OneCopy},
+               three_vec);
   Metadata mprim_scalar = Metadata(prim_flags_scalar);
   Metadata mcons_scalar = Metadata(cons_flags_scalar);
   Metadata mcons_threev = Metadata(cons_flags_vector, three_vec);
 
-  // TODO(BRR) Should these go in a "phoebus" package?
-  const std::string ix1_bc = pin->GetString("phoebus", "ix1_bc");
-  params.Add("ix1_bc", ix1_bc);
-  const std::string ox1_bc = pin->GetString("phoebus", "ox1_bc");
-  params.Add("ox1_bc", ox1_bc);
-  const std::string ix2_bc = pin->GetString("phoebus", "ix2_bc");
-  params.Add("ix2_bc", ix2_bc);
-  const std::string ox2_bc = pin->GetString("phoebus", "ox2_bc");
-  params.Add("ox2_bc", ox2_bc);
-  const std::string ix3_bc = pin->GetString("phoebus", "ix3_bc");
-  params.Add("ix3_bc", ix3_bc);
-  const std::string ox3_bc = pin->GetString("phoebus", "ox3_bc");
-  params.Add("ox3_bc", ox3_bc);
+  // c::bfield is a face-to-cell cache for existing fluid operators.
+  std::vector<MetadataFlag> cons_flags_bfield = {
+      Metadata::Cell,   Metadata::Intensive,  Metadata::Conserved,
+      Metadata::Vector, Metadata::WithFluxes, Metadata::Derived};
+  Metadata mcons_threev_bfield = Metadata(cons_flags_bfield, three_vec);
 
-  int ndim = 1;
-  if (pin->GetInteger("parthenon/mesh", "nx3") > 1)
-    ndim = 3;
-  else if (pin->GetInteger("parthenon/mesh", "nx2") > 1)
-    ndim = 2;
+  for (const std::string name :
+       {"ix1_bc", "ox1_bc", "ix2_bc", "ox2_bc", "ix3_bc", "ox3_bc"}) {
+    params.Add(name, pin->GetOrAddString("parthenon/mesh", name, "outflow"));
+  }
 
   // add the primitive variables
   physics->template AddField<p::density>(mprim_scalar);
   physics->AddField(p::velocity::name(), mprim_threev);
   physics->AddField(p::energy::name(), mprim_scalar);
   if (mhd) {
-    physics->AddField(p::bfield::name(), mprim_threev);
-    if (ndim == 2) {
-      physics->AddField(impl::emf::name(), mprim_scalar);
-    } else if (ndim == 3) {
-      physics->AddField(impl::emf::name(), mprim_threev);
-    }
+    physics->AddField(p::bfield::name(), mprim_threev_bfield);
+    // Re-synced after construction at fine-coarse interfaces.
+    std::vector<MetadataFlag> flags_emf = {Metadata::Real, Metadata::Edge,
+                                           Metadata::Derived, Metadata::OneCopy,
+                                           Metadata::FillGhost};
+    physics->AddField(impl::eemf::name(), Metadata(flags_emf));
+    // Local EMF estimate for the upwind correction.
+    physics->AddField(impl::cemf::name(), Metadata({Metadata::Cell, Metadata::Vector,
+                                                    Metadata::Derived, Metadata::OneCopy},
+                                                   three_vec));
     physics->AddField(diag::divb::name(), mprim_scalar);
   }
   physics->AddField(p::pressure::name(), mprim_scalar);
@@ -240,7 +266,8 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
   physics->AddField(c::momentum::name(), mcons_threev);
   physics->AddField(c::energy::name(), mcons_scalar);
   if (mhd) {
-    physics->AddField(c::bfield::name(), mcons_threev);
+    physics->AddField(c::bfield::name(), mcons_threev_bfield);
+    physics->AddField(c::fbfield::name(), mcons_face_meta);
   }
   if (ye) {
     physics->AddField(c::ye::name(), mcons_scalar);
@@ -346,6 +373,10 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
         HstSum, ReduceMom, "total X" + std::to_string(d + 1) + " momentum"));
   }
 
+  if (mhd) {
+    hst_vars.emplace_back(HistoryOutputVar(HstMax, b_ct::MaxDivB, "MaxDivB"));
+  }
+
   params.Add(parthenon::hist_param_key, hst_vars);
 
   // Fill Derived and Estimate Timestep
@@ -357,6 +388,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
 
 // template <typename T>
 TaskStatus PrimitiveToConserved(MeshBlockData<Real> *rc) {
+  b_ct::BlockFaceToCell(rc, IndexDomain::entire);
   auto *pmb = rc->GetParentPointer();
   IndexRange ib = pmb->cellbounds.GetBoundsI(IndexDomain::entire);
   IndexRange jb = pmb->cellbounds.GetBoundsJ(IndexDomain::entire);
@@ -679,6 +711,13 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
       pmesh->packages.Get("fluid")->Param<PhoebusReconstruction::ReconType>("Recon");
   auto st = pmesh->packages.Get("fluid")->Param<riemann::solver>("RiemannSolver");
 
+  // Use the staggered normal B directly; reconstruct only transverse components.
+  const bool mhd = fluid->Param<bool>("mhd");
+  const int pb_lo = flux.BFieldLo();
+  auto Bf = rc->PackVariables(std::vector<std::string>{fluid_cons::fbfield::name()});
+  auto geom = Geometry::GetCoordinateSystem(rc);
+  using TE = parthenon::TopologicalElement;
+
   parthenon::par_for_outer(
       DEFAULT_OUTER_LOOP_PATTERN, "Reconstruct", DevExecSpace(), 0, 0, 0, nrecon,
       kb.s - dk, kb.e + dk, jb.s - dj, jb.e + dj,
@@ -708,42 +747,78 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
         Real *vk_l = &flux.ql(2 % ndim, n, k + dk, j, 0);
         Real *vk_r = &flux.qr(2 % ndim, n, k, j, 0);
 
+        const bool bypass_x = mhd && (n == pb_lo);
+        const bool bypass_y = mhd && (n == pb_lo + 1);
+        const bool bypass_z = mhd && (n == pb_lo + 2);
+
+        if (bypass_x) {
+          parthenon::par_for_inner(
+              DEFAULT_INNER_LOOP_PATTERN, member, ib.s - 1, ib.e + 1, [=](const int i) {
+                vi_l[i] = Bf(TE::F1, 0, k, j, i + 1) /
+                          geom.DetGamma(CellLocation::Face1, k, j, i + 1);
+                vi_r[i] =
+                    Bf(TE::F1, 0, k, j, i) / geom.DetGamma(CellLocation::Face1, k, j, i);
+              });
+        }
+        if (ndim > 1 && bypass_y) {
+          parthenon::par_for_inner(
+              DEFAULT_INNER_LOOP_PATTERN, member, ib.s - 1, ib.e + 1, [=](const int i) {
+                vj_l[i] = Bf(TE::F2, 0, k, j + 1, i) /
+                          geom.DetGamma(CellLocation::Face2, k, j + 1, i);
+                vj_r[i] =
+                    Bf(TE::F2, 0, k, j, i) / geom.DetGamma(CellLocation::Face2, k, j, i);
+              });
+        }
+        if (ndim > 2 && bypass_z) {
+          parthenon::par_for_inner(
+              DEFAULT_INNER_LOOP_PATTERN, member, ib.s - 1, ib.e + 1, [=](const int i) {
+                vk_l[i] = Bf(TE::F3, 0, k + 1, j, i) /
+                          geom.DetGamma(CellLocation::Face3, k + 1, j, i);
+                vk_r[i] =
+                    Bf(TE::F3, 0, k, j, i) / geom.DetGamma(CellLocation::Face3, k, j, i);
+              });
+        }
+
         switch (rt) {
         case ReconType::weno5z:
-          ReconLoop<WENO5Z>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2,
-                            vi_l, vi_r);
-          if (ndim > 1)
+          if (!bypass_x)
+            ReconLoop<WENO5Z>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2,
+                              vi_l, vi_r);
+          if (ndim > 1 && !bypass_y)
             ReconLoop<WENO5Z>(member, ib.s - 1, ib.e + 1, pvjm2, pvjm1, pv, pvjp1, pvjp2,
                               vj_l, vj_r);
-          if (ndim > 2)
+          if (ndim > 2 && !bypass_z)
             ReconLoop<WENO5Z>(member, ib.s - 1, ib.e + 1, pvkm2, pvkm1, pv, pvkp1, pvkp2,
                               vk_l, vk_r);
           break;
         case ReconType::mp5:
-          ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2, vi_l,
-                         vi_r);
-          if (ndim > 1)
+          if (!bypass_x)
+            ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvim2, pvim1, pv, pvip1, pvip2,
+                           vi_l, vi_r);
+          if (ndim > 1 && !bypass_y)
             ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvjm2, pvjm1, pv, pvjp1, pvjp2,
                            vj_l, vj_r);
-          if (ndim > 2)
+          if (ndim > 2 && !bypass_z)
             ReconLoop<MP5>(member, ib.s - 1, ib.e + 1, pvkm2, pvkm1, pv, pvkp1, pvkp2,
                            vk_l, vk_r);
           break;
         case ReconType::linear:
-          ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
-                                     vi_r);
-          if (ndim > 1)
+          if (!bypass_x)
+            ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvim1, pv, pvip1, vi_l,
+                                       vi_r);
+          if (ndim > 1 && !bypass_y)
             ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvjm1, pv, pvjp1, vj_l,
                                        vj_r);
-          if (ndim > 2)
+          if (ndim > 2 && !bypass_z)
             ReconLoop<PiecewiseLinear>(member, ib.s - 1, ib.e + 1, pvkm1, pv, pvkp1, vk_l,
                                        vk_r);
           break;
         case ReconType::constant:
-          ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vi_l, vi_r);
-          if (ndim > 1)
+          if (!bypass_x)
+            ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vi_l, vi_r);
+          if (ndim > 1 && !bypass_y)
             ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vj_l, vj_r);
-          if (ndim > 2)
+          if (ndim > 2 && !bypass_z)
             ReconLoop<PiecewiseConstant>(member, ib.s - 1, ib.e + 1, pv, vk_l, vk_r);
           break;
         default:
@@ -770,130 +845,6 @@ TaskStatus CalculateFluxes(MeshBlockData<Real> *rc) {
   }
 #undef FLUX
 
-  return TaskStatus::complete;
-}
-
-TaskStatus FluxCT(MeshBlockData<Real> *rc) {
-  using parthenon::MakePackDescriptor;
-  Mesh *pmesh = rc->GetMeshPointer();
-  auto &fluid = pmesh->packages.Get("fluid");
-  if (!fluid->Param<bool>("mhd") || !fluid->Param<bool>("active") ||
-      fluid->Param<bool>("zero_fluxes"))
-    return TaskStatus::complete;
-
-  const int ndim = pmesh->ndim;
-  if (ndim == 1) return TaskStatus::complete;
-  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
-
-  auto &resolved_pkgs = pmesh->resolved_packages;
-  static auto desc = MakePackDescriptor<fluid_cons::bfield>(
-      resolved_pkgs.get(), {}, {parthenon::PDOpt::WithFluxes});
-  auto v = desc.GetPack(rc);
-  auto emf = rc->Get(internal_variables::emf::name()).data;
-
-  if (ndim == 2) {
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FluxCT::EMF::2D", DevExecSpace(), kb.s, kb.e, jb.s,
-        jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          emf(k, j, i) =
-              0.25 * (v.flux(0, X1DIR, 1, k, j, i) + v.flux(0, X1DIR, 1, k, j - 1, i) -
-                      v.flux(0, X2DIR, 0, k, j, i) - v.flux(0, X2DIR, 0, k, j, i - 1));
-        });
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FluxCT::Flux::2D", DevExecSpace(), kb.s, kb.e, jb.s,
-        jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          v.flux(0, X1DIR, 0, k, j, i) = 0.0;
-          v.flux(0, X1DIR, 1, k, j, i) = 0.5 * (emf(k, j, i) + emf(k, j + 1, i));
-          v.flux(0, X2DIR, 0, k, j, i) = -0.5 * (emf(k, j, i) + emf(k, j, i + 1));
-          v.flux(0, X2DIR, 1, k, j, i) = 0.0;
-        });
-  } else if (ndim == 3) {
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FluxCT::EMF::3D", DevExecSpace(), kb.s, kb.e + 1, jb.s,
-        jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          emf(0, k, j, i) =
-              0.25 * (v.flux(0, X2DIR, 2, k, j, i) + v.flux(0, X2DIR, 2, k - 1, j, i) -
-                      v.flux(0, X3DIR, 1, k, j, i) - v.flux(0, X3DIR, 1, k, j - 1, i));
-          emf(1, k, j, i) =
-              -0.25 * (v.flux(0, X1DIR, 2, k, j, i) + v.flux(0, X1DIR, 2, k - 1, j, i) -
-                       v.flux(0, X3DIR, 0, k, j, i) - v.flux(0, X3DIR, 0, k, j, i - 1));
-          emf(2, k, j, i) =
-              0.25 * (v.flux(0, X1DIR, 1, k, j, i) + v.flux(0, X1DIR, 1, k, j - 1, i) -
-                      v.flux(0, X2DIR, 0, k, j, i) - v.flux(0, X2DIR, 0, k, j, i - 1));
-        });
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "FluxCT::Flux::3D", DevExecSpace(), kb.s, kb.e + 1, jb.s,
-        jb.e + 1, ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          v.flux(0, X1DIR, 0, k, j, i) = 0.0;
-          v.flux(0, X1DIR, 1, k, j, i) = 0.5 * (emf(2, k, j, i) + emf(2, k, j + 1, i));
-          v.flux(0, X1DIR, 2, k, j, i) = -0.5 * (emf(1, k, j, i) + emf(1, k + 1, j, i));
-          v.flux(0, X2DIR, 0, k, j, i) = -0.5 * (emf(2, k, j, i) + emf(2, k, j, i + 1));
-          v.flux(0, X2DIR, 1, k, j, i) = 0.0;
-          v.flux(0, X2DIR, 2, k, j, i) = 0.5 * (emf(0, k, j, i) + emf(0, k + 1, j, i));
-          v.flux(0, X3DIR, 0, k, j, i) = 0.5 * (emf(1, k, j, i) + emf(1, k, j, i + 1));
-          v.flux(0, X3DIR, 1, k, j, i) = -0.5 * (emf(0, k, j, i) + emf(0, k, j + 1, i));
-          v.flux(0, X3DIR, 2, k, j, i) = 0.0;
-        });
-  }
-
-  return TaskStatus::complete;
-}
-
-TaskStatus CalculateDivB(MeshBlockData<Real> *rc) {
-  auto *pmb = rc->GetParentPointer();
-  if (!pmb->packages.Get("fluid")->Param<bool>("active")) return TaskStatus::complete;
-  if (!pmb->packages.Get("fluid")->Param<bool>("mhd")) return TaskStatus::complete;
-
-  const int ndim = pmb->pmy_mesh->ndim;
-  IndexRange ib = rc->GetBoundsI(IndexDomain::interior);
-  IndexRange jb = rc->GetBoundsJ(IndexDomain::interior);
-  IndexRange kb = rc->GetBoundsK(IndexDomain::interior);
-
-  // This is the problem for doing things with meshblock packs
-  auto coords = pmb->coords;
-  auto b = rc->Get(fluid_cons::bfield::name()).data;
-  auto divb = rc->Get(diagnostic_variables::divb::name()).data;
-  if (ndim == 2) {
-    // todo(jcd): these are supposed to be node centered, and this misses the
-    // high boundaries
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "DivB::2D", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
-        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          divb(k, j, i) = 0.5 *
-                              (b(0, k, j, i) + b(0, k, j - 1, i) - b(0, k, j, i - 1) -
-                               b(0, k, j - 1, i - 1)) /
-                              coords.CellWidthFA(X1DIR, k, j, i) +
-                          0.5 *
-                              (b(1, k, j, i) + b(1, k, j, i - 1) - b(1, k, j - 1, i) -
-                               b(1, k, j - 1, i - 1)) /
-                              coords.CellWidthFA(X2DIR, k, j, i);
-        });
-  } else if (ndim == 3) {
-    // todo(jcd): these are supposed to be node centered, and this misses the
-    // high boundaries
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "DivB::3D", DevExecSpace(), kb.s, kb.e, jb.s, jb.e, ib.s,
-        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          divb(k, j, i) =
-              0.25 *
-                  (b(0, k, j, i) + b(0, k, j - 1, i) + b(0, k - 1, j, i) +
-                   b(0, k - 1, j - 1, i) - b(0, k, j, i - 1) - b(0, k, j - 1, i - 1) -
-                   b(0, k - 1, j, i - 1) - b(0, k - 1, j - 1, i - 1)) /
-                  coords.CellWidthFA(X1DIR, k, j, i) +
-              0.25 *
-                  (b(1, k, j, i) + b(1, k, j, i - 1) + b(1, k - 1, j, i) +
-                   b(1, k - 1, j, i - 1) - b(1, k, j - 1, i) - b(1, k, j - 1, i - 1) -
-                   b(1, k - 1, j - 1, i) - b(1, k - 1, j - 1, i - 1)) /
-                  coords.CellWidthFA(X2DIR, k, j, i) +
-              0.25 *
-                  (b(2, k, j, i) + b(2, k, j, i - 1) + b(2, k, j - 1, i) +
-                   b(2, k, j - 1, i - 1) - b(2, k - 1, j, i) - b(2, k - 1, j, i - 1) -
-                   b(2, k - 1, j - 1, i) - b(2, k - 1, j - 1, i - 1)) /
-                  coords.CellWidthFA(X3DIR, k, j, i);
-        });
-  }
   return TaskStatus::complete;
 }
 

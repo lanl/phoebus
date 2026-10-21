@@ -18,19 +18,24 @@ problem_id  = mhd_rotor       # problem ID: basename of output filenames
 
 <parthenon/output1>
 variables = p.density,  &
-	          c.density,  &
+            c.density,  &
             p.velocity, &
-	    c.momentum, &
+      c.momentum, &
             p.energy,   &
             c.energy,   &
             p.bfield,   &
-	          pressure,	  &
-	          cs,
-	    flux_divergence, &
-	    src_terms
+            divb,       &
+            pressure,   &
+            cs,
+      flux_divergence, &
+      src_terms
 
 file_type   = hdf5      # Tabular data dump
 dt          = 0.0001      # time increment between outputs
+
+<parthenon/output2>
+file_type = hst      # History data dump (includes MaxDivB whenever fluid/mhd = true)
+dt        = 0.001
 
 <parthenon/time>
 nlim        = -1        # cycle limit
@@ -41,8 +46,8 @@ dt_init_fact = 1.e-3
 
 <parthenon/mesh>
 nghost = 4
-#refinement = adaptive
-#numlevel = 3
+refinement = adaptive
+numlevel = 3
 
 nx1         = 128       # Number of zones in X1-direction
 x1min       = -0.5       # minimum value of X1
@@ -67,15 +72,20 @@ num_threads = 1         # maximum number of OMP threads
 <phoebus/mesh>
 #bc_vars = primitive
 
-#<parthenon/meshblock>
-#nx1 = 64
-#nx2 = 64
-#nx3 = 1
+<parthenon/meshblock>
+nx1 = 64
+nx2 = 64
+nx3 = 1
 
 <parthenon/refinement0>
-field = c.c.bulk.rho
+field = p.density
 method = derivative_order_1
 max_level = 3
+
+<parthenon/refinement1>
+field = p.energy
+method = derivative_order_1
+max_level = 2
 
 # Uses this one for Boosted Minkowski
 <coordinates>

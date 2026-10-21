@@ -26,19 +26,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
-                        imap);
+  auto v = rc->PackVariables(
+      {fluid_prim::density::name(), fluid_prim::velocity::name(),
+       fluid_prim::energy::name(), fluid_prim::ye::name(), fluid_prim::pressure::name(),
+       fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
+      imap);
 
   const int irho = imap[fluid_prim::density::name()].first;
   const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
   const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield::name()].first;
-  const int ib_hi = imap[fluid_prim::bfield::name()].second;
   const int iye = imap[fluid_prim::ye::name()].second;
   const int iprs = imap[fluid_prim::pressure::name()].first;
   const int itmp = imap[fluid_prim::temperature::name()].first;
@@ -110,16 +106,39 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         }
         const Real W = 1. / sqrt(1. - vsq);
         SPACELOOP(ii) { v(ivlo + ii, k, j, i) *= W; }
-        if (ib_hi > 0) {
-          const Real Bx = y < 0.25 ? Bx1 : Bx0;
-          const Real By = y < 0.25 ? By1 : By0;
-          const Real Bz = y < 0.25 ? Bz1 : Bz0;
-          v(ib_lo, k, j, i) = Bx;
-          v(ib_lo + 1, k, j, i) = By;
-          v(ib_hi, k, j, i) = Bz;
-        }
         rng_pool.free_state(rng_gen);
       });
+
+  auto fluid_pkg = pmb->packages.Get("fluid");
+  if (fluid_pkg->Param<bool>("mhd")) {
+    // Initialize CT's face field from the same B(y) profile.
+    using TE = parthenon::TopologicalElement;
+    auto Bf = rc->PackVariables({fluid_cons::fbfield::name()});
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::KH::fbfield::F1", kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const Real y = std::fabs(coords.Xc<2>(j));
+          const Real Bx = y < 0.25 ? Bx1 : Bx0;
+          Bf(TE::F1, 0, k, j, i) = Bx * geom.DetGamma(CellLocation::Face1, k, j, i);
+        });
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::KH::fbfield::F2", kb.s, kb.e, jb.s, jb.e + 1, ib.s,
+        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const Real y = std::fabs(coords.Xf<2>(j));
+          const Real By = y < 0.25 ? By1 : By0;
+          Bf(TE::F2, 0, k, j, i) = By * geom.DetGamma(CellLocation::Face2, k, j, i);
+        });
+    const auto ibf = rc->GetBoundsI(IndexDomain::entire, TE::F3);
+    const auto jbf = rc->GetBoundsJ(IndexDomain::entire, TE::F3);
+    const auto kbf = rc->GetBoundsK(IndexDomain::entire, TE::F3);
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::KH::fbfield::F3", kbf.s, kbf.e, jbf.s, jbf.e, ibf.s,
+        ibf.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const Real y = std::fabs(coords.Xc<2>(j));
+          const Real Bz = y < 0.25 ? Bz1 : Bz0;
+          Bf(TE::F3, 0, k, j, i) = Bz * geom.DetGamma(CellLocation::Face3, k, j, i);
+        });
+  }
 
   fluid::PrimitiveToConserved(rc.get());
 }

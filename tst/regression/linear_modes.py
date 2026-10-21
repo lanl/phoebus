@@ -57,7 +57,7 @@ code = rt.gold_comparison(
     build_type=args.build_type,
     upgold=args.upgold,
     compression_factor=10,
-    tolerance=1.0e-3
+    tolerance=1.0e-5
 )
 
 sys.exit(code)

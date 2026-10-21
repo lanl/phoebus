@@ -25,6 +25,10 @@ set (SRC_LIST
   fixup/fixup_src.cpp
   fixup/fixup_netfield.cpp
 
+  fluid/b_ct.hpp
+  fluid/b_ct.cpp
+  fluid/b_ct_functions.hpp
+  fluid/b_ct_boundaries.cpp
   fluid/con2prim.hpp
   fluid/con2prim_robust.hpp
   fluid/con2prim_statistics.cpp
@@ -90,6 +94,7 @@ set (SRC_LIST
   pgen/bondi.cpp
   pgen/check_cached_geom.cpp
   pgen/friedmann.cpp
+  pgen/field_loop.cpp
   pgen/homogeneous_sphere.cpp
   pgen/progenitor.cpp
   pgen/kh.cpp

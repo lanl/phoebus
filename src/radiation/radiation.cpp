@@ -200,6 +200,7 @@ std::shared_ptr<StateDescriptor> Initialize(ParameterInput *pin) {
                            Inu_swarmvalue_metadata);
 
     // Boundary temperatures for outflow sample boundary conditions
+    // TODO(BLB) Move MOCMC boundaries out of <phoebus> (e.g. into <radiation/mocmc>).
     const std::string ix1_bc = pin->GetOrAddString("phoebus", "ix1_bc", "None");
     if (ix1_bc == "outflow") {
       params.Add("ix1_bc", MOCMCBoundaries::outflow);

@@ -1,0 +1,145 @@
+# © 2026. Triad National Security, LLC. All rights reserved.  This
+# program was produced under U.S. Government contract 89233218CNA000001
+# for Los Alamos National Laboratory (LANL), which is operated by Triad
+# National Security, LLC for the U.S.  Department of Energy/National
+# Nuclear Security Administration. All rights in the program are
+# reserved by Triad National Security, LLC, and the U.S. Department of
+# Energy/National Nuclear Security Administration. The Government is
+# granted for itself and others acting on its behalf a nonexclusive,
+# paid-up, irrevocable worldwide license in this material to reproduce,
+# prepare derivative works, distribute copies to the public, perform
+# publicly and display publicly, and to permit others to do so.
+
+<phoebus>
+problem = field_loop
+
+<parthenon/job>
+problem_id  = field_loop       # problem ID: basename of output filenames
+
+<parthenon/output1>
+variables = p.density,  &
+            c.density,  &
+            p.velocity, &
+            p.energy,   &
+            p.bfield,   &
+            divb,       &
+            pressure
+
+file_type   = hdf5      # Tabular data dump
+dt          = 0.1       # time increment between outputs
+
+<parthenon/output2>
+file_type = hst
+dt        = 0.05
+
+<parthenon/time>
+nlim        = -1        # cycle limit
+tlim        = 4.47      # ~one full diagonal crossing: sqrt(x1size^2+x2size^2)/sqrt(vx^2+vy^2)
+integrator  = rk2       # time integration algorithm
+ncycle_out  = 10        # interval for stdout summary info
+dt_init_fact = 0.1
+
+<parthenon/mesh>
+nghost = 4
+refinement = adaptive
+numlevel = 2
+
+nx1         = 128        # Number of zones in X1-direction
+x1min       = -1        # minimum value of X1
+x1max       = 1         # maximum value of X1
+ix1_bc      = periodic  # Inner-X1 boundary condition flag
+ox1_bc      = periodic  # Outer-X1 boundary condition flag
+
+nx2         = 128        # Number of zones in X2-direction
+x2min       = -0.5      # minimum value of X2
+x2max       = 0.5       # maximum value of X2
+ix2_bc      = periodic  # Inner-X2 boundary condition flag
+ox2_bc      = periodic  # Outer-X2 boundary condition flag
+
+nx3         = 1         # Number of zones in X3-direction
+x3min       = -1        # minimum value of X3
+x3max       = 1         # maximum value of X3
+ix3_bc      = periodic  # Inner-X3 boundary condition flag
+ox3_bc      = periodic  # Outer-X3 boundary condition flag
+
+num_threads = 1         # maximum number of OMP threads
+
+<parthenon/meshblock>
+nx1 = 32
+nx2 = 32
+
+<parthenon/refinement0>
+field = p.bfield
+method = derivative_order_1
+max_level = 2
+
+<parthenon/refinement0>
+field = divb
+method = derivative_order_1
+max_level = 2
+
+<eos>
+type = IdealGas
+Gamma = 1.6666666666666666667
+Cv = 1.0
+
+<physics>
+hydro = true
+he = false
+3t = false
+rad = false
+tracers = false
+
+<fluid>
+mhd = true
+cfl = 0.3
+riemann = hll
+c2p_max_iter = 100
+recon = weno5 
+c2p_tol = 1.e-12
+c2p_method = robust
+
+<field_loop>
+rad    = 0.3       # loop radius
+amp    = 1.e-3     # vector-potential amplitude (sets B strength)
+drat   = 1.0       # density ratio inside the loop (1 = uniform density)
+p0     = 1.0       # background pressure
+
+# Flow velocity
+vx     = 0.4472135955   # = 0.5 * x1size/diag, diag = sqrt(x1size^2+x2size^2)
+vy     = 0.2236067977   # = 0.5 * x2size/diag
+vz     = 0.0
+
+# Loop geometry: cylinder in the x1-x2 plane (axis = x3-hat).
+shape  = cylinder
+axis_x = 0.0
+axis_y = 0.0
+axis_z = 1.0
+
+# Other configurations below
+
+# field loop in the x2-x3 plane (axis = x1-hat). Requires a
+# genuinely 3D mesh (nx3 > 1)
+# shape  = cylinder
+# axis_x = 1.0
+# axis_y = 0.0
+# axis_z = 0.0
+
+# field loop in the x3-x1 plane (axis = x2-hat). Also
+# requires a 3D mesh.
+# shape  = cylinder
+# axis_x = 0.0
+# axis_y = 1.0
+# axis_z = 0.0
+
+# cylindrical loop tilted in the x1-x3 plane, tiled
+# periodically along its own transverse direction so it wraps cleanly across a
+# periodic domain 
+# shape       = cylinder
+# axis_x      = -0.7071068
+# axis_y      = 0.0
+# axis_z      = 0.7071068
+# wrap_period = 1.4142136
+
+# spherical loop, r = sqrt(x^2+y^2+z^2). 
+# shape  = sphere

@@ -84,6 +84,10 @@ class FluxState {
   KOKKOS_FORCEINLINE_FUNCTION
   int NumConserved() const { return ncons; }
 
+  // Reconstruction index of Bx; By and Bz follow.
+  KOKKOS_FORCEINLINE_FUNCTION
+  int BFieldLo() const { return pb_lo; }
+
   KOKKOS_INLINE_FUNCTION
   void prim_to_flux(const int d, const int k, const int j, const int i, const FaceGeom &g,
                     const ParArrayND<Real> &q, Real &vm, Real &vp, Real *U, Real *F,

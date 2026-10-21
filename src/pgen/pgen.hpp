@@ -34,6 +34,7 @@ using namespace parthenon::package::prelude;
   PROBLEM(check_cached_geom)                                                             \
   PROBLEM(shock_tube)                                                                    \
   PROBLEM(friedmann)                                                                     \
+  PROBLEM(field_loop)                                                                    \
   PROBLEM(linear_modes)                                                                  \
   PROBLEM(thin_cooling)                                                                  \
   PROBLEM(leptoneq)                                                                      \

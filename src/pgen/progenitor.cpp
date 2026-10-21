@@ -155,10 +155,13 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                v(irho, k, j, i), v(itmp, k, j, i), lambda) /
                            v(iprs, k, j, i);
+        // Convert raw 3-velocity to Phoebus's u^i = W v^i primitive.
         Real Gammacov[3][3] = {0};
         Real vcon[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
         geom.Metric(CellLocation::Cent, k, j, i, Gammacov);
-        Real Gamma = phoebus::GetLorentzFactor(vcon, Gammacov);
+        Real vsq = 0.0;
+        SPACELOOP2(ii, jj) { vsq += Gammacov[ii][jj] * vcon[ii] * vcon[jj]; }
+        Real Gamma = 1.0 / std::sqrt(1.0 - vsq);
         SPACELOOP(d) { v(ivlo + d, k, j, i) *= Gamma; }
       });
 

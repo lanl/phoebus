@@ -82,6 +82,7 @@ VARIABLE(c, density);
 VARIABLE(c, momentum);
 VARIABLE(c, energy);
 VARIABLE(c, bfield);
+VARIABLE(c, fbfield);
 VARIABLE(c, ye);
 } // namespace fluid_cons
 
@@ -132,7 +133,8 @@ TENSOR_SWARM(Real, mocmc.c, Inuinv, ANYDIM, PHOEBUS_NUM_SPECIES);
 namespace internal_variables {
 VARIABLE_NONS(face_signal_speed);
 VARIABLE_NONS(cell_signal_speed);
-VARIABLE_NONS(emf);
+VARIABLE_NONS(eemf);
+VARIABLE_NONS(cemf);
 VARIABLE_NONS(c2p_scratch);
 VARIABLE_NONS(ql);
 VARIABLE_NONS(qr);

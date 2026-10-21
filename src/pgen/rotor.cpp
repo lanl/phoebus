@@ -23,6 +23,47 @@ using Geometry::NDSPACE;
 
 namespace rotor {
 
+// Transform the rotor velocity and magnetic field at (x, y).
+KOKKOS_INLINE_FUNCTION
+void RotorBcon(const Real x, const Real y, const Real r0, const Real omega, const Real B0,
+               const bool is_snake, const bool is_minkowski, const Real a_snake,
+               const Real k_snake, const Real alpha, const Real betay,
+               Real bcon_transformed[NDFULL], Real ucon_transformed[NDFULL]) {
+  Real yy = y;
+  if (is_snake) yy = y - a_snake * sin(k_snake * x);
+
+  const Real r = std::sqrt(x * x + yy * yy);
+  const Real w = r < r0 ? omega : 0.0;
+  const Real vx = -yy * w;
+  const Real vy = x * w;
+  const Real Gamma0 = 1.0 / sqrt(1.0 - vx * vx - vy * vy);
+
+  Real u_mink[] = {Gamma0, Gamma0 * vx, Gamma0 * vy, 0.0};
+  Real B_mink[3] = {B0, 0.0, 0.0};
+
+  Real Bdotv = 0.0;
+  SPACELOOP(m) Bdotv += B_mink[m] * u_mink[m + 1] / Gamma0;
+  Real bcon[4] = {Gamma0 * Bdotv, 0.0, 0.0, 0.0};
+  SPACELOOP(m) bcon[m + 1] = (B_mink[m] + bcon[0] * u_mink[m + 1]) / Gamma0;
+
+  Real J[NDFULL][NDFULL] = {0};
+  if (is_snake) {
+    J[0][0] = 1 / alpha;
+    J[2][0] = -betay / alpha;
+    J[2][1] = a_snake * k_snake * cos(k_snake * x);
+    J[1][1] = J[2][2] = J[3][3] = 1;
+  } else if (is_minkowski) {
+    J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1.0;
+  }
+
+  for (int mu = 0; mu < NDFULL; mu++) {
+    ucon_transformed[mu] = 0.0;
+    bcon_transformed[mu] = 0.0;
+  }
+  SPACETIMELOOP(mu) SPACETIMELOOP(nu) { ucon_transformed[mu] += J[mu][nu] * u_mink[nu]; }
+  SPACETIMELOOP(mu) SPACETIMELOOP(nu) { bcon_transformed[mu] += J[mu][nu] * bcon[nu]; }
+}
+
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const bool is_minkowski = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski));
   const bool is_snake = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Snake));
@@ -32,19 +73,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
-                        imap);
+  auto v = rc->PackVariables(
+      {fluid_prim::density::name(), fluid_prim::velocity::name(),
+       fluid_prim::energy::name(), fluid_prim::ye::name(), fluid_prim::pressure::name(),
+       fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
+      imap);
 
   const int irho = imap[fluid_prim::density::name()].first;
   const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
   const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield::name()].first;
-  const int ib_hi = imap[fluid_prim::bfield::name()].second;
   const int iye = imap[fluid_prim::ye::name()].second;
   const int iprs = imap[fluid_prim::pressure::name()].first;
   const int itmp = imap[fluid_prim::temperature::name()].first;
@@ -118,15 +155,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
                            v(iprs, k, j, i);
 
         Real u_mink[] = {Gamma, Gamma * vx, Gamma * vy, 0.0};
-        Real B_mink[3] = {B0, 0.0, 0.0};
-
-        Real Bdotv = 0.0;
-        SPACELOOP(m) Bdotv += B_mink[m] * u_mink[m + 1] / Gamma;
-        Real bcon[4] = {Gamma * Bdotv, 0.0, 0.0, 0.0};
-        SPACELOOP(m) bcon[m + 1] = (B_mink[m] + bcon[0] * u_mink[m + 1]) / Gamma;
-
-        Real gcov[NDFULL][NDFULL] = {0};
-        geom.SpacetimeMetric(CellLocation::Cent, k, j, i, gcov);
         Real shift[NDSPACE];
         geom.ContravariantShift(CellLocation::Cent, k, j, i, shift);
 
@@ -144,21 +172,44 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
           ucon_transformed[mu] += J[mu][nu] * u_mink[nu];
         }
-        Real bcon_transformed[NDFULL] = {0, 0, 0, 0};
-        SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
-          bcon_transformed[mu] += J[mu][nu] * bcon[nu];
-        }
-
         Gamma = alpha * ucon_transformed[0];
         v(ivlo, k, j, i) = ucon_transformed[1] + Gamma * shift[0] / alpha;
         v(ivlo + 1, k, j, i) = ucon_transformed[2] + Gamma * shift[1] / alpha;
         v(ivlo + 2, k, j, i) = ucon_transformed[3] + Gamma * shift[2] / alpha;
-        for (int d = ib_lo; d <= ib_hi; d++) {
-          v(d, k, j, i) = bcon_transformed[d - ib_lo + 1] * Gamma -
-                          alpha * bcon_transformed[0] * ucon_transformed[d - ib_lo + 1];
-          // v(d, k, j, i) = B_mink[d-ib_lo];
-        }
       });
+
+  auto fluid_pkg = pmb->packages.Get("fluid");
+  if (fluid_pkg->Param<bool>("mhd")) {
+    // Initialize CT's face field at face coordinates.
+    using TE = parthenon::TopologicalElement;
+    auto Bf = rc->PackVariables({fluid_cons::fbfield::name()});
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::Rotor::fbfield::F1", kb.s, kb.e, jb.s, jb.e, ib.s,
+        ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const Real x = coords.Xf<1>(i);
+          const Real y = coords.Xc<2>(j);
+          Real bcon_transformed[NDFULL], ucon_transformed[NDFULL];
+          RotorBcon(x, y, r0, omega, B0, is_snake, is_minkowski, a_snake, k_snake, alpha,
+                    betay, bcon_transformed, ucon_transformed);
+          const Real Gamma = alpha * ucon_transformed[0];
+          const Real bx = bcon_transformed[1] * Gamma -
+                          alpha * bcon_transformed[0] * ucon_transformed[1];
+          Bf(TE::F1, 0, k, j, i) = bx * geom.DetGamma(CellLocation::Face1, k, j, i);
+        });
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::Rotor::fbfield::F2", kb.s, kb.e, jb.s, jb.e + 1, ib.s,
+        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const Real x = coords.Xc<1>(i);
+          const Real y = coords.Xf<2>(j);
+          Real bcon_transformed[NDFULL], ucon_transformed[NDFULL];
+          RotorBcon(x, y, r0, omega, B0, is_snake, is_minkowski, a_snake, k_snake, alpha,
+                    betay, bcon_transformed, ucon_transformed);
+          const Real Gamma = alpha * ucon_transformed[0];
+          const Real by = bcon_transformed[2] * Gamma -
+                          alpha * bcon_transformed[0] * ucon_transformed[2];
+          Bf(TE::F2, 0, k, j, i) = by * geom.DetGamma(CellLocation::Face2, k, j, i);
+        });
+  }
 
   fluid::PrimitiveToConserved(rc.get());
 }

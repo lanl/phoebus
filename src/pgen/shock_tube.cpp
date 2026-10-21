@@ -12,7 +12,6 @@
 // publicly, and to permit others to do so.
 
 #include "pgen/pgen.hpp"
-#include "phoebus_utils/relativity_utils.hpp"
 
 // Single-material blast wave.
 // As descriged in the Athena test suite
@@ -35,19 +34,15 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   auto &rc = pmb->meshblock_data.Get();
 
   PackIndexMap imap;
-  auto v =
-      rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                         fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                         fluid_prim::ye::name(), fluid_prim::pressure::name(),
-                         fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
-                        imap);
+  auto v = rc->PackVariables(
+      {fluid_prim::density::name(), fluid_prim::velocity::name(),
+       fluid_prim::energy::name(), fluid_prim::ye::name(), fluid_prim::pressure::name(),
+       fluid_prim::temperature::name(), fluid_prim::gamma1::name()},
+      imap);
 
   const int irho = imap[fluid_prim::density::name()].first;
   const int ivlo = imap[fluid_prim::velocity::name()].first;
-  const int ivhi = imap[fluid_prim::velocity::name()].second;
   const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield::name()].first;
-  const int ib_hi = imap[fluid_prim::bfield::name()].second;
   const int iye = imap[fluid_prim::ye::name()].second;
   const int iprs = imap[fluid_prim::pressure::name()].first;
   const int itmp = imap[fluid_prim::temperature::name()].first;
@@ -56,12 +51,16 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real rhol = pin->GetOrAddReal("shocktube", "rhol", 1.0);
   const Real Pl = pin->GetOrAddReal("shocktube", "Pl", 1.0);
   const Real vl = pin->GetOrAddReal("shocktube", "vl", 0.0);
+  const Real vyl = pin->GetOrAddReal("shocktube", "vyl", 0.0);
+  const Real vzl = pin->GetOrAddReal("shocktube", "vzl", 0.0);
   const Real Bxl = pin->GetOrAddReal("shocktube", "Bxl", 0.0);
   const Real Byl = pin->GetOrAddReal("shocktube", "Byl", 0.0);
   const Real Bzl = pin->GetOrAddReal("shocktube", "Bzl", 0.0);
   const Real rhor = pin->GetOrAddReal("shocktube", "rhor", 1.0);
   const Real Pr = pin->GetOrAddReal("shocktube", "Pr", 1.0);
   const Real vr = pin->GetOrAddReal("shocktube", "vr", 0.0);
+  const Real vyr = pin->GetOrAddReal("shocktube", "vyr", 0.0);
+  const Real vzr = pin->GetOrAddReal("shocktube", "vzr", 0.0);
   const Real Bxr = pin->GetOrAddReal("shocktube", "Bxr", 0.0);
   const Real Byr = pin->GetOrAddReal("shocktube", "Byr", 0.0);
   const Real Bzr = pin->GetOrAddReal("shocktube", "Bzr", 0.0);
@@ -83,6 +82,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         const Real rho = x < 0.5 ? rhol : rhor;
         const Real P = x < 0.5 ? Pl : Pr;
         const Real vel = x < 0.5 ? vl : vr;
+        const Real vely = x < 0.5 ? vyl : vyr;
+        const Real velz = x < 0.5 ? vzl : vzr;
 
         Real lambda[2];
         if (iye > 0) {
@@ -99,24 +100,59 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(igm1, k, j, i) = eos.BulkModulusFromDensityTemperature(
                                v(irho, k, j, i), v(itmp, k, j, i), lambda) /
                            v(iprs, k, j, i);
-        for (int d = 0; d < 3; d++)
-          v(ivlo + d, k, j, i) = 0.0;
-        v(ivlo, k, j, i) = vel;
+        // Convert raw 3-velocity to Phoebus's u^i = W v^i primitive.
         Real gammacov[3][3] = {0};
-        Real vcon[3] = {v(ivlo, k, j, i), v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
+        Real vcon[3] = {vel, vely, velz};
         geom.Metric(CellLocation::Cent, k, j, i, gammacov);
-        Real Gamma = phoebus::GetLorentzFactor(vcon, gammacov);
-        v(ivlo, k, j, i) *= Gamma;
-        if (ib_hi > 0) {
-          const Real Bx = x < 0.5 ? Bxl : Bxr;
-          const Real By = x < 0.5 ? Byl : Byr;
-          const Real Bz = x < 0.5 ? Bzl : Bzr;
-          v(ib_lo, k, j, i) = Bx;
-          v(ib_lo + 1, k, j, i) = By;
-          v(ib_hi, k, j, i) = Bz;
-        }
+        Real vsq = 0.0;
+        for (int ii = 0; ii < 3; ii++)
+          for (int jj = 0; jj < 3; jj++)
+            vsq += gammacov[ii][jj] * vcon[ii] * vcon[jj];
+        Real Gamma = 1.0 / std::sqrt(1.0 - vsq);
+        v(ivlo, k, j, i) = Gamma * vel;
+        v(ivlo + 1, k, j, i) = Gamma * vely;
+        v(ivlo + 2, k, j, i) = Gamma * velz;
         if (iye > 0) v(iye, k, j, i) = sin(2.0 * M_PI * x);
       });
+
+  if (pmb->packages.Get("fluid")->Param<bool>("mhd")) {
+    using TE = parthenon::TopologicalElement;
+    auto Bf = rc->PackVariables({fluid_cons::fbfield::name()});
+
+    if (Bxl != 0.0 || Bxr != 0.0) {
+      const auto ibf = rc->GetBoundsI(IndexDomain::entire, TE::F1);
+      const auto jbf = rc->GetBoundsJ(IndexDomain::entire, TE::F1);
+      const auto kbf = rc->GetBoundsK(IndexDomain::entire, TE::F1);
+      pmb->par_for(
+          "Phoebus::ProblemGenerator::ShockTube::fbfield::F1", kbf.s, kbf.e, jbf.s, jbf.e,
+          ibf.s, ibf.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            const Real Bx = coords.Xf<1>(i) < 0.5 ? Bxl : Bxr;
+            Bf(TE::F1, 0, k, j, i) = Bx * geom.DetGamma(CellLocation::Face1, k, j, i);
+          });
+    }
+    if (Byl != 0.0 || Byr != 0.0) {
+      const auto ibf = rc->GetBoundsI(IndexDomain::entire, TE::F2);
+      const auto jbf = rc->GetBoundsJ(IndexDomain::entire, TE::F2);
+      const auto kbf = rc->GetBoundsK(IndexDomain::entire, TE::F2);
+      pmb->par_for(
+          "Phoebus::ProblemGenerator::ShockTube::fbfield::F2", kbf.s, kbf.e, jbf.s, jbf.e,
+          ibf.s, ibf.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            const Real By = coords.Xc<1>(i) < 0.5 ? Byl : Byr;
+            Bf(TE::F2, 0, k, j, i) = By * geom.DetGamma(CellLocation::Face2, k, j, i);
+          });
+    }
+    if (Bzl != 0.0 || Bzr != 0.0) {
+      const auto ibf = rc->GetBoundsI(IndexDomain::entire, TE::F3);
+      const auto jbf = rc->GetBoundsJ(IndexDomain::entire, TE::F3);
+      const auto kbf = rc->GetBoundsK(IndexDomain::entire, TE::F3);
+      pmb->par_for(
+          "Phoebus::ProblemGenerator::ShockTube::fbfield::F3", kbf.s, kbf.e, jbf.s, jbf.e,
+          ibf.s, ibf.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            const Real Bz = coords.Xc<1>(i) < 0.5 ? Bzl : Bzr;
+            Bf(TE::F3, 0, k, j, i) = Bz * geom.DetGamma(CellLocation::Face3, k, j, i);
+          });
+    }
+  }
 
   fluid::PrimitiveToConserved(rc.get());
 }

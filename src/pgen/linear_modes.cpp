@@ -29,6 +29,71 @@ using Kokkos::complex;
 
 namespace linear_modes {
 
+// Transform the linear-mode magnetic field at (x, y).
+KOKKOS_INLINE_FUNCTION
+void LinearModeBField(Real x, Real y, const double k1, const double k2, const Real amp,
+                      const double B10, const double B20, const double B30,
+                      const complex<double> dB1, const complex<double> dB2,
+                      const complex<double> dB3, const complex<double> du1,
+                      const complex<double> du2, const complex<double> du3,
+                      const bool is_snake, const bool is_inchworm,
+                      const bool is_boosted_minkowski, const Real a_snake,
+                      const Real k_snake, const Real alpha, const Real betax,
+                      const Real betay, const Real betaz, Real Bout[3]) {
+  if (is_snake) y = y - a_snake * sin(k_snake * x);
+  if (is_inchworm) x = x - a_snake * sin(k_snake * x);
+
+  const double mode = amp * cos(k1 * x + k2 * y);
+
+  Real u[3] = {(du1 * mode).real(), (du2 * mode).real(), (du3 * mode).real()};
+  Real B[3] = {B10 + (dB1 * mode).real(), B20 + (dB2 * mode).real(),
+               B30 + (dB3 * mode).real()};
+
+  if (!(is_snake || is_inchworm || is_boosted_minkowski)) {
+    Bout[0] = B[0];
+    Bout[1] = B[1];
+    Bout[2] = B[2];
+    return;
+  }
+
+  Real vsq = 0.;
+  SPACELOOP(ii) vsq += u[ii] * u[ii];
+  const Real Gamma0 = sqrt(1. + vsq);
+
+  Real ucon[NDFULL] = {Gamma0, u[0], u[1], u[2]};
+  Real Bdotv = 0.0;
+  SPACELOOP(d) Bdotv += B[d] * u[d] / Gamma0;
+  Real bcon[NDFULL] = {Gamma0 * Bdotv, 0.0, 0.0, 0.0};
+  SPACELOOP(d) bcon[d + 1] = (B[d] + bcon[0] * ucon[d + 1]) / Gamma0;
+
+  Real J[NDFULL][NDFULL] = {0};
+  if (is_snake) {
+    J[0][0] = 1 / alpha;
+    J[2][0] = -betay / alpha;
+    J[2][1] = a_snake * k_snake * cos(k_snake * x);
+    J[1][1] = J[2][2] = J[3][3] = 1;
+  } else if (is_boosted_minkowski) {
+    J[0][0] = J[1][1] = J[2][2] = J[3][3] = 1;
+    J[1][0] = -betax;
+    J[2][0] = -betay;
+    J[3][0] = -betaz;
+  } else if (is_inchworm) {
+    J[0][0] = J[2][2] = J[3][3] = 1;
+    J[1][1] = 1 + a_snake * k_snake * cos(k_snake * x);
+  }
+
+  Real ucon_transformed[NDFULL] = {0, 0, 0, 0};
+  SPACETIMELOOP(mu) SPACETIMELOOP(nu) { ucon_transformed[mu] += J[mu][nu] * ucon[nu]; }
+  Real bcon_transformed[NDFULL] = {0, 0, 0, 0};
+  SPACETIMELOOP(mu) SPACETIMELOOP(nu) { bcon_transformed[mu] += J[mu][nu] * bcon[nu]; }
+
+  const Real Gamma = alpha * ucon_transformed[0];
+  SPACELOOP(d) {
+    Bout[d] = bcon_transformed[d + 1] * Gamma -
+              alpha * bcon_transformed[0] * ucon_transformed[d + 1];
+  }
+}
+
 void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   const bool is_minkowski = (typeid(PHOEBUS_GEOMETRY) == typeid(Geometry::Minkowski));
@@ -45,7 +110,7 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   PackIndexMap imap;
   std::vector<std::string> vars({fluid_prim::density::name(),
                                  fluid_prim::velocity::name(), fluid_prim::energy::name(),
-                                 fluid_prim::bfield::name(), fluid_prim::pressure::name(),
+                                 fluid_prim::pressure::name(),
                                  fluid_prim::temperature::name(),
                                  fluid_prim::gamma1::name(), fluid_prim::ye::name()});
   auto v = rc->PackVariables(vars, imap);
@@ -54,8 +119,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap[fluid_prim::velocity::name()].first;
   const int ivhi = imap[fluid_prim::velocity::name()].second;
   const int ieng = imap[fluid_prim::energy::name()].first;
-  const int ib_lo = imap[fluid_prim::bfield::name()].first;
-  const int ib_hi = imap[fluid_prim::bfield::name()].second;
   const int iprs = imap[fluid_prim::pressure::name()].first;
   const int itmp = imap[fluid_prim::temperature::name()].first;
   const int igm1 = imap[fluid_prim::gamma1::name()].first;
@@ -237,16 +300,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         if (ivhi >= 3) {
           v(ivlo + 2, k, j, i) = u30 + (du3 * mode).real();
         }
-        if (ib_hi >= 1) {
-          v(ib_lo, k, j, i) = B10 + (dB1 * mode).real();
-        }
-        if (ib_hi >= 2) {
-          v(ib_lo + 1, k, j, i) = B20 + (dB2 * mode).real();
-        }
-        if (ib_hi >= 3) {
-          v(ib_lo + 2, k, j, i) = B30 + (dB3 * mode).real();
-        }
-
         Real vsq = 0.;
         SPACELOOP(ii) { vsq += v(ivlo + ii, k, j, i) * v(ivlo + ii, k, j, i); }
         Real Gamma = sqrt(1. + vsq);
@@ -261,14 +314,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           Real ucon[NDFULL] = {Gamma,            // alpha = 1 in Minkowski
                                v(ivlo, k, j, i), // beta^i = 0 in Minkowski
                                v(ivlo + 1, k, j, i), v(ivlo + 2, k, j, i)};
-          Real Bdotv = 0.0;
-          for (int d = ib_lo; d <= ib_hi; d++) {
-            Bdotv += v(d, k, j, i) * v(ivlo + d - ib_lo, k, j, i) / Gamma;
-          }
-          Real bcon[NDFULL] = {Gamma * Bdotv, 0.0, 0.0, 0.0};
-          for (int d = ib_lo; d <= ib_hi; d++) {
-            bcon[d - ib_lo + 1] = (v(d, k, j, i) + bcon[0] * ucon[d - ib_lo + 1]) / Gamma;
-          }
           Real J[NDFULL][NDFULL] = {0};
           if (is_snake) {
             J[0][0] = 1 / alpha;
@@ -288,21 +333,52 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
           SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
             ucon_transformed[mu] += J[mu][nu] * ucon[nu];
           }
-          Real bcon_transformed[NDFULL] = {0, 0, 0, 0};
-          SPACETIMELOOP(mu) SPACETIMELOOP(nu) {
-            bcon_transformed[mu] += J[mu][nu] * bcon[nu];
-          }
-
           Gamma = alpha * ucon_transformed[0];
           v(ivlo, k, j, i) = ucon_transformed[1] + Gamma * shift[0] / alpha;
           v(ivlo + 1, k, j, i) = ucon_transformed[2] + Gamma * shift[1] / alpha;
           v(ivlo + 2, k, j, i) = ucon_transformed[3] + Gamma * shift[2] / alpha;
-          for (int d = ib_lo; d <= ib_hi; d++) {
-            v(d, k, j, i) = bcon_transformed[d - ib_lo + 1] * Gamma -
-                            alpha * bcon_transformed[0] * ucon_transformed[d - ib_lo + 1];
-          }
         }
       });
+
+  auto fluid_pkg = pmb->packages.Get("fluid");
+  if (fluid_pkg->Param<bool>("mhd")) {
+    // Initialize CT's face field at face coordinates.
+    using TE = parthenon::TopologicalElement;
+    auto Bf = rc->PackVariables({fluid_cons::fbfield::name()});
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::LinearModes::fbfield::F1", kb.s, kb.e, jb.s, jb.e,
+        ib.s, ib.e + 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const Real x = coords.Xf<1>(i);
+          const Real y = coords.Xc<2>(j);
+          Real B[3];
+          LinearModeBField(x, y, k1, k2, amp, B10, B20, B30, dB1, dB2, dB3, du1, du2, du3,
+                           is_snake, is_inchworm, is_boosted_minkowski, a_snake, k_snake,
+                           alpha, betax, betay, betaz, B);
+          Bf(TE::F1, 0, k, j, i) = B[0] * geom.DetGamma(CellLocation::Face1, k, j, i);
+        });
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::LinearModes::fbfield::F2", kb.s, kb.e, jb.s, jb.e + 1,
+        ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const Real x = coords.Xc<1>(i);
+          const Real y = coords.Xf<2>(j);
+          Real B[3];
+          LinearModeBField(x, y, k1, k2, amp, B10, B20, B30, dB1, dB2, dB3, du1, du2, du3,
+                           is_snake, is_inchworm, is_boosted_minkowski, a_snake, k_snake,
+                           alpha, betax, betay, betaz, B);
+          Bf(TE::F2, 0, k, j, i) = B[1] * geom.DetGamma(CellLocation::Face2, k, j, i);
+        });
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::LinearModes::fbfield::F3", kb.s, kb.e + (ndim > 2),
+        jb.s, jb.e, ib.s, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          const Real x = coords.Xc<1>(i);
+          const Real y = coords.Xc<2>(j);
+          Real B[3];
+          LinearModeBField(x, y, k1, k2, amp, B10, B20, B30, dB1, dB2, dB3, du1, du2, du3,
+                           is_snake, is_inchworm, is_boosted_minkowski, a_snake, k_snake,
+                           alpha, betax, betay, betaz, B);
+          Bf(TE::F3, 0, k, j, i) = B[2] * geom.DetGamma(CellLocation::Face3, k, j, i);
+        });
+  }
 
   fluid::PrimitiveToConserved(rc.get());
 }

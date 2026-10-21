@@ -14,9 +14,9 @@
 # publicly, and to permit others to do so.
 
 PHDF_PATH = (
-    "../external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/"
+    "../../external/parthenon/scripts/python/packages/parthenon_tools/parthenon_tools/"
 )
-res_low = [8, 16, 32]
+res_low = [8, 16, 32, 64, 128]
 res_high = [128, 256, 512]
 colors = [
     "tab:blue",
@@ -81,9 +81,9 @@ parser.add_argument(
     "--mode",
     metavar="M",
     type=str,
-    default="sound",
+    default=None,
     choices=["entropy", "sound", "alfven", "slow", "fast"],
-    help="What mode to test",
+    help="What mode to test. Defaults to 'sound' for hydro, 'fast' for mhd.",
 )
 parser.add_argument(
     "-r",
@@ -97,6 +97,15 @@ parser.add_argument("-s", "--save", type=str, default=None, help="File to save p
 parser.add_argument(
     "-d", "--dim", type=int, default=2, choices=[1, 2], help="Number of dimensions"
 )
+parser.add_argument(
+    "-n",
+    "--nblocks",
+    type=int,
+    default=1,
+    help="Number of MeshBlocks per dimension (e.g. for exercising AMR prolongation/"
+    "restriction across block boundaries). Resolution at each N must be evenly "
+    "divisible by this. Default 1 (single block, matching prior behavior).",
+)
 parser.add_argument("executable", metavar="E", type=str, help="Executable to run")
 parser.add_argument("input_file", metavar="pin", type=str, help="Input file to use")
 args = parser.parse_args()
@@ -107,8 +116,13 @@ else:
     res = res_low
 
 physics = args.physics
-mode_name = args.mode
-recon = "weno5"
+if args.mode is not None:
+    mode_name = args.mode
+else:
+    # Default mode depends on physics: "sound" isn't a valid mhd mode (and vice versa
+    # for alfven/slow/fast), so the default can't be a single fixed value.
+    mode_name = "fast" if physics == "mhd" else "sound"
+recon = args.recon
 plot_each_wave = True
 plot_initial = False
 
@@ -149,9 +163,14 @@ if physics == "hydro":
             mode["u1"] = 0.1791244302079596
             mode["u2"] = 0.1791244302079596
     else:
-        print('mode_name "' + mode_name + '" not understood')
+        sys.exit(
+            'mode "'
+            + mode_name
+            + '" not valid for physics "hydro" (choose from entropy, sound)'
+        )
 elif physics == "mhd":
-    assert mode["dim"] == 2
+    if mode["dim"] != 2:
+        sys.exit("physics \"mhd\" requires --dim 2 (1D mhd modes aren't supported)")
     if mode_name == "alfven":
         mode["omega"] = 0 + 3.44144232573j
         mode["vars"] = ["u3", "B3"]
@@ -176,9 +195,13 @@ elif physics == "mhd":
         mode["B1"] = 0.359559114174
         mode["B2"] = -0.359559114174
     else:
-        print('mode_name "' + mode_name + '" not understood')
+        sys.exit(
+            'mode "'
+            + mode_name
+            + '" not valid for physics "mhd" (choose from alfven, slow, fast)'
+        )
 else:
-    print('physics "' + physics + '" not understood')
+    sys.exit('physics "' + physics + '" not understood')
 
 mode["cs"] = mode["omega"].imag / mode["knorm"]
 mode["tf"] = 2.0 * np.pi / mode["omega"].imag
@@ -214,19 +237,36 @@ def get_mode(x, y, t, var):
 
 res = np.array(res)
 
+if args.nblocks > 1:
+    bad = [int(N) for N in res if N % args.nblocks != 0]
+    if bad:
+        sys.exit(
+            "--nblocks %d does not evenly divide resolution(s) %s"
+            % (args.nblocks, bad)
+        )
+
 L1 = {}
 for var in mode["vars"]:
     L1[var] = np.zeros(res.size)
 
 for n, N in enumerate(res):
+    meshblock_N = N // args.nblocks
     # Process input file
     with open(TMPINPUTFILE, "r") as infile:
         lines = infile.readlines()
+        section = None
         for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("<") and stripped.endswith(">"):
+                section = stripped[1:-1]
+            # <parthenon/mesh>'s nx1/nx2 set the full mesh resolution; the identically-
+            # named nx1/nx2 under <parthenon/meshblock> set the size of each block, so
+            # they need to be told apart by section to support --nblocks > 1.
+            in_meshblock = section == "parthenon/meshblock"
             if line.startswith("dt") and "dt_init_fact" not in line:
                 lines[i] = "dt = %g" % mode["tf"] + "\n"
             if line.startswith("nx1"):
-                lines[i] = "nx1 = %i" % N + "\n"
+                lines[i] = "nx1 = %i" % (meshblock_N if in_meshblock else N) + "\n"
             if mode["dim"] == 1:
                 if line.startswith("nx2"):
                     lines[i] = "nx2 = 1\n"
@@ -234,7 +274,7 @@ for n, N in enumerate(res):
 
                 #      if physics == 'mhd':
                 if line.startswith("nx2"):
-                    lines[i] = "nx2 = %i" % N + "\n"
+                    lines[i] = "nx2 = %i" % (meshblock_N if in_meshblock else N) + "\n"
                 # break
             if line.startswith("alpha"):
                 lines[i] = "alpha = %g" % mode["lapse"] + "\n"
@@ -314,9 +354,9 @@ for n, N in enumerate(res):
         mode["u2_soln"] = dump.Get("p.velocity", flatten=False)[0, 0, :, :, 1]
         mode["u3_soln"] = dump.Get("p.velocity", flatten=False)[0, 0, :, :, 2]
         if physics == "mhd":
-            parth["B1_soln"] = dump.Get("p.bfield", flatten=False)[0, 0, :, :, 0] - B10
-            parth["B2_soln"] = dump.Get("p.bfield", flatten=False)[0, 0, :, :, 1] - B20
-            parth["B3_soln"] = dump.Get("p.bfield", flatten=False)[0, 0, :, :, 2] - B30
+            mode["B1_soln"] = dump.Get("p.bfield", flatten=False)[0, 0, :, :, 0] - B10
+            mode["B2_soln"] = dump.Get("p.bfield", flatten=False)[0, 0, :, :, 1] - B20
+            mode["B3_soln"] = dump.Get("p.bfield", flatten=False)[0, 0, :, :, 2] - B30
         if mode["dim"] == 1:
             for key in mode.keys():
                 if "_soln" in key:

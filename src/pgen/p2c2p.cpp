@@ -34,7 +34,7 @@ KOKKOS_INLINE_FUNCTION
 Real v3_of_x(const Real x) { return 0.4 + 0.3 * sin(x + 0.1); }
 
 KOKKOS_INLINE_FUNCTION
-Real b1_of_x(const Real x) { return 0.3 + 0.1 * sin(x); }
+Real b1_of_x(const Real) { return 0.3; }
 
 KOKKOS_INLINE_FUNCTION
 Real b2_of_x(const Real x) { return 0.4 + 0.2 * cos(x); }
@@ -46,7 +46,7 @@ void ReportError(Coordinates_t &coords, VariablePack<Real> &v, const int vindex,
                  Real f(const Real)) {
 
   Real max_error = 0.0;
-  Real x0, val0, v0;
+  Real x0 = 0.0, val0 = 0.0, v0 = 0.0;
   /*parthenon::par_reduce(parthenon::loop_pattern_mdrange_tag, "ReportError",
     DevExecSpace(), 0, v.GetDim(3)-1, 0, v.GetDim(2)-1, 0, v.GetDim(1)-1,
     KOKKOS_LAMBDA(const int k, const int j, const int i, Real &merr) {*/
@@ -109,9 +109,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         v(ivlo, k, j, i) = v1_of_x(x);
         v(ivlo + 1, k, j, i) = v2_of_x(x);
         v(ivlo + 2, k, j, i) = v3_of_x(x);
-        v(ib_lo, k, j, i) = b1_of_x(x);
-        v(ib_lo + 1, k, j, i) = b2_of_x(x);
-        v(ib_lo + 2, k, j, i) = b3_of_x(x);
         v(iprs, k, j, i) = eos.PressureFromDensityInternalEnergy(
             v(irho, k, j, i), v(ieng, k, j, i) / v(irho, k, j, i));
         v(itmp, k, j, i) = eos.TemperatureFromDensityInternalEnergy(
@@ -120,6 +117,28 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
             eos.BulkModulusFromDensityTemperature(v(irho, k, j, i), v(itmp, k, j, i)) /
             v(iprs, k, j, i);
       });
+
+  if (pmb->packages.Get("fluid")->Param<bool>("mhd")) {
+    using TE = parthenon::TopologicalElement;
+    auto Bf = rc->PackVariables({fluid_cons::fbfield::name()});
+    for (const auto el : {TE::F1, TE::F2, TE::F3}) {
+      const auto ibf = rc->GetBoundsI(IndexDomain::entire, el);
+      const auto jbf = rc->GetBoundsJ(IndexDomain::entire, el);
+      const auto kbf = rc->GetBoundsK(IndexDomain::entire, el);
+      pmb->par_for(
+          "Phoebus::ProblemGenerator::P2C2P::fbfield", kbf.s, kbf.e, jbf.s, jbf.e, ibf.s,
+          ibf.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            const auto loc = el == TE::F1   ? CellLocation::Face1
+                             : el == TE::F2 ? CellLocation::Face2
+                                            : CellLocation::Face3;
+            const Real x = el == TE::F1 ? coords.Xf<1>(i) : coords.Xc<1>(i);
+            const Real B = el == TE::F1   ? b1_of_x(x)
+                           : el == TE::F2 ? b2_of_x(x)
+                                          : b3_of_x(x);
+            Bf(el, 0, k, j, i) = B * geom.DetGamma(loc, k, j, i);
+          });
+    }
+  }
 
   for (int i = 0; i < 100; i++) {
     fluid::PrimitiveToConserved(rc.get());

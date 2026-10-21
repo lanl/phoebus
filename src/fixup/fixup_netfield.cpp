@@ -19,6 +19,7 @@
 #include <globals.hpp>
 
 #include "analysis/history.hpp"
+#include "fluid/b_ct.hpp"
 #include "fluid/con2prim_robust.hpp"
 #include "fluid/fluid.hpp"
 #include "fluid/prim2con.hpp"
@@ -162,8 +163,9 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
   StateDescriptor *fix_pkg = pm->packages.Get("fixup").get();
 
   const bool enable_phi_enforcement = fix_pkg->Param<bool>("enable_phi_enforcement");
+  const bool mhd = pm->packages.Get("fluid")->Param<bool>("mhd");
 
-  if (enable_phi_enforcement) {
+  if (enable_phi_enforcement && mhd) {
 
     const Real next_dphi_dt_update_time =
         fix_pkg->Param<Real>("next_dphi_dt_update_time");
@@ -172,20 +174,12 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
       return TaskStatus::complete;
     }
 
-    namespace p = fluid_prim;
-    namespace c = fluid_cons;
-    const std::vector<std::string> vars({p::bfield::name(), c::bfield::name()});
-    PackIndexMap imap;
-    auto pack = md->PackVariables(vars, imap);
-
-    const int pblo = imap[p::bfield::name()].first;
-    const int cblo = imap[c::bfield::name()].first;
+    using TE = parthenon::TopologicalElement;
+    auto pack = md->PackVariables(std::vector<std::string>{fluid_cons::fbfield::name()});
 
     const auto ib = md->GetBoundsI(IndexDomain::interior);
     const auto jb = md->GetBoundsJ(IndexDomain::interior);
-    const auto kb = md->GetBoundsK(IndexDomain::interior);
 
-    auto geom = Geometry::GetCoordinateSystem(md);
     auto gpkg = pm->packages.Get("geometry");
     bool derefine_poles = gpkg->Param<bool>("derefine_poles");
     Real h = gpkg->Param<Real>("h");
@@ -196,6 +190,8 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
     const Real Rh = gpkg->Param<Real>("Rh");
     auto tr = Geometry::McKinneyGammieRyan(derefine_poles, h, xt, alpha, x0, smooth);
 
+    // TODO(BLB) Verify phi_factor scaling before use: likely should divide by phi_factor
+    // (and account for Phi normalization by sqrt(Mdot)).
     Real phi_factor =
         fix_pkg->Param<Real>("phi_factor") * fix_pkg->Param<Real>("dphi_dt") * dt;
     if (fiducial) {
@@ -225,27 +221,25 @@ TaskStatus ModifyNetField(MeshData<Real> *md, const Real t, const Real dt,
           }
         });
 
-    // Modify B field
-    parthenon::par_for(
-        DEFAULT_LOOP_PATTERN, "Phoebus::Fixup::ModifyNetField::EvaluateBField",
-        DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
-        KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
-          const auto &coords = pack.GetCoords(b);
-          const Real gammadet = geom.DetGamma(CellLocation::Cent, b, k, j, i);
-
-          pack(b, pblo, k, j, i) +=
-              phi_factor *
-              (-(A(b, j, i) - A(b, j + 1, i) + A(b, j, i + 1) - A(b, j + 1, i + 1)) /
-               (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gammadet));
-          pack(b, pblo + 1, k, j, i) +=
-              phi_factor *
-              ((A(b, j, i) + A(b, j + 1, i) - A(b, j, i + 1) - A(b, j + 1, i + 1)) /
-               (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gammadet));
-
-          SPACELOOP(ii) {
-            pack(b, cblo + ii, k, j, i) = pack(b, pblo + ii, k, j, i) * gammadet;
-          }
-        });
+    for (auto el : {TE::F1, TE::F2}) {
+      const auto ib = md->GetBoundsI(IndexDomain::interior, el);
+      const auto jb = md->GetBoundsJ(IndexDomain::interior, el);
+      const auto kb = md->GetBoundsK(IndexDomain::interior, el);
+      parthenon::par_for(
+          DEFAULT_LOOP_PATTERN, "Phoebus::Fixup::ModifyNetField::EvaluateBField",
+          DevExecSpace(), 0, pack.GetDim(5) - 1, kb.s, kb.e, jb.s, jb.e, ib.s, ib.e,
+          KOKKOS_LAMBDA(const int b, const int k, const int j, const int i) {
+            const auto &coords = pack.GetCoords(b);
+            if (el == TE::F1) {
+              pack(b, el, 0, k, j, i) +=
+                  phi_factor * (A(b, j + 1, i) - A(b, j, i)) / coords.Dxc<2>(j);
+            } else {
+              pack(b, el, 0, k, j, i) -=
+                  phi_factor * (A(b, j, i + 1) - A(b, j, i)) / coords.Dxc<1>(i);
+            }
+          });
+    }
+    b_ct::MeshFaceToCell(md, IndexDomain::interior);
   } // enable_phi_enforcement
 
   return TaskStatus::complete;

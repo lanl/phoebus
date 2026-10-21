@@ -402,7 +402,12 @@ class ConToPrim {
     }
 
     root_find::RootFind root(max_iter);
-    const Real mu = root.regula_falsi(res, 0.0, mu_r, rel_tolerance, v(c2p_mu));
+    root_find::RootFindStatus root_status;
+    const Real mu =
+        root.regula_falsi(res, 0.0, mu_r, rel_tolerance, v(c2p_mu), &root_status);
+    if (root_status == root_find::RootFindStatus::failure) {
+      return ConToPrimStatus::failure;
+    }
     v(c2p_mu) = mu;
 #if CON2PRIM_STATISTICS
     con2prim_statistics::Stats::add(root.iteration_count);

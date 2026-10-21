@@ -183,4 +183,6 @@ if __name__ == "__main__":
         )
 
     p = Pool(processes=args.nproc)
-    p.map(make_frame, enumerate(args.files))
+    #p.map(make_frame, enumerate(args.files))
+    for i, f in enumerate(args.files):
+        make_frame((i, f))

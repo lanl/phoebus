@@ -1,4 +1,4 @@
-// © 2021. Triad National Security, LLC. All rights reserved.  This
+// © 2021-2026. Triad National Security, LLC. All rights reserved.  This
 // program was produced under U.S. Government contract
 // 89233218CNA000001 for Los Alamos National Laboratory (LANL), which
 // is operated by Triad National Security, LLC for the U.S.
@@ -139,8 +139,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
 
   PackIndexMap imap;
   auto v = rc->PackVariables({fluid_prim::density::name(), fluid_prim::velocity::name(),
-                              fluid_prim::energy::name(), fluid_prim::bfield::name(),
-                              fluid_prim::ye::name(), fluid_prim::pressure::name(),
+                              fluid_prim::energy::name(), fluid_prim::ye::name(),
+                              fluid_prim::pressure::name(),
                               fluid_prim::temperature::name(), fluid_prim::gamma1::name(),
                               radmoment_prim::J::name(), radmoment_prim::H::name()},
                              imap);
@@ -149,8 +149,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const int ivlo = imap[fluid_prim::velocity::name()].first;
   const int ivhi = imap[fluid_prim::velocity::name()].second;
   const int ieng = imap[fluid_prim::energy::name()].first;
-  const int iblo = imap[fluid_prim::bfield::name()].first;
-  const int ibhi = imap[fluid_prim::bfield::name()].second;
   const int iye = imap[fluid_prim::ye::name()].second;
   const int iprs = imap[fluid_prim::pressure::name()].first;
   const int itmp = imap[fluid_prim::temperature::name()].first;
@@ -256,6 +254,8 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
   const Real lrho_max = std::log10(rho_max);
   const Real T_min = pmb->packages.Get("eos")->Param<Real>("T_min");
   const Real T_max = pmb->packages.Get("eos")->Param<Real>("T_max");
+  // check floor type
+  const bool is_floor_rhoT = pmb->packages.Get("fixup")->Param<bool>("is_floor_rhoT");
 
   // adiabat calculation for table
   Real lrho_min_adiabat, lrho_max_adiabat; // rho bounds for adiabat
@@ -341,8 +341,6 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         // fixup
         Real rhoflr = 0;
         Real epsflr, tmpflr;
-        // check floor type
-        bool is_floor_rhoT = pmb->packages.Get("fixup")->Param<bool>("is_floor_rhoT");
         floor.GetFloors(x1v, x2v, x3, rhoflr, epsflr, tmpflr);
         Real lambda[2] = {Ye, 0.0};
         if (iye > 0) {
@@ -463,20 +461,32 @@ void ProblemGenerator(MeshBlock *pmb, ParameterInput *pin) {
         A(j, i) = (q > 0 ? q : 0.0);
       });
 
-  // Initialize B field lines, to be normalized in PostInitializationModifier
-  if (ibhi > 0) {
+  // CT initializes the densitized face field from the discrete curl of A.
+  const bool mhd = pmb->packages.Get("fluid")->Param<bool>("mhd");
+  if (mhd) {
+    using TE = parthenon::TopologicalElement;
+    auto Bf = rc->PackVariables({fluid_cons::fbfield::name()});
+    for (const auto el : {TE::F1, TE::F2, TE::F3}) {
+      const auto ib = rc->GetBoundsI(IndexDomain::entire, el);
+      const auto jb = rc->GetBoundsJ(IndexDomain::entire, el);
+      const auto kb = rc->GetBoundsK(IndexDomain::entire, el);
+      pmb->par_for(
+          "Phoebus::ProblemGenerator::Torus::ZeroFaceB", kb.s, kb.e, jb.s, jb.e, ib.s,
+          ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+            Bf(el, 0, k, j, i) = 0.0;
+          });
+    }
+
+    // A(j, i) is the corner-centered x3 vector potential.
     pmb->par_for(
-        "Phoebus::ProblemGenerator::Torus3", kb.s, kb.e, jb.s, jb.e - 1, ib.s, ib.e - 1,
-        KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          // JMM: HARM/bhlight divides by gdet, not gamdet.
-          // This means the HARM primitives are smaller than the Phoebus
-          // primitives by a factor of alpha.
-          const Real gamdet = geom.DetGamma(CellLocation::Cent, k, j, i);
-          v(iblo, k, j, i) = -(A(j, i) - A(j + 1, i) + A(j, i + 1) - A(j + 1, i + 1)) /
-                             (2.0 * coords.CellWidthFA(X2DIR, k, j, i) * gamdet);
-          v(iblo + 1, k, j, i) = (A(j, i) + A(j + 1, i) - A(j, i + 1) - A(j + 1, i + 1)) /
-                                 (2.0 * coords.CellWidthFA(X1DIR, k, j, i) * gamdet);
-          v(ibhi, k, j, i) = 0.0;
+        "Phoebus::ProblemGenerator::Torus::FaceB1", kb.s, kb.e, jb.s + 1, jb.e - 1,
+        ib.s + 1, ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          Bf(TE::F1, 0, k, j, i) = (A(j + 1, i) - A(j, i)) / coords.Dxc<2>(j);
+        });
+    pmb->par_for(
+        "Phoebus::ProblemGenerator::Torus::FaceB2", kb.s, kb.e, jb.s + 1, jb.e, ib.s + 1,
+        ib.e - 1, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+          Bf(TE::F2, 0, k, j, i) = -(A(j, i + 1) - A(j, i)) / coords.Dxc<1>(i);
         });
   }
 
@@ -633,11 +643,8 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
     auto kb = pmb->cellbounds.GetBoundsK(IndexDomain::interior);
 
     PackIndexMap imap;
-    std::vector<std::string> vars = {fluid_prim::bfield::name(),
-                                     fluid_prim::density::name()};
+    std::vector<std::string> vars = {fluid_prim::density::name()};
     auto v = rc->PackVariables(vars, imap);
-    const int iblo = imap[fluid_prim::bfield::name()].first;
-    const int ibhi = imap[fluid_prim::bfield::name()].second;
     const int irho = imap[fluid_prim::density::name()].first;
 
     auto tracer_pkg = pmb->packages.Get("tracers");
@@ -736,13 +743,21 @@ void PostInitializationModifier(ParameterInput *pin, Mesh *pmesh) {
           });
     }
 
-    pmb->par_for(
-        "Phoebus::ProblemGenerator::Torus::BFieldNorm", kb.s, kb.e, jb.s, jb.e, ib.s,
-        ib.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
-          for (int ib = iblo; ib <= ibhi; ib++) {
-            v(ib, k, j, i) *= B_field_fac;
-          }
-        });
+    const bool mhd = pmb->packages.Get("fluid")->Param<bool>("mhd");
+    if (mhd) {
+      using TE = parthenon::TopologicalElement;
+      auto Bf = rc->PackVariables({fluid_cons::fbfield::name()});
+      for (const auto el : {TE::F1, TE::F2, TE::F3}) {
+        const auto ifb = rc->GetBoundsI(IndexDomain::entire, el);
+        const auto jfb = rc->GetBoundsJ(IndexDomain::entire, el);
+        const auto kfb = rc->GetBoundsK(IndexDomain::entire, el);
+        pmb->par_for(
+            "Phoebus::ProblemGenerator::Torus::FaceBFieldNorm", kfb.s, kfb.e, jfb.s,
+            jfb.e, ifb.s, ifb.e, KOKKOS_LAMBDA(const int k, const int j, const int i) {
+              Bf(el, 0, k, j, i) *= B_field_fac;
+            });
+      }
+    }
 
     fluid::PrimitiveToConserved(rc.get());
   }
