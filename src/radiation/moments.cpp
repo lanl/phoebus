@@ -542,6 +542,19 @@ TaskStatus CalculateFluxesImpl(T *rc) {
   auto idx_Ff = imap.GetFlatIdx(var.F);
   auto idx_Ef = imap.GetFlatIdx(var.E);
 
+  // TPJ: The following is needed to compute the average neutrino energy
+  // using the neutrino number density
+  auto var_energy = RadiationVariableNames::GetByMomentType(RadEnergyMoment::Energy); 
+
+  PackIndexMap imap_ql_energy, imap_qr_energy, imap_energy;
+  std::vector<std::string> vars_energy{var_energy.ql, var_energy.qr};
+  std::vector<std::string> flxs_energy{var_energy.E, var_energy.F};
+
+  auto v_energy = rc->PackVariablesAndFluxes(vars_energy, flxs_energy, imap_ql_energy);
+
+  auto idx_ql_energy = imap_ql_energy.GetFlatIdx(var_energy.ql);
+  auto idx_qr_energy = imap_ql_energy.GetFlatIdx(var_energy.qr);
+
   auto num_species = rad_pkg->Param<int>("num_species");
 
   // const int nblock = 1; //v.GetDim(5);
@@ -722,6 +735,70 @@ TaskStatus CalculateFluxesImpl(T *rc) {
           cr.getFluxesFromPrim(Jr, Hr, con_tilPir, &conFr, &Pr);
           cl.Prim2Con(Jl, Hl, con_tilPil, &El, &covFl);
           cr.Prim2Con(Jr, Hr, con_tilPir, &Er, &covFr);
+
+          // TPJ: compute average neutrino energy
+          if (EMOMENT == RadEnergyMoment::Number) {
+              CLOSURE cl_energy(con_vl, &g);
+              CLOSURE cr_energy(con_vr, &g);
+              Real El_energy, Er_energy;
+              Tens2 con_tilPil_energy, con_tilPir_energy;
+              Vec covFl_energy, conFl_energy, conFl_asym_energy;
+              Vec covFr_energy, conFr_energy, conFr_asym_energy;
+              Tens2 Pl_energy, Pl_asym_energy; // P^i_j on the left side of the interface
+              Tens2 Pr_energy, Pr_asym_energy; // P^i_j on the right side of the interface
+
+              Real Jl_energy = v_energy(idx_ql_energy(ispec, 0, idir), k, j, i);
+              Real Jr_energy = v_energy(idx_qr_energy(ispec, 0, idir), k, j, i);
+              if (recon_fixup_strategy == ReconFixupStrategy::bounds) {
+                Jl = std::max<Real>(Jl, J_floor);
+                Jr = std::max<Real>(Jr, J_floor);
+              }
+              Vec Hl_energy = {Jl_energy * v_energy(idx_ql_energy(ispec, 1, idir), k, j, i),
+                               Jl_energy * v_energy(idx_ql_energy(ispec, 2, idir), k, j, i),
+                               Jl_energy * v_energy(idx_ql_energy(ispec, 3, idir), k, j, i)};
+              Vec Hr_energy = {Jr_energy * v_energy(idx_qr_energy(ispec, 1, idir), k, j, i),
+                               Jr_energy * v_energy(idx_qr_energy(ispec, 2, idir), k, j, i),
+                               Jr_energy * v_energy(idx_qr_energy(ispec, 3, idir), k, j, i)};
+              if (recon_fixup_strategy == ReconFixupStrategy::bounds) {
+                const Real xil =
+                    std::sqrt(g.contractCov3Vectors(Hl_energy, Hl_energy) -
+                              std::pow(g.contractConCov3Vectors(con_vl, Hl_energy), 2)) /
+                    Jl_energy;
+                const Real xir =
+                    std::sqrt(g.contractCov3Vectors(Hr_energy, Hr_energy) -
+                              std::pow(g.contractConCov3Vectors(con_vr, Hr_energy), 2)) /
+                    Jr_energy;
+                if (xil > xi_ceiling) {
+                  SPACELOOP(ii) { Hl_energy(ii) *= xi_ceiling / xil; }
+                }
+                if (xir > xi_ceiling) {
+                  SPACELOOP(ii) { Hr_energy(ii) *= xi_ceiling / xir; }
+                }
+              }
+
+              cl_energy.Prim2Con(Jl_energy, Hl_energy, con_tilPil_energy, &El_energy, &covFl_energy);
+              cr_energy.Prim2Con(Jr_energy, Hr_energy, con_tilPir_energy, &Er_energy, &covFr_energy);
+
+              Real vFl = 0.0;
+              SPACELOOP(i) vFl += con_vl(i) * covFl_energy(i);
+
+              Real vFr = 0.0;
+              SPACELOOP(i) vFr += con_vr(i) * covFr_energy(i);
+              
+              // TPJ: note that here El, Er is the number density.
+              // Using eq. A11 in https://arxiv.org/pdf/1607.07450, which is a reasonable estimate for
+              // the average neutrino energy.
+              const Real avg_nul = (Wr * (El_energy - vFl)) / El;
+              const Real avg_nur = (Wr * (Er_energy - vFr)) / Er;
+
+              // TPJ: note that this also assumes that <nu> = <nuF>, see eq. A36 in https://arxiv.org/pdf/1607.07450
+              // We also assume that in the asymptotic limit, the reconstructed flux as the same as in the optically thick limit.
+              // (see eq. A42)
+              conFl = conFl / avg_nul;
+              conFr = conFr / avg_nur;
+              conFl_asym = conFl_asym / avg_nul;
+              conFr_asym = conFr_asym / avg_nur;
+          } 
 
           // Mix the fluxes by the Peclet number
           // TODO: (LFR) Make better choices
